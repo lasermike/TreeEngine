@@ -1,0 +1,6 @@
+﻿Profiling started.
+Profiling process ID 10756 (Tutorial07).
+'10756' is not a valid Process ID.
+Profiler stopping.
+PRF0025: No data was collected.
+Profiling complete.
