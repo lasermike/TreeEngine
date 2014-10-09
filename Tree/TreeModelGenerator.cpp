@@ -57,7 +57,10 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 		child->end.x = branch->end.x + XMVectorGetX(vChildDir) ;
 		child->end.y = branch->end.y + XMVectorGetY(vChildDir) ;
 		child->end.z = branch->end.z + XMVectorGetZ(vChildDir) ;
-		
+
+		child->relStart = XMFLOAT3(0,0,0);
+		XMStoreFloat3(&child->relEnd, vChildDir);
+
 
 		/*
 		const float randScale = RAND_MAX ;		

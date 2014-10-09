@@ -20,6 +20,7 @@
 #include "resource.h"
 #include "Tree.h"
 #include "TreeModelGenerator.h"
+#include <stdio.h>
 
 using namespace DirectX;
 
@@ -74,6 +75,9 @@ void CleanupDevice();
 LRESULT CALLBACK    WndProc( HWND, UINT, WPARAM, LPARAM );
 void Render();
 
+int main() {
+    return wWinMain(GetModuleHandle(NULL), NULL, GetCommandLine(), SW_SHOW);
+}
 
 //--------------------------------------------------------------------------------------
 // Entry point to the program. Initializes everything and goes into a message processing 
@@ -83,6 +87,9 @@ int WINAPI wWinMain( _In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 {
     UNREFERENCED_PARAMETER( hPrevInstance );
     UNREFERENCED_PARAMETER( lpCmdLine );
+
+	//freopen( "CON", "w", stdout );
+	//freopen( "CON", "w", stderr );
 
     if( FAILED( InitWindow( hInstance, nCmdShow ) ) )
         return 0;

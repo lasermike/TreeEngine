@@ -5,6 +5,7 @@
 #include "TreeModel.h"
 #include "TreeModelGenerator.h"
 
+#include <iostream>
 
 using namespace DirectX;
 
@@ -288,8 +289,11 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 	if (time < branch->depth)
 		return S_OK;
 
-	const XMVECTOR vCenter = XMVectorSet(0,0,0,0);
-	const XMVECTOR vScaleCenter = XMVectorSet(0,-0.5,0,0);
+	float animScaleFactor = 1.0f;
+	if (time - 5 < branch->depth)
+	{
+		animScaleFactor = (time - branch->depth) / 5;
+	}
 
 	XMVECTOR vStart = parentStart; //XMLoadFloat3(&(branch->start));
 	XMVECTOR vEnd = XMLoadFloat3(&(branch->end));
@@ -297,16 +301,14 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 	// Scale branch
 	XMVECTOR vMag = XMVector3Length(vEnd - vStart);
 	float magY = XMVectorGetX(vMag);
-	XMVECTOR vMagY = XMVectorSet(1,1, 1, 1); 
 	float magXZ = branch->thickness;
-	if (time - 2 < branch->depth)
-	{
-		magY *= (time - branch->depth) / 2;
-		magXZ *= (time - branch->depth) / 2;
-		vMagY = XMVectorSet(1,magY, 1, 1); 
-	}
-
+	magY *= animScaleFactor;
+	magXZ *= animScaleFactor;
 	XMVECTOR vScale = XMVectorSet(magXZ, magY, magXZ, 0);
+
+	// Child start pos
+	XMVECTOR vMagY = XMVectorSet(animScaleFactor,animScaleFactor, animScaleFactor, 1); 
+	XMVECTOR vChildStart = (vEnd - vStart) * vMagY + vStart;
 
 	// Determine rotation
 	XMMATRIX mRot;
@@ -332,8 +334,10 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 
     // Update variables that change once per frame
     CBChangesEveryFrame cb;
+	const XMVECTOR vCenter = XMVectorSet(0,0,0,0);
+	const XMVECTOR vScaleCenter = XMVectorSet(0,-0.5,0,0);
 	cb.mWorld = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
-	cb.mWorld = XMMatrixTranspose(  cb.mWorld * *world);
+	cb.mWorld = XMMatrixTranspose(  cb.mWorld * *world );
 	XMFLOAT4 vMeshColor( 0.7f, 0.7f, 0.7f, 1.0f );
     cb.vMeshColor = vMeshColor;
 
@@ -348,7 +352,7 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 	{
 		for (auto i = branch->branches.begin(); i != branch->branches.end(); i++)
 		{
-			RenderBranch(pImmediateContext, world, *i,  vEnd * vMagY, time);
+			RenderBranch(pImmediateContext, world, *i,  vChildStart, time);
 		}
 	}
 

@@ -11,6 +11,10 @@ struct Branch
 	int depth;
 	float	thickness;
 
+	XMFLOAT3 relStart;
+	XMFLOAT3 relEnd;
+
+
 	std::vector<Branch*> branches;
 };
 
