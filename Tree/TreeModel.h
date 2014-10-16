@@ -10,10 +10,7 @@ struct Branch
 	XMFLOAT3 end;
 	int depth;
 	float	thickness;
-
-	XMFLOAT3 relStart;
-	XMFLOAT3 relEnd;
-
+	XMFLOAT4 quaternion;
 
 	std::vector<Branch*> branches;
 };

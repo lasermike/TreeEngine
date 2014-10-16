@@ -17,13 +17,16 @@ TreeModel* TreeModelGenerator::Create()
 	srand((unsigned int) time(NULL));
 
 	TreeModel* model = new TreeModel();
-
+	XMVECTOR vStart = XMVectorSet(0, 0, 0,0);
+	XMVECTOR vEnd = XMVectorSet(0, 1.3, 0,0);
+	XMVECTOR vDir = vEnd - vStart;
 	// Create trunk
 	model->trunk = new Branch();
-	model->trunk->start = XMFLOAT3(0, 0, 0);
-	model->trunk->end = XMFLOAT3(0, 1.3, 0);
+	XMStoreFloat3(&model->trunk->start, vStart);
+	XMStoreFloat3(&model->trunk->end, vEnd);
 	model->trunk->thickness = .3;
 	model->trunk->depth = 0;
+	XMStoreFloat4(&model->trunk->quaternion, CalculateQuaternion(vDir));
 
 	GenerateRecursive(model->trunk, 1);
 	return model;
@@ -58,28 +61,38 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 		child->end.y = branch->end.y + XMVectorGetY(vChildDir) ;
 		child->end.z = branch->end.z + XMVectorGetZ(vChildDir) ;
 
-		child->relStart = XMFLOAT3(0,0,0);
-		XMStoreFloat3(&child->relEnd, vChildDir);
-
-
-		/*
-		const float randScale = RAND_MAX ;		
-		XMVECTOR vRand = XMVectorSet(
-			rand() / randScale - 0.5f,
-			rand() / randScale - 0.1f,
-			rand() / randScale - 0.5f, 
-			0);
-		vRand = XMVector3Normalize(vRand);
-		vRand = vRand * (0.5f + (0.5f / depth));
-
-		child->end.x = branch->end.x + XMVectorGetX(vRand);
-		child->end.y = branch->end.y + XMVectorGetY(vRand);
-		child->end.z = branch->end.z + XMVectorGetZ(vRand);
-		*/
-
+		XMStoreFloat4(&child->quaternion, CalculateQuaternion(vChildDir));
+		
 		GenerateRecursive(child, depth + 1);
 	}
 
+}
+
+XMVECTOR TreeModelGenerator::CalculateQuaternion(FXMVECTOR vDirection)
+{
+	// Determine rotation
+	XMMATRIX mRot;
+	XMVECTOR vUp = XMVectorSet(0,1,0,0);
+	//XMVECTOR vDiff = child->vEnd - child->vStart;
+	XMVECTOR vCross = XMVector3Cross(vUp, XMVector3Normalize(vDirection));
+	XMVECTOR vCrossLenSq = XMVector3LengthSq(vCross);
+	XMVECTOR vQuat;
+	float crossLenSq;
+	XMStoreFloat(&crossLenSq, vCrossLenSq);
+	if (crossLenSq > 0.01f) // Need better value for epsilon here
+	{
+		XMVECTOR vDot = XMVector3Dot(vUp, XMVector3Normalize(vDirection));
+		float angle;
+		XMStoreFloat(&angle, vDot);
+		angle = acos(angle);
+		vQuat = XMQuaternionRotationAxis(vCross, angle);
+	}
+	else
+	{
+		vQuat = XMQuaternionRotationAxis(vUp, 0);
+	}
+
+	return vQuat;
 }
 
 TreeModel* TreeModelGenerator::CreateTestTree()

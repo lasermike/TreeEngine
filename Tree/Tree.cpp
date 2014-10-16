@@ -20,7 +20,7 @@ struct SimpleVertex
 struct CBChangesEveryFrame
 {
     XMMATRIX mWorld;
-    XMFLOAT4 vMeshColor;
+//    XMFLOAT4 vMeshColor;
 };
 
 
@@ -337,9 +337,10 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 	const XMVECTOR vCenter = XMVectorSet(0,0,0,0);
 	const XMVECTOR vScaleCenter = XMVectorSet(0,-0.5,0,0);
 	cb.mWorld = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
+	//cb.mWorld = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, XMLoadFloat4(&branch->quaternion), vStart);
 	cb.mWorld = XMMatrixTranspose(  cb.mWorld * *world );
-	XMFLOAT4 vMeshColor( 0.7f, 0.7f, 0.7f, 1.0f );
-    cb.vMeshColor = vMeshColor;
+	//XMFLOAT4 vMeshColor( 0.7f, 0.7f, 0.7f, 1.0f );
+    //cb.vMeshColor = vMeshColor;
 
 	pImmediateContext->VSSetConstantBuffers( 2, 1, &_pCBChangesEveryFrame );
     pImmediateContext->PSSetConstantBuffers( 2, 1, &_pCBChangesEveryFrame );

@@ -1,4 +1,7 @@
 #pragma once
+#include <directxmath.h>
+
+using namespace DirectX;
 
 class TreeModel;
 struct Branch;
@@ -13,6 +16,7 @@ public:
 private:
 	TreeModel* CreateTestTree();
 	void GenerateRecursive(Branch* branch, int depth);
+	XMVECTOR CalculateQuaternion(FXMVECTOR vDirection);
 
 };
 
