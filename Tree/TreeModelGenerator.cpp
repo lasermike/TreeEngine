@@ -16,17 +16,20 @@ TreeModel* TreeModelGenerator::Create()
 {
 	srand((unsigned int) time(NULL));
 
-	TreeModel* model = new TreeModel();
+	model = new TreeModel();
 	XMVECTOR vStart = XMVectorSet(0, 0, 0,0);
 	XMVECTOR vEnd = XMVectorSet(0, 1.3, 0,0);
-	XMVECTOR vDir = vEnd - vStart;
+	//XMVECTOR vDir = vEnd - vStart;
 	// Create trunk
-	model->trunk = new Branch();
-	XMStoreFloat3(&model->trunk->start, vStart);
-	XMStoreFloat3(&model->trunk->end, vEnd);
+	int id = model->treeData.numBranches++;
+	model->trunk = &model->pBranches[id]; //new Branch();
+	model->trunk->id = id;
+	//model->branchMap.push_back(model->trunk);
+	XMStoreFloat4(&model->trunk->start, vStart);
+	XMStoreFloat4(&model->trunk->end, vEnd);
 	model->trunk->thickness = .3;
 	model->trunk->depth = 0;
-	XMStoreFloat4(&model->trunk->quaternion, CalculateQuaternion(vDir));
+	//XMStoreFloat4(&model->trunk->quaternion, CalculateQuaternion(vDir));
 
 	GenerateRecursive(model->trunk, 1);
 	return model;
@@ -37,12 +40,17 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 	if (depth > 5)
 		return;
 
-	int numBranches = depth + rand() % 3;
+	int numBranches = std::min(depth + rand() % 3, 4);
 
 	for (int i = 0; i < numBranches; i++)
 	{
-		Branch* child = new Branch();
-		branch->branches.push_back(child);
+		int id = model->treeData.numBranches++;
+		Branch* child = &model->pBranches[id];
+		child->id = id; //model->treeData.numBranches++;
+		branch->SetChild(i, child->id);
+		//model->branchMap.push_back(child);
+		assert(&model->pBranches[child->id] == child);  // Ensure our look up is correct 
+
 		child->depth = depth;
 		child->thickness = branch->thickness / (depth * 1.1f);
 		child->start = branch->end;
@@ -52,7 +60,7 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 		const double maxAngle = XM_PIDIV2;
 		const double maxAngleDiv2 = maxAngle / 2.0;
 
-		XMVECTOR vParentDir = XMVector3Normalize(XMLoadFloat3(&branch->end) - XMLoadFloat3(&branch->start));
+		XMVECTOR vParentDir = XMVector3Normalize(XMLoadFloat3((XMFLOAT3*)&branch->end) - XMLoadFloat3((XMFLOAT3*)&branch->start));
 		XMVECTOR vChildDir = XMVector3Rotate(vParentDir, XMQuaternionRotationAxis(vX, (maxAngle * rand()) / RAND_MAX - maxAngleDiv2));
 		vChildDir = XMVector3Rotate(vChildDir, XMQuaternionRotationAxis(vZ, (maxAngle * rand()) / RAND_MAX - maxAngleDiv2));
 		child->end = branch->end;
@@ -61,11 +69,10 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 		child->end.y = branch->end.y + XMVectorGetY(vChildDir) ;
 		child->end.z = branch->end.z + XMVectorGetZ(vChildDir) ;
 
-		XMStoreFloat4(&child->quaternion, CalculateQuaternion(vChildDir));
+		//XMStoreFloat4(&child->quaternion, CalculateQuaternion(vChildDir));
 		
 		GenerateRecursive(child, depth + 1);
 	}
-
 }
 
 XMVECTOR TreeModelGenerator::CalculateQuaternion(FXMVECTOR vDirection)
@@ -95,6 +102,7 @@ XMVECTOR TreeModelGenerator::CalculateQuaternion(FXMVECTOR vDirection)
 	return vQuat;
 }
 
+/*
 TreeModel* TreeModelGenerator::CreateTestTree()
 {
 	TreeModel* model = new TreeModel();
@@ -110,7 +118,7 @@ TreeModel* TreeModelGenerator::CreateTestTree()
 		branch->start = XMFLOAT3(0, 1, 0);
 		branch->end = XMFLOAT3(.7, 1.5, 1);
 		branch->thickness = .1;
-		model->trunk->branches.push_back(branch);
+		model->branchMap.push_back(branch);
 
 			Branch* childBranch = new Branch();
 			childBranch->start = XMFLOAT3(.7, 1.5, 1);
@@ -132,3 +140,4 @@ TreeModel* TreeModelGenerator::CreateTestTree()
 
 	return model;
 }
+*/

@@ -12,6 +12,8 @@
 //
 // Copyright (c) Microsoft Corporation. All rights reserved.
 //--------------------------------------------------------------------------------------
+#define D3D_DEBUG_INFO
+
 #include <windows.h>
 #include <d3d11_1.h>
 #include <d3dcompiler.h>

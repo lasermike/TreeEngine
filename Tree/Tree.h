@@ -30,6 +30,8 @@ private:
 	ID3D11ShaderResourceView*           _pTextureRV;
 	ID3D11SamplerState*                 _pSamplerLinear;
 	ID3D11Buffer*                       _pCBChangesEveryFrame;
+	ID3D11Buffer*                       _pCBTree;
+	ID3D11Buffer*						_pCBBranches;
 
 	TreeModel*					_model;
 

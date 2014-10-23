@@ -23,7 +23,33 @@ cbuffer cbChangeOnResize : register( b1 )
 cbuffer cbChangesEveryFrame : register( b2 )
 {
     matrix World;
+	float2 time;
 };
+
+cbuffer cbTree
+{
+    int1 numBranches;
+};
+
+struct Branch
+{
+	int1 id;
+	int1 depth;
+	//float1 thickness;
+	float4 start;
+	float4 end;
+	int4 children;
+};
+
+cbuffer cbBranches
+{
+    Buffer<int> id;
+    Buffer<int> depth;
+    Buffer<float4> start;
+    Buffer<float4> end;
+    Buffer<int4> children;
+};
+
 
 
 //--------------------------------------------------------------------------------------

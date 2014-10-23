@@ -1,3 +1,4 @@
+#define D3D_DEBUG_INFO
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
 #include <directxmath.h>
@@ -20,6 +21,8 @@ struct SimpleVertex
 struct CBChangesEveryFrame
 {
     XMMATRIX mWorld;
+	XMFLOAT2 time;
+//	float time;
 //    XMFLOAT4 vMeshColor;
 };
 
@@ -35,6 +38,8 @@ Tree::Tree(void)
 	_pTextureRV = nullptr;
 	_pSamplerLinear = nullptr;
 	_pCBChangesEveryFrame = nullptr;
+	_pCBTree = nullptr;
+	_pCBBranches = nullptr;
 	_model = nullptr;
 }
 
@@ -254,7 +259,7 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
     if( FAILED( hr ) )
         return hr;
 
-	// Create constants for tree
+	// Create constants for per frame 
     ZeroMemory( &bd, sizeof(bd) );
     bd.Usage = D3D11_USAGE_DEFAULT;   
     bd.ByteWidth = sizeof(CBChangesEveryFrame);
@@ -263,6 +268,35 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
     hr = device->CreateBuffer( &bd, nullptr, &_pCBChangesEveryFrame );
     if( FAILED( hr ) )
         return hr;
+
+	// Create constants for tree
+    ZeroMemory( &bd, sizeof(bd) );
+    bd.Usage = D3D11_USAGE_DEFAULT;   
+    bd.ByteWidth = sizeof(TreeData);
+    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bd.CPUAccessFlags = 0;
+    hr = device->CreateBuffer( &bd, nullptr, &_pCBTree );
+    if( FAILED( hr ) )
+        return hr;
+
+	pImmediateContext->VSSetConstantBuffers( 2, 1, &_pCBTree);
+    pImmediateContext->PSSetConstantBuffers( 2, 1, &_pCBTree);
+	pImmediateContext->UpdateSubresource( _pCBTree, 0, nullptr, &_model->treeData, 0, 0 );
+
+
+	// Create constants for branches
+    ZeroMemory( &bd, sizeof(bd) );
+    bd.Usage = D3D11_USAGE_DEFAULT;   
+	bd.ByteWidth = sizeof(Branch) * _model->treeData.numBranches;
+    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bd.CPUAccessFlags = 0;
+    hr = device->CreateBuffer( &bd, nullptr, &_pCBBranches );
+    if( FAILED( hr ) )
+        return hr;
+
+	pImmediateContext->VSSetConstantBuffers( 2, 1, &_pCBBranches);
+    pImmediateContext->PSSetConstantBuffers( 2, 1, &_pCBBranches);
+	pImmediateContext->UpdateSubresource( _pCBBranches, 0, nullptr, &_model->pBranches, 0, 0 );
 
 	return S_OK;
 }
@@ -296,7 +330,7 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 	}
 
 	XMVECTOR vStart = parentStart; //XMLoadFloat3(&(branch->start));
-	XMVECTOR vEnd = XMLoadFloat3(&(branch->end));
+	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*) &(branch->end));
 
 	// Scale branch
 	XMVECTOR vMag = XMVector3Length(vEnd - vStart);
@@ -339,6 +373,7 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 	cb.mWorld = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 	//cb.mWorld = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, XMLoadFloat4(&branch->quaternion), vStart);
 	cb.mWorld = XMMatrixTranspose(  cb.mWorld * *world );
+	cb.time.x = time;
 	//XMFLOAT4 vMeshColor( 0.7f, 0.7f, 0.7f, 1.0f );
     //cb.vMeshColor = vMeshColor;
 
@@ -349,11 +384,13 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
     pImmediateContext->DrawIndexed( 36, 0, 0 );
 
 	// Render child branches
-	if (branch->branches.size() > 0)
+	const int maxChildren = 4;
+	for (int c = 0; c < maxChildren; c++)
 	{
-		for (auto i = branch->branches.begin(); i != branch->branches.end(); i++)
+		if (branch->Child(c) != 0)
 		{
-			RenderBranch(pImmediateContext, world, *i,  vChildStart, time);
+			Branch* child = &_model->pBranches[branch->Child(c)];
+			RenderBranch(pImmediateContext, world, child,  vChildStart, time);
 		}
 	}
 
@@ -372,6 +409,7 @@ HRESULT Tree::CleanUpDeviceObjects()
     if( _pSamplerLinear ) _pSamplerLinear->Release();
     if( _pTextureRV ) _pTextureRV->Release();
     if( _pCBChangesEveryFrame ) _pCBChangesEveryFrame->Release();
+    if( _pCBTree ) _pCBTree->Release();
 
 
 	return S_OK;
