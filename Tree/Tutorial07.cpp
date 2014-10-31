@@ -455,8 +455,10 @@ void Render()
 	// Moved to tree
 	if (g_resetTree)
 	{
+		g_tree.CleanUpDeviceObjects();
 		TreeModelGenerator generator;
 		g_tree.Create(&generator);
+		g_tree.InitGraphics(g_pd3dDevice, g_pImmediateContext);
 		g_resetTree = false;
 	}
 

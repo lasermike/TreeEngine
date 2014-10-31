@@ -5,6 +5,7 @@
 #include "DDSTextureLoader.h"
 #include "TreeModel.h"
 #include "TreeModelGenerator.h"
+#include "CommonStuff.h"
 
 #include <iostream>
 
@@ -22,9 +23,39 @@ struct CBChangesEveryFrame
 {
     XMMATRIX mWorld;
 	XMFLOAT2 time;
-//	float time;
-//    XMFLOAT4 vMeshColor;
 };
+
+#pragma region InputLayouts
+
+const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[6] =
+{
+	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 0, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+};
+
+ID3D11InputLayout* InputLayouts::InstancedBasic16 = 0;
+
+void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
+{
+	HRESULT hr = (device->CreateInputLayout(InputLayoutDesc::InstancedBasic16, ARRAYSIZE(InputLayoutDesc::InstancedBasic16), pShaderBytecodeWithInputSignature /*passDesc.pIAInputSignature*/,
+		byteCodeLen /*passDesc.IAInputSignatureSize*/, &InstancedBasic16));
+	assert(SUCCEEDED(hr));
+}
+
+void InputLayouts::DestroyAll()
+{
+	if (InstancedBasic16 != nullptr)
+	{
+		InstancedBasic16->Release();
+		InstancedBasic16 = nullptr;
+	}
+}
+
+#pragma endregion
 
 
 
@@ -41,6 +72,8 @@ Tree::Tree(void)
 	_pCBTree = nullptr;
 	_pCBBranches = nullptr;
 	_model = nullptr;
+	_pInstancedBuffer = nullptr;
+	_drawInstanced = true;
 }
 
 
@@ -117,22 +150,34 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
     }
 
     // Define the input layout
-    D3D11_INPUT_ELEMENT_DESC layout[] =
-    {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-    };
-    UINT numElements = ARRAYSIZE( layout );
+	if (!_drawInstanced)
+	{
+		D3D11_INPUT_ELEMENT_DESC layout[] =
+		{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		};
+		UINT numElements = ARRAYSIZE(layout);
 
-    // Create the input layout
-    hr = device->CreateInputLayout( layout, numElements, pVSBlob->GetBufferPointer(),
-                                          pVSBlob->GetBufferSize(), &_pVertexLayout );
-    pVSBlob->Release();
-    if( FAILED( hr ) )
-        return hr;
+		// Create the input layout
+		hr = device->CreateInputLayout(layout, numElements, pVSBlob->GetBufferPointer(),
+			pVSBlob->GetBufferSize(), &_pVertexLayout);
+		if (FAILED(hr))
+			return hr;
 
-    // Set the input layout
-    pImmediateContext->IASetInputLayout( _pVertexLayout );
+		// Set the input layout
+		pImmediateContext->IASetInputLayout(_pVertexLayout);
+	}
+	else
+	{
+		// Create Instanced draw data layout
+		InputLayouts::InitAll(device, pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize());
+
+		pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
+	}
+	pVSBlob->Release();
+
+
 
     // Compile the pixel shader
     ID3DBlob* pPSBlob = nullptr;
@@ -198,9 +243,34 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
         return hr;
 
     // Set vertex buffer
-    UINT stride = sizeof( SimpleVertex );
-    UINT offset = 0;
-    pImmediateContext->IASetVertexBuffers( 0, 1, &_pVertexBuffer, &stride, &offset );
+	if (!_drawInstanced)
+	{
+		UINT stride = sizeof( SimpleVertex );
+		UINT offset = 0;
+		pImmediateContext->IASetVertexBuffers( 0, 1, &_pVertexBuffer, &stride, &offset );
+	}
+	else
+	{
+		// Create instanced buffer
+		instancedData.resize(_model->treeData.numBranches);
+		D3D11_BUFFER_DESC vbd;
+		vbd.Usage = D3D11_USAGE_DYNAMIC;
+		vbd.ByteWidth = sizeof(InstancedData) * instancedData.size();
+		vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		vbd.MiscFlags = 0;
+		vbd.StructureByteStride = 0;
+
+		hr = device->CreateBuffer(&vbd, 0, &_pInstancedBuffer);
+		if (FAILED(hr))
+			return hr;
+
+		UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
+		UINT offset[2] = { 0, 0 };
+		ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
+
+		pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+	}
 
     // Create index buffer
     // Create vertex buffer
@@ -270,7 +340,7 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
         return hr;
 
 	// Create constants for tree
-    ZeroMemory( &bd, sizeof(bd) );
+/*    ZeroMemory( &bd, sizeof(bd) );
     bd.Usage = D3D11_USAGE_DEFAULT;   
     bd.ByteWidth = sizeof(TreeData);
     bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -297,15 +367,12 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
 	pImmediateContext->VSSetConstantBuffers( 2, 1, &_pCBBranches);
     pImmediateContext->PSSetConstantBuffers( 2, 1, &_pCBBranches);
 	pImmediateContext->UpdateSubresource( _pCBBranches, 0, nullptr, &_model->pBranches, 0, 0 );
-
+	*/
 	return S_OK;
 }
 
 HRESULT Tree::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t)
 {
-    //
-    // Render the cube
-    //
     pImmediateContext->VSSetShader( _pVertexShader, nullptr, 0 );
     pImmediateContext->PSSetShader( _pPixelShader, nullptr, 0 );
     pImmediateContext->PSSetShaderResources( 0, 1, &_pTextureRV );
@@ -313,24 +380,86 @@ HRESULT Tree::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, fl
 
 	HRESULT hr = S_OK;
 
-	RenderBranch(pImmediateContext, world, _model->trunk, XMVectorSet(0,0,0,0), t);
+	if (!_drawInstanced)
+	{
+		hr = RenderDirect(pImmediateContext, world, t);
+	}
+	else
+	{
+		hr = RenderIndirect(pImmediateContext, world, t);
 
+	}
 	return hr;
 }
 
-HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX const* world, Branch const* branch, FXMVECTOR parentStart, float time)
+HRESULT Tree::RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t)
+{
+	int currentBranch = 0;
+	XMVECTOR vChildStart;
+	CBChangesEveryFrame cb;
+	ComputeBranchIndirect(currentBranch, world, _model->trunk, XMVectorSet(0, 0, 0, 0), t);
+
+	D3D11_MAPPED_SUBRESOURCE mappedData;
+	HR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
+	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
+
+	for (int i = 0; i < currentBranch; i++)
+	{
+		dataView[i] = instancedData[i];
+	}
+
+	pImmediateContext->Unmap(_pInstancedBuffer, 0);
+
+	//pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
+	//pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
+	//pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
+
+	pImmediateContext->DrawIndexedInstanced(36, currentBranch, 0, 0,0);
+
+	return S_OK;
+}
+
+HRESULT Tree::ComputeBranchIndirect(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time)
 {
 	if (time < branch->depth)
 		return S_OK;
 
+	// Update variables that change once per frame
+	XMVECTOR vChildStart;
+	XMMATRIX mat;
+	ComputeTransformations(&mat, &vChildStart, time, branch, world, parentStart);
+	XMStoreFloat4x4(&instancedData.at(currentBranch).World, mat);
+	currentBranch++;
+
+	// Render child branches
+	const int maxChildren = 4;
+	for (int c = 0; c < maxChildren; c++)
+	{
+		if (branch->Child(c) != 0)
+		{
+			Branch* child = &_model->pBranches[branch->Child(c)];
+			ComputeBranchIndirect(currentBranch, world, child, vChildStart, time);
+		}
+	}
+
+	return S_OK;
+}
+
+HRESULT Tree::RenderDirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t)
+{
+	return RenderBranchDirect(pImmediateContext, world, _model->trunk, XMVectorSet(0, 0, 0, 0), t);
+}
+
+HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, FXMVECTOR parentStart)
+{
 	float animScaleFactor = 1.0f;
 	if (time - 5 < branch->depth)
 	{
 		animScaleFactor = (time - branch->depth) / 5;
 	}
 
-	XMVECTOR vStart = parentStart; //XMLoadFloat3(&(branch->start));
-	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*) &(branch->end));
+	XMVECTOR vStart = parentStart;
+	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end));
 
 	// Scale branch
 	XMVECTOR vMag = XMVector3Length(vEnd - vStart);
@@ -341,12 +470,12 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 	XMVECTOR vScale = XMVectorSet(magXZ, magY, magXZ, 0);
 
 	// Child start pos
-	XMVECTOR vMagY = XMVectorSet(animScaleFactor,animScaleFactor, animScaleFactor, 1); 
-	XMVECTOR vChildStart = (vEnd - vStart) * vMagY + vStart;
+	XMVECTOR vMagY = XMVectorSet(animScaleFactor, animScaleFactor, animScaleFactor, 1);
+	*vChildStart = (vEnd - vStart) * vMagY + vStart;
 
 	// Determine rotation
 	XMMATRIX mRot;
-	XMVECTOR vUp = XMVectorSet(0,1,0,0);
+	XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
 	XMVECTOR vDiff = vEnd - vStart;
 	XMVECTOR vCross = XMVector3Cross(vUp, XMVector3Normalize(vDiff));
 	XMVECTOR vCrossLenSq = XMVector3LengthSq(vCross);
@@ -366,16 +495,24 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 		vQuat = XMQuaternionRotationAxis(vUp, 0);
 	}
 
+	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0);
+	const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
+	*transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
+	*transform = XMMatrixTranspose(*transform * *world);
+
+	return S_OK;
+}
+
+HRESULT Tree::RenderBranchDirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX const* world, Branch const* branch, FXMVECTOR parentStart, float time)
+{
+	if (time < branch->depth)
+		return S_OK;
+
     // Update variables that change once per frame
-    CBChangesEveryFrame cb;
-	const XMVECTOR vCenter = XMVectorSet(0,0,0,0);
-	const XMVECTOR vScaleCenter = XMVectorSet(0,-0.5,0,0);
-	cb.mWorld = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
-	//cb.mWorld = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, XMLoadFloat4(&branch->quaternion), vStart);
-	cb.mWorld = XMMatrixTranspose(  cb.mWorld * *world );
+	XMVECTOR vChildStart;
+	CBChangesEveryFrame cb;
+	ComputeTransformations(&cb.mWorld, &vChildStart, time, branch, world, parentStart);
 	cb.time.x = time;
-	//XMFLOAT4 vMeshColor( 0.7f, 0.7f, 0.7f, 1.0f );
-    //cb.vMeshColor = vMeshColor;
 
 	pImmediateContext->VSSetConstantBuffers( 2, 1, &_pCBChangesEveryFrame );
     pImmediateContext->PSSetConstantBuffers( 2, 1, &_pCBChangesEveryFrame );
@@ -390,7 +527,7 @@ HRESULT Tree::RenderBranch(ID3D11DeviceContext* pImmediateContext, XMMATRIX cons
 		if (branch->Child(c) != 0)
 		{
 			Branch* child = &_model->pBranches[branch->Child(c)];
-			RenderBranch(pImmediateContext, world, child,  vChildStart, time);
+			RenderBranchDirect(pImmediateContext, world, child, vChildStart, time);
 		}
 	}
 
@@ -410,7 +547,11 @@ HRESULT Tree::CleanUpDeviceObjects()
     if( _pTextureRV ) _pTextureRV->Release();
     if( _pCBChangesEveryFrame ) _pCBChangesEveryFrame->Release();
     if( _pCBTree ) _pCBTree->Release();
-
+	if (_pInstancedBuffer) _pInstancedBuffer->Release();
+	if (_drawInstanced)
+	{
+		InputLayouts::DestroyAll();
+	}
 
 	return S_OK;
 }

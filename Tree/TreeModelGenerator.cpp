@@ -1,6 +1,7 @@
 #include "TreeModelGenerator.h"
 #include "TreeModel.h"
 #include <time.h>
+#include <algorithm>
 
 TreeModelGenerator::TreeModelGenerator(void)
 {

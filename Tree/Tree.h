@@ -1,6 +1,6 @@
 #pragma once
 #include <directxmath.h>
-//#include <xnamath.h>
+#include <vector>
 
 using namespace DirectX;
 
@@ -19,6 +19,26 @@ struct ID3D11ShaderResourceView;
 struct ID3D11SamplerState;
 struct ID3D11Buffer;
 
+class InputLayoutDesc
+{
+public:
+	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[6];
+};
+
+class InputLayouts
+{
+public:
+	static void InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen);
+	static void DestroyAll();
+
+	static ID3D11InputLayout* InstancedBasic16;
+};
+
+struct InstancedData
+{
+	XMFLOAT4X4 World;
+};
+
 class Tree
 {
 private:
@@ -32,8 +52,12 @@ private:
 	ID3D11Buffer*                       _pCBChangesEveryFrame;
 	ID3D11Buffer*                       _pCBTree;
 	ID3D11Buffer*						_pCBBranches;
+	ID3D11Buffer*						_pInstancedBuffer;
 
-	TreeModel*					_model;
+	TreeModel*							_model;
+	bool								_drawInstanced;
+
+	std::vector<InstancedData>			instancedData;
 
 public:
 	Tree(void);
@@ -46,6 +70,13 @@ public:
 	HRESULT Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, float time);
 
 private:
-	HRESULT RenderBranch(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX const* world, Branch const* branch, FXMVECTOR start, float time);
+
+	HRESULT RenderDirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t);
+	HRESULT RenderBranchDirect(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX const* world, Branch const* branch, FXMVECTOR start, float time);
+
+	HRESULT RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t);
+	HRESULT ComputeBranchIndirect(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time);
+
+	HRESULT ComputeTransformations(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, const FXMVECTOR parentStart);
 };
 

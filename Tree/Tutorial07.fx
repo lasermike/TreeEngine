@@ -20,7 +20,7 @@ cbuffer cbChangeOnResize : register( b1 )
     matrix Projection;
 };
 
-cbuffer cbChangesEveryFrame : register( b2 )
+/*cbuffer cbChangesEveryFrame : register( b2 )
 {
     matrix World;
 	float2 time;
@@ -48,7 +48,7 @@ cbuffer cbBranches
     Buffer<float4> start;
     Buffer<float4> end;
     Buffer<int4> children;
-};
+};*/
 
 
 
@@ -57,6 +57,7 @@ struct VS_INPUT
 {
     float4 Pos : POSITION;
     float2 Tex : TEXCOORD0;
+	float4x4 World  : WORLD;
 };
 
 struct PS_INPUT
@@ -72,7 +73,7 @@ struct PS_INPUT
 PS_INPUT VS( VS_INPUT input )
 {
     PS_INPUT output = (PS_INPUT)0;
-    output.Pos = mul( input.Pos, World );
+    output.Pos = mul( input.Pos, input.World );
     output.Pos = mul( output.Pos, View );
     output.Pos = mul( output.Pos, Projection );
     output.Tex = input.Tex;
