@@ -5,6 +5,7 @@
 #include "DDSTextureLoader.h"
 #include "TreeModel.h"
 #include "TreeModelGenerator.h"
+#include "GeometryGenerator.h"
 #include "CommonStuff.h"
 
 #include <iostream>
@@ -12,12 +13,6 @@
 using namespace DirectX;
 
 #include "Tree.h"
-
-struct SimpleVertex
-{
-    XMFLOAT3 Pos;
-    XMFLOAT2 Tex;
-};
 
 struct CBChangesEveryFrame
 {
@@ -59,7 +54,7 @@ void InputLayouts::DestroyAll()
 
 
 
-Tree::Tree(void)
+Tree::Tree(void) : _geometryGenerator(), _geometryData()
 {
 	_pVertexShader = nullptr;
 	_pPixelShader = nullptr;
@@ -195,8 +190,33 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
     if( FAILED( hr ) )
         return hr;
 
+	_geometryGenerator.BuildGeometryBuffers(_geometryData);
+	D3D11_BUFFER_DESC vbd;
+	ZeroMemory(&vbd, sizeof(vbd));
+	vbd.Usage = D3D11_USAGE_IMMUTABLE;
+	vbd.ByteWidth = sizeof(SimpleVertex)* _geometryData.vertices.size();
+	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	vbd.CPUAccessFlags = 0;
+	vbd.MiscFlags = 0;
+	D3D11_SUBRESOURCE_DATA vinitData;
+	ZeroMemory(&vinitData, sizeof(vinitData));
+	vinitData.pSysMem = &_geometryData.vertices[0];
+	HR(device->CreateBuffer(&vbd, &vinitData, &_pVertexBuffer));
+
+	D3D11_BUFFER_DESC ibd;
+	ZeroMemory(&ibd, sizeof(ibd));
+	ibd.Usage = D3D11_USAGE_IMMUTABLE;
+	ibd.ByteWidth = sizeof(UINT)* _geometryData.indices.size();
+	ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	ibd.CPUAccessFlags = 0;
+	ibd.MiscFlags = 0;
+	D3D11_SUBRESOURCE_DATA iinitData;
+	ZeroMemory(&iinitData, sizeof(iinitData));
+	iinitData.pSysMem = &_geometryData.indices[0];
+	HR(device->CreateBuffer(&ibd, &iinitData, &_pIndexBuffer));
+
     // Create vertex buffer
-    SimpleVertex vertices[] =
+    /*SimpleVertex vertices[] =
     {
         { XMFLOAT3( -0.5f, 0.5f, -0.5f ), XMFLOAT2( 0.5f, 0.0f ) },
         { XMFLOAT3( 0.5f, 0.5f, -0.5f ), XMFLOAT2( 0.0f, 0.0f ) },
@@ -241,7 +261,7 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
     hr = device->CreateBuffer( &bd, &InitData, &_pVertexBuffer );
     if( FAILED( hr ) )
         return hr;
-
+	*/
     // Set vertex buffer
 	if (!_drawInstanced)
 	{
@@ -274,7 +294,7 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
 
     // Create index buffer
     // Create vertex buffer
-    WORD indices[] =
+    /*WORD indices[] =
     {
         3,1,0,
         2,1,3,
@@ -303,9 +323,10 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
     hr = device->CreateBuffer( &bd, &InitData, &_pIndexBuffer );
     if( FAILED( hr ) )
         return hr;
+	*/
 
     // Set index buffer
-    pImmediateContext->IASetIndexBuffer( _pIndexBuffer, DXGI_FORMAT_R16_UINT, 0 );
+    pImmediateContext->IASetIndexBuffer( _pIndexBuffer, DXGI_FORMAT_R32_UINT, 0 );
 
     // Set primitive topology
     pImmediateContext->IASetPrimitiveTopology( D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
@@ -330,7 +351,8 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
         return hr;
 
 	// Create constants for per frame 
-    ZeroMemory( &bd, sizeof(bd) );
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
     bd.Usage = D3D11_USAGE_DEFAULT;   
     bd.ByteWidth = sizeof(CBChangesEveryFrame);
     bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -414,7 +436,8 @@ HRESULT Tree::RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* w
 	//pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
 	//pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
 
-	pImmediateContext->DrawIndexedInstanced(36, currentBranch, 0, 0,0);
+	pImmediateContext->DrawIndexedInstanced(_geometryData.mCylinderIndexCount, currentBranch, _geometryData.mCylinderIndexOffset, _geometryData.mCylinderVertexOffset, 0);
+	//pImmediateContext->DrawIndexedInstanced(_geometryData.mBoxIndexCount /*36*/, currentBranch, _geometryData.mBoxIndexOffset, _geometryData.mBoxVertexOffset, 0);
 
 	return S_OK;
 }

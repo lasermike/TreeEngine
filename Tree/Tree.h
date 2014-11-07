@@ -1,7 +1,7 @@
 #pragma once
 #include <directxmath.h>
 #include <vector>
-
+#include "GeometryGenerator.h"
 using namespace DirectX;
 
 typedef long HRESULT;
@@ -53,7 +53,8 @@ private:
 	ID3D11Buffer*                       _pCBTree;
 	ID3D11Buffer*						_pCBBranches;
 	ID3D11Buffer*						_pInstancedBuffer;
-
+	GeometryGenerator					_geometryGenerator;
+	GeometryBufferData					_geometryData;
 	TreeModel*							_model;
 	bool								_drawInstanced;
 
