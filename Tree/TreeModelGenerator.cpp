@@ -47,14 +47,21 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 	{
 		int id = model->treeData.numBranches++;
 		Branch* child = &model->pBranches[id];
-		child->id = id; //model->treeData.numBranches++;
+		child->id = id; 
 		branch->SetChild(i, child->id);
-		//model->branchMap.push_back(child);
 		assert(&model->pBranches[child->id] == child);  // Ensure our look up is correct 
 
-		child->depth = depth;
-		child->thickness = branch->thickness / (depth * 1.1f);
 		child->start = branch->end;
+		child->depth = depth;
+
+		if (depth < 4)
+		{
+			child->thickness = branch->thickness * powf(.8f, depth);
+		}
+		else
+		{
+			child->thickness = branch->thickness * powf(.7f, depth);
+		}
 
 		const XMVECTORF32 vX = { 1, 0, 0, 0 };
 		const XMVECTORF32 vZ = { 0, 0, 1, 0 };
@@ -69,8 +76,6 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 		child->end.x = branch->end.x + XMVectorGetX(vChildDir) ;
 		child->end.y = branch->end.y + XMVectorGetY(vChildDir) ;
 		child->end.z = branch->end.z + XMVectorGetZ(vChildDir) ;
-
-		//XMStoreFloat4(&child->quaternion, CalculateQuaternion(vChildDir));
 		
 		GenerateRecursive(child, depth + 1);
 	}

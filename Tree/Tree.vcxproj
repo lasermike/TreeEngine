@@ -401,6 +401,7 @@
     <ClCompile Include="GeometryGenerator.cpp" />
     <ClCompile Include="MathHelper.cpp" />
     <ClCompile Include="Tree.cpp" />
+    <ClCompile Include="TreeGeometry.cpp" />
     <ClCompile Include="TreeModel.cpp" />
     <ClCompile Include="TreeModelGenerator.cpp" />
     <ClCompile Include="Tutorial07.cpp" />
@@ -412,6 +413,7 @@
     <ClInclude Include="MathHelper.h" />
     <CLInclude Include="resource.h" />
     <ClInclude Include="Tree.h" />
+    <ClInclude Include="TreeGeometry.h" />
     <ClInclude Include="TreeModel.h" />
     <ClInclude Include="TreeModelGenerator.h" />
     <ResourceCompile Include="Tutorial07.rc" />

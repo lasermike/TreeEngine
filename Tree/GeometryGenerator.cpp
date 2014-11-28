@@ -13,7 +13,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
 	GeometryGenerator geoGen;
 	geoGen.CreateBox(1.0f, 1.0f, 1.0f, box);
-	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 20, 20, cylinder);
+	geoGen.CreateCylinder(0.5f, 0.4f, 1.0f, 14, 1, cylinder);
 
 	// Cache the vertex offsets to each object in the concatenated vertex buffer.
 	data.mBoxVertexOffset = 0;

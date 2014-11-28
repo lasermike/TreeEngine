@@ -24,7 +24,6 @@ struct Branch
 
 	XMFLOAT4 start;
 	float	thickness;
-
 	XMFLOAT4 end;
 
 	XMINT4 children;
