@@ -1,10 +1,10 @@
 #include "TreeModelGenerator.h"
 #include "TreeModel.h"
-#include <time.h>
 #include <algorithm>
 
-TreeModelGenerator::TreeModelGenerator(void)
+TreeModelGenerator::TreeModelGenerator(unsigned int seed)
 {
+	_seed = seed;
 }
 
 
@@ -15,7 +15,7 @@ TreeModelGenerator::~TreeModelGenerator(void)
 
 TreeModel* TreeModelGenerator::Create()
 {
-	srand((unsigned int) time(NULL));
+	srand(_seed);
 
 	model = new TreeModel();
 	XMVECTOR vStart = XMVectorSet(0, 0, 0,0);

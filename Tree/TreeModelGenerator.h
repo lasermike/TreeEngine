@@ -9,7 +9,7 @@ struct Branch;
 class TreeModelGenerator
 {
 public:
-	TreeModelGenerator(void);
+	TreeModelGenerator(unsigned int seed);
 	~TreeModelGenerator(void);
 	TreeModel* Create();
 
@@ -18,5 +18,7 @@ private:
 	void GenerateRecursive(Branch* branch, int depth);
 	XMVECTOR CalculateQuaternion(FXMVECTOR vDirection);
 	TreeModel* model;
+
+	unsigned int _seed;
 };
 

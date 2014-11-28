@@ -23,6 +23,8 @@
 #include "Tree.h"
 #include "TreeModelGenerator.h"
 #include <stdio.h>
+#include <time.h>
+#include <vector>
 
 using namespace DirectX;
 
@@ -60,6 +62,8 @@ ID3D11DepthStencilView*             g_pDepthStencilView = nullptr;
 bool								g_resetTree = true;
 Tree								g_tree;
 ULONGLONG							g_timeStart = 0;
+std::vector<unsigned int>			g_seeds;
+int									g_currentSeed = 0;
 
 ID3D11Buffer*                       g_pCBNeverChanges = nullptr;
 ID3D11Buffer*                       g_pCBChangeOnResize = nullptr;
@@ -341,10 +345,9 @@ HRESULT InitDevice()
     g_pImmediateContext->RSSetViewports( 1, &vp );
 
 	// Moved to tree
-	TreeModelGenerator generator;
-	g_tree.Create(&generator);
-	g_tree.InitGraphics(g_pd3dDevice, g_pImmediateContext);
-	g_resetTree = false;
+	//TreeModelGenerator generator;
+	//g_tree.Create(&generator);
+	//g_tree.InitGraphics(g_pd3dDevice, g_pImmediateContext);
 
     // Create the constant buffers
     D3D11_BUFFER_DESC bd;
@@ -427,7 +430,16 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
 			switch(wParam)
 			{
 			case VK_SPACE:
+			case VK_RIGHT:
 				g_resetTree = true;
+				g_currentSeed++;
+				break;
+			case VK_LEFT:
+				if (g_currentSeed > 0)
+				{
+					g_resetTree = true;
+					g_currentSeed--;
+				}
 				break;
 			case '0':
 				g_timeStart = 0;
@@ -455,8 +467,11 @@ void Render()
 	// Moved to tree
 	if (g_resetTree)
 	{
-		g_tree.CleanUpDeviceObjects();
-		TreeModelGenerator generator;
+		if (g_currentSeed + 1 > g_seeds.size())
+		{
+			g_seeds.push_back((unsigned int)time(NULL));
+		}
+		TreeModelGenerator generator(g_seeds[g_currentSeed]);
 		g_tree.Create(&generator);
 		g_tree.InitGraphics(g_pd3dDevice, g_pImmediateContext);
 		g_resetTree = false;
