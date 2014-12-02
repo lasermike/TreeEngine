@@ -58,6 +58,8 @@ IDXGISwapChain1*                    g_pSwapChain1 = nullptr;
 ID3D11RenderTargetView*             g_pRenderTargetView = nullptr;
 ID3D11Texture2D*                    g_pDepthStencil = nullptr;
 ID3D11DepthStencilView*             g_pDepthStencilView = nullptr;
+ID3D11RasterizerState*				g_rasterState = nullptr;
+bool								g_enableMsaa = true;
 
 bool								g_resetTree = true;
 Tree								g_tree;
@@ -218,6 +220,15 @@ HRESULT InitDevice()
     if( FAILED( hr ) )
         return hr;
 
+	// Check MSAA support
+	UINT msaaQuality;
+	const UINT msaaCount = 4;
+	HR(g_pd3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
+	if (msaaQuality == 0)
+	{
+		g_enableMsaa = false;
+	}
+
     // Obtain DXGI factory from device (since we used nullptr for pAdapter above)
     IDXGIFactory1* dxgiFactory = nullptr;
     {
@@ -255,8 +266,8 @@ HRESULT InitDevice()
         sd.Width = width;
         sd.Height = height;
         sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        sd.SampleDesc.Count = 1;
-        sd.SampleDesc.Quality = 0;
+		sd.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
+		sd.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
         sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         sd.BufferCount = 1;
 
@@ -312,8 +323,8 @@ HRESULT InitDevice()
     descDepth.MipLevels = 1;
     descDepth.ArraySize = 1;
     descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    descDepth.SampleDesc.Count = 1;
-    descDepth.SampleDesc.Quality = 0;
+	descDepth.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
+	descDepth.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
     descDepth.Usage = D3D11_USAGE_DEFAULT;
     descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     descDepth.CPUAccessFlags = 0;
@@ -323,12 +334,12 @@ HRESULT InitDevice()
         return hr;
 
     // Create the depth stencil view
-    D3D11_DEPTH_STENCIL_VIEW_DESC descDSV;
+    /*D3D11_DEPTH_STENCIL_VIEW_DESC descDSV;
     ZeroMemory( &descDSV, sizeof(descDSV) );
     descDSV.Format = descDepth.Format;
     descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-    descDSV.Texture2D.MipSlice = 0;
-    hr = g_pd3dDevice->CreateDepthStencilView( g_pDepthStencil, &descDSV, &g_pDepthStencilView );
+    descDSV.Texture2D.MipSlice = 0;*/
+    hr = g_pd3dDevice->CreateDepthStencilView( g_pDepthStencil, 0, &g_pDepthStencilView );
     if( FAILED( hr ) )
         return hr;
 
@@ -343,6 +354,24 @@ HRESULT InitDevice()
     vp.TopLeftX = 0;
     vp.TopLeftY = 0;
     g_pImmediateContext->RSSetViewports( 1, &vp );
+
+	// Enable MSAA
+	if (g_enableMsaa)
+	{
+		D3D11_RASTERIZER_DESC rasterDesc;
+		rasterDesc.AntialiasedLineEnable = true; // MSA
+		rasterDesc.CullMode = D3D11_CULL_BACK;
+		rasterDesc.DepthBias = 0;
+		rasterDesc.DepthBiasClamp = 0.0f;
+		rasterDesc.DepthClipEnable = true;
+		rasterDesc.FillMode = D3D11_FILL_SOLID;
+		rasterDesc.FrontCounterClockwise = false;
+		rasterDesc.MultisampleEnable = true; // MSAA
+		rasterDesc.ScissorEnable = false;
+		rasterDesc.SlopeScaledDepthBias = 0.0f;
+		HR(g_pd3dDevice->CreateRasterizerState(&rasterDesc, &g_rasterState));
+		g_pImmediateContext->RSSetState(g_rasterState);
+	}
 
 	// Moved to tree
 	//TreeModelGenerator generator;
@@ -399,6 +428,7 @@ void CleanupDevice()
     if( g_pCBNeverChanges ) g_pCBNeverChanges->Release();
     if( g_pCBChangeOnResize ) g_pCBChangeOnResize->Release();
  	g_tree.CleanUpDeviceObjects();
+	if (g_rasterState) g_rasterState->Release();
 	if( g_pDepthStencil ) g_pDepthStencil->Release();
     if( g_pDepthStencilView ) g_pDepthStencilView->Release();
     if( g_pRenderTargetView ) g_pRenderTargetView->Release();
