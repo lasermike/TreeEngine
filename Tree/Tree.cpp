@@ -44,8 +44,8 @@ HRESULT Tree::CleanUpDeviceObjects()
 	return S_OK;
 }
 
-HRESULT Tree::Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, float time)
+HRESULT Tree::Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, XMVECTOR eyePos, float time)
 {
-	_geometry->Render(pImmediateContext, world, time);
+	_geometry->Render(pImmediateContext, world, eyePos, time);
 	return S_OK;
 }

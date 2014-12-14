@@ -3,6 +3,7 @@
 //
 // Copyright (c) Microsoft Corporation. All rights reserved.
 //--------------------------------------------------------------------------------------
+#include "Materials.fx"
 
 //--------------------------------------------------------------------------------------
 // Constant Buffer Variables
@@ -20,50 +21,28 @@ cbuffer cbChangeOnResize : register( b1 )
     matrix Projection;
 };
 
-/*cbuffer cbChangesEveryFrame : register( b2 )
+cbuffer cbChangesEveryFrame : register( b2 )
 {
-    matrix World;
-	float2 time;
+	DirectionalLight light;
+	Material mat;
+	float3 eyePos;
 };
-
-cbuffer cbTree
-{
-    int1 numBranches;
-};
-
-struct Branch
-{
-	int1 id;
-	int1 depth;
-	//float1 thickness;
-	float4 start;
-	float4 end;
-	int4 children;
-};
-
-cbuffer cbBranches
-{
-    Buffer<int> id;
-    Buffer<int> depth;
-    Buffer<float4> start;
-    Buffer<float4> end;
-    Buffer<int4> children;
-};*/
-
-
 
 //--------------------------------------------------------------------------------------
 struct VS_INPUT
 {
-    float4 Pos : POSITION;
-    float2 Tex : TEXCOORD0;
+    float3 Pos : POSITION;
+	float3 NormalL : NORMAL;
+	float2 Tex : TEXCOORD0;
 	float4x4 World  : WORLD;
 };
 
 struct PS_INPUT
 {
     float4 Pos : SV_POSITION;
-    float2 Tex : TEXCOORD0;
+	float3 PosW : POSITION;
+	float2 Tex : TEXCOORD0;
+	float3 NormalW : NORMAL;
 };
 
 
@@ -73,11 +52,13 @@ struct PS_INPUT
 PS_INPUT VS( VS_INPUT input )
 {
     PS_INPUT output = (PS_INPUT)0;
-    output.Pos = mul( input.Pos, input.World );
-    output.Pos = mul( output.Pos, View );
-    output.Pos = mul( output.Pos, Projection );
+	output.PosW = mul(float4(input.Pos, 1.0f), input.World).xyz;;
+	output.NormalW = mul(input.NormalL, (float3x3)input.World); // TEMP, use gWorldInvTranspose);
+	
+	output.Pos = mul(float4(output.PosW, 1.0f), View);
+	output.Pos = mul(output.Pos, Projection);
     output.Tex = input.Tex;
-    
+
     return output;
 }
 
@@ -85,7 +66,52 @@ PS_INPUT VS( VS_INPUT input )
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
-float4 PS( PS_INPUT input) : SV_Target
+float4 PS2( PS_INPUT input) : SV_Target
 {
     return txDiffuse.Sample( samLinear, input.Tex ) ;
+}
+
+
+float4 PS(PS_INPUT pin /*, float3 gEyePosW, uniform int gLightCount*/) : SV_Target
+{
+	// Interpolating normal can unnormalize it, so normalize it.
+	pin.NormalW = normalize(pin.NormalW);
+
+	// The toEye vector is used in lighting.
+	float3 toEye = eyePos - pin.PosW;
+
+	// Cache the distance to the eye from this surface point.
+	float distToEye = length(toEye);
+
+	// Normalize.
+	toEye /= distToEye;
+
+	// Lighting.
+
+	// Start with a sum of zero. 
+	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float4 spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+	float4 textureColor = txDiffuse.Sample(samLinear, pin.Tex);
+
+	// Sum the light contribution from each light source.  
+	//[unroll]
+	//for (int i = 0; i < gLightCount; ++i)
+	//{
+		float4 A, D, S;
+		ComputeDirectionalLight(mat, textureColor, light /*gDirLights[i]*/, pin.NormalW, toEye,
+			A, D, S);
+
+		ambient += A;
+		diffuse += D;
+		spec += S;
+	//}
+
+	float4 litColor = ambient + diffuse + spec;
+
+	// Common to take alpha from diffuse material.
+	litColor.a = mat.Diffuse.a;
+
+	return litColor;
 }

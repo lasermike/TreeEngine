@@ -3,6 +3,7 @@
 #include "treegeometry.h"
 #include "GeometryGenerator.h"
 #include <vector>
+#include "Materials.h"
 using namespace DirectX;
 
 typedef long HRESULT;
@@ -46,21 +47,23 @@ class TreeGeometry
 
 	TreeModel*							_model; //Weak reference
 
+	Material							_trunkMaterial;
+	DirectionalLight					_light;  // Doesn't belong here, will move later
+
 public:
 	TreeGeometry(TreeModel* model);
 	~TreeGeometry();
 
-
 	HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	HRESULT CleanUpDeviceObjects();
-	HRESULT Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, float time);
+	HRESULT Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, XMVECTOR eyePos, float time);
 
 private:
 
 	HRESULT RenderDirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t);
 	HRESULT RenderBranchDirect(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX const* world, Branch const* branch, FXMVECTOR start, float time);
 
-	HRESULT RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t);
+	HRESULT RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t);
 	HRESULT ComputeBranchIndirect(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time);
 
 	HRESULT ComputeTransformations(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, const FXMVECTOR parentStart);

@@ -20,17 +20,16 @@ TreeModel* TreeModelGenerator::Create()
 	model = new TreeModel();
 	XMVECTOR vStart = XMVectorSet(0, 0, 0,0);
 	XMVECTOR vEnd = XMVectorSet(0, 1.3, 0,0);
-	//XMVECTOR vDir = vEnd - vStart;
+
 	// Create trunk
 	int id = model->treeData.numBranches++;
 	model->trunk = &model->pBranches[id]; //new Branch();
 	model->trunk->id = id;
-	//model->branchMap.push_back(model->trunk);
+
 	XMStoreFloat4(&model->trunk->start, vStart);
 	XMStoreFloat4(&model->trunk->end, vEnd);
 	model->trunk->thickness = .3;
 	model->trunk->depth = 0;
-	//XMStoreFloat4(&model->trunk->quaternion, CalculateQuaternion(vDir));
 
 	GenerateRecursive(model->trunk, 1);
 	return model;
@@ -69,14 +68,29 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 		const double maxAngleDiv2 = maxAngle / 2.0;
 
 		XMVECTOR vParentDir = XMVector3Normalize(XMLoadFloat3((XMFLOAT3*)&branch->end) - XMLoadFloat3((XMFLOAT3*)&branch->start));
-		XMVECTOR vChildDir = XMVector3Rotate(vParentDir, XMQuaternionRotationAxis(vX, (maxAngle * rand()) / RAND_MAX - maxAngleDiv2));
-		vChildDir = XMVector3Rotate(vChildDir, XMQuaternionRotationAxis(vZ, (maxAngle * rand()) / RAND_MAX - maxAngleDiv2));
-		child->end = branch->end;
+
+		if (depth == 5)
+		{
+			float randLen = 0.2 + 0.3 * ((double)rand()) / RAND_MAX;
+			vParentDir = XMVectorScale(vParentDir, randLen);
+		}
+		else if (depth > 1)
+		{
+			float randLen = 0.5 + 0.3 * ((double)rand()) / RAND_MAX;
+			vParentDir = XMVectorScale(vParentDir, randLen);
+		}
+
+
+		XMVECTOR vChildDir = XMVector3Rotate(vParentDir, 
+											 XMQuaternionRotationAxis(vX, (maxAngle * rand()) / RAND_MAX - maxAngleDiv2));
+		vChildDir = XMVector3Rotate(vChildDir, 
+								    XMQuaternionRotationAxis(vZ, (maxAngle * rand()) / RAND_MAX - maxAngleDiv2));
+		//child->end = branch->end;
 		
 		child->end.x = branch->end.x + XMVectorGetX(vChildDir) ;
 		child->end.y = branch->end.y + XMVectorGetY(vChildDir) ;
 		child->end.z = branch->end.z + XMVectorGetZ(vChildDir) ;
-		
+
 		GenerateRecursive(child, depth + 1);
 	}
 }

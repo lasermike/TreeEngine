@@ -15,16 +15,16 @@
 #ifndef GEOMETRYGENERATOR_H
 #define GEOMETRYGENERATOR_H
 
-#include <Windows.h>
+#include "CommonStuff.h"
 #include <directxmath.h>
 #include <vector>
-#include "CommonStuff.h"
 
 using namespace DirectX;
 
 struct SimpleVertex
 {
 	XMFLOAT3 Pos;
+	XMFLOAT3 Normal;
 	XMFLOAT2 Tex;
 };
 

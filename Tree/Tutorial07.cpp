@@ -72,6 +72,7 @@ ID3D11Buffer*                       g_pCBChangeOnResize = nullptr;
 XMMATRIX                            g_World;
 XMMATRIX                            g_View;
 XMMATRIX                            g_Projection;
+XMVECTOR							g_Eye;
 
 
 //--------------------------------------------------------------------------------------
@@ -292,8 +293,8 @@ HRESULT InitDevice()
         sd.BufferDesc.RefreshRate.Denominator = 1;
         sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         sd.OutputWindow = g_hWnd;
-        sd.SampleDesc.Count = 1;
-        sd.SampleDesc.Quality = 0;
+		sd.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
+		sd.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
         sd.Windowed = TRUE;
 
         hr = dxgiFactory->CreateSwapChain( g_pd3dDevice, &sd, &g_pSwapChain );
@@ -334,11 +335,6 @@ HRESULT InitDevice()
         return hr;
 
     // Create the depth stencil view
-    /*D3D11_DEPTH_STENCIL_VIEW_DESC descDSV;
-    ZeroMemory( &descDSV, sizeof(descDSV) );
-    descDSV.Format = descDepth.Format;
-    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-    descDSV.Texture2D.MipSlice = 0;*/
     hr = g_pd3dDevice->CreateDepthStencilView( g_pDepthStencil, 0, &g_pDepthStencilView );
     if( FAILED( hr ) )
         return hr;
@@ -373,11 +369,6 @@ HRESULT InitDevice()
 		g_pImmediateContext->RSSetState(g_rasterState);
 	}
 
-	// Moved to tree
-	//TreeModelGenerator generator;
-	//g_tree.Create(&generator);
-	//g_tree.InitGraphics(g_pd3dDevice, g_pImmediateContext);
-
     // Create the constant buffers
     D3D11_BUFFER_DESC bd;
     ZeroMemory( &bd, sizeof(bd) );
@@ -398,10 +389,10 @@ HRESULT InitDevice()
     g_World = XMMatrixIdentity();
 
     // Initialize the view matrix
-    XMVECTOR Eye = XMVectorSet( 0.0f, 3.5f, -6.0f, 0.0f );
+    g_Eye = XMVectorSet( 0.0f, 3.5f, -6.0f, 0.0f );
     XMVECTOR At = XMVectorSet( 0.0f, 2.0f, 0.0f, 0.0f );
     XMVECTOR Up = XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
-    g_View = XMMatrixLookAtLH( Eye, At, Up );
+    g_View = XMMatrixLookAtLH( g_Eye, At, Up );
 
     CBNeverChanges cbNeverChanges;
     cbNeverChanges.mView = XMMatrixTranspose( g_View );
@@ -537,13 +528,19 @@ void Render()
     //
     // Clear the depth buffer to 1.0 (max depth)
     //
-    g_pImmediateContext->ClearDepthStencilView( g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0 );
+    g_pImmediateContext->ClearDepthStencilView( g_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
+
+	//XMVECTOR eyePos = XMVectorSet(0, 0, 1.0, 0);
+	
+	//eyePos = XMVector3Transform(, g_World);
+	// Draw ground
+
 
 
 	// Move to tree
     g_pImmediateContext->VSSetConstantBuffers( 0, 1, &g_pCBNeverChanges );
     g_pImmediateContext->VSSetConstantBuffers( 1, 1, &g_pCBChangeOnResize );
-	g_tree.Render(g_pImmediateContext, &g_World, t);
+	g_tree.Render(g_pImmediateContext, &g_World, g_Eye, t);
 
     //
     // Present our back buffer to our front buffer

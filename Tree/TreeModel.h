@@ -74,7 +74,11 @@ struct TreeData
 
 };
 
-class TreeModel
+__interface Model
+{
+};
+
+class TreeModel : public Model
 {
 public:
 	TreeModel(void);

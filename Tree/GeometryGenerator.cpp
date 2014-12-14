@@ -48,12 +48,14 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	for (size_t i = 0; i < box.Vertices.size(); ++i, ++k)
 	{
 		data.vertices[k].Pos = box.Vertices[i].Position;
+		data.vertices[k].Normal = box.Vertices[i].Normal;
 		data.vertices[k].Tex = box.Vertices[i].TexC;
 	}
 
 	for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
 	{
 		data.vertices[k].Pos = cylinder.Vertices[i].Position;
+		data.vertices[k].Normal = cylinder.Vertices[i].Normal;
 		data.vertices[k].Tex = cylinder.Vertices[i].TexC;
 	}
 

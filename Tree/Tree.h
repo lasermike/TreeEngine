@@ -9,12 +9,21 @@ struct ID3D11DeviceContext;
 
 typedef long HRESULT;
 
+interface ModelGenerator;
 class TreeModelGenerator;
 class TreeModel;
 struct Branch;
 
+interface WorldObject
+{
+	virtual void Create(ModelGenerator* generator) = 0;
 
-class Tree
+	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext) = 0;
+	virtual HRESULT CleanUpDeviceObjects() = 0;
+	virtual HRESULT Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, XMVECTOR eyePos, float time) = 0;
+};
+
+class Tree : public WorldObject
 {
 private:
 
@@ -25,10 +34,11 @@ public:
 	Tree(void);
 	~Tree(void);
 
+	void Create(ModelGenerator* generator) { return Create((TreeModelGenerator*)generator); }
 	void Create(TreeModelGenerator* generator);
 
 	HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	HRESULT CleanUpDeviceObjects();
-	HRESULT Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, float time);
+	HRESULT Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float time);
 };
 

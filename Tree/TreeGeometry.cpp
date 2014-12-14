@@ -9,11 +9,20 @@
 #include "GeometryGenerator.h"
 #include <iostream>
 #include "CommonStuff.h"
+#include "Materials.h"
 
-struct CBChangesEveryFrame
+struct CBChangesEveryFrameInstanced
+{
+	DirectionalLight light;
+	Material treeMaterial;
+	XMVECTOR eyePos;
+};
+
+struct CBChangesEveryFrameDirect
 {
 	XMMATRIX mWorld;
-	XMFLOAT2 time;
+	DirectionalLight light;
+	Material treeMaterial;
 };
 
 
@@ -22,7 +31,7 @@ struct CBChangesEveryFrame
 class InputLayoutDesc
 {
 public:
-	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[6];
+	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[7];
 };
 
 class InputLayouts
@@ -35,10 +44,11 @@ public:
 };
 
 
-const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[6] =
+const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[7] =
 {
 	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 0, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
@@ -81,6 +91,14 @@ TreeGeometry::TreeGeometry(TreeModel* model) : _geometryGenerator(), _geometryDa
 	_pCBBranches = nullptr;
 	_pInstancedBuffer = nullptr;
 	_drawInstanced = true;
+
+	_trunkMaterial.Ambient = XMFLOAT4(.7, .7, .7, 1.0f);
+	_trunkMaterial.Diffuse = XMFLOAT4(.7, .6f, .6f, 1.0f);
+	_trunkMaterial.Specular = XMFLOAT4(.2, .2f, .2f, 1.0f);
+	_light.Ambient = XMFLOAT4(.5, .5f, .5f, 1.0f);
+	_light.Diffuse = XMFLOAT4(.5, .5f, .5f, 1.0f);
+	_light.Direction = XMFLOAT3(.7f, -.7f, .7f);
+	_light.Specular = XMFLOAT4(.1, .1f, .1f, 1.0f);
 }
 
 TreeGeometry::~TreeGeometry()
@@ -110,7 +128,7 @@ HRESULT CompileShaderFromFile(WCHAR* szFileName, LPCSTR szEntryPoint, LPCSTR szS
 #endif
 
 	ID3DBlob* pErrorBlob = nullptr;
-	hr = D3DCompileFromFile(szFileName, nullptr, nullptr, szEntryPoint, szShaderModel,
+	hr = D3DCompileFromFile(szFileName, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, szEntryPoint, szShaderModel,
 		dwShaderFlags, 0, ppBlobOut, &pErrorBlob);
 	if (FAILED(hr))
 	{
@@ -275,7 +293,7 @@ HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pI
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
 	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(CBChangesEveryFrame);
+	bd.ByteWidth = _drawInstanced ? sizeof(CBChangesEveryFrameInstanced) : sizeof(CBChangesEveryFrameDirect);
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
 	hr = device->CreateBuffer(&bd, nullptr, &_pCBChangesEveryFrame);
@@ -283,38 +301,15 @@ HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pI
 		return hr;
 
 	// Create constants for tree
-	/*    ZeroMemory( &bd, sizeof(bd) );
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(TreeData);
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bd.CPUAccessFlags = 0;
-	hr = device->CreateBuffer( &bd, nullptr, &_pCBTree );
-	if( FAILED( hr ) )
-	return hr;
-
-	pImmediateContext->VSSetConstantBuffers( 2, 1, &_pCBTree);
-	pImmediateContext->PSSetConstantBuffers( 2, 1, &_pCBTree);
-	pImmediateContext->UpdateSubresource( _pCBTree, 0, nullptr, &_model->treeData, 0, 0 );
-
-
-	// Create constants for branches
-	ZeroMemory( &bd, sizeof(bd) );
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(Branch) * _model->treeData.numBranches;
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bd.CPUAccessFlags = 0;
-	hr = device->CreateBuffer( &bd, nullptr, &_pCBBranches );
-	if( FAILED( hr ) )
-	return hr;
-
-	pImmediateContext->VSSetConstantBuffers( 2, 1, &_pCBBranches);
-	pImmediateContext->PSSetConstantBuffers( 2, 1, &_pCBBranches);
-	pImmediateContext->UpdateSubresource( _pCBBranches, 0, nullptr, &_model->pBranches, 0, 0 );
+	/*CBChangesEveryFrame cb;
+	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
+	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
+	pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
 	*/
 	return S_OK;
 }
 
-HRESULT TreeGeometry::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t)
+HRESULT TreeGeometry::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t)
 {
 	pImmediateContext->VSSetShader(_pVertexShader, nullptr, 0);
 	pImmediateContext->PSSetShader(_pPixelShader, nullptr, 0);
@@ -329,13 +324,13 @@ HRESULT TreeGeometry::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* w
 	}
 	else
 	{
-		hr = RenderIndirect(pImmediateContext, world, t);
+		hr = RenderIndirect(pImmediateContext, world, eyePos, t);
 
 	}
 	return hr;
 }
 
-HRESULT TreeGeometry::RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t)
+HRESULT TreeGeometry::RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t)
 {
 	_logInstanceData.clear();
 	_twigInstanceData.clear();
@@ -362,10 +357,14 @@ HRESULT TreeGeometry::RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMM
 
 	pImmediateContext->Unmap(_pInstancedBuffer, 0);
 
-	//CBChangesEveryFrame cb;
-	//pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	//pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	//pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
+	CBChangesEveryFrameInstanced cb;
+	cb.treeMaterial = _trunkMaterial;
+	cb.light = _light;
+	cb.eyePos = eyePos;
+
+	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
+	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
+	pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
 
 	pImmediateContext->DrawIndexedInstanced(_geometryData.mCylinderIndexCount, currentBranch, _geometryData.mCylinderIndexOffset, _geometryData.mCylinderVertexOffset, 0);
 	//pImmediateContext->DrawIndexedInstanced(_geometryData.mBoxIndexCount /*36*/, currentBranch, _geometryData.mBoxIndexOffset, _geometryData.mBoxVertexOffset, 0);
@@ -477,9 +476,8 @@ HRESULT TreeGeometry::RenderBranchDirect(ID3D11DeviceContext* pImmediateContext,
 
 	// Update variables that change once per frame
 	XMVECTOR vChildStart;
-	CBChangesEveryFrame cb;
+	CBChangesEveryFrameDirect cb;
 	ComputeTransformations(&cb.mWorld, &vChildStart, time, branch, world, parentStart);
-	cb.time.x = time;
 
 	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
 	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);

@@ -347,6 +347,9 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <FxCompile Include="Materials.fx">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Tutorial07.fx">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Profile|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -399,6 +402,7 @@
   <ItemGroup>
     <ClCompile Include="DDSTextureLoader.cpp" />
     <ClCompile Include="GeometryGenerator.cpp" />
+    <ClCompile Include="Materials.cpp" />
     <ClCompile Include="MathHelper.cpp" />
     <ClCompile Include="Tree.cpp" />
     <ClCompile Include="TreeGeometry.cpp" />
@@ -410,6 +414,7 @@
     <ClInclude Include="CommonStuff.h" />
     <ClInclude Include="DDSTextureLoader.h" />
     <ClInclude Include="GeometryGenerator.h" />
+    <ClInclude Include="Materials.h" />
     <ClInclude Include="MathHelper.h" />
     <CLInclude Include="resource.h" />
     <ClInclude Include="Tree.h" />
