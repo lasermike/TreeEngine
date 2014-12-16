@@ -10,6 +10,7 @@
 #include <iostream>
 #include "CommonStuff.h"
 #include "Materials.h"
+#include "MathHelper.h"
 
 struct CBChangesEveryFrameInstanced
 {
@@ -21,6 +22,7 @@ struct CBChangesEveryFrameInstanced
 struct CBChangesEveryFrameDirect
 {
 	XMMATRIX mWorld;
+	XMMATRIX mNormalWorld;
 	DirectionalLight light;
 	Material treeMaterial;
 };
@@ -31,7 +33,7 @@ struct CBChangesEveryFrameDirect
 class InputLayoutDesc
 {
 public:
-	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[7];
+	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[11];
 };
 
 class InputLayouts
@@ -44,15 +46,20 @@ public:
 };
 
 
-const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[7] =
+const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[11] =
 {
 	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 0, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+	{ "WORLDNORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLDNORMAL", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLDNORMAL", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "WORLDNORMAL", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
 ID3D11InputLayout* InputLayouts::InstancedBasic16 = 0;
@@ -92,10 +99,10 @@ TreeGeometry::TreeGeometry(TreeModel* model) : _geometryGenerator(), _geometryDa
 	_pInstancedBuffer = nullptr;
 	_drawInstanced = true;
 
-	_trunkMaterial.Ambient = XMFLOAT4(.7, .7, .7, 1.0f);
+	_trunkMaterial.Ambient = XMFLOAT4(.8, .8, .8, 1.0f);
 	_trunkMaterial.Diffuse = XMFLOAT4(.7, .6f, .6f, 1.0f);
 	_trunkMaterial.Specular = XMFLOAT4(.2, .2f, .2f, 1.0f);
-	_light.Ambient = XMFLOAT4(.5, .5f, .5f, 1.0f);
+	_light.Ambient = XMFLOAT4(.6, .6f, .6f, 1.0f);
 	_light.Diffuse = XMFLOAT4(.5, .5f, .5f, 1.0f);
 	_light.Direction = XMFLOAT3(.7f, -.7f, .7f);
 	_light.Specular = XMFLOAT4(.1, .1f, .1f, 1.0f);
@@ -247,7 +254,7 @@ HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pI
 		//_branchInstanceData.resize(_model->treeData.numBranches);
 		D3D11_BUFFER_DESC vbd;
 		vbd.Usage = D3D11_USAGE_DYNAMIC;
-		vbd.ByteWidth = sizeof(InstancedData)* _model->treeData.numBranches;
+		vbd.ByteWidth = sizeof(InstancedData) * _model->treeData.numBranches;
 		vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 		vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 		vbd.MiscFlags = 0;
@@ -379,11 +386,12 @@ HRESULT TreeGeometry::ComputeBranchIndirect(int& currentBranch, XMMATRIX const* 
 
 	// Update variables that change once per frame
 	XMVECTOR vChildStart;
-	XMMATRIX mat;
-	ComputeTransformations(&mat, &vChildStart, time, branch, world, parentStart);
+	XMMATRIX localToWorld, normalLocalToWorld;
+	ComputeTransformations(&localToWorld, &normalLocalToWorld, &vChildStart, time, branch, world, parentStart);
 
 	InstancedData data;
-	XMStoreFloat4x4(&data.World, mat);
+	XMStoreFloat4x4(&data.World, localToWorld);
+	XMStoreFloat4x4(&data.WorldNormal, normalLocalToWorld); //normalLocalToWorld
 
 	InstancedData* pData = nullptr;
 	if (branch->depth < 2)
@@ -416,7 +424,7 @@ HRESULT TreeGeometry::RenderDirect(ID3D11DeviceContext* pImmediateContext, XMMAT
 	return RenderBranchDirect(pImmediateContext, world, _model->trunk, XMVectorSet(0, 0, 0, 0), t);
 }
 
-HRESULT TreeGeometry::ComputeTransformations(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, FXMVECTOR parentStart)
+HRESULT TreeGeometry::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, FXMVECTOR parentStart)
 {
 	float animScaleFactor = 1.0f;
 	if (time - 5 < branch->depth)
@@ -464,7 +472,13 @@ HRESULT TreeGeometry::ComputeTransformations(XMMATRIX* transform, XMVECTOR* vChi
 	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0);
 	const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
 	*transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
+
 	*transform = XMMatrixTranspose(*transform * *world);
+
+	*normalTransform = MathHelper::InverseTranspose(*transform);
+
+
+	//*normalTransform = *transform;
 
 	return S_OK;
 }
@@ -477,7 +491,7 @@ HRESULT TreeGeometry::RenderBranchDirect(ID3D11DeviceContext* pImmediateContext,
 	// Update variables that change once per frame
 	XMVECTOR vChildStart;
 	CBChangesEveryFrameDirect cb;
-	ComputeTransformations(&cb.mWorld, &vChildStart, time, branch, world, parentStart);
+	ComputeTransformations(&cb.mWorld, &cb.mNormalWorld, &vChildStart, time, branch, world, parentStart);
 
 	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
 	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);

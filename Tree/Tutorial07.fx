@@ -35,6 +35,7 @@ struct VS_INPUT
 	float3 NormalL : NORMAL;
 	float2 Tex : TEXCOORD0;
 	float4x4 World  : WORLD;
+	float4x4 WorldNormal  : WORLDNORMAL;
 };
 
 struct PS_INPUT
@@ -53,7 +54,7 @@ PS_INPUT VS( VS_INPUT input )
 {
     PS_INPUT output = (PS_INPUT)0;
 	output.PosW = mul(float4(input.Pos, 1.0f), input.World).xyz;;
-	output.NormalW = mul(input.NormalL, (float3x3)input.World); // TEMP, use gWorldInvTranspose);
+	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal); // TEMP, use gWorldInvTranspose);
 	
 	output.Pos = mul(float4(output.PosW, 1.0f), View);
 	output.Pos = mul(output.Pos, Projection);

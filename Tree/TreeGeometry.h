@@ -22,6 +22,7 @@ class TreeModel;
 struct InstancedData
 {
 	XMFLOAT4X4 World;
+	XMFLOAT4X4 WorldNormal;
 };
 
 class TreeGeometry
@@ -66,7 +67,7 @@ private:
 	HRESULT RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t);
 	HRESULT ComputeBranchIndirect(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time);
 
-	HRESULT ComputeTransformations(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, const FXMVECTOR parentStart);
+	HRESULT ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, const FXMVECTOR parentStart);
 
 };
 

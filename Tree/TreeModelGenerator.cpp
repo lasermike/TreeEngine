@@ -69,7 +69,7 @@ void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
 
 		XMVECTOR vParentDir = XMVector3Normalize(XMLoadFloat3((XMFLOAT3*)&branch->end) - XMLoadFloat3((XMFLOAT3*)&branch->start));
 
-		if (depth == 5)
+		if (depth >= 4)
 		{
 			float randLen = 0.2 + 0.3 * ((double)rand()) / RAND_MAX;
 			vParentDir = XMVectorScale(vParentDir, randLen);

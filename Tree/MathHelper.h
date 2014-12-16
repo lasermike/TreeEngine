@@ -66,6 +66,10 @@ public:
 
 		XMVECTOR det = XMMatrixDeterminant(A);
 		return XMMatrixTranspose(XMMatrixInverse(&det, A));
+
+		//XMMATRIX I = XMMatrixInverse(&det, A);
+		//return XMMatrixTranspose(I);
+		//return I;
 	}
 
 	static XMVECTOR RandUnitVec3();
