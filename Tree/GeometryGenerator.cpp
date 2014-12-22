@@ -16,24 +16,24 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	geoGen.CreateCylinder(0.5f, 0.4f, 1.0f, 14, 1, cylinder);
 
 	// Cache the vertex offsets to each object in the concatenated vertex buffer.
-	data.mBoxVertexOffset = 0;
-	data.mBoxVertexCount = box.Vertices.size();
+	data.boxIndices.VertexOffset = 0;
+	data.boxIndices.VertexCount = box.Vertices.size();
 
 	// Cache the index count of each object.
-	data.mCylinderVertexCount = cylinder.Vertices.size();
-	data.mCylinderVertexOffset = data.mBoxVertexOffset + box.Vertices.size();
+	data.cylinderIndices.VertexCount = cylinder.Vertices.size();
+	data.cylinderIndices.VertexOffset = data.boxIndices.VertexOffset + box.Vertices.size();
 
 	// Cache the starting index for each object in the concatenated index buffer.
-	data.mBoxIndexOffset = 0;
-	data.mBoxIndexCount = box.Indices.size();
+	data.boxIndices.IndexOffset = 0;
+	data.boxIndices.IndexCount = box.Indices.size();
 
 	// Cache the index count of each object.
-	data.mCylinderIndexOffset = data.mBoxIndexCount;
-	data.mCylinderIndexCount = cylinder.Indices.size();
+	data.cylinderIndices.IndexOffset = data.boxIndices.IndexCount;
+	data.cylinderIndices.IndexCount = cylinder.Indices.size();
 
 	UINT totalVertexCount = box.Vertices.size() + cylinder.Vertices.size();
 
-	UINT totalIndexCount = data.mBoxIndexCount + data.mCylinderIndexCount;
+	UINT totalIndexCount = data.boxIndices.IndexCount + data.cylinderIndices.IndexCount;
 
 	//
 	// Extract the vertex elements we are interested in and pack the

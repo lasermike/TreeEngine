@@ -129,7 +129,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions> %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>d3d11.lib;d3dcompiler.lib;dxguid.lib;winmm.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;extern\effects11d.lib;d3dcompiler.lib;dxguid.lib;winmm.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <LargeAddressAware>true</LargeAddressAware>
@@ -404,23 +404,35 @@
     <ClCompile Include="GeometryGenerator.cpp" />
     <ClCompile Include="Materials.cpp" />
     <ClCompile Include="MathHelper.cpp" />
+    <ClCompile Include="Primitive.cpp" />
+    <ClCompile Include="PrimitiveGeometry.cpp" />
+    <ClCompile Include="RenderStates.cpp" />
+    <ClCompile Include="SceneRootGeometry.cpp" />
     <ClCompile Include="Tree.cpp" />
     <ClCompile Include="TreeGeometry.cpp" />
     <ClCompile Include="TreeModel.cpp" />
     <ClCompile Include="TreeModelGenerator.cpp" />
     <ClCompile Include="Tutorial07.cpp" />
+    <ClCompile Include="WorldObject.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommonStuff.h" />
     <ClInclude Include="DDSTextureLoader.h" />
+    <ClInclude Include="Geometry.h" />
     <ClInclude Include="GeometryGenerator.h" />
     <ClInclude Include="Materials.h" />
     <ClInclude Include="MathHelper.h" />
+    <ClInclude Include="Model.h" />
+    <ClInclude Include="Primitive.h" />
+    <ClInclude Include="PrimitiveGeometry.h" />
+    <ClInclude Include="RenderStates.h" />
     <CLInclude Include="resource.h" />
+    <ClInclude Include="SceneRootGeometry.h" />
     <ClInclude Include="Tree.h" />
     <ClInclude Include="TreeGeometry.h" />
     <ClInclude Include="TreeModel.h" />
     <ClInclude Include="TreeModelGenerator.h" />
+    <ClInclude Include="WorldObject.h" />
     <ResourceCompile Include="Tutorial07.rc" />
   </ItemGroup>
   <ItemGroup>

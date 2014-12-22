@@ -1,111 +1,25 @@
 #define D3D_DEBUG_INFO
 #include "TreeGeometry.h"
-#include <d3d11_1.h>
-#include <d3dcompiler.h>
-#include <directxmath.h>
 #include "DDSTextureLoader.h"
+
 #include "TreeModel.h"
 #include "TreeModelGenerator.h"
-#include "GeometryGenerator.h"
-#include <iostream>
-#include "CommonStuff.h"
+#include "SceneRootGeometry.h"
+
 #include "Materials.h"
 #include "MathHelper.h"
 
-struct CBChangesEveryFrameInstanced
-{
-	DirectionalLight light;
-	Material treeMaterial;
-	XMVECTOR eyePos;
-};
-
-struct CBChangesEveryFrameDirect
-{
-	XMMATRIX mWorld;
-	XMMATRIX mNormalWorld;
-	DirectionalLight light;
-	Material treeMaterial;
-};
+#include <iostream>
 
 
-#pragma region InputLayouts
-
-class InputLayoutDesc
-{
-public:
-	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[11];
-};
-
-class InputLayouts
-{
-public:
-	static void InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen);
-	static void DestroyAll();
-
-	static ID3D11InputLayout* InstancedBasic16;
-};
-
-
-const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[11] =
-{
-	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-
-	{ "WORLDNORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLDNORMAL", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLDNORMAL", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLDNORMAL", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-};
-
-ID3D11InputLayout* InputLayouts::InstancedBasic16 = 0;
-
-void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
-{
-	HRESULT hr = (device->CreateInputLayout(InputLayoutDesc::InstancedBasic16, ARRAYSIZE(InputLayoutDesc::InstancedBasic16), pShaderBytecodeWithInputSignature /*passDesc.pIAInputSignature*/,
-		byteCodeLen /*passDesc.IAInputSignatureSize*/, &InstancedBasic16));
-	assert(SUCCEEDED(hr));
-}
-
-void InputLayouts::DestroyAll()
-{
-	if (InstancedBasic16 != nullptr)
-	{
-		InstancedBasic16->Release();
-		InstancedBasic16 = nullptr;
-	}
-}
-
-#pragma endregion
-
-TreeGeometry::TreeGeometry(TreeModel* model) : _geometryGenerator(), _geometryData()
+TreeGeometry::TreeGeometry(TreeModel* model)
 {
 	_model = model;
 
-	_pVertexShader = nullptr;
-	_pPixelShader = nullptr;
-	_pVertexLayout = nullptr;
-	_pVertexBuffer = nullptr;
-	_pIndexBuffer = nullptr;
 	_pTextureRV = nullptr;
 	_pSamplerLinear = nullptr;
-	_pCBChangesEveryFrame = nullptr;
 	_pCBTree = nullptr;
 	_pCBBranches = nullptr;
-	_pInstancedBuffer = nullptr;
-	_drawInstanced = true;
-
-	_trunkMaterial.Ambient = XMFLOAT4(.8, .8, .8, 1.0f);
-	_trunkMaterial.Diffuse = XMFLOAT4(.7, .6f, .6f, 1.0f);
-	_trunkMaterial.Specular = XMFLOAT4(.2, .2f, .2f, 1.0f);
-	_light.Ambient = XMFLOAT4(.6, .6f, .6f, 1.0f);
-	_light.Diffuse = XMFLOAT4(.5, .5f, .5f, 1.0f);
-	_light.Direction = XMFLOAT3(.7f, -.7f, .7f);
-	_light.Specular = XMFLOAT4(.1, .1f, .1f, 1.0f);
 }
 
 TreeGeometry::~TreeGeometry()
@@ -113,174 +27,11 @@ TreeGeometry::~TreeGeometry()
 	CleanUpDeviceObjects();
 }
 
-//--------------------------------------------------------------------------------------
-// Helper for compiling shaders with D3DCompile
-//
-// With VS 11, we could load up prebuilt .cso files instead...
-//--------------------------------------------------------------------------------------
-HRESULT CompileShaderFromFile(WCHAR* szFileName, LPCSTR szEntryPoint, LPCSTR szShaderModel, ID3DBlob** ppBlobOut)
-{
-	HRESULT hr = S_OK;
-
-	DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
-#ifdef _DEBUG
-	// Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
-	// Setting this flag improves the shader debugging experience, but still allows 
-	// the shaders to be optimized and to run exactly the way they will run in 
-	// the release configuration of this program.
-	dwShaderFlags |= D3DCOMPILE_DEBUG;
-
-	// Disable optimizations to further improve shader debugging
-	dwShaderFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif
-
-	ID3DBlob* pErrorBlob = nullptr;
-	hr = D3DCompileFromFile(szFileName, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, szEntryPoint, szShaderModel,
-		dwShaderFlags, 0, ppBlobOut, &pErrorBlob);
-	if (FAILED(hr))
-	{
-		if (pErrorBlob)
-		{
-			OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
-			pErrorBlob->Release();
-		}
-		return hr;
-	}
-	if (pErrorBlob) pErrorBlob->Release();
-
-	return S_OK;
-}
-
 
 HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
 {
-	// Compile the vertex shader
-	ID3DBlob* pVSBlob = nullptr;
-	HRESULT hr = CompileShaderFromFile(L"Tutorial07.fx", "VS", "vs_4_0", &pVSBlob);
-	if (FAILED(hr))
-	{
-		MessageBox(nullptr,
-			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
-		return hr;
-	}
-
-	// Create the vertex shader
-	hr = device->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), nullptr, &_pVertexShader);
-	if (FAILED(hr))
-	{
-		pVSBlob->Release();
-		return hr;
-	}
-
-	// Define the input layout
-	if (!_drawInstanced)
-	{
-		D3D11_INPUT_ELEMENT_DESC layout[] =
-		{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		};
-		UINT numElements = ARRAYSIZE(layout);
-
-		// Create the input layout
-		hr = device->CreateInputLayout(layout, numElements, pVSBlob->GetBufferPointer(),
-			pVSBlob->GetBufferSize(), &_pVertexLayout);
-		if (FAILED(hr))
-			return hr;
-
-		// Set the input layout
-		pImmediateContext->IASetInputLayout(_pVertexLayout);
-	}
-	else
-	{
-		// Create Instanced draw data layout
-		InputLayouts::InitAll(device, pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize());
-
-		pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
-	}
-	pVSBlob->Release();
-
-	// Compile the pixel shader
-	ID3DBlob* pPSBlob = nullptr;
-	hr = CompileShaderFromFile(L"Tutorial07.fx", "PS", "ps_4_0", &pPSBlob);
-	if (FAILED(hr))
-	{
-		MessageBox(nullptr,
-			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
-		return hr;
-	}
-
-	// Create the pixel shader
-	hr = device->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), nullptr, &_pPixelShader);
-	pPSBlob->Release();
-	if (FAILED(hr))
-		return hr;
-
-	_geometryGenerator.BuildGeometryBuffers(_geometryData);
-	D3D11_BUFFER_DESC vbd;
-	ZeroMemory(&vbd, sizeof(vbd));
-	vbd.Usage = D3D11_USAGE_IMMUTABLE;
-	vbd.ByteWidth = sizeof(SimpleVertex)* _geometryData.vertices.size();
-	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vbd.CPUAccessFlags = 0;
-	vbd.MiscFlags = 0;
-	D3D11_SUBRESOURCE_DATA vinitData;
-	ZeroMemory(&vinitData, sizeof(vinitData));
-	vinitData.pSysMem = &_geometryData.vertices[0];
-	HR(device->CreateBuffer(&vbd, &vinitData, &_pVertexBuffer));
-
-	D3D11_BUFFER_DESC ibd;
-	ZeroMemory(&ibd, sizeof(ibd));
-	ibd.Usage = D3D11_USAGE_IMMUTABLE;
-	ibd.ByteWidth = sizeof(UINT)* _geometryData.indices.size();
-	ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	ibd.CPUAccessFlags = 0;
-	ibd.MiscFlags = 0;
-	D3D11_SUBRESOURCE_DATA iinitData;
-	ZeroMemory(&iinitData, sizeof(iinitData));
-	iinitData.pSysMem = &_geometryData.indices[0];
-	HR(device->CreateBuffer(&ibd, &iinitData, &_pIndexBuffer));
-
-	// Set vertex buffer
-	if (!_drawInstanced)
-	{
-		UINT stride = sizeof(SimpleVertex);
-		UINT offset = 0;
-		pImmediateContext->IASetVertexBuffers(0, 1, &_pVertexBuffer, &stride, &offset);
-	}
-	else
-	{
-		// Create instanced buffer
-		//_branchInstanceData.resize(_model->treeData.numBranches);
-		D3D11_BUFFER_DESC vbd;
-		vbd.Usage = D3D11_USAGE_DYNAMIC;
-		vbd.ByteWidth = sizeof(InstancedData) * _model->treeData.numBranches;
-		vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		vbd.MiscFlags = 0;
-		vbd.StructureByteStride = 0;
-
-		hr = device->CreateBuffer(&vbd, 0, &_pInstancedBuffer);
-		if (FAILED(hr))
-			return hr;
-
-		UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
-		UINT offset[2] = { 0, 0 };
-		ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-
-		pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
-	}
-
-	// Set index buffer
-	pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
-
-	// Set primitive topology
-	pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
 	// Load the Texture
-	hr = CreateDDSTextureFromFile(device, L"bark2.dds", nullptr, &_pTextureRV);
-	if (FAILED(hr))
-		return hr;
+	HR(CreateDDSTextureFromFile(device, L"bark2.dds", nullptr, &_pTextureRV));
 
 	// Create the sample state
 	D3D11_SAMPLER_DESC sampDesc;
@@ -292,61 +43,19 @@ HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pI
 	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
 	sampDesc.MinLOD = 0;
 	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
-	hr = device->CreateSamplerState(&sampDesc, &_pSamplerLinear);
+	HRESULT hr = device->CreateSamplerState(&sampDesc, &_pSamplerLinear);
 	if (FAILED(hr))
 		return hr;
 
-	// Create constants for per frame 
-	D3D11_BUFFER_DESC bd;
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = _drawInstanced ? sizeof(CBChangesEveryFrameInstanced) : sizeof(CBChangesEveryFrameDirect);
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bd.CPUAccessFlags = 0;
-	hr = device->CreateBuffer(&bd, nullptr, &_pCBChangesEveryFrame);
-	if (FAILED(hr))
-		return hr;
-
-	// Create constants for tree
-	/*CBChangesEveryFrame cb;
-	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
-	*/
 	return S_OK;
 }
 
-HRESULT TreeGeometry::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t)
+HRESULT TreeGeometry::RenderInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
 {
-	pImmediateContext->VSSetShader(_pVertexShader, nullptr, 0);
-	pImmediateContext->PSSetShader(_pPixelShader, nullptr, 0);
 	pImmediateContext->PSSetShaderResources(0, 1, &_pTextureRV);
 	pImmediateContext->PSSetSamplers(0, 1, &_pSamplerLinear);
 
-	HRESULT hr = S_OK;
-
-	if (!_drawInstanced)
-	{
-		hr = RenderDirect(pImmediateContext, world, t);
-	}
-	else
-	{
-		hr = RenderIndirect(pImmediateContext, world, eyePos, t);
-
-	}
-	return hr;
-}
-
-HRESULT TreeGeometry::RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t)
-{
-	_logInstanceData.clear();
-	_twigInstanceData.clear();
-	int currentBranch = 0;
-
-	XMVECTOR vChildStart;
-	ComputeBranchIndirect(currentBranch, world, _model->trunk, XMVectorSet(0, 0, 0, 0), t);
-
-	D3D11_MAPPED_SUBRESOURCE mappedData;
+	/*D3D11_MAPPED_SUBRESOURCE mappedData;
 	HR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
@@ -363,129 +72,30 @@ HRESULT TreeGeometry::RenderIndirect(ID3D11DeviceContext* pImmediateContext, XMM
 	assert(dvi == currentBranch);
 
 	pImmediateContext->Unmap(_pInstancedBuffer, 0);
+	*/
+	const GeometryBufferData::BufferIndices* pCylinderIndices = pGeometryData->GetBufferIndices(PrimitiveType_Cylinder);
 
-	CBChangesEveryFrameInstanced cb;
-	cb.treeMaterial = _trunkMaterial;
-	cb.light = _light;
-	cb.eyePos = eyePos;
-
-	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
-
-	pImmediateContext->DrawIndexedInstanced(_geometryData.mCylinderIndexCount, currentBranch, _geometryData.mCylinderIndexOffset, _geometryData.mCylinderVertexOffset, 0);
+	pImmediateContext->DrawIndexedInstanced(pCylinderIndices->IndexCount, numInstances, pCylinderIndices->IndexOffset, pCylinderIndices->VertexOffset, startInstance);
 	//pImmediateContext->DrawIndexedInstanced(_geometryData.mBoxIndexCount /*36*/, currentBranch, _geometryData.mBoxIndexOffset, _geometryData.mBoxVertexOffset, 0);
 
 	return S_OK;
 }
 
-HRESULT TreeGeometry::ComputeBranchIndirect(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time)
+HRESULT TreeGeometry::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t)
 {
-	if (time < branch->depth)
-		return S_OK;
+/*	pImmediateContext->PSSetShaderResources(0, 1, &_pTextureRV);
+	pImmediateContext->PSSetSamplers(0, 1, &_pSamplerLinear);
 
-	// Update variables that change once per frame
-	XMVECTOR vChildStart;
-	XMMATRIX localToWorld, normalLocalToWorld;
-	ComputeTransformations(&localToWorld, &normalLocalToWorld, &vChildStart, time, branch, world, parentStart);
+	HRESULT hr = S_OK;
 
-	InstancedData data;
-	XMStoreFloat4x4(&data.World, localToWorld);
-	XMStoreFloat4x4(&data.WorldNormal, normalLocalToWorld); //normalLocalToWorld
+	return RenderBranchDirect(pImmediateContext, world, _model->trunk, XMVectorSet(0, 0, 0, 0), t);*/
 
-	InstancedData* pData = nullptr;
-	if (branch->depth < 2)
-	{
-		_logInstanceData.push_back(data);
-	}
-	else
-	{
-		_twigInstanceData.push_back(data);
-	}
-
-	currentBranch++;
-
-	// Render child branches
-	const int maxChildren = 4;
-	for (int c = 0; c < maxChildren; c++)
-	{
-		if (branch->Child(c) != 0)
-		{
-			Branch* child = &_model->pBranches[branch->Child(c)];
-			ComputeBranchIndirect(currentBranch, world, child, vChildStart, time);
-		}
-	}
-
-	return S_OK;
-}
-
-HRESULT TreeGeometry::RenderDirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float t)
-{
-	return RenderBranchDirect(pImmediateContext, world, _model->trunk, XMVectorSet(0, 0, 0, 0), t);
-}
-
-HRESULT TreeGeometry::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, FXMVECTOR parentStart)
-{
-	float animScaleFactor = 1.0f;
-	if (time - 5 < branch->depth)
-	{
-		animScaleFactor = (time - branch->depth) / 5;
-	}
-
-	XMVECTOR vStart = parentStart;
-	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end));
-
-	// Scale branch
-	XMVECTOR vMag = XMVector3Length(vEnd - vStart);
-	float magY = XMVectorGetX(vMag);
-	float magXZ = branch->thickness;
-	magY *= animScaleFactor;
-	magXZ *= animScaleFactor;
-	XMVECTOR vScale = XMVectorSet(magXZ, magY, magXZ, 0);
-
-	// Child start pos
-	XMVECTOR vMagY = XMVectorSet(animScaleFactor, animScaleFactor, animScaleFactor, 1);
-	*vChildStart = (vEnd - vStart) * vMagY + vStart;
-
-	// Determine rotation
-	XMMATRIX mRot;
-	XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
-	XMVECTOR vDiff = vEnd - vStart;
-	XMVECTOR vCross = XMVector3Cross(vUp, XMVector3Normalize(vDiff));
-	XMVECTOR vCrossLenSq = XMVector3LengthSq(vCross);
-	XMVECTOR vQuat;
-	float crossLenSq;
-	XMStoreFloat(&crossLenSq, vCrossLenSq);
-	if (crossLenSq > 0.01f) // Need better value for epsilon here
-	{
-		XMVECTOR vDot = XMVector3Dot(vUp, XMVector3Normalize(vDiff));
-		float angle;
-		XMStoreFloat(&angle, vDot);
-		angle = acos(angle);
-		vQuat = XMQuaternionRotationAxis(vCross, angle);
-	}
-	else
-	{
-		vQuat = XMQuaternionRotationAxis(vUp, 0);
-	}
-
-	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0);
-	const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
-	*transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
-
-	*transform = XMMatrixTranspose(*transform * *world);
-
-	*normalTransform = MathHelper::InverseTranspose(*transform);
-
-
-	//*normalTransform = *transform;
-
-	return S_OK;
+	return E_NOTIMPL;
 }
 
 HRESULT TreeGeometry::RenderBranchDirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX const* world, Branch const* branch, FXMVECTOR parentStart, float time)
 {
-	if (time < branch->depth)
+/*	if (time < branch->depth)
 		return S_OK;
 
 	// Update variables that change once per frame
@@ -510,7 +120,7 @@ HRESULT TreeGeometry::RenderBranchDirect(ID3D11DeviceContext* pImmediateContext,
 			RenderBranchDirect(pImmediateContext, world, child, vChildStart, time);
 		}
 	}
-
+	*/
 	return S_OK;
 }
 
@@ -518,20 +128,9 @@ HRESULT TreeGeometry::RenderBranchDirect(ID3D11DeviceContext* pImmediateContext,
 
 HRESULT TreeGeometry::CleanUpDeviceObjects()
 {
-	if (_pVertexBuffer) _pVertexBuffer->Release();
-	if (_pIndexBuffer) _pIndexBuffer->Release();
-	if (_pVertexLayout) _pVertexLayout->Release();
-	if (_pVertexShader) _pVertexShader->Release();
-	if (_pPixelShader) _pPixelShader->Release();
 	if (_pSamplerLinear) _pSamplerLinear->Release();
 	if (_pTextureRV) _pTextureRV->Release();
-	if (_pCBChangesEveryFrame) _pCBChangesEveryFrame->Release();
 	if (_pCBTree) _pCBTree->Release();
-	if (_pInstancedBuffer) _pInstancedBuffer->Release();
-	if (_drawInstanced)
-	{
-		InputLayouts::DestroyAll();
-	}
 
 	return S_OK;
 }

@@ -1,0 +1,48 @@
+#pragma once
+#include "WorldObject.h"
+
+class PrimitiveModel : public Model
+{
+	PrimitiveType _primitiveType;
+
+public:
+	PrimitiveModel(PrimitiveType primitiveType) : _primitiveType(primitiveType)
+	{
+	}
+
+	PrimitiveType GetPrimitiveType() { return _primitiveType;  }
+};
+
+class PrimitiveModelGenerator : public ModelGenerator
+{
+	PrimitiveType _primitiveType;
+
+public:
+	PrimitiveModelGenerator(PrimitiveType primitiveType) : _primitiveType(primitiveType)
+	{
+	}
+
+	virtual PrimitiveModel* Create()
+	{
+		return new PrimitiveModel(_primitiveType);
+	}
+};
+
+class Primitive : public WorldObject
+{
+public:
+	Primitive();
+	~Primitive();
+
+	virtual void Create(ModelGenerator* generator) { return Create((PrimitiveModelGenerator*)generator); }
+	virtual void Create(PrimitiveModelGenerator* generator);
+	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
+
+	//virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances);
+
+	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time, InstancedData* dataView);
+
+	virtual unsigned int GetNumInstances(bool /*numMax*/) { return 1; }
+
+};
+

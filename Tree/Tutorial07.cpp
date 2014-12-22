@@ -20,8 +20,11 @@
 #include <directxmath.h>
 #include <directxcolors.h>
 #include "resource.h"
+#include "SceneRootGeometry.h"
 #include "Tree.h"
 #include "TreeModelGenerator.h"
+#include "Primitive.h"
+
 #include <stdio.h>
 #include <time.h>
 #include <vector>
@@ -67,6 +70,9 @@ ULONGLONG							g_timeStart = 0;
 std::vector<unsigned int>			g_seeds;
 int									g_currentSeed = 0;
 
+Primitive							g_Plane;
+SceneRootGeometry					g_Scene;
+
 ID3D11Buffer*                       g_pCBNeverChanges = nullptr;
 ID3D11Buffer*                       g_pCBChangeOnResize = nullptr;
 XMMATRIX                            g_World;
@@ -85,7 +91,10 @@ LRESULT CALLBACK    WndProc( HWND, UINT, WPARAM, LPARAM );
 void Render();
 
 int main() {
-    return wWinMain(GetModuleHandle(NULL), NULL, GetCommandLine(), SW_SHOW);
+	g_Scene.AddChild(&g_tree);
+	g_Scene.AddChild(&g_Plane);
+
+	return wWinMain(GetModuleHandle(NULL), NULL, GetCommandLine(), SW_SHOW);
 }
 
 //--------------------------------------------------------------------------------------
@@ -156,7 +165,7 @@ HRESULT InitWindow( HINSTANCE hInstance, int nCmdShow )
     g_hInst = hInstance;
     RECT rc = { 0, 0, 800, 600 };
     AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
-    g_hWnd = CreateWindow( L"TutorialWindowClass", L" A Forest for the Tree", WS_OVERLAPPEDWINDOW,
+    g_hWnd = CreateWindow( L"TutorialWindowClass", L" A Tree for the Forest", WS_OVERLAPPEDWINDOW,
                            CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInstance,
                            nullptr );
     if( !g_hWnd )
@@ -418,7 +427,9 @@ void CleanupDevice()
 
     if( g_pCBNeverChanges ) g_pCBNeverChanges->Release();
     if( g_pCBChangeOnResize ) g_pCBChangeOnResize->Release();
- 	g_tree.CleanUpDeviceObjects();
+ 	//g_tree.CleanUpDeviceObjects();
+	//g_Plane.CleanUpDeviceObjects();
+	g_Scene.CleanUpDeviceObjects();
 	if (g_rasterState) g_rasterState->Release();
 	if( g_pDepthStencil ) g_pDepthStencil->Release();
     if( g_pDepthStencilView ) g_pDepthStencilView->Release();
@@ -492,9 +503,15 @@ void Render()
 		{
 			g_seeds.push_back((unsigned int)time(NULL));
 		}
+
 		TreeModelGenerator generator(g_seeds[g_currentSeed]);
 		g_tree.Create(&generator);
-		g_tree.InitGraphics(g_pd3dDevice, g_pImmediateContext);
+
+		PrimitiveModelGenerator planeGen(PrimitiveType_Box);
+		g_Plane.Create(&planeGen);
+
+		g_Scene.InitGraphics(g_pd3dDevice, g_pImmediateContext);
+
 		g_resetTree = false;
 	}
 
@@ -530,17 +547,17 @@ void Render()
     //
     g_pImmediateContext->ClearDepthStencilView( g_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
 
-	//XMVECTOR eyePos = XMVectorSet(0, 0, 1.0, 0);
-	
-	//eyePos = XMVector3Transform(, g_World);
+	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBNeverChanges);
+	g_pImmediateContext->VSSetConstantBuffers(1, 1, &g_pCBChangeOnResize);
+
+	// Draw everything
+	g_Scene.Render(g_pImmediateContext, &g_World, g_Eye, t);
+
 	// Draw ground
+	//g_Plane.Render(g_pImmediateContext, &g_World, g_Eye, t);
 
-
-
-	// Move to tree
-    g_pImmediateContext->VSSetConstantBuffers( 0, 1, &g_pCBNeverChanges );
-    g_pImmediateContext->VSSetConstantBuffers( 1, 1, &g_pCBChangeOnResize );
-	g_tree.Render(g_pImmediateContext, &g_World, g_Eye, t);
+	// Draw tree
+	//g_tree.Render(g_pImmediateContext, &g_World, g_Eye, t);
 
     //
     // Present our back buffer to our front buffer

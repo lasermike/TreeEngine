@@ -1,44 +1,44 @@
 #pragma once
-#include <directxmath.h>
+#include "CommonStuff.h"
 #include <vector>
 #include "TreeGeometry.h"
-using namespace DirectX;
-
-struct ID3D11Device;
-struct ID3D11DeviceContext;
+#include "WorldObject.h"
+#include "TreeModel.h"
 
 typedef long HRESULT;
 
-interface ModelGenerator;
 class TreeModelGenerator;
-class TreeModel;
 struct Branch;
-
-interface WorldObject
-{
-	virtual void Create(ModelGenerator* generator) = 0;
-
-	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext) = 0;
-	virtual HRESULT CleanUpDeviceObjects() = 0;
-	virtual HRESULT Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, XMVECTOR eyePos, float time) = 0;
-};
 
 class Tree : public WorldObject
 {
 private:
 
-	TreeGeometry*	_geometry;
-	TreeModel*		_model;
+	//TreeGeometry*	_geometry;
+	TreeModel* _treeModel;
+	//TreeModel* GetTreeModel() { return (TreeModel*)_model; }
+
+	std::vector<InstancedData>			_logInstanceData;
+	std::vector<InstancedData>			_twigInstanceData;
+
+	HRESULT ComputeBranchIndirect(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time);
+	HRESULT ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, const FXMVECTOR parentStart);
+
 
 public:
 	Tree(void);
-	~Tree(void);
+	virtual ~Tree(void);
 
-	void Create(ModelGenerator* generator) { return Create((TreeModelGenerator*)generator); }
+	virtual void Create(ModelGenerator* generator) { return Create((TreeModelGenerator*)generator); }
 	void Create(TreeModelGenerator* generator);
 
-	HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
-	HRESULT CleanUpDeviceObjects();
-	HRESULT Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float time);
+	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
+	virtual HRESULT CleanUpDeviceObjects();
+	virtual HRESULT Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float time);
+
+	//HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometyData, int startInstance);
+
+	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time, InstancedData* dataView);
+	virtual unsigned int GetNumInstances(bool numMax);
 };
 

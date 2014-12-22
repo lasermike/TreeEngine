@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <directxmath.h>
+#include "Model.h"
 
 using namespace DirectX;
 
@@ -72,10 +73,6 @@ struct TreeData
 {
 	int numBranches;
 
-};
-
-__interface Model
-{
 };
 
 class TreeModel : public Model

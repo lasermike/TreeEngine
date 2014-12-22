@@ -1,3 +1,5 @@
+
+#pragma once
 //***************************************************************************************
 // GeometryGenerator.h by Frank Luna (C) 2011 All Rights Reserved.
 //   
@@ -12,14 +14,16 @@
 //   3. Update the texture coordinates and tangent vectors.
 //***************************************************************************************
 
-#ifndef GEOMETRYGENERATOR_H
-#define GEOMETRYGENERATOR_H
-
 #include "CommonStuff.h"
 #include <directxmath.h>
 #include <vector>
 
-using namespace DirectX;
+enum PrimitiveType
+{
+	PrimitiveType_Box = 0,
+	PrimitiveType_Cylinder
+};
+
 
 struct SimpleVertex
 {
@@ -30,7 +34,18 @@ struct SimpleVertex
 
 struct GeometryBufferData
 {
-	UINT mBoxVertexOffset;
+	struct BufferIndices
+	{
+		UINT VertexOffset;
+		UINT VertexCount;
+		UINT IndexOffset;
+		UINT IndexCount;
+	};
+
+	BufferIndices boxIndices;
+	BufferIndices cylinderIndices;
+
+	/*UINT mBoxVertexOffset;
 	UINT mBoxVertexCount;
 	UINT mBoxIndexOffset;
 	UINT mBoxIndexCount;
@@ -38,24 +53,41 @@ struct GeometryBufferData
 	UINT mCylinderVertexCount;
 	UINT mCylinderIndexOffset;
 	UINT mCylinderIndexCount;
+	*/
 	std::vector<SimpleVertex> vertices;
 	std::vector<UINT> indices;
 
 	GeometryBufferData() : vertices(), indices()
 	{
-		 mBoxVertexOffset = 0;
-		 mBoxVertexCount = 0;
-		 mBoxIndexOffset = 0;
-		 mBoxIndexCount = 0;
-		 mCylinderVertexOffset = 0;
-		 mCylinderVertexCount = 0;
-		 mCylinderIndexOffset = 0;
-		 mCylinderIndexCount = 0;
+		ZeroMemory(&boxIndices, sizeof(BufferIndices));
+		ZeroMemory(&cylinderIndices, sizeof(BufferIndices));
+		//mBoxVertexOffset = 0;
+		// mBoxVertexCount = 0;
+		// mBoxIndexOffset = 0;
+		// mBoxIndexCount = 0;
+		// mCylinderVertexOffset = 0;
+		// mCylinderVertexCount = 0;
+		// mCylinderIndexOffset = 0;
+		// mCylinderIndexCount = 0;
 	}
 
-};
+	const BufferIndices* const GetBufferIndices(PrimitiveType primType)
+	{
+		BufferIndices* pBufferIndices = nullptr;
+		switch (primType)
+		{
+		case PrimitiveType_Cylinder:
+			pBufferIndices = &this->cylinderIndices;
+			break;
+		case PrimitiveType_Box:
+		default:
+			pBufferIndices = &this->boxIndices;
+			break;
+		}
 
-using namespace DirectX;
+		return pBufferIndices;
+	}
+};
 
 class GeometryGenerator
 {
@@ -130,4 +162,3 @@ private:
 	void BuildCylinderBottomCap(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, MeshData& meshData);
 };
 
-#endif // GEOMETRYGENERATOR_H

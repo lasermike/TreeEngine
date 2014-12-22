@@ -9,9 +9,9 @@ using namespace DirectX;
 //class TreeModel;
 struct Branch;
 	
-interface ModelGenerator
+class PlaneModelGenerator : public ModelGenerator, public Model
 {
-	virtual Model* Create() = 0;
+	Model* Create() { return this; }
 };
 
 class TreeModelGenerator : ModelGenerator
