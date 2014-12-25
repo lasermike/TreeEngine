@@ -14,6 +14,7 @@ SamplerState samLinear : register( s0 );
 cbuffer cbNeverChanges : register( b0 )
 {
     matrix View;
+	Material groundMaterial;
 };
 
 cbuffer cbChangeOnResize : register( b1 )
@@ -24,9 +25,13 @@ cbuffer cbChangeOnResize : register( b1 )
 cbuffer cbChangesEveryFrame : register( b2 )
 {
 	DirectionalLight light;
-	Material mat;
 	float3 eyePos;
 };
+
+cbuffer cbChangesPerObject : register (b3)
+{
+	Material mat;
+}
 
 //--------------------------------------------------------------------------------------
 struct VS_INPUT
@@ -50,10 +55,16 @@ struct PS_INPUT
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
-PS_INPUT VS( VS_INPUT input )
+PS_INPUT VS3( VS_INPUT input )
 {
+	float4x4 world = input.World;
+	if (mat.flags.x > 0)  //useShadow
+	{
+		world *= mat.shadowMatrix;
+	}
+
     PS_INPUT output = (PS_INPUT)0;
-	output.PosW = mul(float4(input.Pos, 1.0f), input.World).xyz;;
+	output.PosW = mul(float4(input.Pos, 1.0f), world).xyz;;
 	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal); // TEMP, use gWorldInvTranspose);
 	
 	output.Pos = mul(float4(output.PosW, 1.0f), View);
@@ -61,6 +72,28 @@ PS_INPUT VS( VS_INPUT input )
     output.Tex = input.Tex;
 
     return output;
+}
+
+//--------------------------------------------------------------------------------------
+// Vertex Shader
+//--------------------------------------------------------------------------------------
+PS_INPUT VS(VS_INPUT input)
+{
+	float4x4 world = input.World;
+	if (mat.flags.x > 0) //useShadow
+	{
+		world = mat.shadowMatrix * world;
+	}
+
+	PS_INPUT output = (PS_INPUT)0;
+	output.PosW = mul(float4(input.Pos, 1.0f), transpose(world)).xyz;;
+	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal); // TEMP, use gWorldInvTranspose);
+
+	output.Pos = mul(float4(output.PosW, 1.0f), View);
+	output.Pos = mul(output.Pos, Projection);
+	output.Tex = input.Tex;
+
+	return output;
 }
 
 
@@ -73,7 +106,7 @@ float4 PS2( PS_INPUT input) : SV_Target
 }
 
 
-float4 PS(PS_INPUT pin /*, float3 gEyePosW, uniform int gLightCount*/) : SV_Target
+float4 PS(PS_INPUT pin) : SV_Target
 {
 	// Interpolating normal can unnormalize it, so normalize it.
 	pin.NormalW = normalize(pin.NormalW);
@@ -94,7 +127,11 @@ float4 PS(PS_INPUT pin /*, float3 gEyePosW, uniform int gLightCount*/) : SV_Targ
 	float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
 	float4 spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
 
-	float4 textureColor = txDiffuse.Sample(samLinear, pin.Tex);
+	float4 textureColor;
+	if (mat.flags.y > 0)  //use texture
+		textureColor = txDiffuse.Sample(samLinear, pin.Tex);
+	else
+		textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Sum the light contribution from each light source.  
 	//[unroll]

@@ -7,11 +7,11 @@
 class PrimitiveGeometry : public Geometry
 {
 	PrimitiveModel*						_model; //Weak reference
-	ID3D11Buffer*                       _pVertexBuffer;
-	ID3D11Buffer*                       _pIndexBuffer;
 
-	GeometryGenerator					_geometryGenerator;
-	GeometryBufferData					_geometryData;
+	ID3D11ShaderResourceView*           _pTextureRV;
+	ID3D11SamplerState*                 _pSamplerLinear;
+
+	Material _groundMaterial;
 
 public:
 	PrimitiveGeometry(PrimitiveModel* model);
@@ -19,13 +19,17 @@ public:
 
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	virtual HRESULT CleanUpDeviceObjects();
-	virtual HRESULT Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, XMVECTOR eyePos, float time);
 
-	virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
+	virtual HRESULT DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
 	{
-		const GeometryBufferData::BufferIndices* pBufferIndices = pGeometryData->GetBufferIndices(_model->GetPrimitiveType());
+		SetMaterial(pImmediateContext, _groundMaterial);
 
-		pImmediateContext->DrawIndexedInstanced(pBufferIndices->IndexCount, numInstances, pBufferIndices->IndexOffset, pBufferIndices->VertexOffset, startInstance);
+		pImmediateContext->PSSetShaderResources(0, 1, &_pTextureRV);
+		pImmediateContext->PSSetSamplers(0, 1, &_pSamplerLinear);
+
+		const GeometryBufferData::BufferIndices* pBufferIndices = pGeometryData->GetBufferIndices(_model->GetPrimitiveType());
+		pImmediateContext->DrawIndexedInstanced(pBufferIndices->IndexCount, numInstances, pBufferIndices->IndexOffset, 
+												pBufferIndices->VertexOffset, startInstance);
 		return S_OK;
 	}
 };

@@ -4,12 +4,16 @@
 #include "TreeModelGenerator.h"
 #include "MathHelper.h"
 
-Tree::Tree(void) : WorldObject()
+Tree::Tree(void) : _treeModel(nullptr), WorldObject()
 {
 }
 
 Tree::~Tree(void)
 {
+	if (_treeModel)
+	{
+		delete _treeModel;
+	}
 }
 
 void Tree::Create(TreeModelGenerator* generator)
@@ -18,26 +22,10 @@ void Tree::Create(TreeModelGenerator* generator)
 }
 
 HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
-{ 
+{
 	HR(CleanUpDeviceObjects());
 	_geometry = new TreeGeometry(_treeModel);
 	HR(_geometry->InitGraphics(device, pImmediateContext));
-	return S_OK;
-}
-
-HRESULT Tree::CleanUpDeviceObjects()
-{
-	if (_geometry)
-	{
-		delete _geometry;
-		_geometry = nullptr;
-	}
-	return S_OK;
-}
-
-HRESULT Tree::Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, XMVECTOR eyePos, float time)
-{
-	_geometry->Render(pImmediateContext, world, eyePos, time);
 	return S_OK;
 }
 
@@ -48,7 +36,7 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX*
 	int currentBranch = 0;
 
 	XMVECTOR vChildStart;
-	ComputeBranchIndirect(currentBranch, world, _treeModel->trunk, XMVectorSet(0, 0, 0, 0), time);
+	ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, XMVectorSet(0, 0, 0, 0), time);
 
 	int dvi = 0;
 	for (int i = 0; i < _logInstanceData.size(); i++)
@@ -65,7 +53,7 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX*
 	return S_OK;
 }
 
-HRESULT Tree::ComputeBranchIndirect(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time)
+HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time)
 {
 	if (time < branch->depth)
 		return S_OK;
@@ -98,7 +86,7 @@ HRESULT Tree::ComputeBranchIndirect(int& currentBranch, XMMATRIX const* world, B
 		if (branch->Child(c) != 0)
 		{
 			Branch* child = &_treeModel->pBranches[branch->Child(c)];
-			ComputeBranchIndirect(currentBranch, world, child, vChildStart, time);
+			ComputeBranchInstanceData(currentBranch, world, child, vChildStart, time);
 		}
 	}
 
@@ -154,9 +142,11 @@ HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransf
 	const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
 	*transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
-	*transform = XMMatrixTranspose(*transform * *world);
+	//*transform = XMMatrixTranspose(*transform * *world);
+	//*normalTransform = MathHelper::InverseTranspose(*transform);
 
-	*normalTransform = MathHelper::InverseTranspose(*transform);
+	*transform = *transform * *world;  //TODO
+	*normalTransform = MathHelper::InverseTranspose(XMMatrixTranspose(*transform));
 
 
 	//*normalTransform = *transform;

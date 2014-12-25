@@ -4,9 +4,10 @@
 
 #include "TreeModel.h"
 #include "TreeModelGenerator.h"
-#include "SceneRootGeometry.h"
+#include "SceneRoot.h"
 
 #include "Materials.h"
+#include "RenderStates.h"
 #include "MathHelper.h"
 
 #include <iostream>
@@ -20,6 +21,18 @@ TreeGeometry::TreeGeometry(TreeModel* model)
 	_pSamplerLinear = nullptr;
 	_pCBTree = nullptr;
 	_pCBBranches = nullptr;
+
+	_trunkMaterial.Ambient = XMFLOAT4(.8, .8, .8, 1.0f);
+	_trunkMaterial.Diffuse = XMFLOAT4(1, 1, 1, 1.0f);
+	_trunkMaterial.Specular = XMFLOAT4(.2, .2f, .2f, 1.0f);
+	//_trunkMaterial.flags.y = true; //useTextures  TODO
+
+	_shadowMaterial.Ambient = XMFLOAT4(0, 0, 0, 1);
+	_shadowMaterial.Diffuse = XMFLOAT4(0, 0, 0, 0.5f);
+	_shadowMaterial.Specular = XMFLOAT4(0, 0, 0, 16.0f);
+	_shadowMaterial.Reflect = XMFLOAT4(0, 0, 0, 1);
+	_shadowMaterial.flags.x = true;  //useShadowMatrix
+
 }
 
 TreeGeometry::~TreeGeometry()
@@ -27,9 +40,11 @@ TreeGeometry::~TreeGeometry()
 	CleanUpDeviceObjects();
 }
 
-
 HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
 {
+	HR(CleanUpDeviceObjects());
+	HR(Geometry::InitGraphics(device, pImmediateContext));
+
 	// Load the Texture
 	HR(CreateDDSTextureFromFile(device, L"bark2.dds", nullptr, &_pTextureRV));
 
@@ -50,87 +65,45 @@ HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pI
 	return S_OK;
 }
 
-HRESULT TreeGeometry::RenderInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
+HRESULT TreeGeometry::CleanUpDeviceObjects()
 {
+	HR(Geometry::CleanUpDeviceObjects());
+
+	SafeRelease(&_pSamplerLinear);
+	SafeRelease(&_pTextureRV);
+	SafeRelease(&_pCBTree);
+
+	return S_OK;
+}
+
+HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
+{
+	SetMaterial(pImmediateContext, _trunkMaterial);
+
 	pImmediateContext->PSSetShaderResources(0, 1, &_pTextureRV);
 	pImmediateContext->PSSetSamplers(0, 1, &_pSamplerLinear);
 
-	/*D3D11_MAPPED_SUBRESOURCE mappedData;
-	HR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
-	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
-
-	int dvi = 0;
-	for (int i = 0; i < _logInstanceData.size(); i++)
-	{
-		dataView[dvi++] = _logInstanceData[i];
-	}
-
-	for (int i = 0; i < _twigInstanceData.size(); i++)
-	{
-		dataView[dvi++] = _twigInstanceData[i];
-	}
-	assert(dvi == currentBranch);
-
-	pImmediateContext->Unmap(_pInstancedBuffer, 0);
-	*/
 	const GeometryBufferData::BufferIndices* pCylinderIndices = pGeometryData->GetBufferIndices(PrimitiveType_Cylinder);
 
 	pImmediateContext->DrawIndexedInstanced(pCylinderIndices->IndexCount, numInstances, pCylinderIndices->IndexOffset, pCylinderIndices->VertexOffset, startInstance);
-	//pImmediateContext->DrawIndexedInstanced(_geometryData.mBoxIndexCount /*36*/, currentBranch, _geometryData.mBoxIndexOffset, _geometryData.mBoxVertexOffset, 0);
+	/////pImmediateContext->DrawIndexedInstanced(_geometryData.mBoxIndexCount /*36*/, currentBranch, _geometryData.mBoxIndexOffset, _geometryData.mBoxVertexOffset, 0);
+
+	// Shadow
+	pImmediateContext->OMSetDepthStencilState(RenderStates::NoDoubleBlendDSS, 0);
+
+	XMFLOAT3 lightDir = XMFLOAT3(.7f, -.7f, .7f); // TODO: get some scene
+	XMVECTOR shadowPlane = XMVectorSet(0, 1, 0, 0); // XZ plane
+	XMVECTOR toMainLight = XMLoadFloat3(&lightDir) ;
+	XMMATRIX s = XMMatrixShadow(shadowPlane, toMainLight);	
+	XMMATRIX shadowOffsetY = XMMatrixTranslation(0, -1.0f, 0); // *XMMatrixScaling(2.0f, 0.0f, 2.0f);
+	XMStoreFloat4x4(&_shadowMaterial.shadowMatrix,  shadowOffsetY * s);
+	SetMaterial(pImmediateContext, _shadowMaterial);
+	
+	pImmediateContext->DrawIndexedInstanced(pCylinderIndices->IndexCount, numInstances, pCylinderIndices->IndexOffset, pCylinderIndices->VertexOffset, startInstance);
+
+	pImmediateContext->OMSetDepthStencilState(0, 0);
 
 	return S_OK;
 }
 
-HRESULT TreeGeometry::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t)
-{
-/*	pImmediateContext->PSSetShaderResources(0, 1, &_pTextureRV);
-	pImmediateContext->PSSetSamplers(0, 1, &_pSamplerLinear);
 
-	HRESULT hr = S_OK;
-
-	return RenderBranchDirect(pImmediateContext, world, _model->trunk, XMVectorSet(0, 0, 0, 0), t);*/
-
-	return E_NOTIMPL;
-}
-
-HRESULT TreeGeometry::RenderBranchDirect(ID3D11DeviceContext* pImmediateContext, XMMATRIX const* world, Branch const* branch, FXMVECTOR parentStart, float time)
-{
-/*	if (time < branch->depth)
-		return S_OK;
-
-	// Update variables that change once per frame
-	XMVECTOR vChildStart;
-	CBChangesEveryFrameDirect cb;
-	ComputeTransformations(&cb.mWorld, &cb.mNormalWorld, &vChildStart, time, branch, world, parentStart);
-
-	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
-
-	// Just draw boxes
-	pImmediateContext->DrawIndexed(36, 0, 0);
-
-	// Render child branches
-	const int maxChildren = 4;
-	for (int c = 0; c < maxChildren; c++)
-	{
-		if (branch->Child(c) != 0)
-		{
-			Branch* child = &_model->pBranches[branch->Child(c)];
-			RenderBranchDirect(pImmediateContext, world, child, vChildStart, time);
-		}
-	}
-	*/
-	return S_OK;
-}
-
-
-
-HRESULT TreeGeometry::CleanUpDeviceObjects()
-{
-	if (_pSamplerLinear) _pSamplerLinear->Release();
-	if (_pTextureRV) _pTextureRV->Release();
-	if (_pCBTree) _pCBTree->Release();
-
-	return S_OK;
-}

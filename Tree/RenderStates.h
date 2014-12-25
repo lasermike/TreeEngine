@@ -1,15 +1,12 @@
+#pragma once
 //***************************************************************************************
 // RenderStates.h by Frank Luna (C) 2011 All Rights Reserved.
 //   
 // Defines render state objects.  
 //***************************************************************************************
 
-#ifndef RENDERSTATES_H
-#define RENDERSTATES_H
-
 #include "CommonStuff.h"
 #include <d3d11_1.h>
-//#include "d3dUtil.h"
 
 class RenderStates
 {
@@ -32,5 +29,3 @@ public:
 	static ID3D11DepthStencilState* DrawReflectionDSS;
 	static ID3D11DepthStencilState* NoDoubleBlendDSS;
 };
-
-#endif // RENDERSTATES_H

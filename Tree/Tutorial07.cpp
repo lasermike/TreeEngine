@@ -20,7 +20,7 @@
 #include <directxmath.h>
 #include <directxcolors.h>
 #include "resource.h"
-#include "SceneRootGeometry.h"
+#include "SceneRoot.h"
 #include "Tree.h"
 #include "TreeModelGenerator.h"
 #include "Primitive.h"
@@ -34,11 +34,6 @@ using namespace DirectX;
 //--------------------------------------------------------------------------------------
 // Structures
 //--------------------------------------------------------------------------------------
-struct CBNeverChanges
-{
-    XMMATRIX mView;
-};
-
 struct CBChangeOnResize
 {
     XMMATRIX mProjection;
@@ -71,14 +66,11 @@ std::vector<unsigned int>			g_seeds;
 int									g_currentSeed = 0;
 
 Primitive							g_Plane;
-SceneRootGeometry					g_Scene;
+SceneRoot							g_Scene;
 
-ID3D11Buffer*                       g_pCBNeverChanges = nullptr;
 ID3D11Buffer*                       g_pCBChangeOnResize = nullptr;
 XMMATRIX                            g_World;
-XMMATRIX                            g_View;
 XMMATRIX                            g_Projection;
-XMVECTOR							g_Eye;
 
 
 //--------------------------------------------------------------------------------------
@@ -89,6 +81,7 @@ HRESULT InitDevice();
 void CleanupDevice();
 LRESULT CALLBACK    WndProc( HWND, UINT, WPARAM, LPARAM );
 void Render();
+HRESULT OnResize();
 
 int main() {
 	g_Scene.AddChild(&g_tree);
@@ -184,11 +177,6 @@ HRESULT InitDevice()
 {
     HRESULT hr = S_OK;
 
-    RECT rc;
-    GetClientRect( g_hWnd, &rc );
-    UINT width = rc.right - rc.left;
-    UINT height = rc.bottom - rc.top;
-
     UINT createDeviceFlags = 0;
 #ifdef _DEBUG
     createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -230,6 +218,73 @@ HRESULT InitDevice()
     if( FAILED( hr ) )
         return hr;
 
+	// Create constant buffer
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(CBChangeOnResize);
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.CPUAccessFlags = 0;
+	hr = g_pd3dDevice->CreateBuffer(&bd, nullptr, &g_pCBChangeOnResize);
+	if (FAILED(hr))
+		return hr;
+
+    // Initialize the world matrices
+    g_World = XMMatrixIdentity();
+
+	OnResize();
+
+    return S_OK;
+}
+
+HRESULT OnResize()
+{
+	HRESULT hr = S_OK;
+
+	if (!g_pImmediateContext)
+	{
+		return S_FALSE;
+	}
+
+	// Create width/height dependent objects
+	SafeRelease(&g_pDepthStencil);
+	SafeRelease(&g_pDepthStencilView);
+	SafeRelease(&g_pRenderTargetView);
+	SafeRelease(&g_pSwapChain1);
+	SafeRelease(&g_pSwapChain);
+
+	RECT rc;
+	GetClientRect(g_hWnd, &rc);
+	UINT width = rc.right - rc.left;
+	UINT height = rc.bottom - rc.top;
+
+	// Initialize the projection matrix
+	g_Projection = XMMatrixPerspectiveFovLH(XM_PIDIV4, width / (FLOAT)height, 0.01f, 100.0f);
+
+	CBChangeOnResize cbChangesOnResize;
+	cbChangesOnResize.mProjection = XMMatrixTranspose(g_Projection);
+	g_pImmediateContext->UpdateSubresource(g_pCBChangeOnResize, 0, nullptr, &cbChangesOnResize, 0, 0);
+
+	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
+	IDXGIFactory1* dxgiFactory = nullptr;
+	{
+		IDXGIDevice* dxgiDevice = nullptr;
+		hr = g_pd3dDevice->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
+		if (SUCCEEDED(hr))
+		{
+			IDXGIAdapter* adapter = nullptr;
+			hr = dxgiDevice->GetAdapter(&adapter);
+			if (SUCCEEDED(hr))
+			{
+				hr = adapter->GetParent(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&dxgiFactory));
+				adapter->Release();
+			}
+			dxgiDevice->Release();
+		}
+	}
+	if (FAILED(hr))
+		return hr;
+
 	// Check MSAA support
 	UINT msaaQuality;
 	const UINT msaaCount = 4;
@@ -238,127 +293,6 @@ HRESULT InitDevice()
 	{
 		g_enableMsaa = false;
 	}
-
-    // Obtain DXGI factory from device (since we used nullptr for pAdapter above)
-    IDXGIFactory1* dxgiFactory = nullptr;
-    {
-        IDXGIDevice* dxgiDevice = nullptr;
-        hr = g_pd3dDevice->QueryInterface( __uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice) );
-        if (SUCCEEDED(hr))
-        {
-            IDXGIAdapter* adapter = nullptr;
-            hr = dxgiDevice->GetAdapter(&adapter);
-            if (SUCCEEDED(hr))
-            {
-                hr = adapter->GetParent( __uuidof(IDXGIFactory1), reinterpret_cast<void**>(&dxgiFactory) );
-                adapter->Release();
-            }
-            dxgiDevice->Release();
-        }
-    }
-    if (FAILED(hr))
-        return hr;
-
-    // Create swap chain
-    IDXGIFactory2* dxgiFactory2 = nullptr;
-    hr = dxgiFactory->QueryInterface( __uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2) );
-    if ( dxgiFactory2 )
-    {
-        // DirectX 11.1 or later
-        hr = g_pd3dDevice->QueryInterface( __uuidof(ID3D11Device1), reinterpret_cast<void**>(&g_pd3dDevice1) );
-        if (SUCCEEDED(hr))
-        {
-            (void) g_pImmediateContext->QueryInterface( __uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&g_pImmediateContext1) );
-        }
-
-        DXGI_SWAP_CHAIN_DESC1 sd;
-        ZeroMemory(&sd, sizeof(sd));
-        sd.Width = width;
-        sd.Height = height;
-        sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		sd.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
-		sd.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
-        sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        sd.BufferCount = 1;
-
-        hr = dxgiFactory2->CreateSwapChainForHwnd( g_pd3dDevice, g_hWnd, &sd, nullptr, nullptr, &g_pSwapChain1 );
-        if (SUCCEEDED(hr))
-        {
-            hr = g_pSwapChain1->QueryInterface( __uuidof(IDXGISwapChain), reinterpret_cast<void**>(&g_pSwapChain) );
-        }
-
-        dxgiFactory2->Release();
-    }
-    else
-    {
-        // DirectX 11.0 systems
-        DXGI_SWAP_CHAIN_DESC sd;
-        ZeroMemory(&sd, sizeof(sd));
-        sd.BufferCount = 1;
-        sd.BufferDesc.Width = width;
-        sd.BufferDesc.Height = height;
-        sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        sd.BufferDesc.RefreshRate.Numerator = 60;
-        sd.BufferDesc.RefreshRate.Denominator = 1;
-        sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        sd.OutputWindow = g_hWnd;
-		sd.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
-		sd.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
-        sd.Windowed = TRUE;
-
-        hr = dxgiFactory->CreateSwapChain( g_pd3dDevice, &sd, &g_pSwapChain );
-    }
-
-    dxgiFactory->Release();
-
-    if (FAILED(hr))
-        return hr;
-
-    // Create a render target view
-    ID3D11Texture2D* pBackBuffer = nullptr;
-    hr = g_pSwapChain->GetBuffer( 0, __uuidof( ID3D11Texture2D ), reinterpret_cast<void**>( &pBackBuffer ) );
-    if( FAILED( hr ) )
-        return hr;
-
-    hr = g_pd3dDevice->CreateRenderTargetView( pBackBuffer, nullptr, &g_pRenderTargetView );
-    pBackBuffer->Release();
-    if( FAILED( hr ) )
-        return hr;
-
-    // Create depth stencil texture
-    D3D11_TEXTURE2D_DESC descDepth;
-    ZeroMemory( &descDepth, sizeof(descDepth) );
-    descDepth.Width = width;
-    descDepth.Height = height;
-    descDepth.MipLevels = 1;
-    descDepth.ArraySize = 1;
-    descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	descDepth.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
-	descDepth.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
-    descDepth.Usage = D3D11_USAGE_DEFAULT;
-    descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-    descDepth.CPUAccessFlags = 0;
-    descDepth.MiscFlags = 0;
-    hr = g_pd3dDevice->CreateTexture2D( &descDepth, nullptr, &g_pDepthStencil );
-    if( FAILED( hr ) )
-        return hr;
-
-    // Create the depth stencil view
-    hr = g_pd3dDevice->CreateDepthStencilView( g_pDepthStencil, 0, &g_pDepthStencilView );
-    if( FAILED( hr ) )
-        return hr;
-
-    g_pImmediateContext->OMSetRenderTargets( 1, &g_pRenderTargetView, g_pDepthStencilView );
-
-    // Setup the viewport
-    D3D11_VIEWPORT vp;
-    vp.Width = (FLOAT)width;
-    vp.Height = (FLOAT)height;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
-    g_pImmediateContext->RSSetViewports( 1, &vp );
 
 	// Enable MSAA
 	if (g_enableMsaa)
@@ -378,68 +312,129 @@ HRESULT InitDevice()
 		g_pImmediateContext->RSSetState(g_rasterState);
 	}
 
-    // Create the constant buffers
-    D3D11_BUFFER_DESC bd;
-    ZeroMemory( &bd, sizeof(bd) );
-    bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.ByteWidth = sizeof(CBNeverChanges);
-    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    bd.CPUAccessFlags = 0;
-    hr = g_pd3dDevice->CreateBuffer( &bd, nullptr, &g_pCBNeverChanges );
-    if( FAILED( hr ) )
-        return hr;
-    
-    bd.ByteWidth = sizeof(CBChangeOnResize);
-    hr = g_pd3dDevice->CreateBuffer( &bd, nullptr, &g_pCBChangeOnResize );
-    if( FAILED( hr ) )
-        return hr;
- 
-    // Initialize the world matrices
-    g_World = XMMatrixIdentity();
+	// Create swap chain
+	IDXGIFactory2* dxgiFactory2 = nullptr;
+	hr = dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2));
+	if (dxgiFactory2)
+	{
+		// DirectX 11.1 or later
+		hr = g_pd3dDevice->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void**>(&g_pd3dDevice1));
+		if (SUCCEEDED(hr))
+		{
+			(void)g_pImmediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&g_pImmediateContext1));
+		}
 
-    // Initialize the view matrix
-    g_Eye = XMVectorSet( 0.0f, 3.5f, -6.0f, 0.0f );
-    XMVECTOR At = XMVectorSet( 0.0f, 2.0f, 0.0f, 0.0f );
-    XMVECTOR Up = XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
-    g_View = XMMatrixLookAtLH( g_Eye, At, Up );
+		DXGI_SWAP_CHAIN_DESC1 sd;
+		ZeroMemory(&sd, sizeof(sd));
+		sd.Width = width;
+		sd.Height = height;
+		sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		sd.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
+		sd.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
+		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		sd.BufferCount = 1;
 
-    CBNeverChanges cbNeverChanges;
-    cbNeverChanges.mView = XMMatrixTranspose( g_View );
-    g_pImmediateContext->UpdateSubresource( g_pCBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0 );
+		hr = dxgiFactory2->CreateSwapChainForHwnd(g_pd3dDevice, g_hWnd, &sd, nullptr, nullptr, &g_pSwapChain1);
+		if (SUCCEEDED(hr))
+		{
+			hr = g_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&g_pSwapChain));
+		}
 
-    // Initialize the projection matrix
-    g_Projection = XMMatrixPerspectiveFovLH( XM_PIDIV4, width / (FLOAT)height, 0.01f, 100.0f );
-    
-    CBChangeOnResize cbChangesOnResize;
-    cbChangesOnResize.mProjection = XMMatrixTranspose( g_Projection );
-    g_pImmediateContext->UpdateSubresource( g_pCBChangeOnResize, 0, nullptr, &cbChangesOnResize, 0, 0 );
+		dxgiFactory2->Release();
+	}
+	else
+	{
+		// DirectX 11.0 systems
+		DXGI_SWAP_CHAIN_DESC sd;
+		ZeroMemory(&sd, sizeof(sd));
+		sd.BufferCount = 1;
+		sd.BufferDesc.Width = width;
+		sd.BufferDesc.Height = height;
+		sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		sd.BufferDesc.RefreshRate.Numerator = 60;
+		sd.BufferDesc.RefreshRate.Denominator = 1;
+		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		sd.OutputWindow = g_hWnd;
+		sd.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
+		sd.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
+		sd.Windowed = TRUE;
 
-    return S_OK;
+		hr = dxgiFactory->CreateSwapChain(g_pd3dDevice, &sd, &g_pSwapChain);
+	}
+
+	dxgiFactory->Release();
+
+	if (FAILED(hr))
+		return hr;
+
+	// Create a render target view
+	ID3D11Texture2D* pBackBuffer = nullptr;
+	hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer));
+	if (FAILED(hr))
+		return hr;
+
+	hr = g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_pRenderTargetView);
+	pBackBuffer->Release();
+	if (FAILED(hr))
+		return hr;
+
+	// Create depth stencil texture
+	D3D11_TEXTURE2D_DESC descDepth;
+	ZeroMemory(&descDepth, sizeof(descDepth));
+	descDepth.Width = width;
+	descDepth.Height = height;
+	descDepth.MipLevels = 1;
+	descDepth.ArraySize = 1;
+	descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	descDepth.SampleDesc.Count = g_enableMsaa ? msaaCount : 1;
+	descDepth.SampleDesc.Quality = g_enableMsaa ? msaaQuality - 1 : 0;
+	descDepth.Usage = D3D11_USAGE_DEFAULT;
+	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	descDepth.CPUAccessFlags = 0;
+	descDepth.MiscFlags = 0;
+	hr = g_pd3dDevice->CreateTexture2D(&descDepth, nullptr, &g_pDepthStencil);
+	if (FAILED(hr))
+		return hr;
+
+	// Create the depth stencil view
+	hr = g_pd3dDevice->CreateDepthStencilView(g_pDepthStencil, 0, &g_pDepthStencilView);
+	if (FAILED(hr))
+		return hr;
+
+	g_pImmediateContext->OMSetRenderTargets(1, &g_pRenderTargetView, g_pDepthStencilView);
+
+	// Setup the viewport
+	D3D11_VIEWPORT vp;
+	vp.Width = (FLOAT)width;
+	vp.Height = (FLOAT)height;
+	vp.MinDepth = 0.0f;
+	vp.MaxDepth = 1.0f;
+	vp.TopLeftX = 0;
+	vp.TopLeftY = 0;
+	g_pImmediateContext->RSSetViewports(1, &vp);
+
+	return S_OK;
 }
-
 
 //--------------------------------------------------------------------------------------
 // Clean up the objects we've created
 //--------------------------------------------------------------------------------------
 void CleanupDevice()
 {
-    if( g_pImmediateContext ) g_pImmediateContext->ClearState();
-
-    if( g_pCBNeverChanges ) g_pCBNeverChanges->Release();
-    if( g_pCBChangeOnResize ) g_pCBChangeOnResize->Release();
- 	//g_tree.CleanUpDeviceObjects();
-	//g_Plane.CleanUpDeviceObjects();
 	g_Scene.CleanUpDeviceObjects();
-	if (g_rasterState) g_rasterState->Release();
-	if( g_pDepthStencil ) g_pDepthStencil->Release();
-    if( g_pDepthStencilView ) g_pDepthStencilView->Release();
-    if( g_pRenderTargetView ) g_pRenderTargetView->Release();
-    if( g_pSwapChain1 ) g_pSwapChain1->Release();
-    if( g_pSwapChain ) g_pSwapChain->Release();
-    if( g_pImmediateContext1 ) g_pImmediateContext1->Release();
-    if( g_pImmediateContext ) g_pImmediateContext->Release();
-    if( g_pd3dDevice1 ) g_pd3dDevice1->Release();
-    if( g_pd3dDevice ) g_pd3dDevice->Release();
+
+	SafeRelease(&g_pImmediateContext);
+	SafeRelease(&g_pCBChangeOnResize);
+	SafeRelease(&g_rasterState);
+	SafeRelease(&g_pDepthStencil);
+	SafeRelease(&g_pDepthStencilView);
+	SafeRelease(&g_pRenderTargetView);
+	SafeRelease(&g_pSwapChain1);
+	SafeRelease(&g_pSwapChain);
+	SafeRelease(&g_pImmediateContext1); 
+	SafeRelease(&g_pImmediateContext);
+	SafeRelease(&g_pd3dDevice1); 
+	SafeRelease(&g_pd3dDevice);
 }
 
 
@@ -457,7 +452,9 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
             hdc = BeginPaint( hWnd, &ps );
             EndPaint( hWnd, &ps );
             break;
-
+		case WM_SIZE:
+			OnResize();
+			break;
 		case WM_KEYDOWN:
 			switch(wParam)
 			{
@@ -530,12 +527,7 @@ void Render()
     }
 
     // Rotate cube around the origin
-    g_World = XMMatrixRotationY( t );
-
-    // Modify the color
-    //g_vMeshColor.x = ( sinf( t * 1.0f ) + 1.0f ) * 0.5f;
-    //g_vMeshColor.y = ( cosf( t * 3.0f ) + 1.0f ) * 0.5f;
-    //g_vMeshColor.z = ( sinf( t * 5.0f ) + 1.0f ) * 0.5f;
+    g_World = XMMatrixRotationY( t );  //TODO: Uncomment after shadows are working
 
     //
     // Clear the back buffer
@@ -547,17 +539,10 @@ void Render()
     //
     g_pImmediateContext->ClearDepthStencilView( g_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
 
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBNeverChanges);
 	g_pImmediateContext->VSSetConstantBuffers(1, 1, &g_pCBChangeOnResize);
 
 	// Draw everything
-	g_Scene.Render(g_pImmediateContext, &g_World, g_Eye, t);
-
-	// Draw ground
-	//g_Plane.Render(g_pImmediateContext, &g_World, g_Eye, t);
-
-	// Draw tree
-	//g_tree.Render(g_pImmediateContext, &g_World, g_Eye, t);
+	g_Scene.Render(g_pImmediateContext, &g_World, t);
 
     //
     // Present our back buffer to our front buffer

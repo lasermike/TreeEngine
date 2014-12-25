@@ -4,21 +4,23 @@
 
 WorldObject::WorldObject(void) :_geometry(), _drawInstanced(true)
 {
-	_model = nullptr;
 }
 
 WorldObject::~WorldObject(void)
 {
-	if (_model)
-	{
-		delete _model;
-	}
+	CleanUpDeviceObjects();
+}
+
+HRESULT WorldObject::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
+{
+	return S_OK;
 }
 
 HRESULT WorldObject::CleanUpDeviceObjects()
 {
 	if (_geometry)
 	{
+		HR(_geometry->CleanUpDeviceObjects());
 		delete _geometry;
 		_geometry = nullptr;
 	}
@@ -27,12 +29,10 @@ HRESULT WorldObject::CleanUpDeviceObjects()
 
 HRESULT WorldObject::Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, XMVECTOR eyePos, float time)
 {
-	_geometry->Render(pImmediateContext, world, eyePos, time);
-	return S_OK;
+	return E_NOTIMPL;
 }
-
 
 HRESULT WorldObject::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time, InstancedData* dataView)
 {
-	return S_FALSE;
+	return E_NOTIMPL;
 }

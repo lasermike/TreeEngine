@@ -407,7 +407,7 @@
     <ClCompile Include="Primitive.cpp" />
     <ClCompile Include="PrimitiveGeometry.cpp" />
     <ClCompile Include="RenderStates.cpp" />
-    <ClCompile Include="SceneRootGeometry.cpp" />
+    <ClCompile Include="SceneRoot.cpp" />
     <ClCompile Include="Tree.cpp" />
     <ClCompile Include="TreeGeometry.cpp" />
     <ClCompile Include="TreeModel.cpp" />
@@ -427,7 +427,7 @@
     <ClInclude Include="PrimitiveGeometry.h" />
     <ClInclude Include="RenderStates.h" />
     <CLInclude Include="resource.h" />
-    <ClInclude Include="SceneRootGeometry.h" />
+    <ClInclude Include="SceneRoot.h" />
     <ClInclude Include="Tree.h" />
     <ClInclude Include="TreeGeometry.h" />
     <ClInclude Include="TreeModel.h" />

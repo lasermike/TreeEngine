@@ -1,13 +1,16 @@
 #include "Primitive.h"
 #include "PrimitiveGeometry.h"
 
-Primitive::Primitive()
+Primitive::Primitive() : _model(nullptr)
 {
 }
 
-
 Primitive::~Primitive()
 {
+	if (_model)
+	{
+		delete _model;
+	}
 }
 
 void Primitive::Create(PrimitiveModelGenerator* generator)
@@ -25,7 +28,17 @@ HRESULT Primitive::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 
 HRESULT Primitive::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time, InstancedData* dataView)
 {
-	XMMATRIX transform = XMMatrixTranspose(XMMatrixScaling(3, .1f, 3) * *world);
+	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0);
+	const XMVECTOR vScaleCenter = XMVectorSet(0, 0, 0, 0);
+	XMVECTOR vScale = XMVectorSet(8, .01f, 8, 1);
+	XMVECTOR vQuat = XMQuaternionIdentity();
+	XMVECTOR vStart = XMVectorSet(0,-0.50f,0,1);
+
+	XMMATRIX transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
+
+
+	//transform = XMMatrixTranspose(transform * *world);
+	transform = transform * *world;
 
 	XMStoreFloat4x4(&dataView->World, transform);
 	XMStoreFloat4x4(&dataView->WorldNormal, transform);
@@ -33,8 +46,3 @@ HRESULT Primitive::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMA
 	return S_OK;
 }
 
-/*HRESULT Primitive::RenderInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
-{
-	pImmediateContext->DrawIndexedInstanced(pGeometryData->mCylinderIndexCount, numInstances, pGeometryData->mCylinderIndexOffset, pGeometryData->mCylinderVertexOffset, startInstance);
-	return S_OK;
-}*/
