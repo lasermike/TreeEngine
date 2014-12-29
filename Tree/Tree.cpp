@@ -36,7 +36,7 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX*
 	int currentBranch = 0;
 
 	XMVECTOR vChildStart;
-	ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, XMVectorSet(0, 0, 0, 0), time);
+	ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, XMVectorSet(0, .5, 0, 0), time);
 
 	int dvi = 0;
 	for (int i = 0; i < _logInstanceData.size(); i++)

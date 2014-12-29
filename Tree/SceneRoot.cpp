@@ -1,16 +1,18 @@
 #include "SceneRoot.h"
 #include <d3dcompiler.h>
 #include "GeometryGenerator.h"
+#include "RenderStates.h"
 
 struct CBNeverChanges
 {
 	XMMATRIX mView;
 };
 
-struct CBChangesEveryFrameInstanced
+struct CBChangesEveryFrame
 {
 	DirectionalLight light;
 	XMVECTOR eyePos;
+	XMMATRIX worldToCamera;
 };
 
 #pragma region InputLayouts
@@ -115,8 +117,8 @@ SceneRoot::SceneRoot()
 
 	_light.Ambient = XMFLOAT4(.6, .6f, .6f, 1.0f);
 	_light.Diffuse = XMFLOAT4(.5, .5f, .5f, 1.0f);
-	_light.Direction = XMFLOAT3(.7f, -.7f, .7f);
 	_light.Specular = XMFLOAT4(.1, .1f, .1f, 1.0f);
+	_light.Direction = XMFLOAT3(.7f, -.7f, .7f);
 	_pCBChangesEveryFrame = nullptr;
 	_pCBNeverChanges = nullptr;
 }
@@ -134,6 +136,8 @@ void SceneRoot::Create(ModelGenerator* generator)
 HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
 {
 	HRESULT hr = S_OK;
+
+	HR(RenderStates::InitAll(device));
 
 	// Initialize the view matrix
 	_eyePos = XMVectorSet(0.0f, 2.25f, -6.0f, 0.0f);
@@ -198,6 +202,8 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 		return hr;
 	}
 
+
+
 	// Create Instanced draw data layout
 	InputLayouts::InitAll(device, pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize());
 
@@ -246,21 +252,11 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	HR(device->CreateBuffer(&ibd, &iinitData, &_pIndexBuffer));
 
 	// Set vertex buffer
-	/*if (!_drawInstanced)
-	{
-		UINT stride = sizeof(SimpleVertex);
-		UINT offset = 0;
-		pImmediateContext->IASetVertexBuffers(0, 1, &_pVertexBuffer, &stride, &offset);
-	}
-	else
-	{*/
+	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
+	UINT offset[2] = { 0, 0 };
+	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
 
-		UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
-		UINT offset[2] = { 0, 0 };
-		ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-
-		pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
-	//}
+	pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
 
 	// Set index buffer
 	pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
@@ -271,7 +267,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	// Create constants for per frame 
 	ZeroMemory(&bd, sizeof(bd));
 	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(CBChangesEveryFrameInstanced);
+	bd.ByteWidth = sizeof(CBChangesEveryFrame);
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
 	hr = device->CreateBuffer(&bd, nullptr, &_pCBChangesEveryFrame);
@@ -304,9 +300,10 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* worl
 	pImmediateContext->VSSetShader(_pVertexShader, nullptr, 0);
 	pImmediateContext->PSSetShader(_pPixelShader, nullptr, 0);
 
-	CBChangesEveryFrameInstanced cb;
+	CBChangesEveryFrame cb;
 	cb.light = _light;
 	cb.eyePos = _eyePos;
+	cb.worldToCamera = XMMatrixRotationY(time);
 
 	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
 	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
@@ -326,6 +323,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* worl
 
 HRESULT SceneRoot::CleanUpDeviceObjects()
 {
+	RenderStates::DestroyAll();
 
 	for (auto i = _children.begin(); i != _children.end(); i++)
 	{

@@ -527,7 +527,7 @@ void Render()
     }
 
     // Rotate cube around the origin
-    g_World = XMMatrixRotationY( t );  //TODO: Uncomment after shadows are working
+    //g_World = XMMatrixRotationY( t );  //TODO: Uncomment after shadows are working
 
     //
     // Clear the back buffer

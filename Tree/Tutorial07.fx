@@ -26,6 +26,7 @@ cbuffer cbChangesEveryFrame : register( b2 )
 {
 	DirectionalLight light;
 	float3 eyePos;
+	matrix worldToCamera;
 };
 
 cbuffer cbChangesPerObject : register (b3)
@@ -79,10 +80,11 @@ PS_INPUT VS3( VS_INPUT input )
 //--------------------------------------------------------------------------------------
 PS_INPUT VS(VS_INPUT input)
 {
-	float4x4 world = input.World;
+	float4x4 world = input.World  ;
+    [flatten]
 	if (mat.flags.x > 0) //useShadow
 	{
-		world = mat.shadowMatrix * world;
+		world = mat.shadowMatrix * world ;
 	}
 
 	PS_INPUT output = (PS_INPUT)0;

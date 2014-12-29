@@ -89,19 +89,24 @@ HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMMA
 	/////pImmediateContext->DrawIndexedInstanced(_geometryData.mBoxIndexCount /*36*/, currentBranch, _geometryData.mBoxIndexOffset, _geometryData.mBoxVertexOffset, 0);
 
 	// Shadow
+	pImmediateContext->OMSetBlendState(RenderStates::TransparentBS, nullptr, 0xffffffff);
 	pImmediateContext->OMSetDepthStencilState(RenderStates::NoDoubleBlendDSS, 0);
 
-	XMFLOAT3 lightDir = XMFLOAT3(.7f, -.7f, .7f); // TODO: get some scene
+	XMFLOAT4 lightDir = XMFLOAT4(1, 1, 1, 1); // TODO: get from scene
+	XMVECTOR toMainLight = -(XMLoadFloat4(&lightDir));
+	toMainLight = XMVectorSetW(toMainLight, 1);
+
 	XMVECTOR shadowPlane = XMVectorSet(0, 1, 0, 0); // XZ plane
-	XMVECTOR toMainLight = XMLoadFloat3(&lightDir) ;
-	XMMATRIX s = XMMatrixShadow(shadowPlane, toMainLight);	
-	XMMATRIX shadowOffsetY = XMMatrixTranslation(0, -1.0f, 0); // *XMMatrixScaling(2.0f, 0.0f, 2.0f);
-	XMStoreFloat4x4(&_shadowMaterial.shadowMatrix,  shadowOffsetY * s);
+	XMMATRIX s = XMMatrixShadow(shadowPlane, toMainLight);
+	XMMATRIX shadowOffsetY = XMMatrixTranslation(0, 0.99, 0); // *XMMatrixScaling(2.0f, 0.0f, 2.0f);
+	XMStoreFloat4x4(&_shadowMaterial.shadowMatrix, shadowOffsetY * s );
+
 	SetMaterial(pImmediateContext, _shadowMaterial);
 	
 	pImmediateContext->DrawIndexedInstanced(pCylinderIndices->IndexCount, numInstances, pCylinderIndices->IndexOffset, pCylinderIndices->VertexOffset, startInstance);
 
 	pImmediateContext->OMSetDepthStencilState(0, 0);
+	pImmediateContext->OMSetBlendState(0, nullptr, 0xffffffff);
 
 	return S_OK;
 }
