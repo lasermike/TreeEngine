@@ -5,7 +5,7 @@
 // Defines render state objects.  
 //***************************************************************************************
 
-#include "CommonStuff.h"
+#include "stdafx.h"
 #include <d3d11_1.h>
 
 class RenderStates

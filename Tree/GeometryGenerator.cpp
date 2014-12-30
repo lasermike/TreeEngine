@@ -2,8 +2,10 @@
 // GeometryGenerator.cpp by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
+#include "stdafx.h"
 #include "MathHelper.h"
 #include "GeometryGenerator.h"
+#include <algorithm>
 
 
 void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
@@ -343,7 +345,7 @@ void GeometryGenerator::Subdivide(MeshData& meshData)
 void GeometryGenerator::CreateGeosphere(float radius, UINT numSubdivisions, MeshData& meshData)
 {
 	// Put a cap on the number of subdivisions.
-	numSubdivisions = min(numSubdivisions, 5u);
+	numSubdivisions = std::min(numSubdivisions, 5u);
 
 	// Approximate a sphere by tessellating an icosahedron.
 

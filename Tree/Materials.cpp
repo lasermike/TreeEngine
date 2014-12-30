@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "Materials.h"
 
 

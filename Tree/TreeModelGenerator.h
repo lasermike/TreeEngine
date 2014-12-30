@@ -1,5 +1,5 @@
 #pragma once
-#include "CommonStuff.h"
+#include "stdafx.h"
 #include <directxmath.h>
 #include "TreeModel.h"
 

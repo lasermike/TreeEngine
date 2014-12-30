@@ -1,7 +1,6 @@
+#include "stdafx.h"
 #include "PrimitiveGeometry.h"
 #include "DDSTextureLoader.h"
-
-
 
 PrimitiveGeometry::PrimitiveGeometry(PrimitiveModel* model) : Geometry()
 {

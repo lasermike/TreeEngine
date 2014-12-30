@@ -1,4 +1,4 @@
-#include "CommonStuff.h"
+#include "stdafx.h"
 #include "Tree.h"
 #include "TreeModel.h"
 #include "TreeModelGenerator.h"

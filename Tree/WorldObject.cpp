@@ -1,4 +1,4 @@
-#include "CommonStuff.h"
+#include "stdafx.h"
 #include "WorldObject.h"
 
 

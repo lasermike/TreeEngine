@@ -1,12 +1,12 @@
 #pragma once
-#include "CommonStuff.h"
+#include "stdafx.h"
 #include "Materials.h"
 #include "Geometry.h"
 #include "GeometryGenerator.h"
 #include "WorldObject.h"
 #include <list>
 
-class SceneRoot 
+class SceneRoot
 {
 	ID3D11VertexShader*                 _pVertexShader;
 	ID3D11PixelShader*                  _pPixelShader;
@@ -19,7 +19,7 @@ class SceneRoot
 	ID3D11Buffer*                       _pCBChangesEveryFrame;
 	DirectionalLight					_light;  // Doesn't belong here, will move later
 
-	XMMATRIX                            _View;
+	XMFLOAT4X4                          _View;
 	XMVECTOR							_eyePos;
 
 	GeometryGenerator					_geometryGenerator;
@@ -34,7 +34,7 @@ public:
 	virtual void Create(ModelGenerator* generator);
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	virtual HRESULT CleanUpDeviceObjects();
-	HRESULT Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time);
+	HRESULT Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX& world, float time);
 
 	void AddChild(WorldObject* obj)
 	{

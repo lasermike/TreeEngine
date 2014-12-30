@@ -14,7 +14,7 @@
 //   3. Update the texture coordinates and tangent vectors.
 //***************************************************************************************
 
-#include "CommonStuff.h"
+#include "Stdafx.h"
 #include <directxmath.h>
 #include <vector>
 

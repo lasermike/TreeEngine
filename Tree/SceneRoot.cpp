@@ -1,18 +1,21 @@
+#include "stdafx.h"
 #include "SceneRoot.h"
 #include <d3dcompiler.h>
 #include "GeometryGenerator.h"
 #include "RenderStates.h"
 
+__declspec(align(16))
 struct CBNeverChanges
 {
-	XMMATRIX mView;
+	XMFLOAT4X4 mView;
 };
 
+__declspec(align(16))
 struct CBChangesEveryFrame
 {
 	DirectionalLight light;
 	XMVECTOR eyePos;
-	XMMATRIX worldToCamera;
+	XMFLOAT4X4 worldToCamera;
 };
 
 #pragma region InputLayouts
@@ -143,7 +146,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	_eyePos = XMVectorSet(0.0f, 2.25f, -6.0f, 0.0f);
 	XMVECTOR At = XMVectorSet(0.0f, 1.75f, 0.0f, 0.0f);
 	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	_View = XMMatrixLookAtLH(_eyePos, At, Up);
+	XMStoreFloat4x4(&_View, XMMatrixLookAtLH(_eyePos, At, Up));
 
 	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
@@ -157,8 +160,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 		return hr;
 
 	CBNeverChanges cbNeverChanges;
-	cbNeverChanges.mView = XMMatrixTranspose(_View);
-
+	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&_View)));
 	pImmediateContext->UpdateSubresource(_pCBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
 
 	for (auto i = _children.begin(); i != _children.end(); i++)
@@ -277,7 +279,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	return S_OK;
 }
 
-HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time)
+HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX& world, float time)
 {
 	pImmediateContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
 
@@ -290,7 +292,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* worl
 	{
 		if ((*i)->GetNumInstances(true) > 0)
 		{
-			HR((*i)->ComputeConstants(pImmediateContext, world, time, dataView));
+			HR((*i)->ComputeConstants(pImmediateContext, &world, time, dataView));
 			dataView += (*i)->GetNumInstances(false);
 		}
 	}
@@ -303,7 +305,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* worl
 	CBChangesEveryFrame cb;
 	cb.light = _light;
 	cb.eyePos = _eyePos;
-	cb.worldToCamera = XMMatrixRotationY(time);
+	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(time));
 
 	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
 	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
@@ -313,7 +315,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX* worl
 	for (auto i = _children.begin(); i != _children.end(); i++)
 	{
 		WorldObject* obj = (*i);
-		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, world, _eyePos, time, &_geometryData, startInstance);
+		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, &world, _eyePos, time, &_geometryData, startInstance);
 		HR(hr2);
 		startInstance += (*i)->GetNumInstances(false);
 	}

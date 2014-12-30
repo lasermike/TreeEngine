@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "Primitive.h"
 #include "PrimitiveGeometry.h"
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "CommonStuff.h"
+#include "stdafx.h"
 #include "Geometry.h"
 #include "GeometryGenerator.h"
 #include "Primitive.h"
