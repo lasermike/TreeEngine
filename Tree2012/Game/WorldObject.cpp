@@ -27,12 +27,12 @@ HRESULT WorldObject::CleanUpDeviceObjects()
 	return S_OK;
 }
 
-HRESULT WorldObject::Render(ID3D11DeviceContext* pImmediateContext, DirectX::XMMATRIX* world, XMVECTOR eyePos, float time)
+HRESULT WorldObject::Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, XMVECTOR eyePos, float time)
 {
 	return E_NOTIMPL;
 }
 
-HRESULT WorldObject::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time, InstancedData* dataView)
+HRESULT WorldObject::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time, InstancedData* dataView)
 {
 	return E_NOTIMPL;
 }

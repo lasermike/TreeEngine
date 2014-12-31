@@ -5,11 +5,13 @@
 
 #pragma once
 
+#define NOMINMAX 
 #include <xdk.h>
 #include <wrl.h>
 #include <d3d11_x.h>
 #include <DirectXMath.h>
 #include <pix.h>
+#include "stdafx.h"
 
 namespace DX
 {

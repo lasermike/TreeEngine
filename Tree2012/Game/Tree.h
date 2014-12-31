@@ -19,8 +19,8 @@ private:
 	std::vector<InstancedData>			_logInstanceData;
 	std::vector<InstancedData>			_twigInstanceData;
 
-	HRESULT ComputeBranchInstanceData(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time);
-	HRESULT ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, const FXMVECTOR parentStart);
+	HRESULT ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, Branch const* branch, const FXMVECTOR parentStart, float time);
+	HRESULT ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, const FXMVECTOR parentStart);
 
 public:
 	Tree(void);
@@ -31,7 +31,7 @@ public:
 
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 
-	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time, InstancedData* dataView);
+	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time, InstancedData* dataView) override;
 	virtual unsigned int GetNumInstances(bool numMax);
 };
 

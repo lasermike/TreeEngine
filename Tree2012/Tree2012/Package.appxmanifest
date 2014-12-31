@@ -8,10 +8,10 @@
             Version="1.0.0.0" />
   
   <Properties>
-    <DisplayName>Tree2012</DisplayName>
-    <PublisherDisplayName>PublisherDisplayName</PublisherDisplayName>
+    <DisplayName>Tree Simulator</DisplayName>
+    <PublisherDisplayName>Mike Matsel</PublisherDisplayName>
     <Logo>StoreLogo.png</Logo>
-    <Description>Tree2012</Description>
+    <Description>Tree growth visualization</Description>
   </Properties>
   
   <Prerequisites>
@@ -28,7 +28,7 @@
         Executable="$targetnametoken$.exe" 
         EntryPoint="Tree2012.App">
         <VisualElements 
-            DisplayName="Tree2012"
+            DisplayName="Tree Simulator"
             Logo="Logo.png"
             SmallLogo="SmallLogo.png"
             Description="Tree2012"

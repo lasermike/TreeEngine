@@ -41,7 +41,7 @@ public:
 	virtual void Create(PrimitiveModelGenerator* generator);
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 
-	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time, InstancedData* dataView);
+	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time, InstancedData* dataView) override;
 
 	virtual unsigned int GetNumInstances(bool /*numMax*/) { return 1; }
 

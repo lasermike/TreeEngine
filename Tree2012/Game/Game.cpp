@@ -1,8 +1,5 @@
 #include "pch.h"
 #include "Game.h"
-#include <d3d11_1.h>
-#include <d3dcompiler.h>
-#include <directxmath.h>
 #include <directxcolors.h>
 #include "SceneRoot.h"
 #include "Tree.h"
@@ -12,7 +9,10 @@
 #include <time.h>
 
 using namespace DirectX;
+
+#ifndef _XBOX_ONE
 using namespace Windows::Graphics::Display;
+#endif 
 
 #define D3D_DEBUG_INFO
 
@@ -21,7 +21,7 @@ using namespace Windows::Graphics::Display;
 //--------------------------------------------------------------------------------------
 struct CBChangeOnResize
 {
-	XMMATRIX mProjection;
+	XMFLOAT4X4 mProjection;
 };
 
 Game::Game()
@@ -39,7 +39,11 @@ Game::Game()
 	_pDepthStencil = nullptr;
 	_pDepthStencilView = nullptr;
 	_rasterState = nullptr;
+#ifdef _XBOX_ONE
+	_enableMsaa = true; 
+#else
 	_enableMsaa = false; // TODO: disabled for windows store
+#endif
 	_timeStart = 0;
 	_currentSeed = 0;
 	_resetTree = true;
@@ -77,6 +81,10 @@ HRESULT Game::InitDevice()
 	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
+#if defined(_XBOX_ONE) && defined(PROFILE) 
+    createDeviceFlags |= D3D11_CREATE_DEVICE_INSTRUMENTED;
+#endif
+
 	D3D_DRIVER_TYPE driverTypes[] =
 	{
 		D3D_DRIVER_TYPE_HARDWARE,
@@ -96,16 +104,22 @@ HRESULT Game::InitDevice()
 
 	for (UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++)
 	{
+		Microsoft::WRL::ComPtr<ID3D11Device> device;
+	    Microsoft::WRL::ComPtr<ID3D11DeviceContext> d3dContext;
+
 		_driverType = driverTypes[driverTypeIndex];
 		hr = D3D11CreateDevice(nullptr, _driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
-			D3D11_SDK_VERSION, &_pd3dDevice, &_featureLevel, &_pImmediateContext);
+			D3D11_SDK_VERSION, &device, &_featureLevel, &d3dContext);
 
-		if (hr == E_INVALIDARG)
+		HR(device.Get()->QueryInterface( __uuidof(_pd3dDevice), reinterpret_cast<void**>(&_pd3dDevice) ) );
+		HR(d3dContext.Get()->QueryInterface( __uuidof(_pImmediateContext), reinterpret_cast<void**>(&_pImmediateContext) ) );
+
+		/*if (hr == E_INVALIDARG)
 		{
 			// DirectX 11.0 platforms will not recognize D3D_FEATURE_LEVEL_11_1 so we need to retry without it
 			hr = D3D11CreateDevice(nullptr, _driverType, nullptr, createDeviceFlags, &featureLevels[1], numFeatureLevels - 1,
 				D3D11_SDK_VERSION, &_pd3dDevice, &_featureLevel, &_pImmediateContext);
-		}
+		}*/
 
 		if (SUCCEEDED(hr))
 			break;
@@ -149,17 +163,21 @@ HRESULT Game::OnResize()
 	SafeRelease(&_pSwapChain1);
 	SafeRelease(&_pSwapChain);
 
-	auto windowBounds = _window->Bounds;
 
 	// Calculate the necessary swap chain and render target size in pixels.
-	float windowWidth = ConvertDipsToPixels(windowBounds.Width);
-	float windowHeight = ConvertDipsToPixels(windowBounds.Height);
-
+#ifdef _XBOX_ONE
+	UINT windowWidth = 1920;
+	UINT windowHeight = 1080;
+#else
+	auto windowBounds = _window->Bounds;
+	UINT windowWidth = ConvertDipsToPixels(windowBounds.Width);
+	UINT windowHeight = ConvertDipsToPixels(windowBounds.Height);
+#endif
 	// Initialize the projection matrix
-	XMStoreFloat4x4(&_Projection, XMMatrixPerspectiveFovLH(XM_PIDIV4, windowWidth / windowHeight, 0.01f, 100.0f));
+	XMStoreFloat4x4(&_Projection, XMMatrixPerspectiveFovLH(XM_PIDIV4, windowWidth / (float)windowHeight, 0.01f, 100.0f));
 
 	CBChangeOnResize cbChangesOnResize;
-	cbChangesOnResize.mProjection = XMMatrixTranspose(XMLoadFloat4x4(&_Projection));
+	XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(&_Projection)));
 	_pImmediateContext->UpdateSubresource(_pCBChangeOnResize, 0, nullptr, &cbChangesOnResize, 0, 0);
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
@@ -184,7 +202,7 @@ HRESULT Game::OnResize()
 
 	// Check MSAA support
 	UINT msaaQuality;
-	const UINT msaaCount = 4;
+	const UINT msaaCount = 2;
 	HR(_pd3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
 	if (msaaQuality == 0)
 	{
@@ -222,15 +240,22 @@ HRESULT Game::OnResize()
 
 	DXGI_SWAP_CHAIN_DESC1 sd;
 	ZeroMemory(&sd, sizeof(sd));
-	sd.Width = (UINT) windowWidth;
-	sd.Height = (UINT) windowHeight;
+	sd.Width = windowWidth;
+	sd.Height = windowHeight;
+#ifdef _XBOX_ONE
+	sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+#else
 	sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+#endif
 	sd.SampleDesc.Count = _enableMsaa ? msaaCount : 1;
 	sd.SampleDesc.Quality = _enableMsaa ? msaaQuality - 1 : 0;
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sd.BufferCount = 2;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-
+#if defined (_XBOX_ONE)
+	sd.Scaling = DXGI_SCALING_STRETCH;
+	sd.Flags = DXGIX_SWAP_CHAIN_MATCH_XBOX360_AND_PC;
+#endif 
 	HR(dxgiFactory2->CreateSwapChainForCoreWindow(_pd3dDevice, reinterpret_cast<IUnknown*>(_window.Get()), &sd, nullptr, &_pSwapChain1));
 	HR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));
 
@@ -247,11 +272,15 @@ HRESULT Game::OnResize()
 	// Create depth stencil texture
 	D3D11_TEXTURE2D_DESC descDepth;
 	ZeroMemory(&descDepth, sizeof(descDepth));
-	descDepth.Width = (UINT) windowWidth;
-	descDepth.Height = (UINT) windowHeight;
+	descDepth.Width = windowWidth;
+	descDepth.Height = windowHeight;
 	descDepth.MipLevels = 1;
 	descDepth.ArraySize = 1;
+#ifdef _XBOX_ONE
+	descDepth.Format = DXGI_FORMAT_D32_FLOAT;
+#else
 	descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+#endif
 	descDepth.SampleDesc.Count = _enableMsaa ? msaaCount : 1;
 	descDepth.SampleDesc.Quality = _enableMsaa ? msaaQuality - 1 : 0;
 	descDepth.Usage = D3D11_USAGE_DEFAULT;
@@ -267,8 +296,8 @@ HRESULT Game::OnResize()
 
 	// Setup the viewport
 	D3D11_VIEWPORT vp;
-	vp.Width = (FLOAT)windowWidth;
-	vp.Height = (FLOAT)windowHeight;
+	vp.Width = windowWidth;
+	vp.Height = windowHeight;
 	vp.MinDepth = 0.0f;
 	vp.MaxDepth = 1.0f;
 	vp.TopLeftX = 0;
@@ -304,6 +333,8 @@ void Game::CleanupDevice()
 //--------------------------------------------------------------------------------------
 void Game::Render()
 {
+	HRESULT hr = S_OK;
+
 	// Moved to tree
 	if (_resetTree)
 	{
@@ -357,12 +388,15 @@ void Game::Render()
 	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
 
 	// Draw everything
-	_pScene->Render(_pImmediateContext, XMLoadFloat4x4(&_World), t);
+	HRC(_pScene->Render(_pImmediateContext, &_World, t));
 
 	//
 	// Present our back buffer to our front buffer
 	//
-	_pSwapChain->Present(1, 0);
+	HRC(_pSwapChain->Present(1, 0));
+
+Cleanup:
+	return;
 }
 
 void Game::OnKeydown(UINT key)  // WM_KEYDOWN
@@ -387,9 +421,13 @@ void Game::OnKeydown(UINT key)  // WM_KEYDOWN
 	}
 }
 
+#ifndef _XBOX_ONE
 // Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
 float Game::ConvertDipsToPixels(float dips)
 {
 	static const float dipsPerInch = 96.0f;
 	return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 }
+
+#endif
+

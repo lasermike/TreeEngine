@@ -66,7 +66,7 @@ PS_INPUT VS(VS_INPUT input)
 	}
 
 	PS_INPUT output = (PS_INPUT)0;
-	output.PosW = mul(float4(input.Pos, 1.0f), transpose(world)).xyz;;
+	output.PosW = mul(float4(input.Pos, 1.0f), transpose(world)).xyz;
 	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal); // TEMP, use gWorldInvTranspose);
 
 	output.Pos = mul(float4(output.PosW, 1.0f), View);

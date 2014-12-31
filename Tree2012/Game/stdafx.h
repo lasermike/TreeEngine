@@ -2,8 +2,6 @@
 
 //#define NOMINMAX 
 //#include <Windows.h>
-//#include <d3d11_1.h>
-//#include <directxmath.h>
 #include <assert.h>
 #include <iostream>
 #include <vector>
@@ -17,11 +15,22 @@ using namespace DirectX;
 		HRESULT hr = (x);                                      \
 		if (FAILED(hr))                                         \
 		{                                                      \
-		std::cout << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
+		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
 		assert(SUCCEEDED(hr)); \
 		return hr; \
 		}                                                      \
 	}
+#endif
+
+#ifndef HRC
+#define HRC(x)                                              \
+		hr = (x);                                      \
+		if (FAILED(hr))                                         \
+		{                                                      \
+		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
+		assert(SUCCEEDED(hr)); \
+		goto Cleanup; \
+		}                                                      
 #endif
 
 #else
@@ -85,9 +94,9 @@ namespace XboxSampleFramework
     _Check_return_
     HRESULT LoadBlob( _In_z_ const wchar_t* pFilename, std::vector< BYTE >& data );
     _Check_return_
-    HRESULT LoadPixelShader( _In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr );
+    HRESULT LoadPixelShader( _In_ ID3D11Device* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr );
     _Check_return_
-    HRESULT LoadVertexShader( _In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
+    HRESULT LoadVertexShader( _In_ ID3D11Device* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
                               _In_opt_ const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = NULL, _In_opt_ UINT numElements = 0, _COM_Outptr_ ID3D11InputLayout** ppInputLayout = NULL, _In_opt_ std::vector< BYTE >* pData = nullptr );
 }
 

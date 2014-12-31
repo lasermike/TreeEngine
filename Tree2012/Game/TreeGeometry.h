@@ -20,6 +20,7 @@ class TreeGeometry : public Geometry
 
 	Material					_trunkMaterial;
 	Material					_shadowMaterial;
+	bool						_drawShadow;
 
 public:
 	TreeGeometry(TreeModel* model);
@@ -28,7 +29,7 @@ public:
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	virtual HRESULT CleanUpDeviceObjects();
 
-	virtual HRESULT DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometyData, int startInstance, int numInstances);
+	virtual HRESULT DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometyData, int startInstance, int numInstances);
 
 };
 

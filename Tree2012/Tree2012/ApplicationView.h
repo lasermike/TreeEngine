@@ -6,7 +6,7 @@
 
 #include "pch.h"
 #include "Game.h"
-
+#include "InputXboxOne.h"
 
 // Application - implements the required functionality for an application
 ref class ApplicationView sealed : public Windows::ApplicationModel::Core::IFrameworkView
@@ -30,9 +30,13 @@ protected:
     void OnResuming(Platform::Object^ sender, Platform::Object^ args);
     void OnWindowClosed(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::CoreWindowEventArgs^ args);
 
+	void HandleInput();
+
 private:
 
-    Game^ m_game;
+    //Game^ m_game;
+	Game* m_pGame;
+    XSF::Input m_input;
     bool m_windowClosed;
 };
 

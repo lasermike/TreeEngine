@@ -29,7 +29,7 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
 	return S_OK;
 }
 
-HRESULT Tree::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX* world, float time, InstancedData* dataView)
+HRESULT Tree::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time, InstancedData* dataView)
 {
 	_logInstanceData.clear();
 	_twigInstanceData.clear();
@@ -53,7 +53,7 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMMATRIX*
 	return S_OK;
 }
 
-HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMMATRIX const* world, Branch const* branch, const FXMVECTOR parentStart, float time)
+HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, Branch const* branch, const FXMVECTOR parentStart, float time)
 {
 	if (time < branch->depth)
 		return S_OK;
@@ -93,7 +93,7 @@ HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMMATRIX const* worl
 	return S_OK;
 }
 
-HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMMATRIX const* world, FXMVECTOR parentStart)
+HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart)
 {
 	float animScaleFactor = 1.0f;
 	if (time - 5 < branch->depth)
@@ -145,7 +145,7 @@ HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransf
 	//*transform = XMMatrixTranspose(*transform * *world);
 	//*normalTransform = MathHelper::InverseTranspose(*transform);
 
-	*transform = *transform * *world;  //TODO
+	*transform = *transform * XMLoadFloat4x4(world);  //TODO
 	*normalTransform = MathHelper::InverseTranspose(XMMatrixTranspose(*transform));
 
 

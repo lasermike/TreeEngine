@@ -7,6 +7,7 @@ namespace XboxSampleFramework
     namespace Details
     {
         wchar_t    g_strCommonFileRoot[ 1024 ];
+        wchar_t    g_strApplicationDataPath[ 1024 ];
 	}
 }
 
@@ -102,7 +103,7 @@ HRESULT XSF::LoadBlob( const wchar_t* pFilename, std::vector< BYTE >& data )
 // Desc: Load a pixel shader
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT XSF::LoadPixelShader( XSF::D3DDevice* pDev, const wchar_t* path, ID3D11PixelShader** ppPS, std::vector< BYTE >* pData )
+HRESULT XSF::LoadPixelShader( ID3D11Device* pDev, const wchar_t* path, ID3D11PixelShader** ppPS, std::vector< BYTE >* pData )
 {
     std::vector< BYTE > data;
     if( !pData )
@@ -120,7 +121,7 @@ HRESULT XSF::LoadPixelShader( XSF::D3DDevice* pDev, const wchar_t* path, ID3D11P
 // Desc: Load a vertex shader
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT XSF::LoadVertexShader( XSF::D3DDevice* pDev, const wchar_t* path, ID3D11VertexShader** ppVS, 
+HRESULT XSF::LoadVertexShader( ID3D11Device* pDev, const wchar_t* path, ID3D11VertexShader** ppVS, 
                                const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc, UINT numElements, ID3D11InputLayout** ppInputLayout,
                                std::vector< BYTE >* pData )
 {

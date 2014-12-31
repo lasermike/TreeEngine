@@ -78,7 +78,7 @@
     <ReferencePath>$(Console_SdkLibPath);$(Console_SdkWindowsMetadataPath)</ReferencePath>
     <LibraryPath>$(Console_SdkLibPath)</LibraryPath>
     <LibraryWPath>$(Console_SdkLibPath);$(Console_SdkWindowsMetadataPath)</LibraryWPath>
-    <IncludePath>$(Console_SdkIncludeRoot)</IncludePath>
+    <IncludePath>..\Game\.;..\Tree2012\.;$(Console_SdkIncludeRoot)</IncludePath>
     <ExecutablePath>$(Console_SdkRoot)bin;$(VCInstallDir)bin\x86_amd64;$(VCInstallDir)bin;$(WindowsSDK_ExecutablePath_x86);$(VSInstallDir)Common7\Tools\bin;$(VSInstallDir)Common7\tools;$(VSInstallDir)Common7\ide;$(ProgramFiles)\HTML Help Workshop;$(MSBuildToolsPath32);$(FxCopDir);$(PATH);</ExecutablePath>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
@@ -86,7 +86,7 @@
     <ReferencePath>$(Console_SdkLibPath);$(Console_SdkWindowsMetadataPath)</ReferencePath>
     <LibraryPath>$(Console_SdkLibPath)</LibraryPath>
     <LibraryWPath>$(Console_SdkLibPath);$(Console_SdkWindowsMetadataPath)</LibraryWPath>
-    <IncludePath>$(Console_SdkIncludeRoot)</IncludePath>
+    <IncludePath>..\Game\.;..\Tree2012\.;$(Console_SdkIncludeRoot)</IncludePath>
     <ExecutablePath>$(Console_SdkRoot)bin;$(VCInstallDir)bin\x86_amd64;$(VCInstallDir)bin;$(WindowsSDK_ExecutablePath_x86);$(VSInstallDir)Common7\Tools\bin;$(VSInstallDir)Common7\tools;$(VSInstallDir)Common7\ide;$(ProgramFiles)\HTML Help Workshop;$(MSBuildToolsPath32);$(FxCopDir);$(PATH);</ExecutablePath>
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
@@ -150,16 +150,58 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;__WRL_NO_DEFAULT_LIB__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <CustomBuildStep>
+      <Command>      </Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Outputs>$(OutDir)\Media\$(ProjectName).$(Configuration).$(Platform).buildmedia.tmp</Outputs>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Inputs>MediaList.txt</Inputs>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\Game\DDSTextureLoader.h" />
+    <ClInclude Include="..\Game\Game.h" />
+    <ClInclude Include="..\Game\Geometry.h" />
+    <ClInclude Include="..\Game\GeometryGenerator.h" />
+    <ClInclude Include="..\Game\Materials.h" />
+    <ClInclude Include="..\Game\MathHelper.h" />
+    <ClInclude Include="..\Game\Model.h" />
+    <ClInclude Include="..\Game\Primitive.h" />
+    <ClInclude Include="..\Game\PrimitiveGeometry.h" />
+    <ClInclude Include="..\Game\RenderStates.h" />
+    <ClInclude Include="..\Game\Resource.h" />
+    <ClInclude Include="..\Game\SceneRoot.h" />
+    <ClInclude Include="..\Game\stdafx.h" />
+    <ClInclude Include="..\Game\Tree.h" />
+    <ClInclude Include="..\Game\TreeGeometry.h" />
+    <ClInclude Include="..\Game\TreeModel.h" />
+    <ClInclude Include="..\Game\TreeModelGenerator.h" />
+    <ClInclude Include="..\Game\WorldObject.h" />
     <ClInclude Include="ApplicationView.h" />
+    <ClInclude Include="InputXboxOne.h" />
     <ClInclude Include="StepTimer.h" />
-    <ClInclude Include="Game.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Game\DDSTextureLoader.cpp" />
+    <ClCompile Include="..\Game\Game.cpp" />
+    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="..\Game\Materials.cpp" />
+    <ClCompile Include="..\Game\MathHelper.cpp" />
+    <ClCompile Include="..\Game\Primitive.cpp" />
+    <ClCompile Include="..\Game\PrimitiveGeometry.cpp" />
+    <ClCompile Include="..\Game\RenderStates.cpp" />
+    <ClCompile Include="..\Game\SceneRoot.cpp" />
+    <ClCompile Include="..\Game\Stdafx.cpp" />
+    <ClCompile Include="..\Game\Tree.cpp" />
+    <ClCompile Include="..\Game\TreeGeometry.cpp" />
+    <ClCompile Include="..\Game\TreeModel.cpp" />
+    <ClCompile Include="..\Game\TreeModelGenerator.cpp" />
+    <ClCompile Include="..\Game\WorldObject.cpp" />
     <ClCompile Include="ApplicationView.cpp" />
-    <ClCompile Include="Game.cpp" />
+    <ClCompile Include="InputXboxOne.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Durango'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|Durango'">Create</PrecompiledHeader>
@@ -170,10 +212,34 @@
     <AppxManifest Include="Package.appxmanifest" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="..\Game\bark2.dds" />
+    <Image Include="..\Game\snow.dds" />
     <Image Include="Logo.png" />
     <Image Include="SmallLogo.png" />
     <Image Include="SplashScreen.png" />
     <Image Include="StoreLogo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Game\Materials.fx">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">true</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Profile|Durango'">true</ExcludedFromBuild>
+    </None>
+    <CustomBuild Include="..\Game\Tree.hlsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">call buildTreeFiles.bat "fxc.exe" "$(OutDir)/" . "$(Platform)" "$(Configuration)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">$(OutDir)/PS.cso;$(OutDir)/VS.cso</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Profile|Durango'">call buildTreeFiles.bat "fxc.exe" "$(OutDir)/" . "$(Platform)" "$(Configuration)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Profile|Durango'">$(OutDir)/PS.cso;$(OutDir)/VS.cso</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="commonshader.bat" />
+    <None Include="copymedia.bat" />
+    <None Include="buildTreeFiles.bat" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="MediaList.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

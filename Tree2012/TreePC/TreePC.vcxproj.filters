@@ -150,7 +150,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="TreePC_TemporaryKey.pfx" />
-    <None Include="..\Game\Tree.fx">
+    <None Include="..\Game\Tree.hlsl">
       <Filter>Game\Shaders</Filter>
     </None>
   </ItemGroup>

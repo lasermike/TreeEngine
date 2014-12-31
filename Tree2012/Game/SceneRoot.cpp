@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "SceneRoot.h"
-#include <d3dcompiler.h>
 #include "GeometryGenerator.h"
 #include "RenderStates.h"
 
@@ -14,7 +13,7 @@ __declspec(align(16))
 struct CBChangesEveryFrame
 {
 	DirectionalLight light;
-	XMVECTOR eyePos;
+	XMFLOAT4 eyePos;
 	XMFLOAT4X4 worldToCamera;
 };
 
@@ -80,9 +79,9 @@ SceneRoot::SceneRoot()
 	_pIndexBuffer = nullptr;
 	_pInstancedBuffer = nullptr;
 
-	_light.Ambient = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+	_light.Ambient = XMFLOAT4(.2f, .2f, .2f, 1.0f);
 	_light.Diffuse = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-	_light.Specular = XMFLOAT4(.1f, .1f, .1f, 1.0f);
+	_light.Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
 	_light.Direction = XMFLOAT3(.7f, -.7f, .7f);
 	_pCBChangesEveryFrame = nullptr;
 	_pCBNeverChanges = nullptr;
@@ -209,7 +208,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	return S_OK;
 }
 
-HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX& world, float time)
+HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time)
 {
 	pImmediateContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
 
@@ -222,7 +221,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX& worl
 	{
 		if ((*i)->GetNumInstances(true) > 0)
 		{
-			HR((*i)->ComputeConstants(pImmediateContext, &world, time, dataView));
+			HR((*i)->ComputeConstants(pImmediateContext, world, time, dataView));
 			dataView += (*i)->GetNumInstances(false);
 		}
 	}
@@ -234,7 +233,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX& worl
 
 	CBChangesEveryFrame cb;
 	cb.light = _light;
-	cb.eyePos = _eyePos;
+	XMStoreFloat4(&cb.eyePos,  _eyePos);
 	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(time));
 
 	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
@@ -245,7 +244,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMMATRIX& worl
 	for (auto i = _children.begin(); i != _children.end(); i++)
 	{
 		WorldObject* obj = (*i);
-		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, &world, _eyePos, time, &_geometryData, startInstance);
+		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, world, _eyePos, time, &_geometryData, startInstance);
 		HR(hr2);
 		startInstance += (*i)->GetNumInstances(false);
 	}

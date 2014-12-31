@@ -4,6 +4,7 @@
 #include "Primitive.h"
 #include "sceneroot.h"
 #include "Tree.h"
+#include "agile.h"
 
 using namespace Microsoft::WRL;
 
@@ -59,9 +60,9 @@ private:
 	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
 	D3D_DRIVER_TYPE                     _driverType;
 	D3D_FEATURE_LEVEL                   _featureLevel;
-	ID3D11Device*                       _pd3dDevice;
+	XSF::D3DDevice*                     _pd3dDevice;
 	ID3D11Device1*                      _pd3dDevice1;
-	ID3D11DeviceContext*                _pImmediateContext;
+	XSF::D3DDeviceContext*              _pImmediateContext;
 	ID3D11DeviceContext1*               _pImmediateContext1;
 	IDXGISwapChain*                     _pSwapChain;
 	IDXGISwapChain1*                    _pSwapChain1;
