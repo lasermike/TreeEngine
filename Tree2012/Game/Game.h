@@ -77,7 +77,9 @@ private:
 
 	Primitive*							_pPlane;
 	SceneRoot*							_pScene;
-	Tree*								_pTree;
+	//Tree*								_pTree;
+	//Tree*								_pTree;
+	std::vector<Tree*>					_trees;
 	ULONGLONG							_timeStart;
 	std::vector<unsigned int>			_seeds;
 	int									_currentSeed;

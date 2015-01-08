@@ -18,7 +18,10 @@ protected:
 
 	bool		_drawInstanced;
 
+
 public:
+	XMFLOAT3	_position;
+
 	WorldObject(void);
 	~WorldObject(void);
 

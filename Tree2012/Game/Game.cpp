@@ -40,7 +40,7 @@ Game::Game()
 	_pDepthStencilView = nullptr;
 	_rasterState = nullptr;
 #ifdef _XBOX_ONE
-	_enableMsaa = true; 
+	_enableMsaa = false; // TODO
 #else
 	_enableMsaa = false; // TODO: disabled for windows store
 #endif
@@ -51,18 +51,30 @@ Game::Game()
 
 	XSF::SetContentFileRoot();
 
-	_pTree = new Tree();
 	_pScene = new SceneRoot();
-	_pPlane = new Primitive();
 
-	_pScene->AddChild(_pTree);
+	_trees.push_back(new Tree());
+	_pScene->AddChild((*_trees.rbegin()));
+
+	_trees.push_back(new Tree());
+	(*_trees.rbegin())->_position = XMFLOAT3(2,0,2);
+	_pScene->AddChild((*_trees.rbegin()));
+
+	_trees.push_back(new Tree());
+	(*_trees.rbegin())->_position = XMFLOAT3(-2,0,2);
+	_pScene->AddChild((*_trees.rbegin()));
+
+	_pPlane = new Primitive();
 	_pScene->AddChild(_pPlane);
 }
 
 Game::~Game()
 {
-	if (_pTree)
-		delete _pTree;
+	for (auto t = _trees.begin(); t != _trees.end(); t++)
+	{
+		if (*t)
+			delete *t;
+	}
 	if (_pScene)
 		delete _pScene;
 	if (_pPlane)
@@ -202,7 +214,7 @@ HRESULT Game::OnResize()
 
 	// Check MSAA support
 	UINT msaaQuality;
-	const UINT msaaCount = 2;
+	const UINT msaaCount = 4;
 	HR(_pd3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
 	if (msaaQuality == 0)
 	{
@@ -253,8 +265,8 @@ HRESULT Game::OnResize()
 	sd.BufferCount = 2;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 #if defined (_XBOX_ONE)
-	sd.Scaling = DXGI_SCALING_STRETCH;
-	sd.Flags = DXGIX_SWAP_CHAIN_MATCH_XBOX360_AND_PC;
+	//sd.Scaling = DXGI_SCALING_STRETCH;
+	//sd.Flags = DXGIX_SWAP_CHAIN_MATCH_XBOX360_AND_PC;
 #endif 
 	HR(dxgiFactory2->CreateSwapChainForCoreWindow(_pd3dDevice, reinterpret_cast<IUnknown*>(_window.Get()), &sd, nullptr, &_pSwapChain1));
 	HR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));
@@ -343,8 +355,13 @@ void Game::Render()
 			_seeds.push_back((unsigned int)time(NULL));
 		}
 
-		TreeModelGenerator generator(_seeds[_currentSeed]);
-		_pTree->Create(&generator);
+		int treeNum = 1;
+		for (auto t = _trees.begin(); t != _trees.end(); t++)
+		{
+			TreeModelGenerator generator(_seeds[_currentSeed] * treeNum);
+			(*t)->Create(&generator);
+			treeNum++;
+		}
 
 		PrimitiveModelGenerator planeGen(PrimitiveType_Box);
 		_pPlane->Create(&planeGen);
@@ -370,7 +387,7 @@ void Game::Render()
 	}
 
 	// Rotate cube around the origin
-	XMStoreFloat4x4(&_World, XMMatrixRotationY( t ));  //TODO: Uncomment after shadows are working
+	//XMStoreFloat4x4(&_World, XMMatrixRotationY( t ));  //TODO: Uncomment after shadows are working
 
 	// Bind render target
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
@@ -378,7 +395,7 @@ void Game::Render()
 	//
 	// Clear the back buffer
 	//
-	_pImmediateContext->ClearRenderTargetView(_pRenderTargetView, Colors::MidnightBlue);
+	_pImmediateContext->ClearRenderTargetView(_pRenderTargetView, Colors::AliceBlue);
 
 	//
 	// Clear the depth buffer to 1.0 (max depth)

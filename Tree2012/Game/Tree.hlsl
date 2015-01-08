@@ -62,7 +62,12 @@ PS_INPUT VS(VS_INPUT input)
     [flatten]
 	if (mat.flags.x > 0) //useShadow
 	{
-		world = mat.shadowMatrix * world ;
+		world = world  * mat.shadowMatrix ;
+		/*float4x4 shadow = { 1, -2, 0, 0,
+							0,  0, 0, 0,
+							0, -2, 1, 0,
+							0, 0, 0, 1 };
+		world = shadow * world;*/
 	}
 
 	PS_INPUT output = (PS_INPUT)0;

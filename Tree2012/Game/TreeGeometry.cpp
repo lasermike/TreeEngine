@@ -23,7 +23,7 @@ TreeGeometry::TreeGeometry(TreeModel* model)
 	_pCBTree = nullptr;
 	_pCBBranches = nullptr;
 
-	_trunkMaterial.Ambient = XMFLOAT4(.2, .2, .2, 1.0f);
+	_trunkMaterial.Ambient = XMFLOAT4(.4, .4, .4, 1.0f);
 	XMStoreFloat4(&_trunkMaterial.Diffuse, Colors::SaddleBrown); //_trunkMaterial.Diffuse = XMFLOAT4(1, 1, 1, 1.0f);
 	_trunkMaterial.Specular = XMFLOAT4(.4, .4f, .4f, 1.0f);
 	//_trunkMaterial.flags.y = true; //useTextures  TODO
@@ -33,7 +33,7 @@ TreeGeometry::TreeGeometry(TreeModel* model)
 	_shadowMaterial.Specular = XMFLOAT4(0, 0, 0, 16.0f);
 	_shadowMaterial.Reflect = XMFLOAT4(0, 0, 0, 1);
 	_shadowMaterial.flags.x = true;  //useShadowMatrix
-	_drawShadow = false;
+	_drawShadow = true;
 }
 
 TreeGeometry::~TreeGeometry()
@@ -92,16 +92,17 @@ HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFL
 	if (_drawShadow)
 	{
 		// Shadow
-		pImmediateContext->OMSetBlendState(RenderStates::TransparentBS, nullptr, 0xffffffff);
+		//pImmediateContext->OMSetBlendState(RenderStates::TransparentBS, nullptr, 0xffffffff);
 		pImmediateContext->OMSetDepthStencilState(RenderStates::NoDoubleBlendDSS, 0);
 
 		XMFLOAT4 lightDir = XMFLOAT4(1, 1, 1, 1); // TODO: get from scene
 		XMVECTOR toMainLight = -(XMLoadFloat4(&lightDir));
-		toMainLight = XMVectorSetW(toMainLight, 1);
+		toMainLight = XMVectorSetW(toMainLight, 1 );
 
 		XMVECTOR shadowPlane = XMVectorSet(0, 1, 0, 0); // XZ plane
 		XMMATRIX s = XMMatrixShadow(shadowPlane, toMainLight);
-		XMMATRIX shadowOffsetY = XMMatrixTranslation(0, 0.99, 0); // *XMMatrixScaling(2.0f, 0.0f, 2.0f);
+		XMMATRIX shadowOffsetY = XMMatrixTranslation(0, 0.99, 0);
+		XMMATRIX rotMat = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), t);
 		XMStoreFloat4x4(&_shadowMaterial.shadowMatrix, shadowOffsetY * s );
 
 		SetMaterial(pImmediateContext, _shadowMaterial);
@@ -109,7 +110,7 @@ HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFL
 		pImmediateContext->DrawIndexedInstanced(pCylinderIndices->IndexCount, numInstances, pCylinderIndices->IndexOffset, pCylinderIndices->VertexOffset, startInstance);
 
 		pImmediateContext->OMSetDepthStencilState(0, 0);
-		pImmediateContext->OMSetBlendState(0, nullptr, 0xffffffff);
+		//pImmediateContext->OMSetBlendState(0, nullptr, 0xffffffff);
 	}
 	return S_OK;
 }

@@ -4,6 +4,7 @@
 
 WorldObject::WorldObject(void) :_geometry(), _drawInstanced(true)
 {
+	_position = XMFLOAT3(0,0,0);
 }
 
 WorldObject::~WorldObject(void)

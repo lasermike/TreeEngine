@@ -36,7 +36,7 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X
 	int currentBranch = 0;
 
 	XMVECTOR vChildStart;
-	ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, XMVectorSet(0, .5, 0, 0), time);
+	ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, XMVectorSet(0, .5, 0, 0)  + XMLoadFloat3(&_position), time);
 
 	int dvi = 0;
 	for (int i = 0; i < _logInstanceData.size(); i++)
@@ -65,7 +65,7 @@ HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, B
 
 	InstancedData data;
 	XMStoreFloat4x4(&data.World, localToWorld);
-	XMStoreFloat4x4(&data.WorldNormal, normalLocalToWorld); //normalLocalToWorld
+	XMStoreFloat4x4(&data.WorldNormal, normalLocalToWorld);
 
 	InstancedData* pData = nullptr;
 	if (branch->depth < 2)
@@ -79,7 +79,7 @@ HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, B
 
 	currentBranch++;
 
-	// Render child branches
+	// Compute child branches
 	const int maxChildren = 4;
 	for (int c = 0; c < maxChildren; c++)
 	{
@@ -102,7 +102,7 @@ HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransf
 	}
 
 	XMVECTOR vStart = parentStart;
-	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end));
+	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
 
 	// Scale branch
 	XMVECTOR vMag = XMVector3Length(vEnd - vStart);
@@ -142,14 +142,8 @@ HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransf
 	const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
 	*transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
-	//*transform = XMMatrixTranspose(*transform * *world);
-	//*normalTransform = MathHelper::InverseTranspose(*transform);
-
 	*transform = *transform * XMLoadFloat4x4(world);  //TODO
 	*normalTransform = MathHelper::InverseTranspose(XMMatrixTranspose(*transform));
-
-
-	//*normalTransform = *transform;
 
 	return S_OK;
 }
