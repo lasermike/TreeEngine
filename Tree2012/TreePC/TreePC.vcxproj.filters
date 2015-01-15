@@ -144,6 +144,9 @@
     <ClInclude Include="DirectXHelper.h">
       <Filter>Old</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\DXMath.h">
+      <Filter>Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />

@@ -31,7 +31,6 @@ public:
 	SceneRoot();
 	~SceneRoot();
 
-	virtual void Create(ModelGenerator* generator);
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	virtual HRESULT CleanUpDeviceObjects();
 	HRESULT Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time);

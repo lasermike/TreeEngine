@@ -29,22 +29,26 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
 	return S_OK;
 }
 
-HRESULT Tree::ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time, InstancedData* dataView)
+HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, XMFLOAT4X4* world, float time, InstancedData* dataView)
 {
 	_logInstanceData.clear();
 	_twigInstanceData.clear();
 	int currentBranch = 0;
 
-	XMVECTOR vChildStart;
 	ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, XMVectorSet(0, .5, 0, 0)  + XMLoadFloat3(&_position), time);
 
+//	for each level in tree
+//		for each branch in level
+
+
+
 	int dvi = 0;
-	for (int i = 0; i < _logInstanceData.size(); i++)
+	for (unsigned int i = 0; i < _logInstanceData.size(); i++)
 	{
 		dataView[dvi++] = _logInstanceData[i];
 	}
 
-	for (int i = 0; i < _twigInstanceData.size(); i++)
+	for (unsigned int i = 0; i < _twigInstanceData.size(); i++)
 	{
 		dataView[dvi++] = _twigInstanceData[i];
 	}
@@ -61,13 +65,12 @@ HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, B
 	// Update variables that change once per frame
 	XMVECTOR vChildStart;
 	XMMATRIX localToWorld, normalLocalToWorld;
-	ComputeTransformations(&localToWorld, &normalLocalToWorld, &vChildStart, time, branch, world, parentStart);
+	ComputeTransformationsManual(&localToWorld, &normalLocalToWorld, &vChildStart, time, branch, world, parentStart);
 
 	InstancedData data;
 	XMStoreFloat4x4(&data.World, localToWorld);
 	XMStoreFloat4x4(&data.WorldNormal, normalLocalToWorld);
 
-	InstancedData* pData = nullptr;
 	if (branch->depth < 2)
 	{
 		_logInstanceData.push_back(data);
@@ -89,6 +92,59 @@ HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, B
 			ComputeBranchInstanceData(currentBranch, world, child, vChildStart, time);
 		}
 	}
+
+	return S_OK;
+}
+
+
+
+HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMMATRIX* computedNormalTransform, XMVECTOR* vComputedEnd, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart)
+{
+	float animScaleFactor = 1.0f;
+	if (time - 5 < branch->depth)
+	{
+		animScaleFactor = (time - branch->depth) / 5;
+	}
+
+	XMVECTOR vStart = parentStart;
+	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
+
+	// Scale branch
+	XMVECTOR vMag = XMVector3Length(vEnd - vStart);
+	XMVECTOR vScale = XMVectorSet(branch->thickness, XMVectorGetX(vMag), branch->thickness, 0) * animScaleFactor;
+
+	// Child start pos
+	XMVECTOR vMagY = XMVectorSet(animScaleFactor, animScaleFactor, animScaleFactor, 1);
+	*vComputedEnd = (vEnd - vStart) * vMagY + vStart;
+
+	// Determine rotation
+	XMMATRIX mRot;
+	XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
+	XMVECTOR vDir = vEnd - vStart;
+	XMVECTOR vCross = XMVector3Cross(vUp, XMVector3Normalize(vDir));
+	XMVECTOR vCrossLenSq = XMVector3LengthSq(vCross);
+	XMVECTOR vQuat;
+	float crossLenSq;
+	XMStoreFloat(&crossLenSq, vCrossLenSq);
+	if (crossLenSq > 0.01f) // Need better value for epsilon here
+	{
+		XMVECTOR vDot = XMVector3Dot(vUp, XMVector3Normalize(vDir));
+		float angle;
+		XMStoreFloat(&angle, vDot);
+		angle = acos(angle);
+		vQuat = XMQuaternionRotationAxis(vCross, angle);
+	}
+	else
+	{
+		vQuat = XMQuaternionRotationAxis(vUp, 0);
+	}
+
+	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0);
+	const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
+	*computedTransform = MatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
+
+	*computedTransform = *computedTransform * XMLoadFloat4x4(world);  //TODO
+	*computedNormalTransform = MathHelper::InverseTranspose(XMMatrixTranspose(*computedTransform ));
 
 	return S_OK;
 }
@@ -155,7 +211,7 @@ unsigned int Tree::GetNumInstances(bool numMax)
 		if (numMax)
 			return _treeModel->treeData.numBranches;
 		else
-			return _logInstanceData.size() + _twigInstanceData.size();
+			return (unsigned int) (_logInstanceData.size() + _twigInstanceData.size());
 	}
 	else
 		return 0;

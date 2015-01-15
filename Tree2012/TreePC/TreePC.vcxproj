@@ -130,6 +130,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Game\DDSTextureLoader.h" />
+    <ClInclude Include="..\Game\DXMath.h" />
     <ClInclude Include="..\Game\Game.h" />
     <ClInclude Include="..\Game\Geometry.h" />
     <ClInclude Include="..\Game\GeometryGenerator.h" />

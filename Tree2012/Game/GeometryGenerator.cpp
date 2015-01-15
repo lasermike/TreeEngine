@@ -19,23 +19,21 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
 	// Cache the vertex offsets to each object in the concatenated vertex buffer.
 	data.boxIndices.VertexOffset = 0;
-	data.boxIndices.VertexCount = box.Vertices.size();
+	data.boxIndices.VertexCount = (UINT) box.Vertices.size();
 
 	// Cache the index count of each object.
-	data.cylinderIndices.VertexCount = cylinder.Vertices.size();
-	data.cylinderIndices.VertexOffset = data.boxIndices.VertexOffset + box.Vertices.size();
+	data.cylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();
+	data.cylinderIndices.VertexOffset = (UINT) (data.boxIndices.VertexOffset + box.Vertices.size());
 
 	// Cache the starting index for each object in the concatenated index buffer.
 	data.boxIndices.IndexOffset = 0;
-	data.boxIndices.IndexCount = box.Indices.size();
+	data.boxIndices.IndexCount = (UINT) box.Indices.size();
 
 	// Cache the index count of each object.
 	data.cylinderIndices.IndexOffset = data.boxIndices.IndexCount;
-	data.cylinderIndices.IndexCount = cylinder.Indices.size();
+	data.cylinderIndices.IndexCount = (UINT) cylinder.Indices.size();
 
-	UINT totalVertexCount = box.Vertices.size() + cylinder.Vertices.size();
-
-	UINT totalIndexCount = data.boxIndices.IndexCount + data.cylinderIndices.IndexCount;
+	UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size());
 
 	//
 	// Extract the vertex elements we are interested in and pack the
@@ -282,7 +280,7 @@ void GeometryGenerator::Subdivide(MeshData& meshData)
 	// *-----*-----*
 	// v0    m2     v2
 
-	UINT numTris = inputCopy.Indices.size()/3;
+	UINT numTris = (UINT) inputCopy.Indices.size()/3;
 	for(UINT i = 0; i < numTris; ++i)
 	{
 		Vertex v0 = inputCopy.Vertices[ inputCopy.Indices[i*3+0] ];
@@ -507,8 +505,8 @@ void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, floa
 	BuildCylinderBottomCap(bottomRadius, topRadius, height, sliceCount, stackCount, meshData);
 }
 
-void GeometryGenerator::BuildCylinderTopCap(float bottomRadius, float topRadius, float height, 
-											UINT sliceCount, UINT stackCount, MeshData& meshData)
+void GeometryGenerator::BuildCylinderTopCap(float /*bottomRadius*/, float topRadius, float height, 
+											UINT sliceCount, UINT /*stackCount*/, MeshData& meshData)
 {
 	UINT baseIndex = (UINT)meshData.Vertices.size();
 
@@ -543,8 +541,8 @@ void GeometryGenerator::BuildCylinderTopCap(float bottomRadius, float topRadius,
 	}
 }
 
-void GeometryGenerator::BuildCylinderBottomCap(float bottomRadius, float topRadius, float height, 
-											   UINT sliceCount, UINT stackCount, MeshData& meshData)
+void GeometryGenerator::BuildCylinderBottomCap(float bottomRadius, float /*topRadius*/, float height, 
+											   UINT sliceCount, UINT /*stackCount*/, MeshData& meshData)
 {
 	// 
 	// Build bottom cap.

@@ -24,7 +24,7 @@ TreeModel* TreeModelGenerator::Create()
 
 	// Create trunk
 	int id = model->treeData.numBranches++;
-	model->trunk = &model->pBranches[id]; //new Branch();
+	model->trunk = &model->pBranches[id]; 
 	model->trunk->id = id;
 
 	XMStoreFloat4(&model->trunk->start, vStart);
@@ -32,67 +32,73 @@ TreeModel* TreeModelGenerator::Create()
 	model->trunk->thickness = .3f;
 	model->trunk->depth = 0;
 
-	GenerateRecursive(model->trunk, 1);
+	GenerateChildrenRecursive(model->trunk, 1);
 	return model;
 }
 
-void TreeModelGenerator::GenerateRecursive(Branch* branch, int depth)
+void TreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, int depth)
 {
-	if (depth > 5)
-		return;
+	const int maxDepth = 5;
 
-	int numBranches = std::min(depth + rand() % 3, 4);
+	if (depth > maxDepth)
+		return;
+	
+	const int maxChildren = 4;
+
+	int numBranches = std::min(depth + rand() % 3, maxChildren);
+	//int startRotation = rand() % numBranches;
+
+	XMVECTOR vParentDir = XMVector3Normalize(XMLoadFloat3((XMFLOAT3*)&parentBranch->end) - XMLoadFloat3((XMFLOAT3*)&parentBranch->start));
 
 	for (int i = 0; i < numBranches; i++)
 	{
 		int id = model->treeData.numBranches++;
 		Branch* child = &model->pBranches[id];
 		child->id = id; 
-		branch->SetChild(i, child->id);
+		parentBranch->SetChild(i, child->id);
 		assert(&model->pBranches[child->id] == child);  // Ensure our look up is correct 
 
-		child->start = branch->end;
+		child->start = parentBranch->end;
 		child->depth = depth;
 
 		if (depth < 4)
 		{
-			child->thickness = branch->thickness * powf(.8f, depth);
+			child->thickness = parentBranch->thickness * powf(.8f, (float) depth);
 		}
 		else
 		{
-			child->thickness = branch->thickness * powf(.7f, depth);
+			child->thickness = parentBranch->thickness * powf(.7f, (float) depth);
 		}
 
 		const XMVECTORF32 vX = { 1, 0, 0, 0 };
 		const XMVECTORF32 vZ = { 0, 0, 1, 0 };
-		const double maxAngle = XM_PIDIV2;
-		const double maxAngleDiv2 = maxAngle / 2.0;
+		float maxAngle = XM_PIDIV2; // * (1.0f - 1.0f / numBranches);
+		float maxAngleDiv2 = maxAngle / 2.0f;
 
-		XMVECTOR vParentDir = XMVector3Normalize(XMLoadFloat3((XMFLOAT3*)&branch->end) - XMLoadFloat3((XMFLOAT3*)&branch->start));
-
-		if (depth >= 4)
-		{
-			float randLen = 0.2 + 0.3 * ((double)rand()) / RAND_MAX;
-			vParentDir = XMVectorScale(vParentDir, randLen);
-		}
-		else if (depth > 1)
-		{
-			float randLen = 0.5 + 0.3 * ((double)rand()) / RAND_MAX;
-			vParentDir = XMVectorScale(vParentDir, randLen);
-		}
-
-
+		float randNum = rand() / (float) RAND_MAX;
 		XMVECTOR vChildDir = XMVector3Rotate(vParentDir, 
-											 XMQuaternionRotationAxis(vX, (maxAngle * rand()) / RAND_MAX - maxAngleDiv2));
-		vChildDir = XMVector3Rotate(vChildDir, 
-								    XMQuaternionRotationAxis(vZ, (maxAngle * rand()) / RAND_MAX - maxAngleDiv2));
-		//child->end = branch->end;
-		
-		child->end.x = branch->end.x + XMVectorGetX(vChildDir) ;
-		child->end.y = branch->end.y + XMVectorGetY(vChildDir) ;
-		child->end.z = branch->end.z + XMVectorGetZ(vChildDir) ;
+											 XMQuaternionRotationAxis(vX, (maxAngle * randNum - maxAngleDiv2)));
 
-		GenerateRecursive(child, depth + 1);
+		randNum = rand() / (float) RAND_MAX; //(((i + startRotation) % numBranches) / (float)numBranches)
+		vChildDir = XMVector3Rotate(vChildDir, 
+							XMQuaternionRotationAxis(vZ, maxAngle * randNum - maxAngleDiv2));
+
+		if (depth >= 3)
+		{
+			float randLen = 0.2f + 0.3f * ((float)rand()) / RAND_MAX;
+			vChildDir = XMVectorScale(vChildDir, randLen);
+		}
+		else if (depth > 0)
+		{
+			float randLen = 0.5f + 0.3f * ((float)rand()) / RAND_MAX;
+			vChildDir = XMVectorScale(vChildDir, randLen);
+		}
+
+		child->end.x = parentBranch->end.x + XMVectorGetX(vChildDir) ;
+		child->end.y = parentBranch->end.y + XMVectorGetY(vChildDir) ;
+		child->end.z = parentBranch->end.z + XMVectorGetZ(vChildDir) ;
+
+		GenerateChildrenRecursive(child, depth + 1);
 	}
 }
 

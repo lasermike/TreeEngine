@@ -96,6 +96,9 @@
     <ClInclude Include="InputXboxOne.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\DXMath.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">

@@ -23,9 +23,9 @@ TreeGeometry::TreeGeometry(TreeModel* model)
 	_pCBTree = nullptr;
 	_pCBBranches = nullptr;
 
-	_trunkMaterial.Ambient = XMFLOAT4(.4, .4, .4, 1.0f);
+	_trunkMaterial.Ambient = XMFLOAT4(.4f, .4f, .4f, 1.0f);
 	XMStoreFloat4(&_trunkMaterial.Diffuse, Colors::SaddleBrown); //_trunkMaterial.Diffuse = XMFLOAT4(1, 1, 1, 1.0f);
-	_trunkMaterial.Specular = XMFLOAT4(.4, .4f, .4f, 1.0f);
+	_trunkMaterial.Specular = XMFLOAT4(.4f, .4f, .4f, 1.0f);
 	//_trunkMaterial.flags.y = true; //useTextures  TODO
 
 	_shadowMaterial.Ambient = XMFLOAT4(0, 0, 0, 1);
@@ -33,7 +33,10 @@ TreeGeometry::TreeGeometry(TreeModel* model)
 	_shadowMaterial.Specular = XMFLOAT4(0, 0, 0, 16.0f);
 	_shadowMaterial.Reflect = XMFLOAT4(0, 0, 0, 1);
 	_shadowMaterial.flags.x = true;  //useShadowMatrix
+
+#ifndef _XBOX_ONE
 	_drawShadow = true;
+#endif
 }
 
 TreeGeometry::~TreeGeometry()
@@ -77,7 +80,7 @@ HRESULT TreeGeometry::CleanUpDeviceObjects()
 	return S_OK;
 }
 
-HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
+HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* /*world*/, XMVECTOR /*eyePos*/, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
 {
 	SetMaterial(pImmediateContext, _trunkMaterial);
 
@@ -101,7 +104,7 @@ HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFL
 
 		XMVECTOR shadowPlane = XMVectorSet(0, 1, 0, 0); // XZ plane
 		XMMATRIX s = XMMatrixShadow(shadowPlane, toMainLight);
-		XMMATRIX shadowOffsetY = XMMatrixTranslation(0, 0.99, 0);
+		XMMATRIX shadowOffsetY = XMMatrixTranslation(0, 0.99f, 0);
 		XMMATRIX rotMat = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), t);
 		XMStoreFloat4x4(&_shadowMaterial.shadowMatrix, shadowOffsetY * s );
 

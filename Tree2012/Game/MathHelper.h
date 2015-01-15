@@ -9,6 +9,7 @@
 
 #include <Windows.h>
 #include <directxmath.h>
+#include "DXMath.h"
 
 using namespace DirectX;
 

@@ -92,11 +92,6 @@ SceneRoot::~SceneRoot()
 	CleanUpDeviceObjects();
 }
 
-void SceneRoot::Create(ModelGenerator* generator)
-{
-
-}
-
 HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
 {
 	HRESULT hr = S_OK;
@@ -164,7 +159,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	_geometryGenerator.BuildGeometryBuffers(_geometryData);
 	ZeroMemory(&vbd, sizeof(vbd));
 	vbd.Usage = D3D11_USAGE_IMMUTABLE;
-	vbd.ByteWidth = sizeof(SimpleVertex)* _geometryData.vertices.size();
+	vbd.ByteWidth = (UINT) (sizeof(SimpleVertex) * _geometryData.vertices.size());
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = 0;
 	vbd.MiscFlags = 0;
@@ -176,7 +171,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	D3D11_BUFFER_DESC ibd;
 	ZeroMemory(&ibd, sizeof(ibd));
 	ibd.Usage = D3D11_USAGE_IMMUTABLE;
-	ibd.ByteWidth = sizeof(UINT)* _geometryData.indices.size();
+	ibd.ByteWidth = (UINT) (sizeof(UINT) * _geometryData.indices.size());
 	ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
 	ibd.CPUAccessFlags = 0;
 	ibd.MiscFlags = 0;

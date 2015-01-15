@@ -149,9 +149,11 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;__WRL_NO_DEFAULT_LIB__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/favor:AMD64 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <CustomBuildStep>
-      <Command>      </Command>
+      <Command>
+      </Command>
     </CustomBuildStep>
     <CustomBuildStep>
       <Outputs>$(OutDir)\Media\$(ProjectName).$(Configuration).$(Platform).buildmedia.tmp</Outputs>
@@ -162,6 +164,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\Game\DDSTextureLoader.h" />
+    <ClInclude Include="..\Game\DXMath.h" />
     <ClInclude Include="..\Game\Game.h" />
     <ClInclude Include="..\Game\Geometry.h" />
     <ClInclude Include="..\Game\GeometryGenerator.h" />
@@ -239,7 +242,10 @@
     <None Include="buildTreeFiles.bat" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="MediaList.txt" />
+    <Text Include="MediaList.txt">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">
+      </ExcludedFromBuild>
+    </Text>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -21,6 +21,7 @@ private:
 
 	HRESULT ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, Branch const* branch, const FXMVECTOR parentStart, float time);
 	HRESULT ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, const FXMVECTOR parentStart);
+	HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart);
 
 public:
 	Tree(void);

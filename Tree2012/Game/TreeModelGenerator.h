@@ -23,7 +23,7 @@ public:
 
 private:
 	TreeModel* CreateTestTree();
-	void GenerateRecursive(Branch* branch, int depth);
+	void GenerateChildrenRecursive(Branch* branch, int depth);
 	XMVECTOR CalculateQuaternion(FXMVECTOR vDirection);
 	TreeModel* model;
 

@@ -25,7 +25,7 @@ public:
 	WorldObject(void);
 	~WorldObject(void);
 
-	virtual void Create(ModelGenerator* generator) { }
+	virtual void Create(ModelGenerator* /*generator*/) { }
 
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	virtual HRESULT CleanUpDeviceObjects();

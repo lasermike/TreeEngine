@@ -182,8 +182,8 @@ HRESULT Game::OnResize()
 	UINT windowHeight = 1080;
 #else
 	auto windowBounds = _window->Bounds;
-	UINT windowWidth = ConvertDipsToPixels(windowBounds.Width);
-	UINT windowHeight = ConvertDipsToPixels(windowBounds.Height);
+	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
+	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
 #endif
 	// Initialize the projection matrix
 	XMStoreFloat4x4(&_Projection, XMMatrixPerspectiveFovLH(XM_PIDIV4, windowWidth / (float)windowHeight, 0.01f, 100.0f));
@@ -266,7 +266,7 @@ HRESULT Game::OnResize()
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 #if defined (_XBOX_ONE)
 	//sd.Scaling = DXGI_SCALING_STRETCH;
-	//sd.Flags = DXGIX_SWAP_CHAIN_MATCH_XBOX360_AND_PC;
+	sd.Flags = DXGIX_SWAP_CHAIN_MATCH_XBOX360_AND_PC;
 #endif 
 	HR(dxgiFactory2->CreateSwapChainForCoreWindow(_pd3dDevice, reinterpret_cast<IUnknown*>(_window.Get()), &sd, nullptr, &_pSwapChain1));
 	HR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));
@@ -308,8 +308,8 @@ HRESULT Game::OnResize()
 
 	// Setup the viewport
 	D3D11_VIEWPORT vp;
-	vp.Width = windowWidth;
-	vp.Height = windowHeight;
+	vp.Width = (FLOAT) windowWidth;
+	vp.Height = (FLOAT) windowHeight;
 	vp.MinDepth = 0.0f;
 	vp.MaxDepth = 1.0f;
 	vp.TopLeftX = 0;

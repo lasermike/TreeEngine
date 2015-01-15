@@ -133,29 +133,47 @@ float4 PS(PS_INPUT pin) : SV_Target
 	return litColor;
 }
 
-//--------------------------------------------------------------------------------------
-// Vertex Shader
-//--------------------------------------------------------------------------------------
-PS_INPUT VS3( VS_INPUT input )
+/*
+matrix MatrixTransformation
+(
+    float3 ScalingOrigin, 
+    float4 ScalingOrientationQuaternion, 
+    float3 Scaling, 
+    float3 RotationOrigin, 
+    float4 RotationQuaternion, 
+    float3 Translation
+)
 {
-	float4x4 world = input.World;
-	if (mat.flags.x > 0)  //useShadow
-	{
-		world *= mat.shadowMatrix;
-	}
+    matrix M;
+    NegScalingOrigin;
+    float3  VScalingOrigin;
+    matrix MScalingOriginI;
+    matrix MScalingOrientation;
+    matrix MScalingOrientationT;
+    matrix MScaling;
+    float3 VRotationOrigin;
+    matrix MRotation;
+    float3 VTranslation;
 
-    PS_INPUT output = (PS_INPUT)0;
-	output.PosW = mul(float4(input.Pos, 1.0f), world).xyz;;
-	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal); // TEMP, use gWorldInvTranspose);
-	
-	output.Pos = mul(float4(output.PosW, 1.0f), View);
-	output.Pos = mul(output.Pos, Projection);
-    output.Tex = input.Tex;
+    float3 NegScalingOrigin     = -ScalingOrigin;
 
-    return output;
+    MScalingOriginI      = XMMatrixTranslationFromVector(NegScalingOrigin);
+    MScalingOrientation  = XMMatrixRotationQuaternion(ScalingOrientationQuaternion);
+    MScalingOrientationT = XMMatrixTranspose(MScalingOrientation);
+    MScaling             = XMMatrixScalingFromVector(Scaling);
+    VRotationOrigin      = _mm_and_ps(RotationOrigin,g_XMMask3);
+    MRotation            = XMMatrixRotationQuaternion(RotationQuaternion);
+    VTranslation         = _mm_and_ps(Translation,g_XMMask3);
+
+    M      = XMMatrixMultiply(MScalingOriginI, MScalingOrientationT);
+    M      = XMMatrixMultiply(M, MScaling);
+    M      = XMMatrixMultiply(M, MScalingOrientation);
+    M.r[3] = XMVectorAdd(M.r[3], VScalingOrigin);
+    M.r[3] = XMVectorSubtract(M.r[3], VRotationOrigin);
+    M      = XMMatrixMultiply(M, MRotation);
+    M.r[3] = XMVectorAdd(M.r[3], VRotationOrigin);
+    M.r[3] = XMVectorAdd(M.r[3], VTranslation);
+
+    return M;
 }
-
-float4 PS2( PS_INPUT input) : SV_Target
-{
-    return txDiffuse.Sample( samLinear, input.Tex ) ;
-}
+*/

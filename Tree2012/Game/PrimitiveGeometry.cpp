@@ -9,9 +9,10 @@ PrimitiveGeometry::PrimitiveGeometry(PrimitiveModel* model) : Geometry()
 	_pSamplerLinear = nullptr;
 
 	_groundMaterial.Ambient = XMFLOAT4(.5, .5, .5, 1);
-	_groundMaterial.Diffuse = XMFLOAT4(0, .6, 0, 1);
-	_groundMaterial.Specular = XMFLOAT4(.8, .8, .8, 16.0f);
+	_groundMaterial.Diffuse = XMFLOAT4(0, .6f, 0, 1);
+	_groundMaterial.Specular = XMFLOAT4(.8f, .8f, .8f, 16.0f);
 	_groundMaterial.Reflect = XMFLOAT4(0, 0, 0, 1);
+	_groundMaterial.flags.y = 1; 
 }
 
 PrimitiveGeometry::~PrimitiveGeometry()

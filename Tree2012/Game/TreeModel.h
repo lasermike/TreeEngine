@@ -86,7 +86,5 @@ public:
 
 	TreeData treeData;
 	Branch* pBranches;  
-
-	//std::vector<Branch*> branchMap;
 };
 
