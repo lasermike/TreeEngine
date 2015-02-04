@@ -98,12 +98,6 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 
 	HR(RenderStates::InitAll(device));
 
-	// Initialize the view matrix
-	_eyePos = XMVectorSet(0.0f, 2.25f, -6.0f, 0.0f);
-	XMVECTOR At = XMVectorSet(0.0f, 1.75f, 0.0f, 0.0f);
-	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	XMStoreFloat4x4(&_View, XMMatrixLookAtLH(_eyePos, At, Up));
-
 	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
@@ -114,10 +108,6 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	hr = device->CreateBuffer(&bd, nullptr, &_pCBNeverChanges);
 	if (FAILED(hr))
 		return hr;
-
-	CBNeverChanges cbNeverChanges;
-	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&_View)));
-	pImmediateContext->UpdateSubresource(_pCBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
 
 	for (auto i = _children.begin(); i != _children.end(); i++)
 	{
@@ -134,7 +124,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	// Create instanced buffer
 	D3D11_BUFFER_DESC vbd;
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
-	vbd.ByteWidth = sizeof(InstancedData) * numInstances; // _model->treeData.numBranches;
+	vbd.ByteWidth = sizeof(InstancedData) * numInstances;
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	vbd.MiscFlags = 0;
@@ -203,8 +193,22 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	return S_OK;
 }
 
-HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time)
+HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData)
 {
+	CBNeverChanges cbNeverChanges;
+	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&pRenderData->view)));
+	pImmediateContext->UpdateSubresource(_pCBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
+
+	// Set up input assembler
+	pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
+	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
+	UINT offset[2] = { 0, 0 };
+	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
+	pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+	pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+	pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
+	pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 	pImmediateContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
 
 	// Compute instance data
@@ -216,7 +220,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* wo
 	{
 		if ((*i)->GetNumInstances(true) > 0)
 		{
-			HR((*i)->ComputeConstants(pImmediateContext, world, time, dataView));
+			HR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
 			dataView += (*i)->GetNumInstances(false);
 		}
 	}
@@ -228,8 +232,8 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* wo
 
 	CBChangesEveryFrame cb;
 	cb.light = _light;
-	XMStoreFloat4(&cb.eyePos,  _eyePos);
-	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(time));
+	cb.eyePos = pRenderData->eyePos;
+	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(pRenderData->time));
 
 	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
 	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
@@ -239,7 +243,7 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* wo
 	for (auto i = _children.begin(); i != _children.end(); i++)
 	{
 		WorldObject* obj = (*i);
-		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, world, _eyePos, time, &_geometryData, startInstance);
+		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, pRenderData, &_geometryData, startInstance);
 		HR(hr2);
 		startInstance += (*i)->GetNumInstances(false);
 	}

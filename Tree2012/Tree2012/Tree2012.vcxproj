@@ -163,6 +163,7 @@
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\Game\BitmapFont.h" />
     <ClInclude Include="..\Game\DDSTextureLoader.h" />
     <ClInclude Include="..\Game\DXMath.h" />
     <ClInclude Include="..\Game\Game.h" />
@@ -173,10 +174,12 @@
     <ClInclude Include="..\Game\Model.h" />
     <ClInclude Include="..\Game\Primitive.h" />
     <ClInclude Include="..\Game\PrimitiveGeometry.h" />
+    <ClInclude Include="..\Game\RenderData.h" />
     <ClInclude Include="..\Game\RenderStates.h" />
     <ClInclude Include="..\Game\Resource.h" />
     <ClInclude Include="..\Game\SceneRoot.h" />
     <ClInclude Include="..\Game\stdafx.h" />
+    <ClInclude Include="..\Game\StockRenderStates.h" />
     <ClInclude Include="..\Game\Tree.h" />
     <ClInclude Include="..\Game\TreeGeometry.h" />
     <ClInclude Include="..\Game\TreeModel.h" />
@@ -188,6 +191,7 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Game\BitmapFont.cpp" />
     <ClCompile Include="..\Game\DDSTextureLoader.cpp" />
     <ClCompile Include="..\Game\Game.cpp" />
     <ClCompile Include="..\Game\GeometryGenerator.cpp" />
@@ -198,6 +202,7 @@
     <ClCompile Include="..\Game\RenderStates.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
+    <ClCompile Include="..\Game\StockRenderStates.cpp" />
     <ClCompile Include="..\Game\Tree.cpp" />
     <ClCompile Include="..\Game\TreeGeometry.cpp" />
     <ClCompile Include="..\Game\TreeModel.cpp" />
@@ -223,6 +228,20 @@
     <Image Include="StoreLogo.png" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Game\Arial_16.abc">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|Durango'">true</DeploymentContent>
+    </None>
+    <None Include="..\Game\Arial_16.tga">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|Durango'">true</DeploymentContent>
+    </None>
+    <None Include="..\Game\Courier_New_11.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <None Include="..\Game\Courier_New_11.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
     <None Include="..\Game\Materials.fx">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">true</ExcludedFromBuild>
       <FileType>Document</FileType>

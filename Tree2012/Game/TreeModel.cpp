@@ -4,13 +4,17 @@
 
 TreeModel::TreeModel(void) 
 {
-	treeData.numBranches = 0;
 	trunk = nullptr;
-	pBranches = new Branch[maxBranches];
+	treeData.numBranches = 0;
+	treeData.numLevels = 0;
+	treeData.pBranches = new Branch[maxBranches];
+	treeData.pLevels = new BranchLevelData[maxLevels];
 }
 
 
 TreeModel::~TreeModel(void)
 {
+	SafeDelete(&treeData.pBranches);
+	SafeDelete(&treeData.pLevels);
 }
 

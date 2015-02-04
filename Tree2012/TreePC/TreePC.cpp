@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "TreePC.h"
 #include "BasicTimer.h"
+#include <ppltasks.h>
 
 using namespace Windows::ApplicationModel;
 using namespace Windows::ApplicationModel::Core;
@@ -9,7 +10,7 @@ using namespace Windows::UI::Core;
 using namespace Windows::System;
 using namespace Windows::Foundation;
 using namespace Windows::Graphics::Display;
-//using namespace concurrency;
+using namespace concurrency;
 
 TreePC::TreePC() :
 	m_windowClosed(false),
@@ -133,13 +134,12 @@ void TreePC::OnSuspending(Platform::Object^ sender, SuspendingEventArgs^ args)
 	// the app will be forced to exit.
 	SuspendingDeferral^ deferral = args->SuspendingOperation->GetDeferral();
 
-	// TODO - needed?
-	/*create_task([this, deferral]()
+	create_task([this, deferral]()
 	{
 		// Insert your code here.
 
 		deferral->Complete();
-	}); */
+	}); 
 }
  
 void TreePC::OnResuming(Platform::Object^ sender, Platform::Object^ args)

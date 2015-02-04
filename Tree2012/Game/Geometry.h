@@ -2,6 +2,7 @@
 
 #include "GeometryGenerator.h"
 #include "Materials.h"
+#include "RenderData.h"
 
 
 struct CBChangesPerObject
@@ -41,8 +42,8 @@ public:
 		return S_OK;
 	}
 
-	virtual HRESULT DrawInstanced(ID3D11DeviceContext* /*pImmediateContext*/, XMFLOAT4X4* /*world*/, XMVECTOR /*eyePos*/, float /*t*/, GeometryBufferData* /*pGeometryData*/, int /*startInstance*/, int /*numInstances*/)	{ return E_NOTIMPL;	}
-	virtual HRESULT ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, XMFLOAT4X4* /*world*/, float /*time*/) { return E_NOTIMPL; }
+	virtual HRESULT DrawInstanced(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/, GeometryBufferData* /*pGeometryData*/, int /*startInstance*/, int /*numInstances*/)	{ return E_NOTIMPL;	}
+	virtual HRESULT ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/) { return E_NOTIMPL; }
 
 	HRESULT SetMaterial(ID3D11DeviceContext* pImmediateContext, Material material)
 	{

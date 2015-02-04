@@ -22,6 +22,7 @@ struct Branch
 {
 	int id;
 	int depth;
+	int parent;
 
 	XMFLOAT4 start;
 	float	thickness;
@@ -69,10 +70,24 @@ struct Branch
 	}
 };
 
+struct BranchLevelData
+{
+	int depth;
+	int numBranches;
+	std::vector<int>* pBranchesInLevel;
+
+	BranchLevelData() : depth(0), numBranches(0) { }
+	~BranchLevelData() { SafeDelete(&pBranchesInLevel); }
+};
+
 struct TreeData
 {
 	int numBranches;
+	int numLevels;
+	Branch* pBranches;  
+	BranchLevelData* pLevels;
 
+	TreeData() : numBranches(0), numLevels(0), pBranches(nullptr), pLevels(nullptr) { }
 };
 
 class TreeModel : public Model
@@ -81,10 +96,11 @@ public:
 	TreeModel(void);
 	~TreeModel(void);
 
-	//const int maxBranches;
+	static const int maxChildBranches = 4;
+	static const int maxLevels = 6;
 	Branch* trunk;
 
 	TreeData treeData;
-	Branch* pBranches;  
+
 };
 

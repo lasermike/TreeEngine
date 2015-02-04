@@ -6,6 +6,7 @@
 TreeModelGenerator::TreeModelGenerator(unsigned int seed)
 {
 	_seed = seed;
+	_model = nullptr;
 }
 
 
@@ -18,22 +19,32 @@ TreeModel* TreeModelGenerator::Create()
 {
 	srand(_seed);
 
-	model = new TreeModel();
+	_model = new TreeModel();
+
+	_model->treeData.numLevels = TreeModel::maxLevels;
+	for (int i = 0; i < _model->treeData.numLevels; i++)
+	{
+		_model->treeData.pLevels[i].pBranchesInLevel = new std::vector<int>();
+	}
+
 	XMVECTOR vStart = XMVectorSet(0, 0, 0,0);
 	XMVECTOR vEnd = XMVectorSet(0, 1.3f, 0,0);
 
 	// Create trunk
-	int id = model->treeData.numBranches++;
-	model->trunk = &model->pBranches[id]; 
-	model->trunk->id = id;
+	int id = _model->treeData.numBranches++;
+	_model->trunk = &_model->treeData.pBranches[id]; 
+	_model->trunk->id = id;
+	_model->treeData.pLevels[0].pBranchesInLevel->push_back(id);
+	_model->treeData.pLevels[0].numBranches++;
+	_model->trunk->parent = -1;
 
-	XMStoreFloat4(&model->trunk->start, vStart);
-	XMStoreFloat4(&model->trunk->end, vEnd);
-	model->trunk->thickness = .3f;
-	model->trunk->depth = 0;
+	XMStoreFloat4(&_model->trunk->start, vStart);
+	XMStoreFloat4(&_model->trunk->end, vEnd);
+	_model->trunk->thickness = .3f;
+	_model->trunk->depth = 0;
 
-	GenerateChildrenRecursive(model->trunk, 1);
-	return model;
+	GenerateChildrenRecursive(_model->trunk, 1);
+	return _model;
 }
 
 void TreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, int depth)
@@ -52,14 +63,17 @@ void TreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, int dep
 
 	for (int i = 0; i < numBranches; i++)
 	{
-		int id = model->treeData.numBranches++;
-		Branch* child = &model->pBranches[id];
+		int id = _model->treeData.numBranches++;
+		Branch* child = &_model->treeData.pBranches[id];
 		child->id = id; 
 		parentBranch->SetChild(i, child->id);
-		assert(&model->pBranches[child->id] == child);  // Ensure our look up is correct 
+		assert(&_model->treeData.pBranches[child->id] == child);  // Ensure our look up is correct 
+		_model->treeData.pLevels[depth].numBranches++;
+		_model->treeData.pLevels[depth].pBranchesInLevel->push_back(id);
 
 		child->start = parentBranch->end;
 		child->depth = depth;
+		child->parent = parentBranch->id;
 
 		if (depth < 4)
 		{

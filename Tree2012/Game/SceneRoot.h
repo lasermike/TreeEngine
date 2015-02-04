@@ -19,9 +19,6 @@ class SceneRoot
 	ID3D11Buffer*                       _pCBChangesEveryFrame;
 	DirectionalLight					_light;  // Doesn't belong here, will move later
 
-	XMFLOAT4X4                          _View;
-	XMVECTOR							_eyePos;
-
 	GeometryGenerator					_geometryGenerator;
 	GeometryBufferData					_geometryData;
 
@@ -33,7 +30,7 @@ public:
 
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	virtual HRESULT CleanUpDeviceObjects();
-	HRESULT Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time);
+	HRESULT Render(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData);
 
 	void AddChild(WorldObject* obj)
 	{

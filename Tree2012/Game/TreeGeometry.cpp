@@ -80,7 +80,7 @@ HRESULT TreeGeometry::CleanUpDeviceObjects()
 	return S_OK;
 }
 
-HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* /*world*/, XMVECTOR /*eyePos*/, float t, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
+HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
 {
 	SetMaterial(pImmediateContext, _trunkMaterial);
 
@@ -105,7 +105,7 @@ HRESULT TreeGeometry::DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFL
 		XMVECTOR shadowPlane = XMVectorSet(0, 1, 0, 0); // XZ plane
 		XMMATRIX s = XMMatrixShadow(shadowPlane, toMainLight);
 		XMMATRIX shadowOffsetY = XMMatrixTranslation(0, 0.99f, 0);
-		XMMATRIX rotMat = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), t);
+		XMMATRIX rotMat = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), pRenderData->time);
 		XMStoreFloat4x4(&_shadowMaterial.shadowMatrix, shadowOffsetY * s );
 
 		SetMaterial(pImmediateContext, _shadowMaterial);

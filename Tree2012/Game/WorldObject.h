@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "Geometry.h"
 #include "Model.h"
+#include "RenderData.h"
 
 // For rendering indirectly
 struct InstancedData
@@ -32,13 +33,13 @@ public:
 
 	virtual HRESULT Render(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, XMVECTOR eyePos, float time);
 
-	HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, XMVECTOR eyePos, float t, GeometryBufferData* pGeometyData, int startInstance)
+	HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometyData, int startInstance)
 	{
-		HR(_geometry->DrawInstanced(pImmediateContext, world, eyePos, t, pGeometyData, startInstance, GetNumInstances(false)));
+		HR(_geometry->DrawInstanced(pImmediateContext, pRenderData, pGeometyData, startInstance, GetNumInstances(false)));
 		return S_OK;
 	}
 
-	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* world, float time, InstancedData* dataView);
+	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView);
 	virtual unsigned int GetNumInstances(bool /*numMax*/) { return 0; }
 };
 

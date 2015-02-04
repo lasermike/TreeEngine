@@ -99,6 +99,15 @@
     <ClInclude Include="..\Game\DXMath.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\BitmapFont.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\StockRenderStates.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\RenderData.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -155,6 +164,12 @@
     <ClCompile Include="InputXboxOne.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\BitmapFont.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\StockRenderStates.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
@@ -191,6 +206,18 @@
     </None>
     <None Include="..\Game\Materials.fx">
       <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Courier_New_11.abc">
+      <Filter>Game\Resources</Filter>
+    </None>
+    <None Include="..\Game\Courier_New_11.tga">
+      <Filter>Game\Resources</Filter>
+    </None>
+    <None Include="..\Game\Arial_16.tga">
+      <Filter>Game\Resources</Filter>
+    </None>
+    <None Include="..\Game\Arial_16.abc">
+      <Filter>Game\Resources</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

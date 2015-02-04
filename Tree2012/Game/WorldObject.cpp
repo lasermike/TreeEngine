@@ -33,7 +33,7 @@ HRESULT WorldObject::Render(ID3D11DeviceContext* /*pImmediateContext*/, XMFLOAT4
 	return E_NOTIMPL;
 }
 
-HRESULT WorldObject::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, XMFLOAT4X4* /*world*/, float /*time*/, InstancedData* /*dataView*/)
+HRESULT WorldObject::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/, InstancedData* /*dataView*/)
 {
 	return E_NOTIMPL;
 }

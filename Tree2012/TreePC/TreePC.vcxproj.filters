@@ -80,6 +80,12 @@
     <ClCompile Include="..\Game\Stdafx.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\BitmapFont.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\StockRenderStates.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TreePC.h" />
@@ -147,6 +153,18 @@
     <ClInclude Include="..\Game\DXMath.h">
       <Filter>Game</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\BitmapFont.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\StockRenderStates.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\StepTimer.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\RenderData.h">
+      <Filter>Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
@@ -155,6 +173,21 @@
     <None Include="TreePC_TemporaryKey.pfx" />
     <None Include="..\Game\Tree.hlsl">
       <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Courier_New_11.abc">
+      <Filter>Game\Resources</Filter>
+    </None>
+    <None Include="..\Game\Courier_New_11.tga">
+      <Filter>Game\Resources</Filter>
+    </None>
+    <None Include="..\Game\ATGFont.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Arial_16.abc">
+      <Filter>Game\Resources</Filter>
+    </None>
+    <None Include="..\Game\Arial_16.tga">
+      <Filter>Game\Resources</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -170,6 +203,12 @@
       <Filter>Game\Shaders</Filter>
     </FxCompile>
     <FxCompile Include="..\Game\VS.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Game\ATGFontPS.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Game\ATGFontVS.hlsl">
       <Filter>Game\Shaders</Filter>
     </FxCompile>
   </ItemGroup>

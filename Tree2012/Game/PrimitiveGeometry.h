@@ -20,7 +20,7 @@ public:
 	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
 	virtual HRESULT CleanUpDeviceObjects();
 
-	virtual HRESULT DrawInstanced(ID3D11DeviceContext* pImmediateContext, XMFLOAT4X4* /*world*/, XMVECTOR /*eyePos*/, float /*t*/, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
+	virtual HRESULT DrawInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* /*pRenderData*/, GeometryBufferData* pGeometryData, int startInstance, int numInstances)
 	{
 		SetMaterial(pImmediateContext, _groundMaterial);
 

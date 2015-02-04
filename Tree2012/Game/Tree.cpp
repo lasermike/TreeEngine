@@ -29,18 +29,26 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
 	return S_OK;
 }
 
-HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, XMFLOAT4X4* world, float time, InstancedData* dataView)
+HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* pRenderData, InstancedData* dataView)
 {
 	_logInstanceData.clear();
 	_twigInstanceData.clear();
 	int currentBranch = 0;
 
-	ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, XMVectorSet(0, .5, 0, 0)  + XMLoadFloat3(&_position), time);
+	XMVECTOR startPosition = XMLoadFloat3(&_position) + XMVectorSet(0, .5, 0, 0);
 
-//	for each level in tree
-//		for each branch in level
+	ComputeBranchInstanceData(pRenderData, currentBranch, _treeModel->trunk, startPosition);
 
-
+	/* TODO Implement per-branch depth world matrix as a step toward moving this computation to the GPU
+	for (int level = 0; level < _treeModel->treeData.numLevels; level++)
+	{
+		for (int branchIndex = 0; branchIndex < _treeModel->treeData.pLevels[level].numBranches; branchIndex++)
+		{
+			Branch* branch = _treeModel->treeData.pBranches[_treeModel->treeData.pLevels[level].pBranchesInLevel[branchIndex]];
+			XMVECTOR position = (branch->parent == -1) ? startPosition : _logInstanceData[branch->parent].World;
+			ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, position, time);
+		}
+	}*/
 
 	int dvi = 0;
 	for (unsigned int i = 0; i < _logInstanceData.size(); i++)
@@ -57,15 +65,15 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, XMFLO
 	return S_OK;
 }
 
-HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, Branch const* branch, const FXMVECTOR parentStart, float time)
+HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBranch, Branch const* branch, const FXMVECTOR parentStart)
 {
-	if (time < branch->depth)
+	if (pRenderData->time < branch->depth)
 		return S_OK;
 
 	// Update variables that change once per frame
 	XMVECTOR vChildStart;
 	XMMATRIX localToWorld, normalLocalToWorld;
-	ComputeTransformationsManual(&localToWorld, &normalLocalToWorld, &vChildStart, time, branch, world, parentStart);
+	ComputeTransformationsManual(&localToWorld, &normalLocalToWorld, &vChildStart, pRenderData->time, branch, &pRenderData->world, parentStart);
 
 	InstancedData data;
 	XMStoreFloat4x4(&data.World, localToWorld);
@@ -88,8 +96,8 @@ HRESULT Tree::ComputeBranchInstanceData(int& currentBranch, XMFLOAT4X4* world, B
 	{
 		if (branch->Child(c) != 0)
 		{
-			Branch* child = &_treeModel->pBranches[branch->Child(c)];
-			ComputeBranchInstanceData(currentBranch, world, child, vChildStart, time);
+			Branch* child = &_treeModel->treeData.pBranches[branch->Child(c)];
+			ComputeBranchInstanceData(pRenderData, currentBranch, child, vChildStart);
 		}
 	}
 

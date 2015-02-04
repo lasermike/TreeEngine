@@ -1,1 +1,2 @@
 !COMMON_MEDIA_BUILT_DIR!\Shaders    !OUTDIR_COMMON!\Shaders    *.*
+!COMMON_MEDIA_BUILT_DIR!\Fonts    !OUTDIR_COMMON!\Fonts    *.*

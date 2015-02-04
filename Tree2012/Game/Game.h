@@ -5,8 +5,14 @@
 #include "sceneroot.h"
 #include "Tree.h"
 #include "agile.h"
+#include "bitmapfont.h"
+#include "StepTimer.h"
+#include "RenderData.h"
 
 using namespace Microsoft::WRL;
+
+class BitmapFont;
+
 
 class Game 
 {
@@ -33,14 +39,13 @@ public:
 
 private:
 
-	//void Update(DX::StepTimer const& timer);
+	void Update(DX::StepTimer const& timer);
 
 	HRESULT InitDevice();
 	void CleanupDevice();
 	static float ConvertDipsToPixels(float dips);
 
-	//void CreateDevice();
-	//void CreateResources();
+	void BuildShadowTransform();
 
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                                  m_featureLevel;
@@ -54,8 +59,10 @@ private:
 	//Microsoft::WRL::ComPtr<ID3D11Texture2D>            m_depthStencil;
 
 	// Game state
-	//INT64                                              m_frame;
-	//DX::StepTimer                                      m_timer;
+	RenderData							_renderData;
+	DX::StepTimer						m_timer;
+	float								m_fps;
+	//float								m_time;
 
 	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
 	D3D_DRIVER_TYPE                     _driverType;
@@ -70,15 +77,11 @@ private:
 	ID3D11Texture2D*                    _pDepthStencil;
 	ID3D11DepthStencilView*             _pDepthStencilView;
 	ID3D11RasterizerState*				_rasterState;
+	D3D11_VIEWPORT						_viewPort;
 	bool								_enableMsaa;
-
-	XMFLOAT4X4							_World;
-	XMFLOAT4X4                          _Projection;
 
 	Primitive*							_pPlane;
 	SceneRoot*							_pScene;
-	//Tree*								_pTree;
-	//Tree*								_pTree;
 	std::vector<Tree*>					_trees;
 	ULONGLONG							_timeStart;
 	std::vector<unsigned int>			_seeds;
@@ -86,5 +89,11 @@ private:
 	bool								_resetTree;
 
 	ID3D11Buffer*                       _pCBChangeOnResize;
+
+	XSF::BitmapFont*					_bitmapFont;
+
+	//DirectionalLight					_dirLights[1];
+
 };
+
 

@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "Game.h"
 #include <directxcolors.h>
+#include "BitmapFont.h"
+#include "StockRenderStates.h"
 #include "SceneRoot.h"
 #include "Tree.h"
 #include "TreeModelGenerator.h"
@@ -48,6 +50,7 @@ Game::Game()
 	_currentSeed = 0;
 	_resetTree = true;
 	_pCBChangeOnResize = nullptr;
+	_bitmapFont = nullptr;
 
 	XSF::SetContentFileRoot();
 
@@ -66,6 +69,19 @@ Game::Game()
 
 	_pPlane = new Primitive();
 	_pScene->AddChild(_pPlane);
+
+	_renderData.dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	_renderData.dirLights[0].Diffuse  = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+	_renderData.dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+	_renderData.dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	_renderData.time = 0;
+
+	// Initialize the view matrix
+	XMVECTOR eyePos = XMVectorSet(0.0f, 2.25f, -6.0f, 0.0f);
+	XMVECTOR At = XMVectorSet(0.0f, 1.75f, 0.0f, 0.0f);
+	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	XMStoreFloat4x4(&_renderData.view, XMMatrixLookAtLH(eyePos, At, Up));
+	XMStoreFloat4(&_renderData.eyePos, eyePos);
 }
 
 Game::~Game()
@@ -75,10 +91,9 @@ Game::~Game()
 		if (*t)
 			delete *t;
 	}
-	if (_pScene)
-		delete _pScene;
-	if (_pPlane)
-		delete _pPlane;
+	SafeDelete(&_bitmapFont);
+	SafeDelete(&_pScene);
+	SafeDelete(&_pPlane);
 }
 
 //--------------------------------------------------------------------------------------
@@ -151,7 +166,11 @@ HRESULT Game::InitDevice()
 		return hr;
 
 	// Initialize the world matrices
-	XMStoreFloat4x4(&_World, XMMatrixIdentity());
+	XMStoreFloat4x4(&_renderData.world, XMMatrixIdentity());
+
+	XSF::StockRenderStates::Initialize(_pd3dDevice);
+	_bitmapFont = new XSF::BitmapFont();
+    XSF_ERROR_IF_FAILED( _bitmapFont->Create( _pd3dDevice, L"Arial_16" ) );
 
 	OnResize();
 
@@ -186,10 +205,10 @@ HRESULT Game::OnResize()
 	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
 #endif
 	// Initialize the projection matrix
-	XMStoreFloat4x4(&_Projection, XMMatrixPerspectiveFovLH(XM_PIDIV4, windowWidth / (float)windowHeight, 0.01f, 100.0f));
+	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(XM_PIDIV4, windowWidth / (float)windowHeight, 0.01f, 100.0f));
 
 	CBChangeOnResize cbChangesOnResize;
-	XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(&_Projection)));
+	XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(&_renderData.projection)));
 	_pImmediateContext->UpdateSubresource(_pCBChangeOnResize, 0, nullptr, &cbChangesOnResize, 0, 0);
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
@@ -266,7 +285,7 @@ HRESULT Game::OnResize()
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 #if defined (_XBOX_ONE)
 	//sd.Scaling = DXGI_SCALING_STRETCH;
-	sd.Flags = DXGIX_SWAP_CHAIN_MATCH_XBOX360_AND_PC;
+	sd.Flags = DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
 #endif 
 	HR(dxgiFactory2->CreateSwapChainForCoreWindow(_pd3dDevice, reinterpret_cast<IUnknown*>(_window.Get()), &sd, nullptr, &_pSwapChain1));
 	HR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));
@@ -307,14 +326,13 @@ HRESULT Game::OnResize()
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
 
 	// Setup the viewport
-	D3D11_VIEWPORT vp;
-	vp.Width = (FLOAT) windowWidth;
-	vp.Height = (FLOAT) windowHeight;
-	vp.MinDepth = 0.0f;
-	vp.MaxDepth = 1.0f;
-	vp.TopLeftX = 0;
-	vp.TopLeftY = 0;
-	_pImmediateContext->RSSetViewports(1, &vp);
+	_viewPort.Width = (FLOAT) windowWidth;
+	_viewPort.Height = (FLOAT) windowHeight;
+	_viewPort.MinDepth = 0.0f;
+	_viewPort.MaxDepth = 1.0f;
+	_viewPort.TopLeftX = 0;
+	_viewPort.TopLeftY = 0;
+	_pImmediateContext->RSSetViewports(1, &_viewPort);
 
 	return S_OK;
 }
@@ -324,6 +342,7 @@ HRESULT Game::OnResize()
 //--------------------------------------------------------------------------------------
 void Game::CleanupDevice()
 {
+	XSF::StockRenderStates::Shutdown();
 	_pScene->CleanUpDeviceObjects();
 
 	SafeRelease(&_pImmediateContext);
@@ -340,14 +359,9 @@ void Game::CleanupDevice()
 	SafeRelease(&_pd3dDevice);
 }
 
-//--------------------------------------------------------------------------------------
-// Render a frame
-//--------------------------------------------------------------------------------------
-void Game::Render()
+void Game::Update(DX::StepTimer const& timer)
 {
-	HRESULT hr = S_OK;
-
-	// Moved to tree
+	// Rebuild tree if necessary
 	if (_resetTree)
 	{
 		if ((unsigned int)_currentSeed + 1 > _seeds.size())
@@ -373,21 +387,36 @@ void Game::Render()
 	}
 
 	// Update our time
-	static float t = 0.0f;
+	m_fps = (float) timer.GetFramesPerSecond();
+	//static float t = 0.0f;
+
 	if (_driverType == D3D_DRIVER_TYPE_REFERENCE)
 	{
-		t += (float)XM_PI * 0.0125f;
+		_renderData.time += (float)XM_PI * 0.0125f;
 	}
 	else
 	{
 		ULONGLONG timeCur = GetTickCount64();
 		if (_timeStart == 0)
 			_timeStart = timeCur;
-		t = (timeCur - _timeStart) / 1000.0f;
+		_renderData.time = (timeCur - _timeStart) / 1000.0f;
 	}
 
 	// Rotate cube around the origin
-	//XMStoreFloat4x4(&_World, XMMatrixRotationY( t ));  //TODO: Uncomment after shadows are working
+	XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
+}
+
+//--------------------------------------------------------------------------------------
+// Render a frame
+//--------------------------------------------------------------------------------------
+void Game::Render()
+{
+	HRESULT hr = S_OK;
+
+    m_timer.Tick([&]()
+    {
+        Update(m_timer);
+    });
 
 	// Bind render target
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
@@ -405,7 +434,16 @@ void Game::Render()
 	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
 
 	// Draw everything
-	HRC(_pScene->Render(_pImmediateContext, &_World, t));
+	HRC(_pScene->Render(_pImmediateContext, &_renderData));
+
+	if (_bitmapFont)
+	{
+	    _bitmapFont->Begin(_pImmediateContext, &_viewPort, false /*(SampleSettings().FastSemanticsEnabled()*/ );
+		wchar_t text[128];
+		swprintf(text, 128, L"FPS %d", m_timer.GetFramesPerSecond());
+		_bitmapFont->DrawText(0, 10, 0x33444444, text);
+		_bitmapFont->End();
+	}
 
 	//
 	// Present our back buffer to our front buffer
@@ -437,6 +475,44 @@ void Game::OnKeydown(UINT key)  // WM_KEYDOWN
 		break;
 	}
 }
+
+void Game::BuildShadowTransform()
+{
+	// Only the first "main" light casts a shadow.
+	XMVECTOR lightDir = XMLoadFloat3(&_renderData.dirLights[0].Direction);
+	XMVECTOR lightPos = -2.0f * _renderData.mSceneBounds.Radius * lightDir;
+	XMVECTOR targetPos = XMLoadFloat3(&_renderData.mSceneBounds.Center);
+	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+	XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
+
+	// Transform bounding sphere to light space.
+	XMFLOAT3 sphereCenterLS;
+	XMStoreFloat3(&sphereCenterLS, XMVector3TransformCoord(targetPos, V));
+
+	// Ortho frustum in light space encloses scene.
+	float l = sphereCenterLS.x - _renderData.mSceneBounds.Radius;
+	float b = sphereCenterLS.y - _renderData.mSceneBounds.Radius;
+	float n = sphereCenterLS.z - _renderData.mSceneBounds.Radius;
+	float r = sphereCenterLS.x + _renderData.mSceneBounds.Radius;
+	float t = sphereCenterLS.y + _renderData.mSceneBounds.Radius;
+	float f = sphereCenterLS.z + _renderData.mSceneBounds.Radius;
+	XMMATRIX P = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
+
+	// Transform NDC space [-1,+1]^2 to texture space [0,1]^2
+	XMMATRIX T(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+
+	XMMATRIX S = V*P*T;
+
+	XMStoreFloat4x4(&_renderData.lightView, V);
+	XMStoreFloat4x4(&_renderData.lightProj, P);
+	XMStoreFloat4x4(&_renderData.shadowTransform, S);
+}
+
 
 #ifndef _XBOX_ONE
 // Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
