@@ -7,8 +7,10 @@
 #include "Tree.h"
 #include "TreeModelGenerator.h"
 #include "Primitive.h"
+#include "ShadowMap.h"
 #include <stdio.h>
 #include <time.h>
+#include "directxtex.h"
 
 using namespace DirectX;
 
@@ -54,8 +56,10 @@ Game::Game()
 
 	XSF::SetContentFileRoot();
 
+	// Init vertex/index buffer
 	_pScene = new SceneRoot();
 
+	// Init trees and other world objects
 	_trees.push_back(new Tree());
 	_pScene->AddChild((*_trees.rbegin()));
 
@@ -70,6 +74,7 @@ Game::Game()
 	_pPlane = new Primitive();
 	_pScene->AddChild(_pPlane);
 
+	// Init lights
 	_renderData.dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
 	_renderData.dirLights[0].Diffuse  = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
 	_renderData.dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
@@ -82,6 +87,12 @@ Game::Game()
 	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	XMStoreFloat4x4(&_renderData.view, XMMatrixLookAtLH(eyePos, At, Up));
 	XMStoreFloat4(&_renderData.eyePos, eyePos);
+
+	// Init scene bounds.
+	// Estimatation.  The ground plane is the widest object at 14 x 14.  
+	// Ideally would loop through all world space vertices
+	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	_renderData.mSceneBounds.Radius = sqrtf(7.0f*7.0f + 7.0f*7.0f);
 }
 
 Game::~Game()
@@ -138,8 +149,8 @@ HRESULT Game::InitDevice()
 		hr = D3D11CreateDevice(nullptr, _driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
 			D3D11_SDK_VERSION, &device, &_featureLevel, &d3dContext);
 
-		HR(device.Get()->QueryInterface( __uuidof(_pd3dDevice), reinterpret_cast<void**>(&_pd3dDevice) ) );
-		HR(d3dContext.Get()->QueryInterface( __uuidof(_pImmediateContext), reinterpret_cast<void**>(&_pImmediateContext) ) );
+		HRR(device.Get()->QueryInterface( __uuidof(_pd3dDevice), reinterpret_cast<void**>(&_pd3dDevice) ) );
+		HRR(d3dContext.Get()->QueryInterface( __uuidof(_pImmediateContext), reinterpret_cast<void**>(&_pImmediateContext) ) );
 
 		/*if (hr == E_INVALIDARG)
 		{
@@ -171,6 +182,9 @@ HRESULT Game::InitDevice()
 	XSF::StockRenderStates::Initialize(_pd3dDevice);
 	_bitmapFont = new XSF::BitmapFont();
     XSF_ERROR_IF_FAILED( _bitmapFont->Create( _pd3dDevice, L"Arial_16" ) );
+
+	// Init shadow map
+	_renderData.pShadowMap = new ShadowMap(_pd3dDevice, _renderData.SMapSize, _renderData.SMapSize);
 
 	OnResize();
 
@@ -234,7 +248,7 @@ HRESULT Game::OnResize()
 	// Check MSAA support
 	UINT msaaQuality;
 	const UINT msaaCount = 4;
-	HR(_pd3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
+	HRR(_pd3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
 	if (msaaQuality == 0)
 	{
 		_enableMsaa = false;
@@ -254,13 +268,13 @@ HRESULT Game::OnResize()
 		rasterDesc.MultisampleEnable = true; // MSAA
 		rasterDesc.ScissorEnable = false;
 		rasterDesc.SlopeScaledDepthBias = 0.0f;
-		HR(_pd3dDevice->CreateRasterizerState(&rasterDesc, &_rasterState));
+		HRR(_pd3dDevice->CreateRasterizerState(&rasterDesc, &_rasterState));
 		_pImmediateContext->RSSetState(_rasterState);
 	}
 
 	// Create swap chain
 	IDXGIFactory2* dxgiFactory2 = nullptr;
-	HR(dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2)));
+	HRR(dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2)));
 
 	// DirectX 11.1 or later
 	hr = _pd3dDevice->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void**>(&_pd3dDevice1));
@@ -287,17 +301,17 @@ HRESULT Game::OnResize()
 	//sd.Scaling = DXGI_SCALING_STRETCH;
 	sd.Flags = DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
 #endif 
-	HR(dxgiFactory2->CreateSwapChainForCoreWindow(_pd3dDevice, reinterpret_cast<IUnknown*>(_window.Get()), &sd, nullptr, &_pSwapChain1));
-	HR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));
+	HRR(dxgiFactory2->CreateSwapChainForCoreWindow(_pd3dDevice, reinterpret_cast<IUnknown*>(_window.Get()), &sd, nullptr, &_pSwapChain1));
+	HRR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));
 
 	dxgiFactory2->Release();
 	dxgiFactory->Release();
 
 	// Create a render target view
 	ID3D11Texture2D* pBackBuffer = nullptr;
-	HR(_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+	HRR(_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
 
-	HR(hr = _pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &_pRenderTargetView));
+	HRR(hr = _pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &_pRenderTargetView));
 	pBackBuffer->Release();
 
 	// Create depth stencil texture
@@ -318,10 +332,10 @@ HRESULT Game::OnResize()
 	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 	descDepth.CPUAccessFlags = 0;
 	descDepth.MiscFlags = 0;
-	HR(_pd3dDevice->CreateTexture2D(&descDepth, nullptr, &_pDepthStencil));
+	HRR(_pd3dDevice->CreateTexture2D(&descDepth, nullptr, &_pDepthStencil));
 
 	// Create the depth stencil view
-	HR(_pd3dDevice->CreateDepthStencilView(_pDepthStencil, 0, &_pDepthStencilView));
+	HRR(_pd3dDevice->CreateDepthStencilView(_pDepthStencil, 0, &_pDepthStencilView));
 
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
 
@@ -344,6 +358,8 @@ void Game::CleanupDevice()
 {
 	XSF::StockRenderStates::Shutdown();
 	_pScene->CleanUpDeviceObjects();
+
+	SafeDelete(&_renderData.pShadowMap);
 
 	SafeRelease(&_pImmediateContext);
 	SafeRelease(&_pCBChangeOnResize);
@@ -388,7 +404,6 @@ void Game::Update(DX::StepTimer const& timer)
 
 	// Update our time
 	m_fps = (float) timer.GetFramesPerSecond();
-	//static float t = 0.0f;
 
 	if (_driverType == D3D_DRIVER_TYPE_REFERENCE)
 	{
@@ -402,8 +417,14 @@ void Game::Update(DX::StepTimer const& timer)
 		_renderData.time = (timeCur - _timeStart) / 1000.0f;
 	}
 
-	// Rotate cube around the origin
-	XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
+	// Rotate camera around the origin
+	//XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
+
+	BuildShadowTransform();
+
+	//_renderData.view = _renderData.lightView;
+	//_renderData.projection = _renderData.lightProj;
+
 }
 
 //--------------------------------------------------------------------------------------
@@ -418,17 +439,31 @@ void Game::Render()
         Update(m_timer);
     });
 
-	// Bind render target
+	// Render shadow map
+	_renderData.pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext);
+	DrawSceneToShadowMap();
+
+	// Restore state after shadow
+	_pImmediateContext->RSSetState(0);
+	_pImmediateContext->RSSetViewports(1, &_viewPort);
+
+	// Bind render target and depth
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
 
-	//
+#ifdef SAVEDEPTHIMAGE
+	// Save shadow mapt to disk
+	ScratchImage resultImage, convertedImage;
+	HR(CaptureTexture(_pd3dDevice, _pImmediateContext, _renderData.pShadowMap->DepthMapBuffer(), resultImage));
+	const Image* img = resultImage.GetImage(0,0,0);
+	HR(Convert(*img, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 0.5f, convertedImage));
+	img = convertedImage.GetImage(0,0,0);
+	HR(SaveToTGAFile(*img, L"c:\\temp\\smap.tga"));
+#endif
+
 	// Clear the back buffer
-	//
 	_pImmediateContext->ClearRenderTargetView(_pRenderTargetView, Colors::AliceBlue);
 
-	//
 	// Clear the depth buffer to 1.0 (max depth)
-	//
 	_pImmediateContext->ClearDepthStencilView(_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
 	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
@@ -511,6 +546,23 @@ void Game::BuildShadowTransform()
 	XMStoreFloat4x4(&_renderData.lightView, V);
 	XMStoreFloat4x4(&_renderData.lightProj, P);
 	XMStoreFloat4x4(&_renderData.shadowTransform, S);
+}
+
+void Game::DrawSceneToShadowMap()
+{
+	XMMATRIX view     = XMLoadFloat4x4(&_renderData.lightView);
+	XMMATRIX proj     = XMLoadFloat4x4(&_renderData.lightProj);
+	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
+
+	RenderData prevRenderData(_renderData);
+	_renderData.view = _renderData.lightView;
+	_renderData.projection = _renderData.projection;
+	_renderData.pass = ShadowMapPass;
+
+	// Draw everything
+	HR(_pScene->Render(_pImmediateContext, &_renderData));
+
+	_renderData = prevRenderData;
 }
 
 

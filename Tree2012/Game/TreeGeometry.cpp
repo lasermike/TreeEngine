@@ -35,7 +35,7 @@ TreeGeometry::TreeGeometry(TreeModel* model)
 	_shadowMaterial.flags.x = true;  //useShadowMatrix
 
 #ifndef _XBOX_ONE
-	_drawShadow = true;
+	_drawShadow = false;
 #endif
 }
 
@@ -46,11 +46,11 @@ TreeGeometry::~TreeGeometry()
 
 HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
 {
-	HR(CleanUpDeviceObjects());
-	HR(Geometry::InitGraphics(device, pImmediateContext));
+	HRR(CleanUpDeviceObjects());
+	HRR(Geometry::InitGraphics(device, pImmediateContext));
 
 	// Load the Texture
-	HR(CreateDDSTextureFromFile(device, L"bark2.dds", nullptr, &_pTextureRV));
+	HRR(CreateDDSTextureFromFile(device, L"bark2.dds", nullptr, &_pTextureRV));
 
 	// Create the sample state
 	D3D11_SAMPLER_DESC sampDesc;
@@ -71,7 +71,7 @@ HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pI
 
 HRESULT TreeGeometry::CleanUpDeviceObjects()
 {
-	HR(Geometry::CleanUpDeviceObjects());
+	HRR(Geometry::CleanUpDeviceObjects());
 
 	SafeRelease(&_pSamplerLinear);
 	SafeRelease(&_pTextureRV);

@@ -46,23 +46,15 @@ private:
 	static float ConvertDipsToPixels(float dips);
 
 	void BuildShadowTransform();
+	void DrawSceneToShadowMap();
 
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                                  m_featureLevel;
-	//Microsoft::WRL::ComPtr<ID3D11DeviceX>              m_d3dDevice;
-	//Microsoft::WRL::ComPtr<ID3D11DeviceContextX>       m_d3dContext;
-
-	// Rendering resources
-	//Microsoft::WRL::ComPtr<IDXGISwapChain1>            m_swapChain;
-	//Microsoft::WRL::ComPtr<ID3D11RenderTargetView>     m_renderTargetView;
-	//Microsoft::WRL::ComPtr<ID3D11DepthStencilView>     m_depthStencilView;
-	//Microsoft::WRL::ComPtr<ID3D11Texture2D>            m_depthStencil;
 
 	// Game state
 	RenderData							_renderData;
 	DX::StepTimer						m_timer;
 	float								m_fps;
-	//float								m_time;
 
 	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
 	D3D_DRIVER_TYPE                     _driverType;
@@ -91,9 +83,6 @@ private:
 	ID3D11Buffer*                       _pCBChangeOnResize;
 
 	XSF::BitmapFont*					_bitmapFont;
-
-	//DirectionalLight					_dirLights[1];
-
 };
 
 

@@ -21,11 +21,11 @@ PrimitiveGeometry::~PrimitiveGeometry()
 
 HRESULT PrimitiveGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
 {	
-	HR(CleanUpDeviceObjects());
+	HRR(CleanUpDeviceObjects());
 	Geometry::InitGraphics(device, pImmediateContext);
 
 	// Load the Texture
-	HR(CreateDDSTextureFromFile(device, L"snow.dds", nullptr, &_pTextureRV));
+	HRR(CreateDDSTextureFromFile(device, L"snow.dds", nullptr, &_pTextureRV));
 
 	// Create the sample state
 	D3D11_SAMPLER_DESC sampDesc;
@@ -45,7 +45,7 @@ HRESULT PrimitiveGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContex
 }
 HRESULT PrimitiveGeometry::CleanUpDeviceObjects()
 {
-	HR(Geometry::CleanUpDeviceObjects());
+	HRR(Geometry::CleanUpDeviceObjects());
 	SafeRelease(&_pTextureRV);
 	SafeRelease(&_pSamplerLinear);
 

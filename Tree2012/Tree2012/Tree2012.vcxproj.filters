@@ -28,6 +28,9 @@
     <Filter Include="Game\Source">
       <UniqueIdentifier>{b91746a0-0345-4911-828b-4693c3caf116}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Lib">
+      <UniqueIdentifier>{cae7b73d-69af-4d5f-b93b-5d12e95de677}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -108,6 +111,12 @@
     <ClInclude Include="..\Game\RenderData.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\ShadowMap.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\CComPtr.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -170,6 +179,9 @@
     <ClCompile Include="..\Game\StockRenderStates.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\ShadowMap.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
@@ -229,5 +241,10 @@
     <CustomBuild Include="..\Game\Tree.hlsl">
       <Filter>Game\Shaders</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="Lib\DirectXTex.lib">
+      <Filter>Lib</Filter>
+    </Library>
   </ItemGroup>
 </Project>

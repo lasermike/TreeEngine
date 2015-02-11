@@ -23,9 +23,9 @@ void Tree::Create(TreeModelGenerator* generator)
 
 HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
 {
-	HR(CleanUpDeviceObjects());
+	HRR(CleanUpDeviceObjects());
 	_geometry = new TreeGeometry(_treeModel);
-	HR(_geometry->InitGraphics(device, pImmediateContext));
+	HRR(_geometry->InitGraphics(device, pImmediateContext));
 	return S_OK;
 }
 

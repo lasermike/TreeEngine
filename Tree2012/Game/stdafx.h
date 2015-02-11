@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <iostream>
 #include <vector>
+#include <CComPtr.h>
 
 #define XSF_USE_DX_11_1
 
@@ -32,8 +33,21 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #endif 
 
 #if defined(DEBUG) | defined(_DEBUG)
+
 #ifndef HR
 #define HR(x)                                              \
+	{                                                          \
+		HRESULT hr = (x);                                      \
+		if (FAILED(hr))                                         \
+		{                                                      \
+		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
+		assert(SUCCEEDED(hr)); \
+		}                                                      \
+	}
+#endif
+
+#ifndef HRR
+#define HRR(x)                                              \
 	{                                                          \
 		HRESULT hr = (x);                                      \
 		if (FAILED(hr))                                         \
@@ -57,8 +71,8 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #endif
 
 #else
-#ifndef HR
-#define HR(x) (x)
+#ifndef HRR
+#define HRR(x) (x)
 #endif
 #endif 
 

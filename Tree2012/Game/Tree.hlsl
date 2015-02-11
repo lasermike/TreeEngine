@@ -32,6 +32,7 @@ cbuffer cbChangesEveryFrame : register( b2 )
 cbuffer cbChangesPerObject : register (b3)
 {
 	Material mat;
+	float4x4 texTransform;
 }
 
 //--------------------------------------------------------------------------------------
@@ -58,21 +59,16 @@ struct PS_INPUT
 //--------------------------------------------------------------------------------------
 PS_INPUT VS(VS_INPUT input)
 {
-	float4x4 world = input.World  ;
-    [flatten]
-	if (mat.flags.x > 0) //useShadow
+	float4x4 world = input.World;
+    /*[flatten]
+	if (mat.flags.x > 0) //use shear Shadow
 	{
 		world = world  * mat.shadowMatrix ;
-		/*float4x4 shadow = { 1, -2, 0, 0,
-							0,  0, 0, 0,
-							0, -2, 1, 0,
-							0, 0, 0, 1 };
-		world = shadow * world;*/
-	}
+	}*/
 
 	PS_INPUT output = (PS_INPUT)0;
 	output.PosW = mul(float4(input.Pos, 1.0f), transpose(world)).xyz;
-	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal); // TEMP, use gWorldInvTranspose);
+	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal);;
 
 	output.Pos = mul(float4(output.PosW, 1.0f), View);
 	output.Pos = mul(output.Pos, Projection);
@@ -80,7 +76,6 @@ PS_INPUT VS(VS_INPUT input)
 
 	return output;
 }
-
 
 //--------------------------------------------------------------------------------------
 // Pixel Shader
@@ -132,6 +127,86 @@ float4 PS(PS_INPUT pin) : SV_Target
 
 	return litColor;
 }
+
+struct ShadowMapVertexOut
+{
+	float4 PosH : SV_POSITION;
+	float2 Tex  : TEXCOORD;
+};
+ 
+
+ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
+{
+	ShadowMapVertexOut output;
+
+	//float4x4 worldViewProj = transpose(output.World) * View * Projection;
+
+	//output.PosH = mul(float4(input.Pos, 1.0f), worldViewProj);
+	//output.Tex  = mul(float4(input.Tex, 0.0f, 1.0f), texTransform).xy;
+
+
+	//PS_INPUT output = (PS_INPUT)0;
+	float4 pos = mul(float4(input.Pos, 1.0f), transpose( input.World));
+	pos = mul(pos, View);
+	output.PosH = mul(pos, Projection);
+	output.Tex = input.Tex;
+
+
+	return output;
+}
+
+// This is only used for alpha cut out geometry, so that shadows 
+// show up correctly.  Geometry that does not need to sample a
+// texture can use a NULL pixel shader for depth pass.
+void BuildShadowMapPS(ShadowMapVertexOut pin)
+{
+	// TODO support alpha map
+	//float4 diffuse = gDiffuseMap.Sample(samLinear, pin.Tex);
+
+	// Don't write transparent pixels to the shadow map.
+	//clip(diffuse.a - 0.15f);
+}
+
+struct DSVertexIn
+{
+	float3 PosL    : POSITION;
+	float3 NormalL : NORMAL;
+	float2 Tex     : TEXCOORD;
+};
+
+struct DSVertexOut
+{
+	float4 PosH : SV_POSITION;
+	float2 Tex  : TEXCOORD;
+};
+ 
+
+DSVertexOut DrawScreenQuadVS(DSVertexIn vin)
+{
+	DSVertexOut vout;
+
+	float4x4 worldViewProj = float4x4(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, -0.5f, 0.0f, 1.0f);
+
+	vout.PosH = mul(float4(vin.PosL, 1.0f), worldViewProj);
+
+	vout.Tex  = vin.Tex;
+	
+	return vout;
+}
+
+float4 DrawScreenQuadPS(DSVertexOut pin) : SV_Target
+{
+	float4 c = txDiffuse.Sample(samLinear, pin.Tex).r;
+	
+	// draw as grayscale
+	return float4(c.rrr, 1);
+}
+ 
+
 
 /*
 matrix MatrixTransformation

@@ -8,6 +8,7 @@
 struct CBChangesPerObject
 {
 	Material material;
+	XMFLOAT4X4 textureTransform;
 };
 
 class Geometry
@@ -31,7 +32,7 @@ public:
 		bd.ByteWidth = sizeof(CBChangesPerObject);
 		bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		bd.CPUAccessFlags = 0;
-		HR(device->CreateBuffer(&bd, nullptr, &_pCBChangesPerObject));
+		HRR(device->CreateBuffer(&bd, nullptr, &_pCBChangesPerObject));
 
 		return S_OK;
 	}

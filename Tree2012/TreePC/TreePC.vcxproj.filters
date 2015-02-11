@@ -31,6 +31,9 @@
     <Filter Include="Game\Shaders">
       <UniqueIdentifier>{d764843c-3859-42b9-8c90-3883b7baac76}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Lib">
+      <UniqueIdentifier>{8f349712-6ffe-464d-8717-3fd2fdba4398}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="TreePC.cpp" />
@@ -84,6 +87,9 @@
       <Filter>Game</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\StockRenderStates.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\ShadowMap.cpp">
       <Filter>Game</Filter>
     </ClCompile>
   </ItemGroup>
@@ -165,6 +171,13 @@
     <ClInclude Include="..\Game\RenderData.h">
       <Filter>Game</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\ShadowMap.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\CComPtr.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Lib\DirectXTex.h" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
@@ -211,5 +224,22 @@
     <FxCompile Include="..\Game\ATGFontVS.hlsl">
       <Filter>Game\Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="..\Game\BuildShadowMapVS.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Game\BuildShadowMapPS.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Game\DebugTexturePS.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Game\DebugTextureVS.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="Lib\DirectXTex.lib">
+      <Filter>Lib</Filter>
+    </Library>
   </ItemGroup>
 </Project>

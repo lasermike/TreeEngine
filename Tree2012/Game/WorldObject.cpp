@@ -21,7 +21,7 @@ HRESULT WorldObject::CleanUpDeviceObjects()
 {
 	if (_geometry)
 	{
-		HR(_geometry->CleanUpDeviceObjects());
+		HRR(_geometry->CleanUpDeviceObjects());
 		delete _geometry;
 		_geometry = nullptr;
 	}

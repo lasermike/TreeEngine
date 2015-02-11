@@ -2,6 +2,8 @@
 #include "SceneRoot.h"
 #include "GeometryGenerator.h"
 #include "RenderStates.h"
+#include "ShadowMap.h"
+#include "DDSTextureLoader.h" // Test texture
 
 __declspec(align(16))
 struct CBNeverChanges
@@ -23,6 +25,7 @@ class InputLayoutDesc
 {
 public:
 	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[11];
+	static const D3D11_INPUT_ELEMENT_DESC Basic32[3];
 };
 
 class InputLayouts
@@ -32,6 +35,7 @@ public:
 	static void DestroyAll();
 
 	static ID3D11InputLayout* InstancedBasic16;
+	static ID3D11InputLayout* Basic32;
 };
 
 
@@ -50,27 +54,35 @@ const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[11] =
 	{ "WORLDNORMAL", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
+const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::Basic32[3] = 
+{
+	{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+	{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+	{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+};
+
 ID3D11InputLayout* InputLayouts::InstancedBasic16 = 0;
+ID3D11InputLayout* InputLayouts::Basic32 = 0;
 
 void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
 {
-	HRESULT hr = (device->CreateInputLayout(InputLayoutDesc::InstancedBasic16, ARRAYSIZE(InputLayoutDesc::InstancedBasic16), pShaderBytecodeWithInputSignature /*passDesc.pIAInputSignature*/,
-		byteCodeLen /*passDesc.IAInputSignatureSize*/, &InstancedBasic16));
-	assert(SUCCEEDED(hr));
+	HR(device->CreateInputLayout(InputLayoutDesc::InstancedBasic16, 
+								 ARRAYSIZE(InputLayoutDesc::InstancedBasic16), 
+								 pShaderBytecodeWithInputSignature /*passDesc.pIAInputSignature*/,
+								 byteCodeLen /*passDesc.IAInputSignatureSize*/, &InstancedBasic16));
 }
 
 void InputLayouts::DestroyAll()
 {
-	if (InstancedBasic16 != nullptr)
-	{
-		InstancedBasic16->Release();
-		InstancedBasic16 = nullptr;
-	}
+	SafeRelease(&InstancedBasic16);
+	SafeRelease(&Basic32);
 }
 
 #pragma endregion
 
-SceneRoot::SceneRoot()
+SceneRoot::SceneRoot() : _pShadowVertexShader(nullptr), _pShadowPixelShader(nullptr), 
+						 _pScreenQuadVB(nullptr), _pScreenQuadIB(nullptr),
+						 _pDrawScreenVertexShader(), _pDrawScreenPixelShader()
 {
 	_pVertexShader = nullptr;
 	_pPixelShader = nullptr;
@@ -92,11 +104,9 @@ SceneRoot::~SceneRoot()
 	CleanUpDeviceObjects();
 }
 
-HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
+HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext)
 {
-	HRESULT hr = S_OK;
-
-	HR(RenderStates::InitAll(device));
+	HRR(RenderStates::InitAll(device));
 
 	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
@@ -105,13 +115,11 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	bd.ByteWidth = sizeof(CBNeverChanges);
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
-	hr = device->CreateBuffer(&bd, nullptr, &_pCBNeverChanges);
-	if (FAILED(hr))
-		return hr;
+	HRR(device->CreateBuffer(&bd, nullptr, &_pCBNeverChanges));
 
 	for (auto i = _children.begin(); i != _children.end(); i++)
 	{
-		HR((*i)->InitGraphics(device, pImmediateContext));
+		HRR((*i)->InitGraphics(device, pImmediateContext));
 	}
 
 	// Determine number of instances
@@ -129,21 +137,46 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	vbd.MiscFlags = 0;
 	vbd.StructureByteStride = 0;
-	HR(device->CreateBuffer(&vbd, 0, &_pInstancedBuffer));
+	HRR(device->CreateBuffer(&vbd, 0, &_pInstancedBuffer));
 
+	////////  Regular shaders /////
 	// Create Instanced draw data layout
 	std::vector< BYTE > dataVS;
-	HR(XSF::LoadBlob(L"VS.cso", dataVS));
+	HRR(XSF::LoadBlob(L"VS.cso", dataVS));
 
 	// Create VS input layout
 	InputLayouts::InitAll(device, &(dataVS)[ 0 ], dataVS.size());
 	pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
 
-	// Load Vertex Shader
-	HR(device->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &_pVertexShader));
+	// Load regular vertex Shader
+	HRR(device->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &_pVertexShader));
 
-	// Load Pixel Shader
-	HR(XSF::LoadPixelShader(device, L"PS.cso", &_pPixelShader));
+	// Load regular pixel Shader
+	HRR(XSF::LoadPixelShader(device, L"PS.cso", &_pPixelShader));
+
+	////////  Shadow map shader /////
+
+	// Load shadow shaders
+	HRR(XSF::LoadVertexShader(device, L"BuildShadowMapVS.cso", &_pShadowVertexShader));
+	// TODO: load a shadow pixel shader to support transparent textures not casting shadows
+
+	////////  Debug texture /////
+	dataVS.clear();
+	HRR(XSF::LoadBlob(L"DebugTextureVS.cso", dataVS));
+
+	// Load regular vertex Shader
+	HRR(device->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &_pDrawScreenVertexShader));
+
+	HRR(device->CreateInputLayout(InputLayoutDesc::Basic32, 
+								  ARRAYSIZE(InputLayoutDesc::Basic32), 
+								  &(dataVS)[ 0 ] /*passDesc.pIAInputSignature*/,
+								  dataVS.size() /*passDesc.IAInputSignatureSize*/, 
+								  &InputLayouts::Basic32));
+
+	// Load regular pixel Shader
+	HRR(XSF::LoadPixelShader(device, L"DebugTexturePS.cso", &_pDrawScreenPixelShader));
+
+	//////
 
 	// Create vertices and indice for geometry
 	_geometryGenerator.BuildGeometryBuffers(_geometryData);
@@ -156,7 +189,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	D3D11_SUBRESOURCE_DATA vinitData;
 	ZeroMemory(&vinitData, sizeof(vinitData));
 	vinitData.pSysMem = &_geometryData.vertices[0];
-	HR(device->CreateBuffer(&vbd, &vinitData, &_pVertexBuffer));
+	HRR(device->CreateBuffer(&vbd, &vinitData, &_pVertexBuffer));
 
 	D3D11_BUFFER_DESC ibd;
 	ZeroMemory(&ibd, sizeof(ibd));
@@ -168,7 +201,7 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	D3D11_SUBRESOURCE_DATA iinitData;
 	ZeroMemory(&iinitData, sizeof(iinitData));
 	iinitData.pSysMem = &_geometryData.indices[0];
-	HR(device->CreateBuffer(&ibd, &iinitData, &_pIndexBuffer));
+	HRR(device->CreateBuffer(&ibd, &iinitData, &_pIndexBuffer));
 
 	// Set vertex buffer
 	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
@@ -188,13 +221,95 @@ HRESULT SceneRoot::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImme
 	bd.ByteWidth = sizeof(CBChangesEveryFrame);
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
-	HR(device->CreateBuffer(&bd, nullptr, &_pCBChangesEveryFrame));
+	HRR(device->CreateBuffer(&bd, nullptr, &_pCBChangesEveryFrame));
+
+	HRR(BuildScreenQuadGeometryBuffers(device));
+
+	// Load the Texture
+	HRR(CreateDDSTextureFromFile(device, L"snow.dds", nullptr, &_pDebugTextureRV));
 
 	return S_OK;
 }
 
-HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData)
+HRESULT SceneRoot::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
 {
+	GeometryGenerator::MeshData quad;
+
+	GeometryGenerator geoGen;
+	geoGen.CreateFullscreenQuad(quad);
+
+	// Extract the vertex elements we are interested in and pack the
+	// vertices of all the meshes into one vertex buffer.
+
+	std::vector<SimpleVertex> vertices(quad.Vertices.size());
+
+	for(UINT i = 0; i < quad.Vertices.size(); ++i)
+	{
+		vertices[i].Pos    = quad.Vertices[i].Position;
+		vertices[i].Normal = quad.Vertices[i].Normal;
+		vertices[i].Tex    = quad.Vertices[i].TexC;
+	}
+
+    D3D11_BUFFER_DESC vbd;
+    vbd.Usage = D3D11_USAGE_IMMUTABLE;
+    vbd.ByteWidth = (UINT) (sizeof(SimpleVertex) * quad.Vertices.size());
+    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vbd.CPUAccessFlags = 0;
+    vbd.MiscFlags = 0;
+	D3D11_SUBRESOURCE_DATA vinitData = {0};
+    vinitData.pSysMem = &vertices[0];
+    HRR(pD3DDevice->CreateBuffer(&vbd, &vinitData, &_pScreenQuadVB));
+
+	//
+	// Pack the indices of all the meshes into one index buffer.
+	//
+
+	D3D11_BUFFER_DESC ibd;
+    ibd.Usage = D3D11_USAGE_IMMUTABLE;
+	ibd.ByteWidth = (UINT) (sizeof(UINT) * quad.Indices.size());
+    ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    ibd.CPUAccessFlags = 0;
+    ibd.MiscFlags = 0;
+	D3D11_SUBRESOURCE_DATA iinitData = {0};
+    iinitData.pSysMem = &quad.Indices[0];
+    HRR(pD3DDevice->CreateBuffer(&ibd, &iinitData, &_pScreenQuadIB));
+
+	return S_OK;
+}
+
+HRESULT SceneRoot::DrawScreenQuad(XSF::D3DDeviceContext* pContext, RenderData* pRenderData)
+{
+	UINT stride = sizeof(SimpleVertex);
+    UINT offset = 0;
+
+	pContext->IASetInputLayout(InputLayouts::Basic32);
+    pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	pContext->IASetVertexBuffers(0, 1, &_pScreenQuadVB, &stride, &offset);
+	pContext->IASetIndexBuffer(_pScreenQuadIB, DXGI_FORMAT_R32_UINT, 0);
+ 
+	pContext->VSSetShader(_pDrawScreenVertexShader, nullptr, 0);
+	pContext->PSSetShader(_pDrawScreenPixelShader, nullptr, 0);
+
+	//pContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
+
+	// Scale and shift quad to lower-right corner.
+	XMMATRIX world(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, -0.5f, 0.0f, 1.0f);
+
+	ID3D11ShaderResourceView* depthTexture = pRenderData->pShadowMap->DepthMapSRV();
+	pContext->PSSetShaderResources(0, 1, &depthTexture);
+
+	pContext->DrawIndexed(6, 0, 0);
+	return S_OK;
+
+}
+
+HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData)
+{
+	// Update never changes. TODO: Move out to a place that never changes
 	CBNeverChanges cbNeverChanges;
 	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&pRenderData->view)));
 	pImmediateContext->UpdateSubresource(_pCBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
@@ -213,23 +328,33 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, RenderData* pR
 
 	// Compute instance data
 	D3D11_MAPPED_SUBRESOURCE mappedData;
-	HR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
+	HRR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
 	for (auto i = _children.begin(); i != _children.end(); i++)
 	{
 		if ((*i)->GetNumInstances(true) > 0)
 		{
-			HR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
+			HRR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
 			dataView += (*i)->GetNumInstances(false);
 		}
 	}
 
 	pImmediateContext->Unmap(_pInstancedBuffer, 0);
 
-	pImmediateContext->VSSetShader(_pVertexShader, nullptr, 0);
-	pImmediateContext->PSSetShader(_pPixelShader, nullptr, 0);
+	// Set shaders
+	//if (pRenderData->pass == ShadowMapPass)
+	//{
+	//	pImmediateContext->VSSetShader(_pShadowVertexShader, nullptr, 0);
+	//	pImmediateContext->PSSetShader(_pShadowPixelShader, nullptr, 0);
+	//}
+	//else if (pRenderData->pass == RegularPass)
+	//{
+		pImmediateContext->VSSetShader(_pVertexShader, nullptr, 0);
+		pImmediateContext->PSSetShader(_pPixelShader, nullptr, 0);
+	//}
 
+	// Compute world to camera matrix
 	CBChangesEveryFrame cb;
 	cb.light = _light;
 	cb.eyePos = pRenderData->eyePos;
@@ -244,10 +369,15 @@ HRESULT SceneRoot::Render(ID3D11DeviceContext* pImmediateContext, RenderData* pR
 	{
 		WorldObject* obj = (*i);
 		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, pRenderData, &_geometryData, startInstance);
-		HR(hr2);
+		HRR(hr2);
 		startInstance += (*i)->GetNumInstances(false);
 	}
 
+	// Debugging - show depth buffer
+	if (pRenderData->pass == RegularPass)
+	{
+		HRR(DrawScreenQuad(pImmediateContext, pRenderData));
+	}
 	return S_OK;
 }
 

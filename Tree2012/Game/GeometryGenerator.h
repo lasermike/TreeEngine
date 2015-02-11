@@ -24,7 +24,6 @@ enum PrimitiveType
 	PrimitiveType_Cylinder
 };
 
-
 struct SimpleVertex
 {
 	XMFLOAT3 Pos;
@@ -45,15 +44,6 @@ struct GeometryBufferData
 	BufferIndices boxIndices;
 	BufferIndices cylinderIndices;
 
-	/*UINT mBoxVertexOffset;
-	UINT mBoxVertexCount;
-	UINT mBoxIndexOffset;
-	UINT mBoxIndexCount;
-	UINT mCylinderVertexOffset;
-	UINT mCylinderVertexCount;
-	UINT mCylinderIndexOffset;
-	UINT mCylinderIndexCount;
-	*/
 	std::vector<SimpleVertex> vertices;
 	std::vector<UINT> indices;
 
@@ -61,14 +51,6 @@ struct GeometryBufferData
 	{
 		ZeroMemory(&boxIndices, sizeof(BufferIndices));
 		ZeroMemory(&cylinderIndices, sizeof(BufferIndices));
-		//mBoxVertexOffset = 0;
-		// mBoxVertexCount = 0;
-		// mBoxIndexOffset = 0;
-		// mBoxIndexCount = 0;
-		// mCylinderVertexOffset = 0;
-		// mCylinderVertexCount = 0;
-		// mCylinderIndexOffset = 0;
-		// mCylinderIndexCount = 0;
 	}
 
 	const BufferIndices* const GetBufferIndices(PrimitiveType primType)

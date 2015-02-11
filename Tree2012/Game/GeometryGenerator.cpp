@@ -35,10 +35,8 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
 	UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size());
 
-	//
 	// Extract the vertex elements we are interested in and pack the
 	// vertices of all the meshes into one vertex buffer.
-	//
 
 	data.vertices.resize(totalVertexCount);
 
@@ -66,7 +64,6 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	data.indices.insert(data.indices.end(), box.Indices.begin(), box.Indices.end());
 	data.indices.insert(data.indices.end(), cylinder.Indices.begin(), cylinder.Indices.end());
 }
-
 
 void GeometryGenerator::CreateBox(float width, float height, float depth, MeshData& meshData)
 {
