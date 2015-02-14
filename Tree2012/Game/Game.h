@@ -47,6 +47,7 @@ private:
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
+	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                                  m_featureLevel;
@@ -66,8 +67,10 @@ private:
 	IDXGISwapChain*                     _pSwapChain;
 	IDXGISwapChain1*                    _pSwapChain1;
 	ID3D11RenderTargetView*             _pRenderTargetView;
-	ID3D11Texture2D*                    _pDepthStencil;
-	ID3D11DepthStencilView*             _pDepthStencilView;
+
+	CComPtr<ID3D11Texture2D>            _pDepthStencil;
+	CComPtr<ID3D11DepthStencilView>		_pDepthStencilView;
+
 	ID3D11RasterizerState*				_rasterState;
 	D3D11_VIEWPORT						_viewPort;
 	bool								_enableMsaa;
@@ -79,7 +82,8 @@ private:
 	std::vector<unsigned int>			_seeds;
 	int									_currentSeed;
 	bool								_resetTree;
-
+	bool								_showShadowBuffer;
+	bool								_rotate;
 	ID3D11Buffer*                       _pCBChangeOnResize;
 
 	XSF::BitmapFont*					_bitmapFont;

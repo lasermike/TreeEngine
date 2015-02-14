@@ -19,7 +19,7 @@ public:
 	ID3D11ShaderResourceView* DepthMapSRV();
 	ID3D11Texture2D* DepthMapBuffer();
 
-	void BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc);
+	void BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc, ID3D11RenderTargetView* pTestRTV);
 
 private:
 	ShadowMap(const ShadowMap& rhs);

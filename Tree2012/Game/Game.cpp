@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "directxtex.h"
+#include "StockRenderStates.h"
 
 using namespace DirectX;
 
@@ -28,7 +29,7 @@ struct CBChangeOnResize
 	XMFLOAT4X4 mProjection;
 };
 
-Game::Game()
+Game::Game() 
 {
 	_window = nullptr;
 	_driverType = D3D_DRIVER_TYPE_NULL;
@@ -40,8 +41,7 @@ Game::Game()
 	_pSwapChain = nullptr;
 	_pSwapChain1 = nullptr;
 	_pRenderTargetView = nullptr;
-	_pDepthStencil = nullptr;
-	_pDepthStencilView = nullptr;
+	_rotate = false;
 	_rasterState = nullptr;
 #ifdef _XBOX_ONE
 	_enableMsaa = false; // TODO
@@ -51,6 +51,7 @@ Game::Game()
 	_timeStart = 0;
 	_currentSeed = 0;
 	_resetTree = true;
+	_showShadowBuffer = true;
 	_pCBChangeOnResize = nullptr;
 	_bitmapFont = nullptr;
 
@@ -61,14 +62,15 @@ Game::Game()
 
 	// Init trees and other world objects
 	_trees.push_back(new Tree());
+	(*_trees.rbegin())->_position = XMFLOAT3(1.3f,0,1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
 	_trees.push_back(new Tree());
-	(*_trees.rbegin())->_position = XMFLOAT3(2,0,2);
+	(*_trees.rbegin())->_position = XMFLOAT3(1.3f,0,-1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
 	_trees.push_back(new Tree());
-	(*_trees.rbegin())->_position = XMFLOAT3(-2,0,2);
+	(*_trees.rbegin())->_position = XMFLOAT3(-1.3f,0,1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
 	_pPlane = new Primitive();
@@ -92,7 +94,7 @@ Game::Game()
 	// Estimatation.  The ground plane is the widest object at 14 x 14.  
 	// Ideally would loop through all world space vertices
 	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	_renderData.mSceneBounds.Radius = sqrtf(7.0f*7.0f + 7.0f*7.0f);
+	_renderData.mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
 }
 
 Game::~Game()
@@ -152,13 +154,6 @@ HRESULT Game::InitDevice()
 		HRR(device.Get()->QueryInterface( __uuidof(_pd3dDevice), reinterpret_cast<void**>(&_pd3dDevice) ) );
 		HRR(d3dContext.Get()->QueryInterface( __uuidof(_pImmediateContext), reinterpret_cast<void**>(&_pImmediateContext) ) );
 
-		/*if (hr == E_INVALIDARG)
-		{
-			// DirectX 11.0 platforms will not recognize D3D_FEATURE_LEVEL_11_1 so we need to retry without it
-			hr = D3D11CreateDevice(nullptr, _driverType, nullptr, createDeviceFlags, &featureLevels[1], numFeatureLevels - 1,
-				D3D11_SDK_VERSION, &_pd3dDevice, &_featureLevel, &_pImmediateContext);
-		}*/
-
 		if (SUCCEEDED(hr))
 			break;
 	}
@@ -184,13 +179,21 @@ HRESULT Game::InitDevice()
     XSF_ERROR_IF_FAILED( _bitmapFont->Create( _pd3dDevice, L"Arial_16" ) );
 
 	// Init shadow map
-	_renderData.pShadowMap = new ShadowMap(_pd3dDevice, _renderData.SMapSize, _renderData.SMapSize);
+	_renderData.pShadowMap = new ShadowMap(_pd3dDevice, _renderData.SMapWidth, _renderData.SMapHeight);
 
 	OnResize();
 
 	return S_OK;
 }
 
+HRESULT Game::UpdateProjection(XMFLOAT4X4* pProjMat)
+{
+	CBChangeOnResize cbChangesOnResize;
+	XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+	_pImmediateContext->UpdateSubresource(_pCBChangeOnResize, 0, nullptr, &cbChangesOnResize, 0, 0);
+
+	return S_OK;
+}
 
 HRESULT Game::OnResize()
 {
@@ -202,8 +205,10 @@ HRESULT Game::OnResize()
 	}
 
 	// Create width/height dependent objects
-	SafeRelease(&_pDepthStencil);
-	SafeRelease(&_pDepthStencilView);
+	_pDepthStencilView.Release();
+	_pDepthStencil.Release();
+	_pDepthStencilView.Release();
+	
 	SafeRelease(&_pRenderTargetView);
 	SafeRelease(&_pSwapChain1);
 	SafeRelease(&_pSwapChain);
@@ -219,11 +224,9 @@ HRESULT Game::OnResize()
 	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
 #endif
 	// Initialize the projection matrix
-	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(XM_PIDIV4, windowWidth / (float)windowHeight, 0.01f, 100.0f));
+	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(XM_PIDIV4, windowWidth / (float)windowHeight, 1.0f, 30.0f));
 
-	CBChangeOnResize cbChangesOnResize;
-	XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(&_renderData.projection)));
-	_pImmediateContext->UpdateSubresource(_pCBChangeOnResize, 0, nullptr, &cbChangesOnResize, 0, 0);
+	UpdateProjection(&_renderData.projection);
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
 	IDXGIFactory1* dxgiFactory = nullptr;
@@ -324,20 +327,26 @@ HRESULT Game::OnResize()
 #ifdef _XBOX_ONE
 	descDepth.Format = DXGI_FORMAT_D32_FLOAT;
 #else
-	descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	descDepth.Format = DXGI_FORMAT_R24G8_TYPELESS;
 #endif
 	descDepth.SampleDesc.Count = _enableMsaa ? msaaCount : 1;
 	descDepth.SampleDesc.Quality = _enableMsaa ? msaaQuality - 1 : 0;
 	descDepth.Usage = D3D11_USAGE_DEFAULT;
-	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
 	descDepth.CPUAccessFlags = 0;
 	descDepth.MiscFlags = 0;
 	HRR(_pd3dDevice->CreateTexture2D(&descDepth, nullptr, &_pDepthStencil));
 
 	// Create the depth stencil view
-	HRR(_pd3dDevice->CreateDepthStencilView(_pDepthStencil, 0, &_pDepthStencilView));
+    D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+	dsvDesc.Flags = 0;
+    dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    dsvDesc.Texture2D.MipSlice = 0;
+    HRR(_pd3dDevice->CreateDepthStencilView(_pDepthStencil, &dsvDesc, &_pDepthStencilView));
 
-	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
+
+	//_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView[0]);
 
 	// Setup the viewport
 	_viewPort.Width = (FLOAT) windowWidth;
@@ -364,8 +373,8 @@ void Game::CleanupDevice()
 	SafeRelease(&_pImmediateContext);
 	SafeRelease(&_pCBChangeOnResize);
 	SafeRelease(&_rasterState);
-	SafeRelease(&_pDepthStencil);
-	SafeRelease(&_pDepthStencilView);
+	_pDepthStencil.Release();
+	_pDepthStencilView.Release();
 	SafeRelease(&_pRenderTargetView);
 	SafeRelease(&_pSwapChain1);
 	SafeRelease(&_pSwapChain);
@@ -418,13 +427,10 @@ void Game::Update(DX::StepTimer const& timer)
 	}
 
 	// Rotate camera around the origin
-	//XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
+	if (_rotate)
+		XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
 
 	BuildShadowTransform();
-
-	//_renderData.view = _renderData.lightView;
-	//_renderData.projection = _renderData.lightProj;
-
 }
 
 //--------------------------------------------------------------------------------------
@@ -439,8 +445,10 @@ void Game::Render()
         Update(m_timer);
     });
 
+	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
+
 	// Render shadow map
-	_renderData.pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext);
+	_renderData.pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
 	DrawSceneToShadowMap();
 
 	// Restore state after shadow
@@ -449,7 +457,7 @@ void Game::Render()
 
 	// Bind render target and depth
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
-
+	
 #ifdef SAVEDEPTHIMAGE
 	// Save shadow mapt to disk
 	ScratchImage resultImage, convertedImage;
@@ -460,24 +468,38 @@ void Game::Render()
 	HR(SaveToTGAFile(*img, L"c:\\temp\\smap.tga"));
 #endif
 
+	//_renderData.pass = DebugTextureOnly;
+
 	// Clear the back buffer
 	_pImmediateContext->ClearRenderTargetView(_pRenderTargetView, Colors::AliceBlue);
 
 	// Clear the depth buffer to 1.0 (max depth)
 	_pImmediateContext->ClearDepthStencilView(_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
+	// Make shadow map avaiable to shaders
+	ID3D11ShaderResourceView* depthTexture = _renderData.pShadowMap->DepthMapSRV();
+	_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
 
 	// Draw everything
 	HRC(_pScene->Render(_pImmediateContext, &_renderData));
 
+	// Unbind shadow texture so we can render to it next frame
+	depthTexture = nullptr;
+	_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
+
 	if (_bitmapFont)
 	{
-	    _bitmapFont->Begin(_pImmediateContext, &_viewPort, false /*(SampleSettings().FastSemanticsEnabled()*/ );
+	    _bitmapFont->Begin(_pImmediateContext, &_viewPort, false );
 		wchar_t text[128];
 		swprintf(text, 128, L"FPS %d", m_timer.GetFramesPerSecond());
 		_bitmapFont->DrawText(0, 10, 0x33444444, text);
 		_bitmapFont->End();
+	}
+
+
+	if(_showShadowBuffer)
+	{
+		HRC(_pScene->DrawScreenQuad(_pImmediateContext, _renderData.pShadowMap->DepthMapSRV()));
 	}
 
 	//
@@ -507,6 +529,12 @@ void Game::OnKeydown(UINT key)  // WM_KEYDOWN
 		break;
 	case '0':
 		_timeStart = 0;
+		break;
+	case 'Z':
+		_showShadowBuffer = !_showShadowBuffer;
+		break;
+	case 'R':
+		_rotate = !_rotate;
 		break;
 	}
 }
@@ -556,13 +584,23 @@ void Game::DrawSceneToShadowMap()
 
 	RenderData prevRenderData(_renderData);
 	_renderData.view = _renderData.lightView;
-	_renderData.projection = _renderData.projection;
+	_renderData.projection = _renderData.lightProj;
 	_renderData.pass = ShadowMapPass;
+
+	UpdateProjection(&_renderData.projection);
+
+    const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+	stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::BuildShadowMap );
 
 	// Draw everything
 	HR(_pScene->Render(_pImmediateContext, &_renderData));
 
+	// Store render data state
 	_renderData = prevRenderData;
+
+	UpdateProjection(&_renderData.projection);
+
+	stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::Solid);
 }
 
 

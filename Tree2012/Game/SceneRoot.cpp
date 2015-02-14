@@ -4,6 +4,7 @@
 #include "RenderStates.h"
 #include "ShadowMap.h"
 #include "DDSTextureLoader.h" // Test texture
+#include "StockRenderStates.h"
 
 __declspec(align(16))
 struct CBNeverChanges
@@ -17,6 +18,7 @@ struct CBChangesEveryFrame
 	DirectionalLight light;
 	XMFLOAT4 eyePos;
 	XMFLOAT4X4 worldToCamera;
+	XMFLOAT4X4 shadowMatrix;
 };
 
 #pragma region InputLayouts
@@ -94,7 +96,7 @@ SceneRoot::SceneRoot() : _pShadowVertexShader(nullptr), _pShadowPixelShader(null
 	_light.Ambient = XMFLOAT4(.2f, .2f, .2f, 1.0f);
 	_light.Diffuse = XMFLOAT4(.5f, .5f, .5f, 1.0f);
 	_light.Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-	_light.Direction = XMFLOAT3(.7f, -.7f, .7f);
+	_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
 	_pCBChangesEveryFrame = nullptr;
 	_pCBNeverChanges = nullptr;
 }
@@ -225,8 +227,21 @@ HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* p
 
 	HRR(BuildScreenQuadGeometryBuffers(device));
 
+	// Create the sample state
+	D3D11_SAMPLER_DESC sampDesc;
+	ZeroMemory(&sampDesc, sizeof(sampDesc));
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	sampDesc.MinLOD = 0;
+	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+	HRR(device->CreateSamplerState(&sampDesc, &_pSamplerLinear));
+
 	// Load the Texture
 	HRR(CreateDDSTextureFromFile(device, L"snow.dds", nullptr, &_pDebugTextureRV));
+
 
 	return S_OK;
 }
@@ -277,7 +292,7 @@ HRESULT SceneRoot::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
 	return S_OK;
 }
 
-HRESULT SceneRoot::DrawScreenQuad(XSF::D3DDeviceContext* pContext, RenderData* pRenderData)
+HRESULT SceneRoot::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
 {
 	UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
@@ -289,95 +304,95 @@ HRESULT SceneRoot::DrawScreenQuad(XSF::D3DDeviceContext* pContext, RenderData* p
  
 	pContext->VSSetShader(_pDrawScreenVertexShader, nullptr, 0);
 	pContext->PSSetShader(_pDrawScreenPixelShader, nullptr, 0);
+	pContext->PSSetSamplers(0, 1, &_pSamplerLinear);
 
 	//pContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
 
-	// Scale and shift quad to lower-right corner.
-	XMMATRIX world(
-		0.5f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.5f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.5f, -0.5f, 0.0f, 1.0f);
-
-	ID3D11ShaderResourceView* depthTexture = pRenderData->pShadowMap->DepthMapSRV();
 	pContext->PSSetShaderResources(0, 1, &depthTexture);
 
 	pContext->DrawIndexed(6, 0, 0);
+
+	ID3D11ShaderResourceView* nullText[] = {0};
+	pContext->PSSetShaderResources(0, 1, nullText);
+
 	return S_OK;
 
 }
 
 HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData)
 {
+	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+	ID3D11SamplerState* shadowSampler[1] = { stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap) } ;
+	pImmediateContext->PSSetSamplers(2, 1, shadowSampler);
+
 	// Update never changes. TODO: Move out to a place that never changes
 	CBNeverChanges cbNeverChanges;
 	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&pRenderData->view)));
 	pImmediateContext->UpdateSubresource(_pCBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
 
-	// Set up input assembler
-	pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
-	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
-	UINT offset[2] = { 0, 0 };
-	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-	pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
-	pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
-	pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
-	pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	pImmediateContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
-
-	// Compute instance data
-	D3D11_MAPPED_SUBRESOURCE mappedData;
-	HRR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
-	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
-
-	for (auto i = _children.begin(); i != _children.end(); i++)
+	if (pRenderData->pass != DebugTextureOnly)
 	{
-		if ((*i)->GetNumInstances(true) > 0)
+		// Set up input assembler
+		pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
+		UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
+		UINT offset[2] = { 0, 0 };
+		ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
+		pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+		pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+		pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
+		pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		pImmediateContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
+
+		// Compute instance data
+		D3D11_MAPPED_SUBRESOURCE mappedData;
+		HRR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
+		InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
+
+		for (auto i = _children.begin(); i != _children.end(); i++)
 		{
-			HRR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
-			dataView += (*i)->GetNumInstances(false);
+			if ((*i)->GetNumInstances(true) > 0)
+			{
+				HRR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
+				dataView += (*i)->GetNumInstances(false);
+			}
+		}
+
+		pImmediateContext->Unmap(_pInstancedBuffer, 0);
+
+		// Set shaders
+		if (pRenderData->pass == ShadowMapPass)
+		{
+			pImmediateContext->VSSetShader(_pShadowVertexShader, nullptr, 0);
+			pImmediateContext->PSSetShader(_pShadowPixelShader, nullptr, 0);
+		}
+		else if (pRenderData->pass == RegularPass)
+		{
+			pImmediateContext->VSSetShader(_pVertexShader, nullptr, 0);
+			pImmediateContext->PSSetShader(_pPixelShader, nullptr, 0);
+		}
+
+		// Compute world to camera matrix
+		CBChangesEveryFrame cb;
+		cb.light = _light;
+		cb.eyePos = pRenderData->eyePos;
+		cb.shadowMatrix = pRenderData->shadowTransform;
+		XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(pRenderData->time));
+
+		pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
+		pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
+		pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
+
+		int startInstance = 0;
+		for (auto i = _children.begin(); i != _children.end(); i++)
+		{
+			WorldObject* obj = (*i);
+			HRESULT hr2 = obj->RenderInstanced(pImmediateContext, pRenderData, &_geometryData, startInstance);
+			HRR(hr2);
+			startInstance += (*i)->GetNumInstances(false);
 		}
 	}
 
-	pImmediateContext->Unmap(_pInstancedBuffer, 0);
-
-	// Set shaders
-	//if (pRenderData->pass == ShadowMapPass)
-	//{
-	//	pImmediateContext->VSSetShader(_pShadowVertexShader, nullptr, 0);
-	//	pImmediateContext->PSSetShader(_pShadowPixelShader, nullptr, 0);
-	//}
-	//else if (pRenderData->pass == RegularPass)
-	//{
-		pImmediateContext->VSSetShader(_pVertexShader, nullptr, 0);
-		pImmediateContext->PSSetShader(_pPixelShader, nullptr, 0);
-	//}
-
-	// Compute world to camera matrix
-	CBChangesEveryFrame cb;
-	cb.light = _light;
-	cb.eyePos = pRenderData->eyePos;
-	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(pRenderData->time));
-
-	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
-	pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
-
-	int startInstance = 0;
-	for (auto i = _children.begin(); i != _children.end(); i++)
-	{
-		WorldObject* obj = (*i);
-		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, pRenderData, &_geometryData, startInstance);
-		HRR(hr2);
-		startInstance += (*i)->GetNumInstances(false);
-	}
-
-	// Debugging - show depth buffer
-	if (pRenderData->pass == RegularPass)
-	{
-		HRR(DrawScreenQuad(pImmediateContext, pRenderData));
-	}
 	return S_OK;
 }
 

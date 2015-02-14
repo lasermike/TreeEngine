@@ -27,6 +27,7 @@ class SceneRoot
 	CComPtr<ID3D11Buffer>				_pScreenQuadVB;
 	CComPtr<ID3D11Buffer>				_pScreenQuadIB;
 	CComPtr<ID3D11ShaderResourceView>   _pDebugTextureRV;
+	CComPtr<ID3D11SamplerState>			_pSamplerLinear;
 
 	GeometryGenerator					_geometryGenerator;
 	GeometryBufferData					_geometryData;
@@ -47,7 +48,7 @@ public:
 	}
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
-	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, RenderData* pRenderData);
+	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
 
 };
 

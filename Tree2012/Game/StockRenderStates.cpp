@@ -224,7 +224,21 @@ static const D3D11_SAMPLER_DESC s_StockSamplerTypes[] =
         { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
         0.0F,                                           // MinLOD
         D3D11_FLOAT32_MAX                               // MaxLOD
+    },
+    // UseShadowMap
+    {
+        D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT,// Filter mode
+        D3D11_TEXTURE_ADDRESS_BORDER,                    // U address clamping
+        D3D11_TEXTURE_ADDRESS_BORDER,                    // V address clamping
+        D3D11_TEXTURE_ADDRESS_BORDER,                    // W address clamping
+        0.0F,                                           // Mip LOD bias
+        0,                                              // Max Anisotropy - applies if using ANISOTROPIC filtering only
+        D3D11_COMPARISON_LESS,                        // Comparison Func - always pass
+        { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
+        0.0F,                                           // MinLOD
+        D3D11_FLOAT32_MAX                               // MaxLOD
     }
+
 };
 
 
@@ -351,6 +365,23 @@ static const D3D11_RASTERIZER_DESC s_StockRasterizerTypes[] =
         0,                                              // DepthBias
         0.0f,                                           // DepthBiasClamp
         0.0f,                                           // SlopeScaledDepthBias
+        TRUE,                                           // DepthClipEnable
+        FALSE,                                          // ScissorEnable
+        FALSE,                                          // MultisampleEnable
+        FALSE,                                          // AntialiasedLineEnable
+#if defined( XSF_USE_DX_11_1 )
+        0                                               // ForcedSampleCount
+#endif
+    },
+
+    // BuildShadowMap
+    {
+        D3D11_FILL_SOLID,                               // FillMode
+        D3D11_CULL_BACK,                                // CullMode
+        FALSE,                                          // FrontCounterClockwise
+        100000,                                         // DepthBias
+        0.0f,                                           // DepthBiasClamp
+        1.0f,                                           // SlopeScaledDepthBias
         TRUE,                                           // DepthClipEnable
         FALSE,                                          // ScissorEnable
         FALSE,                                          // MultisampleEnable

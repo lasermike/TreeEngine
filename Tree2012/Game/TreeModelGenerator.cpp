@@ -99,12 +99,12 @@ void TreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, int dep
 
 		if (depth >= 3)
 		{
-			float randLen = 0.2f + 0.3f * ((float)rand()) / RAND_MAX;
+			float randLen = 0.4f + 0.4f * ((float)rand()) / RAND_MAX;
 			vChildDir = XMVectorScale(vChildDir, randLen);
 		}
 		else if (depth > 0)
 		{
-			float randLen = 0.5f + 0.3f * ((float)rand()) / RAND_MAX;
+			float randLen = 0.5f + 0.4f * ((float)rand()) / RAND_MAX;
 			vChildDir = XMVectorScale(vChildDir, randLen);
 		}
 

@@ -66,15 +66,17 @@ ID3D11Texture2D* ShadowMap::DepthMapBuffer()
     return mDepthMap;
 }
 
-void ShadowMap::BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc)
+void ShadowMap::BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc, ID3D11RenderTargetView* pTestRTV)
 {
     dc->RSSetViewports(1, &mViewport);
 
 	// Set null render target because we are only going to draw to depth buffer.
 	// Setting a null render target will disable color writes.
     ID3D11RenderTargetView* renderTargets[1] = {0};
+	renderTargets[0] = pTestRTV;
+
     dc->OMSetRenderTargets(1, renderTargets, mDepthMapDSV);
     
-    dc->ClearDepthStencilView(mDepthMapDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+    dc->ClearDepthStencilView(mDepthMapDSV, D3D11_CLEAR_DEPTH, 1.0, 0);
 }
 

@@ -33,7 +33,7 @@ HRESULT Primitive::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, 
 	const XMVECTOR vScaleCenter = XMVectorSet(0, 0, 0, 0);
 	XMVECTOR vScale = XMVectorSet(14, .01f, 14, 1);
 	XMVECTOR vQuat = XMQuaternionIdentity();
-	XMVECTOR vStart = XMVectorSet(0,-0.50f,0,1);
+	XMVECTOR vStart = XMVectorSet(0,0.0f,0,1);
 
 	XMMATRIX transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 

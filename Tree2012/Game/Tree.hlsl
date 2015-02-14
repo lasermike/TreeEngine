@@ -9,7 +9,9 @@
 // Constant Buffer Variables
 //--------------------------------------------------------------------------------------
 Texture2D txDiffuse : register( t0 );
+Texture2D txShadowMap : register( t1 );
 SamplerState samLinear : register( s0 );
+SamplerState samShadow : register( s1 );
 
 cbuffer cbNeverChanges : register( b0 )
 {
@@ -27,6 +29,7 @@ cbuffer cbChangesEveryFrame : register( b2 )
 	DirectionalLight light;
 	float3 eyePos;
 	matrix worldToCamera;
+	matrix shadowMatrix;
 };
 
 cbuffer cbChangesPerObject : register (b3)
@@ -34,6 +37,18 @@ cbuffer cbChangesPerObject : register (b3)
 	Material mat;
 	float4x4 texTransform;
 }
+
+SamplerComparisonState samShadowCompState
+{
+	Filter   = COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+	AddressU = BORDER;
+	AddressV = BORDER;
+	AddressW = BORDER;
+	BorderColor = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+    ComparisonFunc = LESS;
+};
+
 
 //--------------------------------------------------------------------------------------
 struct VS_INPUT
@@ -51,6 +66,7 @@ struct PS_INPUT
 	float3 PosW : POSITION;
 	float2 Tex : TEXCOORD0;
 	float3 NormalW : NORMAL;
+	float4 ShadowPosH : TEXCOORD1;
 };
 
 
@@ -73,6 +89,10 @@ PS_INPUT VS(VS_INPUT input)
 	output.Pos = mul(float4(output.PosW, 1.0f), View);
 	output.Pos = mul(output.Pos, Projection);
 	output.Tex = input.Tex;
+
+	// Generate projective tex-coords to project shadow map onto scene.
+	//float4x4 shadowTransform = mul(transpose(world), shadowMatrix);
+	output.ShadowPosH = mul(float4(output.PosW, 1.0), transpose(shadowMatrix));
 
 	return output;
 }
@@ -107,6 +127,11 @@ float4 PS(PS_INPUT pin) : SV_Target
 	else
 		textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
 
+	// Only the first light casts a shadow.
+	float3 shadow = float3(1.0f, 1.0f, 1.0f);
+	shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, pin.ShadowPosH);
+
+
 	// Sum the light contribution from each light source.  
 	//[unroll]
 	//for (int i = 0; i < gLightCount; ++i)
@@ -116,8 +141,10 @@ float4 PS(PS_INPUT pin) : SV_Target
 			A, D, S);
 
 		ambient += A;
-		diffuse += D;
-		spec += S;
+		diffuse += shadow[0]*D;
+		spec    += shadow[0]*S;
+		//diffuse += D;
+		//spec += S;
 	//}
 
 	float4 litColor = ambient + diffuse + spec;
@@ -141,11 +168,6 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 
 	//float4x4 worldViewProj = transpose(output.World) * View * Projection;
 
-	//output.PosH = mul(float4(input.Pos, 1.0f), worldViewProj);
-	//output.Tex  = mul(float4(input.Tex, 0.0f, 1.0f), texTransform).xy;
-
-
-	//PS_INPUT output = (PS_INPUT)0;
 	float4 pos = mul(float4(input.Pos, 1.0f), transpose( input.World));
 	pos = mul(pos, View);
 	output.PosH = mul(pos, Projection);

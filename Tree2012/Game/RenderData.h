@@ -12,7 +12,8 @@ struct BoundingSphere
 enum RenderPass
 {
 	RegularPass,
-	ShadowMapPass
+	ShadowMapPass,
+	DebugTextureOnly
 };
 
 struct RenderData
@@ -27,7 +28,8 @@ struct RenderData
 	float				time;
 	BoundingSphere		mSceneBounds;
 
-	static const int SMapSize = 2048;
+	static const int SMapWidth = 2048;
+	static const int SMapHeight = 2048;
 	ShadowMap*			pShadowMap;
 	XMFLOAT4X4			lightView;
 	XMFLOAT4X4			lightProj;
