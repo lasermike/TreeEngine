@@ -50,12 +50,13 @@ private:
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 
 	// Direct3D Objects
-	D3D_FEATURE_LEVEL                                  m_featureLevel;
+	D3D_FEATURE_LEVEL                   m_featureLevel;
 
 	// Game state
 	RenderData							_renderData;
-	DX::StepTimer						m_timer;
-	float								m_fps;
+	DX::StepTimer						_timer;
+	double								_timeStart;
+	double								_timeCurrent;
 
 	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
 	D3D_DRIVER_TYPE                     _driverType;
@@ -78,12 +79,13 @@ private:
 	Primitive*							_pPlane;
 	SceneRoot*							_pScene;
 	std::vector<Tree*>					_trees;
-	ULONGLONG							_timeStart;
+
 	std::vector<unsigned int>			_seeds;
 	int									_currentSeed;
 	bool								_resetTree;
 	bool								_showShadowBuffer;
 	bool								_rotate;
+	bool								_paused;
 	ID3D11Buffer*                       _pCBChangeOnResize;
 
 	XSF::BitmapFont*					_bitmapFont;

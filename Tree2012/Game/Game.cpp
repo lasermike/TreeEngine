@@ -42,6 +42,7 @@ Game::Game()
 	_pSwapChain1 = nullptr;
 	_pRenderTargetView = nullptr;
 	_rotate = false;
+	_paused = false;
 	_rasterState = nullptr;
 #ifdef _XBOX_ONE
 	_enableMsaa = false; // TODO
@@ -91,7 +92,7 @@ Game::Game()
 	XMStoreFloat4(&_renderData.eyePos, eyePos);
 
 	// Init scene bounds.
-	// Estimatation.  The ground plane is the widest object at 14 x 14.  
+	// Estimatation.    
 	// Ideally would loop through all world space vertices
 	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	_renderData.mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
@@ -412,18 +413,22 @@ void Game::Update(DX::StepTimer const& timer)
 	}
 
 	// Update our time
-	m_fps = (float) timer.GetFramesPerSecond();
-
 	if (_driverType == D3D_DRIVER_TYPE_REFERENCE)
 	{
 		_renderData.time += (float)XM_PI * 0.0125f;
 	}
 	else
 	{
-		ULONGLONG timeCur = GetTickCount64();
 		if (_timeStart == 0)
-			_timeStart = timeCur;
-		_renderData.time = (timeCur - _timeStart) / 1000.0f;
+		{
+			_timeStart = timer.GetTotalSeconds();
+			_timeCurrent = _timeStart;
+		}
+		else if (!_paused)
+		{
+			_timeCurrent += timer.GetElapsedSeconds();
+		}
+		_renderData.time = (float) _timeCurrent;
 	}
 
 	// Rotate camera around the origin
@@ -440,9 +445,9 @@ void Game::Render()
 {
 	HRESULT hr = S_OK;
 
-    m_timer.Tick([&]()
+    _timer.Tick([&]()
     {
-        Update(m_timer);
+        Update(_timer);
     });
 
 	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
@@ -491,7 +496,7 @@ void Game::Render()
 	{
 	    _bitmapFont->Begin(_pImmediateContext, &_viewPort, false );
 		wchar_t text[128];
-		swprintf(text, 128, L"FPS %d", m_timer.GetFramesPerSecond());
+		swprintf(text, 128, L"FPS %d", _timer.GetFramesPerSecond());
 		_bitmapFont->DrawText(0, 10, 0x33444444, text);
 		_bitmapFont->End();
 	}
@@ -536,6 +541,10 @@ void Game::OnKeydown(UINT key)  // WM_KEYDOWN
 	case 'R':
 		_rotate = !_rotate;
 		break;
+	case 'P':
+		_paused = !_paused;
+		break;
+
 	}
 }
 

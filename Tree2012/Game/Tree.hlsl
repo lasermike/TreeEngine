@@ -11,7 +11,7 @@
 Texture2D txDiffuse : register( t0 );
 Texture2D txShadowMap : register( t1 );
 SamplerState samLinear : register( s0 );
-SamplerState samShadow : register( s1 );
+SamplerComparisonState samShadowCompState  : register( s1 );
 
 cbuffer cbNeverChanges : register( b0 )
 {
@@ -37,18 +37,6 @@ cbuffer cbChangesPerObject : register (b3)
 	Material mat;
 	float4x4 texTransform;
 }
-
-SamplerComparisonState samShadowCompState
-{
-	Filter   = COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
-	AddressU = BORDER;
-	AddressV = BORDER;
-	AddressW = BORDER;
-	BorderColor = float4(0.0f, 0.0f, 0.0f, 0.0f);
-
-    ComparisonFunc = LESS;
-};
-
 
 //--------------------------------------------------------------------------------------
 struct VS_INPUT

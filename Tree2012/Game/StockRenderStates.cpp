@@ -233,8 +233,8 @@ static const D3D11_SAMPLER_DESC s_StockSamplerTypes[] =
         D3D11_TEXTURE_ADDRESS_BORDER,                    // W address clamping
         0.0F,                                           // Mip LOD bias
         0,                                              // Max Anisotropy - applies if using ANISOTROPIC filtering only
-        D3D11_COMPARISON_LESS,                        // Comparison Func - always pass
-        { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
+        D3D11_COMPARISON_LESS_EQUAL,                        
+        { 0.0F, 0.0F, 0.0F, 1.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
         0.0F,                                           // MinLOD
         D3D11_FLOAT32_MAX                               // MaxLOD
     }

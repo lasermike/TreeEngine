@@ -323,7 +323,7 @@ HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 {
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
 	ID3D11SamplerState* shadowSampler[1] = { stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap) } ;
-	pImmediateContext->PSSetSamplers(2, 1, shadowSampler);
+	pImmediateContext->PSSetSamplers(1, 1, shadowSampler);
 
 	// Update never changes. TODO: Move out to a place that never changes
 	CBNeverChanges cbNeverChanges;
