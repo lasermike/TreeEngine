@@ -27,7 +27,6 @@ class SceneRoot
 	CComPtr<ID3D11Buffer>				_pScreenQuadVB;
 	CComPtr<ID3D11Buffer>				_pScreenQuadIB;
 	CComPtr<ID3D11ShaderResourceView>   _pDebugTextureRV;
-	CComPtr<ID3D11SamplerState>			_pSamplerLinear;
 
 	GeometryGenerator					_geometryGenerator;
 	GeometryBufferData					_geometryData;

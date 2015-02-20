@@ -86,6 +86,8 @@ private:
 	bool								_showShadowBuffer;
 	bool								_rotate;
 	bool								_paused;
+	bool								_wireframe;
+	bool								_showHelp;
 	ID3D11Buffer*                       _pCBChangeOnResize;
 
 	XSF::BitmapFont*					_bitmapFont;

@@ -28,7 +28,7 @@ HRESULT WorldObject::CleanUpDeviceObjects()
 	return S_OK;
 }
 
-HRESULT WorldObject::Render(ID3D11DeviceContext* /*pImmediateContext*/, XMFLOAT4X4* /*world*/, XMVECTOR /*eyePos*/, float /*time*/)
+HRESULT WorldObject::Render(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/)
 {
 	return E_NOTIMPL;
 }

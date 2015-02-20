@@ -42,8 +42,7 @@ struct Material
 	XMFLOAT4 Diffuse;
 	XMFLOAT4 Specular; // w = SpecPower
 	XMFLOAT4 Reflect;
-	XMFLOAT4X4 shadowMatrix;
-	XMFLOAT4 flags; // x = useShadowMatrix, y = useTexture
+	XMFLOAT4 flags; // x = n/a, y = useTexture
 };
 
 class Materials

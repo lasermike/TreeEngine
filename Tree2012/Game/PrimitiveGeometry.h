@@ -9,7 +9,6 @@ class PrimitiveGeometry : public Geometry
 	PrimitiveModel*						_model; //Weak reference
 
 	ID3D11ShaderResourceView*           _pTextureRV;
-	ID3D11SamplerState*                 _pSamplerLinear;
 
 	Material _groundMaterial;
 
@@ -25,7 +24,6 @@ public:
 		SetMaterial(pImmediateContext, _groundMaterial);
 
 		pImmediateContext->PSSetShaderResources(0, 1, &_pTextureRV);
-		pImmediateContext->PSSetSamplers(0, 1, &_pSamplerLinear);
 
 		const GeometryBufferData::BufferIndices* pBufferIndices = pGeometryData->GetBufferIndices(_model->GetPrimitiveType());
 		pImmediateContext->DrawIndexedInstanced(pBufferIndices->IndexCount, numInstances, pBufferIndices->IndexOffset, 

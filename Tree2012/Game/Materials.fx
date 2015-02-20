@@ -48,8 +48,7 @@ struct Material
 	float4 Diffuse;
 	float4 Specular; // w = SpecPower
 	float4 Reflect;
-	float4x4 shadowMatrix;
-	float4 flags; // x = useShadowMatrix, y = useTexture
+	float4 flags; // x = n/a, y = useTexture
 };
 
 //---------------------------------------------------------------------------------------

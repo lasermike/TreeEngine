@@ -79,7 +79,7 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	XMStoreFloat4x4(&data.World, localToWorld);
 	XMStoreFloat4x4(&data.WorldNormal, normalLocalToWorld);
 
-	if (branch->depth < 2)
+	if (branch->depth < 4)
 	{
 		_logInstanceData.push_back(data);
 	}
@@ -225,3 +225,13 @@ unsigned int Tree::GetNumInstances(bool numMax)
 		return 0;
 }
 
+HRESULT Tree::RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometryData, int startInstance)
+{
+	const GeometryBufferData::BufferIndices* pCylinderIndices = pGeometryData->GetBufferIndices(PrimitiveType_Cylinder);
+
+	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pCylinderIndices, startInstance, (int) _logInstanceData.size()));
+
+	const GeometryBufferData::BufferIndices* pBoxIndices = pGeometryData->GetBufferIndices(PrimitiveType_Box);
+	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pBoxIndices, startInstance + (int) _logInstanceData.size(), (int)  _twigInstanceData.size()));
+	return S_OK;
+}

@@ -44,7 +44,6 @@ public:
 	}
 
 	virtual HRESULT DrawInstanced(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/, GeometryBufferData* /*pGeometryData*/, int /*startInstance*/, int /*numInstances*/)	{ return E_NOTIMPL;	}
-	virtual HRESULT ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/) { return E_NOTIMPL; }
 
 	HRESULT SetMaterial(ID3D11DeviceContext* pImmediateContext, Material material)
 	{

@@ -64,11 +64,6 @@ struct PS_INPUT
 PS_INPUT VS(VS_INPUT input)
 {
 	float4x4 world = input.World;
-    /*[flatten]
-	if (mat.flags.x > 0) //use shear Shadow
-	{
-		world = world  * mat.shadowMatrix ;
-	}*/
 
 	PS_INPUT output = (PS_INPUT)0;
 	output.PosW = mul(float4(input.Pos, 1.0f), transpose(world)).xyz;
@@ -79,7 +74,6 @@ PS_INPUT VS(VS_INPUT input)
 	output.Tex = input.Tex;
 
 	// Generate projective tex-coords to project shadow map onto scene.
-	//float4x4 shadowTransform = mul(transpose(world), shadowMatrix);
 	output.ShadowPosH = mul(float4(output.PosW, 1.0), transpose(shadowMatrix));
 
 	return output;
@@ -153,8 +147,6 @@ struct ShadowMapVertexOut
 ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 {
 	ShadowMapVertexOut output;
-
-	//float4x4 worldViewProj = transpose(output.World) * View * Projection;
 
 	float4 pos = mul(float4(input.Pos, 1.0f), transpose( input.World));
 	pos = mul(pos, View);

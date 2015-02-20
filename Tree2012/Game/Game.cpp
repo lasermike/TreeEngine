@@ -43,6 +43,8 @@ Game::Game()
 	_pRenderTargetView = nullptr;
 	_rotate = false;
 	_paused = false;
+	_wireframe = false;
+	_showHelp = false;
 	_rasterState = nullptr;
 #ifdef _XBOX_ONE
 	_enableMsaa = false; // TODO
@@ -52,7 +54,7 @@ Game::Game()
 	_timeStart = 0;
 	_currentSeed = 0;
 	_resetTree = true;
-	_showShadowBuffer = true;
+	_showShadowBuffer = false;
 	_pCBChangeOnResize = nullptr;
 	_bitmapFont = nullptr;
 
@@ -422,7 +424,7 @@ void Game::Update(DX::StepTimer const& timer)
 		if (_timeStart == 0)
 		{
 			_timeStart = timer.GetTotalSeconds();
-			_timeCurrent = _timeStart;
+			_timeCurrent = 0;
 		}
 		else if (!_paused)
 		{
@@ -452,6 +454,7 @@ void Game::Render()
 
 	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
 
+
 	// Render shadow map
 	_renderData.pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
 	DrawSceneToShadowMap();
@@ -462,7 +465,13 @@ void Game::Render()
 
 	// Bind render target and depth
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
-	
+
+	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+	if (_wireframe)
+	{
+		stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::Wireframe);
+	}
+
 #ifdef SAVEDEPTHIMAGE
 	// Save shadow mapt to disk
 	ScratchImage resultImage, convertedImage;
@@ -492,7 +501,7 @@ void Game::Render()
 	depthTexture = nullptr;
 	_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
 
-	if (_bitmapFont)
+	if (_showHelp && _bitmapFont)
 	{
 	    _bitmapFont->Begin(_pImmediateContext, &_viewPort, false );
 		wchar_t text[128];
@@ -543,6 +552,12 @@ void Game::OnKeydown(UINT key)  // WM_KEYDOWN
 		break;
 	case 'P':
 		_paused = !_paused;
+		break;
+	case 'W':
+		_wireframe = !_wireframe;
+		break;
+	case 'H':
+		_showHelp = !_showHelp;
 		break;
 
 	}
