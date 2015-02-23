@@ -97,8 +97,8 @@ PS_INPUT VS(VS_INPUT input)
 	output.Pos = mul(output.Pos, Projection);
 	output.Tex = input.Tex;
 
-	float3 eyePosTS = mul(float4(eyePos, 1), input.World);
-	float3 lightPosTS = mul(float4(eyePos, 1), input.World);
+	float3 eyePosTS = mul(float4(eyePos, 1), input.World).xyz;
+	float3 lightPosTS = mul(float4(eyePos, 1), input.World).xyz;
 	output.viewDirTang = WorldToTangentSpace(float4(normalize(eyePosTS - input.Pos), 1), input.NormalL, input.TangentL, transpose(input.World) );
 	output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
 
@@ -110,7 +110,7 @@ PS_INPUT VS(VS_INPUT input)
 	output.ShadowPosH = mul(float4(output.PosW, 1.0), transpose(shadowMatrix));
 
 	output.World = input.World;
-
+	 
 	return output;
 }
 
@@ -134,7 +134,7 @@ float4 PS(PS_INPUT pin) : SV_Target
 
 	//toEye = pin.viewDirTang.xyz;
 	DirectionalLight light2 = light;
-	light2.Direction = pin.lightDirTang;
+	light2.Direction = pin.lightDirTang.xyz;
 
 	// Lighting.
 
