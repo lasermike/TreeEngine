@@ -12,8 +12,7 @@ struct BoundingSphere
 enum RenderPass
 {
 	RegularPass,
-	ShadowMapPass,
-	DebugTextureOnly
+	ShadowMapPass
 };
 
 struct RenderData

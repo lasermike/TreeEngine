@@ -48,6 +48,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 		data.vertices[k].Pos = box.Vertices[i].Position;
 		data.vertices[k].Normal = box.Vertices[i].Normal;
 		data.vertices[k].Tex = box.Vertices[i].TexC;
+		data.vertices[k].TangentU = box.Vertices[i].TangentU;
 	}
 
 	for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
@@ -55,6 +56,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 		data.vertices[k].Pos = cylinder.Vertices[i].Position;
 		data.vertices[k].Normal = cylinder.Vertices[i].Normal;
 		data.vertices[k].Tex = cylinder.Vertices[i].TexC;
+		data.vertices[k].TangentU = cylinder.Vertices[i].TangentU;
 	}
 
 	//

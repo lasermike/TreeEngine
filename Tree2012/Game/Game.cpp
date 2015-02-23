@@ -438,6 +438,9 @@ void Game::Update(DX::StepTimer const& timer)
 		XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
 
 	BuildShadowTransform();
+
+	// Compute per-frame values
+	HR(_pScene->Update(_pImmediateContext, &_renderData));
 }
 
 //--------------------------------------------------------------------------------------
@@ -481,8 +484,6 @@ void Game::Render()
 	img = convertedImage.GetImage(0,0,0);
 	HR(SaveToTGAFile(*img, L"c:\\temp\\smap.tga"));
 #endif
-
-	//_renderData.pass = DebugTextureOnly;
 
 	// Clear the back buffer
 	_pImmediateContext->ClearRenderTargetView(_pRenderTargetView, Colors::AliceBlue);

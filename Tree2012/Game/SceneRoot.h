@@ -39,6 +39,7 @@ public:
 
 	virtual HRESULT InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext);
 	virtual HRESULT CleanUpDeviceObjects();
+	HRESULT Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
 	HRESULT Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
 
 	void AddChild(WorldObject* obj)

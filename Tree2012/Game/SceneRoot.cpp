@@ -26,7 +26,7 @@ struct CBChangesEveryFrame
 class InputLayoutDesc
 {
 public:
-	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[11];
+	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[12];
 	static const D3D11_INPUT_ELEMENT_DESC Basic32[3];
 };
 
@@ -41,11 +41,12 @@ public:
 };
 
 
-const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[11] =
+const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[12] =
 {
 	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D11_INPUT_PER_VERTEX_DATA, 0},
 	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
@@ -306,6 +307,28 @@ HRESULT SceneRoot::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderR
 
 }
 
+HRESULT SceneRoot::Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData)
+{
+	// Compute instance data
+	D3D11_MAPPED_SUBRESOURCE mappedData;
+	HRR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
+	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
+
+	for (auto i = _children.begin(); i != _children.end(); i++)
+	{
+		if ((*i)->GetNumInstances(true) > 0)
+		{
+			HRR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
+			dataView += (*i)->GetNumInstances(false);
+		}
+	}
+
+	pImmediateContext->Unmap(_pInstancedBuffer, 0);
+
+	return S_OK;
+}
+
+
 HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData)
 {
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
@@ -329,22 +352,6 @@ HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 	pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	pImmediateContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
-
-	// Compute instance data
-	D3D11_MAPPED_SUBRESOURCE mappedData;
-	HRR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
-	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
-
-	for (auto i = _children.begin(); i != _children.end(); i++)
-	{
-		if ((*i)->GetNumInstances(true) > 0)
-		{
-			HRR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
-			dataView += (*i)->GetNumInstances(false);
-		}
-	}
-
-	pImmediateContext->Unmap(_pInstancedBuffer, 0);
 
 	// Set shaders
 	if (pRenderData->pass == ShadowMapPass)
