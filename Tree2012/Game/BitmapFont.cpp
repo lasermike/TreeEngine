@@ -15,8 +15,8 @@ using namespace XboxSampleFramework;
 // maximum number of quads each instance can render in one go
 #define     MAX_QUADS_PER_INSTANCE      10*1024
 
-#define     VS_FILE_NAME                L"ATGFontVS.cso"
-#define     PS_FILE_NAME                L"ATGFontPS.cso"
+#define     VS_FILE_NAME                L"FontVertexShader.cso"
+#define     PS_FILE_NAME                L"FontPixelShader.cso"
 
 // BitmapFont description
 

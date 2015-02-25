@@ -1,10 +1,11 @@
-@echo on
+@echo off
 
 REM %1% -- FXC
 REM %2% -- OUTPUT folder
-REM %3% -- input folder (project dir)
-REM %4% -- platform
-REM %5% -- config
+REM %3% -- Layout folder
+REM %4% -- input folder (project dir)
+REM %5% -- platform
+REM %6% -- config
 
 if not exist %2 mkdir %2
 if not exist "%~2Media" mkdir "%~2Media"
@@ -12,37 +13,37 @@ if not exist "%~2Media\Shaders" mkdir "%~2Media\Shaders"
 
 SET cmdline=%~1 /Zi /Zpc
 
-if "a%~5%" == "aDebug" (
+if "a%~6%" == "aDebug" (
    echo Compiling shaders with optimization disabled...
    SET cmdline=%cmdline% /O0 /Od
 )
 
-if "a%~5%" == "aDebug_MonoD3D" (
+if "a%~6%" == "aDebug_MonoD3D" (
    echo Compiling shaders with optimization disabled...
    SET cmdline=%cmdline% /O0 /Od
 )
 
-if "a%~5%" == "aRelease" (
+if "a%~6%" == "aRelease" (
    echo Compiling shaders with optimization enabled...
    SET cmdline=%cmdline% /O3
 )
 
-if "a%~5%" == "aRelease_MonoD3D" (
+if "a%~6%" == "aRelease_MonoD3D" (
    echo Compiling shaders with optimization enabled...
    SET cmdline=%cmdline% /O3
 )
 
-if "a%~5%" == "aProfile" (
+if "a%~6%" == "aProfile" (
    echo Compiling shaders with optimization enabled...
    SET cmdline=%cmdline% /O3
 )
 
-if "a%~5%" == "aProfile_MonoD3D" (
+if "a%~6%" == "aProfile_MonoD3D" (
    echo Compiling shaders with optimization enabled...
    SET cmdline=%cmdline% /O3
 )
 
-if "a%~4%" == "aDurango" (
+if "a%~5%" == "aDurango" (
    echo Compiling shaders for Durango...
    SET cmdline=%cmdline% /D_DURANGO=1 /WX
    rem SET cmdline=%cmdline% /D_DURANGO=1 /D__XBOX_FULL_PRECOMPILE_PROMISE
@@ -50,4 +51,5 @@ if "a%~4%" == "aDurango" (
    echo Compiling shaders for x64...
 )
 
+@echo on
 

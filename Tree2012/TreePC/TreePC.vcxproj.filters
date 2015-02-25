@@ -193,14 +193,17 @@
     <None Include="..\Game\Courier_New_11.tga">
       <Filter>Game\Resources</Filter>
     </None>
-    <None Include="..\Game\ATGFont.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </None>
     <None Include="..\Game\Arial_16.abc">
       <Filter>Game\Resources</Filter>
     </None>
     <None Include="..\Game\Arial_16.tga">
       <Filter>Game\Resources</Filter>
+    </None>
+    <None Include="..\Game\Shaders\ATGFont.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Shaders\commonshader.bat">
+      <Filter>Game\Shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -212,34 +215,18 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\Game\PS.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Game\VS.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Game\ATGFontPS.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Game\ATGFontVS.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Game\BuildShadowMapVS.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Game\BuildShadowMapPS.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Game\DebugTexturePS.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Game\DebugTextureVS.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </FxCompile>
-  </ItemGroup>
-  <ItemGroup>
     <Library Include="Lib\DirectXTex.lib">
       <Filter>Lib</Filter>
     </Library>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\Game\Shaders\ShaderFiles.txt">
+      <Filter>Game\Shaders</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\buildShaders.bat">
+      <Filter>Game\Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

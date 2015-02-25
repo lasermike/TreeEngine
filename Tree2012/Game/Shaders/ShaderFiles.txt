@@ -1,0 +1,8 @@
+ATGFont.hlsl,vs,FontVertexShader
+ATGFont.hlsl,ps,FontPixelShader
+Tree.hlsl,vs,VS
+Tree.hlsl,ps,PS
+Tree.hlsl,vs,DrawScreenQuadVS
+Tree.hlsl,ps,DrawScreenQuadPS
+Tree.hlsl,vs,BuildShadowMapVS
+

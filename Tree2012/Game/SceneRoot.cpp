@@ -165,7 +165,7 @@ HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* p
 
 	////////  Debug texture /////
 	dataVS.clear();
-	HRR(XSF::LoadBlob(L"DebugTextureVS.cso", dataVS));
+	HRR(XSF::LoadBlob(L"DrawScreenQuadVS.cso", dataVS));
 
 	// Load regular vertex Shader
 	HRR(device->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &_pDrawScreenVertexShader));
@@ -177,7 +177,7 @@ HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* p
 								  &InputLayouts::Basic32));
 
 	// Load regular pixel Shader
-	HRR(XSF::LoadPixelShader(device, L"DebugTexturePS.cso", &_pDrawScreenPixelShader));
+	HRR(XSF::LoadPixelShader(device, L"DrawScreenQuadPS.cso", &_pDrawScreenPixelShader));
 
 	//////
 

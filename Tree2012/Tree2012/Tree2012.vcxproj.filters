@@ -207,17 +207,8 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="commonshader.bat">
-      <Filter>Media</Filter>
-    </None>
     <None Include="copymedia.bat">
       <Filter>Media</Filter>
-    </None>
-    <None Include="buildTreeFiles.bat">
-      <Filter>Media</Filter>
-    </None>
-    <None Include="..\Game\Materials.fx">
-      <Filter>Game\Shaders</Filter>
     </None>
     <None Include="..\Game\Courier_New_11.abc">
       <Filter>Game\Resources</Filter>
@@ -231,20 +222,35 @@
     <None Include="..\Game\Arial_16.abc">
       <Filter>Game\Resources</Filter>
     </None>
+    <None Include="..\Game\Shaders\commonshader.bat">
+      <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Shaders\Tree.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Shaders\Materials.fx">
+      <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Shaders\ATGFont.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="MediaList.txt">
       <Filter>Media</Filter>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\Game\Tree.hlsl">
+    <Text Include="..\Game\Shaders\ShaderFiles.txt">
       <Filter>Game\Shaders</Filter>
-    </CustomBuild>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <Library Include="Lib\DirectXTex.lib">
       <Filter>Lib</Filter>
     </Library>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\buildShaders.bat">
+      <Filter>Game\Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>
