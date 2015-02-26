@@ -97,10 +97,14 @@ PS_INPUT VS(VS_INPUT input)
 	output.Pos = mul(output.Pos, Projection);
 	output.Tex = input.Tex;
 
-	float3 eyePosTS = mul(float4(eyePos, 1), input.World).xyz;
-	float3 lightPosTS = mul(float4(eyePos, 1), input.World).xyz;
-	output.viewDirTang = WorldToTangentSpace(float4(normalize(eyePosTS - input.Pos), 1), input.NormalL, input.TangentL, transpose(input.World) );
-	output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
+	float4 vPosTS = WorldToTangentSpace(float4(input.Pos, 1), input.NormalL, input.TangentL, input.World);
+	float4 eyePosTS = WorldToTangentSpace(float4(eyePos, 1), input.NormalL, input.TangentL, input.World);
+	float4 lightPosTS = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, input.World);
+	output.viewDirTang = normalize(eyePosTS - vPosTS);
+	output.lightDirTang = normalize(lightPosTS - eyePosTS);
+	//float4 eyePosTS4 = output.viewDirTang = WorldToTangentSpace(float4(eyePosTS), 1), input.NormalL, input.TangentL, transpose(input.World) );
+	//output.viewDirTang = WorldToTangentSpace(float4(normalize(input.Pos), 1), input.NormalL, input.TangentL, transpose(input.World) );
+	//output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
 
 	//output.viewDirTang = WorldToTangentSpace(float4(normalize(eyePos - input.Pos.xyz), 1), input.NormalL, input.TangentL, transpose(input.World) );
 	//output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));

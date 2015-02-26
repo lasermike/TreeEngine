@@ -250,21 +250,21 @@
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Profile|Durango'">true</ExcludedFromBuild>
     </None>
-    <None Include="..\Game\Shaders\Tree.hlsl">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">call buildTreeFiles.bat "fxc.exe" "$(OutDir)/" . "$(Platform)" "$(Configuration)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">$(OutDir)/PS.cso;$(OutDir)/VS.cso</Outputs>
+    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Profile|Durango'">call buildTreeFiles.bat "fxc.exe" "$(OutDir)/" . "$(Platform)" "$(Configuration)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Profile|Durango'">$(OutDir)/PS.cso;$(OutDir)/VS.cso</Outputs>
-    </None>
+      <FileType>Document</FileType>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\Game\Shaders\buildShaders.bat">
-      <FileType>Document</FileType>
+    <None Include="..\Game\Shaders\buildShaders.bat">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" ..\Game\Shaders\. "$(Platform)" "$(Configuration)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">$(OutDir)/status.txt</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Durango'">call ..\Game\Shaders\buildTreeFiles.bat "fxc.exe" "$(OutDir)/" . "$(Platform)" "$(Configuration)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Durango'">$(OutDir)/PS.cso;$(OutDir)/VS.cso</Outputs>
-    </CustomBuild>
+    </None>
     <None Include="..\Game\Shaders\commonshader.bat" />
     <None Include="copymedia.bat" />
   </ItemGroup>
@@ -281,10 +281,11 @@
     <Library Include="Lib\DirectXTex.lib" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Game\Shaders\ATGFont.hlsl">
+    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-    </None>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -225,13 +225,10 @@
     <None Include="..\Game\Shaders\commonshader.bat">
       <Filter>Game\Shaders</Filter>
     </None>
-    <None Include="..\Game\Shaders\Tree.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </None>
     <None Include="..\Game\Shaders\Materials.fx">
       <Filter>Game\Shaders</Filter>
     </None>
-    <None Include="..\Game\Shaders\ATGFont.hlsl">
+    <None Include="..\Game\Shaders\buildShaders.bat">
       <Filter>Game\Shaders</Filter>
     </None>
   </ItemGroup>
@@ -249,7 +246,10 @@
     </Library>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\Game\Shaders\buildShaders.bat">
+    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
       <Filter>Game\Shaders</Filter>
     </CustomBuild>
   </ItemGroup>

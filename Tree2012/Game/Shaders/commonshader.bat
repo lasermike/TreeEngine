@@ -1,4 +1,4 @@
-@echo off
+@rem echo off
 
 REM %1% -- FXC
 REM %2% -- OUTPUT folder

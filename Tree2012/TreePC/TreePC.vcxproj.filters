@@ -184,9 +184,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="TreePC_TemporaryKey.pfx" />
-    <None Include="..\Game\Tree.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </None>
     <None Include="..\Game\Courier_New_11.abc">
       <Filter>Game\Resources</Filter>
     </None>
@@ -199,10 +196,10 @@
     <None Include="..\Game\Arial_16.tga">
       <Filter>Game\Resources</Filter>
     </None>
-    <None Include="..\Game\Shaders\ATGFont.hlsl">
+    <None Include="..\Game\Shaders\commonshader.bat">
       <Filter>Game\Shaders</Filter>
     </None>
-    <None Include="..\Game\Shaders\commonshader.bat">
+    <None Include="..\Game\Shaders\buildShaders.bat">
       <Filter>Game\Shaders</Filter>
     </None>
   </ItemGroup>
@@ -225,7 +222,10 @@
     </Text>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\Game\Shaders\buildShaders.bat">
+    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
       <Filter>Game\Shaders</Filter>
     </CustomBuild>
   </ItemGroup>
