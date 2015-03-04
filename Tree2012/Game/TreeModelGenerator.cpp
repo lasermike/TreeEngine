@@ -3,19 +3,17 @@
 #include "TreeModel.h"
 #include <algorithm>
 
-TreeModelGenerator::TreeModelGenerator(unsigned int seed)
+FixedTreeModelGenerator::FixedTreeModelGenerator(unsigned int seed)
 {
 	_seed = seed;
 	_model = nullptr;
 }
 
-
-TreeModelGenerator::~TreeModelGenerator(void)
+FixedTreeModelGenerator::~FixedTreeModelGenerator(void)
 {
 }
 
-
-TreeModel* TreeModelGenerator::Create()
+TreeModel* FixedTreeModelGenerator::Create()
 {
 	srand(_seed);
 
@@ -24,7 +22,7 @@ TreeModel* TreeModelGenerator::Create()
 	_model->treeData.numLevels = TreeModel::maxLevels;
 	for (int i = 0; i < _model->treeData.numLevels; i++)
 	{
-		_model->treeData.pLevels[i].pBranchesInLevel = new std::vector<int>();
+//		_model->treeData.pLevels[i].pBranchesInLevel = new std::vector<int>();
 	}
 
 	XMVECTOR vStart = XMVectorSet(0, 0, 0,0);
@@ -34,8 +32,8 @@ TreeModel* TreeModelGenerator::Create()
 	int id = _model->treeData.numBranches++;
 	_model->trunk = &_model->treeData.pBranches[id]; 
 	_model->trunk->id = id;
-	_model->treeData.pLevels[0].pBranchesInLevel->push_back(id);
-	_model->treeData.pLevels[0].numBranches++;
+	//_model->treeData.pLevels[0].pBranchesInLevel->push_back(id);
+	//_model->treeData.pLevels[0].numBranches++;
 	_model->trunk->parent = -1;
 
 	XMStoreFloat4(&_model->trunk->start, vStart);
@@ -47,7 +45,7 @@ TreeModel* TreeModelGenerator::Create()
 	return _model;
 }
 
-void TreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, int depth)
+void FixedTreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, int depth)
 {
 	const int maxDepth = 5;
 
@@ -65,11 +63,12 @@ void TreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, int dep
 	{
 		int id = _model->treeData.numBranches++;
 		Branch* child = &_model->treeData.pBranches[id];
-		child->id = id; 
+		child->id = id;
+		parentBranch->numChildren++;
 		parentBranch->SetChild(i, child->id);
 		assert(&_model->treeData.pBranches[child->id] == child);  // Ensure our look up is correct 
-		_model->treeData.pLevels[depth].numBranches++;
-		_model->treeData.pLevels[depth].pBranchesInLevel->push_back(id);
+//		_model->treeData.pLevels[depth].numBranches++;
+//		_model->treeData.pLevels[depth].pBranchesInLevel->push_back(id);
 
 		child->start = parentBranch->end;
 		child->depth = depth;
@@ -116,7 +115,7 @@ void TreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, int dep
 	}
 }
 
-XMVECTOR TreeModelGenerator::CalculateQuaternion(FXMVECTOR vDirection)
+XMVECTOR FixedTreeModelGenerator::CalculateQuaternion(FXMVECTOR vDirection)
 {
 	// Determine rotation
 	XMMATRIX mRot;

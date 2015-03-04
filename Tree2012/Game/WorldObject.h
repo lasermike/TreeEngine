@@ -3,12 +3,45 @@
 #include "Geometry.h"
 #include "Model.h"
 #include "RenderData.h"
+#include <memory>
 
 // For rendering indirectly
 struct InstancedData
 {
 	XMFLOAT4X4 World;
 	XMFLOAT4X4 WorldNormal;
+};
+
+typedef enum GeneratorType
+{
+	NullGeneratorType,
+	PrimitiveGeneratorType,
+	FixedTreeGeneratorType,
+	LSystemGeneratorType
+};
+
+class WorldObjectParams
+{
+public:
+	WorldObjectParams() : position(0,0,0), generatorType(NullGeneratorType), _animationSpeed(1.0f) { }
+	virtual ~WorldObjectParams() { }
+
+	XMFLOAT3 position;
+	GeneratorType generatorType;
+	float _animationSpeed;
+};
+
+template<typename T>
+class WorldObjectParameters : public WorldObjectParams
+{
+private:
+    T generatorParameters;
+
+public:
+	T& GetGeneratorParameters() 
+	{
+		return generatorParameters;
+	}
 };
 
 class WorldObject
@@ -19,12 +52,16 @@ protected:
 
 	bool		_drawInstanced;
 
+	unique_ptr<WorldObjectParams> _params;
 
 public:
 	XMFLOAT3	_position;
 
-	WorldObject(void);
+	WorldObject(WorldObjectParams* pParams);
 	~WorldObject(void);
+
+	WorldObjectParams& GetParams() { return *_params; }
+	template <class T> WorldObjectParameters<T>& GetParams() { return *(WorldObjectParameters<T>*)_params.get(); }
 
 	virtual void Create(ModelGenerator* /*generator*/) { }
 

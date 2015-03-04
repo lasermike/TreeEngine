@@ -24,7 +24,7 @@ private:
 	HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart);
 
 public:
-	Tree(void);
+	Tree(WorldObjectParams* pParams);
 	virtual ~Tree(void);
 
 	virtual void Create(ModelGenerator* generator) { return Create((TreeModelGenerator*)generator); }

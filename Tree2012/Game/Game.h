@@ -8,6 +8,7 @@
 #include "bitmapfont.h"
 #include "StepTimer.h"
 #include "RenderData.h"
+#include "LSystemModelGenerator.h"
 
 using namespace Microsoft::WRL;
 
@@ -78,7 +79,7 @@ private:
 
 	Primitive*							_pPlane;
 	SceneRoot*							_pScene;
-	std::vector<Tree*>					_trees;
+	vector<Tree*>						_trees;
 
 	std::vector<unsigned int>			_seeds;
 	int									_currentSeed;

@@ -34,7 +34,7 @@ class Primitive : public WorldObject
 	PrimitiveModel*	_model;
 
 public:
-	Primitive();
+	Primitive(WorldObjectParams* wop);
 	~Primitive();
 
 	virtual void Create(ModelGenerator* generator) { return Create((PrimitiveModelGenerator*)generator); }

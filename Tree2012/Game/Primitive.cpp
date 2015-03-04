@@ -2,7 +2,7 @@
 #include "Primitive.h"
 #include "PrimitiveGeometry.h"
 
-Primitive::Primitive() : _model(nullptr)
+Primitive::Primitive(WorldObjectParams* wop) : WorldObject(wop) _model(nullptr)
 {
 }
 
@@ -31,7 +31,7 @@ HRESULT Primitive::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, 
 {
 	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0);
 	const XMVECTOR vScaleCenter = XMVectorSet(0, 0, 0, 0);
-	XMVECTOR vScale = XMVectorSet(14, .01f, 14, 1);
+	XMVECTOR vScale = XMVectorSet(30, .01f, 30, 1);
 	XMVECTOR vQuat = XMQuaternionIdentity();
 	XMVECTOR vStart = XMVectorSet(0,0.0f,0,1);
 

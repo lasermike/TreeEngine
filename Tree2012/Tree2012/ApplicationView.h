@@ -38,6 +38,9 @@ private:
 	Game* m_pGame;
     XSF::Input m_input;
     bool m_windowClosed;
+
+	bool pressedButtons[7];
+
 };
 
 // ApplicationSource - responsible for creating the Application instance

@@ -15,6 +15,10 @@ using namespace Windows::UI::Core;
 ApplicationView::ApplicationView()
 {
     m_windowClosed = false;
+	for (int i = 0; i < ARRAYSIZE(pressedButtons); i++)
+	{
+		pressedButtons[i] = false;
+	}
 }
 
 // Called by the system.  Perform application initialization here,
@@ -65,18 +69,61 @@ void ApplicationView::HandleInput()
 	m_input.Update();
 	const XSF::GamepadReading& input = m_input.GetCurrentGamepadReading();
 
-	if (input.IsDPadRightPressed())
+	if (input.IsDPadRightPressed() && !pressedButtons[0])
 	{
 		m_pGame->OnKeydown(VK_RIGHT);
+		pressedButtons[0] = true;
 	}
-	else if (input.IsDPadLeftPressed())
+	else
+		pressedButtons[0] = false;
+
+	if (input.IsDPadLeftPressed() && !pressedButtons[1])
 	{
 		m_pGame->OnKeydown(VK_LEFT);
+		pressedButtons[1] = true;
 	}
-	else if (input.IsYPressed())
+	else
+		pressedButtons[1] = false;
+	
+	if (input.IsYPressed() && !pressedButtons[2])
 	{
 		m_pGame->OnKeydown('0');
+		pressedButtons[2] = true;
 	}
+	else
+		pressedButtons[2] = false;
+	
+	if (input.IsLeftShoulderPressed() && !pressedButtons[3])
+	{
+		m_pGame->OnKeydown('R');
+		pressedButtons[3] = true;
+	}
+	else
+		pressedButtons[3] = false;
+	
+	if (input.IsRightShoulderPressed() && !pressedButtons[4])
+	{
+		m_pGame->OnKeydown('Z');
+		pressedButtons[4] = true;
+	}
+	else
+		pressedButtons[4] = false;
+
+	if (input.IsDPadUpPressed() && !pressedButtons[5])
+	{
+		m_pGame->OnKeydown('H');
+		pressedButtons[5] = true;
+	}
+	else
+		pressedButtons[5] = false;
+
+	if (input.IsAPressed() && !pressedButtons[6])
+	{
+		m_pGame->OnKeydown('P');
+		pressedButtons[6] = true;
+	}
+	else
+		pressedButtons[6] = false;
 }
 
 void ApplicationView::Uninitialize()

@@ -4,7 +4,7 @@
 #include "TreeModelGenerator.h"
 #include "MathHelper.h"
 
-Tree::Tree(void) : _treeModel(nullptr), WorldObject()
+Tree::Tree(WorldObjectParams* pParams) : _treeModel(nullptr), WorldObject(pParams)
 {
 }
 

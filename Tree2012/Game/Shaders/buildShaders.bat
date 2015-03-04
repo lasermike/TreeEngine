@@ -32,7 +32,7 @@ goto ENDOFSCRIPT
   echo !finalcmd!
   call !finalcmd!
   if ERRORLEVEL 1 goto ENDOFSCRIPT
-rem  copy "%outputfile%" %layoutFolder%
+  copy "%outputfile%" %layoutFolder%
   goto :EOF
 
 :ENDOFSCRIPT

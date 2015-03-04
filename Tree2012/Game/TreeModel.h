@@ -29,6 +29,7 @@ struct Branch
 	XMFLOAT4 end;
 
 	XMINT4 children;
+	int numChildren;
 
 	Branch()
 	{

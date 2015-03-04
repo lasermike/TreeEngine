@@ -2,7 +2,7 @@
 #include "WorldObject.h"
 
 
-WorldObject::WorldObject(void) :_geometry(), _drawInstanced(true)
+WorldObject::WorldObject(WorldObjectParams* pParams) :_geometry(), _params(pParams), _drawInstanced(true)
 {
 	_position = XMFLOAT3(0,0,0);
 }

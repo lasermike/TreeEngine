@@ -9,6 +9,7 @@ TreeModel::TreeModel(void)
 	treeData.numLevels = 0;
 	treeData.pBranches = new Branch[maxBranches];
 	treeData.pLevels = new BranchLevelData[maxLevels];
+
 }
 
 

@@ -63,16 +63,31 @@ Game::Game()
 	// Init vertex/index buffer
 	_pScene = new SceneRoot();
 
+	WorldObjectParameters<LSystemParams>* params1 = new WorldObjectParameters<LSystemParams>();
+
+	params1->position = XMFLOAT3(1.3f, 0, 1.3f);
+	params1->generatorType = LSystemGeneratorType;
+	params1->_animationSpeed = 5.0f;
+	params1->GetGeneratorParameters()._axiom = "A";
+	params1->GetGeneratorParameters()._rules.push_back(Rule("B", "BB"));
+	params1->GetGeneratorParameters()._rules.push_back(Rule("A", "B[A]A"));
+	params1->GetGeneratorParameters()._angle = XM_PIDIV4;
+	params1->GetGeneratorParameters()._numIterations = 4;
+	params1->GetGeneratorParameters()._segmentLength = .25f;
+	//_pTree1Params = move(params1);
+
 	// Init trees and other world objects
-	_trees.push_back(new Tree());
+	_trees.push_back(new Tree(params1));
 	(*_trees.rbegin())->_position = XMFLOAT3(1.3f,0,1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
-	_trees.push_back(new Tree());
+	WorldObjectParams* params2 = new WorldObjectParams();
+	_trees.push_back(new Tree(params2));
 	(*_trees.rbegin())->_position = XMFLOAT3(1.3f,0,-1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
-	_trees.push_back(new Tree());
+	WorldObjectParams* params3 = new WorldObjectParams();
+	_trees.push_back(new Tree(params3));
 	(*_trees.rbegin())->_position = XMFLOAT3(-1.3f,0,1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
@@ -87,7 +102,7 @@ Game::Game()
 	_renderData.time = 0;
 
 	// Initialize the view matrix
-	XMVECTOR eyePos = XMVectorSet(0.0f, 2.25f, -6.0f, 0.0f);
+	XMVECTOR eyePos = XMVectorSet(0.0f, 2.25f, -10.0f, 0.0f);
 	XMVECTOR At = XMVectorSet(0.0f, 1.75f, 0.0f, 0.0f);
 	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	XMStoreFloat4x4(&_renderData.view, XMMatrixLookAtLH(eyePos, At, Up));
@@ -335,7 +350,7 @@ HRESULT Game::OnResize()
 	descDepth.SampleDesc.Count = _enableMsaa ? msaaCount : 1;
 	descDepth.SampleDesc.Quality = _enableMsaa ? msaaQuality - 1 : 0;
 	descDepth.Usage = D3D11_USAGE_DEFAULT;
-	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 	descDepth.CPUAccessFlags = 0;
 	descDepth.MiscFlags = 0;
 	HRR(_pd3dDevice->CreateTexture2D(&descDepth, nullptr, &_pDepthStencil));
@@ -343,7 +358,11 @@ HRESULT Game::OnResize()
 	// Create the depth stencil view
     D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
 	dsvDesc.Flags = 0;
+#ifdef _XBOX_ONE
+    dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+#else
     dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+#endif
     dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Texture2D.MipSlice = 0;
     HRR(_pd3dDevice->CreateDepthStencilView(_pDepthStencil, &dsvDesc, &_pDepthStencilView));
@@ -400,8 +419,18 @@ void Game::Update(DX::StepTimer const& timer)
 		int treeNum = 1;
 		for (auto t = _trees.begin(); t != _trees.end(); t++)
 		{
-			TreeModelGenerator generator(_seeds[_currentSeed] * treeNum);
-			(*t)->Create(&generator);
+			if (treeNum == 1)
+			{
+				WorldObjectParameters<LSystemParams>& wop = (*t)->GetParams<LSystemParams>();
+
+				LSystemModelGenerator generater(wop.GetGeneratorParameters()); // TODO
+				(*t)->Create(&generater);
+			}
+			else
+			{
+				FixedTreeModelGenerator generator(_seeds[_currentSeed] * treeNum);
+				(*t)->Create(&generator);
+			}
 			treeNum++;
 		}
 

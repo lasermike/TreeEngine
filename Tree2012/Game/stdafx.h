@@ -11,6 +11,7 @@
 #define XSF_USE_DX_11_1
 
 using namespace DirectX;
+using namespace std;
 
 #ifdef _DEBUG
 __inline void ReportError(char* msg, char* file, long line, char* exp) 
@@ -72,6 +73,8 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 
 #else
 #ifndef HRR
+#define HR(x) (x)
+#define HRC(x) (x)
 #define HRR(x) (x)
 #endif
 #endif 
@@ -101,7 +104,10 @@ void SafeDelete(T* obj)
 // XSF_ASSERT
 #ifdef NDEBUG
 
-#define XSF_ASSERT( exp )   
+#define XSF_ASSERT( exp )  exp 
+#define XSF_RETURN_IF_FAILED( exp ) exp   
+#define XSF_ERROR_IF_FAILED( exp ) exp  
+
 #else   // NDEBUG
 
 #define XSF_ASSERT( exp )   if( !(exp) ) { ReportError( "assertion failed: %s\n", __FILE__, __LINE__, #exp ); }

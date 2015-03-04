@@ -1,12 +1,7 @@
 #pragma once
 #include "pch.h"
-#include <directxmath.h>
 #include "TreeModel.h"
 
-using namespace DirectX;
-
-//interface Model;
-//class TreeModel;
 struct Branch;
 	
 class PlaneModelGenerator : public ModelGenerator, public Model
@@ -14,11 +9,17 @@ class PlaneModelGenerator : public ModelGenerator, public Model
 	Model* Create() { return this; }
 };
 
-class TreeModelGenerator : ModelGenerator
+class TreeModelGenerator : public ModelGenerator
 {
 public:
-	TreeModelGenerator(unsigned int seed);
-	~TreeModelGenerator(void);
+	virtual TreeModel* Create() = 0;
+};
+
+class FixedTreeModelGenerator : public TreeModelGenerator
+{
+public:
+	FixedTreeModelGenerator(unsigned int seed);
+	~FixedTreeModelGenerator(void);
 	TreeModel* Create();
 
 private:
