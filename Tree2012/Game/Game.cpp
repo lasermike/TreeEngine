@@ -68,30 +68,33 @@ Game::Game()
 	params1->position = XMFLOAT3(1.3f, 0, 1.3f);
 	params1->generatorType = LSystemGeneratorType;
 	params1->_animationSpeed = 5.0f;
+	params1->depthLOD = INT_MAX;
 	params1->GetGeneratorParameters()._axiom = "A";
 	params1->GetGeneratorParameters()._rules.push_back(Rule("B", "BB"));
 	params1->GetGeneratorParameters()._rules.push_back(Rule("A", "B[A]A"));
 	params1->GetGeneratorParameters()._angle = XM_PIDIV4;
-	params1->GetGeneratorParameters()._numIterations = 4;
+	params1->GetGeneratorParameters()._numIterations = 5;
 	params1->GetGeneratorParameters()._segmentLength = .25f;
 	//_pTree1Params = move(params1);
 
 	// Init trees and other world objects
 	_trees.push_back(new Tree(params1));
-	(*_trees.rbegin())->_position = XMFLOAT3(1.3f,0,1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
 	WorldObjectParams* params2 = new WorldObjectParams();
+	params2->position = XMFLOAT3(1.3f,0,-1.3f);
 	_trees.push_back(new Tree(params2));
-	(*_trees.rbegin())->_position = XMFLOAT3(1.3f,0,-1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
 	WorldObjectParams* params3 = new WorldObjectParams();
+	params3->position = XMFLOAT3(-1.3f,0,1.3f);
 	_trees.push_back(new Tree(params3));
-	(*_trees.rbegin())->_position = XMFLOAT3(-1.3f,0,1.3f);
 	_pScene->AddChild((*_trees.rbegin()));
 
-	_pPlane = new Primitive();
+	WorldObjectParams* params4 = new WorldObjectParams();
+	params4->position = XMFLOAT3(0,0,0);
+	params4->scale = XMFLOAT3(30, .01f, 30);
+	_pPlane = new Primitive(params4);
 	_pScene->AddChild(_pPlane);
 
 	// Init lights

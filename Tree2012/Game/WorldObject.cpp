@@ -5,6 +5,12 @@
 WorldObject::WorldObject(WorldObjectParams* pParams) :_geometry(), _params(pParams), _drawInstanced(true)
 {
 	_position = XMFLOAT3(0,0,0);
+	_scale = XMFLOAT3(1,1,1);
+	if (pParams)
+	{
+		_position = pParams->position;
+		_scale = pParams->scale;
+	}
 }
 
 WorldObject::~WorldObject(void)

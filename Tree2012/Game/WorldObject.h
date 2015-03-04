@@ -23,12 +23,18 @@ typedef enum GeneratorType
 class WorldObjectParams
 {
 public:
-	WorldObjectParams() : position(0,0,0), generatorType(NullGeneratorType), _animationSpeed(1.0f) { }
+	WorldObjectParams() : position(0,0,0), 
+						  scale(1,1,1), 
+						  depthLOD(4),
+						  generatorType(NullGeneratorType), 
+						  _animationSpeed(1.0f) { }
 	virtual ~WorldObjectParams() { }
 
 	XMFLOAT3 position;
+	XMFLOAT3 scale;
 	GeneratorType generatorType;
 	float _animationSpeed;
+	int depthLOD;
 };
 
 template<typename T>
@@ -53,9 +59,11 @@ protected:
 	bool		_drawInstanced;
 
 	unique_ptr<WorldObjectParams> _params;
-
-public:
 	XMFLOAT3	_position;
+	XMFLOAT3	_scale;
+
+	float CalcTime(float time) { return time * _params->_animationSpeed; } 
+public:
 
 	WorldObject(WorldObjectParams* pParams);
 	~WorldObject(void);

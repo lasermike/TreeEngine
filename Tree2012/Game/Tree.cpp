@@ -67,19 +67,19 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, Rende
 
 HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBranch, Branch const* branch, const FXMVECTOR parentStart)
 {
-	if (pRenderData->time < branch->depth)
+	if (CalcTime(pRenderData->time) < branch->depth)
 		return S_OK;
 
 	// Update variables that change once per frame
 	XMVECTOR vChildStart;
 	XMMATRIX localToWorld, normalLocalToWorld;
-	ComputeTransformationsManual(&localToWorld, &normalLocalToWorld, &vChildStart, pRenderData->time, branch, &pRenderData->world, parentStart);
+	ComputeTransformationsManual(&localToWorld, &normalLocalToWorld, &vChildStart, CalcTime(pRenderData->time), branch, &pRenderData->world, parentStart);
 
 	InstancedData data;
 	XMStoreFloat4x4(&data.World, localToWorld);
 	XMStoreFloat4x4(&data.WorldNormal, normalLocalToWorld);
 
-	if (branch->depth < 4)
+	if (branch->depth < _params->depthLOD)
 	{
 		_logInstanceData.push_back(data);
 	}
@@ -113,6 +113,12 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMMATRIX
 	{
 		animScaleFactor = (time - branch->depth) / 5;
 	}
+	else
+	{
+		animScaleFactor  = animScaleFactor ;
+	}
+
+	ASSERT(animScaleFactor >= 0.0f);
 
 	XMVECTOR vStart = parentStart;
 	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
@@ -128,21 +134,26 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMMATRIX
 	// Determine rotation
 	XMMATRIX mRot;
 	XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
-	XMVECTOR vDir = vEnd - vStart;
-	XMVECTOR vCross = XMVector3Cross(vUp, XMVector3Normalize(vDir));
+	XMVECTOR vLeft = XMVectorSet(1, 0, 0, 0);
+	XMVECTOR vDir = XMVector3Normalize(vEnd - vStart);
+	XMVECTOR vCross = XMVector3Cross(vUp, vDir);
 	XMVECTOR vCrossLenSq = XMVector3LengthSq(vCross);
 	XMVECTOR vQuat;
 	float crossLenSq;
 	XMStoreFloat(&crossLenSq, vCrossLenSq);
-	if (crossLenSq > 0.01f) // Need better value for epsilon here
+	if (crossLenSq > 0.001f) // Need better value for epsilon here
 	{
-		XMVECTOR vDot = XMVector3Dot(vUp, XMVector3Normalize(vDir));
+		XMVECTOR vDot = XMVector3Dot(vUp, vDir);
 		float angle;
 		XMStoreFloat(&angle, vDot);
 		angle = acos(angle);
 		vQuat = XMQuaternionRotationAxis(vCross, angle);
 	}
-	else
+	else if (XMVectorGetY(vDir) < -0.99f)
+	{ 
+		vQuat = XMQuaternionRotationAxis(vLeft, XM_PI);
+	}
+	else 
 	{
 		vQuat = XMQuaternionRotationAxis(vUp, 0);
 	}
