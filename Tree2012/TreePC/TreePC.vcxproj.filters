@@ -98,6 +98,9 @@
     <ClCompile Include="..\Game\LSystemModelGenerator.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\OrbitCamera.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TreePC.h" />
@@ -186,6 +189,9 @@
     </ClInclude>
     <ClInclude Include="..\Game\LSystemModelGenerator.h">
       <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\OrbitCamera.h">
+      <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

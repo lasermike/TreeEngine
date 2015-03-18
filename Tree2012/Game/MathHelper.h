@@ -41,7 +41,18 @@ public:
 	{
 		return a > b ? a : b;
 	}
-	 
+
+    //--------------------------------------------------------------------------------------
+    // Swaps by creating a temporary
+    //--------------------------------------------------------------------------------------
+    template<class Num> 
+	static void Swap(Num& x, Num& y)
+    {
+	    Num t = y;
+	    y = x;
+	    x = t;
+    }	
+
 	template<typename T>
 	static T Lerp(const T& a, const T& b, float t)
 	{
@@ -56,6 +67,21 @@ public:
 
 	// Returns the polar angle of the point (x,y) in [0, 2*PI).
 	static float AngleFromXY(float x, float y);
+
+	static inline float WrapHalfPi(float x)
+	{
+		return ModF(x + XM_PI, XM_2PI) - XM_PI;
+	}
+
+    //--------------------------------------------------------------------------------------
+    // Float modulus (x % y)
+    //--------------------------------------------------------------------------------------
+    static inline float ModF(float x, float y)
+    {
+	    if (y == 0) { return x; }
+	    return x - y * floor(x / y);
+    }
+
 
 	static XMMATRIX InverseTranspose(CXMMATRIX M)
 	{

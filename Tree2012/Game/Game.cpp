@@ -12,6 +12,7 @@
 #include <time.h>
 #include "directxtex.h"
 #include "StockRenderStates.h"
+#include "OrbitCamera.h"
 
 using namespace DirectX;
 
@@ -67,15 +68,14 @@ Game::Game()
 
 	params1->position = XMFLOAT3(1.3f, 0, 1.3f);
 	params1->generatorType = LSystemGeneratorType;
-	params1->_animationSpeed = 5.0f;
+	params1->_animationSpeed = 10.0f;
 	params1->depthLOD = INT_MAX;
 	params1->GetGeneratorParameters()._axiom = "A";
 	params1->GetGeneratorParameters()._rules.push_back(Rule("B", "BB"));
 	params1->GetGeneratorParameters()._rules.push_back(Rule("A", "B[A]A"));
 	params1->GetGeneratorParameters()._angle = XM_PIDIV4;
-	params1->GetGeneratorParameters()._numIterations = 5;
+	params1->GetGeneratorParameters()._numIterations = 6;
 	params1->GetGeneratorParameters()._segmentLength = .25f;
-	//_pTree1Params = move(params1);
 
 	// Init trees and other world objects
 	_trees.push_back(new Tree(params1));
@@ -104,18 +104,31 @@ Game::Game()
 	_renderData.dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 	_renderData.time = 0;
 
+	// Camera
+	XMFLOAT3 bounds[] = 
+	{
+		XMFLOAT3(-20,4,-20),
+		XMFLOAT3(20,5,20)
+	};
+
+	_camera = new XSF::OrbitCamera();
+	//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
+	_camera->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
+
 	// Initialize the view matrix
-	XMVECTOR eyePos = XMVectorSet(0.0f, 2.25f, -10.0f, 0.0f);
-	XMVECTOR At = XMVectorSet(0.0f, 1.75f, 0.0f, 0.0f);
-	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	XMStoreFloat4x4(&_renderData.view, XMMatrixLookAtLH(eyePos, At, Up));
-	XMStoreFloat4(&_renderData.eyePos, eyePos);
+	UpdateView();
 
 	// Init scene bounds.
 	// Estimatation.    
 	// Ideally would loop through all world space vertices
 	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	_renderData.mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
+}
+
+void Game::UpdateView()
+{
+	XMStoreFloat4x4(&_renderData.view, _camera->GetViewMatrix());
+	XMStoreFloat4(&_renderData.eyePos, _camera->GetEyePosition());
 }
 
 Game::~Game()
@@ -245,7 +258,13 @@ HRESULT Game::OnResize()
 	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
 #endif
 	// Initialize the projection matrix
-	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(XM_PIDIV4, windowWidth / (float)windowHeight, 1.0f, 30.0f));
+	_renderData.screenWidth = windowWidth;
+	_renderData.screenHeight = windowHeight;
+	_renderData.fov = XM_PIDIV4;
+	_renderData.nearClippingPlane = 1.0f;
+	_renderData.farClippingPlane = 30.0f;
+
+	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.fov, _renderData.screenWidth / (float)_renderData.screenHeight, _renderData.nearClippingPlane, _renderData.farClippingPlane));
 
 	UpdateProjection(&_renderData.projection);
 
@@ -465,14 +484,80 @@ void Game::Update(DX::StepTimer const& timer)
 		_renderData.time = (float) _timeCurrent;
 	}
 
-	// Rotate camera around the origin
-	if (_rotate)
-		XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
-
 	BuildShadowTransform();
 
 	// Compute per-frame values
 	HR(_pScene->Update(_pImmediateContext, &_renderData));
+
+
+	//XMFLOAT3* sceneBBox = _pScene->GetBoundingBox();
+	//XMFLOAT3* cameraBBox = _camera->GetBoundingBox();
+
+	XMVECTOR extent = _pScene->GetExtents(TOP);
+	XMFLOAT3 e;
+	XMStoreFloat3(&e, extent);
+
+	XMVECTOR v0, v1;
+	_camera->RayCast(0,0, &_renderData, v0, v1);
+	XMFLOAT3 vv0, vv1;
+	XMStoreFloat3(&vv0, v0);
+	XMStoreFloat3(&vv1, v1);
+	float topDelta = (vv1.y - vv0.y) / (_renderData.farClippingPlane - _renderData.nearClippingPlane);
+	float frustumTopAtExtent = vv0.y + topDelta * sqrt((e.x - vv0.x) * (e.x - vv0.x) + (e.z - vv0.z) * (e.z - vv0.z)); 
+	if (frustumTopAtExtent < e.y)
+	{
+		_camera->SetDollyVelocity(.25f);
+	}
+	else 
+	{
+		_camera->SetDollyVelocity(0);
+	}
+
+
+
+	//sceneBBox[0].y = 3.5f;  // Raise lower minimum
+
+	//if (sceneBBox[1].y > vv1.y)
+	//{
+	//	_camera->SetDollyVelocity(.25f);
+	//}
+	//else if (sceneBBox[0].y > vv0.y)
+	//{
+	//	_camera->SetDollyVelocity(-.25f);
+	//}
+	//else 
+	//{
+	//	_camera->SetDollyVelocity(0);
+	//}
+
+	//sceneBBox[0].x = (float) floor(sceneBBox[0].x);
+	//sceneBBox[0].y = (float) floor(sceneBBox[0].y);
+	//sceneBBox[0].z = (float) floor(sceneBBox[0].z);
+	//sceneBBox[1].x = (float) floor(sceneBBox[1].x);
+	//sceneBBox[1].y = (float) floor(sceneBBox[1].y);
+	//sceneBBox[1].z = (float) floor(sceneBBox[1].z);
+
+	////if (XMVector3Less(XMLoadFloat3(&sceneBBox[0]), XMLoadFloat3(&cameraBBox[0])) ||  
+	////	XMVector3Greater(XMLoadFloat3(&sceneBBox[1]), XMLoadFloat3(&cameraBBox[1])))
+	//if (sceneBBox[0].x < cameraBBox[0].x || sceneBBox[0].y < cameraBBox[0].y || sceneBBox[0].z < cameraBBox[0].z ||
+	//    sceneBBox[1].x > cameraBBox[1].x || sceneBBox[1].y > cameraBBox[1].y || sceneBBox[1].z > cameraBBox[1].z)
+	//{
+	//	_camera->FocusOnBoundingBox(sceneBBox, 2);
+	//}
+
+	// Rotate camera around the origin
+	if (_rotate)
+	{
+		_camera->AddHeadingVelocity(.25f);
+		//XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
+	}
+
+
+
+	_camera->Update((float) timer.GetElapsedSeconds());
+	XMStoreFloat4(&_renderData.eyePos, _camera->GetEyePosition());
+	UpdateView();
+
 }
 
 //--------------------------------------------------------------------------------------

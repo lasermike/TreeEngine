@@ -309,6 +309,10 @@ HRESULT SceneRoot::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderR
 
 HRESULT SceneRoot::Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData)
 {
+	_boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
+	XMVECTOR bbmin = XMLoadFloat3(&_boundingBox[0]);
+	XMVECTOR bbmax = XMLoadFloat3(&_boundingBox[1]);
+
 	// Compute instance data
 	D3D11_MAPPED_SUBRESOURCE mappedData;
 	HRR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
@@ -321,9 +325,15 @@ HRESULT SceneRoot::Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 			HRR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
 			dataView += (*i)->GetNumInstances(false);
 		}
+
+		bbmin = XMVectorMin(bbmin, XMLoadFloat3(&(*i)->GetBoundingBox()[0]));
+		bbmax = XMVectorMax(bbmax, XMLoadFloat3(&(*i)->GetBoundingBox()[1]));
 	}
 
 	pImmediateContext->Unmap(_pInstancedBuffer, 0);
+
+	XMStoreFloat3(&_boundingBox[0], bbmin);
+	XMStoreFloat3(&_boundingBox[1], bbmax);
 
 	return S_OK;
 }
@@ -386,6 +396,23 @@ HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 	}
 
 	return S_OK;
+}
+
+XMVECTOR SceneRoot::GetExtents(Extent extent)
+{
+	auto i = _children.begin() ;
+	XMVECTOR retval = (*i)->GetExtents(extent);
+	i++;
+	for (; i != _children.end(); i++)
+	{
+		XMVECTOR cur = (*i)->GetExtents(extent);
+		if (XMVectorGetY(cur) > XMVectorGetY(retval)) 
+		{
+			retval = cur;
+		}
+	}
+
+	return retval; 
 }
 
 HRESULT SceneRoot::CleanUpDeviceObjects()

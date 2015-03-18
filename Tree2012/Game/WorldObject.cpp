@@ -6,6 +6,8 @@ WorldObject::WorldObject(WorldObjectParams* pParams) :_geometry(), _params(pPara
 {
 	_position = XMFLOAT3(0,0,0);
 	_scale = XMFLOAT3(1,1,1);
+	_boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
+
 	if (pParams)
 	{
 		_position = pParams->position;
@@ -42,4 +44,9 @@ HRESULT WorldObject::Render(ID3D11DeviceContext* /*pImmediateContext*/, RenderDa
 HRESULT WorldObject::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/, InstancedData* /*dataView*/)
 {
 	return E_NOTIMPL;
+}
+
+XMVECTOR WorldObject::GetExtents(Extent extent)
+{
+	return XMLoadFloat3(&_extents[extent]) + XMLoadFloat3(&_position); 
 }

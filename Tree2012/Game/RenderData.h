@@ -1,4 +1,5 @@
 #pragma once
+#include "Materials.h"
 
 class ShadowMap;
 
@@ -22,6 +23,12 @@ struct RenderData
 	XMFLOAT4X4          projection;
 	XMFLOAT4X4			view;
 	XMFLOAT4			eyePos;
+	float				nearClippingPlane;
+	float				farClippingPlane;
+	float				fov;
+	int					screenWidth;
+	int					screenHeight;
+
 
 	DirectionalLight	dirLights[1];
 	float				time;

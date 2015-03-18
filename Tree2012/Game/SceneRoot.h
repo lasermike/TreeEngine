@@ -33,6 +33,8 @@ class SceneRoot
 
 	std::list<WorldObject*>				_children;
 
+	XMFLOAT3	_boundingBox[2];
+
 public:
 	SceneRoot();
 	~SceneRoot();
@@ -50,5 +52,7 @@ public:
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
 
+	XMFLOAT3* GetBoundingBox() { return _boundingBox; }
+	XMVECTOR GetExtents(Extent extent);
 };
 

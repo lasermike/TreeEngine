@@ -10,24 +10,25 @@
 
 void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 {
-	GeometryGenerator::MeshData box;
-	GeometryGenerator::MeshData cylinder;
-
 	GeometryGenerator geoGen;
+
+	GeometryGenerator::MeshData box;
 	geoGen.CreateBox(1.0f, 1.0f, 1.0f, box);
-	geoGen.CreateCylinder(0.5f, 0.4f, 1.0f, 14, 1, cylinder);
 
 	// Cache the vertex offsets to each object in the concatenated vertex buffer.
 	data.boxIndices.VertexOffset = 0;
 	data.boxIndices.VertexCount = (UINT) box.Vertices.size();
 
-	// Cache the index count of each object.
-	data.cylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();
-	data.cylinderIndices.VertexOffset = (UINT) (data.boxIndices.VertexOffset + box.Vertices.size());
-
 	// Cache the starting index for each object in the concatenated index buffer.
 	data.boxIndices.IndexOffset = 0;
 	data.boxIndices.IndexCount = (UINT) box.Indices.size();
+
+	GeometryGenerator::MeshData cylinder;
+	geoGen.CreateCylinder(0.5f, 0.4f, 1.0f, 14, 1, cylinder);
+
+	// Cache the index count of each object.
+	data.cylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();
+	data.cylinderIndices.VertexOffset = (UINT) (data.boxIndices.VertexOffset + box.Vertices.size());
 
 	// Cache the index count of each object.
 	data.cylinderIndices.IndexOffset = data.boxIndices.IndexCount;
@@ -39,8 +40,6 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	// vertices of all the meshes into one vertex buffer.
 
 	data.vertices.resize(totalVertexCount);
-
-	XMFLOAT4 black(0.0f, 0.0f, 0.0f, 1.0f);
 
 	UINT k = 0;
 	for (size_t i = 0; i < box.Vertices.size(); ++i, ++k)
@@ -79,6 +78,9 @@ void GeometryGenerator::CreateBox(float width, float height, float depth, MeshDa
 	float h2 = 0.5f*height;
 	float d2 = 0.5f*depth;
     
+	meshData.BoundingBoxMin = XMFLOAT3(-w2, -h2, -d2);
+	meshData.BoundingBoxMax = XMFLOAT3(w2, h2, d2);
+
 	// Fill in the front face vertex data.
 	v[0] = Vertex(-w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 	v[1] = Vertex(-w2, +h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -117,6 +119,7 @@ void GeometryGenerator::CreateBox(float width, float height, float depth, MeshDa
 
 	meshData.Vertices.assign(&v[0], &v[24]);
  
+
 	//
 	// Create the indices.
 	//
@@ -415,6 +418,9 @@ void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, floa
 {
 	meshData.Vertices.clear();
 	meshData.Indices.clear();
+
+	meshData.BoundingBoxMin = XMFLOAT3(-bottomRadius, -0.5f*height, bottomRadius);
+	meshData.BoundingBoxMax = XMFLOAT3(-topRadius, 0.5f*height, topRadius);
 
 	//
 	// Build Stacks.

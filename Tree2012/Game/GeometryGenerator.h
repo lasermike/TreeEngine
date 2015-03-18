@@ -98,6 +98,8 @@ public:
 	{
 		std::vector<Vertex> Vertices;
 		std::vector<UINT> Indices;
+		XMFLOAT3 BoundingBoxMin;
+		XMFLOAT3 BoundingBoxMax;
 	};
 
 

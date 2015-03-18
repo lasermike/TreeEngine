@@ -9,6 +9,7 @@
 #include "StepTimer.h"
 #include "RenderData.h"
 #include "LSystemModelGenerator.h"
+#include "OrbitCamera.h"
 
 using namespace Microsoft::WRL;
 
@@ -45,6 +46,7 @@ private:
 	HRESULT InitDevice();
 	void CleanupDevice();
 	static float ConvertDipsToPixels(float dips);
+	void UpdateView();
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
@@ -58,6 +60,7 @@ private:
 	DX::StepTimer						_timer;
 	double								_timeStart;
 	double								_timeCurrent;
+    XSF::OrbitCamera*					_camera;
 
 	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
 	D3D_DRIVER_TYPE                     _driverType;

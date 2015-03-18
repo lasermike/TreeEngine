@@ -20,6 +20,15 @@ typedef enum GeneratorType
 	LSystemGeneratorType
 };
 
+typedef enum Extent
+{
+	TOP = 0,
+	LEFT,
+	RIGHT,
+	BOTTOM,
+	NUM_EXTENTS
+};
+
 class WorldObjectParams
 {
 public:
@@ -62,6 +71,9 @@ protected:
 	XMFLOAT3	_position;
 	XMFLOAT3	_scale;
 
+	XMFLOAT3	_boundingBox[2];
+	XMFLOAT3	_extents[4];
+
 	float CalcTime(float time) { return time * _params->_animationSpeed; } 
 public:
 
@@ -86,5 +98,7 @@ public:
 
 	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView);
 	virtual unsigned int GetNumInstances(bool /*numMax*/) { return 0; }
+	XMFLOAT3* GetBoundingBox() { return _boundingBox; }
+	XMVECTOR GetExtents(Extent extent);
 };
 

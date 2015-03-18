@@ -31,6 +31,15 @@ HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediate
 
 HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* pRenderData, InstancedData* dataView)
 {
+	// Clear bounding box
+	_boundingBox[0] = XMFLOAT3(-1,-1,-1);
+	_boundingBox[1] = XMFLOAT3(1,1,1);
+
+	for (int i = 0; i < NUM_EXTENTS; i++)
+	{
+		_extents[i] = XMFLOAT3(0,0,0);
+	}
+
 	_logInstanceData.clear();
 	_twigInstanceData.clear();
 	int currentBranch = 0;
@@ -87,6 +96,12 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	{
 		_twigInstanceData.push_back(data);
 	}
+
+	//Compute bounding box
+	XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMVector3Transform(XMVectorSet(-1.0f,-1.0f,-1.0f, 0), localToWorld),
+												XMLoadFloat3(&_boundingBox[0]))); 
+	XMStoreFloat3(&_boundingBox[1], XMVectorMax(XMVector3Transform(XMVectorSet(1.0f,1.0f,1.0f, 0), localToWorld),
+												XMLoadFloat3(&_boundingBox[1]))); 
 
 	currentBranch++;
 
@@ -164,6 +179,10 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMMATRIX
 
 	*computedTransform = *computedTransform * XMLoadFloat4x4(world);  //TODO
 	*computedNormalTransform = MathHelper::InverseTranspose(XMMatrixTranspose(*computedTransform ));
+
+	// Compute extents.  Keep these in local coordinates if we can.
+	if (XMVectorGetY(vEnd) > _extents[TOP].y)
+		XMStoreFloat3(&_extents[TOP], vEnd);
 
 	return S_OK;
 }
