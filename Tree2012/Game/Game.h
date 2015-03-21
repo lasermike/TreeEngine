@@ -42,15 +42,18 @@ public:
 private:
 
 	void Update(DX::StepTimer const& timer);
+	void Regenerate();
 
 	HRESULT InitDevice();
 	void CleanupDevice();
 	static float ConvertDipsToPixels(float dips);
+
+	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
+	void UpdateCamera(DX::StepTimer const& timer);
 	void UpdateView();
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
-	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                   m_featureLevel;

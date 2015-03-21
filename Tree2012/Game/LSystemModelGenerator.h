@@ -45,6 +45,7 @@ struct LSystemParams
 	float _angle;
 	float _segmentLength;
 	string _constants;
+	float thickness;
 	string _axiom;
 	vector<Rule> _rules;
 

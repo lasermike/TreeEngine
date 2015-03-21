@@ -5,7 +5,7 @@
 
 using namespace DirectX;
 
-const int maxBranches = 2000; //3^6 + 1 
+const int maxBranches = 13000; //3^6 + 1 
 
 
 struct cbBranch

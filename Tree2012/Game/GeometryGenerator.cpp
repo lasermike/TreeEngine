@@ -24,7 +24,8 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	data.boxIndices.IndexCount = (UINT) box.Indices.size();
 
 	GeometryGenerator::MeshData cylinder;
-	geoGen.CreateCylinder(0.5f, 0.4f, 1.0f, 14, 1, cylinder);
+	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 1, cylinder);
+	//geoGen.CreateCylinder(0.5f, 0.4f, 1.0f, 14, 1, cylinder);  // Tapered version
 
 	// Cache the index count of each object.
 	data.cylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();

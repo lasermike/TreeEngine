@@ -32,13 +32,11 @@ TreeModel* FixedTreeModelGenerator::Create()
 	int id = _model->treeData.numBranches++;
 	_model->trunk = &_model->treeData.pBranches[id]; 
 	_model->trunk->id = id;
-	//_model->treeData.pLevels[0].pBranchesInLevel->push_back(id);
-	//_model->treeData.pLevels[0].numBranches++;
 	_model->trunk->parent = -1;
 
 	XMStoreFloat4(&_model->trunk->start, vStart);
 	XMStoreFloat4(&_model->trunk->end, vEnd);
-	_model->trunk->thickness = .3f;
+	_model->trunk->thickness = .25f;
 	_model->trunk->depth = 0;
 
 	GenerateChildrenRecursive(_model->trunk, 1);

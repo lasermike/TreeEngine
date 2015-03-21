@@ -51,7 +51,7 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 	_model->trunk->parent = -1;
 	_model->trunk->start = initialState.pos;
 	XMStoreFloat4(&_model->trunk->end, XMLoadFloat4(&initialState.pos) + XMLoadFloat4(&initialState.dir) * _params._segmentLength);
-	_model->trunk->thickness = 0.05f;
+	_model->trunk->thickness = _params.thickness;
 	_model->trunk->depth = 0;
 	initialState.branch = _model->trunk;
 
@@ -70,19 +70,30 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 		char cmd = *c;
 		switch (cmd)
 		{
+		case 'X':
+			break; // noop
 		case 'A':
 		case 'B':
+		case 'F':
 			XMStoreFloat4(&currentState.pos, XMLoadFloat4(&currentState.pos) + XMLoadFloat4(&currentState.dir) * _params._segmentLength);
 			currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos); 
 			break;
 		case '[':
 			stateStack.push(currentState);
-			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateLeftMat));
 			break;
 		case ']':
 			currentState = stateStack.top();
 			stateStack.pop();
+			break;
+		case '+':
+			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateLeftMat));
+			break;
+		case '-':
 			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateRightMat));
+			break;
+		case 'C':
+			c++;
+			// TODO color
 			break;
 		}
 		previousState = currentState;

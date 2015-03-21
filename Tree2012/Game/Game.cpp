@@ -13,6 +13,7 @@
 #include "directxtex.h"
 #include "StockRenderStates.h"
 #include "OrbitCamera.h"
+#include "GameLoader.h"
 
 using namespace DirectX;
 
@@ -64,6 +65,10 @@ Game::Game()
 	// Init vertex/index buffer
 	_pScene = new SceneRoot();
 
+	GameLoader loader;
+	loader.Load("Basic", _pScene);
+
+	// Init trees and other world objects
 	WorldObjectParameters<LSystemParams>* params1 = new WorldObjectParameters<LSystemParams>();
 
 	params1->position = XMFLOAT3(1.3f, 0, 1.3f);
@@ -72,17 +77,29 @@ Game::Game()
 	params1->depthLOD = INT_MAX;
 	params1->GetGeneratorParameters()._axiom = "A";
 	params1->GetGeneratorParameters()._rules.push_back(Rule("B", "BB"));
-	params1->GetGeneratorParameters()._rules.push_back(Rule("A", "B[A]A"));
+	params1->GetGeneratorParameters()._rules.push_back(Rule("A", "B[+A]-A"));
 	params1->GetGeneratorParameters()._angle = XM_PIDIV4;
 	params1->GetGeneratorParameters()._numIterations = 6;
-	params1->GetGeneratorParameters()._segmentLength = .25f;
+	params1->GetGeneratorParameters()._segmentLength = .08f;
+	params1->GetGeneratorParameters().thickness = .05f;	
 
-	// Init trees and other world objects
 	_trees.push_back(new Tree(params1));
 	_pScene->AddChild((*_trees.rbegin()));
 
-	WorldObjectParams* params2 = new WorldObjectParams();
-	params2->position = XMFLOAT3(1.3f,0,-1.3f);
+	WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>();
+	params2->position = XMFLOAT3(1.3f, 0,-1.3f);
+	params2->generatorType = LSystemGeneratorType;
+	params2->_animationSpeed = 20.0f;
+	params2->depthLOD = INT_MAX;
+	params2->GetGeneratorParameters()._axiom = "X";	
+	params2->GetGeneratorParameters()._constants = "X";	
+	params2->GetGeneratorParameters()._rules.push_back(Rule("X", "C0F-[C2[X]+C3X]+C1F[C3+FX]-X"));
+	params2->GetGeneratorParameters()._rules.push_back(Rule("F", "FF"));
+	params2->GetGeneratorParameters()._angle = 0.436332f;
+	params2->GetGeneratorParameters()._numIterations = 5;
+	params2->GetGeneratorParameters()._segmentLength = .035f;
+	params2->GetGeneratorParameters().thickness = .020f;	
+
 	_trees.push_back(new Tree(params2));
 	_pScene->AddChild((*_trees.rbegin()));
 
@@ -107,11 +124,12 @@ Game::Game()
 	// Camera
 	XMFLOAT3 bounds[] = 
 	{
-		XMFLOAT3(-20,4,-20),
-		XMFLOAT3(20,5,20)
+		XMFLOAT3(-8,1,-8),
+		XMFLOAT3(8,2,8)
 	};
 
 	_camera = new XSF::OrbitCamera();
+	_camera->SetHeading(-2.48f);
 	//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
 	_camera->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
 
@@ -140,7 +158,7 @@ Game::~Game()
 	}
 	SafeDelete(&_bitmapFont);
 	SafeDelete(&_pScene);
-	SafeDelete(&_pPlane);
+	//SafeDelete(&_pPlane);
 }
 
 //--------------------------------------------------------------------------------------
@@ -428,40 +446,45 @@ void Game::CleanupDevice()
 	SafeRelease(&_pd3dDevice);
 }
 
+void Game::Regenerate()
+{
+	if ((unsigned int)_currentSeed + 1 > _seeds.size())
+	{
+		_seeds.push_back((unsigned int)time(NULL));
+	}
+
+	int treeNum = 1;
+	for (auto t = _trees.begin(); t != _trees.end(); t++)
+	{
+		if (treeNum == 1 || treeNum == 2)
+		{
+			WorldObjectParameters<LSystemParams>& wop = (*t)->GetParams<LSystemParams>();
+
+			LSystemModelGenerator generater(wop.GetGeneratorParameters()); // TODO
+			(*t)->Create(&generater);
+		}
+		else
+		{
+			FixedTreeModelGenerator generator(_seeds[_currentSeed] * treeNum);
+			(*t)->Create(&generator);
+		}
+		treeNum++;
+	}
+
+	PrimitiveModelGenerator planeGen(PrimitiveType_Box);
+	_pPlane->Create(&planeGen);
+
+	HRESULT hr = _pScene->InitGraphics(_pd3dDevice, _pImmediateContext);
+	assert(SUCCEEDED(hr));
+		
+}
+
 void Game::Update(DX::StepTimer const& timer)
 {
 	// Rebuild tree if necessary
 	if (_resetTree)
 	{
-		if ((unsigned int)_currentSeed + 1 > _seeds.size())
-		{
-			_seeds.push_back((unsigned int)time(NULL));
-		}
-
-		int treeNum = 1;
-		for (auto t = _trees.begin(); t != _trees.end(); t++)
-		{
-			if (treeNum == 1)
-			{
-				WorldObjectParameters<LSystemParams>& wop = (*t)->GetParams<LSystemParams>();
-
-				LSystemModelGenerator generater(wop.GetGeneratorParameters()); // TODO
-				(*t)->Create(&generater);
-			}
-			else
-			{
-				FixedTreeModelGenerator generator(_seeds[_currentSeed] * treeNum);
-				(*t)->Create(&generator);
-			}
-			treeNum++;
-		}
-
-		PrimitiveModelGenerator planeGen(PrimitiveType_Box);
-		_pPlane->Create(&planeGen);
-
-		HRESULT hr = _pScene->InitGraphics(_pd3dDevice, _pImmediateContext);
-		assert(SUCCEEDED(hr));
-		
+		Regenerate();
 		_resetTree = false;
 	}
 
@@ -489,10 +512,11 @@ void Game::Update(DX::StepTimer const& timer)
 	// Compute per-frame values
 	HR(_pScene->Update(_pImmediateContext, &_renderData));
 
+	UpdateCamera(timer);
+}
 
-	//XMFLOAT3* sceneBBox = _pScene->GetBoundingBox();
-	//XMFLOAT3* cameraBBox = _camera->GetBoundingBox();
-
+void Game::UpdateCamera(DX::StepTimer const& timer)
+{
 	XMVECTOR extent = _pScene->GetExtents(TOP);
 	XMFLOAT3 e;
 	XMStoreFloat3(&e, extent);
@@ -508,42 +532,14 @@ void Game::Update(DX::StepTimer const& timer)
 	{
 		_camera->SetDollyVelocity(.25f);
 	}
+	else if (frustumTopAtExtent > e.y + 1.0f)
+	{
+		_camera->SetDollyVelocity(-.25f);
+	}
 	else 
 	{
 		_camera->SetDollyVelocity(0);
 	}
-
-
-
-	//sceneBBox[0].y = 3.5f;  // Raise lower minimum
-
-	//if (sceneBBox[1].y > vv1.y)
-	//{
-	//	_camera->SetDollyVelocity(.25f);
-	//}
-	//else if (sceneBBox[0].y > vv0.y)
-	//{
-	//	_camera->SetDollyVelocity(-.25f);
-	//}
-	//else 
-	//{
-	//	_camera->SetDollyVelocity(0);
-	//}
-
-	//sceneBBox[0].x = (float) floor(sceneBBox[0].x);
-	//sceneBBox[0].y = (float) floor(sceneBBox[0].y);
-	//sceneBBox[0].z = (float) floor(sceneBBox[0].z);
-	//sceneBBox[1].x = (float) floor(sceneBBox[1].x);
-	//sceneBBox[1].y = (float) floor(sceneBBox[1].y);
-	//sceneBBox[1].z = (float) floor(sceneBBox[1].z);
-
-	////if (XMVector3Less(XMLoadFloat3(&sceneBBox[0]), XMLoadFloat3(&cameraBBox[0])) ||  
-	////	XMVector3Greater(XMLoadFloat3(&sceneBBox[1]), XMLoadFloat3(&cameraBBox[1])))
-	//if (sceneBBox[0].x < cameraBBox[0].x || sceneBBox[0].y < cameraBBox[0].y || sceneBBox[0].z < cameraBBox[0].z ||
-	//    sceneBBox[1].x > cameraBBox[1].x || sceneBBox[1].y > cameraBBox[1].y || sceneBBox[1].z > cameraBBox[1].z)
-	//{
-	//	_camera->FocusOnBoundingBox(sceneBBox, 2);
-	//}
 
 	// Rotate camera around the origin
 	if (_rotate)
@@ -552,12 +548,9 @@ void Game::Update(DX::StepTimer const& timer)
 		//XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
 	}
 
-
-
 	_camera->Update((float) timer.GetElapsedSeconds());
 	XMStoreFloat4(&_renderData.eyePos, _camera->GetEyePosition());
 	UpdateView();
-
 }
 
 //--------------------------------------------------------------------------------------

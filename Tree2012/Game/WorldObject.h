@@ -20,6 +20,12 @@ typedef enum GeneratorType
 	LSystemGeneratorType
 };
 
+typedef enum ObjectType
+{
+	WorldObjectType,
+	TreeType
+};
+
 typedef enum Extent
 {
 	TOP = 0,
@@ -80,6 +86,7 @@ public:
 	WorldObject(WorldObjectParams* pParams);
 	~WorldObject(void);
 
+	virtual ObjectType GetObjectType() { return WorldObjectType; }
 	WorldObjectParams& GetParams() { return *_params; }
 	template <class T> WorldObjectParameters<T>& GetParams() { return *(WorldObjectParameters<T>*)_params.get(); }
 

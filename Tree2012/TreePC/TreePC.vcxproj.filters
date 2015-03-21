@@ -99,7 +99,10 @@
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\OrbitCamera.cpp">
-      <Filter>Game</Filter>
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\GameLoader.cpp">
+      <Filter>Game\Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -191,7 +194,10 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\OrbitCamera.h">
-      <Filter>Game</Filter>
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\GameLoader.h">
+      <Filter>Game\Source</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

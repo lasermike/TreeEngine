@@ -105,6 +105,11 @@ SceneRoot::SceneRoot() : _pShadowVertexShader(nullptr), _pShadowPixelShader(null
 SceneRoot::~SceneRoot()
 {
 	CleanUpDeviceObjects();
+
+	for (auto i = _children.begin(); i != _children.end(); i++)
+	{
+		SafeDelete(&(*i));
+	}
 }
 
 HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext)
@@ -400,6 +405,8 @@ HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 
 XMVECTOR SceneRoot::GetExtents(Extent extent)
 {
+	XSF_ASSERT(extent == TOP);
+
 	auto i = _children.begin() ;
 	XMVECTOR retval = (*i)->GetExtents(extent);
 	i++;
