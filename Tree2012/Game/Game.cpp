@@ -9,7 +9,6 @@
 #include "Primitive.h"
 #include "ShadowMap.h"
 #include <stdio.h>
-#include <time.h>
 #include "directxtex.h"
 #include "StockRenderStates.h"
 #include "OrbitCamera.h"
@@ -43,7 +42,8 @@ Game::Game()
 	_pSwapChain = nullptr;
 	_pSwapChain1 = nullptr;
 	_pRenderTargetView = nullptr;
-	_rotate = false;
+	_rotateSpeed = 0.0f;
+	_dollySpeed = 0.0f;
 	_paused = false;
 	_wireframe = false;
 	_showHelp = false;
@@ -54,84 +54,20 @@ Game::Game()
 	_enableMsaa = false; // TODO: disabled for windows store
 #endif
 	_timeStart = 0;
-	_currentSeed = 0;
 	_resetTree = true;
 	_showShadowBuffer = false;
 	_pCBChangeOnResize = nullptr;
 	_bitmapFont = nullptr;
+	_selection = nullptr;
 
 	XSF::SetContentFileRoot();
 
 	// Init vertex/index buffer
 	_pScene = new SceneRoot();
 
-	GameLoader loader;
-	loader.Load("Basic", _pScene);
-
-	// Init trees and other world objects
-	WorldObjectParameters<LSystemParams>* params1 = new WorldObjectParameters<LSystemParams>();
-
-	params1->position = XMFLOAT3(1.3f, 0, 1.3f);
-	params1->generatorType = LSystemGeneratorType;
-	params1->_animationSpeed = 10.0f;
-	params1->depthLOD = INT_MAX;
-	params1->GetGeneratorParameters()._axiom = "A";
-	params1->GetGeneratorParameters()._rules.push_back(Rule("B", "BB"));
-	params1->GetGeneratorParameters()._rules.push_back(Rule("A", "B[+A]-A"));
-	params1->GetGeneratorParameters()._angle = XM_PIDIV4;
-	params1->GetGeneratorParameters()._numIterations = 6;
-	params1->GetGeneratorParameters()._segmentLength = .08f;
-	params1->GetGeneratorParameters().thickness = .05f;	
-
-	_trees.push_back(new Tree(params1));
-	_pScene->AddChild((*_trees.rbegin()));
-
-	WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>();
-	params2->position = XMFLOAT3(1.3f, 0,-1.3f);
-	params2->generatorType = LSystemGeneratorType;
-	params2->_animationSpeed = 20.0f;
-	params2->depthLOD = INT_MAX;
-	params2->GetGeneratorParameters()._axiom = "X";	
-	params2->GetGeneratorParameters()._constants = "X";	
-	params2->GetGeneratorParameters()._rules.push_back(Rule("X", "C0F-[C2[X]+C3X]+C1F[C3+FX]-X"));
-	params2->GetGeneratorParameters()._rules.push_back(Rule("F", "FF"));
-	params2->GetGeneratorParameters()._angle = 0.436332f;
-	params2->GetGeneratorParameters()._numIterations = 5;
-	params2->GetGeneratorParameters()._segmentLength = .035f;
-	params2->GetGeneratorParameters().thickness = .020f;	
-
-	_trees.push_back(new Tree(params2));
-	_pScene->AddChild((*_trees.rbegin()));
-
-	WorldObjectParams* params3 = new WorldObjectParams();
-	params3->position = XMFLOAT3(-1.3f,0,1.3f);
-	_trees.push_back(new Tree(params3));
-	_pScene->AddChild((*_trees.rbegin()));
-
-	WorldObjectParams* params4 = new WorldObjectParams();
-	params4->position = XMFLOAT3(0,0,0);
-	params4->scale = XMFLOAT3(30, .01f, 30);
-	_pPlane = new Primitive(params4);
-	_pScene->AddChild(_pPlane);
-
-	// Init lights
-	_renderData.dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	_renderData.dirLights[0].Diffuse  = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
-	_renderData.dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
-	_renderData.dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-	_renderData.time = 0;
-
-	// Camera
-	XMFLOAT3 bounds[] = 
-	{
-		XMFLOAT3(-8,1,-8),
-		XMFLOAT3(8,2,8)
-	};
-
 	_camera = new XSF::OrbitCamera();
-	_camera->SetHeading(-2.48f);
-	//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
-	_camera->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
+
+	_loader.Load("Basic", _pScene, &_renderData, _camera);
 
 	// Initialize the view matrix
 	UpdateView();
@@ -151,14 +87,8 @@ void Game::UpdateView()
 
 Game::~Game()
 {
-	for (auto t = _trees.begin(); t != _trees.end(); t++)
-	{
-		if (*t)
-			delete *t;
-	}
 	SafeDelete(&_bitmapFont);
 	SafeDelete(&_pScene);
-	//SafeDelete(&_pPlane);
 }
 
 //--------------------------------------------------------------------------------------
@@ -448,31 +378,7 @@ void Game::CleanupDevice()
 
 void Game::Regenerate()
 {
-	if ((unsigned int)_currentSeed + 1 > _seeds.size())
-	{
-		_seeds.push_back((unsigned int)time(NULL));
-	}
-
-	int treeNum = 1;
-	for (auto t = _trees.begin(); t != _trees.end(); t++)
-	{
-		if (treeNum == 1 || treeNum == 2)
-		{
-			WorldObjectParameters<LSystemParams>& wop = (*t)->GetParams<LSystemParams>();
-
-			LSystemModelGenerator generater(wop.GetGeneratorParameters()); // TODO
-			(*t)->Create(&generater);
-		}
-		else
-		{
-			FixedTreeModelGenerator generator(_seeds[_currentSeed] * treeNum);
-			(*t)->Create(&generator);
-		}
-		treeNum++;
-	}
-
-	PrimitiveModelGenerator planeGen(PrimitiveType_Box);
-	_pPlane->Create(&planeGen);
+	_loader.Regenerate(_pScene);
 
 	HRESULT hr = _pScene->InitGraphics(_pd3dDevice, _pImmediateContext);
 	assert(SUCCEEDED(hr));
@@ -515,37 +421,110 @@ void Game::Update(DX::StepTimer const& timer)
 	UpdateCamera(timer);
 }
 
+void Game::Select(int index)
+{
+	WorldObject* pObj = *_pScene->Children().begin();
+	int i = 0;
+	for (auto child = _pScene->Children().begin(); i < index && child != _pScene->Children().end(); child++)
+	{
+		if ((*child)->GetObjectType() == TreeType)
+		{
+			pObj = *child;
+			i++;
+		}
+	}
+
+	Select(pObj);
+}
+
+void Game::Select(WorldObject* pSelected)
+{
+	_selection = pSelected;
+
+	_camera->SetFocusPositionAttenuation(60);
+
+	//XMVECTOR extent;
+	//if (_selection == nullptr)
+	//{
+	//	extent = _pScene->GetExtents(TOP);
+	//}
+	//else
+	//{
+	//	extent = _selection->GetExtents(TOP);
+	//}
+
+	//extent = XMVectorSetY(extent, XMVectorGetY(extent) / 2.0f); 
+	//_camera->SetFocusPosition(extent);
+}
+
 void Game::UpdateCamera(DX::StepTimer const& timer)
 {
-	XMVECTOR extent = _pScene->GetExtents(TOP);
+	// Find top point of scene or selected object
+	XMVECTOR extent;
+	if (_selection == nullptr)
+	{
+		extent = _pScene->GetExtents(TOP);
+	}
+	else
+	{
+		extent = _selection->GetExtents(TOP);
+	}
+
 	XMFLOAT3 e;
 	XMStoreFloat3(&e, extent);
 
-	XMVECTOR v0, v1;
-	_camera->RayCast(0,0, &_renderData, v0, v1);
-	XMFLOAT3 vv0, vv1;
-	XMStoreFloat3(&vv0, v0);
-	XMStoreFloat3(&vv1, v1);
-	float topDelta = (vv1.y - vv0.y) / (_renderData.farClippingPlane - _renderData.nearClippingPlane);
-	float frustumTopAtExtent = vv0.y + topDelta * sqrt((e.x - vv0.x) * (e.x - vv0.x) + (e.z - vv0.z) * (e.z - vv0.z)); 
-	if (frustumTopAtExtent < e.y)
+	if (_dollySpeed != 0.0f)
 	{
-		_camera->SetDollyVelocity(.25f);
+		_camera->AddDollyVelocity(_dollySpeed);
 	}
-	else if (frustumTopAtExtent > e.y + 1.0f)
+	else
 	{
-		_camera->SetDollyVelocity(-.25f);
-	}
-	else 
-	{
-		_camera->SetDollyVelocity(0);
+		// Determine if extent point is inside or outside the view frustrum
+		XMVECTOR v0, v1;
+		_camera->RayCast(_renderData.screenWidth / 2,0, &_renderData, v0, v1);
+		XMFLOAT3 vv0, vv1;
+		XMStoreFloat3(&vv0, v0);
+		XMStoreFloat3(&vv1, v1);
+		float topDelta = (vv1.y - vv0.y) / (_renderData.farClippingPlane - _renderData.nearClippingPlane);
+		float frustumTopAtExtent = vv0.y + topDelta * sqrt((e.x - vv0.x) * (e.x - vv0.x) + (e.z - vv0.z) * (e.z - vv0.z)); 
+
+		// Dolly nearest or further
+		if (frustumTopAtExtent < e.y)
+		{
+			_camera->SetDollyVelocity(0.5f);
+		}
+		else if (frustumTopAtExtent > e.y + 0.5f)
+		{
+			_camera->SetDollyVelocity(-0.5f);
+		}
+		else 
+		{
+			_camera->SetDollyVelocity(0);
+		}
 	}
 
 	// Rotate camera around the origin
-	if (_rotate)
+	if (_rotateSpeed != 0.0f)
 	{
-		_camera->AddHeadingVelocity(.25f);
-		//XMStoreFloat4x4(&_renderData.world, XMMatrixRotationY( _renderData.time ));  
+		_camera->AddHeadingVelocity(_rotateSpeed);
+	}
+	
+
+	if (_selection)
+	{
+		XMVECTOR focusPoint = _camera->GetFocusPosition();
+		XMVECTOR desiredFocus = XMVectorSetY(extent, XMVectorGetY(extent) / 2.0f); 
+		XMVECTOR difference = desiredFocus - focusPoint;
+		float magnitude = XMVectorGetX(XMVector3Length(difference));
+		if (magnitude > 1.0f)
+		{
+			_camera->SetFocusPositionVelocity(difference / magnitude);
+		}
+		else
+		{
+			_camera->SetFocusPositionAttenuation(250);
+		}
+
 	}
 
 	_camera->Update((float) timer.GetElapsedSeconds());
@@ -640,16 +619,15 @@ void Game::OnKeydown(UINT key)  // WM_KEYDOWN
 {
 	switch (key)
 	{
-	case VK_SPACE:
-	case VK_RIGHT:
+	case ']':
 		_resetTree = true;
-		_currentSeed++;
+		_loader._currentSeed++;
 		break;
-	case VK_LEFT:
-		if (_currentSeed > 0)
+	case '[':
+		if (_loader._currentSeed > 0)
 		{
 			_resetTree = true;
-			_currentSeed--;
+			_loader._currentSeed--;
 		}
 		break;
 	case '0':
@@ -658,8 +636,21 @@ void Game::OnKeydown(UINT key)  // WM_KEYDOWN
 	case 'Z':
 		_showShadowBuffer = !_showShadowBuffer;
 		break;
-	case 'R':
-		_rotate = !_rotate;
+	case VK_LEFT:
+		_rotateSpeed = _rotateSpeed == 0.0f ? -1.0f : 0.0f;
+		break;
+	case VK_RIGHT:
+		_rotateSpeed = _rotateSpeed == 0.0f ? 1.0f : 0.0f;
+		break;
+	case VK_UP:
+		_dollySpeed = _dollySpeed == 0.0f ? -0.5f : 0.0f;
+		break;
+	case VK_DOWN:
+		_dollySpeed = _dollySpeed == 0.0f ? 0.5f : 0.0f;
+		break;
+	case VK_SPACE:
+		_rotateSpeed = 0.0f;
+		_dollySpeed = 0.0f;
 		break;
 	case 'P':
 		_paused = !_paused;
@@ -670,7 +661,14 @@ void Game::OnKeydown(UINT key)  // WM_KEYDOWN
 	case 'H':
 		_showHelp = !_showHelp;
 		break;
-
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+		Select(key - '0');
+		break;
 	}
 }
 

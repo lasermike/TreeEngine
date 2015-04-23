@@ -10,6 +10,7 @@
 #include "RenderData.h"
 #include "LSystemModelGenerator.h"
 #include "OrbitCamera.h"
+#include "GameLoader.h"
 
 using namespace Microsoft::WRL;
 
@@ -51,6 +52,8 @@ private:
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 	void UpdateCamera(DX::StepTimer const& timer);
 	void UpdateView();
+	void Select(WorldObject* pSelected);
+	void Select(int index);
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
@@ -83,21 +86,21 @@ private:
 	D3D11_VIEWPORT						_viewPort;
 	bool								_enableMsaa;
 
-	Primitive*							_pPlane;
+	GameLoader							_loader;
 	SceneRoot*							_pScene;
-	vector<Tree*>						_trees;
 
-	std::vector<unsigned int>			_seeds;
-	int									_currentSeed;
 	bool								_resetTree;
 	bool								_showShadowBuffer;
-	bool								_rotate;
+	float								_rotateSpeed;
+	float								_dollySpeed;
 	bool								_paused;
 	bool								_wireframe;
 	bool								_showHelp;
 	ID3D11Buffer*                       _pCBChangeOnResize;
 
 	XSF::BitmapFont*					_bitmapFont;
+
+	WorldObject*						_selection;
 };
 
 

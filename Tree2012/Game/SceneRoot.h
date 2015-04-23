@@ -31,7 +31,7 @@ class SceneRoot
 	GeometryGenerator					_geometryGenerator;
 	GeometryBufferData					_geometryData;
 
-	std::list<WorldObject*>				_children;
+	list<WorldObject*>				_children;
 
 	XMFLOAT3	_boundingBox[2];
 
@@ -48,6 +48,9 @@ public:
 	{
 		_children.push_back(obj);
 	}
+
+	const list<WorldObject*>& Children() { return _children; }
+
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);

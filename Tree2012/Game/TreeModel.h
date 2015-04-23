@@ -6,7 +6,7 @@
 using namespace DirectX;
 
 const int maxBranches = 13000; //3^6 + 1 
-
+const int maxChildBranches = 8;
 
 struct cbBranch
 {
@@ -28,8 +28,9 @@ struct Branch
 	float	thickness;
 	XMFLOAT4 end;
 
-	XMINT4 children;
-	int numChildren;
+	vector<int> children;
+	//int children[6];
+	//int numChildren;
 
 	Branch()
 	{
@@ -38,36 +39,49 @@ struct Branch
 
 	int Child(int i) const 
 	{ 
-		switch (i) {
-		case 0:
-			return children.x;
-		case 1:
-			return children.y;
-		case 2:
-			return children.z;
-		case 3:
-			return children.w;
-		}
-		throw;
+		//ASSERT(i < maxChildBranches);
+		return children[i];
+
+		//switch (i) {
+		//case 0:
+		//	return children.x;
+		//case 1:
+		//	return children.y;
+		//case 2:
+		//	return children.z;
+		//case 3:
+		//	return children.w;
+		//}
+		//throw;
 	}
+	void AddChild(int c) 
+	{
+		children.push_back(c);
+	}
+
 	void SetChild(int i, int c) 
 	{ 
-		switch (i) {
-		case 0:
-			children.x = c;
-			break;
-		case 1:
-			children.y = c;
-			break;
-		case 2:
-			children.z = c;
-			break;
-		case 3:
-			children.w = c;
-			break;
-		default:
-			throw;
-		}
+		ASSERT(i < maxChildBranches);
+		ASSERT(i == children.size());
+		children.at(i) = c;
+		//children[i] = c;
+
+		//switch (i) {
+		//case 0:
+		//	children.x = c;
+		//	break;
+		//case 1:
+		//	children.y = c;
+		//	break;
+		//case 2:
+		//	children.z = c;
+		//	break;
+		//case 3:
+		//	children.w = c;
+		//	break;
+		//default:
+		//	throw;
+		//}
 	}
 };
 
@@ -97,7 +111,7 @@ public:
 	TreeModel(void);
 	~TreeModel(void);
 
-	static const int maxChildBranches = 4;
+	//static const int maxChildBranches = 6;
 	static const int maxLevels = 6;
 	Branch* trunk;
 

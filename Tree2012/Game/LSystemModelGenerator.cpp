@@ -57,12 +57,24 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
 	BuildState previousState = initialState, currentState;
 
-	XMFLOAT4 axis(0,0,1,1);
-	XMMATRIX rotateLeftMat = XMMatrixRotationAxis(XMLoadFloat4(&axis), _params._angle);
-	XMMATRIX rotateRightMat = XMMatrixRotationAxis(XMLoadFloat4(&axis), -_params._angle);
+	XMFLOAT4 zAxis(0,0,1,1);
+	XMMATRIX rotateZPosMat = XMMatrixRotationAxis(XMLoadFloat4(&zAxis), _params._angle);
+	XMMATRIX rotateZNegMat = XMMatrixRotationAxis(XMLoadFloat4(&zAxis), -_params._angle);
+
+	XMFLOAT4 xAxis(1,0,0,1);
+	XMMATRIX rotateXPosMat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), _params._angle);
+	XMMATRIX rotateXNegMat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), _params._angle);
+	XMMATRIX rotate180Mat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), XM_PI);
+
+	XMFLOAT4 yAxis(0,1,0,1);
+	XMMATRIX rotateYPosMat = XMMatrixRotationAxis(XMLoadFloat4(&yAxis), _params._angle);
+	XMMATRIX rotateYNegMat = XMMatrixRotationAxis(XMLoadFloat4(&yAxis), _params._angle);
+
 
 	stack<BuildState> stateStack;
 
+	int pos = 0;
+	string done;
 	for (auto c = axiom.begin(); c != axiom.end(); c++)
 	{
 		currentState = previousState;
@@ -70,8 +82,27 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 		char cmd = *c;
 		switch (cmd)
 		{
-		case 'X':
-			break; // noop
+		case '&':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateYPosMat)));
+			break;
+		case '^':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateYNegMat)));
+			break;
+		case '<':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateXPosMat)));
+			break;
+		case '>':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateXNegMat)));
+			break;
+		case '+':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateZPosMat)));
+			break;
+		case '-':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateZNegMat)));
+			break;
+		case '|':
+			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotate180Mat));
+			break; 
 		case 'A':
 		case 'B':
 		case 'F':
@@ -85,18 +116,17 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 			currentState = stateStack.top();
 			stateStack.pop();
 			break;
-		case '+':
-			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateLeftMat));
-			break;
-		case '-':
-			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateRightMat));
-			break;
 		case 'C':
 			c++;
 			// TODO color
 			break;
+		case 'X':
+		case ' ':
+			break; // noop
 		}
 		previousState = currentState;
+		pos++;
+		done.push_back(cmd);
 	}
 
 }
@@ -107,13 +137,17 @@ Branch* LSystemModelGenerator::AddBranch(Branch* parent, XMFLOAT4& start, XMFLOA
 	Branch* child = &_model->treeData.pBranches[id];
 
 	child->id = id;
-	parent->SetChild(parent->numChildren, child->id);
-	parent->numChildren++;
+	parent->AddChild(child->id);
+	///parent->numChildren++;
 	child->parent = parent->id;
 	child->start = start;
 	child->end = end;
+	//child->numChildren = 0;
 	child->thickness = parent->thickness;
 	child->depth = parent->depth + 1;
+
+	if (child->depth > _model->treeData.numLevels)
+		_model->treeData.numLevels = child->depth;
 
 	return child;
 }

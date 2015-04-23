@@ -48,5 +48,5 @@ HRESULT WorldObject::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/
 
 XMVECTOR WorldObject::GetExtents(Extent extent)
 {
-	return XMLoadFloat3(&_extents[extent]) + XMLoadFloat3(&_position); 
+	return XMLoadFloat3(&_extents[extent]); // + XMLoadFloat3(&_position); 
 }

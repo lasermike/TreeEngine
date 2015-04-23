@@ -62,8 +62,8 @@ void FixedTreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, in
 		int id = _model->treeData.numBranches++;
 		Branch* child = &_model->treeData.pBranches[id];
 		child->id = id;
-		parentBranch->numChildren++;
-		parentBranch->SetChild(i, child->id);
+		//parentBranch->numChildren++;
+		parentBranch->AddChild(child->id);
 		assert(&_model->treeData.pBranches[child->id] == child);  // Ensure our look up is correct 
 //		_model->treeData.pLevels[depth].numBranches++;
 //		_model->treeData.pLevels[depth].pBranchesInLevel->push_back(id);

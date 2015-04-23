@@ -19,6 +19,8 @@ enum RenderPass
 struct RenderData
 {
 	RenderPass			pass;
+	float				time;
+
 	XMFLOAT4X4			world;
 	XMFLOAT4X4          projection;
 	XMFLOAT4X4			view;
@@ -29,13 +31,11 @@ struct RenderData
 	int					screenWidth;
 	int					screenHeight;
 
-
 	DirectionalLight	dirLights[1];
-	float				time;
 	BoundingSphere		mSceneBounds;
 
-	static const int SMapWidth = 2048;
-	static const int SMapHeight = 2048;
+	static const int	SMapWidth = 2048;
+	static const int	SMapHeight = 2048;
 	ShadowMap*			pShadowMap;
 	XMFLOAT4X4			lightView;
 	XMFLOAT4X4			lightProj;

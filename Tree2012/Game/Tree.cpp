@@ -19,6 +19,10 @@ Tree::~Tree(void)
 void Tree::Create(TreeModelGenerator* generator)
 {
 	_treeModel = generator->Create();
+	if (_params->_animationSpeed == 0.0f)
+	{
+		_params->_animationSpeed = _treeModel->treeData.numLevels / 10.0f; 
+	}
 }
 
 HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
@@ -44,7 +48,7 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, Rende
 	_twigInstanceData.clear();
 	int currentBranch = 0;
 
-	XMVECTOR startPosition = XMLoadFloat3(&_position) + XMVectorSet(0, .5, 0, 0);
+	XMVECTOR startPosition = XMLoadFloat3(&_position); // + XMVectorSet(0, .5, 0, 0);
 
 	ComputeBranchInstanceData(pRenderData, currentBranch, _treeModel->trunk, startPosition);
 
@@ -107,7 +111,7 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 
 	// Compute child branches
 	const int maxChildren = 4;
-	for (int c = 0; c < maxChildren; c++)
+	for (int c = 0; c < branch->children.size(); c++)
 	{
 		if (branch->Child(c) != 0)
 		{

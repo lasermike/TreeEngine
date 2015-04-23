@@ -36,6 +36,9 @@ namespace XboxSampleFramework
         void SetFocusPosition( _In_ FXMVECTOR focusPos ) { m_FocusPosition = focusPos; }
         XMVECTOR GetFocusPosition() const { return m_FocusPosition; }
 
+        void SetFocusPositionVelocity( _In_ FXMVECTOR focusPosVel ) { m_FocusPositionVelocity = focusPosVel; }
+        void SetFocusPositionAttenuation( _In_ float focusPosVelAtt ) { m_FocusPositionVelocityAttenuation = focusPosVelAtt; }
+
         // Sets the focus position to the center of a bounding box.
         // The box is determined of the min/max of the supplied points.
         // The distance from the center is determined by the size of the
@@ -90,7 +93,7 @@ namespace XboxSampleFramework
         XMVECTOR GetEyePosition() const { return m_EyePosition; }
 		XMFLOAT3* GetBoundingBox() { return m_boundingBox; }
 
-	void RayCast(int x, int y, RenderData* pData, XMVECTOR &p1, XMVECTOR &p2);
+		void RayCast(int x, int y, RenderData* pData, XMVECTOR &p1, XMVECTOR &p2);
 
 	private:
 
@@ -99,6 +102,8 @@ namespace XboxSampleFramework
 		XMMATRIX m_InverseViewMatrix;
 		XMVECTOR m_FocusPosition;
         XMVECTOR m_EyePosition;
+		XMVECTOR m_FocusPositionVelocity;
+		float m_FocusPositionVelocityAttenuation;
         float m_Dolly;
 		float m_DollyVelocity;
 		float m_DollyVelocityAttenuation;

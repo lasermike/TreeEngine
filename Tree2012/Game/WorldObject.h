@@ -38,11 +38,12 @@ typedef enum Extent
 class WorldObjectParams
 {
 public:
-	WorldObjectParams() : position(0,0,0), 
-						  scale(1,1,1), 
-						  depthLOD(4),
-						  generatorType(NullGeneratorType), 
-						  _animationSpeed(1.0f) { }
+	WorldObjectParams(GeneratorType genType) :
+		position(0,0,0), 
+		scale(1,1,1), 
+		depthLOD(4),
+		generatorType(genType), 
+		_animationSpeed(1.0f) { }
 	virtual ~WorldObjectParams() { }
 
 	XMFLOAT3 position;
@@ -59,6 +60,8 @@ private:
     T generatorParameters;
 
 public:
+	WorldObjectParameters(GeneratorType genType) : WorldObjectParams(genType) { }
+
 	T& GetGeneratorParameters() 
 	{
 		return generatorParameters;

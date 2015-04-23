@@ -32,6 +32,7 @@ OrbitCamera::OrbitCamera(void)
 {
 	m_EyePosition = XMVectorZero();
 	m_FocusPosition = XMVectorZero();
+	m_FocusPositionVelocity = XMVectorZero();
 	m_Transform = XMMatrixIdentity();
 	m_ViewMatrix = XMMatrixIdentity();
 	m_boundingBox[0] = XMFLOAT3(0,0,0);
@@ -103,6 +104,10 @@ const XMMATRIX& OrbitCamera::Update( _In_ float delta )
         XMVectorSet( 0, 0, m_Dolly, 1 ),
         MRotation );
 
+	m_FocusPosition += m_FocusPositionVelocity * delta;
+	m_FocusPositionVelocity *= XMMax(0.0f, 1 - (delta * m_PitchVelocityAttenuation));
+	 
+
     m_EyePosition = XMVectorAdd( m_FocusPosition, position );
 
     // If the eye position == focus position, set a zero matrix
@@ -121,6 +126,7 @@ const XMMATRIX& OrbitCamera::Update( _In_ float delta )
     return m_ViewMatrix;
 }
 
+// Find the points where ray intersects camera, given screen point near clipping plane (p1) and far clipping plane (p2)
 void OrbitCamera::RayCast(int x, int y, RenderData* pData, XMVECTOR &p1, XMVECTOR &p2)
 {
 //#define	NEAR			10.0f
