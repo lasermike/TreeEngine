@@ -11,7 +11,7 @@ if not exist %2 mkdir %2
 if not exist "%~2Media" mkdir "%~2Media"
 if not exist "%~2Media\Shaders" mkdir "%~2Media\Shaders"
 
-SET cmdline=%~1 /Zi /Zpc
+SET cmdline=%~1 /Zi /Zpr
 
 if "a%~6%" == "aDebug" (
    echo Compiling shaders with optimization disabled...

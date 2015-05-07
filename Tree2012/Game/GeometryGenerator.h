@@ -21,7 +21,8 @@
 enum PrimitiveType
 {
 	PrimitiveType_Box = 0,
-	PrimitiveType_Cylinder
+	PrimitiveType_Cylinder,
+	PrimitiveType_CylinderLD
 };
 
 struct SimpleVertex
@@ -44,6 +45,7 @@ struct GeometryBufferData
 
 	BufferIndices boxIndices;
 	BufferIndices cylinderIndices;
+	BufferIndices cylinderLDIndices;
 
 	std::vector<SimpleVertex> vertices;
 	std::vector<UINT> indices;
@@ -52,6 +54,7 @@ struct GeometryBufferData
 	{
 		ZeroMemory(&boxIndices, sizeof(BufferIndices));
 		ZeroMemory(&cylinderIndices, sizeof(BufferIndices));
+		ZeroMemory(&cylinderLDIndices, sizeof(BufferIndices));
 	}
 
 	const BufferIndices* const GetBufferIndices(PrimitiveType primType)
@@ -61,6 +64,9 @@ struct GeometryBufferData
 		{
 		case PrimitiveType_Cylinder:
 			pBufferIndices = &this->cylinderIndices;
+			break;
+		case PrimitiveType_CylinderLD:
+			pBufferIndices = &this->cylinderLDIndices;
 			break;
 		case PrimitiveType_Box:
 		default:

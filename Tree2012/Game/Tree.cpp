@@ -265,7 +265,7 @@ HRESULT Tree::RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData
 
 	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pCylinderIndices, startInstance, (int) _logInstanceData.size()));
 
-	const GeometryBufferData::BufferIndices* pBoxIndices = pGeometryData->GetBufferIndices(PrimitiveType_Box);
-	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pBoxIndices, startInstance + (int) _logInstanceData.size(), (int)  _twigInstanceData.size()));
+	const GeometryBufferData::BufferIndices* pLDIndices = pGeometryData->GetBufferIndices(PrimitiveType_CylinderLD);
+	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pLDIndices, startInstance + (int) _logInstanceData.size(), (int)  _twigInstanceData.size()));
 	return S_OK;
 }

@@ -57,14 +57,14 @@ struct PS_INPUT
 	float3 NormalW : NORMAL;
 	float4 ShadowPosH : TEXCOORD1;
 	float4 viewDirTang : NORMAL1;
-	float4 lightDirTang : NORMAL2;
+	float3 lightDirTang : NORMAL2;
 	nointerpolation float4x4 World : WORLD;
 };
 
 //---------------------------------------------------------------------------------------
 // Transforms a normal map sample to world space.
 //---------------------------------------------------------------------------------------
-float4 WorldToTangentSpace(float4 vec, float3 unitNormalL, float3 tangentL, float4x4 world)
+float3x3 WorldToTangentSpace(float3 unitNormalL, float3 tangentL, float3x3 world)
 {
 	// Uncompress each component from [0,1] to [-1,1].
 	//float3 normalT = 2.0f*normalMapSample - 1.0f;
@@ -74,15 +74,10 @@ float4 WorldToTangentSpace(float4 vec, float3 unitNormalL, float3 tangentL, floa
 	float3 T = normalize(tangentL - dot(tangentL, N)*N);
 	float3 B = cross(N, T);
 
-	float3x3 TBN = float3x3(T, B, N);
+	float3x3 TBN = transpose(float3x3(T, B, N));
 
-	vec =  float4(mul(vec.xyz , TBN), 1);
-	vec = mul(vec, world);
-
-	return vec;
+	return TBN;
 }
-
-
 
 //--------------------------------------------------------------------------------------
 // Vertex Shader
@@ -90,30 +85,20 @@ float4 WorldToTangentSpace(float4 vec, float3 unitNormalL, float3 tangentL, floa
 PS_INPUT VS(VS_INPUT input)
 {
 	PS_INPUT output = (PS_INPUT)0;
-	output.PosW = mul(float4(input.Pos, 1.0f), transpose(input.World)).xyz;
-	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal);;
+	output.PosW = mul(float4(input.Pos, 1.0f), input.World).xyz;
+	output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal);
 
-	output.Pos = mul(float4(output.PosW, 1.0f), View);
-	output.Pos = mul(output.Pos, Projection);
+	output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
+	output.Pos = mul(output.Pos, transpose(Projection));
 	output.Tex = input.Tex;
+	output.World = input.World;
 
-	float4 vPosTS = WorldToTangentSpace(float4(input.Pos, 1), input.NormalL, input.TangentL, input.World);
-	float4 eyePosTS = WorldToTangentSpace(float4(eyePos, 1), input.NormalL, input.TangentL, input.World);
-	float4 lightPosTS = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, input.World);
-	output.viewDirTang = normalize(eyePosTS - vPosTS);
-	output.lightDirTang = normalize(lightPosTS - eyePosTS);
-	//float4 eyePosTS4 = output.viewDirTang = WorldToTangentSpace(float4(eyePosTS), 1), input.NormalL, input.TangentL, transpose(input.World) );
-	//output.viewDirTang = WorldToTangentSpace(float4(normalize(input.Pos), 1), input.NormalL, input.TangentL, transpose(input.World) );
-	//output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
-
-	//output.viewDirTang = WorldToTangentSpace(float4(normalize(eyePos - input.Pos.xyz), 1), input.NormalL, input.TangentL, transpose(input.World) );
-	//output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
-	
+	float3x3 TBN =	WorldToTangentSpace(input.NormalL, input.TangentL, (float3x3) input.World);
+	float3 lightVec = mul(TBN, light.Direction);
+	output.lightDirTang = normalize(lightVec);
 
 	// Generate projective tex-coords to project shadow map onto scene.
-	output.ShadowPosH = mul(float4(output.PosW, 1.0), transpose(shadowMatrix));
-
-	output.World = input.World;
+	output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
 	 
 	return output;
 }
@@ -134,7 +119,6 @@ float4 PS(PS_INPUT pin) : SV_Target
 
 	// Normalize.
 	toEye /= distToEye;
-
 
 	//toEye = pin.viewDirTang.xyz;
 	DirectionalLight light2 = light;
@@ -193,9 +177,9 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 {
 	ShadowMapVertexOut output;
 
-	float4 pos = mul(float4(input.Pos, 1.0f), transpose( input.World));
-	pos = mul(pos, View);
-	output.PosH = mul(pos, Projection);
+	float4 pos = mul(float4(input.Pos, 1.0f), input.World);
+	pos = mul(pos, transpose(View));
+	output.PosH = mul(pos, transpose(Projection));
 	output.Tex = input.Tex;
 
 
@@ -299,3 +283,17 @@ matrix MatrixTransformation
     return M;
 }
 */
+
+	//float4 vPosTS = WorldToTangentSpace(float4(input.Pos, 1), input.NormalL, input.TangentL, input.World);
+	//float4 eyePosTS = WorldToTangentSpace(float4(eyePos, 1), input.NormalL, input.TangentL, input.World);
+	//float4 lightPosTS = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, input.World);
+	//output.viewDirTang = normalize(eyePosTS - vPosTS);
+	//output.lightDirTang = normalize(lightPosTS - eyePosTS);
+	//
+	//float4 eyePosTS4 = output.viewDirTang = WorldToTangentSpace(float4(eyePosTS), 1), input.NormalL, input.TangentL, transpose(input.World) );
+	//output.viewDirTang = WorldToTangentSpace(float4(normalize(input.Pos), 1), input.NormalL, input.TangentL, transpose(input.World) );
+	//output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
+
+	//output.viewDirTang = WorldToTangentSpace(float4(normalize(eyePos - input.Pos.xyz), 1), input.NormalL, input.TangentL, transpose(input.World) );
+	//output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
+	

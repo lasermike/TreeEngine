@@ -26,7 +26,7 @@ void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData
 	WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params2->position = XMFLOAT3(1.3f, .5f, -1.3f);
 	params2->_animationSpeed = 0.0f;
-	params2->depthLOD = INT_MAX;
+	params2->depthLOD = 3;
 	params2->GetGeneratorParameters()._axiom = "F";	
 	params2->GetGeneratorParameters()._constants = "";	
 	params2->GetGeneratorParameters()._rules.push_back(Rule("F", "F [- & < F][ < + + & F ] | | F [ - - & > F ][+ & F ]"));
@@ -39,7 +39,7 @@ void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData
 	WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params5->position = XMFLOAT3(-1.3f, .5f,-1.3f);
 	params5->_animationSpeed = 0.0f;
-	params5->depthLOD = INT_MAX;
+	params5->depthLOD = 3;
 	params5->GetGeneratorParameters()._axiom = "F";	
 	params5->GetGeneratorParameters()._constants = "";	
 	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "F [ & + F] F [ - > F][- > F][& F]"));

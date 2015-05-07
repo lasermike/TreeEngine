@@ -12,6 +12,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 {
 	GeometryGenerator geoGen;
 
+	//Box
 	GeometryGenerator::MeshData box;
 	geoGen.CreateBox(1.0f, 1.0f, 1.0f, box);
 
@@ -23,9 +24,9 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	data.boxIndices.IndexOffset = 0;
 	data.boxIndices.IndexCount = (UINT) box.Indices.size();
 
+	// Cylinder
 	GeometryGenerator::MeshData cylinder;
 	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 1, cylinder);
-	//geoGen.CreateCylinder(0.5f, 0.4f, 1.0f, 14, 1, cylinder);  // Tapered version
 
 	// Cache the index count of each object.
 	data.cylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();
@@ -35,7 +36,19 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	data.cylinderIndices.IndexOffset = data.boxIndices.IndexCount;
 	data.cylinderIndices.IndexCount = (UINT) cylinder.Indices.size();
 
-	UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size());
+	// Cylinder LD
+	GeometryGenerator::MeshData cylinderLD;
+	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 1, cylinderLD);
+
+	// Cache the index count of each object.
+	data.cylinderLDIndices.VertexCount = (UINT) cylinderLD.Vertices.size();
+	data.cylinderLDIndices.VertexOffset = (UINT) (data.cylinderIndices.VertexOffset + cylinder.Vertices.size());
+
+	// Cache the index count of each object.
+	data.cylinderLDIndices.IndexOffset = data.cylinderIndices.IndexOffset + data.cylinderIndices.IndexCount;
+	data.cylinderLDIndices.IndexCount = (UINT) cylinderLD.Indices.size();
+
+	UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size() + cylinderLD.Vertices.size());
 
 	// Extract the vertex elements we are interested in and pack the
 	// vertices of all the meshes into one vertex buffer.
@@ -59,12 +72,21 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 		data.vertices[k].TangentU = cylinder.Vertices[i].TangentU;
 	}
 
+	for (size_t i = 0; i < cylinderLD.Vertices.size(); ++i, ++k)
+	{
+		data.vertices[k].Pos = cylinderLD.Vertices[i].Position;
+		data.vertices[k].Normal = cylinderLD.Vertices[i].Normal;
+		data.vertices[k].Tex = cylinderLD.Vertices[i].TexC;
+		data.vertices[k].TangentU = cylinderLD.Vertices[i].TangentU;
+	}
+
 	//
 	// Pack the indices of all the meshes into one index buffer.
 	//
 
 	data.indices.insert(data.indices.end(), box.Indices.begin(), box.Indices.end());
 	data.indices.insert(data.indices.end(), cylinder.Indices.begin(), cylinder.Indices.end());
+	data.indices.insert(data.indices.end(), cylinderLD.Indices.begin(), cylinderLD.Indices.end());
 }
 
 void GeometryGenerator::CreateBox(float width, float height, float depth, MeshData& meshData)
