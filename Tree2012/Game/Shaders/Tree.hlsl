@@ -56,9 +56,11 @@ struct PS_INPUT
 	float2 Tex : TEXCOORD0;
 	float3 NormalW : NORMAL;
 	float4 ShadowPosH : TEXCOORD1;
-	float4 viewDirTang : NORMAL1;
-	float3 lightDirTang : NORMAL2;
-	nointerpolation float4x4 World : WORLD;
+	float3 ViewDirection : NORMAL1;
+	float3 T : TEXCOORD3;
+	float3 B : TEXCOORD4;
+	float3 N : TEXCOORD5;
+	//float3 lightDirTang : NORMAL2;
 };
 
 //---------------------------------------------------------------------------------------
@@ -74,7 +76,7 @@ float3x3 WorldToTangentSpace(float3 unitNormalL, float3 tangentL, float3x3 world
 	float3 T = normalize(tangentL - dot(tangentL, N)*N);
 	float3 B = cross(N, T);
 
-	float3x3 TBN = transpose(float3x3(T, B, N));
+	float3x3 TBN = float3x3(T, B, N);
 
 	return TBN;
 }
@@ -91,11 +93,20 @@ PS_INPUT VS(VS_INPUT input)
 	output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
 	output.Pos = mul(output.Pos, transpose(Projection));
 	output.Tex = input.Tex;
-	output.World = input.World;
 
-	float3x3 TBN =	WorldToTangentSpace(input.NormalL, input.TangentL, (float3x3) input.World);
-	float3 lightVec = mul(TBN, light.Direction);
-	output.lightDirTang = normalize(lightVec);
+	// View direction.  Calcuate here and have it interpolated by to the pixel shader
+	output.ViewDirection = output.PosW - eyePos;
+
+	// TBN vectors for tangent space
+	float3 worldNormal = mul( input.NormalL, (float3x3) input.World );
+	output.N = normalize( worldNormal );
+
+	float3 worldTangent = mul( input.TangentL, (float3x3) input.World );
+	output.T = normalize(worldTangent);
+
+	float3 worldBinormal = normalize(cross(output.N, output.T));
+	worldBinormal =	mul( worldBinormal, (float3x3) input.World );
+	output.B = normalize( worldBinormal );
 
 	// Generate projective tex-coords to project shadow map onto scene.
 	output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
@@ -120,9 +131,9 @@ float4 PS(PS_INPUT pin) : SV_Target
 	// Normalize.
 	toEye /= distToEye;
 
-	//toEye = pin.viewDirTang.xyz;
-	DirectionalLight light2 = light;
-	light2.Direction = pin.lightDirTang.xyz;
+	float3x3 TBN = float3x3( normalize(pin.T), normalize(pin.B), normalize(pin.N) ); //transforms world=>tangent space
+	float3 normal = mul( float3(0,0,1), TBN);
+	//float3 normal = pin.NormalW;
 
 	// Lighting.
 
@@ -149,7 +160,7 @@ float4 PS(PS_INPUT pin) : SV_Target
 	//{
 		float4 A, D, S;
 		//ComputeDirectionalLight(mat, textureColor, light2 /*gDirLights[i]*/, pin.NormalW, pin.viewDirTang.xyz, A, D, S);
-		ComputeDirectionalLight(mat, textureColor, light /*gDirLights[i]*/, pin.NormalW, toEye, A, D, S);
+		ComputeDirectionalLight(mat, textureColor, light /*gDirLights[i]*/, normal, toEye, A, D, S);
 
 		ambient += A;
 		diffuse += shadow[0]*D;
