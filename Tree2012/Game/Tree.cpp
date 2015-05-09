@@ -85,12 +85,11 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 
 	// Update variables that change once per frame
 	XMVECTOR vChildStart;
-	XMMATRIX localToWorld, normalLocalToWorld;
-	ComputeTransformationsManual(&localToWorld, &normalLocalToWorld, &vChildStart, CalcTime(pRenderData->time), branch, &pRenderData->world, parentStart);
+	XMMATRIX localToWorld;
+	ComputeTransformationsManual(&localToWorld, &vChildStart, CalcTime(pRenderData->time), branch, &pRenderData->world, parentStart);
 
 	InstancedData data;
 	XMStoreFloat4x4(&data.World, localToWorld);
-	XMStoreFloat4x4(&data.WorldNormal, normalLocalToWorld);
 
 	if (branch->depth < _params->depthLOD)
 	{
@@ -110,8 +109,8 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	currentBranch++;
 
 	// Compute child branches
-	const int maxChildren = 4;
-	for (int c = 0; c < branch->children.size(); c++)
+	//const int maxChildren = 4;
+	for (unsigned int c = 0; c < branch->children.size(); c++)
 	{
 		if (branch->Child(c) != 0)
 		{
@@ -123,9 +122,7 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	return S_OK;
 }
 
-
-
-HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMMATRIX* computedNormalTransform, XMVECTOR* vComputedEnd, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart)
+HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR* vComputedEnd, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart)
 {
 	float animScaleFactor = 1.0f;
 	if (time - 5 < branch->depth)
@@ -181,7 +178,6 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMMATRIX
 	const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
 	*computedTransform = MatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
-	*computedNormalTransform = MathHelper::InverseTranspose(*computedTransform);
 	*computedTransform = *computedTransform * XMLoadFloat4x4(world);  //TODO
 
 	// Compute extents.  Keep these in local coordinates if we can.

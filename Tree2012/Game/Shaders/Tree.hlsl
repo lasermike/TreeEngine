@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------------------
-// File: Tutorial07.fx
+// File: Tree.hlsl
 //
 // Copyright (c) Microsoft Corporation. All rights reserved.
 //--------------------------------------------------------------------------------------
@@ -46,7 +46,6 @@ struct VS_INPUT
 	float2 Tex : TEXCOORD0;
 	float3 TangentL : TANGENT;
 	float4x4 World  : WORLD;
-	float4x4 WorldNormal  : WORLDNORMAL;
 };
 
 struct PS_INPUT
@@ -54,13 +53,11 @@ struct PS_INPUT
     float4 Pos : SV_POSITION;
 	float3 PosW : POSITION;
 	float2 Tex : TEXCOORD0;
-	float3 NormalW : NORMAL;
 	float4 ShadowPosH : TEXCOORD1;
 	float3 ViewDirection : NORMAL1;
 	float3 T : TEXCOORD3;
 	float3 B : TEXCOORD4;
 	float3 N : TEXCOORD5;
-	float3x3 World  : WORLD;
 };
 
 static const bool TSLights = true;
@@ -73,76 +70,43 @@ PS_INPUT VS(VS_INPUT input)
 	PS_INPUT output = (PS_INPUT)0;
 	output.PosW = mul(float4(input.Pos, 1.0f), input.World).xyz;
 
-	if (!TSLights)
-	{
-		output.NormalW = mul(input.NormalL, (float3x3)input.WorldNormal);
-	}
-
 	output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
 	output.Pos = mul(output.Pos, transpose(Projection));
 	output.Tex = input.Tex;
 
 	// View direction.  Calcuate here and have it interpolated by to the pixel shader
-	output.ViewDirection = output.PosW - eyePos;
+	output.ViewDirection = normalize(eyePos - output.PosW);
 
 	// TBN vectors for tangent space
-	if (TSLights)
-	{
-		float3 worldNormal = mul( input.NormalL, (float3x3) input.World );
-		output.N = normalize( worldNormal );
-		//output.N = normalize(input.NormalL); 
+	float3 worldNormal = mul( input.NormalL, (float3x3) input.World );
+	output.N = normalize( worldNormal );
 
-		float3 worldTangent = mul( input.TangentL, (float3x3) input.World );
-		output.T = normalize(worldTangent);
-		//output.T = normalize(input.TangentL);
+	float3 worldTangent = mul( input.TangentL, (float3x3) input.World );
+	output.T = normalize(worldTangent);
 
-		float3 worldBinormal = normalize(cross(output.N, output.T));
-		worldBinormal =	mul( worldBinormal, (float3x3) input.World );
-		//output.B = normalize( worldBinormal );
-	}
+	float3 worldBinormal = normalize(cross(output.N, output.T));
+	worldBinormal =	mul( worldBinormal, (float3x3) input.World );
+	output.B = worldBinormal; 
 
 	// Generate projective tex-coords to project shadow map onto scene.
 	output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
-	 
-	output.World = (float3x3) input.World;
+
 	return output;
 }
 
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
-float4 PS(PS_INPUT pin) : SV_Target
+float4 PS(PS_INPUT input) : SV_Target
 {
 	// The toEye vector is used in lighting.
-	//float3 toEye = eyePos - pin.PosW;
-	float3 toEye = normalize(eyePos - pin.PosW);
+	float3 toEye = normalize(input.ViewDirection);
 
-	// Interpolating normal can unnormalize it, so normalize it.
-	float3 normal = normalize(pin.NormalW);
+	//transforms world=>tangent space
+	float3x3 TBN = float3x3( normalize(input.T), normalize(input.B), normalize(input.N) ); 
 
-	DirectionalLight light2 = light;
-	if (TSLights)
-	{
-		//transforms world=>tangent space
-		float3x3 TBN = float3x3( normalize(pin.T), normalize(pin.B), normalize(pin.N) ); 
-		//TBN = mul(pin.World, TBN);
-
-		// Transform tangent normal to world normal	
-		//normal = mul( TBN, float3(0,0,1));
-		normal = mul( float3(0,0,1), TBN);
-
-		// Convert eye dir to TS
-		//toEye = mul( TBN, toEye);
-
-		// Convert light to TS
-		//light2.Direction = mul( TBN, light.Direction );
-
-		//normal = float3(0,0,1);
-
-	}
-
-	// Normal in TS
-
+	// Transform tangent normal to world normal	
+	float3 normal = mul( float3(0,0,1), TBN);
 
 	// Start with a sum of zero. 
 	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -151,28 +115,24 @@ float4 PS(PS_INPUT pin) : SV_Target
 
 	float4 textureColor;
 	if (mat.flags.y > 0)  //use texture
-		textureColor = txDiffuse.Sample(samLinear, pin.Tex);
+		textureColor = txDiffuse.Sample(samLinear, input.Tex);
 	else
 		textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Only the first light casts a shadow.
 	float3 shadow = float3(1.0f, 1.0f, 1.0f);
-	shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, pin.ShadowPosH);
-
-	//float3 normal = NormalToWorldSpace(pin.NormalL, pin.NormalL, pin.TangentL, pin.World);
+	shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, input.ShadowPosH);
  
 	// Sum the light contribution from each light source.  
 	//[unroll]
 	//for (int i = 0; i < gLightCount; ++i)
 	//{
 		float4 A, D, S;
-		ComputeDirectionalLight(mat, textureColor, light2 /*gDirLights[i]*/, normal, toEye, A, D, S);
+		ComputeDirectionalLight(mat, textureColor, light /*gDirLights[i]*/, normal, toEye, A, D, S);
 
 		ambient += A;
-		diffuse += shadow[0]*D;
-		spec    += shadow[0]*S;
-		//diffuse += D;
-		//spec += S;
+		diffuse += shadow[0]*D; // diffuse += D
+		spec    += shadow[0]*S; // spec += S;
 	//}
 
 	float4 litColor = ambient + diffuse + spec;
@@ -206,10 +166,10 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 // This is only used for alpha cut out geometry, so that shadows 
 // show up correctly.  Geometry that does not need to sample a
 // texture can use a NULL pixel shader for depth pass.
-void BuildShadowMapPS(ShadowMapVertexOut pin)
+void BuildShadowMapPS(ShadowMapVertexOut input)
 {
 	// TODO support alpha map
-	//float4 diffuse = gDiffuseMap.Sample(samLinear, pin.Tex);
+	//float4 diffuse = gDiffuseMap.Sample(samLinear, input.Tex);
 
 	// Don't write transparent pixels to the shadow map.
 	//clip(diffuse.a - 0.15f);
@@ -246,9 +206,9 @@ DSVertexOut DrawScreenQuadVS(DSVertexIn vin)
 	return vout;
 }
 
-float4 DrawScreenQuadPS(DSVertexOut pin) : SV_Target
+float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
 {
-	float4 c = txDiffuse.Sample(samLinear, pin.Tex).r;
+	float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
 	
 	// draw as grayscale
 	return float4(c.rrr, 1);
@@ -300,17 +260,3 @@ matrix MatrixTransformation
     return M;
 }
 */
-
-	//float4 vPosTS = WorldToTangentSpace(float4(input.Pos, 1), input.NormalL, input.TangentL, input.World);
-	//float4 eyePosTS = WorldToTangentSpace(float4(eyePos, 1), input.NormalL, input.TangentL, input.World);
-	//float4 lightPosTS = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, input.World);
-	//output.viewDirTang = normalize(eyePosTS - vPosTS);
-	//output.lightDirTang = normalize(lightPosTS - eyePosTS);
-	//
-	//float4 eyePosTS4 = output.viewDirTang = WorldToTangentSpace(float4(eyePosTS), 1), input.NormalL, input.TangentL, transpose(input.World) );
-	//output.viewDirTang = WorldToTangentSpace(float4(normalize(input.Pos), 1), input.NormalL, input.TangentL, transpose(input.World) );
-	//output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
-
-	//output.viewDirTang = WorldToTangentSpace(float4(normalize(eyePos - input.Pos.xyz), 1), input.NormalL, input.TangentL, transpose(input.World) );
-	//output.lightDirTang = WorldToTangentSpace(float4(light.Direction, 1), input.NormalL, input.TangentL, transpose(input.World));
-	

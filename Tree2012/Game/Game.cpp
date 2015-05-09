@@ -477,7 +477,7 @@ void Game::UpdateCamera(DX::StepTimer const& timer)
 	{
 		_camera->AddDollyVelocity(_dollySpeed);
 	}
-	else
+	else if (0)
 	{
 		// Determine if extent point is inside or outside the view frustrum
 		XMVECTOR v0, v1;
@@ -486,21 +486,22 @@ void Game::UpdateCamera(DX::StepTimer const& timer)
 		XMStoreFloat3(&vv0, v0);
 		XMStoreFloat3(&vv1, v1);
 		float topDelta = (vv1.y - vv0.y) / (_renderData.farClippingPlane - _renderData.nearClippingPlane);
+		
 		float frustumTopAtExtent = vv0.y + topDelta * sqrt((e.x - vv0.x) * (e.x - vv0.x) + (e.z - vv0.z) * (e.z - vv0.z)); 
 
-		//// Dolly nearest or further
-		//if (frustumTopAtExtent < e.y)
-		//{
-		//	_camera->SetDollyVelocity(0.5f);
-		//}
-		//else if (frustumTopAtExtent > e.y + 0.5f)
-		//{
-		//	_camera->SetDollyVelocity(-0.5f);
-		//}
-		//else 
-		//{
-		//	_camera->SetDollyVelocity(0);
-		//}
+		// Dolly nearest or further
+		if (frustumTopAtExtent < e.y)
+		{
+			_camera->SetDollyVelocity(0.5f);
+		}
+		else if (frustumTopAtExtent > e.y + 0.5f)
+		{
+			_camera->SetDollyVelocity(-0.5f);
+		}
+		else 
+		{
+			_camera->SetDollyVelocity(0);
+		}
 	}
 
 	// Rotate camera around the origin
@@ -524,7 +525,6 @@ void Game::UpdateCamera(DX::StepTimer const& timer)
 		{
 			_camera->SetFocusPositionAttenuation(250);
 		}
-
 	}
 
 	_camera->Update((float) timer.GetElapsedSeconds());
