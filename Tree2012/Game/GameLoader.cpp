@@ -14,9 +14,46 @@ GameLoader::GameLoader()
 
 void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, XSF::OrbitCamera* pCamera)
 {
+	LoadTrees(pScene, pRenderData, pCamera);
+//	LoadTestBlock(pScene, pRenderData, pCamera);
+}
+
+void GameLoader::LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, XSF::OrbitCamera* pCamera)
+{
+	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+	params4->position = XMFLOAT3(0,0,0);
+	params4->scale = XMFLOAT3(1, 1.5, 2);
+	XMStoreFloat4(&params4->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
+	params4->primitiveType = PrimitiveType_Box;
+	pScene->AddChild(new Primitive(params4));
+
+	// Init lights
+	pRenderData->dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	pRenderData->dirLights[0].Diffuse  = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+	pRenderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+	pRenderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	pRenderData->time = 0;
+
+	// Camera
+	const float maxBound = 3.0f;
+	XMFLOAT3 bounds[] = 
+	{
+		XMFLOAT3(-maxBound,-maxBound,-maxBound),
+		XMFLOAT3(maxBound,maxBound,maxBound)
+	};
+	pCamera->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
+
+	pCamera->SetHeading(2.48f);
+	//pCamera->SetFocusPosition(XMVectorSet(0, 1.1f, 0, 1));
+
+}
+
+void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, XSF::OrbitCamera* pCamera)
+{
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0,0,0);
 	params4->scale = XMFLOAT3(30, .01f, 30);
+	params4->primitiveType = PrimitiveType_Cylinder;
 	pScene->AddChild(new Primitive(params4));
 
 	WorldObjectParams* params3 = new WorldObjectParams(FixedTreeGeneratorType);
@@ -75,7 +112,7 @@ void GameLoader::Regenerate(SceneRoot* pScene)
 {
 	if ((unsigned int)_currentSeed + 1 > _seeds.size())
 	{
-		_seeds.push_back((unsigned int)time(NULL));
+		_seeds.push_back(0); //(unsigned int)time(NULL));
 	}
 
 	int treeNum = 0;
@@ -98,7 +135,7 @@ void GameLoader::Regenerate(SceneRoot* pScene)
 		}
 		else if (genType == PrimitiveGeneratorType)
 		{
-			PrimitiveModelGenerator planeGen(PrimitiveType_Cylinder);
+			PrimitiveModelGenerator planeGen((*t)->GetParams().primitiveType);
 			(*t)->Create(&planeGen);
 		}
 		else

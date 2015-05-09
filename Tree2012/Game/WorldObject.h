@@ -39,18 +39,25 @@ class WorldObjectParams
 {
 public:
 	WorldObjectParams(GeneratorType genType) :
-		position(0,0,0), 
+		position(0,0,0),
 		scale(1,1,1), 
 		depthLOD(4),
 		generatorType(genType), 
-		_animationSpeed(1.0f) { }
+		_animationSpeed(1.0f),
+		primitiveType(PrimitiveType_Box) 
+	{
+		XMStoreFloat4(&rotation, XMQuaternionIdentity());
+	}
+
 	virtual ~WorldObjectParams() { }
 
 	XMFLOAT3 position;
 	XMFLOAT3 scale;
+	XMFLOAT4 rotation; 
 	GeneratorType generatorType;
 	float _animationSpeed;
 	int depthLOD;
+	PrimitiveType primitiveType;
 };
 
 template<typename T>

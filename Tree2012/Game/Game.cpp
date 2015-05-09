@@ -488,19 +488,19 @@ void Game::UpdateCamera(DX::StepTimer const& timer)
 		float topDelta = (vv1.y - vv0.y) / (_renderData.farClippingPlane - _renderData.nearClippingPlane);
 		float frustumTopAtExtent = vv0.y + topDelta * sqrt((e.x - vv0.x) * (e.x - vv0.x) + (e.z - vv0.z) * (e.z - vv0.z)); 
 
-		// Dolly nearest or further
-		if (frustumTopAtExtent < e.y)
-		{
-			_camera->SetDollyVelocity(0.5f);
-		}
-		else if (frustumTopAtExtent > e.y + 0.5f)
-		{
-			_camera->SetDollyVelocity(-0.5f);
-		}
-		else 
-		{
-			_camera->SetDollyVelocity(0);
-		}
+		//// Dolly nearest or further
+		//if (frustumTopAtExtent < e.y)
+		//{
+		//	_camera->SetDollyVelocity(0.5f);
+		//}
+		//else if (frustumTopAtExtent > e.y + 0.5f)
+		//{
+		//	_camera->SetDollyVelocity(-0.5f);
+		//}
+		//else 
+		//{
+		//	_camera->SetDollyVelocity(0);
+		//}
 	}
 
 	// Rotate camera around the origin

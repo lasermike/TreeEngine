@@ -8,6 +8,9 @@ class GameLoader
 {
 	std::vector<unsigned int> _seeds;
 
+	void LoadTrees(SceneRoot* pScene, RenderData* pRenderData, XSF::OrbitCamera* pCamera);
+	void LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, XSF::OrbitCamera* pCamera);
+
 public:
 	GameLoader();
 

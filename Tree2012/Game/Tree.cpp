@@ -181,8 +181,8 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMMATRIX
 	const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
 	*computedTransform = MatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
+	*computedNormalTransform = MathHelper::InverseTranspose(*computedTransform);
 	*computedTransform = *computedTransform * XMLoadFloat4x4(world);  //TODO
-	*computedNormalTransform = MathHelper::InverseTranspose(XMMatrixTranspose(*computedTransform ));
 
 	// Compute extents.  Keep these in local coordinates if we can.
 	if (XMVectorGetY(vEnd) > _extents[TOP].y)

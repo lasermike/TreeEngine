@@ -11,7 +11,7 @@ PrimitiveGeometry::PrimitiveGeometry(PrimitiveModel* model) : Geometry()
 	_groundMaterial.Diffuse = XMFLOAT4(0, .6f, 0, 1);
 	_groundMaterial.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
 	_groundMaterial.Reflect = XMFLOAT4(0, 0, 0, 1);
-	_groundMaterial.flags.y = 1; 
+	_groundMaterial.flags.y = 0; //1 for textured; 
 }
 
 PrimitiveGeometry::~PrimitiveGeometry()
