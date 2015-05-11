@@ -5,6 +5,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreeXBox", "Tree2012\Tree20
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreePC", "TreePC\TreePC.vcxproj", "{9B22E637-C613-479F-BEC8-59215E96EEFB}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreeClassic", "TreeClassic\TreeClassic.vcxproj", "{FF5EA045-3150-4374-83C0-17C9C97F30F2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -90,11 +92,29 @@ Global
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Release|x64.ActiveCfg = Release|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Release|x64.Build.0 = Release|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Release|x64.Deploy.0 = Release|x64
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|ARM.ActiveCfg = Debug|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|Durango.ActiveCfg = Debug|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|Win32.Build.0 = Debug|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|x64.ActiveCfg = Debug|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|ARM.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|Durango.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|Mixed Platforms.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|Mixed Platforms.Build.0 = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|Win32.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|Win32.Build.0 = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|x64.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Release|ARM.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Release|Durango.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Release|Win32.ActiveCfg = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Release|Win32.Build.0 = Release|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(Performance) = preSolution
-		HasPerformanceSessions = true
 	EndGlobalSection
 EndGlobal

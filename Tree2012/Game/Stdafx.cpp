@@ -34,6 +34,10 @@ void XSF::SetContentFileRoot()
 
     _snwprintf_s( Details::g_strApplicationDataPath, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s\\", writeableFolder.c_str() );
 
+#elif defined(_TREE_CLASSIC)
+	//wcscpy_s(Details::g_strCommonFileRoot, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
+	ASSERT(false);
+
 #else
 //    wchar_t temp[ 1024 ];
 //    GetCurrentDirectoryW( _countof( temp ), temp );
@@ -262,7 +266,7 @@ HRESULT XSF::DynamicBuffer::Create( D3DDevice* pDev, D3D11_BIND_FLAG bindFlags, 
     bufDesc.ByteWidth = size;
     bufDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    XSF_RETURN_IF_FAILED( pDev->CreateBuffer( &bufDesc, nullptr, m_spBuffer.ReleaseAndGetAddressOf() ) );
+    XSF_RETURN_IF_FAILED( pDev->CreateBuffer( &bufDesc, nullptr, &m_spBuffer) );
     
     m_bufferTailOffset = 0;
     m_numBytesMapped = 0;
@@ -292,7 +296,7 @@ HRESULT XSF::DynamicBuffer::Create( D3DDevice* pDev, D3D11_BIND_FLAG bindFlags, 
 //-------------------------------------------------------------------------------------
 void  XSF::DynamicBuffer::Destroy()
 {
-    m_spBuffer.Reset();
+    m_spBuffer.Release();
     m_bufferTailOffset = 0;
     m_numBytesMapped = 0;
     m_bufferSize = 0;
@@ -367,7 +371,7 @@ void XSF::DynamicBuffer::Unmap( UINT numBytesUsed )
 //-------------------------------------------------------------------------------------
 ID3D11Buffer* const&   XSF::DynamicBuffer::GetBuffer() const
 {
-    return *m_spBuffer.GetAddressOf();
+    return m_spBuffer.ptr;
 }
 
 //--------------------------------------------------------------------------------------

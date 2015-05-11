@@ -17,8 +17,16 @@
 using namespace DirectX;
 
 #ifndef _XBOX_ONE
+#ifndef _TREE_CLASSIC
 using namespace Windows::Graphics::Display;
 #endif 
+#endif 
+
+#ifdef _TREE_CLASSIC
+#include <OVR_CAPI_D3D.h>
+#include <Kernel/OVR_System.h>
+#endif 
+
 
 #define D3D_DEBUG_INFO
 
@@ -32,7 +40,11 @@ struct CBChangeOnResize
 
 Game::Game() 
 {
+#ifndef _TREE_CLASSIC
 	_window = nullptr;
+#else
+	_hwnd = nullptr;
+#endif
 	_driverType = D3D_DRIVER_TYPE_NULL;
 	_featureLevel = D3D_FEATURE_LEVEL_11_0;
 	_pd3dDevice = nullptr;
@@ -48,6 +60,7 @@ Game::Game()
 	_wireframe = false;
 	_showHelp = false;
 	_rasterState = nullptr;
+	_displayMode = Monitor;
 #ifdef _XBOX_ONE
 	_enableMsaa = false; // TODO
 #else
@@ -65,8 +78,8 @@ Game::Game()
 	// Init vertex/index buffer
 	_pScene = new SceneRoot();
 
+	// Create the scene
 	_camera = new XSF::OrbitCamera();
-
 	_loader.Load("Basic", _pScene, &_renderData, _camera);
 
 	// Initialize the view matrix
@@ -90,6 +103,47 @@ Game::~Game()
 	SafeDelete(&_bitmapFont);
 	SafeDelete(&_pScene);
 }
+
+#ifdef _TREE_CLASSIC
+//--------------------------------------------------------------------------------------
+// Create Oculus interface if possible
+//--------------------------------------------------------------------------------------
+HRESULT Game::DetectOculus(bool& detected)
+{
+	detected = false;
+
+    OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
+
+	//Initialise rift
+    if (!ovr_Initialize())
+	{ 
+		LOG("Unable to initialize libOVR."); 
+		return 0; 
+	}
+	ovrHmd HMD = ovrHmd_Create(0);
+    if (HMD == NULL)
+    {
+        HMD = ovrHmd_CreateDebug(ovrHmd_DK2);
+    }
+ 
+    if (!HMD) 
+	{	
+		LOG("Oculus Rift not detected."); 
+		ovr_Shutdown(); 
+		return S_FALSE; 
+	}
+
+	if (HMD->ProductName[0] == '\0')
+	{
+		LOG("Rift detected, display not enabled.");
+	}
+
+    bool windowed = (HMD->HmdCaps & ovrHmdCap_ExtendDesktop) ? false : true;    
+
+	detected = true;
+	return S_OK;
+}
+#endif
 
 //--------------------------------------------------------------------------------------
 // Create Direct3D device and swap chain
@@ -126,15 +180,15 @@ HRESULT Game::InitDevice()
 
 	for (UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++)
 	{
-		Microsoft::WRL::ComPtr<ID3D11Device> device;
-	    Microsoft::WRL::ComPtr<ID3D11DeviceContext> d3dContext;
+		CComPtr<ID3D11Device> device;
+	    CComPtr<ID3D11DeviceContext> d3dContext;
 
 		_driverType = driverTypes[driverTypeIndex];
 		hr = D3D11CreateDevice(nullptr, _driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
 			D3D11_SDK_VERSION, &device, &_featureLevel, &d3dContext);
 
-		HRR(device.Get()->QueryInterface( __uuidof(_pd3dDevice), reinterpret_cast<void**>(&_pd3dDevice) ) );
-		HRR(d3dContext.Get()->QueryInterface( __uuidof(_pImmediateContext), reinterpret_cast<void**>(&_pImmediateContext) ) );
+		HRR(device->QueryInterface( __uuidof(_pd3dDevice), reinterpret_cast<void**>(&_pd3dDevice) ) );
+		HRR(d3dContext->QueryInterface( __uuidof(_pImmediateContext), reinterpret_cast<void**>(&_pImmediateContext) ) );
 
 		if (SUCCEEDED(hr))
 			break;
@@ -200,6 +254,13 @@ HRESULT Game::OnResize()
 #ifdef _XBOX_ONE
 	UINT windowWidth = 1920;
 	UINT windowHeight = 1080;
+#elif defined(_TREE_CLASSIC)
+	UINT windowWidth = 0; 
+	UINT windowHeight = 0;
+	RECT rect = {0};
+	GetClientRect(_hwnd, &rect);
+	windowWidth = rect.right - rect.left;
+	windowHeight = rect.bottom - rect.top;
 #else
 	auto windowBounds = _window->Bounds;
 	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
@@ -274,26 +335,42 @@ HRESULT Game::OnResize()
 		(void)_pImmediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&_pImmediateContext1));
 	}
 
+#if defined(_TREE_CLASSIC)
+	DXGI_SWAP_CHAIN_DESC sd;
+#else
 	DXGI_SWAP_CHAIN_DESC1 sd;
+#endif
+
 	ZeroMemory(&sd, sizeof(sd));
+
+#if !defined(_TREE_CLASSIC)
 	sd.Width = windowWidth;
 	sd.Height = windowHeight;
+#endif
+
 #ifdef _XBOX_ONE
 	sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-#else
+#elif !defined(_TREE_CLASSIC)
 	sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
 	sd.SampleDesc.Count = _enableMsaa ? msaaCount : 1;
 	sd.SampleDesc.Quality = _enableMsaa ? msaaQuality - 1 : 0;
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sd.BufferCount = 2;
+	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+
 #if defined (_XBOX_ONE)
 	//sd.Scaling = DXGI_SCALING_STRETCH;
-	sd.Flags = DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
+	sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
 #endif 
+
+#if defined(_TREE_CLASSIC)
+    HRR(dxgiFactory2->CreateSwapChain(_pd3dDevice, &sd, &_pSwapChain));
+#else
 	HRR(dxgiFactory2->CreateSwapChainForCoreWindow(_pd3dDevice, reinterpret_cast<IUnknown*>(_window.Get()), &sd, nullptr, &_pSwapChain1));
 	HRR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));
+#endif 
 
 	dxgiFactory2->Release();
 	dxgiFactory->Release();
@@ -305,7 +382,9 @@ HRESULT Game::OnResize()
 	HRR(hr = _pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &_pRenderTargetView));
 	pBackBuffer->Release();
 
+	// 
 	// Create depth stencil texture
+	//
 	D3D11_TEXTURE2D_DESC descDepth;
 	ZeroMemory(&descDepth, sizeof(descDepth));
 	descDepth.Width = windowWidth;
@@ -738,6 +817,7 @@ void Game::DrawSceneToShadowMap()
 
 
 #ifndef _XBOX_ONE
+#ifndef _TREE_CLASSIC
 // Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
 float Game::ConvertDipsToPixels(float dips)
 {
@@ -745,5 +825,6 @@ float Game::ConvertDipsToPixels(float dips)
 	return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 }
 
+#endif
 #endif
 

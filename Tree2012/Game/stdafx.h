@@ -14,9 +14,14 @@ using namespace DirectX;
 using namespace std;
 
 #ifdef _DEBUG
-__inline void ReportError(char* msg, char* file, long line, char* exp) 
+__inline void Report(char* msg, char* file, long line, char* exp) 
 {
 	std::cerr << msg << " " << file << " " << line << " " << exp << "\n"; 
+}
+
+__inline void ReportError(char* msg, char* file, long line, char* exp) 
+{
+	Report(msg, file, line, exp);
 	assert(false); 
 }
 
@@ -71,11 +76,19 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 		}                                                      
 #endif
 
+#ifndef LOG
+#define LOG(x)	\
+		{		\
+		std::cerr << "LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << "\n"; \
+		}        
+#endif 
+
 #else
 #ifndef HRR
 #define HR(x) (x)
 #define HRC(x) (x)
 #define HRR(x) (x)
+#define LOG(x)
 #endif
 #endif 
 
@@ -237,36 +250,48 @@ namespace XboxSampleFramework
 {
     // Auto-releasing D3D resources
     template< typename t_Resource >
-    struct D3DTypePtr : public Microsoft::WRL::ComPtr< t_Resource >
+    struct D3DTypePtr  //: public Microsoft::WRL::ComPtr< t_Resource >
     {
-        operator t_Resource* () { return Get(); }
-        operator const t_Resource* () const { return Get(); }
+		t_Resource* ptr;
 
-        t_Resource** operator &() { return GetAddressOf(); }
+        operator t_Resource* () { return ptr; }
+        operator const t_Resource* () const { return ptr; }
 
-        // This type traits infrastructure allows you to cast D3DTypePtr< t_Resource > to D3DTypePtr< t_Other > 
-        // whenever you can cast t_Resource to t_Other.
-        //
-        // The cast operator is declared for all t_Other, but only implemented when 
-        // std::is_convertible< t_Resource, t_Other >::value == true
-        // 
-        // Note this facility already exists for ComPtr, but we need to lift it to D3DTypePtr.
-        template< typename t_Other, bool t_bAllowed > struct Typecast;
+        t_Resource** operator &() { return &ptr; }
 
-        template< typename t_Other > 
-        struct Typecast< t_Other, true >
-        {
-            static D3DTypePtr< t_Other >& allowed_cast( D3DTypePtr< t_Resource >& from ) 
-            { 
-                return reinterpret_cast< D3DTypePtr< t_Other >& >( from ); 
-            }
-        };
+		void Release()
+		{
+			if (ptr)
+			{
+				ptr->Release();
+				ptr = nullptr;
+			}
+		}
 
-        template< typename t_Other > 
-        operator D3DTypePtr< t_Other >& () { return Typecast< t_Other, std::is_convertible< t_Resource, t_Other >::value >::allowed_cast( *this ); }
+        //// This type traits infrastructure allows you to cast D3DTypePtr< t_Resource > to D3DTypePtr< t_Other > 
+        //// whenever you can cast t_Resource to t_Other.
+        ////
+        //// The cast operator is declared for all t_Other, but only implemented when 
+        //// std::is_convertible< t_Resource, t_Other >::value == true
+        //// 
+        //// Note this facility already exists for ComPtr, but we need to lift it to D3DTypePtr.
+        //template< typename t_Other, bool t_bAllowed > struct Typecast;
+
+        //template< typename t_Other > 
+        //struct Typecast< t_Other, true >
+        //{
+        //    static D3DTypePtr< t_Other >& allowed_cast( D3DTypePtr< t_Resource >& from ) 
+        //    { 
+        //        return reinterpret_cast< D3DTypePtr< t_Other >& >( from ); 
+        //    }
+        //};
+
+        //template< typename t_Other > 
+        //operator D3DTypePtr< t_Other >& () { return Typecast< t_Other, std::is_convertible< t_Resource, t_Other >::value >::allowed_cast( *this ); }
     };
 
     typedef D3DTypePtr< ID3D11Buffer >              D3DBufferPtr;
+
 
 
 #if defined(_XBOX_ONE) && defined(_TITLE)

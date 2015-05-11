@@ -4,17 +4,26 @@
 #include "Primitive.h"
 #include "sceneroot.h"
 #include "Tree.h"
-#include "agile.h"
 #include "bitmapfont.h"
-#include "StepTimer.h"
 #include "RenderData.h"
 #include "LSystemModelGenerator.h"
 #include "OrbitCamera.h"
 #include "GameLoader.h"
+#include "StepTimer.h"
 
+#ifndef _TREE_CLASSIC
+#include "agile.h"
 using namespace Microsoft::WRL;
+#endif
+
 
 class BitmapFont;
+
+typedef enum DisplayMode
+{
+	Monitor = 0,
+	Oculus
+};
 
 
 class Game 
@@ -24,7 +33,12 @@ public:
 	~Game();
 
 	// Initialization and management
+#ifndef _TREE_CLASSIC
 	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window) { _window = window; return InitDevice(); }
+#else
+	HRESULT Initialize() { ASSERT(false); return E_NOTIMPL; }
+	HRESULT DetectOculus(bool& detected);
+#endif
 	HRESULT Cleanup() { CleanupDevice(); return S_OK; }
 	HRESULT OnResize();
 	void OnKeydown(UINT key);
@@ -68,7 +82,12 @@ private:
 	double								_timeCurrent;
     XSF::OrbitCamera*					_camera;
 
+#ifndef _TREE_CLASSIC
 	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
+#else
+	HWND								_hwnd;
+
+#endif
 	D3D_DRIVER_TYPE                     _driverType;
 	D3D_FEATURE_LEVEL                   _featureLevel;
 	XSF::D3DDevice*                     _pd3dDevice;
@@ -78,7 +97,7 @@ private:
 	IDXGISwapChain*                     _pSwapChain;
 	IDXGISwapChain1*                    _pSwapChain1;
 	ID3D11RenderTargetView*             _pRenderTargetView;
-
+	DisplayMode							_displayMode;
 	CComPtr<ID3D11Texture2D>            _pDepthStencil;
 	CComPtr<ID3D11DepthStencilView>		_pDepthStencilView;
 
