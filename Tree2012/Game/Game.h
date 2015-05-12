@@ -37,7 +37,6 @@ public:
 	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window) { _window = window; return InitDevice(); }
 #else
 	HRESULT Initialize() { ASSERT(false); return E_NOTIMPL; }
-	HRESULT DetectOculus(bool& detected);
 #endif
 	HRESULT Cleanup() { CleanupDevice(); return S_OK; }
 	HRESULT OnResize();

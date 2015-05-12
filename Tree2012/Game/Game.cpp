@@ -22,11 +22,6 @@ using namespace Windows::Graphics::Display;
 #endif 
 #endif 
 
-#ifdef _TREE_CLASSIC
-#include <OVR_CAPI_D3D.h>
-#include <Kernel/OVR_System.h>
-#endif 
-
 
 #define D3D_DEBUG_INFO
 
@@ -105,44 +100,6 @@ Game::~Game()
 }
 
 #ifdef _TREE_CLASSIC
-//--------------------------------------------------------------------------------------
-// Create Oculus interface if possible
-//--------------------------------------------------------------------------------------
-HRESULT Game::DetectOculus(bool& detected)
-{
-	detected = false;
-
-    OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
-
-	//Initialise rift
-    if (!ovr_Initialize())
-	{ 
-		LOG("Unable to initialize libOVR."); 
-		return 0; 
-	}
-	ovrHmd HMD = ovrHmd_Create(0);
-    if (HMD == NULL)
-    {
-        HMD = ovrHmd_CreateDebug(ovrHmd_DK2);
-    }
- 
-    if (!HMD) 
-	{	
-		LOG("Oculus Rift not detected."); 
-		ovr_Shutdown(); 
-		return S_FALSE; 
-	}
-
-	if (HMD->ProductName[0] == '\0')
-	{
-		LOG("Rift detected, display not enabled.");
-	}
-
-    bool windowed = (HMD->HmdCaps & ovrHmdCap_ExtendDesktop) ? false : true;    
-
-	detected = true;
-	return S_OK;
-}
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -416,10 +373,9 @@ HRESULT Game::OnResize()
     dsvDesc.Texture2D.MipSlice = 0;
     HRR(_pd3dDevice->CreateDepthStencilView(_pDepthStencil, &dsvDesc, &_pDepthStencilView));
 
-
-	//_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView[0]);
-
+	//
 	// Setup the viewport
+	//
 	_viewPort.Width = (FLOAT) windowWidth;
 	_viewPort.Height = (FLOAT) windowHeight;
 	_viewPort.MinDepth = 0.0f;

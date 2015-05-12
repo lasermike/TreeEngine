@@ -4,6 +4,8 @@
 #include "pch.h"
 #include "TreeClassic.h"
 #include "Game.h"
+#include <OVR_CAPI_D3D.h>
+#include <Kernel/OVR_System.h>
 
 #define MAX_LOADSTRING 100
 
@@ -12,6 +14,9 @@ HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 
+// Oculus specific
+ovrHmd HMD = nullptr;
+
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
@@ -19,41 +24,41 @@ LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPTSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+                       _In_opt_ HINSTANCE hPrevInstance,
+                       _In_ LPTSTR    lpCmdLine,
+                       _In_ int       nCmdShow)
 {
-	UNREFERENCED_PARAMETER(hPrevInstance);
-	UNREFERENCED_PARAMETER(lpCmdLine);
+    UNREFERENCED_PARAMETER(hPrevInstance);
+    UNREFERENCED_PARAMETER(lpCmdLine);
 
- 	// TODO: Place code here.
-	MSG msg;
-	HACCEL hAccelTable;
+    // TODO: Place code here.
+    MSG msg;
+    HACCEL hAccelTable;
 
-	// Initialize global strings
-	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-	LoadString(hInstance, IDC_TREECLASSIC, szWindowClass, MAX_LOADSTRING);
-	MyRegisterClass(hInstance);
+    // Initialize global strings
+    LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
+    LoadString(hInstance, IDC_TREECLASSIC, szWindowClass, MAX_LOADSTRING);
+    MyRegisterClass(hInstance);
 
-	// Perform application initialization:
-	if (!InitInstance (hInstance, nCmdShow))
-	{
-		return FALSE;
-	}
+    // Perform application initialization:
+    if (!InitInstance (hInstance, nCmdShow))
+    {
+        return FALSE;
+    }
 
-	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_TREECLASSIC));
+    hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_TREECLASSIC));
 
-	// Main message loop:
-	while (GetMessage(&msg, NULL, 0, 0))
-	{
-		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-	}
+    // Main message loop:
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
+        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
 
-	return (int) msg.wParam;
+    return (int) msg.wParam;
 }
 
 
@@ -65,23 +70,62 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 //
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
-	WNDCLASSEX wcex;
+    WNDCLASSEX wcex;
 
-	wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.cbSize = sizeof(WNDCLASSEX);
 
-	wcex.style			= CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc	= WndProc;
-	wcex.cbClsExtra		= 0;
-	wcex.cbWndExtra		= 0;
-	wcex.hInstance		= hInstance;
-	wcex.hIcon			= LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TREECLASSIC));
-	wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
-	wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
-	wcex.lpszMenuName	= MAKEINTRESOURCE(IDC_TREECLASSIC);
-	wcex.lpszClassName	= szWindowClass;
-	wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.style			= CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc	= WndProc;
+    wcex.cbClsExtra		= 0;
+    wcex.cbWndExtra		= 0;
+    wcex.hInstance		= hInstance;
+    wcex.hIcon			= LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TREECLASSIC));
+    wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
+    wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
+    wcex.lpszMenuName	= MAKEINTRESOURCE(IDC_TREECLASSIC);
+    wcex.lpszClassName	= szWindowClass;
+    wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
-	return RegisterClassEx(&wcex);
+    return RegisterClassEx(&wcex);
+}
+
+//--------------------------------------------------------------------------------------
+// Create Oculus interface if possible
+//--------------------------------------------------------------------------------------
+HRESULT DetectOculus(bool& detected)
+{
+    detected = false;
+
+    OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
+
+    //Initialise rift
+    if (!ovr_Initialize())
+    { 
+        LOG("Unable to initialize libOVR."); 
+        return 0; 
+    }
+    HMD = ovrHmd_Create(0);
+    if (HMD == NULL)
+    {
+        HMD = ovrHmd_CreateDebug(ovrHmd_DK2);
+    }
+
+    if (!HMD) 
+    {	
+        LOG("Oculus Rift not detected."); 
+        ovr_Shutdown(); 
+        return S_FALSE; 
+    }
+
+    if (HMD->ProductName[0] == '\0')
+    {
+        LOG("Rift detected, display not enabled.");
+    }
+
+    bool windowed = (HMD->HmdCaps & ovrHmdCap_ExtendDesktop) ? false : true;    
+
+    detected = true;
+    return S_OK;
 }
 
 //
@@ -96,22 +140,25 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   HWND hWnd;
+    bool oculusDetected = false;
+    HR(DetectOculus(oculusDetected));
 
-   hInst = hInstance; // Store instance handle in our global variable
+    HWND hWnd;
 
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+    hInst = hInstance; // Store instance handle in our global variable
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+    hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+    if (!hWnd)
+    {
+        return FALSE;
+    }
 
-   return TRUE;
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    return TRUE;
 }
 
 //
@@ -126,58 +173,58 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	int wmId, wmEvent;
-	PAINTSTRUCT ps;
-	HDC hdc;
+    int wmId, wmEvent;
+    PAINTSTRUCT ps;
+    HDC hdc;
 
-	switch (message)
-	{
-	case WM_COMMAND:
-		wmId    = LOWORD(wParam);
-		wmEvent = HIWORD(wParam);
-		// Parse the menu selections:
-		switch (wmId)
-		{
-		case IDM_ABOUT:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-			break;
-		case IDM_EXIT:
-			DestroyWindow(hWnd);
-			break;
-		default:
-			return DefWindowProc(hWnd, message, wParam, lParam);
-		}
-		break;
-	case WM_PAINT:
-		hdc = BeginPaint(hWnd, &ps);
-		// TODO: Add any drawing code here...
-		EndPaint(hWnd, &ps);
-		break;
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		break;
-	default:
-		return DefWindowProc(hWnd, message, wParam, lParam);
-	}
-	return 0;
+    switch (message)
+    {
+    case WM_COMMAND:
+        wmId    = LOWORD(wParam);
+        wmEvent = HIWORD(wParam);
+        // Parse the menu selections:
+        switch (wmId)
+        {
+        case IDM_ABOUT:
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+            break;
+        case IDM_EXIT:
+            DestroyWindow(hWnd);
+            break;
+        default:
+            return DefWindowProc(hWnd, message, wParam, lParam);
+        }
+        break;
+    case WM_PAINT:
+        hdc = BeginPaint(hWnd, &ps);
+        // TODO: Add any drawing code here...
+        EndPaint(hWnd, &ps);
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
 }
 
 // Message handler for about box.
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	UNREFERENCED_PARAMETER(lParam);
-	switch (message)
-	{
-	case WM_INITDIALOG:
-		return (INT_PTR)TRUE;
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        return (INT_PTR)TRUE;
 
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-		}
-		break;
-	}
-	return (INT_PTR)FALSE;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
 }
