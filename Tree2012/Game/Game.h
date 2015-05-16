@@ -33,10 +33,10 @@ public:
 	~Game();
 
 	// Initialization and management
-#ifndef _TREE_CLASSIC
-	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window) { _window = window; return InitDevice(); }
+#ifdef _TREE_CLASSIC
+	HRESULT Initialize(HWND hwnd) { _hwnd = hwnd;  return InitDevice(); }
 #else
-	HRESULT Initialize() { ASSERT(false); return E_NOTIMPL; }
+	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window) { _window = window; return InitDevice(); }
 #endif
 	HRESULT Cleanup() { CleanupDevice(); return S_OK; }
 	HRESULT OnResize();
@@ -81,11 +81,10 @@ private:
 	double								_timeCurrent;
     XSF::OrbitCamera*					_camera;
 
-#ifndef _TREE_CLASSIC
-	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
-#else
+#ifdef _TREE_CLASSIC
 	HWND								_hwnd;
-
+#else
+	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
 #endif
 	D3D_DRIVER_TYPE                     _driverType;
 	D3D_FEATURE_LEVEL                   _featureLevel;

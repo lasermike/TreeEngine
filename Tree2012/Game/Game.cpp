@@ -223,6 +223,7 @@ HRESULT Game::OnResize()
 	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
 	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
 #endif
+
 	// Initialize the projection matrix
 	_renderData.screenWidth = windowWidth;
 	_renderData.screenHeight = windowHeight;
@@ -292,12 +293,7 @@ HRESULT Game::OnResize()
 		(void)_pImmediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&_pImmediateContext1));
 	}
 
-#if defined(_TREE_CLASSIC)
-	DXGI_SWAP_CHAIN_DESC sd;
-#else
 	DXGI_SWAP_CHAIN_DESC1 sd;
-#endif
-
 	ZeroMemory(&sd, sizeof(sd));
 
 #if !defined(_TREE_CLASSIC)
@@ -307,7 +303,7 @@ HRESULT Game::OnResize()
 
 #ifdef _XBOX_ONE
 	sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-#elif !defined(_TREE_CLASSIC)
+#else //#elif !defined(_TREE_CLASSIC)
 	sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
 	sd.SampleDesc.Count = _enableMsaa ? msaaCount : 1;
@@ -323,7 +319,8 @@ HRESULT Game::OnResize()
 #endif 
 
 #if defined(_TREE_CLASSIC)
-    HRR(dxgiFactory2->CreateSwapChain(_pd3dDevice, &sd, &_pSwapChain));
+	HRR(dxgiFactory2->CreateSwapChainForHwnd(_pd3dDevice, _hwnd, &sd, nullptr, nullptr, &_pSwapChain1));
+	HRR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));
 #else
 	HRR(dxgiFactory2->CreateSwapChainForCoreWindow(_pd3dDevice, reinterpret_cast<IUnknown*>(_window.Get()), &sd, nullptr, &_pSwapChain1));
 	HRR(_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&_pSwapChain)));

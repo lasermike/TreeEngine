@@ -7,6 +7,8 @@
 #include <iostream>
 #include <vector>
 #include <CComPtr.h>
+#include <fstream>
+#include <sstream>
 
 #define XSF_USE_DX_11_1
 
@@ -70,16 +72,18 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 		hr = (x);                                      \
 		if (FAILED(hr))                                         \
 		{                                                      \
-		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
-		assert(SUCCEEDED(hr)); \
-		goto Cleanup; \
+			std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
+			assert(SUCCEEDED(hr)); \
+			goto Cleanup; \
 		}                                                      
 #endif
 
 #ifndef LOG
 #define LOG(x)	\
 		{		\
-		std::cerr << "LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << "\n"; \
+			stringstream str; \
+			str << "LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << "\n"; \
+			OutputDebugStringA(str.str().c_str());  \
 		}        
 #endif 
 

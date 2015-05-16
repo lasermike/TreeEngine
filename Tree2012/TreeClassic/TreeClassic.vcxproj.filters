@@ -224,6 +224,12 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Game\Shaders\buildShaders.bat">
+      <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Shaders\commonshader.bat">
+      <Filter>Game\Shaders</Filter>
+    </None>
     <None Include="..\Game\Arial_16.abc">
       <Filter>Game\Resources</Filter>
     </None>
@@ -235,12 +241,6 @@
     </None>
     <None Include="..\Game\Courier_New_11.tga">
       <Filter>Game\Resources</Filter>
-    </None>
-    <None Include="..\Game\Shaders\buildShaders.bat">
-      <Filter>Game\Shaders</Filter>
-    </None>
-    <None Include="..\Game\Shaders\commonshader.bat">
-      <Filter>Game\Shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

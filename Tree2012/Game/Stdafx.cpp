@@ -2,6 +2,10 @@
 #include <vector>
 #include "processenv.h"
 
+//#ifdef _TREE_CLASSIC
+//#include "Shlwapi.h"
+//#endif
+
 namespace XboxSampleFramework
 {
     namespace Details
@@ -35,8 +39,12 @@ void XSF::SetContentFileRoot()
     _snwprintf_s( Details::g_strApplicationDataPath, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s\\", writeableFolder.c_str() );
 
 #elif defined(_TREE_CLASSIC)
-	//wcscpy_s(Details::g_strCommonFileRoot, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
-	ASSERT(false);
+	GetModuleFileName( NULL, Details::g_strCommonFileRoot, MAX_PATH );
+	//PathRemoveFileSpec(Details::g_strCommonFileRoot);
+	wstring path = Details::g_strCommonFileRoot;
+    size_t found = path.find_last_of(L"/\\");
+    _snwprintf_s( Details::g_strCommonFileRoot, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s", path.substr(0, found).c_str() );
+	LOG(Details::g_strCommonFileRoot);
 
 #else
 //    wchar_t temp[ 1024 ];
