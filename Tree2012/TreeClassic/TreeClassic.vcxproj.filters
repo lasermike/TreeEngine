@@ -242,6 +242,9 @@
     <None Include="..\Game\Courier_New_11.tga">
       <Filter>Game\Resources</Filter>
     </None>
+    <None Include="..\Game\CopyResources.cmd">
+      <Filter>Game\Resources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Library Include="Lib\DirectXTex.lib">

@@ -43,8 +43,6 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     // TODO: Place code here.
-    MSG msg;
-    HACCEL hAccelTable;
 
     // Initialize global strings
     LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -57,19 +55,22 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
         return FALSE;
     }
 
-    hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_TREECLASSIC));
-
     // Main message loop:
-    while (GetMessage(&msg, NULL, 0, 0))
+    MSG msg = {0};
+    while (WM_QUIT != msg.message)
     {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-
-		g_game->Render();
+        else
+        {
+    		g_game->Render();
+        }
     }
+
+    g_game->Cleanup();
 
     return (int) msg.wParam;
 }
@@ -93,7 +94,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     HR(DetectOculus(oculusDetected));
 
 	// Found a regular or debug Oculus device
-	if (HMD)
+	if (HMD && !debugOvr)
 	{
 		Recti vp(HMD->WindowsPos, HMD->Resolution);
 		// Create Window
@@ -125,8 +126,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	}
 	else
 	{
+        RECT rc = { 0, 0, 1024, 768 };
+    AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
 		hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+			CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
 	}
 
     if (!hWnd)
@@ -135,7 +138,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
 	g_game = new Game();
-	g_game->Initialize(hWnd);
+	
+	if (FAILED(g_game->Initialize(hWnd)))
+    {
+		g_game->Cleanup();
+        return 0;
+    }
 
 
     ShowWindow(hWnd, nCmdShow);
@@ -271,7 +279,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     WNDCLASSW wc; memset(&wc, 0, sizeof(wc));
     wc.lpszClassName = L"OVRAppWindow";
     wc.style = CS_OWNDC;
-    wc.lpfnWndProc = DefWindowProc;
+    wc.lpfnWndProc = WndProc;
     wc.cbWndExtra = NULL;
     return RegisterClassW(&wc);
 

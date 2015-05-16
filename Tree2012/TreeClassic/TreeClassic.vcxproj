@@ -43,7 +43,7 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>..\Game\.;..\Inc;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>;..\TreePC\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);</LibraryPath>
-    <OutDir>$(SolutionDir)$(Configuration)\TreeClassic\</OutDir>
+    <OutDir>$(SolutionDir)$(Configuration)\$(ProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -66,6 +66,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>..\Game\CopyResources.cmd $(OutDir)
+</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -86,6 +90,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>..\Game\CopyResources.cmd $(OutDir)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="..\Game\Shaders\ShaderFiles.txt" />
@@ -173,6 +180,7 @@
     <None Include="..\Game\Arial_16.tga">
       <DeploymentContent>true</DeploymentContent>
     </None>
+    <None Include="..\Game\CopyResources.cmd" />
     <None Include="..\Game\Courier_New_11.abc">
       <DeploymentContent>true</DeploymentContent>
     </None>
