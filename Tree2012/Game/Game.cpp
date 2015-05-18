@@ -85,6 +85,8 @@ Game::Game()
 	// Ideally would loop through all world space vertices
 	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	_renderData.mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
+
+    _resizeHandler = std::bind(&Game::StandardResizeHandler, this);
 }
 
 void Game::UpdateView()
@@ -197,6 +199,24 @@ HRESULT Game::OnResize()
 		return S_FALSE;
 	}
 
+    if (_resizeHandler)
+    {
+        hr = _resizeHandler(_renderData.projectionData);
+
+    }
+    //else
+    //{
+//        hr = StandardResizeHandler();
+//    }
+
+        return hr;
+}
+
+// Must create swap chain, depth/stencil, set projection data in _renderData, call RSSetViewports.
+HRESULT Game::StandardResizeHandler()
+{
+    HRESULT hr = S_OK;
+
 	// Create width/height dependent objects
 	_pDepthStencilView.Release();
 	_pDepthStencil.Release();
@@ -225,13 +245,13 @@ HRESULT Game::OnResize()
 #endif
 
 	// Initialize the projection matrix
-	_renderData.screenWidth = windowWidth;
-	_renderData.screenHeight = windowHeight;
-	_renderData.fov = XM_PIDIV4;
-	_renderData.nearClippingPlane = 1.0f;
-	_renderData.farClippingPlane = 30.0f;
+	_renderData.projectionData.screenWidth = windowWidth;
+	_renderData.projectionData.screenHeight = windowHeight;
+	_renderData.projectionData.fov = XM_PIDIV4;
+	_renderData.projectionData.nearClippingPlane = 1.0f;
+	_renderData.projectionData.farClippingPlane = 30.0f;
 
-	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.fov, _renderData.screenWidth / (float)_renderData.screenHeight, _renderData.nearClippingPlane, _renderData.farClippingPlane));
+	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.projectionData.fov, _renderData.projectionData.screenWidth / (float)_renderData.projectionData.screenHeight, _renderData.projectionData.nearClippingPlane, _renderData.projectionData.farClippingPlane));
 
 	UpdateProjection(&_renderData.projection);
 
@@ -513,11 +533,11 @@ void Game::UpdateCamera(DX::StepTimer const& timer)
 	{
 		// Determine if extent point is inside or outside the view frustrum
 		XMVECTOR v0, v1;
-		_camera->RayCast(_renderData.screenWidth / 2,0, &_renderData, v0, v1);
+		_camera->RayCast(_renderData.projectionData.screenWidth / 2,0, &_renderData, v0, v1);
 		XMFLOAT3 vv0, vv1;
 		XMStoreFloat3(&vv0, v0);
 		XMStoreFloat3(&vv1, v1);
-		float topDelta = (vv1.y - vv0.y) / (_renderData.farClippingPlane - _renderData.nearClippingPlane);
+		float topDelta = (vv1.y - vv0.y) / (_renderData.projectionData.farClippingPlane - _renderData.projectionData.nearClippingPlane);
 		
 		float frustumTopAtExtent = vv0.y + topDelta * sqrt((e.x - vv0.x) * (e.x - vv0.x) + (e.z - vv0.z) * (e.z - vv0.z)); 
 

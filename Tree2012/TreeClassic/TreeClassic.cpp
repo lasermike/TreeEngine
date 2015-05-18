@@ -27,7 +27,7 @@ bool windowedOvr = false;
 OVR::Sizei WinSize;
 
 // Forward declarations of functions included in this code module:
-HRESULT				DetectOculus(bool& detected);
+HRESULT				CreateOculusDevice(bool& detected);
 
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
@@ -91,42 +91,36 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     HWND hWnd;
 
     bool oculusDetected = false;
-    HR(DetectOculus(oculusDetected));
+    HR(CreateOculusDevice(oculusDetected));
 
 	// Found a regular or debug Oculus device
 	if (HMD && !debugOvr)
 	{
-		Recti vp(HMD->WindowsPos, HMD->Resolution);
-		// Create Window
-		DWORD wsStyle = WS_POPUP;
-		DWORD sizeDivisor = 1;
+        ovrSizei ovrWinSize = { HMD->Resolution.w / 2, HMD->Resolution.h / 2 };
+		Recti vp(Recti(Vector2i(0), ovrWinSize));
 
-		if (windowedOvr)
-		{
-			wsStyle |= WS_OVERLAPPEDWINDOW; 
-			sizeDivisor = 2;
-		}
-		RECT winSize = { 0, 0, vp.w / sizeDivisor, vp.h / sizeDivisor };
-		AdjustWindowRect(&winSize, wsStyle, false);
-		hWnd = CreateWindowW(L"OVRAppWindow", L"Tree Engine", wsStyle | WS_VISIBLE,
-			vp.x, vp.y, winSize.right - winSize.left, winSize.bottom - winSize.top,
-			NULL, NULL, hInst, NULL);
+        WNDCLASSW wc; memset(&wc, 0, sizeof(wc));
+        wc.lpszClassName = L"OVRAppWindow";
+        wc.style = CS_OWNDC;
+        wc.lpfnWndProc = WndProc;
+        wc.cbWndExtra = sizeof(struct DirectX11 *);
+        RegisterClassW(&wc);
 
-		if (!hWnd)
-			return(false);
-		if (windowedOvr)
-		{
-			WinSize = vp.GetSize();
-		}
-		else
-		{
-			RECT rc; GetClientRect(hWnd, &rc);
-			WinSize = Sizei(rc.right - rc.left, rc.bottom - rc.top);
-		}
+        const DWORD wsStyle = WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME;
+        RECT winSize = { 0, 0, vp.w, vp.h };
+        AdjustWindowRect(&winSize, wsStyle, FALSE);
+        hWnd = CreateWindowW(L"OVRAppWindow", L"Tree Engine VR", wsStyle | WS_VISIBLE,
+            CW_USEDEFAULT, CW_USEDEFAULT, winSize.right - winSize.left, winSize.bottom - winSize.top,
+            NULL, NULL, hInstance, NULL);
+        if (!hWnd) 
+            return(false);
+        //SetWindowLongPtr(hWnd, 0, LONG_PTR(this));
+
+        WinSize = vp.GetSize();
 	}
 	else
 	{
-        RECT rc = { 0, 0, 1024, 768 };
+        RECT rc = { 0, 0, 1600, 1200};
     AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
 		hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
@@ -161,35 +155,30 @@ void OnWindowSizeChanged()
 //--------------------------------------------------------------------------------------
 // Create Oculus interface if possible
 //--------------------------------------------------------------------------------------
-HRESULT DetectOculus(bool& detected)
+HRESULT CreateOculusDevice(bool& detected)
 {
     detected = false;
 
-    OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
+    //OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
 
-    //Initialise rift
-    if (!ovr_Initialize())
-    { 
+    // Initializes LibOVR, and the Rift
+    ovrResult result = ovr_Initialize(nullptr);
+    if (result != ovrSuccess)
+    {
         LOG("Unable to initialize libOVR."); 
         return 0; 
     }
-    HMD = ovrHmd_Create(0);
+
+    result = ovrHmd_Create(0, &HMD);
 	if (HMD)
 	{
 		LOG("Oculus Rift device created."); 
 	}
 	else 
     {
-        HMD = ovrHmd_CreateDebug(ovrHmd_DK2);
+        result = ovrHmd_CreateDebug(ovrHmd_DK2, &HMD);
 		debugOvr = true;
         LOG("Debug Oculus Rift device created."); 
-    }
-
-    if (!HMD) 
-    {	
-        LOG("Oculus Rift not detected."); 
-        ovr_Shutdown(); 
-        return S_FALSE; 
     }
 
     if (HMD->ProductName[0] == '\0')
@@ -197,7 +186,7 @@ HRESULT DetectOculus(bool& detected)
         LOG("Rift detected, display not enabled.");
     }
 
-    windowedOvr = (HMD->HmdCaps & ovrHmdCap_ExtendDesktop) ? false : true;    
+    windowedOvr = false; //(HMD->HmdCaps & ovrHmdCap_ExtendDesktop) ? false : true;    
 
     detected = true;
     return S_OK;

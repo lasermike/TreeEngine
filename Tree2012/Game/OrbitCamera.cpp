@@ -140,11 +140,11 @@ void OrbitCamera::RayCast(int x, int y, RenderData* pData, XMVECTOR &p1, XMVECTO
 
 	float dx,dy;
 
-	dx=tanf(pData->fov * 0.5f) * (x / pData->screenWidth / 2.0f - 1.0f) / (pData->screenWidth / pData->screenHeight);
-	dy=tanf(pData->fov * 0.5f) * (1.0f-y / pData->screenHeight / 2.0f);
+	dx=tanf(pData->projectionData.fov * 0.5f) * (x / pData->projectionData.screenWidth / 2.0f - 1.0f) / (pData->projectionData.screenWidth / pData->projectionData.screenHeight);
+	dy=tanf(pData->projectionData.fov * 0.5f) * (1.0f-y / pData->projectionData.screenHeight / 2.0f);
 
-	p1 = XMVectorSet(dx * pData->nearClippingPlane, dy * pData->nearClippingPlane, pData->nearClippingPlane, 1.0f);
-	p2 = XMVectorSet(dx * pData->farClippingPlane, dy * pData->farClippingPlane, pData->farClippingPlane, 1.0f);
+	p1 = XMVectorSet(dx * pData->projectionData.nearClippingPlane, dy * pData->projectionData.nearClippingPlane, pData->projectionData.nearClippingPlane, 1.0f);
+	p2 = XMVectorSet(dx * pData->projectionData.farClippingPlane, dy * pData->projectionData.farClippingPlane, pData->projectionData.farClippingPlane, 1.0f);
 	
 	p1 = XMVector4Transform(p1, m_Transform);
 	p2 = XMVector4Transform(p2, m_Transform);

@@ -8,6 +8,7 @@
 
 namespace XboxSampleFramework
 {
+
     namespace Details
     {
         wchar_t    g_strCommonFileRoot[ 1024 ];

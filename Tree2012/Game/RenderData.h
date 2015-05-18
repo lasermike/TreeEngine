@@ -16,20 +16,26 @@ enum RenderPass
 	ShadowMapPass
 };
 
+struct ProjectionData
+{
+	int					screenWidth;
+	int					screenHeight;
+	float				fov;
+	float				nearClippingPlane;
+	float				farClippingPlane;
+};
+
 struct RenderData
 {
 	RenderPass			pass;
 	float				time;
 
-	XMFLOAT4X4			world;
+    ProjectionData      projectionData;
+
+	XMFLOAT4X4			world;          // Needed?
 	XMFLOAT4X4          projection;
-	XMFLOAT4X4			view;
+	XMFLOAT4X4			view;           
 	XMFLOAT4			eyePos;
-	float				nearClippingPlane;
-	float				farClippingPlane;
-	float				fov;
-	int					screenWidth;
-	int					screenHeight;
 
 	DirectionalLight	dirLights[1];
 	BoundingSphere		mSceneBounds;

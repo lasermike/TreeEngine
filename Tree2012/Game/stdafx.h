@@ -9,6 +9,7 @@
 #include <CComPtr.h>
 #include <fstream>
 #include <sstream>
+#include <functional>
 
 #define XSF_USE_DX_11_1
 
@@ -32,6 +33,19 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr)
 	std::cerr << msg << " " << file << " " << line << " " << hr << "\n"; 
 	assert(SUCCEEDED(hr)); 
 }
+
+struct Utility
+{
+    void Output(const char * fnt,...)
+    {
+        static char string_text[1000];
+        va_list args; va_start(args,fnt);
+        vsprintf_s(string_text,fnt,args);
+        va_end(args);
+        OutputDebugStringA(string_text);
+    }
+} static Util;
+
 
 #else
 
@@ -81,11 +95,12 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #ifndef LOG
 #define LOG(x)	\
 		{		\
-			stringstream str; \
-			str << "LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << "\n"; \
-			OutputDebugStringA(str.str().c_str());  \
+            Util.Output("Log: %s \n", x);  \
 		}        
 #endif 
+			//wstringstream str; \
+			//str << L"LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << L"\n"; \
+			//OutputDebugString(str.str().c_str());  \
 
 #else
 #ifndef HRR

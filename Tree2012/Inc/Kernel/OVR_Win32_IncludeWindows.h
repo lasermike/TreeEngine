@@ -53,7 +53,6 @@ limitations under the License.
 #endif
 
 #include <Windows.h>
-#include <Winreg.h>
 
 namespace OVR {
 
@@ -152,68 +151,70 @@ public:
 typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedEventHANDLE;
 typedef ScopedHANDLE < ScopedHANDLE_InvalidTraits > ScopedFileHANDLE;
 typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedProcessHANDLE;
+typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedThreadHANDLE;
+typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedSemaphoreHANDLE;
 
-//// Scoped registry keys
-//class ScopedHKEY
-//{
-//    HKEY hAttachedHandle;
-//
-//public:
-//    ScopedHKEY(HKEY handle) :
-//        hAttachedHandle(handle)
-//    {
-//    }
-//    ScopedHKEY()
-//    {
-//        hAttachedHandle = nullptr;
-//    }
-//    ScopedHKEY& operator=(HKEY handle)
-//    {
-//        Close();
-//        hAttachedHandle = handle;
-//        return *this;
-//    }
-//    ~ScopedHKEY()
-//    {
-//        Close();
-//    }
-//
-//    bool IsValid()
-//    {
-//        return hAttachedHandle != nullptr;
-//    }
-//    HKEY Get()
-//    {
-//        return hAttachedHandle;
-//    }
-//    HKEY& GetRawRef()
-//    {
-//        return hAttachedHandle;
-//    }
-//    void Attach(HKEY handle)
-//    {
-//        Close();
-//        hAttachedHandle = handle;
-//    }
-//    void Detach()
-//    {
-//        // Do not close handle
-//        hAttachedHandle = nullptr;
-//    }
-//    bool Close()
-//    {
-//        bool success = true;
-//        if (hAttachedHandle != nullptr)
-//        {
-//            if (::RegCloseKey(hAttachedHandle) == ERROR_SUCCESS)
-//            {
-//                success = false;
-//            }
-//            hAttachedHandle = nullptr;
-//        }
-//        return success;
-//    }
-//};
+// Scoped registry keys
+class ScopedHKEY
+{
+    HKEY hAttachedHandle;
+
+public:
+    ScopedHKEY(HKEY handle) :
+        hAttachedHandle(handle)
+    {
+    }
+    ScopedHKEY()
+    {
+        hAttachedHandle = nullptr;
+    }
+    ScopedHKEY& operator=(HKEY handle)
+    {
+        Close();
+        hAttachedHandle = handle;
+        return *this;
+    }
+    ~ScopedHKEY()
+    {
+        Close();
+    }
+
+    bool IsValid()
+    {
+        return hAttachedHandle != nullptr;
+    }
+    HKEY Get()
+    {
+        return hAttachedHandle;
+    }
+    HKEY& GetRawRef()
+    {
+        return hAttachedHandle;
+    }
+    void Attach(HKEY handle)
+    {
+        Close();
+        hAttachedHandle = handle;
+    }
+    void Detach()
+    {
+        // Do not close handle
+        hAttachedHandle = nullptr;
+    }
+    bool Close()
+    {
+        bool success = true;
+        if (hAttachedHandle != nullptr)
+        {
+            if (::RegCloseKey(hAttachedHandle) == ERROR_SUCCESS)
+            {
+                success = false;
+            }
+            hAttachedHandle = nullptr;
+        }
+        return success;
+    }
+};
 
 
 } // namespace OVR

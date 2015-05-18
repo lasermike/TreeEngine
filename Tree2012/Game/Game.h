@@ -16,7 +16,6 @@
 using namespace Microsoft::WRL;
 #endif
 
-
 class BitmapFont;
 
 typedef enum DisplayMode
@@ -24,6 +23,7 @@ typedef enum DisplayMode
 	Monitor = 0,
 	Oculus
 };
+
 
 
 class Game 
@@ -62,6 +62,7 @@ private:
 	void CleanupDevice();
 	static float ConvertDipsToPixels(float dips);
 
+    HRESULT StandardResizeHandler();
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 	void UpdateCamera(DX::StepTimer const& timer);
 	void UpdateView();
@@ -73,6 +74,8 @@ private:
 
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                   m_featureLevel;
+
+    std::function<HRESULT(ProjectionData& projectionData)> _resizeHandler;
 
 	// Game state
 	RenderData							_renderData;
