@@ -91,8 +91,11 @@ void TreePC::Uninitialize()
 
 void TreePC::OnWindowSizeChanged(CoreWindow^ sender, WindowSizeChangedEventArgs^ args)
 {
-	//m_renderer->UpdateForWindowSizeChange();
-	m_pGame->OnResize();
+	auto windowBounds = CoreWindow::GetForCurrentThread()->Bounds;
+	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
+	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
+
+	m_pGame->OnResize(windowWidth, windowHeight);
 }
 
 void TreePC::OnVisibilityChanged(CoreWindow^ sender, VisibilityChangedEventArgs^ args)
@@ -147,6 +150,13 @@ void TreePC::OnResuming(Platform::Object^ sender, Platform::Object^ args)
 	// Restore any data or state that was unloaded on suspend. By default, data
 	// and state are persisted when resuming from suspend. Note that this event
 	// does not occur if the app was previously terminated.
+}
+
+// Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
+float TreePC::ConvertDipsToPixels(float dips)
+{
+	static const float dipsPerInch = 96.0f;
+	return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 }
 
 IFrameworkView^ Direct3DApplicationSource::CreateView()

@@ -39,7 +39,7 @@ public:
 	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window) { _window = window; return InitDevice(); }
 #endif
 	HRESULT Cleanup() { CleanupDevice(); return S_OK; }
-	HRESULT OnResize();
+	HRESULT OnResize(UINT windowWidth, UINT windowHeight);
 	void OnKeydown(UINT key);
 
 	// Basic game loop
@@ -53,6 +53,11 @@ public:
 	void Suspend();
 	void Resume();
 
+    //typedef std::function<HRESULT(ProjectionData& projectionData)> ResizeFunc;
+    //void SetResizeHandler(ResizeFunc func)
+    //{
+    //    _resizeHandler = func;
+    //}
 private:
 
 	void Update(DX::StepTimer const& timer);
@@ -60,9 +65,8 @@ private:
 
 	HRESULT InitDevice();
 	void CleanupDevice();
-	static float ConvertDipsToPixels(float dips);
 
-    HRESULT StandardResizeHandler();
+    //HRESULT StandardResizeHandler();
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 	void UpdateCamera(DX::StepTimer const& timer);
 	void UpdateView();
@@ -75,7 +79,7 @@ private:
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                   m_featureLevel;
 
-    std::function<HRESULT(ProjectionData& projectionData)> _resizeHandler;
+    //ResizeFunc _resizeHandler;
 
 	// Game state
 	RenderData							_renderData;

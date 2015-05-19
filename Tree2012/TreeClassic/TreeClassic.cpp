@@ -20,6 +20,8 @@ TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 // Tree engine
 Game* g_game = nullptr;
 
+HWND hWnd = nullptr;
+
 // Oculus specific
 ovrHmd HMD = nullptr;
 bool debugOvr = false;
@@ -75,20 +77,18 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
+
+HRESULT OvrResizeHandler(ProjectionData& projectionData)
+{
+    return S_OK;
+}
+
 //
 //   FUNCTION: InitInstance(HINSTANCE, int)
-//
-//   PURPOSE: Saves instance handle and creates main window
-//
-//   COMMENTS:
-//
-//        In this function, we save the instance handle in a global variable and
-//        create and display the main program window.
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hInst = hInstance; // Store instance handle in our global variable
-    HWND hWnd;
 
     bool oculusDetected = false;
     HR(CreateOculusDevice(oculusDetected));
@@ -132,12 +132,19 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
 	g_game = new Game();
-	
+
+    //if (HMD && !debugOvr)
+    //{
+    //    g_game->SetResizeHandler(&OvrResizeHandler);
+    //}
+
+
 	if (FAILED(g_game->Initialize(hWnd)))
     {
 		g_game->Cleanup();
         return 0;
     }
+
 
 
     ShowWindow(hWnd, nCmdShow);
@@ -148,9 +155,17 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 void OnWindowSizeChanged()
 {
-	g_game->OnResize();
-}
+    ASSERT(hWnd);
 
+	UINT windowWidth = 0; 
+	UINT windowHeight = 0;
+	RECT rect = {0};
+	GetClientRect(hWnd, &rect);
+	windowWidth = rect.right - rect.left;
+	windowHeight = rect.bottom - rect.top;
+
+	g_game->OnResize(windowWidth, windowHeight);
+}
 
 //--------------------------------------------------------------------------------------
 // Create Oculus interface if possible

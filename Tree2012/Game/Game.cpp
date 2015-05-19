@@ -86,7 +86,8 @@ Game::Game()
 	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	_renderData.mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
 
-    _resizeHandler = std::bind(&Game::StandardResizeHandler, this);
+    //_resizeHandler = std::bind(&Game::StandardResizeHandler, this);
+    //SetResizeHandler(std::bind(&Game::StandardResizeHandler, this));
 }
 
 void Game::UpdateView()
@@ -176,7 +177,7 @@ HRESULT Game::InitDevice()
 	// Init shadow map
 	_renderData.pShadowMap = new ShadowMap(_pd3dDevice, _renderData.SMapWidth, _renderData.SMapHeight);
 
-	OnResize();
+	//OnResize();
 
 	return S_OK;
 }
@@ -190,8 +191,12 @@ HRESULT Game::UpdateProjection(XMFLOAT4X4* pProjMat)
 	return S_OK;
 }
 
-HRESULT Game::OnResize()
+HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 {
+//#ifdef _XBOX_ONE
+//	UINT windowWidth = 1920;
+//	UINT windowHeight = 1080;
+
 	HRESULT hr = S_OK;
 
 	if (!_pImmediateContext)
@@ -199,23 +204,7 @@ HRESULT Game::OnResize()
 		return S_FALSE;
 	}
 
-    if (_resizeHandler)
-    {
-        hr = _resizeHandler(_renderData.projectionData);
-
-    }
-    //else
-    //{
-//        hr = StandardResizeHandler();
-//    }
-
-        return hr;
-}
-
-// Must create swap chain, depth/stencil, set projection data in _renderData, call RSSetViewports.
-HRESULT Game::StandardResizeHandler()
-{
-    HRESULT hr = S_OK;
+    // Resize logic
 
 	// Create width/height dependent objects
 	_pDepthStencilView.Release();
@@ -226,23 +215,7 @@ HRESULT Game::StandardResizeHandler()
 	SafeRelease(&_pSwapChain1);
 	SafeRelease(&_pSwapChain);
 
-
 	// Calculate the necessary swap chain and render target size in pixels.
-#ifdef _XBOX_ONE
-	UINT windowWidth = 1920;
-	UINT windowHeight = 1080;
-#elif defined(_TREE_CLASSIC)
-	UINT windowWidth = 0; 
-	UINT windowHeight = 0;
-	RECT rect = {0};
-	GetClientRect(_hwnd, &rect);
-	windowWidth = rect.right - rect.left;
-	windowHeight = rect.bottom - rect.top;
-#else
-	auto windowBounds = _window->Bounds;
-	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
-	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
-#endif
 
 	// Initialize the projection matrix
 	_renderData.projectionData.screenWidth = windowWidth;
@@ -250,10 +223,6 @@ HRESULT Game::StandardResizeHandler()
 	_renderData.projectionData.fov = XM_PIDIV4;
 	_renderData.projectionData.nearClippingPlane = 1.0f;
 	_renderData.projectionData.farClippingPlane = 30.0f;
-
-	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.projectionData.fov, _renderData.projectionData.screenWidth / (float)_renderData.projectionData.screenHeight, _renderData.projectionData.nearClippingPlane, _renderData.projectionData.farClippingPlane));
-
-	UpdateProjection(&_renderData.projection);
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
 	IDXGIFactory1* dxgiFactory = nullptr;
@@ -323,6 +292,8 @@ HRESULT Game::StandardResizeHandler()
 
 #ifdef _XBOX_ONE
 	sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	//sd.Scaling = DXGI_SCALING_STRETCH;
+	sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
 #else //#elif !defined(_TREE_CLASSIC)
 	sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
@@ -332,11 +303,6 @@ HRESULT Game::StandardResizeHandler()
 	sd.BufferCount = 2;
 	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-
-#if defined (_XBOX_ONE)
-	//sd.Scaling = DXGI_SCALING_STRETCH;
-	sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
-#endif 
 
 #if defined(_TREE_CLASSIC)
 	HRR(dxgiFactory2->CreateSwapChainForHwnd(_pd3dDevice, _hwnd, &sd, nullptr, nullptr, &_pSwapChain1));
@@ -400,6 +366,23 @@ HRESULT Game::StandardResizeHandler()
 	_viewPort.TopLeftX = 0;
 	_viewPort.TopLeftY = 0;
 	_pImmediateContext->RSSetViewports(1, &_viewPort);
+
+
+    // Validation
+    ASSERT(_pRenderTargetView);
+    ASSERT(_pSwapChain1);
+
+    ASSERT(_renderData.projectionData.nearClippingPlane != 0);
+    ASSERT(_renderData.projectionData.farClippingPlane != 0);
+    ASSERT(_renderData.projectionData.screenWidth != 0);
+    ASSERT(_renderData.projectionData.screenHeight != 0);
+    ASSERT(_renderData.projectionData.fov != 0);
+
+	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.projectionData.fov, _renderData.projectionData.screenWidth / (float)_renderData.projectionData.screenHeight, _renderData.projectionData.nearClippingPlane, _renderData.projectionData.farClippingPlane));
+
+	UpdateProjection(&_renderData.projection);
+
+    ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&_renderData.projection)));
 
 	return S_OK;
 }
@@ -788,16 +771,4 @@ void Game::DrawSceneToShadowMap()
 	stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::Solid);
 }
 
-
-#ifndef _XBOX_ONE
-#ifndef _TREE_CLASSIC
-// Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
-float Game::ConvertDipsToPixels(float dips)
-{
-	static const float dipsPerInch = 96.0f;
-	return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
-}
-
-#endif
-#endif
 
