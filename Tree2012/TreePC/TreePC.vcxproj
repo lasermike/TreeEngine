@@ -201,7 +201,9 @@
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
-    <None Include="..\Game\Arial_16.abc" />
+    <None Include="..\Game\Arial_16.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
     <None Include="..\Game\Arial_16.tga">
       <DeploymentContent>true</DeploymentContent>
     </None>

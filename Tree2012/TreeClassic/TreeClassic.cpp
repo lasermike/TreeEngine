@@ -12,24 +12,27 @@ using namespace OVR;
 
 #define MAX_LOADSTRING 100
 
-// Global Variables:
+// Tree classic
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
+HWND hWnd = nullptr;
+bool oculusMode = false;
 
 // Tree engine
 Game* g_game = nullptr;
 
-HWND hWnd = nullptr;
 
 // Oculus specific
 ovrHmd HMD = nullptr;
 bool debugOvr = false;
 bool windowedOvr = false;
 OVR::Sizei WinSize;
+ovrEyeRenderDesc eyeRenderDesc[2];
 
 // Forward declarations of functions included in this code module:
 HRESULT				CreateOculusDevice(bool& detected);
+HRESULT				ConfigOculusDevice();
 
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
@@ -93,8 +96,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     bool oculusDetected = false;
     HR(CreateOculusDevice(oculusDetected));
 
+	oculusMode = HMD != nullptr; // && debugOvr
+
 	// Found a regular or debug Oculus device
-	if (HMD && !debugOvr)
+	if (oculusMode)
 	{
         ovrSizei ovrWinSize = { HMD->Resolution.w / 2, HMD->Resolution.h / 2 };
 		Recti vp(Recti(Vector2i(0), ovrWinSize));
@@ -120,8 +125,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	}
 	else
 	{
-        RECT rc = { 0, 0, 1600, 1200};
-    AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
+		RECT rc = { 0, 0, 1600, 1080};
+		AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
 		hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
 	}
@@ -133,22 +138,20 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	g_game = new Game();
 
-    //if (HMD && !debugOvr)
-    //{
-    //    g_game->SetResizeHandler(&OvrResizeHandler);
-    //}
-
-
 	if (FAILED(g_game->Initialize(hWnd)))
     {
 		g_game->Cleanup();
         return 0;
     }
 
-
-
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
+
+	// Oculus mode
+	if (oculusMode)
+	{
+		ConfigOculusDevice();
+	}
 
     return TRUE;
 }
@@ -157,9 +160,9 @@ void OnWindowSizeChanged()
 {
     ASSERT(hWnd);
 
+	RECT rect = {0};
 	UINT windowWidth = 0; 
 	UINT windowHeight = 0;
-	RECT rect = {0};
 	GetClientRect(hWnd, &rect);
 	windowWidth = rect.right - rect.left;
 	windowHeight = rect.bottom - rect.top;
@@ -207,6 +210,119 @@ HRESULT CreateOculusDevice(bool& detected)
     return S_OK;
 }
 
+//------------------------------------------------------------
+// ovrSwapTextureSet wrapper class that also maintains the render target views
+// needed for D3D11 rendering.
+struct OculusTexture
+{
+    ovrSwapTextureSet      * TextureSet;
+    ID3D11RenderTargetView * TexRtv[3];
+
+    OculusTexture(ovrHmd hmd, ID3D11Device* pDevice, Sizei size)
+    {
+        D3D11_TEXTURE2D_DESC dsDesc;
+        dsDesc.Width            = size.w;
+        dsDesc.Height           = size.h;
+        dsDesc.MipLevels        = 1;
+        dsDesc.ArraySize        = 1;
+        dsDesc.Format           = DXGI_FORMAT_B8G8R8A8_UNORM;
+        dsDesc.SampleDesc.Count = 1;   // No multi-sampling allowed
+        dsDesc.SampleDesc.Quality = 0;
+        dsDesc.Usage            = D3D11_USAGE_DEFAULT;
+        dsDesc.CPUAccessFlags   = 0;
+        dsDesc.MiscFlags        = 0;
+        dsDesc.BindFlags        = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+
+        ovrHmd_CreateSwapTextureSetD3D11(hmd, pDevice, &dsDesc, &TextureSet);
+        for (int i = 0; i < TextureSet->TextureCount; ++i)
+        {
+            ovrD3D11Texture* tex = (ovrD3D11Texture*)&TextureSet->Textures[i];
+            pDevice->CreateRenderTargetView(tex->D3D11.pTexture, NULL, &TexRtv[i]);
+        }
+    }
+
+    void AdvanceToNextTexture()
+    {
+        TextureSet->CurrentIndex = (TextureSet->CurrentIndex + 1) % TextureSet->TextureCount;
+    }
+    void Release(ovrHmd hmd)
+    {
+        ovrHmd_DestroySwapTextureSet(hmd, TextureSet);
+    }
+};
+
+struct DepthBuffer
+{
+    ID3D11DepthStencilView * TexDsv;
+
+    DepthBuffer(ID3D11Device * Device, Sizei size, int sampleCount = 1)
+    {
+        DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT;
+        D3D11_TEXTURE2D_DESC dsDesc;
+        dsDesc.Width = size.w;
+        dsDesc.Height = size.h;
+        dsDesc.MipLevels = 1;
+        dsDesc.ArraySize = 1;
+        dsDesc.Format = format;
+        dsDesc.SampleDesc.Count = sampleCount;
+        dsDesc.SampleDesc.Quality = 0;
+        dsDesc.Usage = D3D11_USAGE_DEFAULT;
+        dsDesc.CPUAccessFlags = 0;
+        dsDesc.MiscFlags = 0;
+        dsDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        ID3D11Texture2D * Tex;
+        Device->CreateTexture2D(&dsDesc, NULL, &Tex);
+        Device->CreateDepthStencilView(Tex, NULL, &TexDsv);
+    }
+};
+
+HRESULT ConfigOculusDevice()
+{
+	ovrHmd_SetEnabledCaps(HMD, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
+
+    // Start the sensor which informs of the Rift's pose and motion
+    ovrResult result = ovrHmd_ConfigureTracking(HMD, ovrTrackingCap_Orientation | ovrTrackingCap_MagYawCorrection |
+        ovrTrackingCap_Position, 0);
+    ASSERTSZ(result == ovrSuccess, "Failed to configure tracking.");
+
+    // Make the eye render buffers (caution if actual size < requested due to HW limits). 
+    OculusTexture  * pEyeRenderTexture[2];
+    DepthBuffer    * pEyeDepthBuffer[2];
+    ovrRecti         eyeRenderViewport[2];
+    
+    for (int eye = 0; eye < 2; eye++)
+    {
+        Sizei idealSize = ovrHmd_GetFovTextureSize(HMD, (ovrEyeType)eye, HMD->DefaultEyeFov[eye], 1.0f);
+        pEyeRenderTexture[eye]      = new OculusTexture(HMD, g_game->GetDevice(), idealSize);
+		pEyeDepthBuffer[eye]        = new DepthBuffer(g_game->GetDevice(), idealSize);
+        eyeRenderViewport[eye].Pos  = Vector2i(0, 0);
+        eyeRenderViewport[eye].Size = idealSize;
+    }
+
+    // Create a mirror to see on the monitor.
+    ovrTexture*          mirrorTexture = nullptr;
+    D3D11_TEXTURE2D_DESC td = { };
+    td.ArraySize        = 1;
+    td.Format           = DXGI_FORMAT_B8G8R8A8_UNORM;
+    td.Width            = WinSize.w;
+    td.Height           = WinSize.h;
+    td.Usage            = D3D11_USAGE_DEFAULT;
+    td.SampleDesc.Count = 1;
+    td.MipLevels        = 1;
+	ovrHmd_CreateMirrorTextureD3D11(HMD, g_game->GetDevice(), &td, &mirrorTexture);
+
+    //// Create the room model
+    //Scene roomScene;
+
+    //// Create camera
+    //Camera mainCam(Vector3f(0.0f, 1.6f, -5.0f), Matrix4f::RotationY(3.141f));
+
+    // Setup VR components, filling out description
+    eyeRenderDesc[0] = ovrHmd_GetRenderDesc(HMD, ovrEye_Left, HMD->DefaultEyeFov[0]);
+    eyeRenderDesc[1] = ovrHmd_GetRenderDesc(HMD, ovrEye_Right, HMD->DefaultEyeFov[1]);
+
+	return S_OK;
+}
 
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)

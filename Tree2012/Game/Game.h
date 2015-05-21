@@ -34,10 +34,11 @@ public:
 
 	// Initialization and management
 #ifdef _TREE_CLASSIC
-	HRESULT Initialize(HWND hwnd) { _hwnd = hwnd;  return InitDevice(); }
+	HRESULT Initialize(HWND hwnd);
 #else
-	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window) { _window = window; return InitDevice(); }
+	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window);
 #endif
+
 	HRESULT Cleanup() { CleanupDevice(); return S_OK; }
 	HRESULT OnResize(UINT windowWidth, UINT windowHeight);
 	void OnKeydown(UINT key);
@@ -52,6 +53,9 @@ public:
 
 	void Suspend();
 	void Resume();
+
+	const RenderData& GetRenderData() { return _renderData; }
+	ID3D11Device* GetDevice() { return _pd3dDevice1; }
 
     //typedef std::function<HRESULT(ProjectionData& projectionData)> ResizeFunc;
     //void SetResizeHandler(ResizeFunc func)
@@ -75,6 +79,10 @@ private:
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
+
+#if !defined(_TREE_CLASSIC) && !defined(_XBOX_ONE)
+	float ConvertDipsToPixels(float dips);
+#endif 
 
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                   m_featureLevel;

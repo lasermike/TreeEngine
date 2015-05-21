@@ -103,6 +103,46 @@ Game::~Game()
 }
 
 #ifdef _TREE_CLASSIC
+HRESULT Game::Initialize(HWND hwnd) 
+{ 
+	_hwnd = hwnd;  
+	HRESULT hr = S_OK;
+	HRR(InitDevice());
+
+	UINT windowWidth = 0; 
+	UINT windowHeight = 0;
+	RECT rect = {0};
+	GetClientRect(_hwnd, &rect);
+	windowWidth = rect.right - rect.left;
+	windowHeight = rect.bottom - rect.top;
+
+	HRR(OnResize(windowWidth, windowHeight));
+
+	return hr;
+}
+
+#else
+
+HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window) 
+{ 
+	HRESULT hr = S_OK;
+
+	_window = window; 
+	HRR(InitDevice());
+
+	auto windowBounds = _window->Bounds;
+#if defined(_XBOX_ONE)
+	UINT windowWidth = 1920;
+	UINT windowHeight = 1080;
+#else
+	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
+	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
+#endif
+	HRR(OnResize(windowWidth, windowHeight));
+	
+	return hr;
+}
+
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -193,10 +233,6 @@ HRESULT Game::UpdateProjection(XMFLOAT4X4* pProjMat)
 
 HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 {
-//#ifdef _XBOX_ONE
-//	UINT windowWidth = 1920;
-//	UINT windowHeight = 1080;
-
 	HRESULT hr = S_OK;
 
 	if (!_pImmediateContext)
@@ -770,5 +806,14 @@ void Game::DrawSceneToShadowMap()
 
 	stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::Solid);
 }
+
+#if !defined(_TREE_CLASSIC) && !defined(_XBOX_ONE)
+// Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
+float Game::ConvertDipsToPixels(float dips)
+{
+	static const float dipsPerInch = 96.0f;
+	return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+}
+#endif
 
 

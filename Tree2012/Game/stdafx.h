@@ -98,6 +98,12 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
             Util.Output("Log: %s \n", x);  \
 		}        
 #endif 
+
+#define ASSERTSZ(x, str) \
+		if (!x) { \
+			assert(0 == L#x);   \
+			Util.Output("Assert failed: %s \n", L#x); \
+		} 
 			//wstringstream str; \
 			//str << L"LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << L"\n"; \
 			//OutputDebugString(str.str().c_str());  \
