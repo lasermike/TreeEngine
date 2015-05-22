@@ -60,6 +60,7 @@ void ApplicationView::Run()
 
 		HandleInput();
 
+		m_pGame->Tick();
 		m_pGame->Render();
     }
 }

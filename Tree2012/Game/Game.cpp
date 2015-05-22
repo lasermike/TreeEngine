@@ -414,6 +414,9 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
     ASSERT(_renderData.projectionData.screenHeight != 0);
     ASSERT(_renderData.projectionData.fov != 0);
 
+    ASSERT(_viewPort.Width != 0);
+    ASSERT(_viewPort.Height != 0);
+
 	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.projectionData.fov, _renderData.projectionData.screenWidth / (float)_renderData.projectionData.screenHeight, _renderData.projectionData.nearClippingPlane, _renderData.projectionData.farClippingPlane));
 
 	UpdateProjection(&_renderData.projection);
@@ -604,12 +607,10 @@ void Game::UpdateCamera(DX::StepTimer const& timer)
 }
 
 //--------------------------------------------------------------------------------------
-// Render a frame
+// Once per frame processing
 //--------------------------------------------------------------------------------------
-void Game::Render()
+void Game::Tick()
 {
-	HRESULT hr = S_OK;
-
     _timer.Tick([&]()
     {
         Update(_timer);
@@ -625,6 +626,14 @@ void Game::Render()
 	// Restore state after shadow
 	_pImmediateContext->RSSetState(0);
 	_pImmediateContext->RSSetViewports(1, &_viewPort);
+}
+
+//--------------------------------------------------------------------------------------
+// Render a frame.  May be called twice for stereo rendering
+//--------------------------------------------------------------------------------------
+void Game::Render()
+{
+	HRESULT hr = S_OK;
 
 	// Bind render target and depth
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);

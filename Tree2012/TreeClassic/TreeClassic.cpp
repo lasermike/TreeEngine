@@ -33,6 +33,7 @@ ovrEyeRenderDesc eyeRenderDesc[2];
 // Forward declarations of functions included in this code module:
 HRESULT				CreateOculusDevice(bool& detected);
 HRESULT				ConfigOculusDevice();
+HRESULT             Render();
 
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
@@ -71,7 +72,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
         }
         else
         {
-    		g_game->Render();
+            Render();
         }
     }
 
@@ -80,6 +81,31 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
+
+HRESULT Render()
+{
+    g_game->Tick();
+    XMFLOAT4 eye = g_game->GetRenderData().eyePos;
+
+    //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));
+    float y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, 0);
+    //Util.Output("LOG: position Y: %f \n", y);  
+
+    // Get both eye poses simultaneously, with IPD offset already included. 
+    ovrPosef         EyeRenderPose[2];
+    ovrVector3f      HmdToEyeViewOffset[2] = { eyeRenderDesc[0].HmdToEyeViewOffset,
+                                                eyeRenderDesc[1].HmdToEyeViewOffset };
+    ovrFrameTiming   ftiming  = ovrHmd_GetFrameTiming(HMD, 0);
+    ovrTrackingState hmdState = ovrHmd_GetTrackingState(HMD, ftiming.DisplayMidpointSeconds);
+    ovr_CalcEyePoses(hmdState.HeadPose.ThePose, HmdToEyeViewOffset, EyeRenderPose);
+
+    Util.Output("LOG: position Y: %f, %f, %f \n", hmdState.HeadPose.ThePose.Position.x, 
+                                          hmdState.HeadPose.ThePose.Position.y,
+                                          hmdState.HeadPose.ThePose.Position.z);  
+
+    g_game->Render();
+    return S_OK;
+}
 
 HRESULT OvrResizeHandler(ProjectionData& projectionData)
 {
@@ -154,20 +180,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	}
 
     return TRUE;
-}
-
-void OnWindowSizeChanged()
-{
-    ASSERT(hWnd);
-
-	RECT rect = {0};
-	UINT windowWidth = 0; 
-	UINT windowHeight = 0;
-	GetClientRect(hWnd, &rect);
-	windowWidth = rect.right - rect.left;
-	windowHeight = rect.bottom - rect.top;
-
-	g_game->OnResize(windowWidth, windowHeight);
 }
 
 //--------------------------------------------------------------------------------------
@@ -282,7 +294,7 @@ HRESULT ConfigOculusDevice()
 
     // Start the sensor which informs of the Rift's pose and motion
     ovrResult result = ovrHmd_ConfigureTracking(HMD, ovrTrackingCap_Orientation | ovrTrackingCap_MagYawCorrection |
-        ovrTrackingCap_Position, 0);
+                                                     ovrTrackingCap_Position, 0);
     ASSERTSZ(result == ovrSuccess, "Failed to configure tracking.");
 
     // Make the eye render buffers (caution if actual size < requested due to HW limits). 
@@ -324,15 +336,23 @@ HRESULT ConfigOculusDevice()
 	return S_OK;
 }
 
+void OnWindowSizeChanged()
+{
+    ASSERT(hWnd);
+
+	RECT rect = {0};
+	UINT windowWidth = 0; 
+	UINT windowHeight = 0;
+	GetClientRect(hWnd, &rect);
+	windowWidth = rect.right - rect.left;
+	windowHeight = rect.bottom - rect.top;
+
+	g_game->OnResize(windowWidth, windowHeight);
+}
+
+
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
-//
-//  PURPOSE:  Processes messages for the main window.
-//
-//  WM_COMMAND	- process the application menu
-//  WM_PAINT	- Paint the main window
-//  WM_DESTROY	- post a quit message and return
-//
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {

@@ -73,10 +73,8 @@ void TreePC::Run()
 		{
 			timer->Update();
 			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+			m_pGame->Tick();
 			m_pGame->Render();
-			//m_renderer->Update(timer->Total, timer->Delta);
-			//m_renderer->Render();
-			//m_renderer->Present(); // This call is synchronized to the display frame rate.
 		}
 		else
 		{
