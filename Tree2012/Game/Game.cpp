@@ -495,8 +495,6 @@ void Game::Update(DX::StepTimer const& timer)
 	HR(_pScene->Update(_pImmediateContext, &_renderData));
 
     _player->Update(timer, &_renderData);
-
-    UpdateView();
 }
 
 
@@ -530,6 +528,8 @@ void Game::Tick(bool key[256])
 void Game::Render()
 {
 	HRESULT hr = S_OK;
+
+    UpdateView();
 
 	// Bind render target and depth
 	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);

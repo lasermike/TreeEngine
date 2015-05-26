@@ -13,22 +13,20 @@ enum CameraType
 class Camera
 {
 	WorldObject* m_parent;
+    XMFLOAT3     m_hmdPosition;
+    XMFLOAT4     m_hmdRotation;
 
 public:
-	Camera(WorldObject* parent) { m_parent = parent; }
+	Camera(WorldObject* parent) 
+    { 
+        m_parent = parent; 
+        m_hmdPosition = XMFLOAT3(0,0,0);
+        XMStoreFloat4(&m_hmdRotation, XMQuaternionIdentity());
+    }
 
-    XMMATRIX GetViewMatrix()
-	{
-		XMMATRIX rotMat = XMMatrixRotationQuaternion(m_parent->GetRotation());
-		XMVECTOR finalUp      = XMVector3Transform(XMVectorSet(0, 1, 0, 1), rotMat);
-        XMVECTOR finalForward = XMVector3Transform(XMVectorSet(0, 0, 1, 1), rotMat);
+    void SetHmdState(XMFLOAT3 hmdPosition, XMFLOAT4 hmdRotation) { m_hmdPosition = hmdPosition; m_hmdRotation = hmdRotation; }
 
-		XMVECTOR pos = m_parent->GetPosition();
-		return XMMatrixLookAtLH(pos, 
-								pos + finalForward, 
-								finalUp);
-	}
-
+    XMMATRIX GetViewMatrix();
 };
 
 //-----------------------------------------------------------

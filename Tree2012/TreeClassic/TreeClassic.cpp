@@ -29,6 +29,8 @@ bool debugOvr = false;
 bool windowedOvr = false;
 OVR::Sizei WinSize;
 ovrEyeRenderDesc eyeRenderDesc[2];
+ovrQuatf neutralRotation;
+
 
 // Forward declarations of functions included in this code module:
 HRESULT				CreateOculusDevice(bool& detected);
@@ -84,29 +86,66 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 
 HRESULT Render()
 {
-    XMFLOAT4 eye = g_game->GetRenderData().eyePos;
+    if (oculusMode)
+    {
+        XMFLOAT4 eye = g_game->GetRenderData().eyePos;
 
-    //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));
-    float y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, 0);
-    //Util.Output("LOG: position Y: %f \n", y);  
+        //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));
+        float y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, 0);
+        //Util.Output("LOG: position Y: %f \n", y);  
 
-    // Get both eye poses simultaneously, with IPD offset already included. 
-    ovrPosef         EyeRenderPose[2];
-    ovrVector3f      HmdToEyeViewOffset[2] = { eyeRenderDesc[0].HmdToEyeViewOffset,
-                                                eyeRenderDesc[1].HmdToEyeViewOffset };
-    ovrFrameTiming   ftiming  = ovrHmd_GetFrameTiming(HMD, 0);
-    ovrTrackingState hmdState = ovrHmd_GetTrackingState(HMD, ftiming.DisplayMidpointSeconds);
-    ovr_CalcEyePoses(hmdState.HeadPose.ThePose, HmdToEyeViewOffset, EyeRenderPose);
+        // Get both eye poses simultaneously, with IPD offset already included. 
+        ovrPosef         EyeRenderPose[2];
+        ovrVector3f      HmdToEyeViewOffset[2] = { eyeRenderDesc[0].HmdToEyeViewOffset,
+                                                    eyeRenderDesc[1].HmdToEyeViewOffset };
+        ovrFrameTiming   ftiming  = ovrHmd_GetFrameTiming(HMD, 0);
+        ovrTrackingState hmdState = ovrHmd_GetTrackingState(HMD, ftiming.DisplayMidpointSeconds);
+        ovr_CalcEyePoses(hmdState.HeadPose.ThePose, HmdToEyeViewOffset, EyeRenderPose);
 
-    Util.Output("LOG: position Y: %f, %f, %f \n", hmdState.HeadPose.ThePose.Position.x, 
-                                          hmdState.HeadPose.ThePose.Position.y,
-                                          hmdState.HeadPose.ThePose.Position.z);  
+        Util.Output("LOG: position Y: %f, %f, %f \n", hmdState.HeadPose.ThePose.Position.x, 
+                                              hmdState.HeadPose.ThePose.Position.y,
+                                              hmdState.HeadPose.ThePose.Position.z);  
 
-    // Run game 
-    g_game->Tick(key);
 
-    // Render
-    g_game->Render();
+        // Run game 
+        g_game->Tick(key);
+
+        // Render Scene to Eye Buffers
+        for (int eye = 0; eye < 1; eye++)  //2
+        {
+            XMFLOAT3 hmdPos = XMFLOAT3(EyeRenderPose[eye].Position.x, EyeRenderPose[eye].Position.y, EyeRenderPose[eye].Position.z);
+
+            if (key[VK_SPACE])
+            {
+                neutralRotation = EyeRenderPose[eye].Orientation;
+            }
+
+            Quatf finalRot = EyeRenderPose[eye].Orientation;
+            //finalRot.x = EyeRenderPose[eye].Orientation.x - neutralRotation.x;
+            //finalRot.y = EyeRenderPose[eye].Orientation.y - neutralRotation.y;
+            //finalRot.z = EyeRenderPose[eye].Orientation.z - neutralRotation.z;
+            //finalRot.w = EyeRenderPose[eye].Orientation.w - neutralRotation.w;
+
+            XMFLOAT4 hmdRot = XMFLOAT4(-finalRot.x,   // Convert right handed to left handed
+                                       -finalRot.y,   // Ditto
+                                       finalRot.z, 
+                                       finalRot.w);
+            g_game->GetPlayer()->GetCamera()->SetHmdState(hmdPos, hmdRot);
+
+            // Render
+            {
+                g_game->Render();
+            }
+        }
+    }
+    else
+    {
+        // Run game 
+        g_game->Tick(key);
+
+        g_game->Render();
+    }
+
     return S_OK;
 }
 
@@ -125,7 +164,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     bool oculusDetected = false;
     HR(CreateOculusDevice(oculusDetected));
 
-	oculusMode = HMD != nullptr; // && debugOvr
+	oculusMode = HMD != nullptr && !debugOvr;
 
 	// Found a regular or debug Oculus device
 	if (oculusMode)
@@ -151,6 +190,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         //SetWindowLongPtr(hWnd, 0, LONG_PTR(this));
 
         WinSize = vp.GetSize();
+
+        neutralRotation = Quatf::Identity();
 	}
 	else
 	{

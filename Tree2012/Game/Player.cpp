@@ -1,10 +1,28 @@
 #include "pch.h"
 #include "Player.h"
 
+XMMATRIX Camera::GetViewMatrix()
+{
+    //XMMATRIX rotMat = XMMatrixRotationQuaternion(XMQuaternionMultiply(
+    //    XMLoadFloat4(&m_hmdRotation),
+    //    m_parent->GetRotation()
+    //));
+                                                                          
+    XMMATRIX rotMat = XMMatrixRotationQuaternion(XMLoadFloat4(&m_hmdRotation));
+
+	XMVECTOR finalUp      = XMVector3Transform(XMVectorSet(0, 1, 0, 0), rotMat);
+    XMVECTOR finalForward = XMVector3Transform(XMVectorSet(0, 0, 1, 0), rotMat);
+
+	XMVECTOR pos = m_parent->GetPosition();
+	return XMMatrixLookAtLH(pos, 
+							pos + finalForward, 
+							finalUp);
+}
+
 
 Player::Player(WorldObjectParams* params) : WorldObject(params)					   
 {
-    m_cameraType = OrbitCamera;
+    m_cameraType = WalkCamera; //OrbitCamera
 
 	_selection = nullptr;
 	_rotateSpeed = 0.0f;

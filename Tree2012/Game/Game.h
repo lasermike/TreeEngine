@@ -55,6 +55,7 @@ public:
 
 	const RenderData& GetRenderData() { return _renderData; }
 	ID3D11Device* GetDevice() { return _pd3dDevice1; }
+    Player* GetPlayer() { return _player; }
 
     //typedef std::function<HRESULT(ProjectionData& projectionData)> ResizeFunc;
     //void SetResizeHandler(ResizeFunc func)
