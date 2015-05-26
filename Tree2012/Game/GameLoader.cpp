@@ -6,19 +6,20 @@
 #include "LSystemModelGenerator.h"
 #include "orbitcamera.h"
 #include <time.h>
+#include "Player.h"
 
 GameLoader::GameLoader()
 {
 	_currentSeed = 0;
 }
 
-void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, XSF::OrbitCamera* pCamera)
+void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
-	LoadTrees(pScene, pRenderData, pCamera);
+	LoadTrees(pScene, pRenderData, pPlayer);
 //	LoadTestBlock(pScene, pRenderData, pCamera);
 }
 
-void GameLoader::LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, XSF::OrbitCamera* pCamera)
+void GameLoader::LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0,0,0);
@@ -41,14 +42,16 @@ void GameLoader::LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, XSF::
 		XMFLOAT3(-maxBound,-maxBound,-maxBound),
 		XMFLOAT3(maxBound,maxBound,maxBound)
 	};
-	pCamera->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
 
-	pCamera->SetHeading(2.48f);
-	//pCamera->SetFocusPosition(XMVectorSet(0, 1.1f, 0, 1));
-
+    if (pPlayer && pPlayer->GetOrbitCamera())
+    {
+        pPlayer->GetOrbitCamera()->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
+	    pPlayer->GetOrbitCamera()->SetHeading(2.48f);
+	    //pCamera->SetFocusPosition(XMVectorSet(0, 1.1f, 0, 1));
+    }
 }
 
-void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, XSF::OrbitCamera* pCamera)
+void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0,0,0);
@@ -103,11 +106,11 @@ void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, XSF::Orbi
 		XMFLOAT3(maxBound,2,maxBound)
 	};
 
-	if (pCamera)
+    if (pPlayer && pPlayer->GetOrbitCamera())
 	{
-		pCamera->SetHeading(-2.48f);
+		pPlayer->GetOrbitCamera()->SetHeading(-2.48f);
 		//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
-		pCamera->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
+		pPlayer->GetOrbitCamera()->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
 	}
 }
 

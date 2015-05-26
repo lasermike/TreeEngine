@@ -49,8 +49,6 @@ Game::Game()
 	_pSwapChain = nullptr;
 	_pSwapChain1 = nullptr;
 	_pRenderTargetView = nullptr;
-	_rotateSpeed = 0.0f;
-	_dollySpeed = 0.0f;
 	_paused = false;
 	_wireframe = false;
 	_showHelp = false;
@@ -66,7 +64,6 @@ Game::Game()
 	_showShadowBuffer = false;
 	_pCBChangeOnResize = nullptr;
 	_bitmapFont = nullptr;
-	_selection = nullptr;
 	_player = nullptr;
 
 	XSF::SetContentFileRoot();
@@ -80,12 +77,7 @@ Game::Game()
 	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
 	_player = new Player(playerParams);
 
-	// Create the scene
-	if (m_cameraType == OrbitCamera)
-	{
-		_camera = new XSF::OrbitCamera();
-	}
-	_loader.Load("Basic", _pScene, &_renderData, _camera);
+	_loader.Load("Basic", _pScene, &_renderData, _player);
 
 	// Initialize the view matrix
 	UpdateView();
@@ -102,16 +94,8 @@ Game::Game()
 
 void Game::UpdateView()
 {
-	if (m_cameraType == OrbitCamera)
-	{
-		XMStoreFloat4x4(&_renderData.view, _camera->GetViewMatrix());
-		XMStoreFloat4(&_renderData.eyePos, _camera->GetEyePosition());
-	}
-	else 
-	{
-		XMStoreFloat4x4(&_renderData.view, _player->GetCamera()->GetViewMatrix());
-		XMStoreFloat4(&_renderData.eyePos, _player->GetPosition());
-	}
+	XMStoreFloat4x4(&_renderData.view, _player->GetViewMatrix());
+	XMStoreFloat4(&_renderData.eyePos, _player->GetEyePosition());
 }
 
 Game::~Game()
@@ -510,122 +494,11 @@ void Game::Update(DX::StepTimer const& timer)
 	// Compute per-frame values
 	HR(_pScene->Update(_pImmediateContext, &_renderData));
 
-	if (m_cameraType == OrbitCamera)
-	{
-		UpdateOrbitCamera(timer);
-	}
+    _player->Update(timer, &_renderData);
+
+    UpdateView();
 }
 
-void Game::Select(int index)
-{
-	WorldObject* pObj = *_pScene->Children().begin();
-	int i = 0;
-	for (auto child = _pScene->Children().begin(); i < index && child != _pScene->Children().end(); child++)
-	{
-		if ((*child)->GetObjectType() == TreeType)
-		{
-			pObj = *child;
-			i++;
-		}
-	}
-
-	Select(pObj);
-}
-
-void Game::Select(WorldObject* pSelected)
-{
-	_selection = pSelected;
-
-	//_camera->SetFocusPositionAttenuation(60);
-
-	//XMVECTOR extent;
-	//if (_selection == nullptr)
-	//{
-	//	extent = _pScene->GetExtents(TOP);
-	//}
-	//else
-	//{
-	//	extent = _selection->GetExtents(TOP);
-	//}
-
-	//extent = XMVectorSetY(extent, XMVectorGetY(extent) / 2.0f); 
-	//_camera->SetFocusPosition(extent);
-}
-
-void Game::UpdateOrbitCamera(DX::StepTimer const& timer)
-{
-	// Find top point of scene or selected object
-	XMVECTOR extent;
-	if (_selection == nullptr)
-	{
-		extent = _pScene->GetExtents(TOP);
-	}
-	else
-	{
-		extent = _selection->GetExtents(TOP);
-	}
-
-	XMFLOAT3 e;
-	XMStoreFloat3(&e, extent);
-
-	if (_dollySpeed != 0.0f)
-	{
-		_camera->AddDollyVelocity(_dollySpeed);
-	}
-	else if (0)
-	{
-		// Determine if extent point is inside or outside the view frustrum
-		XMVECTOR v0, v1;
-		_camera->RayCast(_renderData.projectionData.screenWidth / 2,0, &_renderData, v0, v1);
-		XMFLOAT3 vv0, vv1;
-		XMStoreFloat3(&vv0, v0);
-		XMStoreFloat3(&vv1, v1);
-		float topDelta = (vv1.y - vv0.y) / (_renderData.projectionData.farClippingPlane - _renderData.projectionData.nearClippingPlane);
-		
-		float frustumTopAtExtent = vv0.y + topDelta * sqrt((e.x - vv0.x) * (e.x - vv0.x) + (e.z - vv0.z) * (e.z - vv0.z)); 
-
-		// Dolly nearest or further
-		if (frustumTopAtExtent < e.y)
-		{
-			_camera->SetDollyVelocity(0.5f);
-		}
-		else if (frustumTopAtExtent > e.y + 0.5f)
-		{
-			_camera->SetDollyVelocity(-0.5f);
-		}
-		else 
-		{
-			_camera->SetDollyVelocity(0);
-		}
-	}
-
-	// Rotate camera around the origin
-	if (_rotateSpeed != 0.0f)
-	{
-		_camera->AddHeadingVelocity(_rotateSpeed);
-	}
-	
-
-	if (_selection)
-	{
-		XMVECTOR focusPoint = _camera->GetFocusPosition();
-		XMVECTOR desiredFocus = XMVectorSetY(extent, XMVectorGetY(extent) / 2.0f); 
-		XMVECTOR difference = desiredFocus - focusPoint;
-		float magnitude = XMVectorGetX(XMVector3Length(difference));
-		if (magnitude > 1.0f)
-		{
-			_camera->SetFocusPositionVelocity(difference / magnitude);
-		}
-		else
-		{
-			_camera->SetFocusPositionAttenuation(250);
-		}
-	}
-
-	_camera->Update((float) timer.GetElapsedSeconds());
-	XMStoreFloat4(&_renderData.eyePos, _camera->GetEyePosition());
-	UpdateView();
-}
 
 //--------------------------------------------------------------------------------------
 // Once per frame processing
@@ -720,28 +593,15 @@ Cleanup:
 
 void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 {
-	_rotateSpeed = 0.0f;
-	_dollySpeed = 0.0f;
-	const char availableKeys[] = { 'W', 'S', 'D', 'A' };
+    _player->HandleInput(key);
 
+    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H' };
 	for (char k : availableKeys)
 	{
 		if (key[k])
 		{
 			switch (k)
 			{
-			case 'A':
-				_rotateSpeed += key[k] ? -1.0f : 0.0f;
-				break;
-			case 'D':
-				_rotateSpeed += key[k] ? 1.0f : 0.0f;
-				break;
-			case 'W':
-				_dollySpeed += key[k] ? -0.5f : 0.0f;
-				break;
-			case 'S':
-				_dollySpeed += key[k] ? 0.5f : 0.0f;
-				break;
 			case ']':
 				_resetTree = true;
 				_loader._currentSeed++;
@@ -759,10 +619,6 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 			case 'Z':
 				_showShadowBuffer = !_showShadowBuffer;
 				break;
-			case VK_SPACE:
-				_rotateSpeed = 0.0f;
-				_dollySpeed = 0.0f;
-				break;
 			case 'P':
 				_paused = !_paused;
 				break;
@@ -772,14 +628,14 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 			case 'H':
 				_showHelp = !_showHelp;
 				break;
-			case '1':
-			case '2':
-			case '3':
-			case '4':
-			case '5':
-			case '6':
-				Select(k - '0');
-				break;
+			//case '1':
+			//case '2':
+			//case '3':
+			//case '4':
+			//case '5':
+			//case '6':
+			//	Select(k - '0');
+			//	break;
 			}
 		}
 	}

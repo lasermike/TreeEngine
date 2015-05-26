@@ -7,7 +7,6 @@
 #include "bitmapfont.h"
 #include "RenderData.h"
 #include "LSystemModelGenerator.h"
-#include "OrbitCamera.h"
 #include "GameLoader.h"
 #include "StepTimer.h"
 #include "Player.h"
@@ -73,10 +72,7 @@ private:
 
     //HRESULT StandardResizeHandler();
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
-	void UpdateOrbitCamera(DX::StepTimer const& timer);
 	void UpdateView();
-	void Select(WorldObject* pSelected);
-	void Select(int index);
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
@@ -91,10 +87,6 @@ private:
 	DX::StepTimer						_timer;
 	double								_timeStart;
 	double								_timeCurrent;
-
-	// Camera
-	CameraType							m_cameraType;
-	XSF::OrbitCamera*					_camera;
 
 #ifdef _TREE_CLASSIC
 	HWND								_hwnd;
@@ -127,16 +119,12 @@ private:
 
 	bool								_resetTree;
 	bool								_showShadowBuffer;
-	float								_rotateSpeed;
-	float								_dollySpeed;
 	bool								_paused;
 	bool								_wireframe;
 	bool								_showHelp;
 	ID3D11Buffer*                       _pCBChangeOnResize;
 
 	XSF::BitmapFont*					_bitmapFont;
-
-	WorldObject*						_selection;
 
 	Player*								_player;
 };

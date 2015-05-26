@@ -84,7 +84,6 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 
 HRESULT Render()
 {
-    g_game->Tick(key);
     XMFLOAT4 eye = g_game->GetRenderData().eyePos;
 
     //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));
@@ -103,6 +102,10 @@ HRESULT Render()
                                           hmdState.HeadPose.ThePose.Position.y,
                                           hmdState.HeadPose.ThePose.Position.z);  
 
+    // Run game 
+    g_game->Tick(key);
+
+    // Render
     g_game->Render();
     return S_OK;
 }
@@ -362,6 +365,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     switch (message)
     {
+    case WM_KEYDOWN:
+        key[wParam] = true;
+        break;
+    case WM_KEYUP:
+        key[wParam] = false;
+        break;
     case WM_COMMAND:
         wmId    = LOWORD(wParam);
         wmEvent = HIWORD(wParam);
