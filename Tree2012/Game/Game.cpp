@@ -67,14 +67,24 @@ Game::Game()
 	_pCBChangeOnResize = nullptr;
 	_bitmapFont = nullptr;
 	_selection = nullptr;
+	_player = nullptr;
 
 	XSF::SetContentFileRoot();
 
 	// Init vertex/index buffer
 	_pScene = new SceneRoot();
 
+	// Create player
+	WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
+	playerParams->position = XMFLOAT3(-4.3f, 1.5f, -5.5f);
+	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
+	_player = new Player(playerParams);
+
 	// Create the scene
-	_camera = new XSF::OrbitCamera();
+	if (m_cameraType == OrbitCamera)
+	{
+		_camera = new XSF::OrbitCamera();
+	}
 	_loader.Load("Basic", _pScene, &_renderData, _camera);
 
 	// Initialize the view matrix
@@ -92,8 +102,16 @@ Game::Game()
 
 void Game::UpdateView()
 {
-	XMStoreFloat4x4(&_renderData.view, _camera->GetViewMatrix());
-	XMStoreFloat4(&_renderData.eyePos, _camera->GetEyePosition());
+	if (m_cameraType == OrbitCamera)
+	{
+		XMStoreFloat4x4(&_renderData.view, _camera->GetViewMatrix());
+		XMStoreFloat4(&_renderData.eyePos, _camera->GetEyePosition());
+	}
+	else 
+	{
+		XMStoreFloat4x4(&_renderData.view, _player->GetCamera()->GetViewMatrix());
+		XMStoreFloat4(&_renderData.eyePos, _player->GetPosition());
+	}
 }
 
 Game::~Game()
@@ -492,7 +510,10 @@ void Game::Update(DX::StepTimer const& timer)
 	// Compute per-frame values
 	HR(_pScene->Update(_pImmediateContext, &_renderData));
 
-	UpdateCamera(timer);
+	if (m_cameraType == OrbitCamera)
+	{
+		UpdateOrbitCamera(timer);
+	}
 }
 
 void Game::Select(int index)
@@ -515,7 +536,7 @@ void Game::Select(WorldObject* pSelected)
 {
 	_selection = pSelected;
 
-	_camera->SetFocusPositionAttenuation(60);
+	//_camera->SetFocusPositionAttenuation(60);
 
 	//XMVECTOR extent;
 	//if (_selection == nullptr)
@@ -531,7 +552,7 @@ void Game::Select(WorldObject* pSelected)
 	//_camera->SetFocusPosition(extent);
 }
 
-void Game::UpdateCamera(DX::StepTimer const& timer)
+void Game::UpdateOrbitCamera(DX::StepTimer const& timer)
 {
 	// Find top point of scene or selected object
 	XMVECTOR extent;
@@ -609,8 +630,10 @@ void Game::UpdateCamera(DX::StepTimer const& timer)
 //--------------------------------------------------------------------------------------
 // Once per frame processing
 //--------------------------------------------------------------------------------------
-void Game::Tick()
+void Game::Tick(bool key[256])
 {
+	HandleInput(key);
+
     _timer.Tick([&]()
     {
         Update(_timer);
@@ -695,60 +718,70 @@ Cleanup:
 	return;
 }
 
-void Game::OnKeydown(UINT key)  // WM_KEYDOWN
+void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 {
-	switch (key)
+	_rotateSpeed = 0.0f;
+	_dollySpeed = 0.0f;
+	const char availableKeys[] = { 'W', 'S', 'D', 'A' };
+
+	for (char k : availableKeys)
 	{
-	case ']':
-		_resetTree = true;
-		_loader._currentSeed++;
-		break;
-	case '[':
-		if (_loader._currentSeed > 0)
+		if (key[k])
 		{
-			_resetTree = true;
-			_loader._currentSeed--;
+			switch (k)
+			{
+			case 'A':
+				_rotateSpeed += key[k] ? -1.0f : 0.0f;
+				break;
+			case 'D':
+				_rotateSpeed += key[k] ? 1.0f : 0.0f;
+				break;
+			case 'W':
+				_dollySpeed += key[k] ? -0.5f : 0.0f;
+				break;
+			case 'S':
+				_dollySpeed += key[k] ? 0.5f : 0.0f;
+				break;
+			case ']':
+				_resetTree = true;
+				_loader._currentSeed++;
+				break;
+			case '[':
+				if (_loader._currentSeed > 0)
+				{
+					_resetTree = true;
+					_loader._currentSeed--;
+				}
+				break;
+			case '0':
+				_timeStart = 0;
+				break;
+			case 'Z':
+				_showShadowBuffer = !_showShadowBuffer;
+				break;
+			case VK_SPACE:
+				_rotateSpeed = 0.0f;
+				_dollySpeed = 0.0f;
+				break;
+			case 'P':
+				_paused = !_paused;
+				break;
+			case '#':
+				_wireframe = !_wireframe;
+				break;
+			case 'H':
+				_showHelp = !_showHelp;
+				break;
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+				Select(k - '0');
+				break;
+			}
 		}
-		break;
-	case '0':
-		_timeStart = 0;
-		break;
-	case 'Z':
-		_showShadowBuffer = !_showShadowBuffer;
-		break;
-	case VK_LEFT:
-		_rotateSpeed = _rotateSpeed == 0.0f ? -1.0f : 0.0f;
-		break;
-	case VK_RIGHT:
-		_rotateSpeed = _rotateSpeed == 0.0f ? 1.0f : 0.0f;
-		break;
-	case VK_UP:
-		_dollySpeed = _dollySpeed == 0.0f ? -0.5f : 0.0f;
-		break;
-	case VK_DOWN:
-		_dollySpeed = _dollySpeed == 0.0f ? 0.5f : 0.0f;
-		break;
-	case VK_SPACE:
-		_rotateSpeed = 0.0f;
-		_dollySpeed = 0.0f;
-		break;
-	case 'P':
-		_paused = !_paused;
-		break;
-	case 'W':
-		_wireframe = !_wireframe;
-		break;
-	case 'H':
-		_showHelp = !_showHelp;
-		break;
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-		Select(key - '0');
-		break;
 	}
 }
 

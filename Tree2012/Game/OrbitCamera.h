@@ -13,9 +13,27 @@
 
 struct RenderData;
 
-//#ifndef XSF_H_INCLUDED
-//#error  Please include SampleFramework.h before this file
-//#endif
+
+__declspec(align(16)) 
+class Camera2
+{
+    XMVECTOR Pos;
+    XMMATRIX Rot;
+    Camera2() { };
+    //Camera(XMVECTOR pos, XMMATRIX rot) : Pos(pos), Rot(rot) { };
+    XMMATRIX GetViewMatrix()
+    {    
+		XMVECTOR finalUp      = XMVector3Transform(XMVectorSet(0, 1, 0, 1),  Rot);
+        XMVECTOR finalForward = XMVector3Transform(XMVectorSet(0, 0, -1, 1), Rot);
+
+		return XMMatrixLookAtLH(Pos, Pos + finalForward, finalUp);
+
+        //return(Matrix4f::LookAtRH(Pos, Pos + finalForward, finalUp));
+    }
+};
+
+//----------------------------------------------------
+
 
 namespace XboxSampleFramework
 {

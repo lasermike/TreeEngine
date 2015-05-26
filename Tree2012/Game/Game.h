@@ -10,6 +10,7 @@
 #include "OrbitCamera.h"
 #include "GameLoader.h"
 #include "StepTimer.h"
+#include "Player.h"
 
 #ifndef _TREE_CLASSIC
 #include "agile.h"
@@ -41,10 +42,9 @@ public:
 
 	HRESULT Cleanup() { CleanupDevice(); return S_OK; }
 	HRESULT OnResize(UINT windowWidth, UINT windowHeight);
-	void OnKeydown(UINT key);
 
 	// Basic game loop
-	void Tick();
+	void Tick(bool key[256]);
 	void Render();
 
 	// Rendering helpers
@@ -66,23 +66,20 @@ private:
 
 	void Update(DX::StepTimer const& timer);
 	void Regenerate();
+	void HandleInput(bool key[256]);
 
 	HRESULT InitDevice();
 	void CleanupDevice();
 
     //HRESULT StandardResizeHandler();
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
-	void UpdateCamera(DX::StepTimer const& timer);
+	void UpdateOrbitCamera(DX::StepTimer const& timer);
 	void UpdateView();
 	void Select(WorldObject* pSelected);
 	void Select(int index);
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
-
-#if !defined(_TREE_CLASSIC) && !defined(_XBOX_ONE)
-	float ConvertDipsToPixels(float dips);
-#endif 
 
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                   m_featureLevel;
@@ -94,13 +91,20 @@ private:
 	DX::StepTimer						_timer;
 	double								_timeStart;
 	double								_timeCurrent;
-    XSF::OrbitCamera*					_camera;
+
+	// Camera
+	CameraType							m_cameraType;
+	XSF::OrbitCamera*					_camera;
 
 #ifdef _TREE_CLASSIC
 	HWND								_hwnd;
 #else
 	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
-#endif
+#if !defined(_XBOX_ONE)
+	float ConvertDipsToPixels(float dips);
+#endif // XBOX
+#endif //Classic
+
 	D3D_DRIVER_TYPE                     _driverType;
 	D3D_FEATURE_LEVEL                   _featureLevel;
 	XSF::D3DDevice*                     _pd3dDevice;
@@ -133,6 +137,8 @@ private:
 	XSF::BitmapFont*					_bitmapFont;
 
 	WorldObject*						_selection;
+
+	Player*								_player;
 };
 
 

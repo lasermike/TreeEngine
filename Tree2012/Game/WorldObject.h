@@ -53,7 +53,7 @@ public:
 
 	XMFLOAT3 position;
 	XMFLOAT3 scale;
-	XMFLOAT4 rotation; 
+	XMFLOAT4 rotation; // Quaternion
 	GeneratorType generatorType;
 	float _animationSpeed;
 	int depthLOD;
@@ -85,6 +85,7 @@ protected:
 
 	unique_ptr<WorldObjectParams> _params;
 	XMFLOAT3	_position;
+	XMFLOAT4    _rotation; // Quaternion
 	XMFLOAT3	_scale;
 
 	XMFLOAT3	_boundingBox[2];
@@ -117,5 +118,7 @@ public:
 	virtual unsigned int GetNumInstances(bool /*numMax*/) { return 0; }
 	XMFLOAT3* GetBoundingBox() { return _boundingBox; }
 	XMVECTOR GetExtents(Extent extent);
+	XMVECTOR GetPosition()  { return XMLoadFloat3(&_position); }
+	XMVECTOR GetRotation()  { return XMLoadFloat4(&_rotation); }
 };
 

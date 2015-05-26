@@ -100,7 +100,7 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #endif 
 
 #define ASSERTSZ(x, str) \
-		if (!x) { \
+		if (!(x)) { \
 			assert(0 == L#x);   \
 			Util.Output("Assert failed: %s \n", L#x); \
 		} 

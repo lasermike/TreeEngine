@@ -103,9 +103,12 @@ void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, XSF::Orbi
 		XMFLOAT3(maxBound,2,maxBound)
 	};
 
-	pCamera->SetHeading(-2.48f);
-	//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
-	pCamera->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
+	if (pCamera)
+	{
+		pCamera->SetHeading(-2.48f);
+		//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
+		pCamera->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
+	}
 }
 
 void GameLoader::Regenerate(SceneRoot* pScene)

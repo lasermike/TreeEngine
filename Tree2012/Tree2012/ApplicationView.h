@@ -40,7 +40,7 @@ private:
     bool m_windowClosed;
 
 	bool pressedButtons[7];
-
+	bool m_key[256];
 };
 
 // ApplicationSource - responsible for creating the Application instance

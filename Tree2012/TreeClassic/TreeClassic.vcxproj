@@ -112,6 +112,7 @@
     <ClInclude Include="..\Game\MathHelper.h" />
     <ClInclude Include="..\Game\Model.h" />
     <ClInclude Include="..\Game\OrbitCamera.h" />
+    <ClInclude Include="..\Game\Player.h" />
     <ClInclude Include="..\Game\Primitive.h" />
     <ClInclude Include="..\Game\PrimitiveGeometry.h" />
     <ClInclude Include="..\Game\RenderData.h" />
@@ -142,6 +143,7 @@
     <ClCompile Include="..\Game\Materials.cpp" />
     <ClCompile Include="..\Game\MathHelper.cpp" />
     <ClCompile Include="..\Game\OrbitCamera.cpp" />
+    <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\PrimitiveGeometry.cpp" />
     <ClCompile Include="..\Game\RenderStates.cpp" />

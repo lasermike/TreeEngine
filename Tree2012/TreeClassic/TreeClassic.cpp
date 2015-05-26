@@ -21,7 +21,7 @@ bool oculusMode = false;
 
 // Tree engine
 Game* g_game = nullptr;
-
+bool key[256] = {};
 
 // Oculus specific
 ovrHmd HMD = nullptr;
@@ -84,7 +84,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 
 HRESULT Render()
 {
-    g_game->Tick();
+    g_game->Tick(key);
     XMFLOAT4 eye = g_game->GetRenderData().eyePos;
 
     //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));

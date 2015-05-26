@@ -5,12 +5,15 @@
 WorldObject::WorldObject(WorldObjectParams* pParams) :_geometry(), _params(pParams), _drawInstanced(true)
 {
 	_position = XMFLOAT3(0,0,0);
+	XMStoreFloat4(&_rotation, XMQuaternionIdentity());
 	_scale = XMFLOAT3(1,1,1);
+
 	_boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
 
 	if (pParams)
 	{
 		_position = pParams->position;
+		_rotation = pParams->rotation;
 		_scale = pParams->scale;
 	}
 }

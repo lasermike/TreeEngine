@@ -16,6 +16,7 @@ TreePC::TreePC() :
 	m_windowClosed(false),
 	m_windowVisible(true)
 {
+	ZeroMemory(m_key, ARRAYSIZE(m_key) * sizeof(bool));
 }
 
 void TreePC::Initialize(CoreApplicationView^ applicationView)
@@ -55,7 +56,9 @@ void TreePC::SetWindow(CoreWindow^ window)
 	window->KeyDown +=
 		ref new TypedEventHandler<CoreWindow^, KeyEventArgs^>(this, &TreePC::OnKeyDown);
 
-	//m_renderer->Initialize(CoreWindow::GetForCurrentThread());
+	window->KeyUp +=
+		ref new TypedEventHandler<CoreWindow^, KeyEventArgs^>(this, &TreePC::OnKeyUp);
+
 	m_pGame->Initialize(CoreWindow::GetForCurrentThread());
 }
 
@@ -73,7 +76,7 @@ void TreePC::Run()
 		{
 			timer->Update();
 			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
-			m_pGame->Tick();
+			m_pGame->Tick(m_key);
 			m_pGame->Render();
 		}
 		else
@@ -118,8 +121,14 @@ void TreePC::OnPointerMoved(CoreWindow^ sender, PointerEventArgs^ args)
 
 void TreePC::OnKeyDown(CoreWindow^ sender, KeyEventArgs^ args)
 {
-	if (m_pGame)
-		m_pGame->OnKeydown((UINT) args->VirtualKey);
+	assert( (int) args->VirtualKey < 256);
+	m_key[ (int) args->VirtualKey] = true;
+}
+
+void TreePC::OnKeyUp(CoreWindow^ sender, KeyEventArgs^ args)
+{
+	assert( (int) args->VirtualKey < 256);
+	m_key[ (int) args->VirtualKey] = false;
 }
 
 void TreePC::OnActivated(CoreApplicationView^ applicationView, IActivatedEventArgs^ args)
