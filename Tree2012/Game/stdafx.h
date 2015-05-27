@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sstream>
 #include <functional>
+#include "Win32_DirectXAppUtil.h"
 
 #define XSF_USE_DX_11_1
 
@@ -33,18 +34,6 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr)
 	std::cerr << msg << " " << file << " " << line << " " << hr << "\n"; 
 	assert(SUCCEEDED(hr)); 
 }
-
-struct Utility
-{
-    void Output(const char * fnt,...)
-    {
-        static char string_text[1000];
-        va_list args; va_start(args,fnt);
-        vsprintf_s(string_text,fnt,args);
-        va_end(args);
-        OutputDebugStringA(string_text);
-    }
-} static Util;
 
 
 #else
@@ -389,7 +378,6 @@ namespace XboxSampleFramework
         DynamicBuffer( const DynamicBuffer& );// = delete;
         DynamicBuffer& operator = ( const DynamicBuffer& );// = delete;
     };
-
 
 }
 

@@ -44,7 +44,7 @@ public:
 
 	// Basic game loop
 	void Tick(bool key[256]);
-	void Render();
+	void Render(bool present);
 
 	// Rendering helpers
 	void Clear();
@@ -55,6 +55,10 @@ public:
 
 	const RenderData& GetRenderData() { return _renderData; }
 	ID3D11Device* GetDevice() { return _pd3dDevice1; }
+    XSF::D3DDeviceContext* GetContext() { return _pImmediateContext; }
+    ID3D11Texture2D* GetBackBuffer() { return _pDepthStencil; }
+    IDXGISwapChain* GetSwapChain() { return _pSwapChain; }
+
     Player* GetPlayer() { return _player; }
 
     //typedef std::function<HRESULT(ProjectionData& projectionData)> ResizeFunc;

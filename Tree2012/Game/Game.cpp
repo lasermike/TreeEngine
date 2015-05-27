@@ -512,7 +512,6 @@ void Game::Tick(bool key[256])
 
 	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
 
-
 	// Render shadow map
 	_renderData.pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
 	DrawSceneToShadowMap();
@@ -525,14 +524,17 @@ void Game::Tick(bool key[256])
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-void Game::Render()
+void Game::Render(bool oculus)
 {
 	HRESULT hr = S_OK;
 
     UpdateView();
 
-	// Bind render target and depth
-	_pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
+    if (!oculus)
+    {
+	    // Bind render target and depth
+	    _pImmediateContext->OMSetRenderTargets(1, &_pRenderTargetView, _pDepthStencilView);
+    }
 
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
 	if (_wireframe)
@@ -550,11 +552,14 @@ void Game::Render()
 	HR(SaveToTGAFile(*img, L"c:\\temp\\smap.tga"));
 #endif
 
-	// Clear the back buffer
-	_pImmediateContext->ClearRenderTargetView(_pRenderTargetView, Colors::AliceBlue);
+    if (!oculus)
+    {
+	    // Clear the back buffer
+	    _pImmediateContext->ClearRenderTargetView(_pRenderTargetView, Colors::AliceBlue);
 
-	// Clear the depth buffer to 1.0 (max depth)
-	_pImmediateContext->ClearDepthStencilView(_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	    // Clear the depth buffer to 1.0 (max depth)
+	    _pImmediateContext->ClearDepthStencilView(_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    }
 
 	// Make shadow map avaiable to shaders
 	ID3D11ShaderResourceView* depthTexture = _renderData.pShadowMap->DepthMapSRV();
@@ -582,10 +587,11 @@ void Game::Render()
 		HRC(_pScene->DrawScreenQuad(_pImmediateContext, _renderData.pShadowMap->DepthMapSRV()));
 	}
 
-	//
-	// Present our back buffer to our front buffer
-	//
-	HRC(_pSwapChain->Present(1, 0));
+    if (!oculus)
+    {
+	    // Present our back buffer to our front buffer
+	    HRC(_pSwapChain->Present(1, 0));
+    }
 
 Cleanup:
 	return;

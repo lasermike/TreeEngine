@@ -77,7 +77,7 @@ void TreePC::Run()
 			timer->Update();
 			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
 			m_pGame->Tick(m_key);
-			m_pGame->Render();
+			m_pGame->Render(false);
 		}
 		else
 		{
