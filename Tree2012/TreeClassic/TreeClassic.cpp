@@ -173,6 +173,10 @@ HRESULT Render()
 			XMFLOAT3 hmdPos = XMFLOAT3(adjustedPos.x, adjustedPos.y, adjustedPos.z);			 
 
             // Compute rotation.  Divide sensor data by neutral data 
+			//XMVECTOR eyeQuat = XMVectorSet(-EyeRenderPose[eye].Orientation.x, -EyeRenderPose[eye].Orientation.y,
+			//								EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);
+			//XMVECTOR neutralQuat = XMVectorSet(-neutralRotation.x, -neutralRotation.y,
+			//									neutralRotation.z, neutralRotation.w);
 			XMVECTOR eyeQuat = XMVectorSet(-EyeRenderPose[eye].Orientation.x, -EyeRenderPose[eye].Orientation.y,
 											EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);
 			XMVECTOR neutralQuat = XMVectorSet(-neutralRotation.x, -neutralRotation.y,
@@ -184,48 +188,46 @@ HRESULT Render()
             g_game->GetPlayer()->GetCamera()->SetHmdState(hmdPos, hmdRot);
 
             // Render
-            {
-                // Increment to use next texture, just before writing
-                g_pEyeRenderTexture[eye]->AdvanceToNextTexture();
 
-                // Clear and set up rendertarget
-                int texIndex = g_pEyeRenderTexture[eye]->TextureSet->CurrentIndex;
+            // Increment to use next texture, just before writing
+            g_pEyeRenderTexture[eye]->AdvanceToNextTexture();
 
-                DIRECTX.SetAndClearRenderTarget(g_pEyeRenderTexture[eye]->TexRtv[texIndex], g_pEyeDepthBuffer[eye]);
+            // Clear and set up rendertarget
+            int texIndex = g_pEyeRenderTexture[eye]->TextureSet->CurrentIndex;
 
-                DIRECTX.SetViewport(Recti(g_eyeRenderViewport[eye]));
+            DIRECTX.SetAndClearRenderTarget(g_pEyeRenderTexture[eye]->TexRtv[texIndex], g_pEyeDepthBuffer[eye]);
 
-                g_game->Render(true);
+            DIRECTX.SetViewport(Recti(g_eyeRenderViewport[eye]));
 
-                // Initialize our single full screen Fov layer.
-                ovrLayerEyeFov ld;
-                ld.Header.Type  = ovrLayerType_EyeFov;
-                ld.Header.Flags = 0;
-
-                for (int eye = 0; eye < 2; eye++)
-                {
-                    ld.ColorTexture[eye] = g_pEyeRenderTexture[eye]->TextureSet;
-                    ld.Viewport[eye]     = g_eyeRenderViewport[eye];
-                    ld.Fov[eye]          = HMD->DefaultEyeFov[eye];
-                    ld.RenderPose[eye]   = EyeRenderPose[eye];
-                }
-
-                ovrLayerHeader* layers = &ld.Header;
-                ovrResult result = ovrHmd_SubmitFrame(HMD, 0, nullptr, &layers, 1);
-                //isVisible = result == ovrSuccess;
-
-                // Render mirror
-	            ID3D11Texture2D* pBackBuffer = nullptr;
-                HRR(g_game->GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
-
-                ovrD3D11Texture* tex = (ovrD3D11Texture*)g_mirrorTexture;
-                DIRECTX.Context->CopyResource(pBackBuffer, tex->D3D11.pTexture);
-                pBackBuffer->Release();
-
-                DIRECTX.SwapChain->Present(0, 0);
-
-            }
+            g_game->Render(true);
         }
+
+        // Initialize our single full screen Fov layer.
+        ovrLayerEyeFov ld;
+        ld.Header.Type  = ovrLayerType_EyeFov;
+        ld.Header.Flags = 0;
+
+        for (int eye = 0; eye < 2; eye++)
+        {
+            ld.ColorTexture[eye] = g_pEyeRenderTexture[eye]->TextureSet;
+            ld.Viewport[eye]     = g_eyeRenderViewport[eye];
+            ld.Fov[eye]          = HMD->DefaultEyeFov[eye];
+            ld.RenderPose[eye]   = EyeRenderPose[eye];
+        }
+
+        ovrLayerHeader* layers = &ld.Header;
+        ovrResult result = ovrHmd_SubmitFrame(HMD, 0, nullptr, &layers, 1);
+        //isVisible = result == ovrSuccess;
+
+        // Render mirror
+	    ID3D11Texture2D* pBackBuffer = nullptr;
+        HRR(g_game->GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+
+        ovrD3D11Texture* tex = (ovrD3D11Texture*)g_mirrorTexture;
+        DIRECTX.Context->CopyResource(pBackBuffer, tex->D3D11.pTexture);
+        pBackBuffer->Release();
+
+        DIRECTX.SwapChain->Present(0, 0);
     }
     else
     {
