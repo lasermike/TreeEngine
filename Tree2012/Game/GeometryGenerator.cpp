@@ -26,7 +26,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
 	// Cylinder
 	GeometryGenerator::MeshData cylinder;
-	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 1, cylinder);
+	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 1, true, false, cylinder);
 
 	// Cache the index count of each object.
 	data.cylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();
@@ -38,7 +38,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
 	// Cylinder LD
 	GeometryGenerator::MeshData cylinderLD;
-	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 1, cylinderLD);
+	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 1, false, false, cylinderLD);
 
 	// Cache the index count of each object.
 	data.cylinderLDIndices.VertexCount = (UINT) cylinderLD.Vertices.size();
@@ -437,7 +437,7 @@ void GeometryGenerator::CreateGeosphere(float radius, UINT numSubdivisions, Mesh
 	}
 }
 
-void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, MeshData& meshData)
+void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, bool buildTop, bool buildBottom, MeshData& meshData)
 {
 	meshData.Vertices.clear();
 	meshData.Indices.clear();
@@ -529,8 +529,15 @@ void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, floa
 		}
 	}
 
-	BuildCylinderTopCap(bottomRadius, topRadius, height, sliceCount, stackCount, meshData);
-	BuildCylinderBottomCap(bottomRadius, topRadius, height, sliceCount, stackCount, meshData);
+	if (buildTop)
+	{
+		BuildCylinderTopCap(bottomRadius, topRadius, height, sliceCount, stackCount, meshData);
+	}
+
+	if (buildBottom)
+	{
+		BuildCylinderBottomCap(bottomRadius, topRadius, height, sliceCount, stackCount, meshData);
+	}
 }
 
 void GeometryGenerator::BuildCylinderTopCap(float /*bottomRadius*/, float topRadius, float height, 

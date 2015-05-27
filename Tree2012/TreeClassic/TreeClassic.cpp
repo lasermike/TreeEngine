@@ -30,7 +30,7 @@ bool windowedOvr = false;
 OVR::Sizei WinSize;
 ovrEyeRenderDesc eyeRenderDesc[2];
 ovrQuatf neutralRotation;
-
+Vector3f neutralPosition;
 
 // Forward declarations of functions included in this code module:
 HRESULT				CreateOculusDevice(bool& detected);
@@ -97,7 +97,7 @@ HRESULT Render()
         // Get both eye poses simultaneously, with IPD offset already included. 
         ovrPosef         EyeRenderPose[2];
         ovrVector3f      HmdToEyeViewOffset[2] = { eyeRenderDesc[0].HmdToEyeViewOffset,
-                                                    eyeRenderDesc[1].HmdToEyeViewOffset };
+                                                   eyeRenderDesc[1].HmdToEyeViewOffset };
         ovrFrameTiming   ftiming  = ovrHmd_GetFrameTiming(HMD, 0);
         ovrTrackingState hmdState = ovrHmd_GetTrackingState(HMD, ftiming.DisplayMidpointSeconds);
         ovr_CalcEyePoses(hmdState.HeadPose.ThePose, HmdToEyeViewOffset, EyeRenderPose);
@@ -113,23 +113,33 @@ HRESULT Render()
         // Render Scene to Eye Buffers
         for (int eye = 0; eye < 1; eye++)  //2
         {
-            XMFLOAT3 hmdPos = XMFLOAT3(EyeRenderPose[eye].Position.x, EyeRenderPose[eye].Position.y, EyeRenderPose[eye].Position.z);
-
             if (key[VK_SPACE])
             {
+				neutralPosition = EyeRenderPose[eye].Position;
                 neutralRotation = EyeRenderPose[eye].Orientation;
             }
 
-            Quatf finalRot = EyeRenderPose[eye].Orientation;
-            //finalRot.x = EyeRenderPose[eye].Orientation.x - neutralRotation.x;
-            //finalRot.y = EyeRenderPose[eye].Orientation.y - neutralRotation.y;
-            //finalRot.z = EyeRenderPose[eye].Orientation.z - neutralRotation.z;
-            //finalRot.w = EyeRenderPose[eye].Orientation.w - neutralRotation.w;
+			// COmpute position
+            Vector3f adjustedPos = Vector3f(EyeRenderPose[eye].Position) - neutralPosition;
+			XMFLOAT3 hmdPos = XMFLOAT3(adjustedPos.x, adjustedPos.y, adjustedPos.z);			 
 
-            XMFLOAT4 hmdRot = XMFLOAT4(-finalRot.x,   // Convert right handed to left handed
-                                       -finalRot.y,   // Ditto
-                                       finalRot.z, 
-                                       finalRot.w);
+			XMFLOAT4 hmdRot;
+			if (1)
+			{
+				// Subtract neutral data from sensor data
+				XMVECTOR eyeQuat = XMVectorSet(-EyeRenderPose[eye].Orientation.x, -EyeRenderPose[eye].Orientation.y,
+											   EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);
+				XMVECTOR neutralQuat = XMVectorSet(-neutralRotation.x, -neutralRotation.y,
+												   neutralRotation.z, neutralRotation.w);
+				XMVECTOR finalQuat = XMQuaternionMultiply(eyeQuat, XMQuaternionInverse(neutralQuat));
+				XMStoreFloat4(&hmdRot, finalQuat);
+			}
+			else
+			{
+				hmdRot = XMFLOAT4(-EyeRenderPose[eye].Orientation.x, -EyeRenderPose[eye].Orientation.y,
+								  EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);
+			}
+
             g_game->GetPlayer()->GetCamera()->SetHmdState(hmdPos, hmdRot);
 
             // Render

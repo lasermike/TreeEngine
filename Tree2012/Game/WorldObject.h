@@ -9,7 +9,6 @@
 struct InstancedData
 {
 	XMFLOAT4X4 World;
-	//XMFLOAT4X4 WorldNormal;
 };
 
 typedef enum GeneratorType

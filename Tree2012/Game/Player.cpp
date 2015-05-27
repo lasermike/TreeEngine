@@ -3,12 +3,12 @@
 
 XMMATRIX Camera::GetViewMatrix()
 {
-    //XMMATRIX rotMat = XMMatrixRotationQuaternion(XMQuaternionMultiply(
-    //    XMLoadFloat4(&m_hmdRotation),
-    //    m_parent->GetRotation()
-    //));
+    XMMATRIX rotMat = XMMatrixRotationQuaternion(XMQuaternionMultiply(
+        m_parent->GetRotation(),
+        XMLoadFloat4(&m_hmdRotation)
+    ));
                                                                           
-    XMMATRIX rotMat = XMMatrixRotationQuaternion(XMLoadFloat4(&m_hmdRotation));
+    //XMMATRIX rotMat = XMMatrixRotationQuaternion(XMLoadFloat4(&m_hmdRotation));
 
 	XMVECTOR finalUp      = XMVector3Transform(XMVectorSet(0, 1, 0, 0), rotMat);
     XMVECTOR finalForward = XMVector3Transform(XMVectorSet(0, 0, 1, 0), rotMat);
@@ -24,20 +24,18 @@ Player::Player(WorldObjectParams* params) : WorldObject(params)
 {
     m_cameraType = WalkCamera; //OrbitCamera
 
-	_selection = nullptr;
-	_rotateSpeed = 0.0f;
-	_dollySpeed = 0.0f;
-
 	// Create the scene
 	if (m_cameraType == OrbitCamera)
 	{
+		_selection = nullptr;
+		_rotateSpeed = 0.0f;
+		_dollySpeed = 0.0f;
 		m_orbitCamera = new XSF::OrbitCamera();
 	}
     else
     {
 	    m_camera = new Camera(this);
     }
-
 }
 
 
@@ -179,11 +177,13 @@ void Player::HandleInput(bool key[256])  // WM_KEYDOWN
     {
         XMMATRIX rot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
 
-	    const char availableKeys[] = { 'W', 'S', 'D', 'A' };
+	    const char availableKeys[] = { 'W', 'S', 'D', 'A', VK_LEFT, VK_RIGHT };
 	    for (char k : availableKeys)
 	    {
 		    if (key[k])
 		    {
+				XMMATRIX startRot, addRot;
+
 			    switch (k)
 			    {
 			    case 'A':
@@ -198,6 +198,19 @@ void Player::HandleInput(bool key[256])  // WM_KEYDOWN
 			    case 'S':
                     XMStoreFloat3(&_position, XMLoadFloat3(&_position) + XMVector4Transform(XMVectorSet(0,0, -0.05f, 1), rot));
 				    break;
+			    case VK_LEFT:
+					startRot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
+					addRot = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), -0.02f);
+					XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(startRot * addRot));
+				    break;
+			    case VK_RIGHT:
+					startRot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
+					addRot = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), 0.02f);
+					XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(startRot * addRot));
+				    break;
+				default:
+					assert(false);
+					break;
                 }
             }
         }
