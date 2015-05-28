@@ -5,8 +5,8 @@
 
 enum CameraType
 {
-	OrbitCamera = 0,
-	WalkCamera
+	OrbitCameraType = 0,
+	WalkCameraType
 };
 
 //-----------------------------------------------------------
@@ -38,7 +38,7 @@ class Player :
 	// Camera
 	CameraType							m_cameraType;
 	Camera* m_camera;
-	XSF::OrbitCamera*					m_orbitCamera;
+	OrbitCamera*						m_orbitCamera;
 	WorldObject*						_selection;
 	float								_rotateSpeed;
 	float								_dollySpeed;
@@ -51,7 +51,7 @@ public:
     void HandleInput(bool key[256]);
 
 	Camera* GetCamera() { return m_camera; }
-    XSF::OrbitCamera* GetOrbitCamera() { return m_orbitCamera; }
+    OrbitCamera* GetOrbitCamera() { return m_orbitCamera; }
     
     XMMATRIX GetViewMatrix();
     XMVECTOR GetEyePosition();
@@ -62,7 +62,7 @@ public:
 
     inline void Update(DX::StepTimer const& timer, RenderData* pRenderData)
     {
-	    if (m_cameraType == OrbitCamera)
+	    if (m_cameraType == OrbitCameraType)
 	    {
 		    UpdateOrbitCamera(timer, pRenderData);
 	    }

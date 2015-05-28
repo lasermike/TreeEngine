@@ -15,6 +15,7 @@ class Geometry
 {
 	ID3D11Buffer* _pCBChangesPerObject;
 
+	ID3D11Buffer* _pInstancedBuffer;
 
 public:
 	Geometry()

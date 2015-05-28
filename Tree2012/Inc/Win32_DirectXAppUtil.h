@@ -21,13 +21,23 @@ limitations under the License.
 #define OVR_Win32_DirectXAppUtil_h
 
 #include "Extras/OVR_Math.h"
-#include "d3dcompiler.h"
+
+#ifdef _XBOX_ONE
+#include <d3dcompiler_x.h>
+#include <d3d11_x.h>
+#else
+#include <d3dcompiler.h>
 #pragma comment(lib, "d3dcompiler.lib")
-using namespace OVR;
 
 #include <d3d11.h>
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d11.lib")
+
+
+#endif
+
+using namespace OVR;
+
 
 #ifndef VALIDATE
 #define VALIDATE(x, msg) if (!(x)) { MessageBoxA(NULL, (msg), "OculusRoomTiny", MB_ICONERROR | MB_OK); exit(-1); }

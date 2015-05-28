@@ -62,7 +62,7 @@ void ApplicationView::Run()
 		HandleInput();
 
 		m_pGame->Tick(m_key);
-		m_pGame->Render();
+		m_pGame->Render(false);
     }
 }
 

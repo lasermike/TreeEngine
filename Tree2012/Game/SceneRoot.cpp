@@ -51,10 +51,6 @@ const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[8] =
 	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 	{ "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	//{ "WORLDNORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	//{ "WORLDNORMAL", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	//{ "WORLDNORMAL", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	//{ "WORLDNORMAL", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
 const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::Basic32[3] = 
@@ -346,27 +342,11 @@ HRESULT SceneRoot::Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 
 HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData)
 {
+	// Set samplers
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
 	ID3D11SamplerState* samplers[2] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
 											 stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap) } ;
 	pImmediateContext->PSSetSamplers(0, 2, samplers);
-
-	// Update never changes. TODO: Move out to a place that never changes
-	CBNeverChanges cbNeverChanges;
-	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&pRenderData->view)));
-	pImmediateContext->UpdateSubresource(_pCBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
-
-	// Set up input assembler
-	pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
-	UINT stride[1] = { sizeof(SimpleVertex) }; //, sizeof(InstancedData) };
-	UINT offset[1] = { 0 }; //, 0 };
-	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-	pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
-	pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
-	pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
-	pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	pImmediateContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
 
 	// Set shaders
 	if (pRenderData->pass == ShadowMapPass)
@@ -380,20 +360,36 @@ HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 		pImmediateContext->PSSetShader(_pPixelShader, nullptr, 0);
 	}
 
+	// Update never changes. TODO: Move out to a place that never changes
+	CBNeverChanges cbNeverChanges;
+	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&pRenderData->view)));
+	pImmediateContext->UpdateSubresource(_pCBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
+	pImmediateContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
+
+	// Update changes every frame CB.
 	// Compute world to camera matrix
 	CBChangesEveryFrame cb;
 	cb.light = _light;
 	cb.eyePos = pRenderData->eyePos;
 	cb.shadowMatrix = pRenderData->shadowTransform;
 	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(pRenderData->time));
-
 	pImmediateContext->VSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
 	pImmediateContext->PSSetConstantBuffers(2, 1, &_pCBChangesEveryFrame);
 	pImmediateContext->UpdateSubresource(_pCBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
 
+	// Set up input assembler
+	pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
+	UINT stride[1] = { sizeof(SimpleVertex) };
+	UINT offset[1] = { 0 };
+	pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
+	pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 	int startInstance = 0;
 	for (auto i = _children.begin(); i != _children.end(); i++)
 	{
+		ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
+		pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
+
 		WorldObject* obj = (*i);
 		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, pRenderData, &_geometryData, startInstance);
 		HRR(hr2);

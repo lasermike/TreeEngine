@@ -22,15 +22,15 @@ XMMATRIX Camera::GetViewMatrix()
 
 Player::Player(WorldObjectParams* params) : WorldObject(params)					   
 {
-    m_cameraType = WalkCamera; //OrbitCamera
+    m_cameraType = WalkCameraType; //OrbitCamera
 
 	// Create the scene
-	if (m_cameraType == OrbitCamera)
+	if (m_cameraType == OrbitCameraType)
 	{
 		_selection = nullptr;
 		_rotateSpeed = 0.0f;
 		_dollySpeed = 0.0f;
-		m_orbitCamera = new XSF::OrbitCamera();
+		m_orbitCamera = new OrbitCamera();
 	}
     else
     {
@@ -45,7 +45,7 @@ Player::~Player(void)
 
 XMMATRIX Player::GetViewMatrix()
 {
-	if (m_cameraType == OrbitCamera)
+	if (m_cameraType == OrbitCameraType)
 	{
 		return m_orbitCamera->GetViewMatrix();
 	}
@@ -57,7 +57,7 @@ XMMATRIX Player::GetViewMatrix()
 
 XMVECTOR Player::GetEyePosition()
 {
-	if (m_cameraType == OrbitCamera)
+	if (m_cameraType == OrbitCameraType)
 	{
 		return m_orbitCamera->GetEyePosition();
 	}
@@ -148,7 +148,7 @@ void Player::HandleInput(bool key[256])  // WM_KEYDOWN
 	_rotateSpeed = 0.0f;
 	_dollySpeed = 0.0f;
 
-    if (m_cameraType == OrbitCamera)
+    if (m_cameraType == OrbitCameraType)
     {
 	    const char availableKeys[] = { 'W', 'S', 'D', 'A' };
 	    for (char k : availableKeys)

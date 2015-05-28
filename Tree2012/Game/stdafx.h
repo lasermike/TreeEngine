@@ -1,6 +1,6 @@
 #pragma once 
-#ifndef STDAFX_H
-#define STDAFX_H
+#ifndef TREEUTILS_H
+#define TREEUTILS_H
 
 //#define NOMINMAX 
 #include <assert.h>
