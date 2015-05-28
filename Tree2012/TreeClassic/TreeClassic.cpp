@@ -131,6 +131,21 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
+XMVECTOR RH2LH(const Vector3f& rvec)
+{
+    return XMVectorSet(-rvec.x, -rvec.y, rvec.z, 1);
+}
+
+XMVECTOR RH2LH(const Vector4f& rvec)
+{
+    return XMVectorSet(-rvec.x, -rvec.y, rvec.z, rvec.w);
+}
+
+XMVECTOR RH2LH(const ovrQuatf& rvec)
+{
+    return XMVectorSet(-rvec.x, -rvec.y, rvec.z, rvec.w);
+}
+
 
 HRESULT Render()
 {
@@ -177,15 +192,17 @@ HRESULT Render()
 			//								EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);
 			//XMVECTOR neutralQuat = XMVectorSet(-neutralRotation.x, -neutralRotation.y,
 			//									neutralRotation.z, neutralRotation.w);
-			XMVECTOR eyeQuat = XMVectorSet(-EyeRenderPose[eye].Orientation.x, -EyeRenderPose[eye].Orientation.y,
-											EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);
-			XMVECTOR neutralQuat = XMVectorSet(-neutralRotation.x, -neutralRotation.y,
-												neutralRotation.z, neutralRotation.w);
-			XMVECTOR finalQuat = XMQuaternionMultiply(eyeQuat, XMQuaternionInverse(neutralQuat));
+            XMVECTOR eyeQuat = RH2LH(EyeRenderPose[eye].Orientation);
+            XMVECTOR neutralQuat = RH2LH(neutralRotation);
+			XMVECTOR finalQuat = eyeQuat; //XMQuaternionMultiply(eyeQuat, XMQuaternionInverse(neutralQuat));
 			XMFLOAT4 hmdRot;
 			XMStoreFloat4(&hmdRot, finalQuat);
 
             g_game->GetPlayer()->GetCamera()->SetHmdState(hmdPos, hmdRot);
+
+            Matrix4f proj = ovrMatrix4f_Projection(eyeRenderDesc[eye].Fov, 0.2f, 1000.0f, ovrProjection_None);
+            XMFLOAT4X4 projxm = XMFLOAT4X4((float*) (proj.Transposed().M));
+            g_game->UpdateProjection(&projxm);
 
             // Render
 

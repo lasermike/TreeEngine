@@ -4,8 +4,8 @@
 XMMATRIX Camera::GetViewMatrix()
 {
     XMMATRIX rotMat = XMMatrixRotationQuaternion(XMQuaternionMultiply(
-        m_parent->GetRotation(),
-        XMLoadFloat4(&m_hmdRotation)
+        XMLoadFloat4(&m_hmdRotation), m_parent->GetRotation()
+        
     ));
                                                                           
     //XMMATRIX rotMat = XMMatrixRotationQuaternion(XMLoadFloat4(&m_hmdRotation));

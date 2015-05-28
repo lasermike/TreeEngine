@@ -419,7 +419,9 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
     ASSERT(_viewPort.Width != 0);
     ASSERT(_viewPort.Height != 0);
 
-	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.projectionData.fov, _renderData.projectionData.screenWidth / (float)_renderData.projectionData.screenHeight, _renderData.projectionData.nearClippingPlane, _renderData.projectionData.farClippingPlane));
+	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.projectionData.fov, 
+                    _renderData.projectionData.screenWidth / (float)_renderData.projectionData.screenHeight, 
+                    _renderData.projectionData.nearClippingPlane, _renderData.projectionData.farClippingPlane));
 
 	UpdateProjection(&_renderData.projection);
 

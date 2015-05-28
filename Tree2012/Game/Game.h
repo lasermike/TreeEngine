@@ -58,6 +58,7 @@ public:
     XSF::D3DDeviceContext* GetContext() { return _pImmediateContext; }
     ID3D11Texture2D* GetBackBuffer() { return _pDepthStencil; }
     IDXGISwapChain* GetSwapChain() { return _pSwapChain; }
+	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 
     Player* GetPlayer() { return _player; }
 
@@ -76,7 +77,6 @@ private:
 	void CleanupDevice();
 
     //HRESULT StandardResizeHandler();
-	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 	void UpdateView();
 
 	void BuildShadowTransform();
