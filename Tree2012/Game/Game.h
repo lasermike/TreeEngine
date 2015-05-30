@@ -69,6 +69,8 @@ public:
     //}
 private:
 
+	HRESULT Initialize();
+
 	void Update(DX::StepTimer const& timer);
 	void Regenerate();
 	void HandleInput(bool key[256]);
@@ -121,6 +123,7 @@ private:
 
 	GameLoader							_loader;
 	SceneRoot*							_pScene;
+	RenderManager						_renderManager;
 
 	bool								_resetTree;
 	bool								_showShadowBuffer;

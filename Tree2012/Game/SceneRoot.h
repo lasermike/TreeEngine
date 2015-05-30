@@ -6,7 +6,40 @@
 #include "WorldObject.h"
 #include <list>
 
+class RenderManager;
+
 class SceneRoot
+{
+	RenderManager* m_renderManager; // Weak
+
+	list<WorldObject*>				_children;
+
+	XMFLOAT3	_boundingBox[2]; // Move to Scene!
+
+
+public:
+
+	SceneRoot() : m_renderManager(nullptr) { };
+	SceneRoot(RenderManager* renderManager) : m_renderManager(renderManager) { }
+	~SceneRoot(); 
+
+	HRESULT InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext); // Long term should go away
+
+	HRESULT Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
+	HRESULT Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
+
+	void AddChild(WorldObject* obj)
+	{
+		_children.push_back(obj);
+	}
+
+	const list<WorldObject*>& Children() { return _children; }
+
+	XMVECTOR GetExtents(Extent extent);
+	XMFLOAT3* GetBoundingBox() { return _boundingBox; }
+};
+
+class RenderManager
 {
 	ID3D11VertexShader*                 _pVertexShader;
 	ID3D11PixelShader*                  _pPixelShader;
@@ -31,31 +64,18 @@ class SceneRoot
 	GeometryGenerator					_geometryGenerator;
 	GeometryBufferData					_geometryData;
 
-	list<WorldObject*>				_children;
-
-	XMFLOAT3	_boundingBox[2];
-
 public:
-	SceneRoot();
-	~SceneRoot();
+	RenderManager();
+	~RenderManager();
 
-	virtual HRESULT InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext);
+	HRESULT Initialize();
+
+	virtual HRESULT InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext, const list<WorldObject*>& children);
 	virtual HRESULT CleanUpDeviceObjects();
-	HRESULT Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
-	HRESULT Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
-
-	void AddChild(WorldObject* obj)
-	{
-		_children.push_back(obj);
-	}
-
-	const list<WorldObject*>& Children() { return _children; }
-
+	HRESULT Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData, const list<WorldObject*>& children);
+	HRESULT Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData, const list<WorldObject*>& children);
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
-
-	XMFLOAT3* GetBoundingBox() { return _boundingBox; }
-	XMVECTOR GetExtents(Extent extent);
 };
 

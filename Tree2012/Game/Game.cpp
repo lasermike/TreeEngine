@@ -65,31 +65,6 @@ Game::Game()
 	_pCBChangeOnResize = nullptr;
 	_bitmapFont = nullptr;
 	_player = nullptr;
-
-	XSF::SetContentFileRoot();
-
-	// Init vertex/index buffer
-	_pScene = new SceneRoot();
-
-	// Create player
-	WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
-	playerParams->position = XMFLOAT3(-4.3f, 1.5f, -5.5f);
-	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
-	_player = new Player(playerParams);
-
-	_loader.Load("Basic", _pScene, &_renderData, _player);
-
-	// Initialize the view matrix
-	UpdateView();
-
-	// Init scene bounds.
-	// Estimatation.    
-	// Ideally would loop through all world space vertices
-	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	_renderData.mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
-
-    //_resizeHandler = std::bind(&Game::StandardResizeHandler, this);
-    //SetResizeHandler(std::bind(&Game::StandardResizeHandler, this));
 }
 
 void Game::UpdateView()
@@ -104,9 +79,43 @@ Game::~Game()
 	SafeDelete(&_pScene);
 }
 
+HRESULT Game::Initialize()
+{
+	XSF::SetContentFileRoot();
+
+	_renderManager.Initialize();
+
+	// Init vertex/index buffer
+	_pScene = new SceneRoot(&_renderManager);
+
+	// Create player
+	WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
+	playerParams->position = XMFLOAT3(-4.3f, 1.5f, -5.5f);
+	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
+	_player = new Player(playerParams);
+
+	_loader.Load("Basic", _pScene, &_renderData, _player);
+
+	// Initialize the view matrix
+	//UpdateView();
+
+	// Init scene bounds.
+	// Estimatation.    
+	// Ideally would loop through all world space vertices
+	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	_renderData.mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
+
+    //_resizeHandler = std::bind(&Game::StandardResizeHandler, this);
+    //SetResizeHandler(std::bind(&Game::StandardResizeHandler, this));
+
+	return S_OK;
+}
+
 #ifdef _TREE_CLASSIC
 HRESULT Game::Initialize(HWND hwnd) 
 { 
+	Initialize();
+
 	_hwnd = hwnd;  
 	HRESULT hr = S_OK;
 	HRR(InitDevice());
@@ -128,6 +137,8 @@ HRESULT Game::Initialize(HWND hwnd)
 HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window) 
 { 
 	HRESULT hr = S_OK;
+
+	Initialize();
 
 	_window = window; 
 	HRR(InitDevice());
@@ -436,7 +447,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 void Game::CleanupDevice()
 {
 	XSF::StockRenderStates::Shutdown();
-	_pScene->CleanUpDeviceObjects();
+	_renderManager.CleanUpDeviceObjects();
 
 	SafeDelete(&_renderData.pShadowMap);
 
@@ -459,8 +470,7 @@ void Game::Regenerate()
 	_loader.Regenerate(_pScene);
 
 	HRESULT hr = _pScene->InitGraphics(_pd3dDevice, _pImmediateContext);
-	assert(SUCCEEDED(hr));
-		
+	assert(SUCCEEDED(hr));		
 }
 
 void Game::Update(DX::StepTimer const& timer)
@@ -586,7 +596,7 @@ void Game::Render(bool oculus)
 
 	if(_showShadowBuffer)
 	{
-		HRC(_pScene->DrawScreenQuad(_pImmediateContext, _renderData.pShadowMap->DepthMapSRV()));
+		HRC(_renderManager.DrawScreenQuad(_pImmediateContext, _renderData.pShadowMap->DepthMapSRV()));
 	}
 
     if (!oculus)

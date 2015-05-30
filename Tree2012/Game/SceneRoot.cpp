@@ -79,7 +79,36 @@ void InputLayouts::DestroyAll()
 
 #pragma endregion
 
-SceneRoot::SceneRoot() : _pShadowVertexShader(nullptr), _pShadowPixelShader(nullptr), 
+
+SceneRoot::~SceneRoot()
+{
+	for (auto i = _children.begin(); i != _children.end(); i++)
+	{
+		SafeDelete(&(*i));
+	}
+}
+
+XMVECTOR SceneRoot::GetExtents(Extent extent)
+{
+	XSF_ASSERT(extent == TOP);
+
+	auto i = _children.begin() ;
+	XMVECTOR retval = (*i)->GetExtents(extent);
+	i++;
+	for (; i != _children.end(); i++)
+	{
+		XMVECTOR cur = (*i)->GetExtents(extent);
+		if (XMVectorGetY(cur) > XMVectorGetY(retval)) 
+		{
+			retval = cur;
+		}
+	}
+
+	return retval; 
+}
+
+
+RenderManager::RenderManager() : _pShadowVertexShader(nullptr), _pShadowPixelShader(nullptr), 
 						 _pScreenQuadVB(nullptr), _pScreenQuadIB(nullptr),
 						 _pDrawScreenVertexShader(), _pDrawScreenPixelShader()
 {
@@ -98,20 +127,24 @@ SceneRoot::SceneRoot() : _pShadowVertexShader(nullptr), _pShadowPixelShader(null
 	_pCBNeverChanges = nullptr;
 }
 
-SceneRoot::~SceneRoot()
+HRESULT RenderManager::Initialize()
 {
-	CleanUpDeviceObjects();
+	return S_OK;
+}
 
-	for (auto i = _children.begin(); i != _children.end(); i++)
-	{
-		SafeDelete(&(*i));
-	}
+RenderManager::~RenderManager()
+{
 }
 
 HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext)
 {
-	HRR(RenderStates::InitAll(device));
+	return m_renderManager->InitGraphics(device, pImmediateContext, _children);
+}
 
+HRESULT RenderManager::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext, const list<WorldObject*>& children)
+{
+	HRR(RenderStates::InitAll(device));
+	
 	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
@@ -121,14 +154,14 @@ HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* p
 	bd.CPUAccessFlags = 0;
 	HRR(device->CreateBuffer(&bd, nullptr, &_pCBNeverChanges));
 
-	for (auto i = _children.begin(); i != _children.end(); i++)
+	for (auto i = children.begin(); i != children.end(); i++)
 	{
 		HRR((*i)->InitGraphics(device, pImmediateContext));
 	}
 
 	// Determine number of instances
 	unsigned int numInstances = 0;
-	for (auto j = _children.begin(); j != _children.end(); j++)
+	for (auto j = children.begin(); j != children.end(); j++)
 	{
 		numInstances += (*j)->GetNumInstances(true);
 	}
@@ -236,7 +269,7 @@ HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* p
 	return S_OK;
 }
 
-HRESULT SceneRoot::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
+HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
 {
 	GeometryGenerator::MeshData quad;
 
@@ -282,7 +315,7 @@ HRESULT SceneRoot::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
 	return S_OK;
 }
 
-HRESULT SceneRoot::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
+HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
 {
 	UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
@@ -313,34 +346,48 @@ HRESULT SceneRoot::Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 	_boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
 	XMVECTOR bbmin = XMLoadFloat3(&_boundingBox[0]);
 	XMVECTOR bbmax = XMLoadFloat3(&_boundingBox[1]);
+	
+	HRESULT hr = m_renderManager->Update(pImmediateContext, pRenderData, _children);
 
+	for (auto i : _children)
+	{
+		bbmin = XMVectorMin(bbmin, XMLoadFloat3(&i->GetBoundingBox()[0]));
+		bbmax = XMVectorMax(bbmax, XMLoadFloat3(&i->GetBoundingBox()[1]));
+	}
+
+	XMStoreFloat3(&_boundingBox[0], bbmin);
+	XMStoreFloat3(&_boundingBox[1], bbmax);
+
+	return hr;
+}
+
+HRESULT RenderManager::Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData, const list<WorldObject*>& children)
+{
 	// Compute instance data
 	D3D11_MAPPED_SUBRESOURCE mappedData;
 	HRR(pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
-	for (auto i = _children.begin(); i != _children.end(); i++)
+	for (auto i = children.begin(); i != children.end(); i++)
 	{
 		if ((*i)->GetNumInstances(true) > 0)
 		{
 			HRR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
 			dataView += (*i)->GetNumInstances(false);
 		}
-
-		bbmin = XMVectorMin(bbmin, XMLoadFloat3(&(*i)->GetBoundingBox()[0]));
-		bbmax = XMVectorMax(bbmax, XMLoadFloat3(&(*i)->GetBoundingBox()[1]));
 	}
 
 	pImmediateContext->Unmap(_pInstancedBuffer, 0);
 
-	XMStoreFloat3(&_boundingBox[0], bbmin);
-	XMStoreFloat3(&_boundingBox[1], bbmax);
-
 	return S_OK;
 }
 
-
 HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData)
+{
+	return m_renderManager->Render(pImmediateContext, pRenderData, _children);
+}
+
+HRESULT RenderManager::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData, const list<WorldObject*>& children)
 {
 	// Set samplers
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
@@ -385,7 +432,7 @@ HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 	pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	int startInstance = 0;
-	for (auto i = _children.begin(); i != _children.end(); i++)
+	for (auto i = children.begin(); i != children.end(); i++)
 	{
 		ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
 		pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
@@ -399,33 +446,9 @@ HRESULT SceneRoot::Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* 
 	return S_OK;
 }
 
-XMVECTOR SceneRoot::GetExtents(Extent extent)
-{
-	XSF_ASSERT(extent == TOP);
-
-	auto i = _children.begin() ;
-	XMVECTOR retval = (*i)->GetExtents(extent);
-	i++;
-	for (; i != _children.end(); i++)
-	{
-		XMVECTOR cur = (*i)->GetExtents(extent);
-		if (XMVectorGetY(cur) > XMVectorGetY(retval)) 
-		{
-			retval = cur;
-		}
-	}
-
-	return retval; 
-}
-
-HRESULT SceneRoot::CleanUpDeviceObjects()
+HRESULT RenderManager::CleanUpDeviceObjects()
 {
 	RenderStates::DestroyAll();
-
-	for (auto i = _children.begin(); i != _children.end(); i++)
-	{
-		(*i)->CleanUpDeviceObjects();
-	}
 
 	SafeRelease(&_pVertexBuffer);
 	SafeRelease(&_pIndexBuffer);
