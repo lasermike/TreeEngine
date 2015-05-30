@@ -36,6 +36,7 @@ public:
 	virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometyData, int startInstance);
 
 	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView) override;
-	virtual unsigned int GetNumInstances(bool numMax);
+	virtual unsigned int GetNumInstances();
+	virtual unsigned int GetMaxInstances();
 };
 

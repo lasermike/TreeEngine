@@ -24,6 +24,8 @@ public:
 	~SceneRoot(); 
 
 	HRESULT InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext); // Long term should go away
+	HRESULT CleanUpDeviceObjects();
+
 
 	HRESULT Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
 	HRESULT Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
@@ -37,10 +39,13 @@ public:
 
 	XMVECTOR GetExtents(Extent extent);
 	XMFLOAT3* GetBoundingBox() { return _boundingBox; }
+
+    UINT32 GetMaxInstances();
 };
 
 class RenderManager
 {
+    SceneRoot*                          _pCurrentScene; // Weak
 	ID3D11VertexShader*                 _pVertexShader;
 	ID3D11PixelShader*                  _pPixelShader;
 	CComPtr<ID3D11VertexShader>			_pShadowVertexShader;
@@ -70,7 +75,7 @@ public:
 
 	HRESULT Initialize();
 
-	virtual HRESULT InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext, const list<WorldObject*>& children);
+	virtual HRESULT InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext, UINT32 maxInstances);
 	virtual HRESULT CleanUpDeviceObjects();
 	HRESULT Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData, const list<WorldObject*>& children);
 	HRESULT Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData, const list<WorldObject*>& children);

@@ -127,6 +127,8 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     }
 
     g_game->Cleanup();
+    
+    delete g_game;
 
     return (int) msg.wParam;
 }

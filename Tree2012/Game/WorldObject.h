@@ -109,12 +109,13 @@ public:
 
 	virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometyData, int startInstance)
 	{
-		HRR(_geometry->DrawInstanced(pImmediateContext, pRenderData, pGeometyData, startInstance, GetNumInstances(false)));
+		HRR(_geometry->DrawInstanced(pImmediateContext, pRenderData, pGeometyData, startInstance, GetNumInstances()));
 		return S_OK;
 	}
 
 	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView);
-	virtual unsigned int GetNumInstances(bool /*numMax*/) { return 0; }
+	virtual unsigned int GetNumInstances() { return 0; }
+	virtual unsigned int GetMaxInstances() { return 0; }
 	XMFLOAT3* GetBoundingBox() { return _boundingBox; }
 	XMVECTOR GetExtents(Extent extent);
 	XMVECTOR GetPosition()  { return XMLoadFloat3(&_position); }

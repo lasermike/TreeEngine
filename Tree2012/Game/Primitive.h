@@ -43,7 +43,8 @@ public:
 
 	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView) override;
 
-	virtual unsigned int GetNumInstances(bool /*numMax*/) { return 1; }
+	virtual unsigned int GetNumInstances() { return 1; }
+	virtual unsigned int GetMaxInstances() { return 1; }
 
 };
 

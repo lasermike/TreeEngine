@@ -107,6 +107,38 @@ XMVECTOR SceneRoot::GetExtents(Extent extent)
 	return retval; 
 }
 
+UINT32 SceneRoot::GetMaxInstances()
+{
+    // Determine number of instances
+	unsigned int numInstances = 0;
+	for (auto j : _children)
+	{
+		numInstances += j->GetMaxInstances();
+	}
+
+    return numInstances;
+}
+
+HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext)
+{
+	for (auto i : _children)
+	{
+		HRR(i->InitGraphics(device, pImmediateContext));
+	}
+
+	return S_OK;
+}
+
+HRESULT SceneRoot::CleanUpDeviceObjects()
+{
+    for (auto i : _children)
+    {
+        i->CleanUpDeviceObjects();
+    }
+
+    return S_OK;
+}
+
 
 RenderManager::RenderManager() : _pShadowVertexShader(nullptr), _pShadowPixelShader(nullptr), 
 						 _pScreenQuadVB(nullptr), _pScreenQuadIB(nullptr),
@@ -136,13 +168,10 @@ RenderManager::~RenderManager()
 {
 }
 
-HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext)
+HRESULT RenderManager::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext, UINT32 maxInstances)
 {
-	return m_renderManager->InitGraphics(device, pImmediateContext, _children);
-}
+    HRR(CleanUpDeviceObjects());
 
-HRESULT RenderManager::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext, const list<WorldObject*>& children)
-{
 	HRR(RenderStates::InitAll(device));
 	
 	// Create the constant buffers
@@ -154,22 +183,10 @@ HRESULT RenderManager::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContex
 	bd.CPUAccessFlags = 0;
 	HRR(device->CreateBuffer(&bd, nullptr, &_pCBNeverChanges));
 
-	for (auto i = children.begin(); i != children.end(); i++)
-	{
-		HRR((*i)->InitGraphics(device, pImmediateContext));
-	}
-
-	// Determine number of instances
-	unsigned int numInstances = 0;
-	for (auto j = children.begin(); j != children.end(); j++)
-	{
-		numInstances += (*j)->GetNumInstances(true);
-	}
-
 	// Create instanced buffer
 	D3D11_BUFFER_DESC vbd;
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
-	vbd.ByteWidth = sizeof(InstancedData) * numInstances;
+	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	vbd.MiscFlags = 0;
@@ -370,10 +387,10 @@ HRESULT RenderManager::Update(XSF::D3DDeviceContext* pImmediateContext, RenderDa
 
 	for (auto i = children.begin(); i != children.end(); i++)
 	{
-		if ((*i)->GetNumInstances(true) > 0)
+		if ((*i)->GetMaxInstances() > 0)
 		{
 			HRR((*i)->ComputeConstants(pImmediateContext, pRenderData, dataView));
-			dataView += (*i)->GetNumInstances(false);
+			dataView += (*i)->GetNumInstances();
 		}
 	}
 
@@ -440,7 +457,7 @@ HRESULT RenderManager::Render(XSF::D3DDeviceContext* pImmediateContext, RenderDa
 		WorldObject* obj = (*i);
 		HRESULT hr2 = obj->RenderInstanced(pImmediateContext, pRenderData, &_geometryData, startInstance);
 		HRR(hr2);
-		startInstance += (*i)->GetNumInstances(false);
+		startInstance += (*i)->GetNumInstances();
 	}
 
 	return S_OK;

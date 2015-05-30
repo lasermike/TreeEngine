@@ -11,6 +11,9 @@
 #include <d3d11_x.h>
 #include <DirectXMath.h>
 #include <pix.h>
+
+#define TREENGINE_XBOX
+
 #include "stdafx.h"
 
 namespace DX
@@ -24,3 +27,4 @@ namespace DX
         }
     }
 }
+

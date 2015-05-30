@@ -242,14 +242,22 @@ HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransf
 	return S_OK;
 }
 
-unsigned int Tree::GetNumInstances(bool numMax)
+unsigned int Tree::GetMaxInstances()
 { 
 	if (_treeModel)
 	{
-		if (numMax)
-			return _treeModel->treeData.numBranches;
-		else
-			return (unsigned int) (_logInstanceData.size() + _twigInstanceData.size());
+        return _treeModel->treeData.numBranches;
+	}
+	else
+		return 0;
+
+}
+
+unsigned int Tree::GetNumInstances()
+{ 
+	if (_treeModel)
+	{
+        return (unsigned int) (_logInstanceData.size() + _twigInstanceData.size());
 	}
 	else
 		return 0;

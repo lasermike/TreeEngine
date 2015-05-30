@@ -22,4 +22,7 @@
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
 
+// Above this line include platform specific stuff
+#define TREENGINE_WIN32
+
 #include <stdafx.h>

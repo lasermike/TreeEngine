@@ -54,8 +54,8 @@ Game::Game()
 	_showHelp = false;
 	_rasterState = nullptr;
 	_displayMode = Monitor;
-#ifdef _XBOX_ONE
-	_enableMsaa = false; // TODO
+#ifdef ENABLE_MSAA
+	_enableMsaa = true; // TODO
 #else
 	_enableMsaa = false; // TODO: disabled for windows store
 #endif
@@ -95,9 +95,6 @@ HRESULT Game::Initialize()
 	_player = new Player(playerParams);
 
 	_loader.Load("Basic", _pScene, &_renderData, _player);
-
-	// Initialize the view matrix
-	//UpdateView();
 
 	// Init scene bounds.
 	// Estimatation.    
@@ -416,7 +413,6 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	_viewPort.TopLeftY = 0;
 	_pImmediateContext->RSSetViewports(1, &_viewPort);
 
-
     // Validation
     ASSERT(_pRenderTargetView);
     ASSERT(_pSwapChain1);
@@ -446,6 +442,13 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 //--------------------------------------------------------------------------------------
 void Game::CleanupDevice()
 {
+    if (_pScene)
+    {
+        _pScene->CleanUpDeviceObjects();
+    }
+
+    _renderManager.CleanUpDeviceObjects();
+
 	XSF::StockRenderStates::Shutdown();
 	_renderManager.CleanUpDeviceObjects();
 
@@ -470,6 +473,10 @@ void Game::Regenerate()
 	_loader.Regenerate(_pScene);
 
 	HRESULT hr = _pScene->InitGraphics(_pd3dDevice, _pImmediateContext);
+    assert(SUCCEEDED(hr));
+
+    // Init render manager
+    hr = _renderManager.InitGraphics(_pd3dDevice, _pImmediateContext, _pScene->GetMaxInstances());
 	assert(SUCCEEDED(hr));		
 }
 
