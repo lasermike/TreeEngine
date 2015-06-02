@@ -135,6 +135,9 @@
     <ClInclude Include="..\Game\Player.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\RenderManager.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="TreeClassic.cpp">
@@ -207,6 +210,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\Player.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\RenderManager.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
   </ItemGroup>

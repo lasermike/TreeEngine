@@ -105,6 +105,9 @@
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\Player.cpp" />
+    <ClCompile Include="..\Game\RenderManager.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TreePC.h" />
@@ -201,6 +204,9 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\Player.h" />
+    <ClInclude Include="..\Game\RenderManager.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />

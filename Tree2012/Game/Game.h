@@ -10,6 +10,7 @@
 #include "GameLoader.h"
 #include "StepTimer.h"
 #include "Player.h"
+#include "RenderManager.h"
 
 #ifndef _TREE_CLASSIC
 #include "agile.h"

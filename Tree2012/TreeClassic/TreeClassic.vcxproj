@@ -116,6 +116,7 @@
     <ClInclude Include="..\Game\Primitive.h" />
     <ClInclude Include="..\Game\PrimitiveGeometry.h" />
     <ClInclude Include="..\Game\RenderData.h" />
+    <ClInclude Include="..\Game\RenderManager.h" />
     <ClInclude Include="..\Game\RenderStates.h" />
     <ClInclude Include="..\Game\Resource.h" />
     <ClInclude Include="..\Game\SceneRoot.h" />
@@ -146,6 +147,7 @@
     <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\PrimitiveGeometry.cpp" />
+    <ClCompile Include="..\Game\RenderManager.cpp" />
     <ClCompile Include="..\Game\RenderStates.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
     <ClCompile Include="..\Game\ShadowMap.cpp" />
