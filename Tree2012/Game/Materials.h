@@ -34,9 +34,9 @@ struct PointLight
 };
 
 
-struct Material
+struct ShaderMaterial
 {
-	Material() { ZeroMemory(this, sizeof(this)); }
+	ShaderMaterial() { ZeroMemory(this, sizeof(this)); }
 
 	XMFLOAT4 Ambient;
 	XMFLOAT4 Diffuse;

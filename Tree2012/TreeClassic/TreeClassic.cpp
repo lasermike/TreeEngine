@@ -153,7 +153,7 @@ HRESULT Render()
 {
     if (oculusMode)
     {
-        XMFLOAT4 eye = g_game->GetRenderData().eyePos;
+        XMFLOAT4 eye = g_game->GetRenderManager().GetRenderData().eyePos;
 
         //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));
         float y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, 0);

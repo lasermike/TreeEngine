@@ -60,13 +60,14 @@ void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* p
 	pScene->AddChild(new Primitive(params4));
 
 	WorldObjectParams* params3 = new WorldObjectParams(FixedTreeGeneratorType);
+	params3->depthLOD = 2;
 	params3->position = XMFLOAT3(-1.3f, 0.5f,1.3f);
 	pScene->AddChild(new Tree(params3));
 
 	WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params2->position = XMFLOAT3(1.3f, .5f, -1.3f);
 	params2->_animationSpeed = 0.0f;
-	params2->depthLOD = 3;
+	params2->depthLOD = 5;
 	params2->GetGeneratorParameters()._axiom = "F";	
 	params2->GetGeneratorParameters()._constants = "";	
 	params2->GetGeneratorParameters()._rules.push_back(Rule("F", "F [- & < F][ < + + & F ] | | F [ - - & > F ][+ & F ]"));
@@ -79,7 +80,7 @@ void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* p
 	WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params5->position = XMFLOAT3(-1.3f, .5f,-1.3f);
 	params5->_animationSpeed = 0.0f;
-	params5->depthLOD = 3;
+	params5->depthLOD = 5;
 	params5->GetGeneratorParameters()._axiom = "F";	
 	params5->GetGeneratorParameters()._constants = "";	
 	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "F [ & + F] F [ - > F][- > F][& F]"));
@@ -88,8 +89,6 @@ void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* p
 	params5->GetGeneratorParameters()._segmentLength = .28f;
 	params5->GetGeneratorParameters().thickness = .020f;	
 	pScene->AddChild(new Tree(params5));
-
-
 
 	// Init lights
 	pRenderData->dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);

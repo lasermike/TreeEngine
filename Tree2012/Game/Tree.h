@@ -31,7 +31,7 @@ public:
 	void Create(TreeModelGenerator* generator);
 	virtual ObjectType GetObjectType() { return TreeType; }
 
-	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
+	virtual HRESULT InitGraphics(RenderManager& renderManager);
 
 	virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometyData, int startInstance);
 

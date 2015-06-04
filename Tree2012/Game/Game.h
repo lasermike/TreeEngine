@@ -5,7 +5,6 @@
 #include "sceneroot.h"
 #include "Tree.h"
 #include "bitmapfont.h"
-#include "RenderData.h"
 #include "LSystemModelGenerator.h"
 #include "GameLoader.h"
 #include "StepTimer.h"
@@ -54,7 +53,7 @@ public:
 	void Suspend();
 	void Resume();
 
-	const RenderData& GetRenderData() { return _renderData; }
+	RenderManager& GetRenderManager() { return _renderManager; }
 	ID3D11Device* GetDevice() { return _pd3dDevice1; }
     XSF::D3DDeviceContext* GetContext() { return _pImmediateContext; }
     ID3D11Texture2D* GetBackBuffer() { return _pDepthStencil; }
@@ -91,7 +90,6 @@ private:
     //ResizeFunc _resizeHandler;
 
 	// Game state
-	RenderData							_renderData;
 	DX::StepTimer						_timer;
 	double								_timeStart;
 	double								_timeCurrent;

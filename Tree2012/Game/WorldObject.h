@@ -102,10 +102,10 @@ public:
 
 	virtual void Create(ModelGenerator* /*generator*/) { }
 
-	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
+	virtual HRESULT InitGraphics(RenderManager& renderManager);
 	virtual HRESULT CleanUpDeviceObjects();
 
-	virtual HRESULT Render(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData);
+	virtual HRESULT Render(RenderManager& renderManager);
 
 	virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometyData, int startInstance)
 	{

@@ -23,7 +23,7 @@ WorldObject::~WorldObject(void)
 	CleanUpDeviceObjects();
 }
 
-HRESULT WorldObject::InitGraphics(ID3D11Device* /*device*/, ID3D11DeviceContext* /*pImmediateContext*/)
+HRESULT WorldObject::InitGraphics(RenderManager& /*renderManager*/)
 {
 	return S_OK;
 }
@@ -39,7 +39,7 @@ HRESULT WorldObject::CleanUpDeviceObjects()
 	return S_OK;
 }
 
-HRESULT WorldObject::Render(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/)
+HRESULT WorldObject::Render(RenderManager& /*renderManager*/)
 {
 	return E_NOTIMPL;
 }

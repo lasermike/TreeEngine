@@ -6,28 +6,24 @@
 #include <list>
 
 class RenderManager;
+class WorldObject;
 
 class SceneRoot
 {
-	RenderManager* m_renderManager; // Weak
-
 	list<WorldObject*>				_children;
 
 	XMFLOAT3	_boundingBox[2]; // Move to Scene!
 
-
 public:
 
-	SceneRoot() : m_renderManager(nullptr) { };
-	SceneRoot(RenderManager* renderManager) : m_renderManager(renderManager) { }
+	SceneRoot() { };
 	~SceneRoot(); 
 
-	HRESULT InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext); // Long term should go away
+	HRESULT InitGraphics(RenderManager& renderManager); 
 	HRESULT CleanUpDeviceObjects();
 
-
-	HRESULT Update(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
-	HRESULT Render(XSF::D3DDeviceContext* pImmediateContext, RenderData* pRenderData);
+	HRESULT Update(RenderManager& renderManager);
+	HRESULT Render(RenderManager& renderManager);
 
 	void AddChild(WorldObject* obj)
 	{

@@ -20,11 +20,11 @@ void Primitive::Create(PrimitiveModelGenerator* generator)
 	_model = generator->Create();
 }
 
-HRESULT Primitive::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
+HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 {
 	HRR(CleanUpDeviceObjects());
 	_geometry = new PrimitiveGeometry((PrimitiveModel*)_model);
-	HRR(_geometry->InitGraphics(device, pImmediateContext));
+	HRR(_geometry->InitGraphics(renderManager));
 	return S_OK;
 }
 

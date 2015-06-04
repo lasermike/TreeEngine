@@ -17,13 +17,13 @@ class TreeGeometry : public Geometry
 
 	TreeModel*					_model; //Weak reference
 
-	Material					_trunkMaterial;
+	ShaderMaterial					_trunkMaterial;
 
 public:
 	TreeGeometry(TreeModel* model);
 	~TreeGeometry();
 
-	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
+	virtual HRESULT InitGraphics(RenderManager& renderManager);
 	virtual HRESULT CleanUpDeviceObjects();
 
 	virtual HRESULT DrawInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, const GeometryBufferData::BufferIndices* bufferIndices, int startInstance, int numInstances);

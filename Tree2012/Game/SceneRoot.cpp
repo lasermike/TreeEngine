@@ -2,6 +2,7 @@
 #include "SceneRoot.h"
 #include "GeometryGenerator.h"
 #include "ShadowMap.h"
+#include "RenderManager.h"
 
 SceneRoot::~SceneRoot()
 {
@@ -42,11 +43,11 @@ UINT32 SceneRoot::GetMaxInstances()
     return numInstances;
 }
 
-HRESULT SceneRoot::InitGraphics(XSF::D3DDevice* device, XSF::D3DDeviceContext* pImmediateContext)
+HRESULT SceneRoot::InitGraphics(RenderManager& renderManager)
 {
 	for (auto i : _children)
 	{
-		HRR(i->InitGraphics(device, pImmediateContext));
+		HRR(i->InitGraphics(renderManager));
 	}
 
 	return S_OK;
@@ -60,6 +61,31 @@ HRESULT SceneRoot::CleanUpDeviceObjects()
     }
 
     return S_OK;
+}
+
+HRESULT SceneRoot::Update(RenderManager& renderManager)
+{
+	_boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
+	XMVECTOR bbmin = XMLoadFloat3(&_boundingBox[0]);
+	XMVECTOR bbmax = XMLoadFloat3(&_boundingBox[1]);
+	
+	HRESULT hr = renderManager.Update(_children);
+
+	for (auto i : _children)
+	{
+		bbmin = XMVectorMin(bbmin, XMLoadFloat3(&i->GetBoundingBox()[0]));
+		bbmax = XMVectorMax(bbmax, XMLoadFloat3(&i->GetBoundingBox()[1]));
+	}
+
+	XMStoreFloat3(&_boundingBox[0], bbmin);
+	XMStoreFloat3(&_boundingBox[1], bbmax);
+
+	return hr;
+}
+
+HRESULT SceneRoot::Render(RenderManager& renderManager)
+{
+	return renderManager.Render(_children);
 }
 
 

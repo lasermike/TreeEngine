@@ -16,7 +16,7 @@ SamplerComparisonState samShadowCompState  : register( s1 );
 cbuffer cbNeverChanges : register( b0 )
 {
     matrix View;
-	Material groundMaterial;
+	ShaderMaterial groundMaterial;
 };
 
 cbuffer cbChangeOnResize : register( b1 )
@@ -34,7 +34,7 @@ cbuffer cbChangesEveryFrame : register( b2 )
 
 cbuffer cbChangesPerObject : register (b3)
 {
-	Material mat;
+	ShaderMaterial mat;
 	float4x4 texTransform;
 }
 

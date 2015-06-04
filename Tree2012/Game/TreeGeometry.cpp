@@ -34,13 +34,13 @@ TreeGeometry::~TreeGeometry()
 	CleanUpDeviceObjects();
 }
 
-HRESULT TreeGeometry::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
+HRESULT TreeGeometry::InitGraphics(RenderManager& renderManager)
 {
 	HRR(CleanUpDeviceObjects());
-	HRR(Geometry::InitGraphics(device, pImmediateContext));
+	HRR(Geometry::InitGraphics(renderManager));
 
 	// Load the Texture
-	HRR(CreateDDSTextureFromFile(device, L"bark2.dds", nullptr, &_pTextureRV));
+	HRR(CreateDDSTextureFromFile(renderManager.GetDevice(), L"bark2.dds", nullptr, &_pTextureRV));
 
 	return S_OK;
 }

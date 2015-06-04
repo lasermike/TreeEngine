@@ -42,7 +42,7 @@ struct SpotLight
 	float pad;
 };
 
-struct Material
+struct ShaderMaterial
 {
 	float4 Ambient;
 	float4 Diffuse;
@@ -56,7 +56,7 @@ struct Material
 // from a directional light.  We need to output the terms separately because
 // later we will modify the individual terms.
 //---------------------------------------------------------------------------------------
-void ComputeDirectionalLight(Material mat, float4 textureColor, DirectionalLight L, 
+void ComputeDirectionalLight(ShaderMaterial mat, float4 textureColor, DirectionalLight L, 
                              float3 normal, float3 toEye,
 					         out float4 ambient,
 						     out float4 diffuse,
@@ -95,7 +95,7 @@ void ComputeDirectionalLight(Material mat, float4 textureColor, DirectionalLight
 // from a point light.  We need to output the terms separately because
 // later we will modify the individual terms.
 //---------------------------------------------------------------------------------------
-void ComputePointLight(Material mat, PointLight L, float3 pos, float3 normal, float3 toEye,
+void ComputePointLight(ShaderMaterial mat, PointLight L, float3 pos, float3 normal, float3 toEye,
 				   out float4 ambient, out float4 diffuse, out float4 spec)
 {
 	// Initialize outputs.
@@ -147,7 +147,7 @@ void ComputePointLight(Material mat, PointLight L, float3 pos, float3 normal, fl
 // from a spotlight.  We need to output the terms separately because
 // later we will modify the individual terms.
 //---------------------------------------------------------------------------------------
-void ComputeSpotLight(Material mat, SpotLight L, float3 pos, float3 normal, float3 toEye,
+void ComputeSpotLight(ShaderMaterial mat, SpotLight L, float3 pos, float3 normal, float3 toEye,
 				  out float4 ambient, out float4 diffuse, out float4 spec)
 {
 	// Initialize outputs.

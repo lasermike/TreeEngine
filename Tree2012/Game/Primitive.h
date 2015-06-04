@@ -39,7 +39,7 @@ public:
 
 	virtual void Create(ModelGenerator* generator) { return Create((PrimitiveModelGenerator*)generator); }
 	virtual void Create(PrimitiveModelGenerator* generator);
-	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
+	virtual HRESULT InitGraphics(RenderManager& renderManager);
 
 	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView) override;
 

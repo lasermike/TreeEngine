@@ -25,11 +25,11 @@ void Tree::Create(TreeModelGenerator* generator)
 	}
 }
 
-HRESULT Tree::InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext)
+HRESULT Tree::InitGraphics(RenderManager& renderManager)
 {
 	HRR(CleanUpDeviceObjects());
 	_geometry = new TreeGeometry(_treeModel);
-	HRR(_geometry->InitGraphics(device, pImmediateContext));
+	HRR(_geometry->InitGraphics(renderManager));
 	return S_OK;
 }
 
@@ -269,7 +269,7 @@ HRESULT Tree::RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData
 
 	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pCylinderIndices, startInstance, (int) _logInstanceData.size()));
 
-	const GeometryBufferData::BufferIndices* pLDIndices = pGeometryData->GetBufferIndices(PrimitiveType_CylinderLD);
+	const GeometryBufferData::BufferIndices* pLDIndices = pGeometryData->GetBufferIndices(PrimitiveType_Box);
 	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pLDIndices, startInstance + (int) _logInstanceData.size(), (int)  _twigInstanceData.size()));
 	return S_OK;
 }

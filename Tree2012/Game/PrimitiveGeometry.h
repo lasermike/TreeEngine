@@ -10,13 +10,13 @@ class PrimitiveGeometry : public Geometry
 
 	ID3D11ShaderResourceView*           _pTextureRV;
 
-	Material _groundMaterial;
+	ShaderMaterial _groundMaterial;
 
 public:
 	PrimitiveGeometry(PrimitiveModel* model);
 	virtual ~PrimitiveGeometry();
 
-	virtual HRESULT InitGraphics(ID3D11Device* device, ID3D11DeviceContext* pImmediateContext);
+	virtual HRESULT InitGraphics(RenderManager& renderManager);
 	virtual HRESULT CleanUpDeviceObjects();
 
 	virtual HRESULT DrawInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* /*pRenderData*/, GeometryBufferData* pGeometryData, int startInstance, int numInstances)

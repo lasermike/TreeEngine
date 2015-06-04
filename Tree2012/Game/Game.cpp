@@ -69,12 +69,13 @@ Game::Game()
 
 void Game::UpdateView()
 {
-	XMStoreFloat4x4(&_renderData.view, _player->GetViewMatrix());
-	XMStoreFloat4(&_renderData.eyePos, _player->GetEyePosition());
+	XMStoreFloat4x4(&_renderManager.GetRenderData().view, _player->GetViewMatrix());
+	XMStoreFloat4(&_renderManager.GetRenderData().eyePos, _player->GetEyePosition());
 }
 
 Game::~Game()
 {
+	CleanupDevice();
 	SafeDelete(&_bitmapFont);
 	SafeDelete(&_pScene);
 }
@@ -86,7 +87,7 @@ HRESULT Game::Initialize()
 	_renderManager.Initialize();
 
 	// Init vertex/index buffer
-	_pScene = new SceneRoot(&_renderManager);
+	_pScene = new SceneRoot();
 
 	// Create player
 	WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
@@ -94,13 +95,13 @@ HRESULT Game::Initialize()
 	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
 	_player = new Player(playerParams);
 
-	_loader.Load("Basic", _pScene, &_renderData, _player);
+	_loader.Load("Basic", _pScene, &_renderManager.GetRenderData(), _player);
 
 	// Init scene bounds.
 	// Estimatation.    
 	// Ideally would loop through all world space vertices
-	_renderData.mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	_renderData.mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
+	_renderManager.GetRenderData().mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	_renderManager.GetRenderData().mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
 
     //_resizeHandler = std::bind(&Game::StandardResizeHandler, this);
     //SetResizeHandler(std::bind(&Game::StandardResizeHandler, this));
@@ -206,6 +207,9 @@ HRESULT Game::InitDevice()
 	if (FAILED(hr))
 		return hr;
 
+	// Give renderman a reference to D3D
+	_renderManager.SetDXReferences(_pd3dDevice, _pImmediateContext);
+
 	// Create constant buffer
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
@@ -218,16 +222,14 @@ HRESULT Game::InitDevice()
 		return hr;
 
 	// Initialize the world matrices
-	XMStoreFloat4x4(&_renderData.world, XMMatrixIdentity());
+	XMStoreFloat4x4(&_renderManager.GetRenderData().world, XMMatrixIdentity());
 
 	XSF::StockRenderStates::Initialize(_pd3dDevice);
 	_bitmapFont = new XSF::BitmapFont();
     XSF_ERROR_IF_FAILED( _bitmapFont->Create( _pd3dDevice, L"Arial_16" ) );
 
 	// Init shadow map
-	_renderData.pShadowMap = new ShadowMap(_pd3dDevice, _renderData.SMapWidth, _renderData.SMapHeight);
-
-	//OnResize();
+	_renderManager.GetRenderData().pShadowMap = new ShadowMap(_pd3dDevice, _renderManager.GetRenderData().SMapWidth, _renderManager.GetRenderData().SMapHeight);
 
 	return S_OK;
 }
@@ -264,11 +266,11 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	// Calculate the necessary swap chain and render target size in pixels.
 
 	// Initialize the projection matrix
-	_renderData.projectionData.screenWidth = windowWidth;
-	_renderData.projectionData.screenHeight = windowHeight;
-	_renderData.projectionData.fov = XM_PIDIV4;
-	_renderData.projectionData.nearClippingPlane = 1.0f;
-	_renderData.projectionData.farClippingPlane = 30.0f;
+	_renderManager.GetRenderData().projectionData.screenWidth = windowWidth;
+	_renderManager.GetRenderData().projectionData.screenHeight = windowHeight;
+	_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
+	_renderManager.GetRenderData().projectionData.nearClippingPlane = 1.0f;
+	_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
 	IDXGIFactory1* dxgiFactory = nullptr;
@@ -417,22 +419,22 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
     ASSERT(_pRenderTargetView);
     ASSERT(_pSwapChain1);
 
-    ASSERT(_renderData.projectionData.nearClippingPlane != 0);
-    ASSERT(_renderData.projectionData.farClippingPlane != 0);
-    ASSERT(_renderData.projectionData.screenWidth != 0);
-    ASSERT(_renderData.projectionData.screenHeight != 0);
-    ASSERT(_renderData.projectionData.fov != 0);
+    ASSERT(_renderManager.GetRenderData().projectionData.nearClippingPlane != 0);
+    ASSERT(_renderManager.GetRenderData().projectionData.farClippingPlane != 0);
+    ASSERT(_renderManager.GetRenderData().projectionData.screenWidth != 0);
+    ASSERT(_renderManager.GetRenderData().projectionData.screenHeight != 0);
+    ASSERT(_renderManager.GetRenderData().projectionData.fov != 0);
 
     ASSERT(_viewPort.Width != 0);
     ASSERT(_viewPort.Height != 0);
 
-	XMStoreFloat4x4(&_renderData.projection, XMMatrixPerspectiveFovLH(_renderData.projectionData.fov, 
-                    _renderData.projectionData.screenWidth / (float)_renderData.projectionData.screenHeight, 
-                    _renderData.projectionData.nearClippingPlane, _renderData.projectionData.farClippingPlane));
+	XMStoreFloat4x4(&_renderManager.GetRenderData().projection, XMMatrixPerspectiveFovLH(_renderManager.GetRenderData().projectionData.fov, 
+                    _renderManager.GetRenderData().projectionData.screenWidth / (float)_renderManager.GetRenderData().projectionData.screenHeight, 
+                    _renderManager.GetRenderData().projectionData.nearClippingPlane, _renderManager.GetRenderData().projectionData.farClippingPlane));
 
-	UpdateProjection(&_renderData.projection);
+	UpdateProjection(&_renderManager.GetRenderData().projection);
 
-    ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&_renderData.projection)));
+    ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&_renderManager.GetRenderData().projection)));
 
 	return S_OK;
 }
@@ -452,7 +454,7 @@ void Game::CleanupDevice()
 	XSF::StockRenderStates::Shutdown();
 	_renderManager.CleanUpDeviceObjects();
 
-	SafeDelete(&_renderData.pShadowMap);
+	SafeDelete(&_renderManager.GetRenderData().pShadowMap);
 
 	SafeRelease(&_pImmediateContext);
 	SafeRelease(&_pCBChangeOnResize);
@@ -470,14 +472,22 @@ void Game::CleanupDevice()
 
 void Game::Regenerate()
 {
+	HRESULT hr = S_OK;
+
+	// Clear old stuff
+	_pScene->CleanUpDeviceObjects();
+	_renderManager.CleanUpDeviceObjects();
+
 	_loader.Regenerate(_pScene);
 
-	HRESULT hr = _pScene->InitGraphics(_pd3dDevice, _pImmediateContext);
+    // Init render manager
+    hr = _renderManager.InitGraphics(_pScene->GetMaxInstances());
+	assert(SUCCEEDED(hr));		
+
+	// Init new stuff
+	hr = _pScene->InitGraphics(_renderManager);
     assert(SUCCEEDED(hr));
 
-    // Init render manager
-    hr = _renderManager.InitGraphics(_pd3dDevice, _pImmediateContext, _pScene->GetMaxInstances());
-	assert(SUCCEEDED(hr));		
 }
 
 void Game::Update(DX::StepTimer const& timer)
@@ -492,7 +502,7 @@ void Game::Update(DX::StepTimer const& timer)
 	// Update our time
 	if (_driverType == D3D_DRIVER_TYPE_REFERENCE)
 	{
-		_renderData.time += (float)XM_PI * 0.0125f;
+		_renderManager.GetRenderData().time += (float)XM_PI * 0.0125f;
 	}
 	else
 	{
@@ -505,15 +515,15 @@ void Game::Update(DX::StepTimer const& timer)
 		{
 			_timeCurrent += timer.GetElapsedSeconds();
 		}
-		_renderData.time = (float) _timeCurrent;
+		_renderManager.GetRenderData().time = (float) _timeCurrent;
 	}
 
 	BuildShadowTransform();
 
 	// Compute per-frame values
-	HR(_pScene->Update(_pImmediateContext, &_renderData));
+	HR(_pScene->Update(_renderManager));
 
-    _player->Update(timer, &_renderData);
+    _player->Update(timer, &_renderManager.GetRenderData());
 }
 
 
@@ -532,7 +542,7 @@ void Game::Tick(bool key[256])
 	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
 
 	// Render shadow map
-	_renderData.pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
+	_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
 	DrawSceneToShadowMap();
 
 	// Restore state after shadow
@@ -564,7 +574,7 @@ void Game::Render(bool oculus)
 #ifdef SAVEDEPTHIMAGE
 	// Save shadow mapt to disk
 	ScratchImage resultImage, convertedImage;
-	HR(CaptureTexture(_pd3dDevice, _pImmediateContext, _renderData.pShadowMap->DepthMapBuffer(), resultImage));
+	HR(CaptureTexture(_pd3dDevice, _pImmediateContext, _renderManager.GetRenderData().pShadowMap->DepthMapBuffer(), resultImage));
 	const Image* img = resultImage.GetImage(0,0,0);
 	HR(Convert(*img, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 0.5f, convertedImage));
 	img = convertedImage.GetImage(0,0,0);
@@ -581,11 +591,11 @@ void Game::Render(bool oculus)
     }
 
 	// Make shadow map avaiable to shaders
-	ID3D11ShaderResourceView* depthTexture = _renderData.pShadowMap->DepthMapSRV();
+	ID3D11ShaderResourceView* depthTexture = _renderManager.GetRenderData().pShadowMap->DepthMapSRV();
 	_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
 
 	// Draw everything
-	HRC(_pScene->Render(_pImmediateContext, &_renderData));
+	HRC(_pScene->Render(_renderManager));
 
 	// Unbind shadow texture so we can render to it next frame
 	depthTexture = nullptr;
@@ -603,8 +613,10 @@ void Game::Render(bool oculus)
 
 	if(_showShadowBuffer)
 	{
-		HRC(_renderManager.DrawScreenQuad(_pImmediateContext, _renderData.pShadowMap->DepthMapSRV()));
+		HRC(_renderManager.DrawScreenQuad(_pImmediateContext, _renderManager.GetRenderData().pShadowMap->DepthMapSRV()));
 	}
+
+
 
     if (!oculus)
     {
@@ -669,9 +681,9 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 void Game::BuildShadowTransform()
 {
 	// Only the first "main" light casts a shadow.
-	XMVECTOR lightDir = XMLoadFloat3(&_renderData.dirLights[0].Direction);
-	XMVECTOR lightPos = -2.0f * _renderData.mSceneBounds.Radius * lightDir;
-	XMVECTOR targetPos = XMLoadFloat3(&_renderData.mSceneBounds.Center);
+	XMVECTOR lightDir = XMLoadFloat3(&_renderManager.GetRenderData().dirLights[0].Direction);
+	XMVECTOR lightPos = -2.0f * _renderManager.GetRenderData().mSceneBounds.Radius * lightDir;
+	XMVECTOR targetPos = XMLoadFloat3(&_renderManager.GetRenderData().mSceneBounds.Center);
 	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
 	XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
@@ -681,12 +693,12 @@ void Game::BuildShadowTransform()
 	XMStoreFloat3(&sphereCenterLS, XMVector3TransformCoord(targetPos, V));
 
 	// Ortho frustum in light space encloses scene.
-	float l = sphereCenterLS.x - _renderData.mSceneBounds.Radius;
-	float b = sphereCenterLS.y - _renderData.mSceneBounds.Radius;
-	float n = sphereCenterLS.z - _renderData.mSceneBounds.Radius;
-	float r = sphereCenterLS.x + _renderData.mSceneBounds.Radius;
-	float t = sphereCenterLS.y + _renderData.mSceneBounds.Radius;
-	float f = sphereCenterLS.z + _renderData.mSceneBounds.Radius;
+	float l = sphereCenterLS.x - _renderManager.GetRenderData().mSceneBounds.Radius;
+	float b = sphereCenterLS.y - _renderManager.GetRenderData().mSceneBounds.Radius;
+	float n = sphereCenterLS.z - _renderManager.GetRenderData().mSceneBounds.Radius;
+	float r = sphereCenterLS.x + _renderManager.GetRenderData().mSceneBounds.Radius;
+	float t = sphereCenterLS.y + _renderManager.GetRenderData().mSceneBounds.Radius;
+	float f = sphereCenterLS.z + _renderManager.GetRenderData().mSceneBounds.Radius;
 	XMMATRIX P = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
 
 	// Transform NDC space [-1,+1]^2 to texture space [0,1]^2
@@ -698,34 +710,34 @@ void Game::BuildShadowTransform()
 
 	XMMATRIX S = V*P*T;
 
-	XMStoreFloat4x4(&_renderData.lightView, V);
-	XMStoreFloat4x4(&_renderData.lightProj, P);
-	XMStoreFloat4x4(&_renderData.shadowTransform, S);
+	XMStoreFloat4x4(&_renderManager.GetRenderData().lightView, V);
+	XMStoreFloat4x4(&_renderManager.GetRenderData().lightProj, P);
+	XMStoreFloat4x4(&_renderManager.GetRenderData().shadowTransform, S);
 }
 
 void Game::DrawSceneToShadowMap()
 {
-	XMMATRIX view     = XMLoadFloat4x4(&_renderData.lightView);
-	XMMATRIX proj     = XMLoadFloat4x4(&_renderData.lightProj);
+	XMMATRIX view     = XMLoadFloat4x4(&_renderManager.GetRenderData().lightView);
+	XMMATRIX proj     = XMLoadFloat4x4(&_renderManager.GetRenderData().lightProj);
 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
 
-	RenderData prevRenderData(_renderData);
-	_renderData.view = _renderData.lightView;
-	_renderData.projection = _renderData.lightProj;
-	_renderData.pass = ShadowMapPass;
+	RenderData prevRenderData(_renderManager.GetRenderData());
+	_renderManager.GetRenderData().view = _renderManager.GetRenderData().lightView;
+	_renderManager.GetRenderData().projection = _renderManager.GetRenderData().lightProj;
+	_renderManager.GetRenderData().pass = ShadowMapPass;
 
-	UpdateProjection(&_renderData.projection);
+	UpdateProjection(&_renderManager.GetRenderData().projection);
 
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
 	stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::BuildShadowMap );
 
 	// Draw everything
-	HR(_pScene->Render(_pImmediateContext, &_renderData));
+	HR(_pScene->Render(_renderManager));
 
 	// Store render data state
-	_renderData = prevRenderData;
+	_renderManager.GetRenderData() = prevRenderData;
 
-	UpdateProjection(&_renderData.projection);
+	UpdateProjection(&_renderManager.GetRenderData().projection);
 
 	stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::Solid);
 }
