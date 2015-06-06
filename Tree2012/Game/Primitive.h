@@ -32,10 +32,12 @@ public:
 class Primitive : public WorldObject
 {
 	PrimitiveModel*	_model;
+	UINT m_materialToken;
 
 public:
 	Primitive(WorldObjectParams* wop);
 	~Primitive();
+	virtual ObjectType GetObjectType() { return PrimitiveObjectType; }
 
 	virtual void Create(ModelGenerator* generator) { return Create((PrimitiveModelGenerator*)generator); }
 	virtual void Create(PrimitiveModelGenerator* generator);

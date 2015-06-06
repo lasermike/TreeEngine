@@ -81,19 +81,10 @@ RenderManager::RenderManager() : _pShadowVertexShader(nullptr), _pShadowPixelSha
 						 _pScreenQuadVB(nullptr), _pScreenQuadIB(nullptr),
 						 _pDrawScreenVertexShader(), _pDrawScreenPixelShader()
 {
-	_pVertexShader = nullptr;
-	_pPixelShader = nullptr;
-	_pVertexLayout = nullptr;
-	_pVertexBuffer = nullptr;
-	_pIndexBuffer = nullptr;
-	_pInstancedBuffer = nullptr;
-
 	_light.Ambient = XMFLOAT4(.2f, .2f, .2f, 1.0f);
 	_light.Diffuse = XMFLOAT4(.5f, .5f, .5f, 1.0f);
 	_light.Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
 	_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
-	_pCBChangesEveryFrame = nullptr;
-	_pCBNeverChanges = nullptr;
 }
 
 HRESULT RenderManager::Initialize()
@@ -105,7 +96,7 @@ RenderManager::~RenderManager()
 {
 }
 
-HRESULT RenderManager::InitGraphics(UINT32 maxInstances)
+HRESULT RenderManager::InitGraphicsEarly()
 {
     HRR(CleanUpDeviceObjects());
 
@@ -119,16 +110,6 @@ HRESULT RenderManager::InitGraphics(UINT32 maxInstances)
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
 	HRR(_pd3dDevice->CreateBuffer(&bd, nullptr, &_pCBNeverChanges));
-
-	// Create instanced buffer
-	D3D11_BUFFER_DESC vbd;
-	vbd.Usage = D3D11_USAGE_DYNAMIC;
-	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
-	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	vbd.MiscFlags = 0;
-	vbd.StructureByteStride = 0;
-	HRR(_pd3dDevice->CreateBuffer(&vbd, 0, &_pInstancedBuffer));
 
 	////////  Regular shaders /////
 	// Create Instanced draw data layout
@@ -171,6 +152,7 @@ HRESULT RenderManager::InitGraphics(UINT32 maxInstances)
 
 	// Create vertices and indice for geometry
 	_geometryGenerator.BuildGeometryBuffers(_geometryData);
+	D3D11_BUFFER_DESC vbd;
 	ZeroMemory(&vbd, sizeof(vbd));
 	vbd.Usage = D3D11_USAGE_IMMUTABLE;
 	vbd.ByteWidth = (UINT) (sizeof(SimpleVertex) * _geometryData.vertices.size());
@@ -193,12 +175,6 @@ HRESULT RenderManager::InitGraphics(UINT32 maxInstances)
 	ZeroMemory(&iinitData, sizeof(iinitData));
 	iinitData.pSysMem = &_geometryData.indices[0];
 	HRR(_pd3dDevice->CreateBuffer(&ibd, &iinitData, &_pIndexBuffer));
-
-	// Set vertex buffer
-	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
-	UINT offset[2] = { 0, 0 };
-	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-	_pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
 
 	// Set index buffer
 	_pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
@@ -223,6 +199,26 @@ HRESULT RenderManager::InitGraphics(UINT32 maxInstances)
 	return S_OK;
 }
 
+HRESULT RenderManager::InitGraphicsFinal(UINT32 maxInstances)
+{
+	// Create instanced buffer
+	D3D11_BUFFER_DESC vbd;
+	vbd.Usage = D3D11_USAGE_DYNAMIC;
+	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
+	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	vbd.MiscFlags = 0;
+	vbd.StructureByteStride = 0;
+	HRR(_pd3dDevice->CreateBuffer(&vbd, 0, &_pInstancedBuffer));
+
+	// Set vertex buffer
+	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
+	UINT offset[2] = { 0, 0 };
+	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
+	_pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+
+	return S_OK;
+}
 HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
 {
 	GeometryGenerator::MeshData quad;
@@ -304,25 +300,34 @@ HRESULT RenderManager::Update(const list<WorldObject*>& children)
 
 	for (auto i = children.begin(); i != children.end(); i++)
 	{
-		if ((*i)->GetMaxInstances() > 0)
+		if ((*i)->GetMaxInstances() > 0 && (*i)->GetObjectType() != PrimitiveObjectType /* TODO TEMPTEMP */)
 		{
 			HRR((*i)->ComputeConstants(_pImmediateContext, &_renderData, dataView));
 			dataView += (*i)->GetNumInstances();
 		}
 	}
 
+	for (auto ru : m_renderUnits)
+	{
+		for (auto object : ru.second)
+		{
+			HRR(object->ComputeConstants(_pImmediateContext, &_renderData, dataView));
+			dataView += object->GetNumInstances();
+		}
+	}
+
+
 	_pImmediateContext->Unmap(_pInstancedBuffer, 0);
 
 	return S_OK;
 }
-
 
 HRESULT RenderManager::Render(const list<WorldObject*>& children)
 {
 	// Set samplers
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
 	ID3D11SamplerState* samplers[2] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
-											 stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap) } ;
+										stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap) } ;
 	_pImmediateContext->PSSetSamplers(0, 2, samplers);
 
 	// Set shaders
@@ -361,16 +366,31 @@ HRESULT RenderManager::Render(const list<WorldObject*>& children)
 	_pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
 	_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+	// TODO: render for each material instead of each child
+
 	int startInstance = 0;
 	for (auto i : children)
 	{
-		ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-		_pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
+		if (i->GetObjectType() != PrimitiveObjectType) /* TODO TEMPTEMP */
+		{
+			ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
+			_pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
 
-		WorldObject* obj = i;
-		HRESULT hr2 = obj->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
-		HRR(hr2);
-		startInstance += i->GetNumInstances();
+			WorldObject* obj = i;
+			HRESULT hr2 = obj->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
+			HRR(hr2);
+			startInstance += i->GetNumInstances();
+		}
+	}
+
+	for (auto ru : m_renderUnits)
+	{
+		for (auto object : ru.second)
+		{
+			HRESULT hr2 = object->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
+			HRR(hr2);
+			startInstance += object->GetNumInstances();
+		}
 	}
 
 	return S_OK;
@@ -389,7 +409,84 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 	SafeRelease(&_pCBChangesEveryFrame);
 	SafeRelease(&_pInstancedBuffer);
 
+	for (auto t : m_textures)
+	{
+		if (t.second)
+		{
+			t.second->Release();
+		}
+	}
+	m_textures.clear();
+	m_materials.clear();
+	m_renderUnits.clear();
+
 	InputLayouts::DestroyAll();
+
+	return S_OK;
+}
+
+HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
+{
+	//m_materials[textureFilename]
+	ID3D11ShaderResourceView* texture = m_textures[textureFilename];
+	if (!texture)
+	{
+		// Load the Texture
+		HRR(CreateDDSTextureFromFile(_pd3dDevice, textureFilename, nullptr, &texture));
+		m_textures[textureFilename] = texture;
+	}
+
+	return S_OK;
+}
+
+HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, ShaderMaterial& shaderMaterial, Material** newMaterial)
+{
+	ID3D11ShaderResourceView* texture = nullptr;
+
+	if (textureFilename)
+	{
+		LoadTexture(textureFilename);
+
+		texture = m_textures[textureFilename];
+		assert(texture);
+	}
+
+	m_materials.emplace(std::make_pair(name, 
+		Material(name, texture, InputLayouts::InstancedBasic16, (ID3D11VertexShader*) _pVertexShader, (ID3D11PixelShader*)_pPixelShader, 
+		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/, 
+		shaderMaterial)));
+
+	*newMaterial = &m_materials[name];
+
+	return S_OK;
+}
+
+HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
+							      const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
+{
+	m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferIndices)));
+	*newMesh = &m_meshes[name];
+	return S_OK;
+}
+
+HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object)
+{
+	RenderUnitReservations* reservation = nullptr;
+
+	for (auto ru : m_renderUnits)
+	{
+		if (ru.first.m_material == material && ru.first.m_mesh == mesh) 
+		{
+			reservation = &ru.second;
+		}
+	}
+
+	if (reservation == nullptr)
+	{
+		reservation = &m_renderUnits[RenderUnit(material, mesh)];
+	}
+
+	reservation->push_back(object);
 
 	return S_OK;
 }

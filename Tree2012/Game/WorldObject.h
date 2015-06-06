@@ -22,6 +22,7 @@ typedef enum GeneratorType
 typedef enum ObjectType
 {
 	WorldObjectType,
+	PrimitiveObjectType,
 	TreeType
 };
 

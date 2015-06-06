@@ -25,6 +25,23 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 	HRR(CleanUpDeviceObjects());
 	_geometry = new PrimitiveGeometry((PrimitiveModel*)_model);
 	HRR(_geometry->InitGraphics(renderManager));
+
+	ShaderMaterial mat;
+	mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
+	mat.Diffuse = XMFLOAT4(0, .6f, 0, 1);
+	mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
+	mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+	mat.flags.y = 1; //1 for textured; 
+
+	Material* newMaterial = nullptr;
+	renderManager.CreateMaterial(L"ground", L"snow.dds", mat, &newMaterial);
+	
+	Mesh* newMesh = nullptr;
+	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());
+	renderManager.CreateMesh(L"ground", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &newMesh);
+
+	renderManager.ReserveRenderUnit(newMaterial, newMesh, this);
+
 	return S_OK;
 }
 

@@ -103,7 +103,7 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #define HRC(x) (x)
 #define HRR(x) (x)
 #define LOG(x)
-#define ASSERTSZ(x)
+#define ASSERTSZ(x, str)
 #endif
 #endif 
 

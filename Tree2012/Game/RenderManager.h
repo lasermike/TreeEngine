@@ -3,6 +3,7 @@
 #include "SceneRoot.h"
 #include "RenderData.h"
 #include "Materials.h"
+#include <map>
 
 enum MaterialTypes
 {
@@ -15,20 +16,22 @@ enum MaterialTypes
 
 //enum { MAT_WRAP = 1, MAT_WIRE = 2, MAT_ZALWAYS = 4, MAT_NOCULL = 8 };
 
-class Material
+struct Material
 {
-	wstring					 m_name;
-	ID3D11Texture2D*		 m_texture;
-	ID3D11VertexShader*      m_vertexShader;
-	ID3D11PixelShader*       m_pixelShader;
-    ID3D11InputLayout*       m_inputLayout;
-    ID3D11SamplerState*      m_samplerState;
-    ID3D11RasterizerState*   m_rasterizer;
-    ID3D11DepthStencilState* m_depthState;
-	ShaderMaterial			 m_shaderMaterial;
+	wstring					  m_name;
+	ID3D11ShaderResourceView* m_texture;
+	ID3D11VertexShader*       m_vertexShader;
+	ID3D11PixelShader*        m_pixelShader;
+    ID3D11InputLayout*        m_inputLayout;
+
+	ShaderMaterial			  m_shaderMaterial;
+
+	ID3D11SamplerState*       m_samplerState;
+    ID3D11RasterizerState*    m_rasterizer;
+    ID3D11DepthStencilState*  m_depthState;
 
 public:
-	Material(wchar_t* name, ID3D11Texture2D* texture, ID3D11InputLayout* inputLayout,
+	Material(const wchar_t* name, ID3D11ShaderResourceView* texture, ID3D11InputLayout* inputLayout,
 			 ID3D11VertexShader* vertexShader, ID3D11PixelShader* pixelShader, ID3D11SamplerState* samplerState,
 			 ID3D11RasterizerState* rasterizer, ID3D11DepthStencilState* depthState, ShaderMaterial shaderMaterial) :
 				m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
@@ -38,36 +41,84 @@ public:
 		ASSERT(m_vertexShader != nullptr);
 		ASSERT(m_pixelShader != nullptr);
 		ASSERT(m_inputLayout != nullptr);
-		ASSERT(m_samplerState != nullptr);
-		ASSERT(m_rasterizer != nullptr);
-		ASSERT(m_depthState != nullptr);
+		//TODO
+		//ASSERT(m_samplerState != nullptr);
+		//ASSERT(m_rasterizer != nullptr);
+		//ASSERT(m_depthState != nullptr);
+	}
+	Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
+				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
+				 m_depthState(nullptr) { }
+
+	~Material()
+	{
 	}
 };
 
+struct Mesh
+{
+	ID3D11Buffer* m_vertexBuffer;
+	ID3D11Buffer* m_indexBuffer;
+	const GeometryBufferData::BufferIndices* m_bufferIndices;
+
+public:
+	Mesh() : m_vertexBuffer(nullptr), m_indexBuffer(nullptr), m_bufferIndices(nullptr) { } 
+	Mesh(ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, const GeometryBufferData::BufferIndices* bufferIndices) :
+		m_vertexBuffer(vertexBuffer), m_indexBuffer(indexBuffer), m_bufferIndices(bufferIndices)  
+	{
+		assert(m_vertexBuffer);
+		assert(m_indexBuffer);
+		assert(m_bufferIndices);
+	}
+};
+
+
+struct RenderUnit
+{
+	Material* m_material;
+	Mesh* m_mesh;
+
+	RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh) 
+	{
+		assert(m_material);
+		assert(m_mesh);
+	}
+
+	bool operator<(const RenderUnit& ru2) const
+	{
+		return ru2.m_material != m_material || ru2.m_mesh != m_mesh;
+	}
+};
+
+
 class RenderManager
 {
+	typedef std::list<WorldObject*> RenderUnitReservations;
 
-	std::vector<Material>				m_materials;
+	std::map<wstring, Material>						m_materials;
+	std::map<wstring, Mesh>							m_meshes;
+	std::map<wstring, ID3D11ShaderResourceView*>	m_textures;
+	std::map<RenderUnit, RenderUnitReservations>	m_renderUnits;
 
-    // Per material
-	ID3D11VertexShader*                 _pVertexShader;
-	ID3D11PixelShader*                  _pPixelShader;
+    // TODO per material
+	CComPtr<ID3D11VertexShader>         _pVertexShader;
+	CComPtr<ID3D11PixelShader>          _pPixelShader;
 
 	CComPtr<ID3D11VertexShader>			_pShadowVertexShader;
 	CComPtr<ID3D11PixelShader>			_pShadowPixelShader;
 	CComPtr<ID3D11VertexShader>			_pDrawScreenVertexShader;
 	CComPtr<ID3D11PixelShader>			_pDrawScreenPixelShader;
 
-	ID3D11InputLayout*                  _pVertexLayout;
-	ID3D11Buffer*                       _pVertexBuffer;
-	ID3D11Buffer*                       _pIndexBuffer;
-	ID3D11Buffer*						_pInstancedBuffer;
+	CComPtr<ID3D11InputLayout>          _pVertexLayout;
+	CComPtr<ID3D11Buffer>               _pVertexBuffer;
+	CComPtr<ID3D11Buffer>               _pIndexBuffer;
+	CComPtr<ID3D11Buffer>				_pInstancedBuffer;
 
 	GeometryGenerator					_geometryGenerator;
 	GeometryBufferData					_geometryData;
 
-	ID3D11Buffer*                       _pCBNeverChanges;
-	ID3D11Buffer*                       _pCBChangesEveryFrame;
+	CComPtr<ID3D11Buffer>               _pCBNeverChanges;
+	CComPtr<ID3D11Buffer>               _pCBChangesEveryFrame;
 	DirectionalLight					_light;  // Doesn't belong here, will move later
 
 	CComPtr<ID3D11Buffer>				_pScreenQuadVB;
@@ -80,21 +131,29 @@ class RenderManager
 	XSF::D3DDeviceContext*              _pImmediateContext;
 
 	RenderData							_renderData;
+	
+	HRESULT LoadTexture(const wchar_t* textureFilename);
 
 public:
 	RenderManager();
 	~RenderManager();
-
 	HRESULT Initialize();
 	void SetDXReferences(XSF::D3DDevice* device, XSF::D3DDeviceContext* immediateContext) { _pd3dDevice = device; _pImmediateContext = immediateContext; }
 	
 	RenderData& GetRenderData() { return _renderData; }
 	XSF::D3DDevice* GetDevice() { return _pd3dDevice; }
 	XSF::D3DDeviceContext* GetContext() { return _pImmediateContext; }
+	ID3D11Buffer* GetVertexBuffer() { return _pVertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
+	ID3D11Buffer* GetIndexBuffer() { return _pIndexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
+	GeometryBufferData& GetGeometryBufferData() { return _geometryData; }
+	
+	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
+	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
+					   const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
+	HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object);
 
-	Material* AddMaterial() { }
-
-	virtual HRESULT InitGraphics(UINT32 maxInstances);
+	HRESULT InitGraphicsEarly();
+	HRESULT InitGraphicsFinal(UINT32 maxInstances);
 	virtual HRESULT CleanUpDeviceObjects();
 	HRESULT Update(const list<WorldObject*>& children);
 	HRESULT Render(const list<WorldObject*>& children);
