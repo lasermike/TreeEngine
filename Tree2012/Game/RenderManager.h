@@ -72,33 +72,31 @@ public:
 	}
 };
 
-
 struct RenderUnit
 {
-	Material* m_material;
-	Mesh* m_mesh;
+	Material*					m_material;
+	Mesh*						m_mesh;
 
-	RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh) 
+	UINT						totalMaxInstances;
+	std::map<WorldObject*, UINT> reservations;
+
+	RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh), totalMaxInstances(0) 
 	{
 		assert(m_material);
 		assert(m_mesh);
 	}
 
-	bool operator<(const RenderUnit& ru2) const
-	{
-		return ru2.m_material != m_material || ru2.m_mesh != m_mesh;
-	}
 };
-
 
 class RenderManager
 {
-	typedef std::list<WorldObject*> RenderUnitReservations;
-
 	std::map<wstring, Material>						m_materials;
 	std::map<wstring, Mesh>							m_meshes;
 	std::map<wstring, ID3D11ShaderResourceView*>	m_textures;
-	std::map<RenderUnit, RenderUnitReservations>	m_renderUnits;
+	std::list<RenderUnit>							m_renderUnits;
+
+	//std::map<WorldObject*, std::list<RenderUnit*>>	m_objectToRenderUnits;
+
 
     // TODO per material
 	CComPtr<ID3D11VertexShader>         _pVertexShader;
@@ -126,7 +124,6 @@ class RenderManager
 	CComPtr<ID3D11ShaderResourceView>   _pDebugTextureRV;
 
 	// Weak references.  Owned by Game
-    SceneRoot*                          _pCurrentScene; 
 	XSF::D3DDevice*						_pd3dDevice;
 	XSF::D3DDeviceContext*              _pImmediateContext;
 
@@ -150,10 +147,10 @@ public:
 	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
 	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
 					   const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
-	HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object);
+	HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
 
 	HRESULT InitGraphicsEarly();
-	HRESULT InitGraphicsFinal(UINT32 maxInstances);
+	HRESULT InitGraphicsFinal(SceneRoot* scene);
 	virtual HRESULT CleanUpDeviceObjects();
 	HRESULT Update(const list<WorldObject*>& children);
 	HRESULT Render(const list<WorldObject*>& children);

@@ -489,7 +489,7 @@ void Game::Regenerate()
     assert(SUCCEEDED(hr));
 
     // Do post scene initialization stuff
-    hr = _renderManager.InitGraphicsFinal(_pScene->GetMaxInstances());
+    hr = _renderManager.InitGraphicsFinal(_pScene);
 	assert(SUCCEEDED(hr));		
 
 }

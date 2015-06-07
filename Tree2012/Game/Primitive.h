@@ -32,7 +32,7 @@ public:
 class Primitive : public WorldObject
 {
 	PrimitiveModel*	_model;
-	UINT m_materialToken;
+	RenderUnit* m_renderUnit;
 
 public:
 	Primitive(WorldObjectParams* wop);
@@ -44,6 +44,7 @@ public:
 	virtual HRESULT InitGraphics(RenderManager& renderManager);
 
 	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView) override;
+	HRESULT ComputeConstants2(RenderManager* renderManager, InstancedData* dataView);
 
 	virtual unsigned int GetNumInstances() { return 1; }
 	virtual unsigned int GetMaxInstances() { return 1; }

@@ -40,9 +40,16 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());
 	renderManager.CreateMesh(L"ground", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &newMesh);
 
-	renderManager.ReserveRenderUnit(newMaterial, newMesh, this);
+	renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
 
 	return S_OK;
+}
+
+HRESULT Primitive::ComputeConstants2(RenderManager* renderManager, InstancedData* buffer)
+{
+	UINT offset = 0;
+
+	return ComputeConstants(renderManager->GetContext(), &renderManager->GetRenderData(), buffer + m_renderUnit->reservations[this]);
 }
 
 HRESULT Primitive::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* pRenderData, InstancedData* dataView)

@@ -4,6 +4,8 @@
 #include "DDSTextureLoader.h" // Test texture
 #include "StockRenderStates.h"
 
+#include "Primitive.h" // TEMPTEMP
+
 __declspec(align(16))
 struct CBNeverChanges
 {
@@ -199,97 +201,34 @@ HRESULT RenderManager::InitGraphicsEarly()
 	return S_OK;
 }
 
-HRESULT RenderManager::InitGraphicsFinal(UINT32 maxInstances)
+HRESULT RenderManager::InitGraphicsFinal(SceneRoot* scene)
 {
 	// Create instanced buffer
 	D3D11_BUFFER_DESC vbd;
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
-	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
+	vbd.ByteWidth = sizeof(InstancedData) * scene->GetMaxInstances();
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	vbd.MiscFlags = 0;
 	vbd.StructureByteStride = 0;
 	HRR(_pd3dDevice->CreateBuffer(&vbd, 0, &_pInstancedBuffer));
 
-	// Set vertex buffer
-	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
-	UINT offset[2] = { 0, 0 };
-	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-	_pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
-
-	return S_OK;
-}
-HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
-{
-	GeometryGenerator::MeshData quad;
-
-	GeometryGenerator geoGen;
-	geoGen.CreateFullscreenQuad(quad);
-
-	// Extract the vertex elements we are interested in and pack the
-	// vertices of all the meshes into one vertex buffer.
-
-	std::vector<SimpleVertex> vertices(quad.Vertices.size());
-
-	for(UINT i = 0; i < quad.Vertices.size(); ++i)
+	// Update the offsets so that each render unit has a contiguous range of values
+	// For each render unit
+	UINT nextRenderUnitFirstInstance = 0;
+	for (auto rui = m_renderUnits.begin(); rui != m_renderUnits.end(); rui++)
 	{
-		vertices[i].Pos    = quad.Vertices[i].Position;
-		vertices[i].Normal = quad.Vertices[i].Normal;
-		vertices[i].Tex    = quad.Vertices[i].TexC;
+		// For each reservation in that render unit
+		for (auto entry : rui->reservations)
+		{
+			entry.second += nextRenderUnitFirstInstance; 
+		}
+		nextRenderUnitFirstInstance += rui->totalMaxInstances;
 	}
 
-    D3D11_BUFFER_DESC vbd;
-    vbd.Usage = D3D11_USAGE_IMMUTABLE;
-    vbd.ByteWidth = (UINT) (sizeof(SimpleVertex) * quad.Vertices.size());
-    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    vbd.CPUAccessFlags = 0;
-    vbd.MiscFlags = 0;
-	D3D11_SUBRESOURCE_DATA vinitData = {0};
-    vinitData.pSysMem = &vertices[0];
-    HRR(pD3DDevice->CreateBuffer(&vbd, &vinitData, &_pScreenQuadVB));
-
-	//
-	// Pack the indices of all the meshes into one index buffer.
-	//
-
-	D3D11_BUFFER_DESC ibd;
-    ibd.Usage = D3D11_USAGE_IMMUTABLE;
-	ibd.ByteWidth = (UINT) (sizeof(UINT) * quad.Indices.size());
-    ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    ibd.CPUAccessFlags = 0;
-    ibd.MiscFlags = 0;
-	D3D11_SUBRESOURCE_DATA iinitData = {0};
-    iinitData.pSysMem = &quad.Indices[0];
-    HRR(pD3DDevice->CreateBuffer(&ibd, &iinitData, &_pScreenQuadIB));
-
 	return S_OK;
 }
 
-HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
-{
-	UINT stride = sizeof(SimpleVertex);
-    UINT offset = 0;
-
-	pContext->IASetInputLayout(InputLayouts::Basic32);
-    pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	pContext->IASetVertexBuffers(0, 1, &_pScreenQuadVB, &stride, &offset);
-	pContext->IASetIndexBuffer(_pScreenQuadIB, DXGI_FORMAT_R32_UINT, 0);
- 
-	pContext->VSSetShader(_pDrawScreenVertexShader, nullptr, 0);
-	pContext->PSSetShader(_pDrawScreenPixelShader, nullptr, 0);
-
-	//pContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
-
-	pContext->PSSetShaderResources(0, 1, &depthTexture);
-
-	pContext->DrawIndexed(6, 0, 0);
-
-	ID3D11ShaderResourceView* nullText[] = {0};
-	pContext->PSSetShaderResources(0, 1, nullText);
-
-	return S_OK;
-
-}
 
 HRESULT RenderManager::Update(const list<WorldObject*>& children)
 {
@@ -303,19 +242,18 @@ HRESULT RenderManager::Update(const list<WorldObject*>& children)
 		if ((*i)->GetMaxInstances() > 0 && (*i)->GetObjectType() != PrimitiveObjectType /* TODO TEMPTEMP */)
 		{
 			HRR((*i)->ComputeConstants(_pImmediateContext, &_renderData, dataView));
-			dataView += (*i)->GetNumInstances();
+			dataView += (*i)->GetMaxInstances();
 		}
 	}
 
-	for (auto ru : m_renderUnits)
+	for (auto c : children)
 	{
-		for (auto object : ru.second)
+		if (c->GetObjectType() == PrimitiveObjectType)
 		{
-			HRR(object->ComputeConstants(_pImmediateContext, &_renderData, dataView));
-			dataView += object->GetNumInstances();
+			HRR( ((Primitive*)c)->ComputeConstants2(this, reinterpret_cast<InstancedData*>(dataView)));
+			//HRR( ((Primitive*)c)->ComputeConstants2(this, reinterpret_cast<InstancedData*>(mappedData.pData)));
 		}
 	}
-
 
 	_pImmediateContext->Unmap(_pInstancedBuffer, 0);
 
@@ -361,10 +299,16 @@ HRESULT RenderManager::Render(const list<WorldObject*>& children)
 
 	// Set up input assembler
 	_pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
-	UINT stride[1] = { sizeof(SimpleVertex) };
-	UINT offset[1] = { 0 };
+	//UINT stride[1] = { sizeof(SimpleVertex) };
+	//UINT offset[1] = { 0 };
 	_pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
 	_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// Set vertex buffer
+	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
+	UINT offset[2] = { 0, 0 };
+	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
+	_pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
 
 	// TODO: render for each material instead of each child
 
@@ -373,23 +317,23 @@ HRESULT RenderManager::Render(const list<WorldObject*>& children)
 	{
 		if (i->GetObjectType() != PrimitiveObjectType) /* TODO TEMPTEMP */
 		{
-			ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-			_pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
+			//ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
+			//_pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
 
 			WorldObject* obj = i;
 			HRESULT hr2 = obj->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
 			HRR(hr2);
-			startInstance += i->GetNumInstances();
+			startInstance += i->GetMaxInstances();
 		}
 	}
 
-	for (auto ru : m_renderUnits)
+	for (auto& ru : m_renderUnits)
 	{
-		for (auto object : ru.second)
+		for (auto reservation : ru.reservations)
 		{
-			HRESULT hr2 = object->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
+			HRESULT hr2 = reservation.first->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
 			HRR(hr2);
-			startInstance += object->GetNumInstances();
+			startInstance += reservation.first->GetMaxInstances();
 		}
 	}
 
@@ -469,24 +413,107 @@ HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffe
 	return S_OK;
 }
 
-HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object)
+HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit)
 {
-	RenderUnitReservations* reservation = nullptr;
+	RenderUnit* unit = nullptr;
+	UINT ruIndex = 0;
 
-	for (auto ru : m_renderUnits)
+	for (RenderUnit& ru : m_renderUnits)
 	{
-		if (ru.first.m_material == material && ru.first.m_mesh == mesh) 
+		if (ru.m_material == material && ru.m_mesh == mesh) 
 		{
-			reservation = &ru.second;
+			unit = &ru;
+			break;
 		}
+		ruIndex++;
 	}
 
-	if (reservation == nullptr)
+	if (unit == nullptr)
 	{
-		reservation = &m_renderUnits[RenderUnit(material, mesh)];
+		m_renderUnits.emplace_back(RenderUnit(material, mesh));
+		unit = &(*m_renderUnits.rbegin());
 	}
 
-	reservation->push_back(object);
+	// Update look up table
+	//m_objectToRenderUnits[object].push_back(unit);
+
+	// Add reservation
+	unit->reservations[object] = unit->totalMaxInstances;
+	unit->totalMaxInstances += object->GetMaxInstances();
+
+	*ppRenderUnit = unit;
 
 	return S_OK;
+}
+
+HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
+{
+	GeometryGenerator::MeshData quad;
+
+	GeometryGenerator geoGen;
+	geoGen.CreateFullscreenQuad(quad);
+
+	// Extract the vertex elements we are interested in and pack the
+	// vertices of all the meshes into one vertex buffer.
+
+	std::vector<SimpleVertex> vertices(quad.Vertices.size());
+
+	for(UINT i = 0; i < quad.Vertices.size(); ++i)
+	{
+		vertices[i].Pos    = quad.Vertices[i].Position;
+		vertices[i].Normal = quad.Vertices[i].Normal;
+		vertices[i].Tex    = quad.Vertices[i].TexC;
+	}
+
+    D3D11_BUFFER_DESC vbd;
+    vbd.Usage = D3D11_USAGE_IMMUTABLE;
+    vbd.ByteWidth = (UINT) (sizeof(SimpleVertex) * quad.Vertices.size());
+    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vbd.CPUAccessFlags = 0;
+    vbd.MiscFlags = 0;
+	D3D11_SUBRESOURCE_DATA vinitData = {0};
+    vinitData.pSysMem = &vertices[0];
+    HRR(pD3DDevice->CreateBuffer(&vbd, &vinitData, &_pScreenQuadVB));
+
+	//
+	// Pack the indices of all the meshes into one index buffer.
+	//
+
+	D3D11_BUFFER_DESC ibd;
+    ibd.Usage = D3D11_USAGE_IMMUTABLE;
+	ibd.ByteWidth = (UINT) (sizeof(UINT) * quad.Indices.size());
+    ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    ibd.CPUAccessFlags = 0;
+    ibd.MiscFlags = 0;
+	D3D11_SUBRESOURCE_DATA iinitData = {0};
+    iinitData.pSysMem = &quad.Indices[0];
+    HRR(pD3DDevice->CreateBuffer(&ibd, &iinitData, &_pScreenQuadIB));
+
+	return S_OK;
+}
+
+HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
+{
+	UINT stride = sizeof(SimpleVertex);
+    UINT offset = 0;
+
+	pContext->IASetInputLayout(InputLayouts::Basic32);
+    pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	pContext->IASetVertexBuffers(0, 1, &_pScreenQuadVB, &stride, &offset);
+	pContext->IASetIndexBuffer(_pScreenQuadIB, DXGI_FORMAT_R32_UINT, 0);
+ 
+	pContext->VSSetShader(_pDrawScreenVertexShader, nullptr, 0);
+	pContext->PSSetShader(_pDrawScreenPixelShader, nullptr, 0);
+
+	//pContext->VSSetConstantBuffers(0, 1, &_pCBNeverChanges);
+
+	pContext->PSSetShaderResources(0, 1, &depthTexture);
+
+	pContext->DrawIndexed(6, 0, 0);
+
+	ID3D11ShaderResourceView* nullText[] = {0};
+	pContext->PSSetShaderResources(0, 1, nullText);
+
+	return S_OK;
+
 }
