@@ -5,6 +5,8 @@
 #include "RenderData.h"
 #include <memory>
 
+interface IRenderFrameConfig;
+
 // For rendering indirectly
 struct InstancedData
 {
@@ -114,7 +116,7 @@ public:
 		return S_OK;
 	}
 
-	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView);
+	virtual HRESULT ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView);
 	virtual unsigned int GetNumInstances() { return 0; }
 	virtual unsigned int GetMaxInstances() { return 0; }
 	XMFLOAT3* GetBoundingBox() { return _boundingBox; }

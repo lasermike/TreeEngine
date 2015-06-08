@@ -33,6 +33,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 	mat.Reflect = XMFLOAT4(0, 0, 0, 1);
 	mat.flags.y = 1; //1 for textured; 
 
+	// Create material, mesh, and reserve render unit
 	Material* newMaterial = nullptr;
 	renderManager.CreateMaterial(L"ground", L"snow.dds", mat, &newMaterial);
 	
@@ -45,15 +46,12 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 	return S_OK;
 }
 
-HRESULT Primitive::ComputeConstants2(RenderManager* renderManager, InstancedData* buffer)
+HRESULT Primitive::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView)
 {
-	UINT offset = 0;
+	pFrameConfig->SetInstances(m_renderUnit, this, dataView, 1);
 
-	return ComputeConstants(renderManager->GetContext(), &renderManager->GetRenderData(), buffer + m_renderUnit->reservations[this]);
-}
+	//dataView += m_renderUnit->reservations[this];
 
-HRESULT Primitive::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* pRenderData, InstancedData* dataView)
-{
 	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0); 
 	const XMVECTOR vScaleCenter = XMVectorSet(0, 0, 0, 0);
 	XMVECTOR vScale = XMLoadFloat3(&_scale);
@@ -63,7 +61,7 @@ HRESULT Primitive::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, 
 	XMMATRIX transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
 	// Multiply by this object's world matrix
-	transform = transform * XMLoadFloat4x4(&pRenderData->world);
+	transform = transform * XMLoadFloat4x4(&pFrameConfig->GetRenderData().world);
 
 	XMStoreFloat4x4(&dataView->World, transform);
 

@@ -19,6 +19,9 @@ private:
 	std::vector<InstancedData>			_logInstanceData;
 	std::vector<InstancedData>			_twigInstanceData;
 
+	RenderUnit*							m_logUnit;
+	RenderUnit*							m_twigUnit;
+
 	HRESULT ComputeBranchInstanceData(RenderData* pRenderData, int& currentBranch, Branch const* branch, const FXMVECTOR parentStart);
 	HRESULT ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, const FXMVECTOR parentStart);
 	HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart);
@@ -35,7 +38,7 @@ public:
 
 	virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometyData, int startInstance);
 
-	virtual HRESULT ComputeConstants(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, InstancedData* dataView) override;
+	virtual HRESULT ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView) override;
 	virtual unsigned int GetNumInstances();
 	virtual unsigned int GetMaxInstances();
 };

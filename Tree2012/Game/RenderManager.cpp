@@ -91,6 +91,7 @@ RenderManager::RenderManager() : _pShadowVertexShader(nullptr), _pShadowPixelSha
 
 HRESULT RenderManager::Initialize()
 {
+	m_nextInstanceBufferOffset = 0;
 	return S_OK;
 }
 
@@ -197,7 +198,6 @@ HRESULT RenderManager::InitGraphicsEarly()
 	// Load the Texture
 	HRR(CreateDDSTextureFromFile(_pd3dDevice, L"snow.dds", nullptr, &_pDebugTextureRV));
 
-
 	return S_OK;
 }
 
@@ -213,18 +213,41 @@ HRESULT RenderManager::InitGraphicsFinal(SceneRoot* scene)
 	vbd.StructureByteStride = 0;
 	HRR(_pd3dDevice->CreateBuffer(&vbd, 0, &_pInstancedBuffer));
 
+	//UINT nextRenderUnitFirstInstance = 0;
+	//for (auto c : scene->Children())
+	//{
+	//	m_reservations
+	//}
+
+	//UINT nextRenderUnitFirstInstance = 0;
+	//for (auto c : scene->Children())
+	//{
+	//	for (auto& ru : m_renderUnits)
+	//	{
+	//		// For each reservation in that render unit
+	//		for (auto& entry : ru.reservations)
+	//		{
+	//			if (entry.first == c)
+	//			{
+	//				entry.second += nextRenderUnitFirstInstance; 
+	//			}
+	//		}
+	//	}
+	//	nextRenderUnitFirstInstance += c->GetMaxInstances();
+	//}
+
 	// Update the offsets so that each render unit has a contiguous range of values
 	// For each render unit
-	UINT nextRenderUnitFirstInstance = 0;
-	for (auto rui = m_renderUnits.begin(); rui != m_renderUnits.end(); rui++)
-	{
-		// For each reservation in that render unit
-		for (auto entry : rui->reservations)
-		{
-			entry.second += nextRenderUnitFirstInstance; 
-		}
-		nextRenderUnitFirstInstance += rui->totalMaxInstances;
-	}
+	//UINT nextRenderUnitFirstInstance = 0;
+	//for (auto rui = m_renderUnits.begin(); rui != m_renderUnits.end(); rui++)
+	//{
+	//	// For each reservation in that render unit
+	//	for (auto& entry : rui->reservations)
+	//	{
+	//		entry.second += nextRenderUnitFirstInstance; 
+	//	}
+	//	nextRenderUnitFirstInstance += rui->totalMaxInstances;
+	//}
 
 	return S_OK;
 }
@@ -237,22 +260,19 @@ HRESULT RenderManager::Update(const list<WorldObject*>& children)
 	HRR(_pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
-	for (auto i = children.begin(); i != children.end(); i++)
-	{
-		if ((*i)->GetMaxInstances() > 0 && (*i)->GetObjectType() != PrimitiveObjectType /* TODO TEMPTEMP */)
-		{
-			HRR((*i)->ComputeConstants(_pImmediateContext, &_renderData, dataView));
-			dataView += (*i)->GetMaxInstances();
-		}
-	}
+	//for (auto i = children.begin(); i != children.end(); i++)
+	//{
+	//	if ((*i)->GetMaxInstances() > 0 && (*i)->GetObjectType() != PrimitiveObjectType /* TODO TEMPTEMP */)
+	//	{
+	//		HRR((*i)->ComputeConstants(&_renderData, dataView));
+	//		dataView += (*i)->GetMaxInstances();
+	//	}
+	//}
 
 	for (auto c : children)
 	{
-		if (c->GetObjectType() == PrimitiveObjectType)
-		{
-			HRR( ((Primitive*)c)->ComputeConstants2(this, reinterpret_cast<InstancedData*>(dataView)));
-			//HRR( ((Primitive*)c)->ComputeConstants2(this, reinterpret_cast<InstancedData*>(mappedData.pData)));
-		}
+		InstancedData* instanceView = dataView + m_objectToInstanceBufferOffset[c];
+		HRR(c->ComputeConstants(this, instanceView));
 	}
 
 	_pImmediateContext->Unmap(_pInstancedBuffer, 0);
@@ -312,28 +332,25 @@ HRESULT RenderManager::Render(const list<WorldObject*>& children)
 
 	// TODO: render for each material instead of each child
 
-	int startInstance = 0;
-	for (auto i : children)
-	{
-		if (i->GetObjectType() != PrimitiveObjectType) /* TODO TEMPTEMP */
-		{
-			//ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
-			//_pImmediateContext->IASetVertexBuffers(0, 1, vbs, stride, offset);
+	//int startInstance = 0;
+	//for (auto i : children)
+	//{
+	//	if (i->GetObjectType() != PrimitiveObjectType) /* TODO TEMPTEMP */
+	//	{
 
-			WorldObject* obj = i;
-			HRESULT hr2 = obj->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
-			HRR(hr2);
-			startInstance += i->GetMaxInstances();
-		}
-	}
+	//		WorldObject* obj = i;
+	//		HRESULT hr2 = obj->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
+	//		HRR(hr2);
+	//		startInstance += i->GetMaxInstances();
+	//	}
+	//}
 
 	for (auto& ru : m_renderUnits)
 	{
-		for (auto reservation : ru.reservations)
+		for (auto object : ru.reservations)
 		{
-			HRESULT hr2 = reservation.first->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
+			HRESULT hr2 = object->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, m_objectToInstanceBufferOffset[object]);
 			HRR(hr2);
-			startInstance += reservation.first->GetMaxInstances();
 		}
 	}
 
@@ -362,7 +379,11 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 	}
 	m_textures.clear();
 	m_materials.clear();
+	m_meshes.clear();
 	m_renderUnits.clear();
+	m_objectToInstanceBufferOffset.clear();
+	m_nextInstanceBufferOffset = 0;
+	m_perFrameInstanceData.clear();
 
 	InputLayouts::DestroyAll();
 
@@ -387,7 +408,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 {
 	ID3D11ShaderResourceView* texture = nullptr;
 
-	if (textureFilename)
+	if (textureFilename && *textureFilename)
 	{
 		LoadTexture(textureFilename);
 
@@ -434,15 +455,28 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
 		unit = &(*m_renderUnits.rbegin());
 	}
 
-	// Update look up table
-	//m_objectToRenderUnits[object].push_back(unit);
+	// Update object to instance buffer look up table if not present
+	if (m_objectToInstanceBufferOffset.find(object) == m_objectToInstanceBufferOffset.end())
+	{
+		m_objectToInstanceBufferOffset[object] = m_nextInstanceBufferOffset;
+		m_nextInstanceBufferOffset += object->GetMaxInstances();
+	}
 
 	// Add reservation
-	unit->reservations[object] = unit->totalMaxInstances;
-	unit->totalMaxInstances += object->GetMaxInstances();
+	unit->reservations.push_back(object);
+	unit->totalMaxInstances += object->GetMaxInstances(); // TODO needed?
+
+	// Add per frame reservation
+	m_perFrameInstanceData[unit][object] = std::make_pair<InstancedData*, UINT>(nullptr, 0);
 
 	*ppRenderUnit = unit;
 
+	return S_OK;
+}
+
+HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object, InstancedData* dataView, UINT numInstances)
+{
+	m_perFrameInstanceData[renderUnit][object] = std::make_pair(dataView, numInstances);
 	return S_OK;
 }
 

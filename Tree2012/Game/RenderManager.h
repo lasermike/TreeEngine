@@ -77,8 +77,8 @@ struct RenderUnit
 	Material*					m_material;
 	Mesh*						m_mesh;
 
-	UINT						totalMaxInstances;
-	std::map<WorldObject*, UINT> reservations;
+	UINT						totalMaxInstances; // TODO Needed?
+	std::list<WorldObject*>		reservations;
 
 	RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh), totalMaxInstances(0) 
 	{
@@ -88,15 +88,23 @@ struct RenderUnit
 
 };
 
-class RenderManager
+interface IRenderFrameConfig
+{
+	virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, InstancedData* dataView, UINT numInstances) = 0;
+	virtual RenderData& GetRenderData() = 0;
+};
+
+class RenderManager : public IRenderFrameConfig
 {
 	std::map<wstring, Material>						m_materials;
 	std::map<wstring, Mesh>							m_meshes;
 	std::map<wstring, ID3D11ShaderResourceView*>	m_textures;
 	std::list<RenderUnit>							m_renderUnits;
 
-	//std::map<WorldObject*, std::list<RenderUnit*>>	m_objectToRenderUnits;
+	std::map<WorldObject*, UINT>					m_objectToInstanceBufferOffset;
+	UINT											m_nextInstanceBufferOffset;
 
+	std::map<RenderUnit*, std::map<WorldObject*, std::pair<InstancedData*, UINT>>> m_perFrameInstanceData;
 
     // TODO per material
 	CComPtr<ID3D11VertexShader>         _pVertexShader;
@@ -148,6 +156,7 @@ public:
 	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
 					   const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
 	HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
+	HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, InstancedData* dataView, UINT numInstances);
 
 	HRESULT InitGraphicsEarly();
 	HRESULT InitGraphicsFinal(SceneRoot* scene);

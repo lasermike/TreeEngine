@@ -44,7 +44,7 @@ HRESULT WorldObject::Render(RenderManager& /*renderManager*/)
 	return E_NOTIMPL;
 }
 
-HRESULT WorldObject::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* /*pRenderData*/, InstancedData* /*dataView*/)
+HRESULT WorldObject::ComputeConstants(IRenderFrameConfig* /*pFrameConfig*/, InstancedData* /*dataView*/)
 {
 	return E_NOTIMPL;
 }

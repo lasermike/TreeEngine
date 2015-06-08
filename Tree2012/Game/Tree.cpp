@@ -30,10 +30,33 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	HRR(CleanUpDeviceObjects());
 	_geometry = new TreeGeometry(_treeModel);
 	HRR(_geometry->InitGraphics(renderManager));
+
+	ShaderMaterial trunkMaterial;
+	trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+	//XMStoreFloat4(&_trunkMaterial.Diffuse, Colors::RosyBrown); 
+	trunkMaterial.Diffuse = XMFLOAT4(1.0f, .7f, .3f, 1.0f);
+	trunkMaterial.Specular = XMFLOAT4(.4f, .4f, .4f, 1.0f);
+	trunkMaterial.flags.y = false; //true; //useTextures  TODO
+
+	// Create material, mesh, and reserve render unit
+	Material* pTrunk = nullptr;
+	renderManager.CreateMaterial(L"trunk", L"", trunkMaterial, &pTrunk);
+	Mesh* pNewMesh = nullptr;
+	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Cylinder);
+	renderManager.CreateMesh(L"trunk", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
+	renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
+
+	Material* pTwig = nullptr;
+	renderManager.CreateMaterial(L"twig", L"", trunkMaterial, &pTwig);
+	pNewMesh = nullptr;
+	pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
+	renderManager.CreateMesh(L"twig", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
+	renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
+
 	return S_OK;
 }
 
-HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, RenderData* pRenderData, InstancedData* dataView)
+HRESULT Tree::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView)
 {
 	// Clear bounding box
 	_boundingBox[0] = XMFLOAT3(-1,-1,-1);
@@ -50,7 +73,7 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, Rende
 
 	XMVECTOR startPosition = XMLoadFloat3(&_position); // + XMVectorSet(0, .5, 0, 0);
 
-	ComputeBranchInstanceData(pRenderData, currentBranch, _treeModel->trunk, startPosition);
+	ComputeBranchInstanceData(&pFrameConfig->GetRenderData(), currentBranch, _treeModel->trunk, startPosition);
 
 	/* TODO Implement per-branch depth world matrix as a step toward moving this computation to the GPU
 	for (int level = 0; level < _treeModel->treeData.numLevels; level++)
@@ -63,17 +86,21 @@ HRESULT Tree::ComputeConstants(ID3D11DeviceContext* /*pImmediateContext*/, Rende
 		}
 	}*/
 
+	InstancedData* logBuffer = dataView;
+	InstancedData* twigBuffer = dataView + _logInstanceData.size();
+
+	// TODO add to render unit specific data view
 	int dvi = 0;
 	for (unsigned int i = 0; i < _logInstanceData.size(); i++)
 	{
-		dataView[dvi++] = _logInstanceData[i];
+		logBuffer[dvi++] = _logInstanceData[i];
 	}
 
+	dvi = 0;
 	for (unsigned int i = 0; i < _twigInstanceData.size(); i++)
 	{
-		dataView[dvi++] = _twigInstanceData[i];
+		twigBuffer[dvi++] = _twigInstanceData[i];
 	}
-	assert(dvi == currentBranch);
 
 	return S_OK;
 }
@@ -109,7 +136,6 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	currentBranch++;
 
 	// Compute child branches
-	//const int maxChildren = 4;
 	for (unsigned int c = 0; c < branch->children.size(); c++)
 	{
 		if (branch->Child(c) != 0)
@@ -257,6 +283,7 @@ unsigned int Tree::GetNumInstances()
 { 
 	if (_treeModel)
 	{
+		assert(_treeModel->treeData.numBranches >= _logInstanceData.size() + _twigInstanceData.size());
         return (unsigned int) (_logInstanceData.size() + _twigInstanceData.size());
 	}
 	else
