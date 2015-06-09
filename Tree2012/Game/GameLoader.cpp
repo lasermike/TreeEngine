@@ -53,12 +53,6 @@ void GameLoader::LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Playe
 
 void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
-	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
-	params4->position = XMFLOAT3(0,0,0);
-	params4->scale = XMFLOAT3(30, .01f, 30);
-	params4->primitiveType = PrimitiveType_Cylinder;
-	pScene->AddChild(new Primitive(params4));
-
 	WorldObjectParams* params3 = new WorldObjectParams(FixedTreeGeneratorType);
 	params3->depthLOD = 2;
 	params3->position = XMFLOAT3(-1.3f, 0.5f,1.3f);
@@ -89,6 +83,12 @@ void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* p
 	params5->GetGeneratorParameters()._segmentLength = .28f;
 	params5->GetGeneratorParameters().thickness = .020f;	
 	pScene->AddChild(new Tree(params5));
+
+	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+	params4->position = XMFLOAT3(0,0,0);
+	params4->scale = XMFLOAT3(30, .01f, 30);
+	params4->primitiveType = PrimitiveType_Cylinder;
+	pScene->AddChild(new Primitive(params4));
 
 	// Init lights
 	pRenderData->dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);

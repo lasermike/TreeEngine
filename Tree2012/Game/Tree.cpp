@@ -56,7 +56,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	return S_OK;
 }
 
-HRESULT Tree::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView)
+HRESULT Tree::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView, UINT startInstance)
 {
 	// Clear bounding box
 	_boundingBox[0] = XMFLOAT3(-1,-1,-1);
@@ -75,19 +75,8 @@ HRESULT Tree::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* 
 
 	ComputeBranchInstanceData(&pFrameConfig->GetRenderData(), currentBranch, _treeModel->trunk, startPosition);
 
-	/* TODO Implement per-branch depth world matrix as a step toward moving this computation to the GPU
-	for (int level = 0; level < _treeModel->treeData.numLevels; level++)
-	{
-		for (int branchIndex = 0; branchIndex < _treeModel->treeData.pLevels[level].numBranches; branchIndex++)
-		{
-			Branch* branch = _treeModel->treeData.pBranches[_treeModel->treeData.pLevels[level].pBranchesInLevel[branchIndex]];
-			XMVECTOR position = (branch->parent == -1) ? startPosition : _logInstanceData[branch->parent].World;
-			ComputeBranchInstanceData(currentBranch, world, _treeModel->trunk, position, time);
-		}
-	}*/
-
-	InstancedData* logBuffer = dataView;
-	InstancedData* twigBuffer = dataView + _logInstanceData.size();
+	InstancedData* logBuffer = dataView + startInstance;
+	InstancedData* twigBuffer = dataView  + startInstance + _logInstanceData.size();
 
 	// TODO add to render unit specific data view
 	int dvi = 0;
@@ -101,6 +90,9 @@ HRESULT Tree::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* 
 	{
 		twigBuffer[dvi++] = _twigInstanceData[i];
 	}
+
+	pFrameConfig->SetInstances(m_logUnit, this, startInstance, _logInstanceData.size());
+	pFrameConfig->SetInstances(m_twigUnit, this, startInstance + _logInstanceData.size(), _twigInstanceData.size());
 
 	return S_OK;
 }

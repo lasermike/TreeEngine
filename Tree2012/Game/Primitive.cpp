@@ -46,11 +46,10 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 	return S_OK;
 }
 
-HRESULT Primitive::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView)
+HRESULT Primitive::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView, UINT startInstance)
 {
-	pFrameConfig->SetInstances(m_renderUnit, this, dataView, 1);
-
-	//dataView += m_renderUnit->reservations[this];
+	pFrameConfig->SetInstances(m_renderUnit, this, startInstance, 1);
+	InstancedData* firstDataView = dataView + startInstance;
 
 	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0); 
 	const XMVECTOR vScaleCenter = XMVectorSet(0, 0, 0, 0);
@@ -63,7 +62,7 @@ HRESULT Primitive::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedD
 	// Multiply by this object's world matrix
 	transform = transform * XMLoadFloat4x4(&pFrameConfig->GetRenderData().world);
 
-	XMStoreFloat4x4(&dataView->World, transform);
+	XMStoreFloat4x4(&firstDataView->World, transform);
 
 	return S_OK;
 }

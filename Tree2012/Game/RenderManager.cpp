@@ -99,7 +99,7 @@ RenderManager::~RenderManager()
 {
 }
 
-HRESULT RenderManager::InitGraphicsEarly()
+HRESULT RenderManager::InitGraphics(UINT maxInstances)
 {
     HRR(CleanUpDeviceObjects());
 
@@ -198,60 +198,17 @@ HRESULT RenderManager::InitGraphicsEarly()
 	// Load the Texture
 	HRR(CreateDDSTextureFromFile(_pd3dDevice, L"snow.dds", nullptr, &_pDebugTextureRV));
 
-	return S_OK;
-}
-
-HRESULT RenderManager::InitGraphicsFinal(SceneRoot* scene)
-{
 	// Create instanced buffer
-	D3D11_BUFFER_DESC vbd;
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
-	vbd.ByteWidth = sizeof(InstancedData) * scene->GetMaxInstances();
+	vbd.ByteWidth = sizeof(InstancedData) * maxInstances; 
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	vbd.MiscFlags = 0;
 	vbd.StructureByteStride = 0;
 	HRR(_pd3dDevice->CreateBuffer(&vbd, 0, &_pInstancedBuffer));
 
-	//UINT nextRenderUnitFirstInstance = 0;
-	//for (auto c : scene->Children())
-	//{
-	//	m_reservations
-	//}
-
-	//UINT nextRenderUnitFirstInstance = 0;
-	//for (auto c : scene->Children())
-	//{
-	//	for (auto& ru : m_renderUnits)
-	//	{
-	//		// For each reservation in that render unit
-	//		for (auto& entry : ru.reservations)
-	//		{
-	//			if (entry.first == c)
-	//			{
-	//				entry.second += nextRenderUnitFirstInstance; 
-	//			}
-	//		}
-	//	}
-	//	nextRenderUnitFirstInstance += c->GetMaxInstances();
-	//}
-
-	// Update the offsets so that each render unit has a contiguous range of values
-	// For each render unit
-	//UINT nextRenderUnitFirstInstance = 0;
-	//for (auto rui = m_renderUnits.begin(); rui != m_renderUnits.end(); rui++)
-	//{
-	//	// For each reservation in that render unit
-	//	for (auto& entry : rui->reservations)
-	//	{
-	//		entry.second += nextRenderUnitFirstInstance; 
-	//	}
-	//	nextRenderUnitFirstInstance += rui->totalMaxInstances;
-	//}
-
 	return S_OK;
 }
-
 
 HRESULT RenderManager::Update(const list<WorldObject*>& children)
 {
@@ -260,19 +217,10 @@ HRESULT RenderManager::Update(const list<WorldObject*>& children)
 	HRR(_pImmediateContext->Map(_pInstancedBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
-	//for (auto i = children.begin(); i != children.end(); i++)
-	//{
-	//	if ((*i)->GetMaxInstances() > 0 && (*i)->GetObjectType() != PrimitiveObjectType /* TODO TEMPTEMP */)
-	//	{
-	//		HRR((*i)->ComputeConstants(&_renderData, dataView));
-	//		dataView += (*i)->GetMaxInstances();
-	//	}
-	//}
-
 	for (auto c : children)
 	{
-		InstancedData* instanceView = dataView + m_objectToInstanceBufferOffset[c];
-		HRR(c->ComputeConstants(this, instanceView));
+		InstancedData* instanceView = dataView ;
+		HRR(c->ComputeConstants(this, instanceView, m_objectToInstanceBufferOffset[c]));
 	}
 
 	_pImmediateContext->Unmap(_pInstancedBuffer, 0);
@@ -319,8 +267,6 @@ HRESULT RenderManager::Render(const list<WorldObject*>& children)
 
 	// Set up input assembler
 	_pImmediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
-	//UINT stride[1] = { sizeof(SimpleVertex) };
-	//UINT offset[1] = { 0 };
 	_pImmediateContext->IASetIndexBuffer(_pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
 	_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -330,30 +276,40 @@ HRESULT RenderManager::Render(const list<WorldObject*>& children)
 	ID3D11Buffer* vbs[2] = { _pVertexBuffer, _pInstancedBuffer };
 	_pImmediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
 
-	// TODO: render for each material instead of each child
-
-	//int startInstance = 0;
-	//for (auto i : children)
-	//{
-	//	if (i->GetObjectType() != PrimitiveObjectType) /* TODO TEMPTEMP */
-	//	{
-
-	//		WorldObject* obj = i;
-	//		HRESULT hr2 = obj->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, startInstance);
-	//		HRR(hr2);
-	//		startInstance += i->GetMaxInstances();
-	//	}
-	//}
-
+	// Render each unit
 	for (auto& ru : m_renderUnits)
 	{
-		for (auto object : ru.reservations)
-		{
-			HRESULT hr2 = object->RenderInstanced(_pImmediateContext, &_renderData, &_geometryData, m_objectToInstanceBufferOffset[object]);
-			HRR(hr2);
-		}
+		Render(ru);
 	}
 
+	return S_OK;
+}
+
+HRESULT RenderManager::SetMaterial(Material& material)
+{
+	CBChangesPerObject cb;
+	cb.material = material.m_shaderMaterial;
+
+	_pImmediateContext->VSSetConstantBuffers(3, 1, &material.m_constBuffer);
+	_pImmediateContext->PSSetConstantBuffers(3, 1, &material.m_constBuffer);
+	_pImmediateContext->UpdateSubresource(material.m_constBuffer, 0, nullptr, &cb, 0, 0);
+	return S_OK;
+}
+
+HRESULT RenderManager::Render(RenderUnit& ru)
+{
+	SetMaterial(*ru.m_material);
+	_pImmediateContext->PSSetShaderResources(0, 1, &ru.m_material->m_texture);
+
+	for (auto object : ru.reservations)
+	{
+		UINT startInstance = m_perFrameInstanceData[&ru][object].first;
+		UINT numInstances = m_perFrameInstanceData[&ru][object].second;
+
+		_pImmediateContext->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset, 
+												 ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
+
+	}
 	return S_OK;
 }
 
@@ -392,7 +348,6 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 
 HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 {
-	//m_materials[textureFilename]
 	ID3D11ShaderResourceView* texture = m_textures[textureFilename];
 	if (!texture)
 	{
@@ -406,6 +361,14 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, ShaderMaterial& shaderMaterial, Material** newMaterial)
 {
+	auto existing = m_materials.find(name);
+	if (existing != m_materials.end())
+	{
+		*newMaterial = &m_materials[name];
+		return S_FALSE;
+	}
+
+	// Create a new material
 	ID3D11ShaderResourceView* texture = nullptr;
 
 	if (textureFilename && *textureFilename)
@@ -416,10 +379,20 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 		assert(texture);
 	}
 
+	// Create constants for material
+	ID3D11Buffer* pConstBuffer = nullptr;
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(CBChangesPerObject);
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.CPUAccessFlags = 0;
+	HRR(_pd3dDevice->CreateBuffer(&bd, nullptr, &pConstBuffer));
+
 	m_materials.emplace(std::make_pair(name, 
 		Material(name, texture, InputLayouts::InstancedBasic16, (ID3D11VertexShader*) _pVertexShader, (ID3D11PixelShader*)_pPixelShader, 
 		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/, 
-		shaderMaterial)));
+		shaderMaterial, pConstBuffer)));
 
 	*newMaterial = &m_materials[name];
 
@@ -467,16 +440,16 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
 	unit->totalMaxInstances += object->GetMaxInstances(); // TODO needed?
 
 	// Add per frame reservation
-	m_perFrameInstanceData[unit][object] = std::make_pair<InstancedData*, UINT>(nullptr, 0);
+	m_perFrameInstanceData[unit][object] = std::make_pair<UINT, UINT>(0, 0);
 
 	*ppRenderUnit = unit;
 
 	return S_OK;
 }
 
-HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object, InstancedData* dataView, UINT numInstances)
+HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances)
 {
-	m_perFrameInstanceData[renderUnit][object] = std::make_pair(dataView, numInstances);
+	m_perFrameInstanceData[renderUnit][object] = std::make_pair(startInstance, numInstances);
 	return S_OK;
 }
 

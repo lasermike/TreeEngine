@@ -44,7 +44,7 @@ HRESULT WorldObject::Render(RenderManager& /*renderManager*/)
 	return E_NOTIMPL;
 }
 
-HRESULT WorldObject::ComputeConstants(IRenderFrameConfig* /*pFrameConfig*/, InstancedData* /*dataView*/)
+HRESULT WorldObject::ComputeConstants(IRenderFrameConfig* /*pFrameConfig*/, InstancedData* /*dataView*/, UINT /*startInstance*/)
 {
 	return E_NOTIMPL;
 }

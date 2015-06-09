@@ -43,7 +43,7 @@ public:
 	virtual void Create(PrimitiveModelGenerator* generator);
 	virtual HRESULT InitGraphics(RenderManager& renderManager);
 
-	virtual HRESULT ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView) override;
+	virtual HRESULT ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView, UINT startInstance) override;
 
 	virtual unsigned int GetNumInstances() { return 1; }
 	virtual unsigned int GetMaxInstances() { return 1; }

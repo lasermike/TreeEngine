@@ -481,17 +481,12 @@ void Game::Regenerate()
 	_loader.Regenerate(_pScene);
 
     // Init render manager
-    hr = _renderManager.InitGraphicsEarly();
+    hr = _renderManager.InitGraphics(_pScene->GetMaxInstances());
 	assert(SUCCEEDED(hr));		
 
 	// Init new stuff
 	hr = _pScene->InitGraphics(_renderManager);
     assert(SUCCEEDED(hr));
-
-    // Do post scene initialization stuff
-    hr = _renderManager.InitGraphicsFinal(_pScene);
-	assert(SUCCEEDED(hr));		
-
 }
 
 void Game::Update(DX::StepTimer const& timer)
