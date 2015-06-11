@@ -2,7 +2,7 @@
 #include "WorldObject.h"
 
 
-WorldObject::WorldObject(WorldObjectParams* pParams) :_geometry(), _params(pParams), _drawInstanced(true)
+WorldObject::WorldObject(WorldObjectParams* pParams) : _params(pParams), _drawInstanced(true)
 {
 	_position = XMFLOAT3(0,0,0);
 	XMStoreFloat4(&_rotation, XMQuaternionIdentity());
@@ -30,21 +30,10 @@ HRESULT WorldObject::InitGraphics(RenderManager& /*renderManager*/)
 
 HRESULT WorldObject::CleanUpDeviceObjects()
 {
-	if (_geometry)
-	{
-		HRR(_geometry->CleanUpDeviceObjects());
-		delete _geometry;
-		_geometry = nullptr;
-	}
 	return S_OK;
 }
 
-HRESULT WorldObject::Render(RenderManager& /*renderManager*/)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT WorldObject::ComputeConstants(IRenderFrameConfig* /*pFrameConfig*/, InstancedData* /*dataView*/, UINT /*startInstance*/)
+HRESULT WorldObject::ComputeConstants(IRenderFrame* /*pFrameConfig*/, InstancedData* /*dataView*/, UINT /*startInstance*/)
 {
 	return E_NOTIMPL;
 }

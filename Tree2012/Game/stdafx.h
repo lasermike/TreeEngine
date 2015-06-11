@@ -384,6 +384,4 @@ namespace XboxSampleFramework
 
 namespace XSF = XboxSampleFramework;
 
-#include "RenderManager.h"
-
 #endif

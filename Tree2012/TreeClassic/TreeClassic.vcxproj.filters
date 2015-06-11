@@ -63,9 +63,6 @@
     <ClInclude Include="..\Game\GameLoader.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\Geometry.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
     <ClInclude Include="..\Game\GeometryGenerator.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
@@ -85,9 +82,6 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\Primitive.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\PrimitiveGeometry.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\RenderData.h">
@@ -115,9 +109,6 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\Tree.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\TreeGeometry.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\TreeModel.h">
@@ -173,9 +164,6 @@
     <ClCompile Include="..\Game\Primitive.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\PrimitiveGeometry.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\RenderStates.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -194,9 +182,6 @@
     <ClCompile Include="..\Game\Tree.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\TreeGeometry.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\TreeModel.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -213,9 +198,6 @@
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\RenderManager.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\Geometry.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
   </ItemGroup>

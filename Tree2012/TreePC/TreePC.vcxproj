@@ -142,7 +142,6 @@
     <ClInclude Include="..\Game\DXMath.h" />
     <ClInclude Include="..\Game\Game.h" />
     <ClInclude Include="..\Game\GameLoader.h" />
-    <ClInclude Include="..\Game\Geometry.h" />
     <ClInclude Include="..\Game\GeometryGenerator.h" />
     <ClInclude Include="..\Game\LSystemModelGenerator.h" />
     <ClInclude Include="..\Game\Materials.h" />
@@ -151,7 +150,6 @@
     <ClInclude Include="..\Game\OrbitCamera.h" />
     <ClInclude Include="..\Game\Player.h" />
     <ClInclude Include="..\Game\Primitive.h" />
-    <ClInclude Include="..\Game\PrimitiveGeometry.h" />
     <ClInclude Include="..\Game\RenderData.h" />
     <ClInclude Include="..\Game\RenderManager.h" />
     <ClInclude Include="..\Game\RenderStates.h" />
@@ -162,7 +160,6 @@
     <ClInclude Include="..\Game\StepTimer.h" />
     <ClInclude Include="..\Game\StockRenderStates.h" />
     <ClInclude Include="..\Game\Tree.h" />
-    <ClInclude Include="..\Game\TreeGeometry.h" />
     <ClInclude Include="..\Game\TreeModel.h" />
     <ClInclude Include="..\Game\TreeModelGenerator.h" />
     <ClInclude Include="..\Game\WorldObject.h" />
@@ -177,7 +174,6 @@
     <ClCompile Include="..\Game\DDSTextureLoader.cpp" />
     <ClCompile Include="..\Game\Game.cpp" />
     <ClCompile Include="..\Game\GameLoader.cpp" />
-    <ClCompile Include="..\Game\Geometry.cpp" />
     <ClCompile Include="..\Game\GeometryGenerator.cpp" />
     <ClCompile Include="..\Game\LSystemModelGenerator.cpp" />
     <ClCompile Include="..\Game\Materials.cpp" />
@@ -185,7 +181,6 @@
     <ClCompile Include="..\Game\OrbitCamera.cpp" />
     <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
-    <ClCompile Include="..\Game\PrimitiveGeometry.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp" />
     <ClCompile Include="..\Game\RenderStates.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
@@ -193,7 +188,6 @@
     <ClCompile Include="..\Game\Stdafx.cpp" />
     <ClCompile Include="..\Game\StockRenderStates.cpp" />
     <ClCompile Include="..\Game\Tree.cpp" />
-    <ClCompile Include="..\Game\TreeGeometry.cpp" />
     <ClCompile Include="..\Game\TreeModel.cpp" />
     <ClCompile Include="..\Game\TreeModelGenerator.cpp" />
     <ClCompile Include="..\Game\WorldObject.cpp" />

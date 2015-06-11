@@ -2,6 +2,7 @@
 #include "Tree.h"
 #include "TreeModel.h"
 #include "TreeModelGenerator.h"
+#include "RenderManager.h"
 #include "MathHelper.h"
 
 Tree::Tree(WorldObjectParams* pParams) : _treeModel(nullptr), WorldObject(pParams)
@@ -28,8 +29,6 @@ void Tree::Create(TreeModelGenerator* generator)
 HRESULT Tree::InitGraphics(RenderManager& renderManager)
 {
 	HRR(CleanUpDeviceObjects());
-	_geometry = new TreeGeometry(_treeModel);
-	HRR(_geometry->InitGraphics(renderManager));
 
 	ShaderMaterial trunkMaterial;
 	trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
@@ -56,7 +55,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	return S_OK;
 }
 
-HRESULT Tree::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView, UINT startInstance)
+HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataView, UINT startInstance)
 {
 	// Clear bounding box
 	_boundingBox[0] = XMFLOAT3(-1,-1,-1);
@@ -91,8 +90,8 @@ HRESULT Tree::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* 
 		twigBuffer[dvi++] = _twigInstanceData[i];
 	}
 
-	pFrameConfig->SetInstances(m_logUnit, this, startInstance, _logInstanceData.size());
-	pFrameConfig->SetInstances(m_twigUnit, this, startInstance + _logInstanceData.size(), _twigInstanceData.size());
+	pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT) _logInstanceData.size());
+	pFrameConfig->SetInstances(m_twigUnit, this, startInstance + (UINT) _logInstanceData.size(), (UINT) _twigInstanceData.size());
 
 	return S_OK;
 }
@@ -275,20 +274,9 @@ unsigned int Tree::GetNumInstances()
 { 
 	if (_treeModel)
 	{
-		assert(_treeModel->treeData.numBranches >= _logInstanceData.size() + _twigInstanceData.size());
+		assert((UINT)_treeModel->treeData.numBranches >= _logInstanceData.size() + _twigInstanceData.size());
         return (unsigned int) (_logInstanceData.size() + _twigInstanceData.size());
 	}
 	else
 		return 0;
-}
-
-HRESULT Tree::RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometryData, int startInstance)
-{
-	const GeometryBufferData::BufferIndices* pCylinderIndices = pGeometryData->GetBufferIndices(PrimitiveType_Cylinder);
-
-	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pCylinderIndices, startInstance, (int) _logInstanceData.size()));
-
-	const GeometryBufferData::BufferIndices* pLDIndices = pGeometryData->GetBufferIndices(PrimitiveType_Box);
-	HRR( ((TreeGeometry*)_geometry)->DrawInstanced(pImmediateContext, pRenderData, pLDIndices, startInstance + (int) _logInstanceData.size(), (int)  _twigInstanceData.size()));
-	return S_OK;
 }

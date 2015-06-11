@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "Primitive.h"
-#include "PrimitiveGeometry.h"
+#include "RenderManager.h"
 #include "MathHelper.h"
 
 Primitive::Primitive(WorldObjectParams* wop) : WorldObject(wop), _model(nullptr)
@@ -23,8 +23,6 @@ void Primitive::Create(PrimitiveModelGenerator* generator)
 HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 {
 	HRR(CleanUpDeviceObjects());
-	_geometry = new PrimitiveGeometry((PrimitiveModel*)_model);
-	HRR(_geometry->InitGraphics(renderManager));
 
 	ShaderMaterial mat;
 	mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
@@ -46,7 +44,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 	return S_OK;
 }
 
-HRESULT Primitive::ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView, UINT startInstance)
+HRESULT Primitive::ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataView, UINT startInstance)
 {
 	pFrameConfig->SetInstances(m_renderUnit, this, startInstance, 1);
 	InstancedData* firstDataView = dataView + startInstance;

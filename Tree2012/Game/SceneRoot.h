@@ -1,6 +1,5 @@
 #pragma once
 #include "pch.h"
-#include "Geometry.h"
 #include "GeometryGenerator.h"
 #include "WorldObject.h"
 #include <list>
@@ -23,7 +22,6 @@ public:
 	HRESULT CleanUpDeviceObjects();
 
 	HRESULT Update(RenderManager& renderManager);
-	HRESULT Render(RenderManager& renderManager);
 
 	void AddChild(WorldObject* obj)
 	{

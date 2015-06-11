@@ -1,7 +1,6 @@
 #pragma once
 #include "pch.h"
 #include <vector>
-#include "TreeGeometry.h"
 #include "WorldObject.h"
 #include "TreeModel.h"
 #include "Materials.h"
@@ -10,6 +9,7 @@ typedef long HRESULT;
 
 class TreeModelGenerator;
 struct Branch;
+struct RenderUnit;
 
 class Tree : public WorldObject
 {
@@ -36,9 +36,7 @@ public:
 
 	virtual HRESULT InitGraphics(RenderManager& renderManager);
 
-	virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometyData, int startInstance);
-
-	virtual HRESULT ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView, UINT startInstance) override;
+	virtual HRESULT ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataView, UINT startInstance) override;
 	virtual unsigned int GetNumInstances();
 	virtual unsigned int GetMaxInstances();
 };

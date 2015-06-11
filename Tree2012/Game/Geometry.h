@@ -7,12 +7,6 @@
 
 class RenderManager;
 
-struct CBChangesPerObject
-{
-	ShaderMaterial material;
-	XMFLOAT4X4 textureTransform;
-};
-
 class Geometry
 {
 	ID3D11Buffer* _pCBChangesPerObject;

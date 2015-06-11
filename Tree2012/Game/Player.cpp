@@ -217,7 +217,7 @@ void Player::HandleInput(bool key[256])  // WM_KEYDOWN
     }
 }
 
-void Player::Select(int index)
+void Player::Select(int /*index*/)
 {
 	//WorldObject* pObj = *_pScene->Children().begin();
 	//int i = 0;

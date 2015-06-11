@@ -2,6 +2,8 @@
 #include "WorldObject.h"
 #include "Materials.h"
 
+struct RenderUnit;
+
 class PrimitiveModel : public Model
 {
 	PrimitiveType _primitiveType;
@@ -43,7 +45,7 @@ public:
 	virtual void Create(PrimitiveModelGenerator* generator);
 	virtual HRESULT InitGraphics(RenderManager& renderManager);
 
-	virtual HRESULT ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView, UINT startInstance) override;
+	virtual HRESULT ComputeConstants(IRenderFrame* pFrame, InstancedData* dataView, UINT startInstance) override;
 
 	virtual unsigned int GetNumInstances() { return 1; }
 	virtual unsigned int GetMaxInstances() { return 1; }

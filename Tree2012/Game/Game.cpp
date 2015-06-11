@@ -13,6 +13,7 @@
 #include "StockRenderStates.h"
 #include "OrbitCamera.h"
 #include "GameLoader.h"
+#include "RenderManager.h"
 
 using namespace DirectX;
 
@@ -95,6 +96,8 @@ HRESULT Game::Initialize()
 	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
 	_player = new Player(playerParams);
 
+	_renderManager.GetRenderData().frame = 0;
+
 	_loader.Load("Basic", _pScene, &_renderManager.GetRenderData(), _player);
 
 	// Init scene bounds.
@@ -102,9 +105,6 @@ HRESULT Game::Initialize()
 	// Ideally would loop through all world space vertices
 	_renderManager.GetRenderData().mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	_renderManager.GetRenderData().mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
-
-    //_resizeHandler = std::bind(&Game::StandardResizeHandler, this);
-    //SetResizeHandler(std::bind(&Game::StandardResizeHandler, this));
 
 	return S_OK;
 }
@@ -491,6 +491,8 @@ void Game::Regenerate()
 
 void Game::Update(DX::StepTimer const& timer)
 {
+	_renderManager.GetRenderData().frame++;
+
 	// Rebuild tree if necessary
 	if (_resetTree)
 	{
@@ -594,7 +596,7 @@ void Game::Render(bool oculus)
 	_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
 
 	// Draw everything
-	HRC(_pScene->Render(_renderManager));
+	HRC(_renderManager.Render());
 
 	// Unbind shadow texture so we can render to it next frame
 	depthTexture = nullptr;
@@ -731,9 +733,6 @@ void Game::DrawSceneToShadowMap()
 	stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::BuildShadowMap );
 
 	// Draw everything
-	HR(_pScene->Render(_renderManager));
-
-	// Store render data state
 	_renderManager.GetRenderData() = prevRenderData;
 
 	UpdateProjection(&_renderManager.GetRenderData().projection);

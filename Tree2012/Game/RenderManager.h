@@ -24,13 +24,13 @@ struct Material
 	ID3D11PixelShader*        m_pixelShader;
     ID3D11InputLayout*        m_inputLayout;
 
-	// Owned objects TODO make into CComPtr
+	ShaderMaterial			  m_shaderMaterial;
+	CComPtr<ID3D11Buffer>	  m_constBuffer;     // Owned
+
+	// NYI
 	ID3D11SamplerState*       m_samplerState;
     ID3D11RasterizerState*    m_rasterizer;
     ID3D11DepthStencilState*  m_depthState;
-
-	ShaderMaterial			  m_shaderMaterial;
-	CComPtr<ID3D11Buffer>	  m_constBuffer;
 
 public:
 	Material(const wchar_t* name, ID3D11ShaderResourceView* texture, ID3D11InputLayout* inputLayout,
@@ -92,54 +92,80 @@ struct RenderUnit
 
 };
 
-interface IRenderFrameConfig
+struct DoubleBuffer	
+{
+	CComPtr<ID3D11Buffer> buffers[2];
+
+	HRESULT Create(const D3D11_BUFFER_DESC& bd, XSF::D3DDevice* device)
+	{
+		buffers[0].Release();
+		buffers[1].Release();
+
+		HRR(device->CreateBuffer(&bd, 0, &buffers[0]));
+		HRR(device->CreateBuffer(&bd, 0, &buffers[1]));
+
+		return S_OK;
+	}
+	void Release()
+	{
+		buffers[0].Release();
+		buffers[1].Release();
+	}
+	ID3D11Buffer* Get(UINT frame) { return buffers[frame % 2]; }
+};
+
+
+interface IRenderFrame
 {
 	virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
 	virtual RenderData& GetRenderData() = 0;
+	virtual XSF::D3DDeviceContext* GetContext() = 0;
 };
 
-class RenderManager : public IRenderFrameConfig
+class RenderManager : public IRenderFrame
 {
+	// Filled in during scene initialization
 	std::map<wstring, Material>						m_materials;
 	std::map<wstring, Mesh>							m_meshes;
 	std::map<wstring, ID3D11ShaderResourceView*>	m_textures;
 	std::list<RenderUnit>							m_renderUnits;
+	std::map<WorldObject*, UINT>					m_objectToInstanceBufferOffset;  // Filled in during scene initialization
+	UINT											m_nextInstanceBufferOffset;		 // Used during initialization
 
-	std::map<WorldObject*, UINT>					m_objectToInstanceBufferOffset;
-	UINT											m_nextInstanceBufferOffset;
-
+	// Filled in each frame by each world object via SetInstances()
 	std::map<RenderUnit*, std::map<WorldObject*, std::pair<UINT, UINT>>> m_perFrameInstanceData;
 
+	RenderData							m_renderData;
+
     // TODO per material
-	CComPtr<ID3D11VertexShader>         _pVertexShader;
-	CComPtr<ID3D11PixelShader>          _pPixelShader;
+	CComPtr<ID3D11VertexShader>         m_vertexShader;
+	CComPtr<ID3D11PixelShader>          m_pixelShader;
 
-	CComPtr<ID3D11VertexShader>			_pShadowVertexShader;
-	CComPtr<ID3D11PixelShader>			_pShadowPixelShader;
-	CComPtr<ID3D11VertexShader>			_pDrawScreenVertexShader;
-	CComPtr<ID3D11PixelShader>			_pDrawScreenPixelShader;
+	CComPtr<ID3D11VertexShader>			m_shadowVertexShader;
+	CComPtr<ID3D11PixelShader>			m_shadowPixelShader;
+	CComPtr<ID3D11VertexShader>			m_drawScreenVertexShader;
+	CComPtr<ID3D11PixelShader>			m_drawScreenPixelShader;
 
-	CComPtr<ID3D11InputLayout>          _pVertexLayout;
-	CComPtr<ID3D11Buffer>               _pVertexBuffer;
-	CComPtr<ID3D11Buffer>               _pIndexBuffer;
-	CComPtr<ID3D11Buffer>				_pInstancedBuffer;
+	CComPtr<ID3D11InputLayout>          m_vertexLayout;
+	CComPtr<ID3D11Buffer>               m_vertexBuffer;
+	CComPtr<ID3D11Buffer>               m_indexBuffer;
+	DoubleBuffer						m_instancedBuffer;
+	//CComPtr<ID3D11Buffer>				m_instancedBuffer;
 
-	GeometryGenerator					_geometryGenerator;
-	GeometryBufferData					_geometryData;
+	GeometryGenerator					m_geometryGenerator;
+	GeometryBufferData					m_geometryData;
 
-	CComPtr<ID3D11Buffer>               _pCBNeverChanges;
-	CComPtr<ID3D11Buffer>               _pCBChangesEveryFrame;
-	DirectionalLight					_light;  // Doesn't belong here, will move later
+	CComPtr<ID3D11Buffer>               m_CBNeverChanges;
+	CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
+	DirectionalLight					m_light;  // Doesn't belong here, will move later
 
-	CComPtr<ID3D11Buffer>				_pScreenQuadVB;
-	CComPtr<ID3D11Buffer>				_pScreenQuadIB;
-	CComPtr<ID3D11ShaderResourceView>   _pDebugTextureRV;
+	CComPtr<ID3D11Buffer>				m_screenQuadVB;
+	CComPtr<ID3D11Buffer>				m_screenQuadIB;
+	CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
 
 	// Weak references.  Owned by Game
-	XSF::D3DDevice*						_pd3dDevice;
-	XSF::D3DDeviceContext*              _pImmediateContext;
-
-	RenderData							_renderData;
+	XSF::D3DDevice*						m_d3dDevice;
+	XSF::D3DDeviceContext*              m_immediateContext;
 	
 	HRESULT LoadTexture(const wchar_t* textureFilename);
 	HRESULT Render(RenderUnit& renderUnit);
@@ -149,14 +175,14 @@ public:
 	RenderManager();
 	~RenderManager();
 	HRESULT Initialize();
-	void SetDXReferences(XSF::D3DDevice* device, XSF::D3DDeviceContext* immediateContext) { _pd3dDevice = device; _pImmediateContext = immediateContext; }
+	void SetDXReferences(XSF::D3DDevice* device, XSF::D3DDeviceContext* immediateContext) { m_d3dDevice = device; m_immediateContext = immediateContext; }
 	
-	RenderData& GetRenderData() { return _renderData; }
-	XSF::D3DDevice* GetDevice() { return _pd3dDevice; }
-	XSF::D3DDeviceContext* GetContext() { return _pImmediateContext; }
-	ID3D11Buffer* GetVertexBuffer() { return _pVertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
-	ID3D11Buffer* GetIndexBuffer() { return _pIndexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
-	GeometryBufferData& GetGeometryBufferData() { return _geometryData; }
+	RenderData& GetRenderData() { return m_renderData; }
+	XSF::D3DDevice* GetDevice() { return m_d3dDevice; }
+	XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
+	ID3D11Buffer* GetVertexBuffer() { return m_vertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
+	ID3D11Buffer* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
+	GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
 	
 	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
 	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
@@ -167,7 +193,7 @@ public:
 	HRESULT InitGraphics(UINT maxInstances);
 	virtual HRESULT CleanUpDeviceObjects();
 	HRESULT Update(const list<WorldObject*>& children);
-	HRESULT Render(const list<WorldObject*>& children);
+	HRESULT Render();
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);

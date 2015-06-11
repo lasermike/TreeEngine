@@ -82,10 +82,3 @@ HRESULT SceneRoot::Update(RenderManager& renderManager)
 
 	return hr;
 }
-
-HRESULT SceneRoot::Render(RenderManager& renderManager)
-{
-	return renderManager.Render(_children);
-}
-
-

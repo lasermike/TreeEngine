@@ -1,11 +1,13 @@
 #pragma once
 #include "pch.h"
-#include "Geometry.h"
 #include "Model.h"
 #include "RenderData.h"
+#include <GeometryGenerator.h>
 #include <memory>
 
-interface IRenderFrameConfig;
+class RenderManager;
+
+interface IRenderFrame;
 
 // For rendering indirectly
 struct InstancedData
@@ -81,8 +83,6 @@ class WorldObject
 {
 protected:
 
-	Geometry*	_geometry;
-
 	bool		_drawInstanced;
 
 	unique_ptr<WorldObjectParams> _params;
@@ -108,15 +108,7 @@ public:
 	virtual HRESULT InitGraphics(RenderManager& renderManager);
 	virtual HRESULT CleanUpDeviceObjects();
 
-	virtual HRESULT Render(RenderManager& renderManager);
-
-	virtual HRESULT RenderInstanced(ID3D11DeviceContext* pImmediateContext, RenderData* pRenderData, GeometryBufferData* pGeometyData, int startInstance)
-	{
-		HRR(_geometry->DrawInstanced(pImmediateContext, pRenderData, pGeometyData, startInstance, GetNumInstances()));
-		return S_OK;
-	}
-
-	virtual HRESULT ComputeConstants(IRenderFrameConfig* pFrameConfig, InstancedData* dataView, UINT startInstance);
+	virtual HRESULT ComputeConstants(IRenderFrame* pFrame, InstancedData* dataView, UINT startInstance);
 	virtual unsigned int GetNumInstances() { return 0; }
 	virtual unsigned int GetMaxInstances() { return 0; }
 	XMFLOAT3* GetBoundingBox() { return _boundingBox; }
