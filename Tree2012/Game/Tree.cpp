@@ -57,6 +57,8 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 
 HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataView, UINT startInstance)
 {
+	// TODO handle scale and rotation of worldobject someday if needed
+
 	// Clear bounding box
 	_boundingBox[0] = XMFLOAT3(-1,-1,-1);
 	_boundingBox[1] = XMFLOAT3(1,1,1);
@@ -70,7 +72,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataVi
 	_twigInstanceData.clear();
 	int currentBranch = 0;
 
-	XMVECTOR startPosition = XMLoadFloat3(&_position); // + XMVectorSet(0, .5, 0, 0);
+	XMVECTOR startPosition = XMLoadFloat3(&_position); 
 
 	ComputeBranchInstanceData(&pFrameConfig->GetRenderData(), currentBranch, _treeModel->trunk, startPosition);
 
@@ -109,7 +111,7 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	InstancedData data;
 	XMStoreFloat4x4(&data.World, localToWorld);
 
-	if (branch->depth < _params->depthLOD)
+	if (branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(parentStart - pRenderData->eyePos)) < 100.0f)
 	{
 		_logInstanceData.push_back(data);
 	}

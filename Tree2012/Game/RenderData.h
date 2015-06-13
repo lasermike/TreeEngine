@@ -25,6 +25,7 @@ struct ProjectionData
 	float				farClippingPlane;
 };
 
+__declspec(align(16)) 
 struct RenderData
 {
 	RenderPass			pass;
@@ -36,7 +37,7 @@ struct RenderData
 	XMFLOAT4X4			world;          // Needed?
 	XMFLOAT4X4          projection;
 	XMFLOAT4X4			view;           
-	XMFLOAT4			eyePos;
+	XMVECTOR			eyePos;
 
 	DirectionalLight	dirLights[1];
 	BoundingSphere		mSceneBounds;

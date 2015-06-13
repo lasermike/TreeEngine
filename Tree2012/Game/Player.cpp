@@ -20,7 +20,7 @@ XMMATRIX Camera::GetViewMatrix()
 }
 
 
-Player::Player(WorldObjectParams* params) : WorldObject(params)					   
+Player::Player(WorldObjectParams* params) : WorldObject(params), m_orbitCamera(nullptr), m_camera(nullptr), _selection(nullptr)					   
 {
     m_cameraType = WalkCameraType; //OrbitCamera
 
@@ -139,7 +139,7 @@ void Player::UpdateOrbitCamera(DX::StepTimer const& timer, RenderData* pRenderDa
 	//}
 
 	m_orbitCamera->Update((float) timer.GetElapsedSeconds());
-	XMStoreFloat4(&pRenderData->eyePos, m_orbitCamera->GetEyePosition());
+	pRenderData->eyePos = m_orbitCamera->GetEyePosition();
 	//UpdateView();
 }
 

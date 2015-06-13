@@ -223,7 +223,7 @@ HRESULT RenderManager::Update(const list<WorldObject*>& children)
 	HRR(m_immediateContext->Map(m_instancedBuffer.Get(m_renderData.frame), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
-	for (auto c : children)
+	for (WorldObject* c : children)
 	{
 		InstancedData* instanceView = dataView ;
 		HRR(c->ComputeConstants(this, instanceView, m_objectToInstanceBufferOffset[c]));
@@ -264,7 +264,7 @@ HRESULT RenderManager::Render()
 	// Compute world to camera matrix
 	CBChangesEveryFrame cb;
 	cb.light = m_light;
-	cb.eyePos = m_renderData.eyePos;
+	XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
 	cb.shadowMatrix = m_renderData.shadowTransform;
 	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
 	m_immediateContext->VSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);

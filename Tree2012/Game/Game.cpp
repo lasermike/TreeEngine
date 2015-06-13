@@ -71,7 +71,7 @@ Game::Game()
 void Game::UpdateView()
 {
 	XMStoreFloat4x4(&_renderManager.GetRenderData().view, _player->GetViewMatrix());
-	XMStoreFloat4(&_renderManager.GetRenderData().eyePos, _player->GetEyePosition());
+	_renderManager.GetRenderData().eyePos = _player->GetEyePosition();
 }
 
 Game::~Game()
@@ -220,6 +220,8 @@ HRESULT Game::InitDevice()
 	hr = _pd3dDevice->CreateBuffer(&bd, nullptr, &_pCBChangeOnResize);
 	if (FAILED(hr))
 		return hr;
+
+	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
 
 	// Initialize the world matrices
 	XMStoreFloat4x4(&_renderManager.GetRenderData().world, XMMatrixIdentity());
@@ -525,6 +527,10 @@ void Game::Update(DX::StepTimer const& timer)
 	HR(_pScene->Update(_renderManager));
 
     _player->Update(timer, &_renderManager.GetRenderData());
+
+	// Render shadow map
+	_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
+	DrawSceneToShadowMap();
 }
 
 
@@ -539,8 +545,6 @@ void Game::Tick(bool key[256])
     {
         Update(_timer);
     });
-
-	_pImmediateContext->VSSetConstantBuffers(1, 1, &_pCBChangeOnResize);
 
 	// Render shadow map
 	_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
@@ -572,16 +576,6 @@ void Game::Render(bool oculus)
 		stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::Wireframe);
 	}
 
-#ifdef SAVEDEPTHIMAGE
-	// Save shadow mapt to disk
-	ScratchImage resultImage, convertedImage;
-	HR(CaptureTexture(_pd3dDevice, _pImmediateContext, _renderManager.GetRenderData().pShadowMap->DepthMapBuffer(), resultImage));
-	const Image* img = resultImage.GetImage(0,0,0);
-	HR(Convert(*img, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 0.5f, convertedImage));
-	img = convertedImage.GetImage(0,0,0);
-	HR(SaveToTGAFile(*img, L"c:\\temp\\smap.tga"));
-#endif
-
     if (!oculus)
     {
 	    // Clear the back buffer
@@ -611,13 +605,10 @@ void Game::Render(bool oculus)
 		_bitmapFont->End();
 	}
 
-
 	if(_showShadowBuffer)
 	{
 		HRC(_renderManager.DrawScreenQuad(_pImmediateContext, _renderManager.GetRenderData().pShadowMap->DepthMapSRV()));
 	}
-
-
 
     if (!oculus)
     {
@@ -733,6 +724,8 @@ void Game::DrawSceneToShadowMap()
 	stockStates.ApplyRasterizerState( _pImmediateContext, XSF::StockRasterizerStates::BuildShadowMap );
 
 	// Draw everything
+	HR(_renderManager.Render());
+
 	_renderManager.GetRenderData() = prevRenderData;
 
 	UpdateProjection(&_renderManager.GetRenderData().projection);

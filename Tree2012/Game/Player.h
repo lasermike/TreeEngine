@@ -37,7 +37,7 @@ class Player :
 
 	// Camera
 	CameraType							m_cameraType;
-	Camera* m_camera;
+	Camera*								m_camera;
 	OrbitCamera*						m_orbitCamera;
 	WorldObject*						_selection;
 	float								_rotateSpeed;
