@@ -158,7 +158,6 @@ HRESULT Render()
 
         //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));
         float y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, 0);
-        //Util.Output("LOG: position Y: %f \n", y);  
 
         // Get both eye poses simultaneously, with IPD offset already included. 
         ovrPosef         EyeRenderPose[2];
@@ -168,13 +167,9 @@ HRESULT Render()
         ovrTrackingState hmdState = ovrHmd_GetTrackingState(HMD, ftiming.DisplayMidpointSeconds);
         ovr_CalcEyePoses(hmdState.HeadPose.ThePose, HmdToEyeViewOffset, EyeRenderPose);
 
-        //Util.Output("LOG: position Y: %f, %f, %f \n", hmdState.HeadPose.ThePose.Position.x, 
-        //                                      hmdState.HeadPose.ThePose.Position.y,
-        //                                      hmdState.HeadPose.ThePose.Position.z);  
-
-
         // Run game 
-        g_game->Tick(key);
+        g_game->ComputeCPU(key);
+        g_game->ComputeGPU();
 
         // Render Scene to Eye Buffers
         for (int eye = 0; eye < 2; eye++)  //2
@@ -252,7 +247,8 @@ HRESULT Render()
     else
     {
         // Run game 
-        g_game->Tick(key);
+        g_game->ComputeCPU(key);
+        g_game->ComputeGPU();
 
         g_game->Render(false);
     }

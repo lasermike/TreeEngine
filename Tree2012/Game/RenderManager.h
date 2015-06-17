@@ -96,6 +96,10 @@ struct DoubleBuffer
 {
 	CComPtr<ID3D11Buffer> buffers[2];
 
+	DoubleBuffer() 
+	{
+	}
+
 	HRESULT Create(const D3D11_BUFFER_DESC& bd, XSF::D3DDevice* device)
 	{
 		buffers[0].Release();

@@ -80,16 +80,14 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataVi
 	InstancedData* twigBuffer = dataView  + startInstance + _logInstanceData.size();
 
 	// TODO add to render unit specific data view
-	int dvi = 0;
-	for (unsigned int i = 0; i < _logInstanceData.size(); i++)
+	if (_logInstanceData.size())
 	{
-		logBuffer[dvi++] = _logInstanceData[i];
+		memcpy(logBuffer, &_logInstanceData[0], _logInstanceData.size() * sizeof(InstancedData));
 	}
 
-	dvi = 0;
-	for (unsigned int i = 0; i < _twigInstanceData.size(); i++)
+	if (_twigInstanceData.size() > 0)
 	{
-		twigBuffer[dvi++] = _twigInstanceData[i];
+		memcpy(twigBuffer, &_twigInstanceData[0], _twigInstanceData.size() * sizeof(InstancedData));
 	}
 
 	pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT) _logInstanceData.size());

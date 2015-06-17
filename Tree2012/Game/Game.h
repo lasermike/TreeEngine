@@ -43,7 +43,8 @@ public:
 	HRESULT OnResize(UINT windowWidth, UINT windowHeight);
 
 	// Basic game loop
-	void Tick(bool key[256]);
+	void ComputeCPU(bool key[256]);
+	void ComputeGPU();
 	void Render(bool present);
 
 	// Rendering helpers
@@ -61,6 +62,13 @@ public:
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 
     Player* GetPlayer() { return _player; }
+
+	// Allow SSE members
+	void* operator new(size_t size) 
+	{ 
+		return _aligned_malloc(size, 16); 
+	}
+	void operator delete(void* mem) { return _aligned_free(mem); }
 
     //typedef std::function<HRESULT(ProjectionData& projectionData)> ResizeFunc;
     //void SetResizeHandler(ResizeFunc func)

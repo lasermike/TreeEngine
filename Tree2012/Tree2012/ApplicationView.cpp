@@ -61,7 +61,8 @@ void ApplicationView::Run()
 
 		HandleInput();
 
-		m_pGame->Tick(m_key);
+		m_pGame->ComputeCPU(m_key);
+		m_pGame->ComputeGPU();
 		m_pGame->Render(false);
     }
 }

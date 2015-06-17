@@ -321,7 +321,6 @@ HRESULT RenderManager::Render(RenderUnit& ru)
 
 HRESULT RenderManager::CleanUpDeviceObjects()
 {
-	RenderStates::DestroyAll();
 
 	SafeRelease(&m_vertexBuffer);
 	SafeRelease(&m_indexBuffer);
@@ -348,6 +347,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 	m_perFrameInstanceData.clear();
 
 	InputLayouts::DestroyAll();
+	RenderStates::DestroyAll();
 
 	return S_OK;
 }

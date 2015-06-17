@@ -140,7 +140,6 @@ void Player::UpdateOrbitCamera(DX::StepTimer const& timer, RenderData* pRenderDa
 
 	m_orbitCamera->Update((float) timer.GetElapsedSeconds());
 	pRenderData->eyePos = m_orbitCamera->GetEyePosition();
-	//UpdateView();
 }
 
 void Player::HandleInput(bool key[256])  // WM_KEYDOWN

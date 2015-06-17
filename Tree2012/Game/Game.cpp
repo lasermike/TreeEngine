@@ -521,7 +521,6 @@ void Game::Update(DX::StepTimer const& timer)
 		_renderManager.GetRenderData().time = (float) _timeCurrent;
 	}
 
-	BuildShadowTransform();
 
 	// Compute per-frame values
 	HR(_pScene->Update(_renderManager));
@@ -529,6 +528,7 @@ void Game::Update(DX::StepTimer const& timer)
     _player->Update(timer, &_renderManager.GetRenderData());
 
 	// Render shadow map
+	BuildShadowTransform();
 	_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
 	DrawSceneToShadowMap();
 }
@@ -537,7 +537,7 @@ void Game::Update(DX::StepTimer const& timer)
 //--------------------------------------------------------------------------------------
 // Once per frame processing
 //--------------------------------------------------------------------------------------
-void Game::Tick(bool key[256])
+void Game::ComputeCPU(bool key[256])
 {
 	HandleInput(key);
 
@@ -545,7 +545,10 @@ void Game::Tick(bool key[256])
     {
         Update(_timer);
     });
+}
 
+void Game::ComputeGPU()
+{
 	// Render shadow map
 	_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
 	DrawSceneToShadowMap();
@@ -613,7 +616,7 @@ void Game::Render(bool oculus)
     if (!oculus)
     {
 	    // Present our back buffer to our front buffer
-	    HRC(_pSwapChain->Present(1, 0));
+	    HRC(_pSwapChain->Present(0, 0));
     }
 
 Cleanup:
