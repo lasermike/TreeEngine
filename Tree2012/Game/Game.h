@@ -17,6 +17,7 @@ using namespace Microsoft::WRL;
 #endif
 
 class BitmapFont;
+interface IInputManager;
 
 typedef enum DisplayMode
 {
@@ -24,12 +25,23 @@ typedef enum DisplayMode
 	Oculus
 };
 
+struct FrameInputData
+{
+	UINT frame;
+	bool key[256];
 
+	FrameInputData()
+	{
+		frame = 0;
+		memset(key, 0, sizeof(bool) * _countof(key));
+	}
+};
 
 class Game 
 {
 public:
-	Game();
+
+	Game(IInputManager* inputMgr);
 	~Game();
 
 	// Initialization and management
@@ -43,7 +55,7 @@ public:
 	HRESULT OnResize(UINT windowWidth, UINT windowHeight);
 
 	// Basic game loop
-	void ComputeCPU(bool key[256]);
+	void ComputeCPU();
 	void ComputeGPU();
 	void Render(bool present);
 
@@ -55,6 +67,8 @@ public:
 	void Resume();
 
 	RenderManager& GetRenderManager() { return _renderManager; }
+
+	// Accessor methods for Oculus
 	ID3D11Device* GetDevice() { return _pd3dDevice1; }
     XSF::D3DDeviceContext* GetContext() { return _pImmediateContext; }
     ID3D11Texture2D* GetBackBuffer() { return _pDepthStencil; }
@@ -70,11 +84,6 @@ public:
 	}
 	void operator delete(void* mem) { return _aligned_free(mem); }
 
-    //typedef std::function<HRESULT(ProjectionData& projectionData)> ResizeFunc;
-    //void SetResizeHandler(ResizeFunc func)
-    //{
-    //    _resizeHandler = func;
-    //}
 private:
 
 	HRESULT Initialize();
@@ -95,7 +104,7 @@ private:
 	// Direct3D Objects
 	D3D_FEATURE_LEVEL                   m_featureLevel;
 
-    //ResizeFunc _resizeHandler;
+	IInputManager*						m_inputMgr;
 
 	// Game state
 	DX::StepTimer						_timer;

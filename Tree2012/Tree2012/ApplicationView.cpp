@@ -19,7 +19,6 @@ ApplicationView::ApplicationView()
 	{
 		pressedButtons[i] = false;
 	}
-	ZeroMemory(m_key, ARRAYSIZE(m_key) * sizeof(bool));
 }
 
 // Called by the system.  Perform application initialization here,
@@ -39,8 +38,7 @@ void ApplicationView::SetWindow(CoreWindow^ window)
 {
     window->Closed += ref new TypedEventHandler<CoreWindow^, CoreWindowEventArgs^>(this, &ApplicationView::OnWindowClosed);
 
-    //m_game = ref new Game();
-	m_pGame = new Game();
+	m_pGame = new Game(&m_inputManager);
 	m_pGame->Initialize(window);
 }
 
@@ -61,7 +59,7 @@ void ApplicationView::Run()
 
 		HandleInput();
 
-		m_pGame->ComputeCPU(m_key);
+		m_pGame->ComputeCPU();
 		m_pGame->ComputeGPU();
 		m_pGame->Render(false);
     }
@@ -72,13 +70,15 @@ void ApplicationView::HandleInput()
 	m_input.Update();
 	const XSF::GamepadReading& input = m_input.GetCurrentGamepadReading();
 
-	m_key[VK_RIGHT] = input.IsDPadRightPressed();
-	m_key[VK_LEFT] = input.IsDPadLeftPressed();
-	m_key['0'] = input.IsYPressed();
-	m_key['R'] = input.IsLeftShoulderPressed();
-	m_key['Z'] = input.IsRightShoulderPressed();
-	m_key['H'] = input.IsDPadUpPressed();
-	m_key['P'] = input.IsAPressed();
+	FrameInputData& data = m_inputManager.GetFrameInput(0);
+
+	data.key[VK_RIGHT] = input.IsDPadRightPressed();
+	data.key[VK_LEFT] = input.IsDPadLeftPressed();
+	data.key['0'] = input.IsYPressed();
+	data.key['R'] = input.IsLeftShoulderPressed();
+	data.key['Z'] = input.IsRightShoulderPressed();
+	data.key['H'] = input.IsDPadUpPressed();
+	data.key['P'] = input.IsAPressed();
 }
 
 void ApplicationView::Uninitialize()

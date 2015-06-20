@@ -8,12 +8,13 @@
 #include "TreeModelGenerator.h"
 #include "Primitive.h"
 #include "ShadowMap.h"
-#include <stdio.h>
 #include "directxtex.h"
 #include "StockRenderStates.h"
 #include "OrbitCamera.h"
 #include "GameLoader.h"
 #include "RenderManager.h"
+#include "InputManager.h"
+//#include "ThreadPool.h"
 
 using namespace DirectX;
 
@@ -34,7 +35,7 @@ struct CBChangeOnResize
 	XMFLOAT4X4 mProjection;
 };
 
-Game::Game() 
+Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr) 
 {
 #ifndef _TREE_CLASSIC
 	_window = nullptr;
@@ -66,6 +67,7 @@ Game::Game()
 	_pCBChangeOnResize = nullptr;
 	_bitmapFont = nullptr;
 	_player = nullptr;
+	assert(m_inputMgr);
 }
 
 void Game::UpdateView()
@@ -537,9 +539,10 @@ void Game::Update(DX::StepTimer const& timer)
 //--------------------------------------------------------------------------------------
 // Once per frame processing
 //--------------------------------------------------------------------------------------
-void Game::ComputeCPU(bool key[256])
+void Game::ComputeCPU()
 {
-	HandleInput(key);
+	FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
+	HandleInput(inputData.key);
 
     _timer.Tick([&]()
     {

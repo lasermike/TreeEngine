@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "TreeClassic.h"
 #include "Game.h"
+#include "InputManager.h"
 #include <OVR_CAPI_D3D.h>
 #include <Kernel/OVR_System.h>
 #include <Extras/OVR_Math.h>
@@ -61,7 +62,7 @@ bool oculusMode = false;
 
 // Tree engine
 Game* g_game = nullptr;
-bool key[256] = {};
+InputManager g_inputManager;
 
 // Oculus specific
 ovrHmd HMD = nullptr;
@@ -87,7 +88,6 @@ ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
-
 
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
@@ -168,13 +168,13 @@ HRESULT Render()
         ovr_CalcEyePoses(hmdState.HeadPose.ThePose, HmdToEyeViewOffset, EyeRenderPose);
 
         // Run game 
-        g_game->ComputeCPU(key);
+        g_game->ComputeCPU();
         g_game->ComputeGPU();
 
         // Render Scene to Eye Buffers
         for (int eye = 0; eye < 2; eye++)  //2
         {
-            if (key[VK_SPACE])
+			if (g_inputManager.GetFrameInput(0).key[VK_SPACE])
             {
                 // Reset to default camera position
 				neutralPosition = EyeRenderPose[eye].Position;
@@ -247,7 +247,7 @@ HRESULT Render()
     else
     {
         // Run game 
-        g_game->ComputeCPU(key);
+        g_game->ComputeCPU();
         g_game->ComputeGPU();
 
         g_game->Render(false);
@@ -256,10 +256,6 @@ HRESULT Render()
     return S_OK;
 }
 
-HRESULT OvrResizeHandler(ProjectionData& projectionData)
-{
-    return S_OK;
-}
 
 //
 //   FUNCTION: InitInstance(HINSTANCE, int)
@@ -313,7 +309,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         return FALSE;
     }
 
-	g_game = new Game();
+	g_game = new Game(&g_inputManager);
 
 	if (FAILED(g_game->Initialize(hWnd)))
     {
@@ -454,13 +450,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     PAINTSTRUCT ps;
     HDC hdc;
 
+	FrameInputData& input = g_inputManager.GetFrameInput(0);
+
     switch (message)
     {
     case WM_KEYDOWN:
-        key[wParam] = true;
+        input.key[wParam] = true;
         break;
     case WM_KEYUP:
-        key[wParam] = false;
+        input.key[wParam] = false;
         break;
     case WM_COMMAND:
         wmId    = LOWORD(wParam);

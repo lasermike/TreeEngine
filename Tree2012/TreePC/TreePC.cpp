@@ -16,7 +16,6 @@ TreePC::TreePC() :
 	m_windowClosed(false),
 	m_windowVisible(true)
 {
-	ZeroMemory(m_key, ARRAYSIZE(m_key) * sizeof(bool));
 }
 
 void TreePC::Initialize(CoreApplicationView^ applicationView)
@@ -30,8 +29,7 @@ void TreePC::Initialize(CoreApplicationView^ applicationView)
 	CoreApplication::Resuming +=
         ref new EventHandler<Platform::Object^>(this, &TreePC::OnResuming);
 
-	m_pGame = new Game();
-	//m_renderer = ref new CubeRenderer();
+	m_pGame = new Game(&m_inputManager);
 }
 
 void TreePC::SetWindow(CoreWindow^ window)
@@ -76,7 +74,7 @@ void TreePC::Run()
 		{
 			timer->Update();
 			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
-			m_pGame->ComputeCPU(m_key);
+			m_pGame->ComputeCPU();
 			m_pGame->ComputeGPU();
 			m_pGame->Render(false);
 		}
@@ -123,13 +121,13 @@ void TreePC::OnPointerMoved(CoreWindow^ sender, PointerEventArgs^ args)
 void TreePC::OnKeyDown(CoreWindow^ sender, KeyEventArgs^ args)
 {
 	assert( (int) args->VirtualKey < 256);
-	m_key[ (int) args->VirtualKey] = true;
+	m_inputManager.GetFrameInput(0).key[ (int) args->VirtualKey] = true;
 }
 
 void TreePC::OnKeyUp(CoreWindow^ sender, KeyEventArgs^ args)
 {
 	assert( (int) args->VirtualKey < 256);
-	m_key[ (int) args->VirtualKey] = false;
+	m_inputManager.GetFrameInput(0).key[ (int) args->VirtualKey] = false;
 }
 
 void TreePC::OnActivated(CoreApplicationView^ applicationView, IActivatedEventArgs^ args)

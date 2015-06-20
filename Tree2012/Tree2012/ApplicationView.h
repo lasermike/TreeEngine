@@ -7,6 +7,7 @@
 #include "pch.h"
 #include "Game.h"
 #include "InputXboxOne.h"
+#include "InputManager.h"
 
 // Application - implements the required functionality for an application
 ref class ApplicationView sealed : public Windows::ApplicationModel::Core::IFrameworkView
@@ -40,7 +41,8 @@ private:
     bool m_windowClosed;
 
 	bool pressedButtons[7];
-	bool m_key[256];
+
+	InputManager m_inputManager;
 };
 
 // ApplicationSource - responsible for creating the Application instance

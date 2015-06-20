@@ -2,6 +2,7 @@
 
 #include "pch.h"
 #include "Game.h"
+#include "InputManager.h"
 
 ref class TreePC sealed : public Windows::ApplicationModel::Core::IFrameworkView
 {
@@ -34,7 +35,7 @@ private:
 	Game* m_pGame;
 	bool m_windowClosed;
 	bool m_windowVisible;
-	bool m_key[256];
+	InputManager m_inputManager;
 };
 
 ref class Direct3DApplicationSource sealed : Windows::ApplicationModel::Core::IFrameworkViewSource
