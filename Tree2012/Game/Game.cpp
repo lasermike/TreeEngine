@@ -14,7 +14,7 @@
 #include "GameLoader.h"
 #include "RenderManager.h"
 #include "InputManager.h"
-//#include "ThreadPool.h"
+#include "ThreadPool.h"
 
 using namespace DirectX;
 
@@ -67,6 +67,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 	_pCBChangeOnResize = nullptr;
 	_bitmapFont = nullptr;
 	_player = nullptr;
+	m_threadPool = nullptr;
 	assert(m_inputMgr);
 }
 
@@ -81,6 +82,7 @@ Game::~Game()
 	CleanupDevice();
 	SafeDelete(&_bitmapFont);
 	SafeDelete(&_pScene);
+	SafeDelete(&m_threadPool);
 }
 
 HRESULT Game::Initialize()
@@ -107,6 +109,9 @@ HRESULT Game::Initialize()
 	// Ideally would loop through all world space vertices
 	_renderManager.GetRenderData().mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	_renderManager.GetRenderData().mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
+
+	// Threading
+	m_threadPool = new ThreadPool(4);
 
 	return S_OK;
 }
@@ -523,16 +528,15 @@ void Game::Update(DX::StepTimer const& timer)
 		_renderManager.GetRenderData().time = (float) _timeCurrent;
 	}
 
+	HR(_renderManager.BeginFrame());
 
 	// Compute per-frame values
-	HR(_pScene->Update(_renderManager));
+	HR(_pScene->Update(_renderManager, *m_threadPool));
 
     _player->Update(timer, &_renderManager.GetRenderData());
 
-	// Render shadow map
-	BuildShadowTransform();
-	_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
-	DrawSceneToShadowMap();
+	HR(_renderManager.EndFrame());
+
 }
 
 
@@ -553,6 +557,7 @@ void Game::ComputeCPU()
 void Game::ComputeGPU()
 {
 	// Render shadow map
+	BuildShadowTransform();
 	_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(_pImmediateContext, nullptr);
 	DrawSceneToShadowMap();
 

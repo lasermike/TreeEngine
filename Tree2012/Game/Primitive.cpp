@@ -44,9 +44,13 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 	return S_OK;
 }
 
-HRESULT Primitive::ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataView, UINT startInstance)
+HRESULT Primitive::ComputeConstants(IRenderFrame* pFrameConfig)
 {
+	UINT startInstance = 0;
+	HRR(pFrameConfig->GetInstanceIndex(this, startInstance));
+
 	pFrameConfig->SetInstances(m_renderUnit, this, startInstance, 1);
+	InstancedData* dataView = pFrameConfig->GetRenderData().instanceData;
 	InstancedData* firstDataView = dataView + startInstance;
 
 	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0); 

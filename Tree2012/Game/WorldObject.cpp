@@ -33,7 +33,7 @@ HRESULT WorldObject::CleanUpDeviceObjects()
 	return S_OK;
 }
 
-HRESULT WorldObject::ComputeConstants(IRenderFrame* /*pFrameConfig*/, InstancedData* /*dataView*/, UINT /*startInstance*/)
+HRESULT WorldObject::ComputeConstants(IRenderFrame* /*pFrameConfig*/)
 {
 	return E_NOTIMPL;
 }

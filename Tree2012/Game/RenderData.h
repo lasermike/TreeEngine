@@ -2,6 +2,7 @@
 #include "Materials.h"
 
 class ShadowMap;
+struct InstancedData;
 
 struct BoundingSphere
 {
@@ -34,6 +35,8 @@ struct RenderData
 
     ProjectionData      projectionData;
 
+	InstancedData*		instanceData;
+
 	XMFLOAT4X4			world;          // Needed?
 	XMFLOAT4X4          projection;
 	XMFLOAT4X4			view;           
@@ -49,7 +52,7 @@ struct RenderData
 	XMFLOAT4X4			lightProj;
 	XMFLOAT4X4			shadowTransform;
 
-	RenderData() : pass(RegularPass), time(0.0f), frame(0), pShadowMap(nullptr)
+	RenderData() : pass(RegularPass), time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr)
 	{
 		XMStoreFloat4x4(&world, XMMatrixIdentity());
 		XMStoreFloat4x4(&view, XMMatrixIdentity());

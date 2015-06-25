@@ -36,7 +36,7 @@ public:
 
 	virtual HRESULT InitGraphics(RenderManager& renderManager);
 
-	virtual HRESULT ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataView, UINT startInstance) override;
+	virtual HRESULT ComputeConstants(IRenderFrame* pFrameConfig) override;
 	virtual unsigned int GetNumInstances();
 	virtual unsigned int GetMaxInstances();
 };

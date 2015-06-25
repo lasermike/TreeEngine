@@ -122,6 +122,7 @@ struct DoubleBuffer
 interface IRenderFrame
 {
 	virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
+	virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
 	virtual RenderData& GetRenderData() = 0;
 	virtual XSF::D3DDeviceContext* GetContext() = 0;
 };
@@ -154,7 +155,6 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D11Buffer>               m_vertexBuffer;
 	CComPtr<ID3D11Buffer>               m_indexBuffer;
 	DoubleBuffer						m_instancedBuffer;
-	//CComPtr<ID3D11Buffer>				m_instancedBuffer;
 
 	GeometryGenerator					m_geometryGenerator;
 	GeometryBufferData					m_geometryData;
@@ -193,10 +193,13 @@ public:
 					   const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
 	HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
 	HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
+	HRESULT GetInstanceIndex(WorldObject* object, UINT&);
 
 	HRESULT InitGraphics(UINT maxInstances);
 	virtual HRESULT CleanUpDeviceObjects();
-	HRESULT Update(const list<WorldObject*>& children);
+
+	HRESULT BeginFrame();
+	HRESULT EndFrame();
 	HRESULT Render();
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);

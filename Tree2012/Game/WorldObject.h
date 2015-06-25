@@ -108,7 +108,7 @@ public:
 	virtual HRESULT InitGraphics(RenderManager& renderManager);
 	virtual HRESULT CleanUpDeviceObjects();
 
-	virtual HRESULT ComputeConstants(IRenderFrame* pFrame, InstancedData* dataView, UINT startInstance);
+	virtual HRESULT ComputeConstants(IRenderFrame* pFrame);
 	virtual unsigned int GetNumInstances() { return 0; }
 	virtual unsigned int GetMaxInstances() { return 0; }
 	XMFLOAT3* GetBoundingBox() { return _boundingBox; }

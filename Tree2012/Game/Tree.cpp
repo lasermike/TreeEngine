@@ -55,8 +55,13 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	return S_OK;
 }
 
-HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig, InstancedData* dataView, UINT startInstance)
+HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 {
+	UINT startInstance = 0;
+	HRR(pFrameConfig->GetInstanceIndex(this, startInstance));
+
+	InstancedData* dataView = pFrameConfig->GetRenderData().instanceData;
+
 	// TODO handle scale and rotation of worldobject someday if needed
 
 	// Clear bounding box

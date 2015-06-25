@@ -4,6 +4,7 @@
 #include "WorldObject.h"
 #include <list>
 
+class ThreadPool;
 class RenderManager;
 class WorldObject;
 
@@ -21,7 +22,7 @@ public:
 	HRESULT InitGraphics(RenderManager& renderManager); 
 	HRESULT CleanUpDeviceObjects();
 
-	HRESULT Update(RenderManager& renderManager);
+	HRESULT Update(IRenderFrame& renderFrame, ThreadPool& threadPool);
 
 	void AddChild(WorldObject* obj)
 	{

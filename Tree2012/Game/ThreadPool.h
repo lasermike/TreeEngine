@@ -13,13 +13,29 @@
 #include <functional>
 #include <stdexcept>
 
+struct WorkData
+{
+	UINT workType;
+	UINT start;
+	UINT end;
+	void* param1;
+};
+
 class ThreadPool {
 public:
     ThreadPool(size_t);
-    template<class F, class... Args>
-    auto enqueue(F&& f, Args&&... args) 
-        -> std::future<typename std::result_of<F(Args...)>::type>;
+    template<class F>
+    auto enqueue(F&& f, WorkData* pWork) 
+        -> std::future<typename std::result_of<F(WorkData*)>::type>;
+	void WaitTilDone();
+
+    //template<class F, class... Args>
+    //auto enqueue(F&& f, Args&&... args) 
+    //    -> std::future<typename std::result_of<F(Args...)>::type>;
     ~ThreadPool();
+
+	UINT GetNumWorkers() { return numWorkers; }
+
 private:
     // need to keep track of threads so we can join them
     std::vector< std::thread > workers;
@@ -27,14 +43,16 @@ private:
     std::queue< std::function<void()> > tasks;
     
     // synchronization
-    std::mutex queue_mutex;
-    std::condition_variable condition;
+    std::mutex queue_mutex, workingThreads_mutex;
+    std::condition_variable workAvailableCondition, workersIdleCondition;
     bool stop;
+	UINT numWorkers;
+	UINT workingThreads;
 };
  
 // the constructor just launches some amount of workers
 inline ThreadPool::ThreadPool(size_t threads)
-    :   stop(false)
+    :   stop(false), numWorkers((UINT) threads), workingThreads(0)
 {
     for(size_t i = 0;i<threads;++i)
         workers.emplace_back(
@@ -46,7 +64,7 @@ inline ThreadPool::ThreadPool(size_t threads)
 
                     {
                         std::unique_lock<std::mutex> lock(this->queue_mutex);
-                        this->condition.wait(lock,
+                        this->workAvailableCondition.wait(lock,
                             [this]{ return this->stop || !this->tasks.empty(); });
                         if(this->stop && this->tasks.empty())
                             return;
@@ -54,24 +72,38 @@ inline ThreadPool::ThreadPool(size_t threads)
                         this->tasks.pop();
                     }
 
+                    {
+                        std::unique_lock<std::mutex> lock(this->workingThreads_mutex);
+						this->workingThreads++;
+					}
+
                     task();
+
+                    {
+                        std::unique_lock<std::mutex> lock(this->workingThreads_mutex);
+						this->workingThreads--;
+					    workersIdleCondition.notify_one();
+					}
                 }
             }
         );
 }
 
 // add new work item to the pool
-template<class F, class... Args>
-auto ThreadPool::enqueue(F&& f, Args&&... args) 
-    -> std::future<typename std::result_of<F(Args...)>::type>
+//template<class F, class... Args>
+//auto ThreadPool::enqueue(F&& f, Args&&... args) 
+//    -> std::future<typename std::result_of<F(Args...)>::type>
+template<class F>
+auto ThreadPool::enqueue(F&& f, WorkData* pWorkData) 
+    -> std::future<typename std::result_of<F(WorkData*)>::type>
 {
-    using return_type = typename std::result_of<F(Args...)>::type;
+    //using return_type = typename std::result_of<F(WorkData*)>::type;
 
-    auto task = std::make_shared< std::packaged_task<return_type()> >(
-            std::bind(std::forward<F>(f), std::forward<Args>(args)...)
+    auto task = std::make_shared< std::packaged_task<std::result_of<F(WorkData*)>::type()> >(
+            std::bind(std::forward<F>(f), std::forward<WorkData*>(pWorkData))
         );
         
-    std::future<return_type> res = task->get_future();
+    std::future<std::result_of<F(WorkData*)>::type> res = task->get_future();
     {
         std::unique_lock<std::mutex> lock(queue_mutex);
 
@@ -81,7 +113,7 @@ auto ThreadPool::enqueue(F&& f, Args&&... args)
 
         tasks.emplace([task](){ (*task)(); });
     }
-    condition.notify_one();
+    workAvailableCondition.notify_one();
     return res;
 }
 
@@ -92,9 +124,19 @@ inline ThreadPool::~ThreadPool()
         std::unique_lock<std::mutex> lock(queue_mutex);
         stop = true;
     }
-    condition.notify_all();
+    workAvailableCondition.notify_all();
     for(std::thread &worker: workers)
         worker.join();
+}
+
+inline void ThreadPool::WaitTilDone()
+{
+    std::unique_lock<std::mutex> lock(this->workingThreads_mutex);
+	this->workersIdleCondition.wait(lock,
+		[this]
+		{ 
+			return this->tasks.empty() && this->workingThreads == 0; 
+		});
 }
 
 #endif

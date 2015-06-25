@@ -16,6 +16,7 @@
 using namespace Microsoft::WRL;
 #endif
 
+class ThreadPool;
 class BitmapFont;
 interface IInputManager;
 
@@ -105,7 +106,7 @@ private:
 	D3D_FEATURE_LEVEL                   m_featureLevel;
 
 	IInputManager*						m_inputMgr;
-
+	ThreadPool*							m_threadPool;
 	// Game state
 	DX::StepTimer						_timer;
 	double								_timeStart;

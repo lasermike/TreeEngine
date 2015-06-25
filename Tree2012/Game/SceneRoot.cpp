@@ -3,6 +3,7 @@
 #include "GeometryGenerator.h"
 #include "ShadowMap.h"
 #include "RenderManager.h"
+#include "ThreadPool.h"
 
 SceneRoot::~SceneRoot()
 {
@@ -63,18 +64,53 @@ HRESULT SceneRoot::CleanUpDeviceObjects()
     return S_OK;
 }
 
-HRESULT SceneRoot::Update(RenderManager& renderManager)
+HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
 {
+	HRESULT hr = S_OK;
+
+	UINT numObjs = (UINT) _children.size();
+	UINT objsPerThread = numObjs / threadPool.GetNumWorkers();
+
+	WorkData threadData = { 0, 0 /*first*/, objsPerThread /*last*/, &renderFrame }; 
+
+	std::list<WorkData> workData;
+
+	for (UINT i = 0; i < threadPool.GetNumWorkers(); i++)
+	{
+		if (i + 1 == threadPool.GetNumWorkers()) // Make sure the last iteration has all remaining objs
+		{
+			threadData.end = numObjs;
+		}
+
+		workData.push_back(threadData);
+		threadPool.enqueue([this](WorkData* data)
+						   {
+							   UINT num = 0;
+							   for (auto c : _children)
+							   {
+								   if (num >= data->start && num < data->end)
+								   {
+									   c->ComputeConstants((IRenderFrame*) data->param1);
+								   }
+								   num++;
+							   }
+						   }, &*workData.rbegin());	
+		threadData.start  += objsPerThread;
+		threadData.end  += objsPerThread;
+	}
+
+	threadPool.WaitTilDone();
+
 	_boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
 	XMVECTOR bbmin = XMLoadFloat3(&_boundingBox[0]);
 	XMVECTOR bbmax = XMLoadFloat3(&_boundingBox[1]);
 	
-	HRESULT hr = renderManager.Update(_children);
-
-	for (auto i : _children)
+	for (WorldObject* c : _children)
 	{
-		bbmin = XMVectorMin(bbmin, XMLoadFloat3(&i->GetBoundingBox()[0]));
-		bbmax = XMVectorMax(bbmax, XMLoadFloat3(&i->GetBoundingBox()[1]));
+		//HRR(c->ComputeConstants(&renderFrame));
+
+		bbmin = XMVectorMin(bbmin, XMLoadFloat3(&c->GetBoundingBox()[0]));
+		bbmax = XMVectorMax(bbmax, XMLoadFloat3(&c->GetBoundingBox()[1]));
 	}
 
 	XMStoreFloat3(&_boundingBox[0], bbmin);

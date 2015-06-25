@@ -216,21 +216,26 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	return S_OK;
 }
 
-HRESULT RenderManager::Update(const list<WorldObject*>& children)
+HRESULT RenderManager::BeginFrame()
 {
 	// Compute instance data
 	D3D11_MAPPED_SUBRESOURCE mappedData;
 	HRR(m_immediateContext->Map(m_instancedBuffer.Get(m_renderData.frame), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
+	m_renderData.instanceData = dataView;
 
-	for (WorldObject* c : children)
-	{
-		InstancedData* instanceView = dataView ;
-		HRR(c->ComputeConstants(this, instanceView, m_objectToInstanceBufferOffset[c]));
-	}
+	return S_OK;
+}
 
+HRESULT RenderManager::EndFrame()
+{
 	m_immediateContext->Unmap(m_instancedBuffer.Get(m_renderData.frame), 0);
+	return S_OK;
+}
 
+HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance)
+{
+	startInstance = m_objectToInstanceBufferOffset[object];
 	return S_OK;
 }
 
