@@ -30,6 +30,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	wireframeDesc.DepthClipEnable = true;
 
 	HRR(device->CreateRasterizerState(&wireframeDesc, &WireframeRS));
+	SetDebugName(WireframeRS, "RenderState::WireframeRS");
 
 	//
 	// NoCullRS
@@ -42,6 +43,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	noCullDesc.DepthClipEnable = true;
 
 	HRR(device->CreateRasterizerState(&noCullDesc, &NoCullRS));
+	SetDebugName(NoCullRS, "RenderState::NoCullRS");
 
 	//
 	// CullClockwiseRS
@@ -58,6 +60,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	cullClockwiseDesc.DepthClipEnable = true;
 
 	HRR(device->CreateRasterizerState(&cullClockwiseDesc, &CullClockwiseRS));
+	SetDebugName(CullClockwiseRS, "RenderState::CullClockwiseRS");
 
 	//
 	// AlphaToCoverageBS
@@ -70,6 +73,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	alphaToCoverageDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
 	HRR(device->CreateBlendState(&alphaToCoverageDesc, &AlphaToCoverageBS));
+	SetDebugName(AlphaToCoverageBS, "RenderState::AlphaToCoverageBS");
 
 	//
 	// TransparentBS
@@ -89,6 +93,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	transparentDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
 	HRR(device->CreateBlendState(&transparentDesc, &TransparentBS));
+	SetDebugName(TransparentBS, "RenderState::TransparentBS");
 
 	//
 	// NoRenderTargetWritesBS
@@ -108,6 +113,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	noRenderTargetWritesDesc.RenderTarget[0].RenderTargetWriteMask = 0;
 
 	HRR(device->CreateBlendState(&noRenderTargetWritesDesc, &NoRenderTargetWritesBS));
+	SetDebugName(NoRenderTargetWritesBS, "RenderState::NoRenderTargetWritesBS");
 
 	//
 	// MarkMirrorDSS
@@ -133,6 +139,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	mirrorDesc.BackFace.StencilFunc         = D3D11_COMPARISON_ALWAYS;
 
 	HRR(device->CreateDepthStencilState(&mirrorDesc, &MarkMirrorDSS));
+	SetDebugName(MarkMirrorDSS, "RenderState::MarkMirrorDSS");
 
 	//
 	// DrawReflectionDSS
@@ -158,6 +165,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	drawReflectionDesc.BackFace.StencilFunc   = D3D11_COMPARISON_EQUAL;
 
 	HRR(device->CreateDepthStencilState(&drawReflectionDesc, &DrawReflectionDSS));
+	SetDebugName(DrawReflectionDSS, "RenderState::DrawReflectionDSS");
 
 	//
 	// NoDoubleBlendDSS
@@ -183,6 +191,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	noDoubleBlendDesc.BackFace.StencilFunc   = D3D11_COMPARISON_EQUAL;
 
 	HRR(device->CreateDepthStencilState(&noDoubleBlendDesc, &NoDoubleBlendDSS));
+	SetDebugName(NoDoubleBlendDSS, "RenderState::NoDoubleBlendDSS");
 
 	return S_OK;
 }

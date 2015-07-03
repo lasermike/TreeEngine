@@ -400,3 +400,14 @@ UINT XSF::DynamicBuffer::GetTailOffset() const
 {
     return m_bufferTailOffset;
 }
+
+//
+// Naming
+//
+#if defined(_DEBUG) && !defined(_XBOX_ONE) // NAMING
+void SetDebugName(ID3D11DeviceChild* child, const char* name)
+{
+	child->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(name), name);
+}
+#endif
+

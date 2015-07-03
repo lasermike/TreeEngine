@@ -135,6 +135,7 @@ void SafeDelete(T* obj)
 #define XSF_ASSERT( exp )  exp 
 #define XSF_RETURN_IF_FAILED( exp ) exp   
 #define XSF_ERROR_IF_FAILED( exp ) exp  
+__inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
 
 #else   // NDEBUG
 
@@ -143,6 +144,16 @@ void SafeDelete(T* obj)
 #define XSF_RETURN_IF_FAILED( exp ) { HRESULT _hr_ = (exp); if( FAILED( _hr_ ) ) { ReportFailure( "Failure with HRESULT of %x", __FILE__, __LINE__, ( _hr_ ) ); return _hr_; } }
 
 #define XSF_ERROR_IF_FAILED( exp ) { HRESULT _hr_ = (exp); if( FAILED( _hr_ ) ) ReportFailure( "Failure with HRESULT of %x", __FILE__, __LINE__, ( _hr_ ) ); }
+
+//
+// Naming of objects
+//
+#if defined(_XBOX_ONE) // NAMING
+	__inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
+#else
+	void SetDebugName(ID3D11DeviceChild* child, const char* name);
+
+#endif // NAMING
 
 #endif  // NDEBUG
 

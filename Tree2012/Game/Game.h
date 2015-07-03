@@ -67,16 +67,16 @@ public:
 	void Suspend();
 	void Resume();
 
-	RenderManager& GetRenderManager() { return _renderManager; }
+	RenderManager& GetRenderManager() { return m_renderManager; }
 
 	// Accessor methods for Oculus
-	ID3D11Device* GetDevice() { return _pd3dDevice1; }
-    XSF::D3DDeviceContext* GetContext() { return _pImmediateContext; }
-    ID3D11Texture2D* GetBackBuffer() { return _pDepthStencil; }
-    IDXGISwapChain* GetSwapChain() { return _pSwapChain; }
+	ID3D11Device* GetDevice() { return m_pd3dDevice1; }
+    XSF::D3DDeviceContext* GetContext() { return m_pImmediateContext; }
+    ID3D11Texture2D* GetBackBuffer() { return m_pDepthStencil; }
+    IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 
-    Player* GetPlayer() { return _player; }
+    Player* GetPlayer() { return m_player; }
 
 	// Allow SSE members
 	void* operator new(size_t size) 
@@ -96,62 +96,64 @@ private:
 	HRESULT InitDevice();
 	void CleanupDevice();
 
-    //HRESULT StandardResizeHandler();
 	void UpdateView();
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
 
-	// Direct3D Objects
-	D3D_FEATURE_LEVEL                   m_featureLevel;
+	// Managers
+	GameLoader							m_loader;
+	RenderManager						m_renderManager;
 
-	IInputManager*						m_inputMgr;
+	// Owned objectes
 	ThreadPool*							m_threadPool;
+	SceneRoot*							m_pScene;
+	XSF::BitmapFont*					m_bitmapFont;
+	Player*								m_player;
+
+	// Unowned objects
+	IInputManager*						m_inputMgr;   
+
 	// Game state
-	DX::StepTimer						_timer;
-	double								_timeStart;
-	double								_timeCurrent;
+	DX::StepTimer						m_timer;
+	double								m_timeStart;
+	double								m_timeCurrent;
 
 #ifdef _TREE_CLASSIC
-	HWND								_hwnd;
+	HWND								m_hwnd;
 #else
-	Platform::Agile<Windows::UI::Core::CoreWindow>		_window;
+	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;
 #if !defined(_XBOX_ONE)
 	float ConvertDipsToPixels(float dips);
 #endif // XBOX
 #endif //Classic
 
-	D3D_DRIVER_TYPE                     _driverType;
-	D3D_FEATURE_LEVEL                   _featureLevel;
-	XSF::D3DDevice*                     _pd3dDevice;
-	ID3D11Device1*                      _pd3dDevice1;
-	XSF::D3DDeviceContext*              _pImmediateContext;
-	ID3D11DeviceContext1*               _pImmediateContext1;
-	IDXGISwapChain*                     _pSwapChain;
-	IDXGISwapChain1*                    _pSwapChain1;
-	ID3D11RenderTargetView*             _pRenderTargetView;
-	DisplayMode							_displayMode;
-	CComPtr<ID3D11Texture2D>            _pDepthStencil;
-	CComPtr<ID3D11DepthStencilView>		_pDepthStencilView;
+	// Direct3D Objects
+	D3D_DRIVER_TYPE                     m_driverType;
+	D3D_FEATURE_LEVEL                   m_featureLevel;
+	CComPtr<XSF::D3DDevice>             m_pd3dDevice;
+	CComPtr<ID3D11Device1>              m_pd3dDevice1;
+	CComPtr<XSF::D3DDeviceContext>      m_pImmediateContext;
+	CComPtr<ID3D11DeviceContext1>       m_pImmediateContext1;
+	CComPtr<IDXGISwapChain>             m_pSwapChain;
+	CComPtr<IDXGISwapChain1>            m_pSwapChain1;
+	CComPtr<ID3D11RenderTargetView>     m_pRenderTargetView;
+	DisplayMode							m_displayMode;
+	CComPtr<ID3D11Texture2D>            m_pDepthStencil;
+	CComPtr<ID3D11DepthStencilView>		m_pDepthStencilView;
 
-	ID3D11RasterizerState*				_rasterState;
-	D3D11_VIEWPORT						_viewPort;
-	bool								_enableMsaa;
+	CComPtr<ID3D11RasterizerState>		m_rasterState;
+	CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
 
-	GameLoader							_loader;
-	SceneRoot*							_pScene;
-	RenderManager						_renderManager;
+	D3D11_VIEWPORT						m_viewPort;
+	bool								m_enableMsaa;
 
-	bool								_resetTree;
-	bool								_showShadowBuffer;
-	bool								_paused;
-	bool								_wireframe;
-	bool								_showHelp;
-	ID3D11Buffer*                       _pCBChangeOnResize;
+	bool								m_resetTree;
+	bool								m_showShadowBuffer;
+	bool								m_paused;
+	bool								m_wireframe;
+	bool								m_showHelp;
 
-	XSF::BitmapFont*					_bitmapFont;
-
-	Player*								_player;
 };
 
 

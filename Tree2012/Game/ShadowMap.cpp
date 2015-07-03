@@ -32,6 +32,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     texDesc.MiscFlags      = 0;
 
     HR(device->CreateTexture2D(&texDesc, 0, &mDepthMap));
+	SetDebugName(mDepthMap, "ShadowMap::mDepthMap");
 
     D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
 	dsvDesc.Flags = 0;
@@ -39,6 +40,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Texture2D.MipSlice = 0;
     HR(device->CreateDepthStencilView(mDepthMap, &dsvDesc, &mDepthMapDSV));
+	SetDebugName(mDepthMapDSV, "ShadowMap::mDepthMapDSV");
 
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
@@ -46,6 +48,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
     srvDesc.Texture2D.MostDetailedMip = 0;
     HR(device->CreateShaderResourceView(mDepthMap, &srvDesc, &mDepthMapSRV));
+	SetDebugName(mDepthMapSRV, "ShadowMap::mDepthMapSRV");
 
 }
 

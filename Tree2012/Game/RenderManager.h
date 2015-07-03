@@ -56,6 +56,7 @@ public:
 
 	~Material()
 	{
+		m_constBuffer.Release();
 	}
 };
 
@@ -107,6 +108,8 @@ struct DoubleBuffer
 
 		HRR(device->CreateBuffer(&bd, 0, &buffers[0]));
 		HRR(device->CreateBuffer(&bd, 0, &buffers[1]));
+		SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
+		SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
 
 		return S_OK;
 	}

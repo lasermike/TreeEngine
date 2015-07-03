@@ -75,6 +75,7 @@ void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWith
 								 ARRAYSIZE(InputLayoutDesc::InstancedBasic16), 
 								 pShaderBytecodeWithInputSignature /*passDesc.pIAInputSignature*/,
 								 byteCodeLen /*passDesc.IAInputSignatureSize*/, &InstancedBasic16));
+	SetDebugName(InstancedBasic16, "RenderManager InstancedBasic16");
 }
 
 void InputLayouts::DestroyAll()
@@ -103,6 +104,7 @@ HRESULT RenderManager::Initialize()
 
 RenderManager::~RenderManager()
 {
+	CleanUpDeviceObjects();
 }
 
 HRESULT RenderManager::InitGraphics(UINT maxInstances)
@@ -119,6 +121,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_CBNeverChanges));
+	SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
 
 	////////  Regular shaders /////
 	// Create Instanced draw data layout
@@ -131,14 +134,17 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 
 	// Load regular vertex Shader
 	HRR(m_d3dDevice->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader));
+	SetDebugName(m_vertexShader, "RenderManager::m_vertexShader");
 
 	// Load regular pixel Shader
 	HRR(XSF::LoadPixelShader(m_d3dDevice, L"PS.cso", &m_pixelShader));
+	SetDebugName(m_pixelShader, "RenderManager::m_pixelShader");
 
 	////////  Shadow map shader /////
 
 	// Load shadow shaders
 	HRR(XSF::LoadVertexShader(m_d3dDevice, L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+	SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
 	// TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
 	////////  Debug texture /////
@@ -147,15 +153,18 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 
 	// Load regular vertex Shader
 	HRR(m_d3dDevice->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_drawScreenVertexShader));
+	SetDebugName(m_drawScreenVertexShader, "RenderManager::m_drawScreenVertexShader");
 
 	HRR(m_d3dDevice->CreateInputLayout(InputLayoutDesc::Basic32, 
 								  ARRAYSIZE(InputLayoutDesc::Basic32), 
 								  &(dataVS)[ 0 ] /*passDesc.pIAInputSignature*/,
 								  dataVS.size() /*passDesc.IAInputSignatureSize*/, 
 								  &InputLayouts::Basic32));
+	SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
 
 	// Load regular pixel Shader
 	HRR(XSF::LoadPixelShader(m_d3dDevice, L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
+	SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
 
 	//////
 
@@ -172,6 +181,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	ZeroMemory(&vinitData, sizeof(vinitData));
 	vinitData.pSysMem = &m_geometryData.vertices[0];
 	HRR(m_d3dDevice->CreateBuffer(&vbd, &vinitData, &m_vertexBuffer));
+	SetDebugName(m_vertexBuffer, "RenderManager::m_vertexBuffer");
 
 	D3D11_BUFFER_DESC ibd;
 	ZeroMemory(&ibd, sizeof(ibd));
@@ -184,6 +194,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	ZeroMemory(&iinitData, sizeof(iinitData));
 	iinitData.pSysMem = &m_geometryData.indices[0];
 	HRR(m_d3dDevice->CreateBuffer(&ibd, &iinitData, &m_indexBuffer));
+	SetDebugName(m_indexBuffer, "RenderManager::m_indexBuffer");
 
 	// Set index buffer
 	m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
@@ -198,11 +209,13 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
+	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
 
 	HRR(BuildScreenQuadGeometryBuffers(m_d3dDevice));
 
 	// Load the Texture
 	HRR(CreateDDSTextureFromFile(m_d3dDevice, L"snow.dds", nullptr, &m_debugTextureRV));
+	SetDebugName(m_debugTextureRV, "RenderManager::m_debugTextureRV");
 
 	// Create instanced buffer
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
@@ -399,6 +412,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &pConstBuffer));
+	SetDebugName(pConstBuffer, "RenderManager::CreateMaterial::pConstBuffer");
 
 	m_materials.emplace(std::make_pair(name, 
 		Material(name, texture, InputLayouts::InstancedBasic16, (ID3D11VertexShader*) m_vertexShader, (ID3D11PixelShader*)m_pixelShader, 
@@ -492,6 +506,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 	D3D11_SUBRESOURCE_DATA vinitData = {0};
     vinitData.pSysMem = &vertices[0];
     HRR(pD3DDevice->CreateBuffer(&vbd, &vinitData, &m_screenQuadVB));
+	SetDebugName(m_screenQuadVB, "RenderManager::m_screenQuadVB");
 
 	//
 	// Pack the indices of all the meshes into one index buffer.
@@ -506,6 +521,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 	D3D11_SUBRESOURCE_DATA iinitData = {0};
     iinitData.pSysMem = &quad.Indices[0];
     HRR(pD3DDevice->CreateBuffer(&ibd, &iinitData, &m_screenQuadIB));
+	SetDebugName(m_screenQuadIB, "RenderManager::m_screenQuadIB");
 
 	return S_OK;
 }

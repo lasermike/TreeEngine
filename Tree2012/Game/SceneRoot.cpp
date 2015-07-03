@@ -107,8 +107,6 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
 	
 	for (WorldObject* c : _children)
 	{
-		//HRR(c->ComputeConstants(&renderFrame));
-
 		bbmin = XMVectorMin(bbmin, XMLoadFloat3(&c->GetBoundingBox()[0]));
 		bbmax = XMVectorMax(bbmax, XMLoadFloat3(&c->GetBoundingBox()[1]));
 	}
