@@ -203,11 +203,12 @@ HRESULT Game::InitDevice()
 		hr = D3D11CreateDevice(nullptr, m_driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
 			D3D11_SDK_VERSION, &device, &m_featureLevel, &d3dContext);
 
-		HRR(device->QueryInterface( __uuidof(m_pd3dDevice), reinterpret_cast<void**>(&m_pd3dDevice) ) );
-		HRR(d3dContext->QueryInterface( __uuidof(m_pImmediateContext), reinterpret_cast<void**>(&m_pImmediateContext) ) );
-
 		if (SUCCEEDED(hr))
+        {
+        	HRR(device->QueryInterface( __uuidof(m_pd3dDevice), reinterpret_cast<void**>(&m_pd3dDevice) ) );
+    		HRR(d3dContext->QueryInterface( __uuidof(m_pImmediateContext), reinterpret_cast<void**>(&m_pImmediateContext) ) );
 			break;
+        }
 	}
 	if (FAILED(hr))
 		return hr;
@@ -294,7 +295,6 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	// Create width/height dependent objects
 	m_pDepthStencilView.Release();
 	m_pDepthStencil.Release();
-	m_pDepthStencilView.Release();
 	
 	m_pRenderTargetView.Release();
 	m_pSwapChain1.Release();
@@ -310,20 +310,18 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
-	IDXGIFactory1* dxgiFactory = nullptr;
+    CComPtr<IDXGIFactory1> dxgiFactory;
 	{
-		IDXGIDevice* dxgiDevice = nullptr;
+		CComPtr<IDXGIDevice> dxgiDevice;
 		hr = m_pd3dDevice->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
 		if (SUCCEEDED(hr))
 		{
-			IDXGIAdapter* adapter = nullptr;
+			CComPtr<IDXGIAdapter> adapter;
 			hr = dxgiDevice->GetAdapter(&adapter);
 			if (SUCCEEDED(hr))
 			{
 				hr = adapter->GetParent(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&dxgiFactory));
-				adapter->Release();
 			}
-			dxgiDevice->Release();
 		}
 	}
 	if (FAILED(hr))
@@ -358,7 +356,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	}
 
 	// Create swap chain
-	IDXGIFactory2* dxgiFactory2 = nullptr;
+	CComPtr<IDXGIFactory2> dxgiFactory2;
 	HRR(dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2)));
 
 	// DirectX 11.1 or later
@@ -398,11 +396,8 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
 #endif 
 
-	dxgiFactory2->Release();
-	dxgiFactory->Release();
-
 	// Create a render target view
-	ID3D11Texture2D* pBackBuffer = nullptr;
+	CComPtr<ID3D11Texture2D> pBackBuffer;
 	HRR(m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
 
 	HRR(hr = m_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
@@ -488,6 +483,7 @@ void Game::CleanupDevice()
     if (m_pScene)
     {
         m_pScene->CleanUpDeviceObjects();
+        SafeDelete(&m_pScene);
     }
 
     m_renderManager.CleanUpDeviceObjects();
@@ -507,6 +503,12 @@ void Game::CleanupDevice()
 	m_pImmediateContext1.Release();
 	m_pImmediateContext.Release();
 
+    if (m_bitmapFont)
+    {
+        delete m_bitmapFont;
+        m_bitmapFont = nullptr;
+    }
+
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
 	if (m_pd3dDevice)
 	{
@@ -517,8 +519,8 @@ void Game::CleanupDevice()
 	}
 #endif
 
-	m_pd3dDevice1.Release();
 	m_pd3dDevice.Release();
+    m_pd3dDevice1.Detach(); // TODO: Device leak somewhere causing crash
 }
 
 void Game::Regenerate()

@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sstream>
 #include <functional>
+#include <algorithm>
 #include "Win32_DirectXAppUtil.h"
 
 #define XSF_USE_DX_11_1

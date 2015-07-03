@@ -69,13 +69,13 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
 	HRESULT hr = S_OK;
 
 	UINT numObjs = (UINT) _children.size();
-	UINT objsPerThread = numObjs / threadPool.GetNumWorkers();
+	UINT objsPerThread = std::max(1U, numObjs / threadPool.GetNumWorkers());
 
-	WorkData threadData = { 0, 0 /*first*/, objsPerThread /*last*/, &renderFrame }; 
+	WorkData threadData = { 0, 0 /*first*/, objsPerThread /*end*/, &renderFrame }; 
 
 	std::list<WorkData> workData;
 
-	for (UINT i = 0; i < threadPool.GetNumWorkers(); i++)
+	for (UINT i = 0; i < threadPool.GetNumWorkers() && threadData.end <= numObjs; i++)
 	{
 		if (i + 1 == threadPool.GetNumWorkers()) // Make sure the last iteration has all remaining objs
 		{

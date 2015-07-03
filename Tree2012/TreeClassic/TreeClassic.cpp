@@ -126,6 +126,13 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
         }
     }
 
+
+    if (HMD)
+    {
+        ovrHmd_Destroy(HMD);
+        HMD = nullptr;
+    }
+
     g_game->Cleanup();
     
     delete g_game;

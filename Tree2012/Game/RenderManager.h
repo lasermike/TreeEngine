@@ -25,7 +25,7 @@ struct Material
     ID3D11InputLayout*        m_inputLayout;
 
 	ShaderMaterial			  m_shaderMaterial;
-	CComPtr<ID3D11Buffer>	  m_constBuffer;     // Owned
+	CComPtr<ID3D11Buffer>     m_constBuffer;
 
 	// NYI
 	ID3D11SamplerState*       m_samplerState;
@@ -52,7 +52,19 @@ public:
 	}
 	Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
 				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
-				 m_depthState(nullptr) { }
+				 m_depthState(nullptr), m_constBuffer() { }
+
+    Material(Material const& rhs) :
+        m_name(rhs.m_name), m_texture(rhs.m_texture), m_inputLayout(rhs.m_inputLayout), m_vertexShader(rhs.m_vertexShader),
+		m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
+		m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer) 
+
+    {};        // Copy constructor
+    Material& operator=(Material const& rhs)
+    {
+        return *this;
+    }  
+
 
 	~Material()
 	{
@@ -133,7 +145,7 @@ interface IRenderFrame
 class RenderManager : public IRenderFrame
 {
 	// Filled in during scene initialization
-	std::map<wstring, Material>						m_materials;
+	std::map<wstring, Material*>					m_materials;
 	std::map<wstring, Mesh>							m_meshes;
 	std::map<wstring, ID3D11ShaderResourceView*>	m_textures;
 	std::list<RenderUnit>							m_renderUnits;
@@ -154,6 +166,7 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D11VertexShader>			m_drawScreenVertexShader;
 	CComPtr<ID3D11PixelShader>			m_drawScreenPixelShader;
 
+    // Single vertex and index buffer for all geometry in scene
 	CComPtr<ID3D11InputLayout>          m_vertexLayout;
 	CComPtr<ID3D11Buffer>               m_vertexBuffer;
 	CComPtr<ID3D11Buffer>               m_indexBuffer;

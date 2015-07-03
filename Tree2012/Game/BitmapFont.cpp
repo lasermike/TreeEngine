@@ -377,6 +377,7 @@ HRESULT BitmapFont::Create( D3DDevice* pDevice, const WCHAR* strFontFileName, co
         DebugPrint( "BitmapFont::Create: failed to create texture %x\n", hr );
         return hr;
     }
+    SetDebugName(pTex, "BitmapFont::Create pTex");
 
     // correct endianness
     // TODO: remove when the data is fixed
@@ -447,6 +448,7 @@ HRESULT BitmapFont::Create( D3DDevice* pDevice, ID3D11Texture2D* pFontTexture, c
         DebugPrint( "BitmapFont::Create: failed to create VB SRV %x\n", hr );
         return hr;
     }
+    SetDebugName(m_pFontTextureSRV, "m_pFontTextureSRV");
 
     // Save a copy of the texture
     m_pFontTexture = pFontTexture;

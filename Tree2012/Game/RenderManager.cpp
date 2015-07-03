@@ -211,9 +211,10 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
 	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
 
+    // Debug overlay to show depth map
 	HRR(BuildScreenQuadGeometryBuffers(m_d3dDevice));
 
-	// Load the Texture
+	// Load the debug texture
 	HRR(CreateDDSTextureFromFile(m_d3dDevice, L"snow.dds", nullptr, &m_debugTextureRV));
 	SetDebugName(m_debugTextureRV, "RenderManager::m_debugTextureRV");
 
@@ -225,6 +226,54 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	vbd.MiscFlags = 0;
 	vbd.StructureByteStride = 0;
 	HRR(m_instancedBuffer.Create(vbd, m_d3dDevice));
+
+	return S_OK;
+}
+
+HRESULT RenderManager::CleanUpDeviceObjects()
+{
+
+	SafeRelease(&m_vertexBuffer);
+	SafeRelease(&m_indexBuffer);
+	SafeRelease(&m_vertexLayout);
+	SafeRelease(&m_vertexShader);
+	SafeRelease(&m_pixelShader);
+	SafeRelease(&m_CBNeverChanges);
+	SafeRelease(&m_CBChangesEveryFrame);
+	m_instancedBuffer.Release();
+
+	for (auto t : m_textures)
+	{
+		if (t.second)
+		{
+			t.second->Release();
+		}
+	}
+	m_textures.clear();
+
+	for (auto m : m_materials)
+	{
+        if (m.second)
+		{
+            delete m.second;
+            m.second = nullptr;
+		}
+	}
+	m_materials.clear();
+
+	m_meshes.clear();
+	m_renderUnits.clear();
+	m_objectToInstanceBufferOffset.clear();
+	m_nextInstanceBufferOffset = 0;
+	m_perFrameInstanceData.clear();
+    m_screenQuadVB.Release();
+    m_screenQuadIB.Release();
+    m_debugTextureRV.Release();
+    m_drawScreenPixelShader.Release();
+    m_drawScreenVertexShader.Release();
+    m_shadowVertexShader.Release();
+	InputLayouts::DestroyAll();
+	RenderStates::DestroyAll();
 
 	return S_OK;
 }
@@ -337,39 +386,6 @@ HRESULT RenderManager::Render(RenderUnit& ru)
 	return S_OK;
 }
 
-HRESULT RenderManager::CleanUpDeviceObjects()
-{
-
-	SafeRelease(&m_vertexBuffer);
-	SafeRelease(&m_indexBuffer);
-	SafeRelease(&m_vertexLayout);
-	SafeRelease(&m_vertexShader);
-	SafeRelease(&m_pixelShader);
-	SafeRelease(&m_CBNeverChanges);
-	SafeRelease(&m_CBChangesEveryFrame);
-	m_instancedBuffer.Release();
-
-	for (auto t : m_textures)
-	{
-		if (t.second)
-		{
-			t.second->Release();
-		}
-	}
-	m_textures.clear();
-	m_materials.clear();
-	m_meshes.clear();
-	m_renderUnits.clear();
-	m_objectToInstanceBufferOffset.clear();
-	m_nextInstanceBufferOffset = 0;
-	m_perFrameInstanceData.clear();
-
-	InputLayouts::DestroyAll();
-	RenderStates::DestroyAll();
-
-	return S_OK;
-}
-
 HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 {
 	ID3D11ShaderResourceView* texture = m_textures[textureFilename];
@@ -388,7 +404,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	auto existing = m_materials.find(name);
 	if (existing != m_materials.end())
 	{
-		*newMaterial = &m_materials[name];
+		*newMaterial = m_materials[name];
 		return S_FALSE;
 	}
 
@@ -404,7 +420,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	}
 
 	// Create constants for material
-	ID3D11Buffer* pConstBuffer = nullptr;
+	CComPtr<ID3D11Buffer> pConstBuffer;
+//	ID3D11Buffer* pConstBuffer = nullptr;
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
 	bd.Usage = D3D11_USAGE_DEFAULT;
@@ -414,12 +431,12 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &pConstBuffer));
 	SetDebugName(pConstBuffer, "RenderManager::CreateMaterial::pConstBuffer");
 
-	m_materials.emplace(std::make_pair(name, 
-		Material(name, texture, InputLayouts::InstancedBasic16, (ID3D11VertexShader*) m_vertexShader, (ID3D11PixelShader*)m_pixelShader, 
+    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, (ID3D11VertexShader*) m_vertexShader, (ID3D11PixelShader*)m_pixelShader, 
 		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/, 
-		shaderMaterial, pConstBuffer)));
+		shaderMaterial, pConstBuffer);
+	m_materials[name] = newMat;
 
-	*newMaterial = &m_materials[name];
+	*newMaterial = newMat;
 
 	return S_OK;
 }
