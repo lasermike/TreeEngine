@@ -90,8 +90,8 @@ RenderManager::RenderManager() : m_shadowVertexShader(nullptr), m_shadowPixelSha
 						 m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
 						 m_drawScreenVertexShader(), m_drawScreenPixelShader()
 {
-	m_light.Ambient = XMFLOAT4(.2f, .2f, .2f, 1.0f);
-	m_light.Diffuse = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+	m_light.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+	m_light.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	m_light.Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
 	m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
 }

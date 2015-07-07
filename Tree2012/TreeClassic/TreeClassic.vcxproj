@@ -166,6 +166,9 @@
     <Image Include="..\Game\bark2.dds">
       <DeploymentContent>true</DeploymentContent>
     </Image>
+    <Image Include="..\Game\Bark_0009_diffuse.DDS">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
     <Image Include="..\Game\snow.dds">
       <DeploymentContent>true</DeploymentContent>
     </Image>

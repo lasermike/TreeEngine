@@ -219,6 +219,9 @@
     <Image Include="..\Game\snow.dds">
       <Filter>Game\Resources</Filter>
     </Image>
+    <Image Include="..\Game\Bark_0009_diffuse.DDS">
+      <Filter>Game\Resources</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Game\Shaders\buildShaders.bat">

@@ -306,7 +306,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	m_renderManager.GetRenderData().projectionData.screenWidth = windowWidth;
 	m_renderManager.GetRenderData().projectionData.screenHeight = windowHeight;
 	m_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
-	m_renderManager.GetRenderData().projectionData.nearClippingPlane = 1.0f;
+	m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
 	m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)

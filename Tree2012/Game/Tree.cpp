@@ -31,22 +31,22 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	HRR(CleanUpDeviceObjects());
 
 	ShaderMaterial trunkMaterial;
-	trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
 	//XMStoreFloat4(&_trunkMaterial.Diffuse, Colors::RosyBrown); 
-	trunkMaterial.Diffuse = XMFLOAT4(1.0f, .7f, .3f, 1.0f);
-	trunkMaterial.Specular = XMFLOAT4(.4f, .4f, .4f, 1.0f);
-	trunkMaterial.flags.y = false; //true; //useTextures  TODO
+	trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+	trunkMaterial.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	trunkMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
+	trunkMaterial.flags.y = true; //useTextures  TODO
 
 	// Create material, mesh, and reserve render unit
 	Material* pTrunk = nullptr;
-	renderManager.CreateMaterial(L"trunk", L"", trunkMaterial, &pTrunk);
+	renderManager.CreateMaterial(L"trunk", L"Bark_0005_diffuse.dds", trunkMaterial, &pTrunk);
 	Mesh* pNewMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Cylinder);
 	renderManager.CreateMesh(L"trunk", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
 	renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
 
 	Material* pTwig = nullptr;
-	renderManager.CreateMaterial(L"twig", L"", trunkMaterial, &pTwig);
+	renderManager.CreateMaterial(L"twig", L"Bark_0005_diffuse.dds", trunkMaterial, &pTwig);
 	pNewMesh = nullptr;
 	pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
 	renderManager.CreateMesh(L"twig", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
