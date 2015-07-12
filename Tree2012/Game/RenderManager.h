@@ -54,12 +54,14 @@ public:
 				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
 				 m_depthState(nullptr), m_constBuffer() { }
 
+	// Necessary?
     Material(Material const& rhs) :
         m_name(rhs.m_name), m_texture(rhs.m_texture), m_inputLayout(rhs.m_inputLayout), m_vertexShader(rhs.m_vertexShader),
 		m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
 		m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer) 
-
     {};        // Copy constructor
+
+	// Necessary?
     Material& operator=(Material const& rhs)
     {
         return *this;

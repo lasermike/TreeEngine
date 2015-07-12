@@ -10,6 +10,7 @@ class GameLoader
 	std::vector<unsigned int> _seeds;
 
 	void LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
+	void LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
 	void LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
 
 public:
