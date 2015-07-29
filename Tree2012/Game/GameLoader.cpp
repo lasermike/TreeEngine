@@ -118,15 +118,15 @@ void GameLoader::LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* 
 {
 	WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params5->position = XMFLOAT3(0, .5f, 0);
-	params5->_animationSpeed = 0.0f;
+	params5->_animationSpeed = 10.0f;
 	params5->depthLOD = 1;
 	params5->GetGeneratorParameters()._axiom = "F";	
 	params5->GetGeneratorParameters()._constants = "";	
-	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "F [ & + F] F [ ^ + F]"));
+	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "F F [ > & F + F] ")); //[ < ^ - F F] 
 	params5->GetGeneratorParameters()._angle = 0.383972f;
-	params5->GetGeneratorParameters()._numIterations = 6;
-	params5->GetGeneratorParameters()._segmentLength = .5f;
-	params5->GetGeneratorParameters().thickness = .10f;	
+	params5->GetGeneratorParameters()._numIterations = 3;
+	params5->GetGeneratorParameters()._segmentLength = .2f;
+	params5->GetGeneratorParameters().thickness = .01f;	
 	pScene->AddChild(new Tree(params5));
 
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);

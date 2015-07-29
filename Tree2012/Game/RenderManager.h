@@ -62,7 +62,7 @@ public:
     {};        // Copy constructor
 
 	// Necessary?
-    Material& operator=(Material const& rhs)
+    Material& operator=(Material const& /*rhs*/)
     {
         return *this;
     }  

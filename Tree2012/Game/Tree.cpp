@@ -106,6 +106,8 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	if (CalcTime(pRenderData->time) < branch->depth)
 		return S_OK;
 
+	pRenderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat++;
+
 	// Update variables that change once per frame
 	XMVECTOR vChildStart;
 	XMMATRIX localToWorld;
@@ -146,6 +148,8 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 
 HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR* vComputedEnd, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart)
 {
+
+
 	float animScaleFactor = 1.0f;
 	if (time - 5 < branch->depth)
 	{

@@ -4,6 +4,20 @@
 class ShadowMap;
 struct InstancedData;
 
+enum FrameStat
+{
+	FPS_STAT,
+	WORLD_MATRIX_COMPUTED_STAT,
+	MAX_FRAME_STAT
+};
+
+struct FrameStatistic
+{
+	FrameStat id;
+	const wchar_t* name;
+	UINT stat;
+};
+
 struct BoundingSphere
 {
 	BoundingSphere() : Center(0.0f, 0.0f, 0.0f), Radius(0.0f) {}
@@ -26,27 +40,37 @@ struct ProjectionData
 	float				farClippingPlane;
 };
 
+// Centalized data necessary to render a frame.
+// This struct is copied at least twice per frame
 __declspec(align(16)) 
 struct RenderData
 {
+	// General
 	RenderPass			pass;
 	float				time;
 	UINT				frame;
 
+	// Transformations
     ProjectionData      projectionData;
-
-	InstancedData*		instanceData;
 
 	XMFLOAT4X4			world;          // Needed?
 	XMFLOAT4X4          projection;
 	XMFLOAT4X4			view;           
 	XMVECTOR			eyePos;
 
-	DirectionalLight	dirLights[1];
-	BoundingSphere		mSceneBounds;
+	// Instance rendering
+	InstancedData*		instanceData;
 
+	// Per frame statistics
+	FrameStatistic*		frameStats;
+
+	// Lighting
+	DirectionalLight	dirLights[1];
+
+	// Shadows
 	static const int	SMapWidth = 2048;
 	static const int	SMapHeight = 2048;
+	BoundingSphere		mSceneBounds;
 	ShadowMap*			pShadowMap;
 	XMFLOAT4X4			lightView;
 	XMFLOAT4X4			lightProj;

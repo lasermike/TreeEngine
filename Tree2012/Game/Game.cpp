@@ -35,7 +35,7 @@ struct CBChangeOnResize
 	XMFLOAT4X4 mProjection;
 };
 
-Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr) 
+Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 {
 #ifndef _TREE_CLASSIC
 	m_window = nullptr;
@@ -589,6 +589,12 @@ void Game::Update(DX::StepTimer const& timer)
 //--------------------------------------------------------------------------------------
 void Game::ComputeCPU()
 {
+	// Reset stats
+	for (int i = 0; i < MAX_FRAME_STAT; i++)
+	{
+		m_renderManager.GetRenderData().frameStats[i].stat = 0;
+	}
+
 	FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
 	HandleInput(inputData.key);
 
@@ -653,10 +659,18 @@ void Game::Render(bool oculus)
 
 	if (m_showHelp && m_bitmapFont)
 	{
+		m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
+		float y = 10;
 	    m_bitmapFont->Begin(m_pImmediateContext, &m_viewPort, false );
-		wchar_t text[128];
-		swprintf(text, 128, L"FPS %d", m_timer.GetFramesPerSecond());
-		m_bitmapFont->DrawText(0, 10, 0x33444444, text);
+
+		for (int i = 0; i < MAX_FRAME_STAT; i++)
+		{
+			wchar_t text[128];
+			swprintf(text, 128, L"%s %d", m_renderManager.GetRenderData().frameStats[i].name, 
+				m_renderManager.GetRenderData().frameStats[i].stat);
+			m_bitmapFont->DrawText(0, y, 0x33444444, text);
+			y += 34.0f;
+		}
 		m_bitmapFont->End();
 	}
 

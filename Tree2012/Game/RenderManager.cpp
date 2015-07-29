@@ -6,6 +6,9 @@
 
 #include "Primitive.h" // TEMPTEMP
 
+FrameStatistic g_frameStats[MAX_FRAME_STAT] = { { FPS_STAT, L"FPS", 0 }, { WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", 0 } };
+
+
 __declspec(align(16))
 struct CBNeverChanges
 {
@@ -90,6 +93,8 @@ RenderManager::RenderManager() : m_shadowVertexShader(nullptr), m_shadowPixelSha
 						 m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
 						 m_drawScreenVertexShader(), m_drawScreenPixelShader()
 {
+	m_renderData.frameStats = g_frameStats;
+
 	m_light.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
 	m_light.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	m_light.Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
