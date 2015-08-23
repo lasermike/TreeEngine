@@ -36,6 +36,7 @@ private:
 	bool m_windowClosed;
 	bool m_windowVisible;
 	InputManager m_inputManager;
+	//DisplayInformation^ m_info;
 };
 
 ref class Direct3DApplicationSource sealed : Windows::ApplicationModel::Core::IFrameworkViewSource

@@ -137,7 +137,7 @@ HRESULT Game::Initialize(HWND hwnd)
 
 #else
 
-HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window) 
+HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi) 
 { 
 	HRESULT hr = S_OK;
 
@@ -151,8 +151,8 @@ HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window)
 	UINT windowWidth = 1920;
 	UINT windowHeight = 1080;
 #else
-	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
-	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
+	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width, logicalDpi);
+	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height, logicalDpi);
 #endif
 	HRR(OnResize(windowWidth, windowHeight));
 	
@@ -804,10 +804,13 @@ void Game::DrawSceneToShadowMap()
 
 #if !defined(_TREE_CLASSIC) && !defined(_XBOX_ONE)
 // Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
-float Game::ConvertDipsToPixels(float dips)
+float Game::ConvertDipsToPixels(float dips, float logicalDpi )
 {
 	static const float dipsPerInch = 96.0f;
-	return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+
+	return floor(dips * logicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+																				 //DisplayInformation
+	//return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 }
 #endif
 

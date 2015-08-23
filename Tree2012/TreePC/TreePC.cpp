@@ -57,7 +57,11 @@ void TreePC::SetWindow(CoreWindow^ window)
 	window->KeyUp +=
 		ref new TypedEventHandler<CoreWindow^, KeyEventArgs^>(this, &TreePC::OnKeyUp);
 
-	m_pGame->Initialize(CoreWindow::GetForCurrentThread());
+	auto m_info = DisplayInformation::GetForCurrentView();
+
+	m_pGame->Initialize(CoreWindow::GetForCurrentThread(), m_info->LogicalDpi);
+
+
 }
 
 void TreePC::Load(Platform::String^ entryPoint)
@@ -162,7 +166,13 @@ void TreePC::OnResuming(Platform::Object^ sender, Platform::Object^ args)
 float TreePC::ConvertDipsToPixels(float dips)
 {
 	static const float dipsPerInch = 96.0f;
-	return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+
+	auto m_info = DisplayInformation::GetForCurrentView();
+
+
+	return floor(dips * m_info ->LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+
+	//return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 }
 
 IFrameworkView^ Direct3DApplicationSource::CreateView()

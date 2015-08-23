@@ -27,7 +27,7 @@ cbuffer OncePerDrawText : register( b0 )
 };
 
 
-StructuredBuffer< VS_IN >    quadsData : register( u0 );
+StructuredBuffer< VS_IN >    quadsData : register( t0 ); //u0
 //sampler FontTexture : register(s0) : register( t0 );
 SamplerState samLinear : register( s0 );
 Texture2D txDiffuse : register( t0 );

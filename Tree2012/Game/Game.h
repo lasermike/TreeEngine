@@ -49,7 +49,7 @@ public:
 #ifdef _TREE_CLASSIC
 	HRESULT Initialize(HWND hwnd);
 #else
-	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window);
+	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
 #endif
 
 	HRESULT Cleanup() { CleanupDevice(); return S_OK; }
@@ -124,7 +124,7 @@ private:
 #else
 	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;
 #if !defined(_XBOX_ONE)
-	float ConvertDipsToPixels(float dips);
+	float ConvertDipsToPixels(float dips, float logicalDpi);
 #endif // XBOX
 #endif //Classic
 

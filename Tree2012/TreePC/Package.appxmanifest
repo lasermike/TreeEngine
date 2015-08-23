@@ -1,9 +1,15 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Package xmlns="http://schemas.microsoft.com/appx/2010/manifest">
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  IgnorableNamespaces="uap mp">
+
 
   <Identity Name="775e936d-bc9b-4fbb-96e0-88a99bfd34d9"
             Publisher="CN=mmatsel"
             Version="1.0.0.0" />
+  <mp:PhoneIdentity PhoneProductId="d611695a-4c59-4c5c-b9db-74230ac615a9" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>TreePC</DisplayName>
@@ -11,10 +17,9 @@
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
-  <Prerequisites>
-    <OSMinVersion>6.2.1</OSMinVersion>
-    <OSMaxVersionTested>6.2.1</OSMaxVersionTested>
-  </Prerequisites>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.0.0" MaxVersionTested="10.0.0.0" />
+  </Dependencies>
 
   <Resources>
     <Resource Language="x-generate"/>
@@ -24,16 +29,18 @@
     <Application Id="App"
         Executable="$targetnametoken$.exe"
         EntryPoint="TreePC.App">
-        <VisualElements
-            DisplayName="TreePC"
-            Logo="Assets\Logo.png"
-            SmallLogo="Assets\SmallLogo.png"
-            Description="TreePC"
-            ForegroundText="light"
-            BackgroundColor="#464646">
-            <DefaultTile ShowName="allLogos" />
-            <SplashScreen Image="Assets\SplashScreen.png" />
-        </VisualElements>
+      <uap:VisualElements
+        DisplayName="TreePC"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        Description="TreePC"
+
+        BackgroundColor="transparent">
+
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"/>
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
     </Application>
   </Applications>
   <Capabilities>
