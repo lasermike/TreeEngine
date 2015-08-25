@@ -15,7 +15,7 @@ struct InstancedData
 	XMFLOAT4X4 World;
 };
 
-typedef enum GeneratorType
+enum GeneratorType
 {
 	NullGeneratorType,
 	PrimitiveGeneratorType,
@@ -23,14 +23,14 @@ typedef enum GeneratorType
 	LSystemGeneratorType
 };
 
-typedef enum ObjectType
+enum ObjectType
 {
 	WorldObjectType,
 	PrimitiveObjectType,
 	TreeType
 };
 
-typedef enum Extent
+enum Extent
 {
 	TOP = 0,
 	LEFT,

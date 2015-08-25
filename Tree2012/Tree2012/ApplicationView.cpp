@@ -39,7 +39,7 @@ void ApplicationView::SetWindow(CoreWindow^ window)
     window->Closed += ref new TypedEventHandler<CoreWindow^, CoreWindowEventArgs^>(this, &ApplicationView::OnWindowClosed);
 
 	m_pGame = new Game(&m_inputManager);
-	m_pGame->Initialize(window);
+	m_pGame->Initialize(window, 0);
 }
 
 // The purpose of this method is to get the application entry point.

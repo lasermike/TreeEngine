@@ -61,12 +61,12 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #ifndef HRR
 #define HRR(x)                                              \
 	{                                                          \
-		HRESULT hr = (x);                                      \
-		if (FAILED(hr))                                         \
+		HRESULT hr2 = (x);                                      \
+		if (FAILED(hr2))                                         \
 		{                                                      \
-		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
-		assert(SUCCEEDED(hr)); \
-		return hr; \
+		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr2 << ", " << L#x << "\n"; \
+		assert(SUCCEEDED(hr2)); \
+		return hr2; \
 		}                                                      \
 	}
 #endif

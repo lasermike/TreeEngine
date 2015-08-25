@@ -116,7 +116,6 @@ void FixedTreeModelGenerator::GenerateChildrenRecursive(Branch* parentBranch, in
 XMVECTOR FixedTreeModelGenerator::CalculateQuaternion(FXMVECTOR vDirection)
 {
 	// Determine rotation
-	XMMATRIX mRot;
 	XMVECTOR vUp = XMVectorSet(0,1,0,0);
 	//XMVECTOR vDiff = child->vEnd - child->vStart;
 	XMVECTOR vCross = XMVector3Cross(vUp, XMVector3Normalize(vDirection));

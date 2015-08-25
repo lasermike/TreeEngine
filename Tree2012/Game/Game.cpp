@@ -139,8 +139,6 @@ HRESULT Game::Initialize(HWND hwnd)
 
 HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi) 
 { 
-	HRESULT hr = S_OK;
-
 	Initialize();
 
 	m_window = window; 
@@ -148,6 +146,7 @@ HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi
 
 	auto windowBounds = m_window->Bounds;
 #if defined(_XBOX_ONE)
+	logicalDpi = logicalDpi; // Address warning 
 	UINT windowWidth = 1920;
 	UINT windowHeight = 1080;
 #else
@@ -156,7 +155,7 @@ HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi
 #endif
 	HRR(OnResize(windowWidth, windowHeight));
 	
-	return hr;
+	return S_OK;
 }
 
 #endif
@@ -166,7 +165,7 @@ HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi
 //--------------------------------------------------------------------------------------
 HRESULT Game::InitDevice()
 {
-	HRESULT hr = S_OK;
+	HRESULT result = S_OK;
 
 	UINT createDeviceFlags = 0;
 #ifdef _DEBUG
@@ -200,18 +199,19 @@ HRESULT Game::InitDevice()
 	    CComPtr<ID3D11DeviceContext> d3dContext;
 
 		m_driverType = driverTypes[driverTypeIndex];
-		hr = D3D11CreateDevice(nullptr, m_driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
+		result = D3D11CreateDevice(nullptr, m_driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
 			D3D11_SDK_VERSION, &device, &m_featureLevel, &d3dContext);
 
-		if (SUCCEEDED(hr))
+		if (SUCCEEDED(result))
         {
         	HRR(device->QueryInterface( __uuidof(m_pd3dDevice), reinterpret_cast<void**>(&m_pd3dDevice) ) );
     		HRR(d3dContext->QueryInterface( __uuidof(m_pImmediateContext), reinterpret_cast<void**>(&m_pImmediateContext) ) );
 			break;
         }
 	}
-	if (FAILED(hr))
-		return hr;
+
+	if (FAILED(result))
+		return result;
 
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
 	{
@@ -221,10 +221,8 @@ HRESULT Game::InitDevice()
 	
 		CComPtr<ID3D11InfoQueue> d3dInfoQueue;
 		HR(d3dDebug->QueryInterface( __uuidof(ID3D11InfoQueue), (void**)&d3dInfoQueue ))
-		//#ifdef _DEBUG
 		d3dInfoQueue->SetBreakOnSeverity( D3D11_MESSAGE_SEVERITY_CORRUPTION, true );
 		d3dInfoQueue->SetBreakOnSeverity( D3D11_MESSAGE_SEVERITY_ERROR, true );
-		//#endif
  
 		D3D11_MESSAGE_ID hide [] =
 		{
@@ -253,9 +251,7 @@ HRESULT Game::InitDevice()
 	bd.ByteWidth = sizeof(CBChangeOnResize);
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
-	hr = m_pd3dDevice->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize);
-	if (FAILED(hr))
-		return hr;
+	HRR(m_pd3dDevice->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
 
 	m_pImmediateContext->VSSetConstantBuffers(1, 1, &m_pCBChangeOnResize);
 

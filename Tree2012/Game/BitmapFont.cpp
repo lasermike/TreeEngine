@@ -792,11 +792,11 @@ VOID BitmapFont::Begin( D3DDeviceContext* pCtx, const D3D11_VIEWPORT* pViewport,
 
                 if( desc.ViewDimension == D3D11_RTV_DIMENSION_TEXTURE2D )
                 {
-                    D3D11_TEXTURE2D_DESC desc;
-                    pRes->GetDesc( &desc );
+                    D3D11_TEXTURE2D_DESC desc2;
+                    pRes->GetDesc( &desc2 );
 
-                    m_curRTSx = desc.Width;
-                    m_curRTSy = desc.Height;
+                    m_curRTSx = desc2.Width;
+                    m_curRTSy = desc2.Height;
                     bGotSize = TRUE;
                 }
 
@@ -813,11 +813,11 @@ VOID BitmapFont::Begin( D3DDeviceContext* pCtx, const D3D11_VIEWPORT* pViewport,
 
                 if( desc.ViewDimension == D3D11_DSV_DIMENSION_TEXTURE2D )
                 {
-                    D3D11_TEXTURE2D_DESC desc;
-                    pRes->GetDesc( &desc );
+                    D3D11_TEXTURE2D_DESC desc2;
+                    pRes->GetDesc( &desc2 );
 
-                    m_curRTSx = desc.Width;
-                    m_curRTSy = desc.Height;
+                    m_curRTSx = desc2.Width;
+                    m_curRTSy = desc2.Height;
                     bGotSize = TRUE;
                 }
 

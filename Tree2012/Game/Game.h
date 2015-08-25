@@ -20,7 +20,7 @@ class ThreadPool;
 class BitmapFont;
 interface IInputManager;
 
-typedef enum DisplayMode
+enum DisplayMode
 {
 	Monitor = 0,
 	Oculus
