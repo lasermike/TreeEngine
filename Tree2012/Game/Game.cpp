@@ -636,7 +636,7 @@ void Game::Render(bool oculus)
     if (!oculus)
     {
 	    // Clear the back buffer
-	    m_pImmediateContext->ClearRenderTargetView(m_pRenderTargetView, Colors::AliceBlue);
+	    m_pImmediateContext->ClearRenderTargetView(m_pRenderTargetView, Colors::SkyBlue);  //AliceBlue
 
 	    // Clear the depth buffer to 1.0 (max depth)
 	    m_pImmediateContext->ClearDepthStencilView(m_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);

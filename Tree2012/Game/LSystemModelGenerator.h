@@ -76,5 +76,5 @@ public:
 
 protected:
 	void CreateSkeleton(string& cmd);
-	Branch* AddBranch(Branch* parent, XMFLOAT4& start, XMFLOAT4& end);
+	Branch* AddBranch(Branch* parent, XMFLOAT4& start, XMFLOAT4& end, GeometryType geometryType);
 };

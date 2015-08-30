@@ -89,9 +89,11 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateYNegMat)));
 			break;
 		case '<':
+		case '/':
 			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateXPosMat)));
 			break;
 		case '>':
+		case '\\':
 			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateXNegMat)));
 			break;
 		case '+':
@@ -103,11 +105,15 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 		case '|':
 			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotate180Mat));
 			break; 
-		case 'A':
-		case 'B':
+		//case 'A':
+		//case 'B':
+		case 'f':
+			XMStoreFloat4(&currentState.pos, XMLoadFloat4(&currentState.pos) + XMLoadFloat4(&currentState.dir) * _params._segmentLength * 0.2f);
+			currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos, Leaf);
+			break;
 		case 'F':
 			XMStoreFloat4(&currentState.pos, XMLoadFloat4(&currentState.pos) + XMLoadFloat4(&currentState.dir) * _params._segmentLength);
-			currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos); 
+			currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos, Stick);
 			break;
 		case '[':
 			stateStack.push(currentState);
@@ -131,7 +137,7 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
 }
 
-Branch* LSystemModelGenerator::AddBranch(Branch* parent, XMFLOAT4& start, XMFLOAT4& end)
+Branch* LSystemModelGenerator::AddBranch(Branch* parent, XMFLOAT4& start, XMFLOAT4& end, GeometryType geometryType)
 {
 	int id = _model->treeData.numBranches++;
 	Branch* child = &_model->treeData.pBranches[id];
@@ -145,6 +151,7 @@ Branch* LSystemModelGenerator::AddBranch(Branch* parent, XMFLOAT4& start, XMFLOA
 	//child->numChildren = 0;
 	child->thickness = parent->thickness;
 	child->depth = parent->depth + 1;
+	child->geometryType = geometryType;
 
 	if (child->depth > _model->treeData.numLevels)
 		_model->treeData.numLevels = child->depth;

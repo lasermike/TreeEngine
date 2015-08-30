@@ -4,6 +4,9 @@
 #include "TreeModelGenerator.h"
 #include "RenderManager.h"
 #include "MathHelper.h"
+#include <directxcolors.h>
+
+using namespace DirectX;
 
 Tree::Tree(WorldObjectParams* pParams) : _treeModel(nullptr), WorldObject(pParams)
 {
@@ -35,7 +38,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
 	trunkMaterial.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	trunkMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
-	trunkMaterial.flags.y = true; //useTextures  TODO
+	trunkMaterial.flags.y = false; //useTextures  TODO
 
 	// Create material, mesh, and reserve render unit
 	Material* pTrunk = nullptr;
@@ -51,6 +54,18 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
 	renderManager.CreateMesh(L"twig", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
 	renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
+
+	ShaderMaterial leafMaterial;
+	XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
+	leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
+	leafMaterial.flags.y = false; //useTextures  TODO
+
+	Material* pLeaf = nullptr;
+	renderManager.CreateMaterial(L"leaf", L"", leafMaterial, &pLeaf);
+	pNewMesh = nullptr;
+	pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
+	renderManager.CreateMesh(L"leaf", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
+	renderManager.ReserveRenderUnit(pLeaf, pNewMesh, this, &m_leafUnit);
 
 	return S_OK;
 }
@@ -75,6 +90,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 
 	_logInstanceData.clear();
 	_twigInstanceData.clear();
+	_leafInstanceData.clear();
 	int currentBranch = 0;
 
 	XMVECTOR startPosition = XMLoadFloat3(&_position); 
@@ -82,7 +98,8 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 	ComputeBranchInstanceData(&pFrameConfig->GetRenderData(), currentBranch, _treeModel->trunk, startPosition);
 
 	InstancedData* logBuffer = dataView + startInstance;
-	InstancedData* twigBuffer = dataView  + startInstance + _logInstanceData.size();
+	InstancedData* twigBuffer = dataView + startInstance + _logInstanceData.size();
+	InstancedData* leafBuffer = dataView + startInstance + _logInstanceData.size() + _twigInstanceData.size();
 
 	// TODO add to render unit specific data view
 	if (_logInstanceData.size())
@@ -95,9 +112,15 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 		memcpy(twigBuffer, &_twigInstanceData[0], _twigInstanceData.size() * sizeof(InstancedData));
 	}
 
-	pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT) _logInstanceData.size());
-	pFrameConfig->SetInstances(m_twigUnit, this, startInstance + (UINT) _logInstanceData.size(), (UINT) _twigInstanceData.size());
+	if (_leafInstanceData.size() > 0)
+	{
+		memcpy(leafBuffer, &_leafInstanceData[0], _leafInstanceData.size() * sizeof(InstancedData));
+	}
 
+	pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT) _logInstanceData.size());
+	pFrameConfig->SetInstances(m_twigUnit, this, startInstance + (UINT) _logInstanceData.size(), (UINT)_twigInstanceData.size());
+	pFrameConfig->SetInstances(m_leafUnit, this, startInstance + (UINT) _logInstanceData.size() + (UINT) _twigInstanceData.size(), (UINT)_leafInstanceData.size());
+	
 	return S_OK;
 }
 
@@ -116,15 +139,24 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	InstancedData data;
 	XMStoreFloat4x4(&data.World, localToWorld);
 
-	if (branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(parentStart - pRenderData->eyePos)) < 100.0f)
+	// Decide which geometry model to use
+	switch (branch->geometryType)
 	{
-		_logInstanceData.push_back(data);
-	}
-	else
-	{
-		_twigInstanceData.push_back(data);
-	}
+		case Leaf:
+			_leafInstanceData.push_back(data);
+			break;
+		case Stick:
+			if (branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(parentStart - pRenderData->eyePos)) < 100.0f)
+			{
+				_logInstanceData.push_back(data);
+			}
+			else
+			{
+				_twigInstanceData.push_back(data);
+			}
 
+			break;
+	}
 	//Compute bounding box
 	XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMVector3Transform(XMVectorSet(-1.0f,-1.0f,-1.0f, 0), localToWorld),
 												XMLoadFloat3(&_boundingBox[0]))); 
@@ -148,8 +180,6 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 
 HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR* vComputedEnd, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart)
 {
-
-
 	float animScaleFactor = 1.0f;
 	if (time - 5 < branch->depth)
 	{
@@ -167,7 +197,17 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
 
 	// Scale branch
 	XMVECTOR vMag = XMVector3Length(vEnd - vStart);
-	XMVECTOR vScale = XMVectorSet(branch->thickness, XMVectorGetX(vMag), branch->thickness, 0) * animScaleFactor;
+	XMVECTOR vScale;
+	
+	switch (branch->geometryType)
+	{
+	case Leaf:
+		vScale = XMVectorSet(0.06f, XMVectorGetX(vMag), 0.004f, 0) * animScaleFactor;
+		break;
+	case Stick:
+		vScale = XMVectorSet(branch->thickness, XMVectorGetX(vMag), branch->thickness, 0) * animScaleFactor;
+		break;
+	}
 
 	// Child start pos
 	XMVECTOR vMagY = XMVectorSet(animScaleFactor, animScaleFactor, animScaleFactor, 1);
@@ -283,8 +323,8 @@ unsigned int Tree::GetNumInstances()
 { 
 	if (_treeModel)
 	{
-		assert((UINT)_treeModel->treeData.numBranches >= _logInstanceData.size() + _twigInstanceData.size());
-        return (unsigned int) (_logInstanceData.size() + _twigInstanceData.size());
+		assert((UINT)_treeModel->treeData.numBranches >= _logInstanceData.size() + _twigInstanceData.size() + _leafInstanceData.size());
+        return (unsigned int) (_logInstanceData.size() + _twigInstanceData.size() + _leafInstanceData.size());
 	}
 	else
 		return 0;

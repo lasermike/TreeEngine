@@ -18,9 +18,11 @@ private:
 	TreeModel* _treeModel;
 	std::vector<InstancedData>			_logInstanceData;
 	std::vector<InstancedData>			_twigInstanceData;
+	std::vector<InstancedData>			_leafInstanceData;
 
 	RenderUnit*							m_logUnit;
 	RenderUnit*							m_twigUnit;
+	RenderUnit*							m_leafUnit;
 
 	HRESULT ComputeBranchInstanceData(RenderData* pRenderData, int& currentBranch, Branch const* branch, const FXMVECTOR parentStart);
 	HRESULT ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, const FXMVECTOR parentStart);

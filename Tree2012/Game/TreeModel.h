@@ -18,11 +18,19 @@ struct cbBranch
 
 };
 
+
+enum GeometryType
+{
+	Stick,
+	Leaf
+};
+
 struct Branch
 {
 	int id;
 	int depth;
 	int parent;
+	GeometryType geometryType;
 
 	XMFLOAT4 start;
 	float	thickness;
