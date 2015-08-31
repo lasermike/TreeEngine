@@ -32,16 +32,16 @@ TreeModel* LSystemModelGenerator::Create()
 
 	OutputDebugStringA(axiom.c_str());
 	
-	CreateSkeleton(axiom);
+	CreateSkeleton2(axiom);
 
 	return _model;
 }
 
-void LSystemModelGenerator::CreateSkeleton(string& axiom)
+void LSystemModelGenerator::CreateSkeleton2(string& axiom)
 {
 	BuildState initialState;
-	initialState.pos = XMFLOAT4(0,0,0,1);
-	initialState.dir = XMFLOAT4(0,1,0,1);
+	initialState.pos = XMFLOAT4(0, 0, 0, 1);
+	initialState.dir = XMFLOAT4(0, 1, 0, 1);
 
 	int id = _model->treeData.numBranches++;
 	Branch* child = &_model->treeData.pBranches[id];
@@ -57,16 +57,16 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
 	BuildState previousState = initialState, currentState;
 
-	XMFLOAT4 zAxis(0,0,1,1);
+	XMFLOAT4 zAxis(0, 0, 1, 1);
 	XMMATRIX rotateZPosMat = XMMatrixRotationAxis(XMLoadFloat4(&zAxis), _params._angle);
 	XMMATRIX rotateZNegMat = XMMatrixRotationAxis(XMLoadFloat4(&zAxis), -_params._angle);
 
-	XMFLOAT4 xAxis(1,0,0,1);
+	XMFLOAT4 xAxis(1, 0, 0, 1);
 	XMMATRIX rotateXPosMat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), _params._angle);
 	XMMATRIX rotateXNegMat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), _params._angle);
 	XMMATRIX rotate180Mat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), XM_PI);
 
-	XMFLOAT4 yAxis(0,1,0,1);
+	XMFLOAT4 yAxis(0, 1, 0, 1);
 	XMMATRIX rotateYPosMat = XMMatrixRotationAxis(XMLoadFloat4(&yAxis), _params._angle);
 	XMMATRIX rotateYNegMat = XMMatrixRotationAxis(XMLoadFloat4(&yAxis), _params._angle);
 
@@ -89,11 +89,11 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateYNegMat)));
 			break;
 		case '<':
-		case '/':
+		case '\\':
 			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateXPosMat)));
 			break;
 		case '>':
-		case '\\':
+		case '/':
 			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateXNegMat)));
 			break;
 		case '+':
@@ -104,9 +104,109 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 			break;
 		case '|':
 			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotate180Mat));
-			break; 
-		//case 'A':
-		//case 'B':
+			break;
+			//case 'A':
+			//case 'B':
+		case 'f':
+			XMStoreFloat4(&currentState.pos, XMLoadFloat4(&currentState.pos) + XMLoadFloat4(&currentState.dir) * _params._segmentLength * 0.2f);
+			currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos, Leaf);
+			break;
+		case 'F':
+			XMStoreFloat4(&currentState.pos, XMLoadFloat4(&currentState.pos) + XMLoadFloat4(&currentState.dir) * _params._segmentLength);
+			currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos, Stick);
+			break;
+		case '[':
+			stateStack.push(currentState);
+			break;
+		case ']':
+			currentState = stateStack.top();
+			stateStack.pop();
+			break;
+		case 'C':
+			c++;
+			// TODO color
+			break;
+		case 'X':
+		case ' ':
+			break; // noop
+		}
+		previousState = currentState;
+		pos++;
+		done.push_back(cmd);
+	}
+
+}
+
+void LSystemModelGenerator::CreateSkeleton(string& axiom)
+{
+	BuildState initialState;
+	initialState.pos = XMFLOAT4(0, 0, 0, 1);
+	initialState.dir = XMFLOAT4(0, 1, 0, 1);
+
+	int id = _model->treeData.numBranches++;
+	Branch* child = &_model->treeData.pBranches[id];
+
+	_model->trunk = child;
+	_model->trunk->id = id;
+	_model->trunk->parent = -1;
+	_model->trunk->start = initialState.pos;
+	XMStoreFloat4(&_model->trunk->end, XMLoadFloat4(&initialState.pos) + XMLoadFloat4(&initialState.dir) * _params._segmentLength);
+	_model->trunk->thickness = _params.thickness;
+	_model->trunk->depth = 0;
+	initialState.branch = _model->trunk;
+
+	BuildState previousState = initialState, currentState;
+
+	XMFLOAT4 zAxis(0, 0, 1, 1);
+	XMMATRIX rotateZPosMat = XMMatrixRotationAxis(XMLoadFloat4(&zAxis), _params._angle);
+	XMMATRIX rotateZNegMat = XMMatrixRotationAxis(XMLoadFloat4(&zAxis), -_params._angle);
+
+	XMFLOAT4 xAxis(1, 0, 0, 1);
+	XMMATRIX rotateXPosMat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), _params._angle);
+	XMMATRIX rotateXNegMat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), _params._angle);
+	XMMATRIX rotate180Mat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), XM_PI);
+
+	XMFLOAT4 yAxis(0, 1, 0, 1);
+	XMMATRIX rotateYPosMat = XMMatrixRotationAxis(XMLoadFloat4(&yAxis), _params._angle);
+	XMMATRIX rotateYNegMat = XMMatrixRotationAxis(XMLoadFloat4(&yAxis), _params._angle);
+
+
+	stack<BuildState> stateStack;
+
+	int pos = 0;
+	string done;
+	for (auto c = axiom.begin(); c != axiom.end(); c++)
+	{
+		currentState = previousState;
+
+		char cmd = *c;
+		switch (cmd)
+		{
+		case '&':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateYPosMat)));
+			break;
+		case '^':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateYNegMat)));
+			break;
+		case '<':
+		case '\\':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateXPosMat)));
+			break;
+		case '>':
+		case '/':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateXNegMat)));
+			break;
+		case '+':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateZPosMat)));
+			break;
+		case '-':
+			XMStoreFloat4(&currentState.dir, XMVector4Normalize(XMVector4Transform(XMLoadFloat4(&currentState.dir), rotateZNegMat)));
+			break;
+		case '|':
+			XMStoreFloat4(&currentState.dir, XMVector4Transform(XMLoadFloat4(&currentState.dir), rotate180Mat));
+			break;
+			//case 'A':
+			//case 'B':
 		case 'f':
 			XMStoreFloat4(&currentState.pos, XMLoadFloat4(&currentState.pos) + XMLoadFloat4(&currentState.dir) * _params._segmentLength * 0.2f);
 			currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos, Leaf);

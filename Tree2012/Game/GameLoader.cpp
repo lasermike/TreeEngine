@@ -16,7 +16,7 @@ GameLoader::GameLoader()
 void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
 	//LoadTrees(pScene, pRenderData, pPlayer);
-	LoadTrees3(pScene, pRenderData, pPlayer);
+	LoadTrees2(pScene, pRenderData, pPlayer);
 //	LoadTestBlock(pScene, pRenderData, pCamera);
 }
 
@@ -122,11 +122,11 @@ void GameLoader::LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* 
 	params5->depthLOD = 1;
 	params5->GetGeneratorParameters()._constants = "";
 	params5->GetGeneratorParameters()._axiom = "X";
-	params5->GetGeneratorParameters()._rules.push_back(Rule("X", "F[+X][>-X]FX"));
+	params5->GetGeneratorParameters()._rules.push_back(Rule("X", "F[+X][-X]FX"));
 	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "FF"));
-	params5->GetGeneratorParameters()._angle = 0.23998277214922031682700748066718f;
+	params5->GetGeneratorParameters()._angle = 0.47996554429844063365401496133436f;
 	params5->GetGeneratorParameters()._numIterations = 7;
-	params5->GetGeneratorParameters()._segmentLength = .01f;
+	params5->GetGeneratorParameters()._segmentLength = .009f;
 	params5->GetGeneratorParameters().thickness = .01f;
 	pScene->AddChild(new Tree(params5));
 
@@ -177,8 +177,8 @@ void GameLoader::LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* 
 	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "S ///// F "));
 	params5->GetGeneratorParameters()._rules.push_back(Rule("S", "FL"));
 	params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’??f]"));
-	//params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’??{-f+f+f-|-f+f+f}]"));
-	params5->GetGeneratorParameters()._angle = 0.19634954084936207740391521145497f;
+	params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’??{-f+f+f-|-f+f+f}]"));
+	params5->GetGeneratorParameters()._angle = 0.09817477042468103870195760572749f;
 	params5->GetGeneratorParameters()._numIterations = 5;
 	params5->GetGeneratorParameters()._segmentLength = .4f;
 	params5->GetGeneratorParameters().thickness = .01f;
