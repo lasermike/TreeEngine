@@ -55,8 +55,8 @@ struct LSystemParams
 
 struct BuildState
 {
-	XMFLOAT4 pos;
-	XMFLOAT4 dir;
+	XMVECTOR pos;
+	XMVECTOR dir;
 	Branch* branch;
 
 	BuildState()

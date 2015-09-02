@@ -6,7 +6,13 @@
 
 #include "Primitive.h" // TEMPTEMP
 
-FrameStatistic g_frameStats[MAX_FRAME_STAT] = { { FPS_STAT, L"FPS", 0 }, { WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", 0 } };
+FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
+{ 
+	{ FPS_STAT, L"FPS", 0 }, 
+	{ WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", 0 }, 
+	{ NUM_LEAVES_STAT, L"Num leaves", 0 },
+	{ NUM_STICKS_STAT, L"Num sticks", 0 },
+};
 
 
 __declspec(align(16))

@@ -91,7 +91,7 @@ HRESULT Game::Initialize()
 
 	// Create player
 	WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
-	playerParams->position = XMFLOAT3(-4.3f, 1.5f, -5.5f);
+	playerParams->position = XMFLOAT3(-4.0f, 1.5f, -4.0f);
 	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
 	m_player = new Player(playerParams);
 
