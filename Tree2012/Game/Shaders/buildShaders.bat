@@ -26,7 +26,7 @@ goto ENDOFSCRIPT
     set target=ps_5_0
 	set suffix=PS
   )
-  set outputfile=%~4/%~n3.cso
+  set outputfile=%~4%~n3.cso
   ECHO Building %1 for %target%  
   set finalcmd=%cmdline% %1 /T%target% /E%3 /Fo"%outputfile%"
   echo !finalcmd!

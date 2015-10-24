@@ -7,6 +7,7 @@
 #include <agile.h>
 
 // Above this line include platform specific stuff
-#define TREENGINE_WINRT
+#define TREENGINE_UNIVERSAL
+#undef WIN32
 
 #include <stdafx.h>

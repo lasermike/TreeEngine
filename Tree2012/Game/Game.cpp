@@ -19,7 +19,7 @@
 using namespace DirectX;
 
 #ifndef _XBOX_ONE
-#ifndef _TREE_CLASSIC
+#ifndef WIN32
 using namespace Windows::Graphics::Display;
 #endif 
 #endif 
@@ -37,7 +37,7 @@ struct CBChangeOnResize
 
 Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 {
-#ifndef _TREE_CLASSIC
+#ifndef WIN32
 	m_window = nullptr;
 #else
 	m_hwnd = nullptr;
@@ -114,7 +114,7 @@ HRESULT Game::Initialize()
 	return S_OK;
 }
 
-#ifdef _TREE_CLASSIC
+#ifdef WIN32
 HRESULT Game::Initialize(HWND hwnd) 
 { 
 	Initialize();
@@ -134,7 +134,6 @@ HRESULT Game::Initialize(HWND hwnd)
 
 	return hr;
 }
-
 #else
 
 HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi) 
@@ -365,7 +364,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	DXGI_SWAP_CHAIN_DESC1 sd;
 	ZeroMemory(&sd, sizeof(sd));
 
-#if !defined(_TREE_CLASSIC)
+#if !defined(WIN32)
 	sd.Width = windowWidth;
 	sd.Height = windowHeight;
 #endif
@@ -374,7 +373,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
 	//sd.Scaling = DXGI_SCALING_STRETCH;
 	sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
-#else //#elif !defined(_TREE_CLASSIC)
+#else //#elif !defined(WIN32)
 	sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
 	sd.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
@@ -384,7 +383,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 
-#if defined(_TREE_CLASSIC)
+#if defined(WIN32)
 	HRR(dxgiFactory2->CreateSwapChainForHwnd(m_pd3dDevice, m_hwnd, &sd, nullptr, nullptr, &m_pSwapChain1));
 	HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
 #else
@@ -798,7 +797,7 @@ void Game::DrawSceneToShadowMap()
 	stockStates.ApplyRasterizerState( m_pImmediateContext, XSF::StockRasterizerStates::Solid);
 }
 
-#if !defined(_TREE_CLASSIC) && !defined(_XBOX_ONE)
+#if !defined(WIN32) && !defined(_XBOX_ONE)
 // Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
 float Game::ConvertDipsToPixels(float dips, float logicalDpi )
 {

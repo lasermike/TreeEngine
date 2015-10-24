@@ -11,7 +11,7 @@
 #include "Player.h"
 #include "RenderManager.h"
 
-#ifndef _TREE_CLASSIC
+#ifndef WIN32
 #include "agile.h"
 using namespace Microsoft::WRL;
 #endif
@@ -46,7 +46,7 @@ public:
 	~Game();
 
 	// Initialization and management
-#ifdef _TREE_CLASSIC
+#ifdef WIN32
 	HRESULT Initialize(HWND hwnd);
 #else
 	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
@@ -119,7 +119,7 @@ private:
 	double								m_timeStart;
 	double								m_timeCurrent;
 
-#ifdef _TREE_CLASSIC
+#ifdef WIN32
 	HWND								m_hwnd;
 #else
 	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;

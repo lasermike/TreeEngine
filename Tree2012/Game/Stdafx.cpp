@@ -39,7 +39,7 @@ void XSF::SetContentFileRoot()
 
     _snwprintf_s( Details::g_strApplicationDataPath, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s\\", writeableFolder.c_str() );
 
-#elif defined(_TREE_CLASSIC)
+#elif defined(WIN32)
 	GetModuleFileName( NULL, Details::g_strCommonFileRoot, MAX_PATH );
 	//PathRemoveFileSpec(Details::g_strCommonFileRoot);
 	wstring path = Details::g_strCommonFileRoot;

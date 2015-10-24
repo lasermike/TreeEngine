@@ -127,6 +127,7 @@
     <ClCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Disabled</Optimization>
+      <UndefinePreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">WIN32</UndefinePreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\Game\CopyResources.cmd $(OutDir)</Command>
@@ -135,6 +136,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">WIN32</UndefinePreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\Game\CopyResources.cmd $(OutDir)</Command>

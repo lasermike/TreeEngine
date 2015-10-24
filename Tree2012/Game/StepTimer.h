@@ -4,7 +4,7 @@
 
 #pragma once
 
-#ifndef _TREE_CLASSIC
+#ifndef WIN32
 #include <wrl.h>
 #endif
 
@@ -28,7 +28,7 @@ namespace DX
 			if (!QueryPerformanceFrequency(&m_qpcFrequency))
 			{
 				OutputDebugString(L"StepTimer: QPC failed\n");
-#ifndef _TREE_CLASSIC
+#ifndef WIN32
 				throw ref new Platform::FailureException();
 #endif			
 			}
@@ -36,7 +36,7 @@ namespace DX
 			if (!QueryPerformanceCounter(&m_qpcLastTime))
 			{
 				OutputDebugString(L"StepTimer: QPC failed\n");
-#ifndef _TREE_CLASSIC
+#ifndef WIN32
 				throw ref new Platform::FailureException();
 #endif
 			}
@@ -81,7 +81,7 @@ namespace DX
 			if (!QueryPerformanceCounter(&m_qpcLastTime))
 			{
 				OutputDebugString(L"StepTimer: QPC failed\n");
-#ifndef _TREE_CLASSIC
+#ifndef WIN32
 				throw ref new Platform::FailureException();
 #endif
 			}
@@ -102,7 +102,7 @@ namespace DX
 			if (!QueryPerformanceCounter(&currentTime))
 			{
 				OutputDebugString(L"StepTimer: QPC failed\n");
-#ifndef _TREE_CLASSIC
+#ifndef WIN32
 				throw ref new Platform::FailureException();
 #endif
 			}
