@@ -144,6 +144,7 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 	{
 		case Leaf:
 			_leafInstanceData.push_back(data);
+			pRenderData->frameStats[NUM_LEAVES_STAT].stat++;
 			break;
 		case Stick:
 			if (branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(parentStart - pRenderData->eyePos)) < 100.0f)
@@ -154,6 +155,7 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 			{
 				_twigInstanceData.push_back(data);
 			}
+			pRenderData->frameStats[NUM_STICKS_STAT].stat++;
 
 			break;
 	}
@@ -202,7 +204,7 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
 	switch (branch->geometryType)
 	{
 	case Leaf:
-		vScale = XMVectorSet(0.06f, XMVectorGetX(vMag), 0.004f, 0) * animScaleFactor;
+		vScale = XMVectorSet(XMVectorGetX(vMag) * 0.5f, XMVectorGetX(vMag), 0.004f, 0) * animScaleFactor;
 		break;
 	case Stick:
 		vScale = XMVectorSet(branch->thickness, XMVectorGetX(vMag), branch->thickness, 0) * animScaleFactor;
