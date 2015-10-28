@@ -44,6 +44,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 #endif
 	m_driverType = D3D_DRIVER_TYPE_NULL;
 	m_featureLevel = D3D_FEATURE_LEVEL_11_0;
+	m_renderToSharedTexture = false;
 	m_paused = false;
 	m_wireframe = false;
 	m_showHelp = false;
@@ -115,8 +116,10 @@ HRESULT Game::Initialize()
 }
 
 #ifdef WIN32
-HRESULT Game::Initialize(HWND hwnd) 
+HRESULT Game::Initialize(HWND hwnd, bool renderToSharedTexture) 
 { 
+	m_renderToSharedTexture = renderToSharedTexture;
+
 	Initialize();
 
 	m_hwnd = hwnd;  
@@ -294,6 +297,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	m_pRenderTargetView.Release();
 	m_pSwapChain1.Release();
 	m_pSwapChain.Release();
+	m_pSharedRenderToTexture.Release();
 
 	// Calculate the necessary swap chain and render target size in pixels.
 
@@ -361,40 +365,64 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 		(void)m_pImmediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&m_pImmediateContext1));
 	}
 
-	DXGI_SWAP_CHAIN_DESC1 sd;
-	ZeroMemory(&sd, sizeof(sd));
+	CComPtr<ID3D11Texture2D> pBackBuffer;
+
+	if (m_renderToSharedTexture) // Create just a textured to render to.  No double buffering.
+	{
+		D3D11_TEXTURE2D_DESC Desc;
+		Desc.Width = 1600;
+		Desc.Height = 1080;
+		Desc.MipLevels = 1;
+		Desc.ArraySize = 1;
+		Desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		Desc.SampleDesc.Count = 1;
+		Desc.SampleDesc.Quality = 0;
+		Desc.Usage = D3D11_USAGE_DEFAULT;
+		Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+		Desc.CPUAccessFlags = 0;
+		Desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+
+		HRESULT hr = S_OK;
+		HRR(m_pd3dDevice->CreateTexture2D(&Desc, NULL, &m_pSharedRenderToTexture));
+
+		pBackBuffer = m_pSharedRenderToTexture;
+	}
+	else // Create swap chain which includes render target buffer
+	{
+		DXGI_SWAP_CHAIN_DESC1 sd;
+		ZeroMemory(&sd, sizeof(sd));
 
 #if !defined(WIN32)
-	sd.Width = windowWidth;
-	sd.Height = windowHeight;
+		sd.Width = windowWidth;
+		sd.Height = windowHeight;
 #endif
 
 #ifdef _XBOX_ONE
-	sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-	//sd.Scaling = DXGI_SCALING_STRETCH;
-	sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
+		sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+		//sd.Scaling = DXGI_SCALING_STRETCH;
+		sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
 #else //#elif !defined(WIN32)
-	sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
-	sd.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
-	sd.SampleDesc.Quality = m_enableMsaa ? msaaQuality - 1 : 0;
-	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	sd.BufferCount = 2;
-	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+		sd.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
+		sd.SampleDesc.Quality = m_enableMsaa ? msaaQuality - 1 : 0;
+		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		sd.BufferCount = 2;
+		sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+		sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 
 #if defined(WIN32)
-	HRR(dxgiFactory2->CreateSwapChainForHwnd(m_pd3dDevice, m_hwnd, &sd, nullptr, nullptr, &m_pSwapChain1));
-	HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
+		HRR(dxgiFactory2->CreateSwapChainForHwnd(m_pd3dDevice, m_hwnd, &sd, nullptr, nullptr, &m_pSwapChain1));
+		HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
 #else
-	HRR(dxgiFactory2->CreateSwapChainForCoreWindow(m_pd3dDevice, reinterpret_cast<IUnknown*>(m_window.Get()), &sd, nullptr, &m_pSwapChain1));
-	HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
+		HRR(dxgiFactory2->CreateSwapChainForCoreWindow(m_pd3dDevice, reinterpret_cast<IUnknown*>(m_window.Get()), &sd, nullptr, &m_pSwapChain1));
+		HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
 #endif 
 
-	// Create a render target view
-	CComPtr<ID3D11Texture2D> pBackBuffer;
-	HRR(m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+		HRR(m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+	}
 
+	// Create a render target view
 	HRR(hr = m_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
 	SetDebugName(m_pRenderTargetView, "Game::m_pRenderTargetView");
 	pBackBuffer->Release();
@@ -448,7 +476,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 
     // Validation
     ASSERT(m_pRenderTargetView);
-    ASSERT(m_pSwapChain1);
+    ASSERT(m_pSwapChain1 || m_pSharedRenderToTexture);
 
     ASSERT(m_renderManager.GetRenderData().projectionData.nearClippingPlane != 0);
     ASSERT(m_renderManager.GetRenderData().projectionData.farClippingPlane != 0);
@@ -495,6 +523,7 @@ void Game::CleanupDevice()
 	m_pRenderTargetView.Release();
 	m_pSwapChain1.Release();
 	m_pSwapChain.Release();
+	m_pSharedRenderToTexture.Release();
 	m_pImmediateContext1.Release();
 	m_pImmediateContext.Release();
 
@@ -674,7 +703,7 @@ void Game::Render(bool oculus)
 		HRC(m_renderManager.DrawScreenQuad(m_pImmediateContext, m_renderManager.GetRenderData().pShadowMap->DepthMapSRV()));
 	}
 
-    if (!oculus)
+    if (!oculus && !m_renderToSharedTexture)
     {
 	    // Present our back buffer to our front buffer
 	    HRC(m_pSwapChain->Present(0, 0));

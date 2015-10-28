@@ -318,7 +318,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	g_game = new Game(&g_inputManager);
 
-	if (FAILED(g_game->Initialize(hWnd)))
+	if (FAILED(g_game->Initialize(hWnd, false)))
     {
 		g_game->Cleanup();
         return 0;
@@ -326,7 +326,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
     // Set up the oculus helper library
     DIRECTX.Context = g_game->GetContext();
-    DIRECTX.BackBuffer = g_game->GetBackBuffer();
+    //DIRECTX.BackBuffer = g_game->GetBackBuffer();
     DIRECTX.SwapChain = g_game->GetSwapChain();
 
     ShowWindow(hWnd, nCmdShow);

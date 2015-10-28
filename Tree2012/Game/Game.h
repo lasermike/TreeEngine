@@ -47,7 +47,7 @@ public:
 
 	// Initialization and management
 #ifdef WIN32
-	HRESULT Initialize(HWND hwnd);
+	HRESULT Initialize(HWND hwnd, bool renderToSharedTexture);
 #else
 	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
 #endif
@@ -72,7 +72,7 @@ public:
 	// Accessor methods for Oculus
 	ID3D11Device* GetDevice() { return m_pd3dDevice1; }
     XSF::D3DDeviceContext* GetContext() { return m_pImmediateContext; }
-    ID3D11Texture2D* GetBackBuffer() { return m_pDepthStencil; }
+    ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
     IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 
@@ -138,6 +138,7 @@ private:
 	CComPtr<IDXGISwapChain>             m_pSwapChain;
 	CComPtr<IDXGISwapChain1>            m_pSwapChain1;
 	CComPtr<ID3D11RenderTargetView>     m_pRenderTargetView;
+	CComPtr<ID3D11Texture2D>            m_pSharedRenderToTexture;
 	DisplayMode							m_displayMode;
 	CComPtr<ID3D11Texture2D>            m_pDepthStencil;
 	CComPtr<ID3D11DepthStencilView>		m_pDepthStencilView;
@@ -147,6 +148,8 @@ private:
 
 	D3D11_VIEWPORT						m_viewPort;
 	bool								m_enableMsaa;
+
+	bool								m_renderToSharedTexture;
 
 	bool								m_resetTree;
 	bool								m_showShadowBuffer;
