@@ -11,7 +11,13 @@ class PlaneModelGenerator : public ModelGenerator, public Model
 
 class TreeModelGenerator : public ModelGenerator
 {
+protected:
+	Branch* AddBranch(Branch* parent, XMFLOAT4& start, XMFLOAT4& end, GeometryType geometryType, float thickness);
+	TreeModel*	_model;
+
 public:
+	TreeModelGenerator() : _model(nullptr) { } 
+
 	virtual TreeModel* Create() = 0;
 };
 

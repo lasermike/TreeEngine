@@ -3,6 +3,31 @@
 #include "TreeModel.h"
 #include <algorithm>
 
+Branch* TreeModelGenerator::AddBranch(Branch* parent, XMFLOAT4& start, XMFLOAT4& end, GeometryType geometryType, float thickness)
+{
+	int id = _model->treeData.numBranches++;
+	Branch* child = &_model->treeData.pBranches[id];
+
+	child->id = id;
+
+	if (parent)
+	{
+		parent->AddChild(child->id);
+	}
+
+	child->parent = parent ? parent->id : -1;
+	child->start = start;
+	child->end = end;
+	child->thickness = thickness;
+	child->depth = parent ? parent->depth + 1 : 0;
+	child->geometryType = geometryType;
+
+	if (child->depth > _model->treeData.numLevels)
+		_model->treeData.numLevels = child->depth;
+
+	return child;
+}
+
 FixedTreeModelGenerator::FixedTreeModelGenerator(unsigned int seed)
 {
 	_seed = seed;

@@ -116,6 +116,9 @@ Cleanup:
 extern "C" __declspec(dllexport) void WINAPI RenderScene(LPSIZE pSize)
 {
 	// Run game 
+	// TODO: sdfjlk
+
+
 	g_game->ComputeCPU();
 	g_game->ComputeGPU();
 

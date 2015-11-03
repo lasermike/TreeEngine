@@ -20,14 +20,16 @@ enum GeneratorType
 	NullGeneratorType,
 	PrimitiveGeneratorType,
 	FixedTreeGeneratorType,
-	LSystemGeneratorType
+	LSystemGeneratorType,
+	GraphGeneratorType,
 };
 
 enum ObjectType
 {
 	WorldObjectType,
 	PrimitiveObjectType,
-	TreeType
+	TreeType,
+	GraphType,
 };
 
 enum Extent

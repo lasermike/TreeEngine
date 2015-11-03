@@ -2,7 +2,7 @@
 #include "LSystemModelGenerator.h"
 #include <stack>
 
-LSystemModelGenerator::LSystemModelGenerator(LSystemParams& params) : _model(nullptr), _params(params)
+LSystemModelGenerator::LSystemModelGenerator(LSystemParams& params) : TreeModelGenerator(), _params(params)
 {
 }
 
@@ -133,7 +133,7 @@ void LSystemModelGenerator::CreateSkeleton2(string& axiom)
 			XMStoreFloat4(&tmpPrev, prevPos);
 			XMStoreFloat4(&tmpNext, currentState.pos);
 			
-			currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (cmd == 'L' ? Leaf : Stick ));
+			currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (cmd == 'L' ? Leaf : Stick ), _params.thickness);
 			break;
 		case '[':
 			stateStack.push(currentState);
@@ -262,24 +262,3 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
 }
 
-Branch* LSystemModelGenerator::AddBranch(Branch* parent, XMFLOAT4& start, XMFLOAT4& end, GeometryType geometryType)
-{
-	int id = _model->treeData.numBranches++;
-	Branch* child = &_model->treeData.pBranches[id];
-
-	child->id = id;
-	parent->AddChild(child->id);
-	///parent->numChildren++;
-	child->parent = parent->id;
-	child->start = start;
-	child->end = end;
-	//child->numChildren = 0;
-	child->thickness = parent->thickness;
-	child->depth = parent->depth + 1;
-	child->geometryType = geometryType;
-
-	if (child->depth > _model->treeData.numLevels)
-		_model->treeData.numLevels = child->depth;
-
-	return child;
-}

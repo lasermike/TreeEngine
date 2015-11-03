@@ -195,6 +195,7 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
 	ASSERT(animScaleFactor >= 0.0f);
 
 	XMVECTOR vStart = parentStart;
+	//XMVECTOR vStart = XMLoadFloat3((XMFLOAT3*)&(branch->start)) + XMLoadFloat3(&_position);
 	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
 
 	// Scale branch
@@ -264,6 +265,7 @@ HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransf
 	}
 
 	XMVECTOR vStart = parentStart;
+	//XMVECTOR vStart = XMLoadFloat3((XMFLOAT3*)&(branch->start)) + XMLoadFloat3(&_position);
 	XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
 
 	// Scale branch
