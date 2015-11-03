@@ -15,10 +15,105 @@ GameLoader::GameLoader()
 
 void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
-	//LoadTrees(pScene, pRenderData, pPlayer);
-	LoadTrees3(pScene, pRenderData, pPlayer);
+	LoadGraph(pScene, pRenderData, pPlayer);
+//	LoadTrees(pScene, pRenderData, pPlayer);
 //	LoadTestBlock(pScene, pRenderData, pCamera);
 }
+
+
+struct GraphParams
+{
+	std::vector<XMFLOAT2> points;
+
+	GraphParams()  { };
+};
+
+
+class GraphModelGenerator : public TreeModelGenerator
+{
+	GraphParams _params;
+
+public:
+	GraphModelGenerator(GraphParams& params) : _params(params) { }
+	TreeModel* Create();
+
+protected:
+	void CreateGraph(std::vector<XMFLOAT2>& points);
+};
+
+TreeModel* GraphModelGenerator::Create()
+{ 
+	_model = new TreeModel();
+
+	Branch* parent = nullptr;
+
+	for (UINT i = 1; i < _params.points.size(); i++)
+	{
+		XMFLOAT4 start = XMFLOAT4(_params.points[i - 1].x, _params.points[i - 1].y, 0, 0);
+		XMFLOAT4 end = XMFLOAT4(_params.points[i].x, _params.points[i].y, 0, 0);
+
+		Branch* child = AddBranch(parent, start, end, Stick, .020f);
+
+		if (i == 1)
+		{
+			_model->trunk = child;
+		}
+
+		parent = child;
+	}
+
+	return _model; 
+}
+
+void GraphModelGenerator::CreateGraph(std::vector<XMFLOAT2>& points) { }
+
+
+void GameLoader::LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
+{
+	// Graph
+	WorldObjectParameters<GraphParams>* graphParams = new WorldObjectParameters<GraphParams>(GraphGeneratorType);
+	graphParams->position = XMFLOAT3(1.3f, .5f, -1.3f);
+	graphParams->_animationSpeed = 0.0f;
+	graphParams->depthLOD = 1;
+	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(0, 0));
+	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(1, 1));
+	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(2, 1.5f));
+	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(3, 2.5f));
+	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(4, 1));
+	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(5, 0));
+	pScene->AddChild(new Tree(graphParams));
+
+
+	// "Ground" (temporary)
+	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+	params4->position = XMFLOAT3(0, 0, 0);
+	params4->scale = XMFLOAT3(30, .01f, 30);
+	params4->primitiveType = PrimitiveType_Cylinder;
+	pScene->AddChild(new Primitive(params4));
+
+	// Init lights
+	pRenderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	pRenderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+	pRenderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+	pRenderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	pRenderData->time = 0;
+
+	// Camera
+	const float maxBound = 3.0f;
+	XMFLOAT3 bounds[] =
+	{
+		XMFLOAT3(-maxBound,-maxBound,-maxBound),
+		XMFLOAT3(maxBound,maxBound,maxBound)
+	};
+
+	if (pPlayer && pPlayer->GetOrbitCamera())
+	{
+		pPlayer->GetOrbitCamera()->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
+		pPlayer->GetOrbitCamera()->SetHeading(2.48f);
+		//pCamera->SetFocusPosition(XMVectorSet(0, 1.1f, 0, 1));
+	}
+}
+
 
 void GameLoader::LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
@@ -166,7 +261,7 @@ void GameLoader::LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* 
 	// p3 :S? FL 
 	// p4 :L? [’’’??{-f+f+f-|-f+f+f}]
 
-
+	// INCOMPLETE TREE!
 	WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params5->position = XMFLOAT3(0, 2.0f, 0);
 	params5->_animationSpeed = 15.0f;
@@ -242,6 +337,12 @@ void GameLoader::Regenerate(SceneRoot* pScene)
 		{
 			PrimitiveModelGenerator planeGen((*t)->GetParams().primitiveType);
 			(*t)->Create(&planeGen);
+		}
+		else if (genType == GraphGeneratorType)
+		{
+			WorldObjectParameters<GraphParams>& wop = (*t)->GetParams<GraphParams>();
+			GraphModelGenerator graphGen(wop.GetGeneratorParameters());
+			(*t)->Create(&graphGen);
 		}
 		else
 		{

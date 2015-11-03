@@ -14,6 +14,8 @@ class GameLoader
 	void LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
 	void LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
 
+	void LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
+
 public:
 	GameLoader();
 

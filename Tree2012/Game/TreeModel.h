@@ -37,8 +37,6 @@ struct Branch
 	XMFLOAT4 end;
 
 	vector<int> children;
-	//int children[6];
-	//int numChildren;
 
 	Branch()
 	{
@@ -47,20 +45,7 @@ struct Branch
 
 	int Child(int i) const 
 	{ 
-		//ASSERT(i < maxChildBranches);
 		return children[i];
-
-		//switch (i) {
-		//case 0:
-		//	return children.x;
-		//case 1:
-		//	return children.y;
-		//case 2:
-		//	return children.z;
-		//case 3:
-		//	return children.w;
-		//}
-		//throw;
 	}
 	void AddChild(int c) 
 	{
@@ -72,24 +57,6 @@ struct Branch
 		ASSERT(i < maxChildBranches);
 		ASSERT(i == children.size());
 		children.at(i) = c;
-		//children[i] = c;
-
-		//switch (i) {
-		//case 0:
-		//	children.x = c;
-		//	break;
-		//case 1:
-		//	children.y = c;
-		//	break;
-		//case 2:
-		//	children.z = c;
-		//	break;
-		//case 3:
-		//	children.w = c;
-		//	break;
-		//default:
-		//	throw;
-		//}
 	}
 };
 
