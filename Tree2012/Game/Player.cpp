@@ -176,7 +176,7 @@ void Player::HandleInput(bool key[256])  // WM_KEYDOWN
     {
         XMMATRIX rot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
 
-	    const char availableKeys[] = { 'W', 'S', 'D', 'A', VK_LEFT, VK_RIGHT };
+	    const char availableKeys[] = { 'W', 'S', 'D', 'A', VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN };
 	    for (char k : availableKeys)
 	    {
 		    if (key[k])
@@ -207,6 +207,16 @@ void Player::HandleInput(bool key[256])  // WM_KEYDOWN
 					addRot = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), 0.02f);
 					XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(startRot * addRot));
 				    break;
+				case VK_UP:
+					startRot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
+					addRot = XMMatrixRotationAxis(XMVectorSet(1, 0, 0, 0), -0.02f);
+					XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(addRot * startRot));
+					break;
+				case VK_DOWN:
+					startRot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
+					addRot = XMMatrixRotationAxis(XMVectorSet(1, 0, 0, 0), 0.02f);
+					XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(addRot * startRot));
+					break;
 				default:
 					assert(false);
 					break;

@@ -173,11 +173,12 @@ void GameLoader::LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* 
 	params5->depthLOD = 1;
 	params5->GetGeneratorParameters()._constants = "";
 	params5->GetGeneratorParameters()._axiom = "A";
-	params5->GetGeneratorParameters()._rules.push_back(Rule("A", "[&&&FL!A]/////’[&&&FL!A]///////’[&FL!A]"));
-	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "S/////F"));
+	params5->GetGeneratorParameters()._rules.push_back(Rule("A", "+++&&&[/FLA]---&&&[/FLA]+++&&&[/FLA]"));
+	//params5->GetGeneratorParameters()._rules.push_back(Rule("A", "[&FL!A]/////’[&FL!A]///////’[&FL!A]"));
+	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "S----F"));
 	params5->GetGeneratorParameters()._rules.push_back(Rule("S", "FL"));
-	//params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’^^f]"));
-	//params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’??{-f+f+f-|-f+f+f}]"));
+	////params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’^^f]"));
+	////params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’??{-f+f+f-|-f+f+f}]"));
 	params5->GetGeneratorParameters()._angle = 0.1963495f;
 	params5->GetGeneratorParameters()._numIterations = 1;
 	params5->GetGeneratorParameters()._segmentLength = .1f;
