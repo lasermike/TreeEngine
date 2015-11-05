@@ -39,8 +39,8 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr)
 
 #else
 
-void ReportError(char* msg, char* file, long line, char* exp) { }
-void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
+__inline void ReportError(char* msg, char* file, long line, char* exp) { }
+__inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 
 #endif 
 
@@ -101,7 +101,7 @@ void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #else
 #ifndef HRR
 #define HR(x) (x)
-#define HRC(x) (x)
+#define HRC(x) if (FAILED(x)) goto Cleanup;
 #define HRR(x) (x)
 #define LOG(x)
 #define ASSERTSZ(x, str)

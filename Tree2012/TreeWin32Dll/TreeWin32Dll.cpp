@@ -77,11 +77,6 @@ extern "C" __declspec(dllexport) LPVOID WINAPI InitializeScene()
 	}
 
 	// Get a D3D9 handle to the back buffer
-	//HRC(g_game->GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pSwapChain)));
-
-	//HRC(pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
-	
-
 	HRC(g_game->GetBackBuffer()->QueryInterface(__uuidof(IDXGIResource), (void**)&pResource));
 	HRC(pResource->GetSharedHandle(&hSharedHandle));
 	g_game->GetBackBuffer()->GetDesc(&textureDesc);

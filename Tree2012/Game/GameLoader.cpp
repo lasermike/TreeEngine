@@ -70,17 +70,47 @@ void GraphModelGenerator::CreateGraph(std::vector<XMFLOAT2>& points) { }
 
 void GameLoader::LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
+
 	// Graph
 	WorldObjectParameters<GraphParams>* graphParams = new WorldObjectParameters<GraphParams>(GraphGeneratorType);
 	graphParams->position = XMFLOAT3(1.3f, .5f, -1.3f);
-	graphParams->_animationSpeed = 0.0f;
+	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(0, 0));
+	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(1, 1));
+	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(2, 1.5f));
+	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(3, 2.5f));
+	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(4, 1));
+	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(5, 0));
+
+	// Find max values
+	std::vector<XMFLOAT2> values;
+	float maxX = 0, maxY = 0;
+	ifstream infile("graphdata.txt"); // for example
+	string line = "";
+	while (getline(infile, line)) 
+	{
+		stringstream strstr(line);
+		string time = "", value1 = "";
+		getline(strstr, time, ',');
+		getline(strstr, value1, ',');
+		float x = (float) atof(time.c_str());
+		float y = (float) atof(value1.c_str());
+		values.push_back(XMFLOAT2(x, y));
+		maxX = std::max(maxX, x);
+		maxY = std::max(maxY, y);
+	}
+
+	float xScale = 100.0f / maxX;
+	float xDelta = values[1].x;
+
+	GraphParams& params = graphParams->GetGeneratorParameters();
+	for (int i = 1; i < values.size(); i++)
+	{
+		params.points.push_back(XMFLOAT2(values[i].x * xScale,
+			values[i].y / xDelta));
+	}
+
 	graphParams->depthLOD = 1;
-	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(0, 0));
-	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(1, 1));
-	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(2, 1.5f));
-	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(3, 2.5f));
-	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(4, 1));
-	graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(5, 0));
+	graphParams->_animationSpeed = 50.0f;
 	pScene->AddChild(new Tree(graphParams));
 
 
@@ -98,6 +128,8 @@ void GameLoader::LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* p
 	pRenderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 	pRenderData->time = 0;
 
+	//pPlayer->SetPosition
+	
 	// Camera
 	const float maxBound = 3.0f;
 	XMFLOAT3 bounds[] =
