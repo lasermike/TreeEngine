@@ -1,6 +1,7 @@
 @setlocal
+@echo off
 @set result=0
-@robocopy /NJH %1 %2 %3 %4 %5 %6 %7 %8
+@robocopy /NJH %*
 @if %ERRORLEVEL% EQU 16 echo ***FATAL ERROR*** & goto end
     if %ERRORLEVEL% EQU 15 echo OKCOPY + FAIL + MISMATCHES + XTRA & goto end
     if %ERRORLEVEL% EQU 14 echo FAIL + MISMATCHES + XTRA & goto end
@@ -20,6 +21,6 @@
     if %ERRORLEVEL% EQU 0 echo No Change & goto end
 	
 :end  
-
+@echo on
 @exit /B %result% 	
 	

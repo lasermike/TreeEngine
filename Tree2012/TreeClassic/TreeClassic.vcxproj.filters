@@ -31,6 +31,9 @@
     <Text Include="..\Game\Shaders\ShaderFiles.txt">
       <Filter>Game\Shaders</Filter>
     </Text>
+    <Text Include="..\Game\graphdata.txt">
+      <Filter>Game\Resources</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="targetver.h">

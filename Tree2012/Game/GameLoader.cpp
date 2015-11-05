@@ -85,11 +85,12 @@ void GameLoader::LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* p
 	std::vector<XMFLOAT2> values;
 	float maxX = 0, maxY = 0;
 	ifstream infile("graphdata.txt"); // for example
-	string line = "";
+	ASSERT(infile);
+	string line;
 	while (getline(infile, line)) 
 	{
 		stringstream strstr(line);
-		string time = "", value1 = "";
+		string time, value1;
 		getline(strstr, time, ',');
 		getline(strstr, value1, ',');
 		float x = (float) atof(time.c_str());
