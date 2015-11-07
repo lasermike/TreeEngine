@@ -117,5 +117,9 @@ public:
 	XMVECTOR GetExtents(Extent extent);
 	XMVECTOR GetPosition()  { return XMLoadFloat3(&_position); }
 	XMVECTOR GetRotation()  { return XMLoadFloat4(&_rotation); }
+
+	void SetPosition(XMVECTOR pos) { return XMStoreFloat3(&_position, pos); }
+	void SetRotation(XMVECTOR rot) { return XMStoreFloat4(&_rotation, rot); }
+
 };
 

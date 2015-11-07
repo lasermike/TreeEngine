@@ -29,6 +29,8 @@ public:
 		_children.push_back(obj);
 	}
 
+	void DeleteAllChildren();
+
 	const list<WorldObject*>& Children() { return _children; }
 
 	XMVECTOR GetExtents(Extent extent);

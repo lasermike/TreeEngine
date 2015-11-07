@@ -13,10 +13,33 @@ GameLoader::GameLoader()
 	_currentSeed = 0;
 }
 
+void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
+{
+	switch (sceneNum)
+	{
+	case 0:
+	{
+		LoadTrees(pScene, pRenderData, pPlayer);
+		break;
+	}
+	case 1:
+	{
+		LoadGraph(pScene, pRenderData, pPlayer);
+		break;
+	}
+	case 2:
+	default:
+	{
+		LoadTestBlock(pScene, pRenderData, pPlayer);
+		break;
+	}
+	}
+}
+
 void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
 {
-	LoadGraph(pScene, pRenderData, pPlayer);
-//	LoadTrees(pScene, pRenderData, pPlayer);
+//	LoadGraph(pScene, pRenderData, pPlayer);
+	LoadTrees(pScene, pRenderData, pPlayer);
 //	LoadTestBlock(pScene, pRenderData, pCamera);
 }
 
@@ -68,12 +91,12 @@ TreeModel* GraphModelGenerator::Create()
 void GraphModelGenerator::CreateGraph(std::vector<XMFLOAT2>& points) { }
 
 
-void GameLoader::LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
+void GameLoader::LoadGraph(SceneRoot* scene, RenderData* renderData, Player* player)
 {
 
 	// Graph
 	WorldObjectParameters<GraphParams>* graphParams = new WorldObjectParameters<GraphParams>(GraphGeneratorType);
-	graphParams->position = XMFLOAT3(1.3f, .5f, -1.3f);
+	graphParams->position = XMFLOAT3(0, .5f, 0);
 	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(0, 0));
 	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(1, 1));
 	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(2, 1.5f));
@@ -112,39 +135,25 @@ void GameLoader::LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* p
 
 	graphParams->depthLOD = 1;
 	graphParams->_animationSpeed = 50.0f;
-	pScene->AddChild(new Tree(graphParams));
-
+	scene->AddChild(new Tree(graphParams));
 
 	// "Ground" (temporary)
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0, 0, 0);
 	params4->scale = XMFLOAT3(30, .01f, 30);
 	params4->primitiveType = PrimitiveType_Cylinder;
-	pScene->AddChild(new Primitive(params4));
+	scene->AddChild(new Primitive(params4));
 
 	// Init lights
-	pRenderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	pRenderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
-	pRenderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
-	pRenderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-	pRenderData->time = 0;
+	renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	renderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+	renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+	renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	renderData->time = 0;
 
-	//pPlayer->SetPosition
-	
 	// Camera
-	const float maxBound = 3.0f;
-	XMFLOAT3 bounds[] =
-	{
-		XMFLOAT3(-maxBound,-maxBound,-maxBound),
-		XMFLOAT3(maxBound,maxBound,maxBound)
-	};
-
-	if (pPlayer && pPlayer->GetOrbitCamera())
-	{
-		pPlayer->GetOrbitCamera()->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
-		pPlayer->GetOrbitCamera()->SetHeading(2.48f);
-		//pCamera->SetFocusPosition(XMVectorSet(0, 1.1f, 0, 1));
-	}
+	player->SetPosition(XMLoadFloat3(&XMFLOAT3(50.0f, 1.5f, -20.0f)));
+	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), 0));
 }
 
 

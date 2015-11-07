@@ -56,13 +56,24 @@ HRESULT SceneRoot::InitGraphics(RenderManager& renderManager)
 
 HRESULT SceneRoot::CleanUpDeviceObjects()
 {
-    for (auto i : _children)
+    for (auto child : _children)
     {
-        i->CleanUpDeviceObjects();
+        child->CleanUpDeviceObjects();
     }
 
     return S_OK;
 }
+
+void SceneRoot::DeleteAllChildren()
+{
+	CleanUpDeviceObjects();
+	for (auto child : _children)
+	{
+		delete child;
+	}
+	_children.clear();
+}
+
 
 HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
 {

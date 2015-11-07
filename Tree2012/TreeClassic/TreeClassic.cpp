@@ -461,12 +461,29 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     switch (message)
     {
-    case WM_KEYDOWN:
-        input.key[wParam] = true;
-        break;
-    case WM_KEYUP:
-        input.key[wParam] = false;
-        break;
+	case WM_SYSKEYDOWN:
+	case WM_SYSKEYUP:
+	case WM_KEYDOWN:
+	case WM_KEYUP:
+	{
+		UINT VKCode = wParam;
+		bool WasDown = ((lParam & (1 << 30)) != 0);
+		bool IsDown = ((lParam & (1 << 31)) == 0);
+		
+		if (WasDown != IsDown)
+		{
+			if (IsDown)
+				input.key[wParam] = true;
+			else if (WasDown)
+				input.key[wParam] = false;
+		}
+	}
+	//case WM_KEYDOWN:
+ //       input.key[wParam] = !(lParam & 1 << 30);
+ //       break;
+ //   case WM_KEYUP:
+ //       input.key[wParam] = false;
+ //       break;
     case WM_COMMAND:
         wmId    = LOWORD(wParam);
         wmEvent = HIWORD(wParam);

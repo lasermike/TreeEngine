@@ -118,6 +118,8 @@ private:
 	DX::StepTimer						m_timer;
 	double								m_timeStart;
 	double								m_timeCurrent;
+	int								    m_currentScene;
+	int								    m_advanceScene;
 
 #ifdef WIN32
 	HWND								m_hwnd;

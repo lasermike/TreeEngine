@@ -52,6 +52,8 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 	m_timeStart = 0;
 	m_resetTree = true;
 	m_showShadowBuffer = false;
+	m_advanceScene = 0;
+	m_currentScene = 0;
 
 #ifdef ENABLE_MSAA
 	m_enableMsaa = true; // TODO
@@ -97,6 +99,9 @@ HRESULT Game::Initialize()
 	m_player = new Player(playerParams);
 
 	m_renderManager.GetRenderData().frame = 0;
+	m_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
+	m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
+	m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
 	m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player);
 
@@ -155,6 +160,7 @@ HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi
 	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width, logicalDpi);
 	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height, logicalDpi);
 #endif
+
 	HRR(OnResize(windowWidth, windowHeight));
 	
 	return S_OK;
@@ -305,8 +311,6 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 	m_renderManager.GetRenderData().projectionData.screenWidth = windowWidth;
 	m_renderManager.GetRenderData().projectionData.screenHeight = windowHeight;
 	m_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
-	m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
-	m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
     CComPtr<IDXGIFactory1> dxgiFactory;
@@ -570,6 +574,20 @@ void Game::Update(DX::StepTimer const& timer)
 {
 	m_renderManager.GetRenderData().frame++;
 
+	if (m_advanceScene)
+	{
+		m_currentScene += m_advanceScene;
+		m_currentScene = m_currentScene % m_loader.GetNumScenes();
+		m_advanceScene = 0;
+
+		m_pScene->DeleteAllChildren();
+		m_renderManager.CleanUpDeviceObjects();
+
+		m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player);
+
+		m_resetTree = true;
+	}
+
 	// Rebuild tree if necessary
 	if (m_resetTree)
 	{
@@ -717,7 +735,7 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 {
     m_player->HandleInput(key);
 
-    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H' };
+    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H', 'N', 'B' };
 	for (char k : availableKeys)
 	{
 		if (key[k])
@@ -727,30 +745,45 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 			case ']':
 				m_resetTree = true;
 				m_loader._currentSeed++;
+				key[k] = false;
 				break;
 			case '[':
 				if (m_loader._currentSeed > 0)
 				{
 					m_resetTree = true;
 					m_loader._currentSeed--;
+					key[k] = false;
 				}
 				break;
 			case '0':
 				m_timeStart = 0;
+				key[k] = false;
 				break;
 			case 'Z':
 				m_showShadowBuffer = !m_showShadowBuffer;
+				key[k] = false;
 				break;
 			case 'P':
 				m_paused = !m_paused;
+				key[k] = false;
 				break;
 			case '#':
 				m_wireframe = !m_wireframe;
+				key[k] = false;
 				break;
 			case 'H':
 				m_showHelp = !m_showHelp;
+				key[k] = false;
 				break;
-			//case '1':
+			case 'N':
+				m_advanceScene = 1;
+				key[k] = false;
+				break;
+			case 'B':
+				m_advanceScene = -1;
+				key[k] = false;
+				break;
+				//case '1':
 			//case '2':
 			//case '3':
 			//case '4':

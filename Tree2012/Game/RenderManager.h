@@ -1,9 +1,10 @@
 #pragma once
 #include "pch.h"
-#include "SceneRoot.h"
+#include "GeometryGenerator.h"
 #include "RenderData.h"
 #include "Materials.h"
-#include <map>
+
+class WorldObject;
 
 enum MaterialTypes
 {

@@ -20,7 +20,9 @@ public:
 	GameLoader();
 
 	void Load(char* name, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
+	void Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
 	void Regenerate(SceneRoot* pScene);
 
 	int						  _currentSeed;
+	int GetNumScenes() { return 3; }
 };
