@@ -5,22 +5,37 @@ class SceneRoot;
 struct RenderData;
 class Player;
 
+struct GameData
+{
+	bool useShadowMaps;
+
+	GameData() 
+	{
+		ResetToDefaults();
+	}
+
+	void ResetToDefaults()
+	{
+		useShadowMaps = true;
+	}
+};
+
 class GameLoader
 {
 	std::vector<unsigned int> _seeds;
 
-	void LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
-	void LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
-	void LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
-	void LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
+	void LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
+	void LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
+	void LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
+	void LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
 
-	void LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
+	void LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
 
 public:
 	GameLoader();
 
-	void Load(char* name, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
-	void Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer);
+	void Load(char* name, SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData);
+	void Load(int sceneNum, SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData);
 	void Regenerate(SceneRoot* pScene);
 
 	int						  _currentSeed;

@@ -27,9 +27,10 @@ cbuffer cbChangeOnResize : register( b1 )
 cbuffer cbChangesEveryFrame : register( b2 )
 {
 	DirectionalLight light;
-	float3 eyePos;
+	float4 eyePos;
 	matrix worldToCamera;
 	matrix shadowMatrix;
+	uint globalFlags;  // bit 0 = use shadow maps
 };
 
 cbuffer cbMaterial : register (b3)
@@ -103,10 +104,10 @@ float4 PS(PS_INPUT input) : SV_Target
 	float3 toEye = normalize(input.ViewDirection);
 
 	//transforms world=>tangent space
-	float3x3 TBN = float3x3( normalize(input.T), normalize(input.B), normalize(input.N) ); 
+	float3x3 TBN = float3x3(normalize(input.T), normalize(input.B), normalize(input.N));
 
 	// Transform tangent normal to world normal	
-	float3 normal = mul( float3(0,0,1), TBN);
+	float3 normal = mul(float3(0,0,1), TBN);
 
 	// Start with a sum of zero. 
 	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -121,7 +122,11 @@ float4 PS(PS_INPUT input) : SV_Target
 
 	// Only the first light casts a shadow.
 	float3 shadow = float3(1.0f, 1.0f, 1.0f);
-	shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, input.ShadowPosH);
+
+	if (globalFlags & 0x1)
+	{
+		shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, input.ShadowPosH);
+	}
  
 	// Sum the light contribution from each light source.  
 	//[unroll]

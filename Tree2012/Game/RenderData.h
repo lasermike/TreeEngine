@@ -73,7 +73,7 @@ struct RenderData
 	static const int	SMapWidth = 2048;
 	static const int	SMapHeight = 2048;
 	BoundingSphere		mSceneBounds;
-	ShadowMap*			pShadowMap;
+	ShadowMap*			pShadowMap;		// Owned by Game
 	XMFLOAT4X4			lightView;
 	XMFLOAT4X4			lightProj;
 	XMFLOAT4X4			shadowTransform;

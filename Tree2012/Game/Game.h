@@ -159,6 +159,7 @@ private:
 	bool								m_wireframe;
 	bool								m_showHelp;
 
+	GameData							m_gameData;
 };
 
 

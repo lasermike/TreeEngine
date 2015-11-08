@@ -144,7 +144,7 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 			pRenderData->frameStats[NUM_LEAVES_STAT].stat++;
 			break;
 		case Stick:
-			if (branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(parentStart - pRenderData->eyePos)) < 100.0f)
+			if (_params->depthLOD != -1 && (branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(parentStart - pRenderData->eyePos)) < 100.0f))
 			{
 				_logInstanceData.push_back(data);
 			}

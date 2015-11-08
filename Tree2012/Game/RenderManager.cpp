@@ -28,6 +28,7 @@ struct CBChangesEveryFrame
 	XMFLOAT4 eyePos;
 	XMFLOAT4X4 worldToCamera;
 	XMFLOAT4X4 shadowMatrix;
+	UINT globalFlags;
 };
 
 struct CBMaterial
@@ -342,7 +343,8 @@ HRESULT RenderManager::Render()
 	// Update changes every frame CB.
 	// Compute world to camera matrix
 	CBChangesEveryFrame cb;
-	cb.light = m_light;
+	cb.globalFlags = m_renderData.pShadowMap ? 0x1 : 0x0;
+	cb.light = m_renderData.dirLights[0];
 	XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
 	cb.shadowMatrix = m_renderData.shadowTransform;
 	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));

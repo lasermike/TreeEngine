@@ -98,13 +98,14 @@ HRESULT Game::Initialize()
 	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
 	m_player = new Player(playerParams);
 
+	// Rendering defaults
 	m_renderManager.GetRenderData().frame = 0;
 	m_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
 	m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
 	m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
-	m_loader.Load(0, m_pScene, &m_renderManager.GetRenderData(), m_player);
-	//m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player);
+	m_loader.Load(1, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
+	//m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
 	// Init scene bounds.
 	// Estimatation.    
@@ -269,9 +270,6 @@ HRESULT Game::InitDevice()
 	XSF::StockRenderStates::Initialize(m_pd3dDevice);
 	m_bitmapFont = new XSF::BitmapFont();
     XSF_ERROR_IF_FAILED( m_bitmapFont->Create( m_pd3dDevice, L"Arial_16" ) );
-
-	// Init shadow map
-	m_renderManager.GetRenderData().pShadowMap = new ShadowMap(m_pd3dDevice, m_renderManager.GetRenderData().SMapWidth, m_renderManager.GetRenderData().SMapHeight);
 
 	return S_OK;
 }
@@ -558,12 +556,19 @@ void Game::Regenerate()
 	// Clear old stuff
 	m_pScene->CleanUpDeviceObjects();
 	m_renderManager.CleanUpDeviceObjects();
+	SafeDelete(&m_renderManager.GetRenderData().pShadowMap);
 
 	m_loader.Regenerate(m_pScene);
 
     // Init render manager
     hr = m_renderManager.InitGraphics(m_pScene->GetMaxInstances());
 	assert(SUCCEEDED(hr));		
+
+	// Init shadow map
+	if (m_gameData.useShadowMaps)
+	{
+		m_renderManager.GetRenderData().pShadowMap = new ShadowMap(m_pd3dDevice, m_renderManager.GetRenderData().SMapWidth, m_renderManager.GetRenderData().SMapHeight);
+	}
 
 	// Init new stuff
 	hr = m_pScene->InitGraphics(m_renderManager);
@@ -576,16 +581,19 @@ void Game::Update(DX::StepTimer const& timer)
 
 	if (m_advanceScene)
 	{
+		// Clean out game state 
 		m_pScene->DeleteAllChildren();
 		m_renderManager.CleanUpDeviceObjects();
+		m_gameData.ResetToDefaults();
 
 		m_currentScene += m_advanceScene;
 		m_currentScene = m_currentScene % m_loader.GetNumScenes();
 		m_advanceScene = 0;
 
+		// Load the next/prev scene
+		m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
-		m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player);
-
+		// Create models and device objects
 		m_resetTree = true;
 	}
 
@@ -650,9 +658,12 @@ void Game::ComputeCPU()
 void Game::ComputeGPU()
 {
 	// Render shadow map
-	BuildShadowTransform();
-	m_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(m_pImmediateContext, nullptr);
-	DrawSceneToShadowMap();
+	if (m_gameData.useShadowMaps)
+	{
+		BuildShadowTransform();
+		m_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(m_pImmediateContext, nullptr);
+		DrawSceneToShadowMap();
+	}
 
 	// Restore state after shadow
 	m_pImmediateContext->RSSetState(0);
@@ -690,15 +701,21 @@ void Game::Render(bool oculus)
     }
 
 	// Make shadow map avaiable to shaders
-	ID3D11ShaderResourceView* depthTexture = m_renderManager.GetRenderData().pShadowMap->DepthMapSRV();
-	m_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
+	if (m_gameData.useShadowMaps)
+	{
+		ID3D11ShaderResourceView* depthTexture = m_renderManager.GetRenderData().pShadowMap->DepthMapSRV();
+		m_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
+	}
 
 	// Draw everything
 	HRC(m_renderManager.Render());
 
 	// Unbind shadow texture so we can render to it next frame
-	depthTexture = nullptr;
-	m_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
+	if (m_gameData.useShadowMaps)
+	{
+		ID3D11ShaderResourceView* depthTexture = nullptr;
+		m_pImmediateContext->PSSetShaderResources(1, 1, &depthTexture);
+	}
 
 	if (m_showHelp && m_bitmapFont)
 	{
