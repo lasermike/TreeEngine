@@ -10,6 +10,8 @@
 
 void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 {
+	data.Release();
+
 	GeometryGenerator geoGen;
 
 	//Box

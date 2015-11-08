@@ -99,7 +99,7 @@ protected:
 public:
 
 	WorldObject(WorldObjectParams* pParams);
-	~WorldObject(void);
+	virtual ~WorldObject(void);
 
 	virtual ObjectType GetObjectType() { return WorldObjectType; }
 	WorldObjectParams& GetParams() { return *_params; }

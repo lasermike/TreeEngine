@@ -67,7 +67,7 @@ HRESULT SceneRoot::CleanUpDeviceObjects()
 void SceneRoot::DeleteAllChildren()
 {
 	CleanUpDeviceObjects();
-	for (auto child : _children)
+	for (WorldObject* child : _children)
 	{
 		delete child;
 	}

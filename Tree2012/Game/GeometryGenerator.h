@@ -57,6 +57,12 @@ struct GeometryBufferData
 		ZeroMemory(&cylinderLDIndices, sizeof(BufferIndices));
 	}
 
+	void Release()
+	{
+		vertices.clear();
+		indices.clear();
+	}
+
 	const BufferIndices* const GetBufferIndices(PrimitiveType primType)
 	{
 		BufferIndices* pBufferIndices = nullptr;

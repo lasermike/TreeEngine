@@ -103,7 +103,8 @@ HRESULT Game::Initialize()
 	m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
 	m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
-	m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player);
+	m_loader.Load(0, m_pScene, &m_renderManager.GetRenderData(), m_player);
+	//m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player);
 
 	// Init scene bounds.
 	// Estimatation.    
@@ -243,7 +244,6 @@ HRESULT Game::InitDevice()
 		filter.DenyList.NumIDs = _countof(hide);
 		filter.DenyList.pIDList = hide;
 		d3dInfoQueue->AddStorageFilterEntries( &filter );
-		d3dInfoQueue->Release();
 	}
 #endif
 
@@ -530,6 +530,7 @@ void Game::CleanupDevice()
 	m_pSharedRenderToTexture.Release();
 	m_pImmediateContext1.Release();
 	m_pImmediateContext.Release();
+	m_pd3dDevice1.Release(); // TODO: Device leak somewhere causing crash
 
     if (m_bitmapFont)
     {
@@ -548,7 +549,6 @@ void Game::CleanupDevice()
 #endif
 
 	m_pd3dDevice.Release();
-    m_pd3dDevice1.Detach(); // TODO: Device leak somewhere causing crash
 }
 
 void Game::Regenerate()
@@ -576,12 +576,13 @@ void Game::Update(DX::StepTimer const& timer)
 
 	if (m_advanceScene)
 	{
+		m_pScene->DeleteAllChildren();
+		m_renderManager.CleanUpDeviceObjects();
+
 		m_currentScene += m_advanceScene;
 		m_currentScene = m_currentScene % m_loader.GetNumScenes();
 		m_advanceScene = 0;
 
-		m_pScene->DeleteAllChildren();
-		m_renderManager.CleanUpDeviceObjects();
 
 		m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player);
 

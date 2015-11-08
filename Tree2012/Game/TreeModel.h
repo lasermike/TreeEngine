@@ -38,9 +38,13 @@ struct Branch
 
 	vector<int> children;
 
-	Branch()
+	Branch() : id(0), depth(0), parent(0), geometryType(Stick)
 	{
-		memset(this, 0, sizeof Branch);
+	}
+
+	~Branch()
+	{
+		children.clear();
 	}
 
 	int Child(int i) const 
@@ -64,10 +68,10 @@ struct BranchLevelData
 {
 	int depth;
 	int numBranches;
-	std::vector<int>* pBranchesInLevel;
+	//std::vector<int>* pBranchesInLevel;
 
 	BranchLevelData() : depth(0), numBranches(0) { }
-	~BranchLevelData() { SafeDelete(&pBranchesInLevel); }
+	~BranchLevelData() { /*SafeDelete(&pBranchesInLevel);*/ }
 };
 
 struct TreeData

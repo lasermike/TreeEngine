@@ -21,6 +21,7 @@ WorldObject::WorldObject(WorldObjectParams* pParams) : _params(pParams), _drawIn
 WorldObject::~WorldObject(void)
 {
 	CleanUpDeviceObjects();
+	_params.reset();
 }
 
 HRESULT WorldObject::InitGraphics(RenderManager& /*renderManager*/)

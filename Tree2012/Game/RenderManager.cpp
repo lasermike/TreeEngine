@@ -258,6 +258,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 		if (t.second)
 		{
 			t.second->Release();
+			t.second = nullptr;
 		}
 	}
 	m_textures.clear();
@@ -493,7 +494,9 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
 	unit->totalMaxInstances += object->GetMaxInstances(); // TODO needed?
 
 	// Add per frame reservation
-	m_perFrameInstanceData[unit][object] = std::make_pair<UINT, UINT>(0, 0);
+	ASSERT(m_perFrameInstanceData[unit].find(object) == m_perFrameInstanceData[unit].end());
+	m_perFrameInstanceData[unit][object].first = 0;
+	m_perFrameInstanceData[unit][object].second = 0;
 
 	*ppRenderUnit = unit;
 
@@ -502,7 +505,8 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
 
 HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances)
 {
-	m_perFrameInstanceData[renderUnit][object] = std::make_pair(startInstance, numInstances);
+	m_perFrameInstanceData[renderUnit][object].first = startInstance;
+	m_perFrameInstanceData[renderUnit][object].second = numInstances;
 	return S_OK;
 }
 

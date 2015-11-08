@@ -19,7 +19,8 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 	{
 	case 0:
 	{
-		LoadTrees(pScene, pRenderData, pPlayer);
+		LoadTestBlock(pScene, pRenderData, pPlayer);
+		//LoadTrees(pScene, pRenderData, pPlayer);
 		break;
 	}
 	case 1:
@@ -127,7 +128,7 @@ void GameLoader::LoadGraph(SceneRoot* scene, RenderData* renderData, Player* pla
 	float xDelta = values[1].x;
 
 	GraphParams& params = graphParams->GetGeneratorParameters();
-	for (int i = 1; i < values.size(); i++)
+	for (UINT i = 1; i < values.size(); i++)
 	{
 		params.points.push_back(XMFLOAT2(values[i].x * xScale,
 			values[i].y / xDelta));
@@ -157,44 +158,33 @@ void GameLoader::LoadGraph(SceneRoot* scene, RenderData* renderData, Player* pla
 }
 
 
-void GameLoader::LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
+void GameLoader::LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player)
 {
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0,0,0);
 	params4->scale = XMFLOAT3(1, 1.5, 2);
 	XMStoreFloat4(&params4->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
 	params4->primitiveType = PrimitiveType_Box;
-	pScene->AddChild(new Primitive(params4));
+	scene->AddChild(new Primitive(params4));
 
 	// Init lights
-	pRenderData->dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	pRenderData->dirLights[0].Diffuse  = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
-	pRenderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
-	pRenderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-	pRenderData->time = 0;
+	renderData->dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	renderData->dirLights[0].Diffuse  = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+	renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+	renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	renderData->time = 0;
 
 	// Camera
-	const float maxBound = 3.0f;
-	XMFLOAT3 bounds[] = 
-	{
-		XMFLOAT3(-maxBound,-maxBound,-maxBound),
-		XMFLOAT3(maxBound,maxBound,maxBound)
-	};
-
-    if (pPlayer && pPlayer->GetOrbitCamera())
-    {
-        pPlayer->GetOrbitCamera()->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
-	    pPlayer->GetOrbitCamera()->SetHeading(2.48f);
-	    //pCamera->SetFocusPosition(XMVectorSet(0, 1.1f, 0, 1));
-    }
+	player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
+	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
-void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
+void GameLoader::LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player)
 {
 	WorldObjectParams* params3 = new WorldObjectParams(FixedTreeGeneratorType);
 	params3->depthLOD = 2;
 	params3->position = XMFLOAT3(-1.3f, 0.5f,1.3f);
-	pScene->AddChild(new Tree(params3));
+	scene->AddChild(new Tree(params3));
 
 	WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params2->position = XMFLOAT3(1.3f, .5f, -1.3f);
@@ -207,7 +197,7 @@ void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* p
 	params2->GetGeneratorParameters()._numIterations = 4;
 	params2->GetGeneratorParameters()._segmentLength = .28f;
 	params2->GetGeneratorParameters().thickness = .020f;	
-	pScene->AddChild(new Tree(params2));
+	scene->AddChild(new Tree(params2));
 
 	WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params5->position = XMFLOAT3(-1.3f, .5f,-1.3f);
@@ -220,38 +210,27 @@ void GameLoader::LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* p
 	params5->GetGeneratorParameters()._numIterations = 4;
 	params5->GetGeneratorParameters()._segmentLength = .28f;
 	params5->GetGeneratorParameters().thickness = .020f;	
-	pScene->AddChild(new Tree(params5));
+	scene->AddChild(new Tree(params5));
 
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0,0,0);
 	params4->scale = XMFLOAT3(30, .01f, 30);
 	params4->primitiveType = PrimitiveType_Cylinder;
-	pScene->AddChild(new Primitive(params4));
+	scene->AddChild(new Primitive(params4));
 
 	// Init lights
-	pRenderData->dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	pRenderData->dirLights[0].Diffuse  = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
-	pRenderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
-	pRenderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-	pRenderData->time = 0;
+	renderData->dirLights[0].Ambient  = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	renderData->dirLights[0].Diffuse  = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+	renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+	renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	renderData->time = 0;
 
 	// Camera
-	const float maxBound = 7.0f;
-	XMFLOAT3 bounds[] = 
-	{
-		XMFLOAT3(-maxBound,1,-maxBound),
-		XMFLOAT3(maxBound,2,maxBound)
-	};
-
-    if (pPlayer && pPlayer->GetOrbitCamera())
-	{
-		pPlayer->GetOrbitCamera()->SetHeading(-2.48f);
-		//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
-		pPlayer->GetOrbitCamera()->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
-	}
+	player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
+	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
-void GameLoader::LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
+void GameLoader::LoadTrees2(SceneRoot* scene, RenderData* renderData, Player* player)
 {
 	WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
 	params5->position = XMFLOAT3(0, .5f, 0);
@@ -265,37 +244,26 @@ void GameLoader::LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* 
 	params5->GetGeneratorParameters()._numIterations = 5;
 	params5->GetGeneratorParameters()._segmentLength = .05f;
 	params5->GetGeneratorParameters().thickness = .01f;
-	pScene->AddChild(new Tree(params5));
+	scene->AddChild(new Tree(params5));
 
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0, 0, 0);
 	params4->scale = XMFLOAT3(30, .01f, 30);
 	params4->primitiveType = PrimitiveType_Cylinder;
-	pScene->AddChild(new Primitive(params4));
+	scene->AddChild(new Primitive(params4));
 
 	// Init lights
-	pRenderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	pRenderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
-	pRenderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
-	pRenderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-	pRenderData->time = 0;
+	renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	renderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+	renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+	renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	renderData->time = 0;
 
 	// Camera
-	const float maxBound = 7.0f;
-	XMFLOAT3 bounds[] =
-	{
-		XMFLOAT3(-maxBound,1,-maxBound),
-		XMFLOAT3(maxBound,2,maxBound)
-	};
-
-	if (pPlayer && pPlayer->GetOrbitCamera())
-	{
-		pPlayer->GetOrbitCamera()->SetHeading(-2.48f);
-		//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
-		pPlayer->GetOrbitCamera()->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
-	}
+	player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
+	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
-void GameLoader::LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer)
+void GameLoader::LoadTrees3(SceneRoot* scene, RenderData* renderData, Player* player)
 {
 	// ?:A 
 	// p1 :A?[&FL!A]/////’[&FL!A]///////’[&FL!A] 
@@ -320,35 +288,24 @@ void GameLoader::LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* 
 	params5->GetGeneratorParameters()._numIterations = 1;
 	params5->GetGeneratorParameters()._segmentLength = .1f;
 	params5->GetGeneratorParameters().thickness = .01f;
-	pScene->AddChild(new Tree(params5));
+	scene->AddChild(new Tree(params5));
 
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0, 0, 0);
 	params4->scale = XMFLOAT3(30, .01f, 30);
 	params4->primitiveType = PrimitiveType_Cylinder;
-	pScene->AddChild(new Primitive(params4));
+	scene->AddChild(new Primitive(params4));
 
 	// Init lights
-	pRenderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	pRenderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
-	pRenderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
-	pRenderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-	pRenderData->time = 0;
+	renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	renderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+	renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+	renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	renderData->time = 0;
 
 	// Camera
-	const float maxBound = 7.0f;
-	XMFLOAT3 bounds[] =
-	{
-		XMFLOAT3(-maxBound,1,-maxBound),
-		XMFLOAT3(maxBound,2,maxBound)
-	};
-
-	if (pPlayer && pPlayer->GetOrbitCamera())
-	{
-		pPlayer->GetOrbitCamera()->SetHeading(-2.48f);
-		//_camera->SetFocusPosition(XMVectorSet(0, 1.0f, 0, 1));
-		pPlayer->GetOrbitCamera()->FocusOnBoundingBox(bounds, ARRAYSIZE(bounds));
-	}
+	player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
+	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
 void GameLoader::Regenerate(SceneRoot* pScene)

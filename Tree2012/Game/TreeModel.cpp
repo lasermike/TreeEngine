@@ -15,7 +15,7 @@ TreeModel::TreeModel(void)
 
 TreeModel::~TreeModel(void)
 {
-	SafeDelete(&treeData.pBranches);
-	SafeDelete(&treeData.pLevels);
+	delete [] treeData.pBranches;
+	delete [] treeData.pLevels ;
 }
 

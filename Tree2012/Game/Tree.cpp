@@ -14,10 +14,7 @@ Tree::Tree(WorldObjectParams* pParams) : _treeModel(nullptr), WorldObject(pParam
 
 Tree::~Tree(void)
 {
-	if (_treeModel)
-	{
-		delete _treeModel;
-	}
+	SafeDelete(&_treeModel);
 }
 
 void Tree::Create(TreeModelGenerator* generator)
