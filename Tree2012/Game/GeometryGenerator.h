@@ -22,7 +22,8 @@ enum PrimitiveType
 {
 	PrimitiveType_Box = 0,
 	PrimitiveType_Cylinder,
-	PrimitiveType_CylinderLD
+	PrimitiveType_CylinderLD,
+	PrimitiveType_FSQuad,
 };
 
 struct SimpleVertex
@@ -46,6 +47,7 @@ struct GeometryBufferData
 	BufferIndices boxIndices;
 	BufferIndices cylinderIndices;
 	BufferIndices cylinderLDIndices;
+	BufferIndices fsQuadIndices;
 
 	std::vector<SimpleVertex> vertices;
 	std::vector<UINT> indices;
@@ -55,6 +57,7 @@ struct GeometryBufferData
 		ZeroMemory(&boxIndices, sizeof(BufferIndices));
 		ZeroMemory(&cylinderIndices, sizeof(BufferIndices));
 		ZeroMemory(&cylinderLDIndices, sizeof(BufferIndices));
+		ZeroMemory(&fsQuadIndices, sizeof(BufferIndices));
 	}
 
 	void Release()
@@ -73,6 +76,9 @@ struct GeometryBufferData
 			break;
 		case PrimitiveType_CylinderLD:
 			pBufferIndices = &this->cylinderLDIndices;
+			break;
+		case PrimitiveType_FSQuad:
+			pBufferIndices = &this->fsQuadIndices;
 			break;
 		case PrimitiveType_Box:
 		default:

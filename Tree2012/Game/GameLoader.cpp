@@ -7,6 +7,7 @@
 #include "orbitcamera.h"
 #include <time.h>
 #include "Player.h"
+#include "Graph.h"
 
 GameLoader::GameLoader()
 {
@@ -33,63 +34,83 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 		LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
 		break;
 	}
+	case 3:
+	{
+		LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
+		break;
+	}
 	}
 }
 
 void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData)
 {
+	Load(0, pScene, pRenderData, pPlayer, gameData);
 //	LoadGraph(pScene, pRenderData, pPlayer, gameData);
-	LoadTrees(pScene, pRenderData, pPlayer, gameData);
+//	LoadTrees(pScene, pRenderData, pPlayer, gameData);
 //	LoadTestBlock(pScene, pRenderData, pCamera, gameData);
 }
 
-
-struct GraphParams
+HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, char* filename)
 {
-	std::vector<XMFLOAT2> points;
-
-	GraphParams()  { };
-};
-
-
-class GraphModelGenerator : public TreeModelGenerator
-{
-	GraphParams _params;
-
-public:
-	GraphModelGenerator(GraphParams& params) : _params(params) { }
-	TreeModel* Create();
-
-protected:
-	void CreateGraph(std::vector<XMFLOAT2>& points);
-};
-
-TreeModel* GraphModelGenerator::Create()
-{ 
-	_model = new TreeModel();
-
-	Branch* parent = nullptr;
-
-	for (UINT i = 1; i < _params.points.size(); i++)
+	// Find max values
+	std::vector<XMFLOAT2> values;
+	float maxX = 0, maxY = 0;
+	ifstream infile(filename); // for example
+	ASSERT(infile);
+	string line;
+	while (getline(infile, line))
 	{
-		XMFLOAT4 start = XMFLOAT4(_params.points[i - 1].x, _params.points[i - 1].y, 0, 0);
-		XMFLOAT4 end = XMFLOAT4(_params.points[i].x, _params.points[i].y, 0, 0);
-
-		const float thickness = 0.005f;
-		Branch* child = AddBranch(parent, start, end, Stick, thickness);
-
-		if (i == 1)
-		{
-			_model->trunk = child;
-		}
-
-		parent = child;
+		stringstream strstr(line);
+		string time, value1;
+		getline(strstr, time, ',');
+		getline(strstr, value1, ',');
+		float x = (float)atof(time.c_str());
+		float y = (float)atof(value1.c_str());
+		values.push_back(XMFLOAT2(x, y));
+		maxX = std::max(maxX, x);
+		maxY = std::max(maxY, y);
 	}
 
-	return _model; 
+	float xScale = 10.0f / maxX;
+	float xDelta = .5f / values[1].x;
+
+	for (UINT i = 1; i < values.size(); i++)
+	{
+		points.push_back(XMFLOAT2(values[i].x * xScale,
+			values[i].y * xDelta));
+	}
+
+	return S_OK;
 }
 
-void GraphModelGenerator::CreateGraph(std::vector<XMFLOAT2>& points) { }
+void GameLoader::LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+{
+	// Graph
+	WorldObjectParameters<GraphParams>* graphParams = new WorldObjectParameters<GraphParams>(GraphGeneratorType);
+
+	// Graph params
+	graphParams->depthLOD = -1;
+	graphParams->_animationSpeed = 300.0f;
+	graphParams->position = XMFLOAT3(0, .55f, 0);
+	scene->AddChild(new FSGraph(graphParams));
+
+	// Load graph points
+	GraphParams& params = graphParams->GetGeneratorParameters();
+	LoadGraphPoints(params.points, "graphdata.txt");
+
+	// Init lights
+	//m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
+	renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+	renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+	renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+	//renderData->dirLights[0].Direction = XMFLOAT3(0.0f, 0.0f, 1.0f);
+	renderData->time = 0;
+
+	// Camera
+	player->SetPosition(XMLoadFloat3(&XMFLOAT3(5.0f, 1.5f, -8.2f)));
+	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), 0));
+}
 
 
 void GameLoader::LoadGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
@@ -105,34 +126,8 @@ void GameLoader::LoadGraph(SceneRoot* scene, RenderData* renderData, Player* pla
 	//graphParams->GetGeneratorParameters().points.push_back(XMFLOAT2(5, 0));
 
 	// Load graph points
-	// Find max values
-	std::vector<XMFLOAT2> values;
-	float maxX = 0, maxY = 0;
-	ifstream infile("graphdata.txt"); // for example
-	ASSERT(infile);
-	string line;
-	while (getline(infile, line)) 
-	{
-		stringstream strstr(line);
-		string time, value1;
-		getline(strstr, time, ',');
-		getline(strstr, value1, ',');
-		float x = (float) atof(time.c_str());
-		float y = (float) atof(value1.c_str());
-		values.push_back(XMFLOAT2(x, y));
-		maxX = std::max(maxX, x);
-		maxY = std::max(maxY, y);
-	}
-
-	float xScale = 10.0f / maxX;
-	float xDelta =  .5f / values[1].x;
-
 	GraphParams& params = graphParams->GetGeneratorParameters();
-	for (UINT i = 1; i < values.size(); i++)
-	{
-		params.points.push_back(XMFLOAT2(values[i].x * xScale,
-										 values[i].y * xDelta));
-	}
+	LoadGraphPoints(params.points, "graphdata.txt");
 
 	// Graph params
 	graphParams->depthLOD = -1;

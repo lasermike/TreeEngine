@@ -15,6 +15,13 @@ enum MaterialTypes
 	MaterialTypesMax
 };
 
+enum ShaderType
+{
+	ShaderType_VertexShader,
+	ShaderType_PixelShader,
+	ShaderType_ComputeShader,
+};
+
 //enum { MAT_WRAP = 1, MAT_WIRE = 2, MAT_ZALWAYS = 4, MAT_NOCULL = 8 };
 
 struct Material
@@ -151,6 +158,8 @@ class RenderManager : public IRenderFrame
 	std::map<wstring, Material*>					m_materials;
 	std::map<wstring, Mesh>							m_meshes;
 	std::map<wstring, ID3D11ShaderResourceView*>	m_textures;
+	std::map<wstring, ID3D11VertexShader*>			m_vertexShaders;
+	std::map<wstring, ID3D11PixelShader*>			m_pixelShaders;
 	std::list<RenderUnit>							m_renderUnits;
 	std::map<WorldObject*, UINT>					m_objectToInstanceBufferOffset;  // Filled in during scene initialization
 	UINT											m_nextInstanceBufferOffset;		 // Used during initialization
@@ -191,6 +200,7 @@ class RenderManager : public IRenderFrame
 	XSF::D3DDeviceContext*              m_immediateContext;
 	
 	HRESULT LoadTexture(const wchar_t* textureFilename);
+	HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
 	HRESULT Render(RenderUnit& renderUnit);
 	HRESULT SetMaterial(Material& material);
 
@@ -207,7 +217,7 @@ public:
 	ID3D11Buffer* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
 	GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
 	
-	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
+	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
 	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
 					   const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
 	HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);

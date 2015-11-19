@@ -28,6 +28,7 @@ class GameLoader
 	void LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
 	void LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
 	void LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
+	void LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData);
 
 	void LoadGraph(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
 
@@ -39,5 +40,5 @@ public:
 	void Regenerate(SceneRoot* pScene);
 
 	int						  _currentSeed;
-	int GetNumScenes() { return 3; }
+	int GetNumScenes() { return 4; }
 };

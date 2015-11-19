@@ -104,7 +104,8 @@ HRESULT Game::Initialize()
 	m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
 	m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
-	m_loader.Load(1, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
+	m_currentScene = 3;
+	m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 	//m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
 	// Init scene bounds.

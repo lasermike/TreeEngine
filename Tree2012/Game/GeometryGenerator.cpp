@@ -43,14 +43,28 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 1, false, false, cylinderLD);
 
 	// Cache the index count of each object.
-	data.cylinderLDIndices.VertexCount = (UINT) cylinderLD.Vertices.size();
-	data.cylinderLDIndices.VertexOffset = (UINT) (data.cylinderIndices.VertexOffset + cylinder.Vertices.size());
+	data.cylinderLDIndices.VertexCount = (UINT)cylinderLD.Vertices.size();
+	data.cylinderLDIndices.VertexOffset = (UINT)(data.cylinderIndices.VertexOffset + cylinder.Vertices.size());
 
 	// Cache the index count of each object.
 	data.cylinderLDIndices.IndexOffset = data.cylinderIndices.IndexOffset + data.cylinderIndices.IndexCount;
-	data.cylinderLDIndices.IndexCount = (UINT) cylinderLD.Indices.size();
+	data.cylinderLDIndices.IndexCount = (UINT)cylinderLD.Indices.size();
 
-	UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size() + cylinderLD.Vertices.size());
+	// FS Quad
+	GeometryGenerator::MeshData fsQuad;
+	geoGen.CreateFullscreenQuad(fsQuad);
+
+	// Cache the index count of each object.
+	data.fsQuadIndices.VertexCount = (UINT)fsQuad.Vertices.size();
+	data.fsQuadIndices.VertexOffset = (UINT)(data.cylinderLDIndices.VertexOffset + cylinderLD.Vertices.size());
+
+	// Cache the index count of each object.
+	data.fsQuadIndices.IndexOffset = data.cylinderLDIndices.IndexOffset + data.cylinderLDIndices.IndexCount;
+	data.fsQuadIndices.IndexCount = (UINT)fsQuad.Indices.size();
+
+	// Finalize everything
+	UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size() + cylinderLD.Vertices.size() + 
+									fsQuad.Vertices.size());
 
 	// Extract the vertex elements we are interested in and pack the
 	// vertices of all the meshes into one vertex buffer.
@@ -82,6 +96,14 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 		data.vertices[k].TangentU = cylinderLD.Vertices[i].TangentU;
 	}
 
+	for (size_t i = 0; i < fsQuad.Vertices.size(); ++i, ++k)
+	{
+		data.vertices[k].Pos = fsQuad.Vertices[i].Position;
+		data.vertices[k].Normal = fsQuad.Vertices[i].Normal;
+		data.vertices[k].Tex = fsQuad.Vertices[i].TexC;
+		data.vertices[k].TangentU = fsQuad.Vertices[i].TangentU;
+	}
+
 	//
 	// Pack the indices of all the meshes into one index buffer.
 	//
@@ -89,6 +111,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 	data.indices.insert(data.indices.end(), box.Indices.begin(), box.Indices.end());
 	data.indices.insert(data.indices.end(), cylinder.Indices.begin(), cylinder.Indices.end());
 	data.indices.insert(data.indices.end(), cylinderLD.Indices.begin(), cylinderLD.Indices.end());
+	data.indices.insert(data.indices.end(), fsQuad.Indices.begin(), fsQuad.Indices.end());
 }
 
 void GeometryGenerator::CreateBox(float width, float height, float depth, MeshData& meshData)

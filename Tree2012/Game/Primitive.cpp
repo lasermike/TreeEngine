@@ -33,7 +33,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 
 	// Create material, mesh, and reserve render unit
 	Material* newMaterial = nullptr;
-	renderManager.CreateMaterial(L"ground", L"snow.dds", mat, &newMaterial);
+	renderManager.CreateMaterial(L"ground", L"snow.dds", nullptr, nullptr, mat, &newMaterial);
 
 	Mesh* newMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());

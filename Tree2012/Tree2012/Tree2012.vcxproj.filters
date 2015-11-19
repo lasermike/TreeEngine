@@ -200,6 +200,9 @@
     <ClCompile Include="..\Game\RenderManager.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\Graph.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />

@@ -254,7 +254,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 	SafeRelease(&m_CBChangesEveryFrame);
 	m_instancedBuffer.Release();
 
-	for (auto t : m_textures)
+	for (auto& t : m_textures)
 	{
 		if (t.second)
 		{
@@ -263,6 +263,24 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 		}
 	}
 	m_textures.clear();
+
+	for (auto& vs : m_vertexShaders)
+	{
+		if (vs.second)
+		{
+			vs.second->Release();
+			vs.second = nullptr;
+		}
+	}
+
+	for (auto& ps : m_pixelShaders)
+	{
+		if (ps.second)
+		{
+			ps.second->Release();
+			ps.second = nullptr;
+		}
+	}
 
 	for (auto m : m_materials)
 	{
@@ -379,6 +397,9 @@ HRESULT RenderManager::SetMaterial(Material& material)
 
 	m_immediateContext->VSSetConstantBuffers(3, 1, &material.m_constBuffer);
 	m_immediateContext->PSSetConstantBuffers(3, 1, &material.m_constBuffer);
+	m_immediateContext->VSSetShader(material.m_vertexShader, nullptr, 0);
+	m_immediateContext->PSSetShader(material.m_pixelShader, nullptr, 0);
+
 	m_immediateContext->UpdateSubresource(material.m_constBuffer, 0, nullptr, &cb, 0, 0);
 	return S_OK;
 }
@@ -413,7 +434,62 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 	return S_OK;
 }
 
-HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, ShaderMaterial& shaderMaterial, Material** newMaterial)
+HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shaderType)
+{
+	char sbFilename[MAX_PATH];
+	size_t converted = 0;
+	size_t filenameLen = (wcslen(shaderFilename) + 1) * 2;
+	wcstombs_s(&converted, sbFilename, filenameLen, shaderFilename, filenameLen);
+	ASSERT(converted * 2 == filenameLen);
+
+	switch (shaderType)
+	{
+	case ShaderType_VertexShader:
+	{
+		ID3D11VertexShader* vertexShader = m_vertexShaders[shaderFilename];
+		if (vertexShader)
+		{
+			return S_OK;
+		}
+
+		std::vector< BYTE > shaderData;
+		HRR(XSF::LoadBlob(shaderFilename, shaderData));
+
+		// Create VS input layout
+		// Load regular vertex Shader
+		HRR(m_d3dDevice->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &vertexShader));
+
+		m_vertexShaders[shaderFilename] = vertexShader;
+
+		SetDebugName(vertexShader,  sbFilename);
+
+		break;
+
+	}
+	case ShaderType_PixelShader:
+	{
+		ID3D11PixelShader* pixelShader = m_pixelShaders[shaderFilename];
+		if (pixelShader)
+		{
+			return S_OK;
+		}
+
+		// Load regular pixel Shader
+		HRR(XSF::LoadPixelShader(m_d3dDevice, shaderFilename, &pixelShader));
+
+		m_pixelShaders[shaderFilename] = pixelShader;
+
+		SetDebugName(pixelShader, sbFilename);
+
+		break;
+	}
+	}
+	return S_OK;
+}
+
+HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textureFilename,
+									  const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
+									  ShaderMaterial& shaderMaterial, Material** newMaterial)
 {
 	auto existing = m_materials.find(name);
 	if (existing != m_materials.end())
@@ -435,7 +511,6 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
 	// Create constants for material
 	CComPtr<ID3D11Buffer> pConstBuffer;
-//	ID3D11Buffer* pConstBuffer = nullptr;
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
 	bd.Usage = D3D11_USAGE_DEFAULT;
@@ -445,7 +520,23 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &pConstBuffer));
 	SetDebugName(pConstBuffer, "RenderManager::CreateMaterial::pConstBuffer");
 
-    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, (ID3D11VertexShader*) m_vertexShader, (ID3D11PixelShader*)m_pixelShader, 
+	ID3D11VertexShader* vertexShader = m_vertexShader;
+	ID3D11PixelShader* pixelShader = m_pixelShader;
+	if (vertexShaderFilename && *vertexShaderFilename)
+	{
+		LoadShader(vertexShaderFilename, ShaderType_VertexShader);
+		vertexShader = m_vertexShaders[vertexShaderFilename];
+		assert(vertexShader);
+	}
+
+	if (pixelShaderFilename && *pixelShaderFilename)
+	{
+		LoadShader(pixelShaderFilename, ShaderType_PixelShader);
+		pixelShader = m_pixelShaders[pixelShaderFilename];
+		assert(pixelShader);
+	}
+
+    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader, 
 		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/, 
 		shaderMaterial, pConstBuffer);
 	m_materials[name] = newMat;

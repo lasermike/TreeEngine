@@ -76,7 +76,7 @@ PS_INPUT VS(VS_INPUT input)
 	output.Tex = input.Tex;
 
 	// View direction.  Calcuate here and have it interpolated by to the pixel shader
-	output.ViewDirection = normalize(eyePos - output.PosW);
+	output.ViewDirection = normalize(eyePos.xyz - output.PosW);
 
 	// TBN vectors for tangent space
 	float3 worldNormal = mul( input.NormalL, (float3x3) input.World );
@@ -219,6 +219,32 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
 	return float4(c.rrr, 1);
 }
  
+
+PS_INPUT FSGraphVS(VS_INPUT input)
+{
+	PS_INPUT output = (PS_INPUT)0;
+
+	float4x4 worldViewProj = float4x4(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f);
+
+	output.Pos = mul(float4(input.Pos, 1.0f), worldViewProj);
+
+	output.Tex = input.Tex;
+
+	return output;
+}
+
+float4 FSGraphPS(PS_INPUT input) : SV_Target
+{
+	//float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
+	float4 c = float4(input.Tex.x, input.Tex.y, 0, 1);
+	//float4 c = float4(1.0, 0, 0, 1);
+
+	return c; //float4(c.rrr, 1);
+}
 
 
 /*
