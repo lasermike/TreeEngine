@@ -217,6 +217,7 @@ public:
 	ID3D11Buffer* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
 	GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
 	
+	HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
 	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
 	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
 					   const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);

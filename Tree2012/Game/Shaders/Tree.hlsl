@@ -239,9 +239,9 @@ PS_INPUT FSGraphVS(VS_INPUT input)
 
 float4 FSGraphPS(PS_INPUT input) : SV_Target
 {
-	//float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
-	float4 c = float4(input.Tex.x, input.Tex.y, 0, 1);
+	float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
 	//float4 c = float4(1.0, 0, 0, 1);
+	//float4 c = float4(input.Tex.x, input.Tex.y, 0, 1);
 
 	return c; //float4(c.rrr, 1);
 }

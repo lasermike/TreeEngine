@@ -9,7 +9,6 @@ struct GraphParams
 	GraphParams() { };
 };
 
-
 class GraphModelGenerator : public TreeModelGenerator
 {
 	GraphParams _params;
@@ -25,6 +24,15 @@ protected:
 
 /* -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- */
 
+struct FSGraphParams
+{
+	std::vector<float> points;
+	UINT width = 0;
+	UINT height = 0;
+
+	FSGraphParams() { };
+};
+
 class FSGraphModel : public Model
 {
 public:
@@ -35,10 +43,10 @@ public:
 
 class FSGraphModelGenerator : public ModelGenerator
 {
-	GraphParams _params;
+	FSGraphParams _params;
 
 public:
-	FSGraphModelGenerator(GraphParams& params) : _params(params) { }
+	FSGraphModelGenerator(FSGraphParams& params) : _params(params) { }
 	FSGraphModel* Create();
 
 protected:
@@ -63,6 +71,5 @@ public:
 
 	virtual unsigned int GetNumInstances() { return 1; }
 	virtual unsigned int GetMaxInstances() { return 1; }
-
 };
 

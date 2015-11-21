@@ -487,6 +487,40 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 	return S_OK;
 }
 
+HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height)
+{
+	D3D11_TEXTURE2D_DESC desc = {};
+	desc.Width = width;
+	desc.Height = height;
+	desc.ArraySize = 1;
+	desc.MipLevels = 1;
+	desc.SampleDesc.Count = 1;
+	desc.SampleDesc.Quality = 0;
+	desc.Format = DXGI_FORMAT_R32_FLOAT;
+	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+	D3D11_SUBRESOURCE_DATA subData = {};
+	subData.pSysMem = points;
+	subData.SysMemPitch = width * sizeof(float);
+	subData.SysMemSlicePitch = width * height * sizeof(float);
+
+	CComPtr<ID3D11Texture2D> texture;
+	HRR(m_d3dDevice->CreateTexture2D(&desc, &subData, &texture));
+	SetDebugName(texture, "RenderManager::CreateTexture2::procedural");
+
+	CComPtr<ID3D11ShaderResourceView> view;
+	HRR(m_d3dDevice->CreateShaderResourceView(texture, nullptr, &view));
+	SetDebugName(view, "RenderManager::CreateTexture2::proc view");
+
+	// Success
+	m_textures[name] = view;
+	texture.Release();
+	view.Detach();
+
+	return S_OK;
+}
+
+
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textureFilename,
 									  const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
 									  ShaderMaterial& shaderMaterial, Material** newMaterial)

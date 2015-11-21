@@ -83,20 +83,79 @@ HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, char* filename)
 	return S_OK;
 }
 
+HRESULT CreateBufferOfGraphPoints(std::vector<float>& buffer, UINT& width, char* filename)
+{
+	// Find max values
+	float maxTime = 0;
+	UINT rows = 0;
+	UINT columns = 0;
+
+	ifstream infile(filename); // for example
+	ASSERT(infile);
+
+	// Determine number of rows and columns and max time value
+	string line;
+	while (getline(infile, line))   // Read row
+	{
+		stringstream strstr(line);
+		string time;
+		getline(strstr, time, ',');
+
+		// Store time from column 0
+		float timeFloat = (float)atof(time.c_str());
+		buffer.push_back(timeFloat);
+
+		// Find highest time value
+		maxTime = std::max(maxTime, timeFloat);
+
+		// Insert remaining columns
+		string value;
+		while (getline(strstr, value, ','))
+		{
+			float valueFloat = (float)atof(time.c_str());
+			buffer.push_back(valueFloat);
+		}
+		rows++;
+	}
+
+	ASSERT(buffer.size() % rows == 0);
+	columns = buffer.size() / rows;
+
+	float timeScale = 10.0f / maxTime;
+	float timeDelta = .5f / buffer[columns];
+
+	for (UINT i = 0; i < buffer.size(); i++)
+	{
+		if (!(i % columns))  // Scale time
+		{
+			buffer[i] *= timeScale;
+		}
+		else   // Scale values
+		{
+			buffer[i] *= timeDelta;
+		}
+	}
+
+	width = columns;
+
+	return S_OK;
+}
+
 void GameLoader::LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
-	// Graph
-	WorldObjectParameters<GraphParams>* graphParams = new WorldObjectParameters<GraphParams>(GraphGeneratorType);
-
 	// Graph params
+	WorldObjectParameters<FSGraphParams>* graphParams = new WorldObjectParameters<FSGraphParams>(FSGraphGeneratorType);
+	FSGraphParams& params = graphParams->GetGeneratorParameters();
 	graphParams->depthLOD = -1;
 	graphParams->_animationSpeed = 300.0f;
 	graphParams->position = XMFLOAT3(0, .55f, 0);
-	scene->AddChild(new FSGraph(graphParams));
 
-	// Load graph points
-	GraphParams& params = graphParams->GetGeneratorParameters();
-	LoadGraphPoints(params.points, "graphdata.txt");
+	// Load graph points into buffer
+	UINT width = 0;
+	HR(CreateBufferOfGraphPoints(params.points, params.width, "graphdata.txt"));
+	params.height = params.points.size() / params.width;
+
+	scene->AddChild(new FSGraph(graphParams));
 
 	// Init lights
 	//m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
@@ -343,6 +402,12 @@ void GameLoader::Regenerate(SceneRoot* pScene)
 		{
 			WorldObjectParameters<GraphParams>& wop = (*t)->GetParams<GraphParams>();
 			GraphModelGenerator graphGen(wop.GetGeneratorParameters());
+			(*t)->Create(&graphGen);
+		}
+		else if (genType == FSGraphGeneratorType)
+		{
+			WorldObjectParameters<FSGraphParams>& wop = (*t)->GetParams<FSGraphParams>();
+			FSGraphModelGenerator graphGen(wop.GetGeneratorParameters());
 			(*t)->Create(&graphGen);
 		}
 		else

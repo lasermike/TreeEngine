@@ -58,6 +58,10 @@ HRESULT FSGraph::InitGraphics(RenderManager& renderManager)
 {
 	HRR(CleanUpDeviceObjects());
 
+	renderManager.CreateTexture2D(L"graph", GetParams<FSGraphParams>().GetGeneratorParameters().points.data(),
+		GetParams<FSGraphParams>().GetGeneratorParameters().width,
+		GetParams<FSGraphParams>().GetGeneratorParameters().height );
+
 	ShaderMaterial mat;
 	mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
 	mat.Diffuse = XMFLOAT4(0, .6f, 0, 1);
@@ -67,7 +71,7 @@ HRESULT FSGraph::InitGraphics(RenderManager& renderManager)
 
 	// Create material, mesh, and reserve render unit
 	Material* newMaterial = nullptr;
-	renderManager.CreateMaterial(L"line0", nullptr, L"FSGraphVS.cso", L"FSGraphPS.cso", mat, &newMaterial);
+	renderManager.CreateMaterial(L"line0", L"graph", L"FSGraphVS.cso", L"FSGraphPS.cso", mat, &newMaterial);
 
 	Mesh* newMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_FSQuad);
