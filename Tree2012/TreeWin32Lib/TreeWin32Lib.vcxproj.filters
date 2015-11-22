@@ -243,4 +243,9 @@
       <Filter>Game\Shaders</Filter>
     </CustomBuild>
   </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\TreeClassic\Lib\Debug\DirectXTex.lib">
+      <Filter>Lib</Filter>
+    </Library>
+  </ItemGroup>
 </Project>

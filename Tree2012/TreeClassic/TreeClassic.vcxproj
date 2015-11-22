@@ -131,7 +131,6 @@ call ..\Game\CopyResources.cmd $(OutDir)
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="Lib\DirectXTex.lib" />
     <Library Include="Lib\LibOVR.lib" />
     <Library Include="Lib\LibOVRKernel.lib" />
   </ItemGroup>

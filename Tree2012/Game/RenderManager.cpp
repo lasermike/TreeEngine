@@ -6,6 +6,8 @@
 
 #include "Primitive.h" // TEMPTEMP
 
+#include "DirectXTex.h"
+
 FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
 { 
 	{ FPS_STAT, L"FPS", 0 }, 
@@ -336,9 +338,11 @@ HRESULT RenderManager::Render()
 {
 	// Set samplers
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-	ID3D11SamplerState* samplers[2] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
-										stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap) } ;
-	m_immediateContext->PSSetSamplers(0, 2, samplers);
+	ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
+										stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap),
+										stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagLinearMipPointUVWClamp)
+};
+	m_immediateContext->PSSetSamplers(0, 3, samplers);
 
 	// Set shaders
 	if (m_renderData.pass == ShadowMapPass)
@@ -511,6 +515,18 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 	CComPtr<ID3D11ShaderResourceView> view;
 	HRR(m_d3dDevice->CreateShaderResourceView(texture, nullptr, &view));
 	SetDebugName(view, "RenderManager::CreateTexture2::proc view");
+
+#if 1
+	Image img;
+	img.width = width;
+	img.height = height;
+	img.format = DXGI_FORMAT_R32_FLOAT;
+	img.rowPitch = subData.SysMemPitch;
+	img.slicePitch = subData.SysMemSlicePitch ;
+	img.pixels = (uint8_t*) subData.pSysMem;
+	HR(SaveToDDSFile(img, DDS_FLAGS_NONE, L"FSGraphTexture.DDS"));
+#endif
+
 
 	// Success
 	m_textures[name] = view;

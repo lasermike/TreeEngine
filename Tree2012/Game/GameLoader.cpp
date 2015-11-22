@@ -29,7 +29,6 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 		break;
 	}
 	case 2:
-	default:
 	{
 		LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
 		break;
@@ -39,6 +38,8 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 		LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
 		break;
 	}
+	default:
+		ASSERT(false);
 	}
 }
 
@@ -54,7 +55,7 @@ HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, char* filename)
 {
 	// Find max values
 	std::vector<XMFLOAT2> values;
-	float maxX = 0, maxY = 0;
+	float maxX = 0; //, maxY = 0;
 	ifstream infile(filename); // for example
 	ASSERT(infile);
 	string line;
@@ -68,7 +69,7 @@ HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, char* filename)
 		float y = (float)atof(value1.c_str());
 		values.push_back(XMFLOAT2(x, y));
 		maxX = std::max(maxX, x);
-		maxY = std::max(maxY, y);
+		//maxY = std::max(maxY, y);
 	}
 
 	float xScale = 10.0f / maxX;
@@ -112,7 +113,7 @@ HRESULT CreateBufferOfGraphPoints(std::vector<float>& buffer, UINT& width, char*
 		string value;
 		while (getline(strstr, value, ','))
 		{
-			float valueFloat = (float)atof(time.c_str());
+			float valueFloat = (float)atof(value.c_str());
 			buffer.push_back(valueFloat);
 		}
 		rows++;

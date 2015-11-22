@@ -12,6 +12,7 @@ Texture2D txDiffuse : register( t0 );
 Texture2D txShadowMap : register( t1 );
 SamplerState samLinear : register( s0 );
 SamplerComparisonState samShadowCompState  : register( s1 );
+SamplerState samPoint : register(s2);
 
 cbuffer cbNeverChanges : register( b0 )
 {
@@ -220,17 +221,19 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
 }
  
 
+/********* FS GRAPH ********/
+
 PS_INPUT FSGraphVS(VS_INPUT input)
 {
 	PS_INPUT output = (PS_INPUT)0;
 
-	float4x4 worldViewProj = float4x4(
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f);
+	//float4x4 worldViewProj = float4x4(
+	//	1.0f, 0.0f, 0.0f, 0.0f,
+	//	0.0f, 1.0f, 0.0f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f);
 
-	output.Pos = mul(float4(input.Pos, 1.0f), worldViewProj);
+	output.Pos = float4(input.Pos, 1); //mul(float4(input.Pos, 1.0f), worldViewProj);
 
 	output.Tex = input.Tex;
 
@@ -239,7 +242,8 @@ PS_INPUT FSGraphVS(VS_INPUT input)
 
 float4 FSGraphPS(PS_INPUT input) : SV_Target
 {
-	float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
+	float4 c = txDiffuse.Sample(samPoint, input.Tex).r;
+	//float4 c = txDiffuse.Load(input.Tex).r;
 	//float4 c = float4(1.0, 0, 0, 1);
 	//float4 c = float4(input.Tex.x, input.Tex.y, 0, 1);
 
