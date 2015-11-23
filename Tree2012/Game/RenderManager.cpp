@@ -526,8 +526,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 	img.pixels = (uint8_t*) subData.pSysMem;
 	HR(SaveToDDSFile(img, DDS_FLAGS_NONE, L"FSGraphTexture.DDS"));
 #endif
-
-
+	
 	// Success
 	m_textures[name] = view;
 	texture.Release();

@@ -587,8 +587,13 @@ void Game::Update(DX::StepTimer const& timer)
 		m_renderManager.CleanUpDeviceObjects();
 		m_gameData.ResetToDefaults();
 
+		// Determine which scene to load
 		m_currentScene += m_advanceScene;
 		m_currentScene = m_currentScene % m_loader.GetNumScenes();
+		if (m_currentScene < 0)
+		{
+			m_currentScene += m_loader.GetNumScenes();
+		}
 		m_advanceScene = 0;
 
 		// Load the next/prev scene

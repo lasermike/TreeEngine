@@ -122,18 +122,18 @@ HRESULT CreateBufferOfGraphPoints(std::vector<float>& buffer, UINT& width, char*
 	ASSERT(buffer.size() % rows == 0);
 	columns = buffer.size() / rows;
 
-	float timeScale = 10.0f / maxTime;
-	float timeDelta = .5f / buffer[columns];
+	double timeScale = 1.0 / maxTime;
+	double timeDelta = .1 / buffer[columns];
 
 	for (UINT i = 0; i < buffer.size(); i++)
 	{
 		if (!(i % columns))  // Scale time
 		{
-			buffer[i] *= timeScale;
+			buffer[i] = float(buffer[i] * timeScale);
 		}
 		else   // Scale values
 		{
-			buffer[i] *= timeDelta;
+			buffer[i] = float(buffer[i] * timeDelta);
 		}
 	}
 
