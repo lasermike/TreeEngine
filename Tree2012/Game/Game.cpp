@@ -37,10 +37,10 @@ struct CBChangeOnResize
 
 Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 {
-#ifndef WIN32
-	m_window = nullptr;
-#else
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
 	m_hwnd = nullptr;
+#else
+	m_window = nullptr;
 #endif
 	m_driverType = D3D_DRIVER_TYPE_NULL;
 	m_featureLevel = D3D_FEATURE_LEVEL_11_0;
@@ -123,8 +123,8 @@ HRESULT Game::Initialize()
 	return S_OK;
 }
 
-#ifdef WIN32
-HRESULT Game::Initialize(HWND hwnd, bool renderToSharedTexture) 
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
+HRESULT Game::Initialize(HWND hwnd, bool renderToSharedTexture)
 { 
 	m_renderToSharedTexture = renderToSharedTexture;
 
@@ -385,7 +385,6 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 		Desc.CPUAccessFlags = 0;
 		Desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
 
-		HRESULT hr = S_OK;
 		HRR(m_pd3dDevice->CreateTexture2D(&Desc, NULL, &m_pSharedRenderToTexture));
 
 		pBackBuffer = m_pSharedRenderToTexture;
@@ -414,7 +413,7 @@ HRESULT Game::OnResize(UINT windowWidth, UINT windowHeight)
 		sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 		sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 
-#if defined(WIN32)
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
 		HRR(dxgiFactory2->CreateSwapChainForHwnd(m_pd3dDevice, m_hwnd, &sd, nullptr, nullptr, &m_pSwapChain1));
 		HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
 #else

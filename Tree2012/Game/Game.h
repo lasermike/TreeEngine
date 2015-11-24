@@ -11,7 +11,7 @@
 #include "Player.h"
 #include "RenderManager.h"
 
-#ifndef WIN32
+#if !defined(WIN32) || defined(TREENGINE_XBOX)
 #include "agile.h"
 using namespace Microsoft::WRL;
 #endif
@@ -46,7 +46,7 @@ public:
 	~Game();
 
 	// Initialization and management
-#ifdef WIN32
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
 	HRESULT Initialize(HWND hwnd, bool renderToSharedTexture);
 #else
 	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
@@ -121,7 +121,7 @@ private:
 	int								    m_currentScene;
 	int								    m_advanceScene;
 
-#ifdef WIN32
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
 	HWND								m_hwnd;
 #else
 	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;
