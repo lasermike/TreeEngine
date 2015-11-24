@@ -92,6 +92,12 @@
     <PostBuildEvent>
       <Command>..\Game\CopyResources.cmd $(OutDir)</Command>
     </PostBuildEvent>
+    <Lib>
+      <AdditionalDependencies>DirectXTex.lib</AdditionalDependencies>
+    </Lib>
+    <Lib>
+      <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Debug</AdditionalLibraryDirectories>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -124,6 +130,10 @@
     <PostBuildEvent>
       <Command>..\Game\CopyResources.cmd $(OutDir)</Command>
     </PostBuildEvent>
+    <Lib>
+      <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Release</AdditionalLibraryDirectories>
+      <AdditionalDependencies>DirectXTex.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -262,9 +272,6 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="..\TreeClassic\Lib\Debug\DirectXTex.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
