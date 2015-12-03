@@ -264,7 +264,8 @@ float4 FSGraphPS(PS_INPUT input) : SV_Target
 	float srcWidth = 21.0;
 	float srcHeight = 857.0;
 	float dot_size = 2.0;
-	float4 delta = float4(1.0 / 128, 0.0, 2.0 / 128, 0.0);
+	float4 delta = float4(1.0 / srcHeight, 0.0, 2.0 / srcHeight, 0.0);
+	//float4 delta = float4(1.0 / 128, 0.0, 2.0 / 128, 0.0);
 
 	const float columnIndex = .2857;
 	float2 p = float2(input.Pos.x, input.Pos.y);
@@ -273,38 +274,33 @@ float4 FSGraphPS(PS_INPUT input) : SV_Target
 	//float t = p.x * 128.0 - floor(p.x * 128.0);
 	float4 lineHeights;
 
-	float2 coord1 = float2(srcTC - delta.xy).xy;
+	float2 coord1 = float2(srcTC - delta.yx).xy;
 	float2 coord2 = float2(srcTC).xy;
-	float2 coord3 = float2(srcTC + delta.xy).xy;
-	float2 coord4 = float2(srcTC + delta.zw).xy;
-
-	//c[0] = txDiffuse.Load(int3(coord1, 0)).x;
-	//c[1] = txDiffuse.Load(int3(coord2, 0)).x;
-	//c[2] = txDiffuse.Load(int3(coord3, 0)).x;
-	//c[3] = txDiffuse.Load(int3(coord4, 0)).x;
+	float2 coord3 = float2(srcTC + delta.yx).xy;
+	float2 coord4 = float2(srcTC + delta.wz).xy;
 
 	lineHeights[0] = txDiffuse.Sample(samPoint, coord1).x;
 	lineHeights[1] = txDiffuse.Sample(samPoint, coord2).x;
 	lineHeights[2] = txDiffuse.Sample(samPoint, coord3).x;
 	lineHeights[3] = txDiffuse.Sample(samPoint, coord4).x;
 
-	float2 p0 = float2((srcTC.x - delta.x) * srcWidth, lineHeights[0] * srcHeight);
+	float2 srcPos0 = float2((input.Tex.x - delta.x), lineHeights[0]);
 	float2 srcPos1 = float2(input.Tex.x, lineHeights[1]);
-	float2 p2 = float2((srcTC.x + delta.x) * srcWidth, lineHeights[2] * srcHeight);
-	float2 p3 = float2((srcTC.x + delta.z) * srcWidth, lineHeights[3] * srcHeight);
+	float2 srcPos2 = float2((input.Tex.x + delta.x), lineHeights[2] );
+	float2 srcPos3 = float2(input.Tex.x + delta.z, lineHeights[3]);
 	float2 destPos = float2(input.Tex.x, 1 - input.Tex.y );
 
 	/* Compute distance to segments */
-	float dist = distance(srcPos1, destPos);
-	//dist = dist / srcHeight;
-
-	//float d = segdist(p0, p1, a);
-	//d = min(d, segdist(p1, p2, a));
-	//d = min(d, segdist(p2, p3, a));
+	//float dist = distance(srcPos1, destPos);
+	
+	float dist = segdist(srcPos0, srcPos1, destPos);
+	dist = min(dist, segdist(srcPos1, srcPos2, destPos));
+	dist = min(dist, segdist(srcPos2, srcPos3, destPos));
+	dist = min(dist, segdist(srcPos2, srcPos3, destPos));
 
 	/* Compute distance to dots */
-	//d = min(d, length(a - p0) - dot_size);
-	//d = min(d, length(a - p1) - dot_size);
+	//dist = min(dist, length(destPos - srcPos0) - dot_size);
+	//dist = min(dist, length(destPos - srcPos1) - dot_size);
 	//d = min(d, length(a - p2) - dot_size);
 	//d = min(d, length(a - p3) - dot_size);
 
@@ -313,18 +309,20 @@ float4 FSGraphPS(PS_INPUT input) : SV_Target
 	//return clamp(1.0 - dist, 0.0, 1.0);
 
 	/* Add line width */
-	float line_width = .003;
+	float line_width = delta.x;
 	float lum = clamp(line_width - dist, 0.0, 1.0);
 
 	//return lum;
 
 	/* Compensate for ??? */
-	lum = pow(1.0 - lum, 1000);
+	lum = pow(1.0 - lum, 2000);
+	//lum = pow(1.0 - lum, 1.0 / 2.4);
 
-	return lum; 
+	//return float4(lum, lum, lum, 1);
 
 	/* Choose some funny colours */
-	float4 retval = float4(lerp(p.x, 1.0, lum), lum, lum, 1.0);
+	float4 retval = float4(lerp(2, 1.0, lum), lum, lum, 1.0);
+	//float4 retval = float4(lerp(p.x, 1.0, lum), lum, lum, 1.0);
 
 	return retval;
 }
