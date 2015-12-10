@@ -21,7 +21,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 {
 	//
 	// WireframeRS
-	//
+	// 
 	D3D11_RASTERIZER_DESC wireframeDesc;
 	ZeroMemory(&wireframeDesc, sizeof(D3D11_RASTERIZER_DESC));
 	wireframeDesc.FillMode = D3D11_FILL_WIREFRAME;
@@ -32,7 +32,7 @@ HRESULT RenderStates::InitAll(ID3D11Device* device)
 	HRR(device->CreateRasterizerState(&wireframeDesc, &WireframeRS));
 	SetDebugName(WireframeRS, "RenderState::WireframeRS");
 
-	//
+	// 
 	// NoCullRS
 	//
 	D3D11_RASTERIZER_DESC noCullDesc;

@@ -1,0 +1,46 @@
+﻿<Window x:Class="D3DImageSample.Window1"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  Name="RootWindow" Title="Window1" Height="300" Width="300">
+  <Grid Background="{StaticResource RotatingTriangleScene}" />
+</Window>
+
+<!--<Window x:Class="D3DImageSample.Window1"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Name="RootWindow" Title="Window1" Height="300" Width="300" 
+    Background="{StaticResource RotatingTriangleScene}"
+    AllowsTransparency="True" WindowStyle="None" />-->
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+<!---->
