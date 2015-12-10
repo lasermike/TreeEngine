@@ -248,11 +248,7 @@
     </Image>
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="Lib\DirectXTex.lib">
-      <Filter>Lib</Filter>
-    </Library>
+    <Image Include="Assets\StoreLogo.png" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\Game\Shaders\ShaderFiles.txt">

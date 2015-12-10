@@ -259,19 +259,19 @@ float segdist(float2 p1, float2 p2, float2 a)
 	return distance(a, lerp(p1, p2, t));
 }
 
-float4 FSGraphPS(PS_INPUT input) : SV_Target
+static float4 lineColors[3] = { { 1,0,0,0 },
+						{ 0,1,0,0 },
+						{ 0,1,1,0 } };
+
+float4 CalcFrag(PS_INPUT input, float columnIndex, float4 lineColor)
 {
 	float srcWidth = 21.0;
 	float srcHeight = 857.0;
 	float dot_size = 2.0;
 	float4 delta = float4(1.0 / srcHeight, 0.0, 2.0 / srcHeight, 0.0);
-	//float4 delta = float4(1.0 / 128, 0.0, 2.0 / 128, 0.0);
 
-	const float columnIndex = .2857;
 	float2 p = float2(input.Pos.x, input.Pos.y);
 	float2 srcTC = float2(columnIndex, input.Tex.x);
-	//float2 tc = float2(floor(p.x * 128.0) / 128.0, p.y);
-	//float t = p.x * 128.0 - floor(p.x * 128.0);
 	float4 lineHeights;
 
 	float2 coord1 = float2(srcTC - delta.yx).xy;
@@ -290,9 +290,7 @@ float4 FSGraphPS(PS_INPUT input) : SV_Target
 	float2 srcPos3 = float2(input.Tex.x + delta.z, lineHeights[3]);
 	float2 destPos = float2(input.Tex.x, 1 - input.Tex.y );
 
-	/* Compute distance to segments */
-	//float dist = distance(srcPos1, destPos);
-	
+	/* Compute distance to segments */	
 	float dist = segdist(srcPos0, srcPos1, destPos);
 	dist = min(dist, segdist(srcPos1, srcPos2, destPos));
 	dist = min(dist, segdist(srcPos2, srcPos3, destPos));
@@ -304,27 +302,31 @@ float4 FSGraphPS(PS_INPUT input) : SV_Target
 	//d = min(d, length(a - p2) - dot_size);
 	//d = min(d, length(a - p3) - dot_size);
 
-	//return dist;
-
-	//return clamp(1.0 - dist, 0.0, 1.0);
-
 	/* Add line width */
 	float line_width = delta.x;
-	float lum = clamp(line_width - dist, 0.0, 1.0);
+	float lineLum = clamp(line_width - dist, 0.0, 1.0);
+	lineLum = lineLum / delta.x;
 
-	//return lum;
-
-	/* Compensate for ??? */
-	lum = pow(1.0 - lum, 2000);
-	//lum = pow(1.0 - lum, 1.0 / 2.4);
-
-	//return float4(lum, lum, lum, 1);
-
-	/* Choose some funny colours */
-	float4 retval = float4(lerp(2, 1.0, lum), lum, lum, 1.0);
-	//float4 retval = float4(lerp(p.x, 1.0, lum), lum, lum, 1.0);
+	float4 retval = float4(1, 1, 1, 1);
+	retval -= lineColor * lineLum;
 
 	return retval;
+}
+
+float4 FSGraphPS(PS_INPUT input) : SV_Target
+{
+	//const float columnIndex = .2857;
+	float srcWidth = 21.0;
+
+	float4 result = 1;
+
+	[unroll]
+	for (int i = 4; i < 7; i++)
+	{
+		float columnIndex = i * (1 / srcWidth);
+		result = min(result, CalcFrag(input, columnIndex, lineColors[i - 4]));
+	}
+	return result;
 }
 
 

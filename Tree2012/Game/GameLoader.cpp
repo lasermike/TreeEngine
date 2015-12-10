@@ -170,6 +170,8 @@ void GameLoader::LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* p
 	// Camera
 	player->SetPosition(XMLoadFloat3(&XMFLOAT3(5.0f, 1.5f, -8.2f)));
 	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), 0));
+
+	gameData->useShadowMaps = false;
 }
 
 
