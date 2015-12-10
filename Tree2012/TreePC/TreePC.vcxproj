@@ -105,7 +105,7 @@
     <IncludePath>..\Game\.;..\Inc;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);$(UniversalCRT_IncludePath)</IncludePath>
     <LibraryPath>;..\TreePC\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);$(UniversalCRT_LibraryPath_x86)</LibraryPath>
     <TargetName>$(ProjectName)</TargetName>
-    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
+    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>..\Game\.;..\Inc;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);$(UniversalCRT_IncludePath)</IncludePath>
@@ -139,7 +139,7 @@
       <UndefinePreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">WIN32</UndefinePreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\Game\CopyResources.cmd $(OutDir)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\Game\CopyResources.cmd $(OutDir)\AppX</Command>
     </PostBuildEvent>
     <Link>
       <AdditionalLibraryDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Lib\Debug</AdditionalLibraryDirectories>

@@ -516,7 +516,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 	HRR(m_d3dDevice->CreateShaderResourceView(texture, nullptr, &view));
 	SetDebugName(view, "RenderManager::CreateTexture2::proc view");
 
-#if 1
+#if 0
 	Image img;
 	img.width = width;
 	img.height = height;

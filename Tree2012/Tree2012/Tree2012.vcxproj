@@ -136,10 +136,11 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Durango'">
     <Link>
-      <AdditionalDependencies>pixEvt.lib;d3d11_x.lib;combase.lib;kernelx.lib;uuid.lib;</AdditionalDependencies>
+      <AdditionalDependencies>DirectXTex.lib;pixEvt.lib;d3d11_x.lib;combase.lib;kernelx.lib;uuid.lib;</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+      <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Debug</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
