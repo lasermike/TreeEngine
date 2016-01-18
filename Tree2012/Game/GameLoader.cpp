@@ -8,6 +8,15 @@
 #include <time.h>
 #include "Player.h"
 #include "Graph.h"
+#include <directxcolors.h>
+
+void GameData::ResetToDefaults()
+{
+	useShadowMaps = true;
+	useAlphaBlendedRenderTarget = true;
+	clearColor = Colors::SkyBlue;
+}
+
 
 GameLoader::GameLoader()
 {
@@ -172,6 +181,8 @@ void GameLoader::LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* p
 	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), 0));
 
 	gameData->useShadowMaps = false;
+	gameData->clearColor = Colors::White;
+	gameData->useAlphaBlendedRenderTarget = true;
 }
 
 

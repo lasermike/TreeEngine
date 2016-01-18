@@ -401,8 +401,13 @@ HRESULT RenderManager::SetMaterial(Material& material)
 
 	m_immediateContext->VSSetConstantBuffers(3, 1, &material.m_constBuffer);
 	m_immediateContext->PSSetConstantBuffers(3, 1, &material.m_constBuffer);
-	m_immediateContext->VSSetShader(material.m_vertexShader, nullptr, 0);
-	m_immediateContext->PSSetShader(material.m_pixelShader, nullptr, 0);
+
+	// TODO: support arbitary vertex shaders with shadow mapping
+	if (m_renderData.pass != ShadowMapPass)
+	{
+		m_immediateContext->VSSetShader(material.m_vertexShader, nullptr, 0);
+		m_immediateContext->PSSetShader(material.m_pixelShader, nullptr, 0);
+	}
 
 	m_immediateContext->UpdateSubresource(material.m_constBuffer, 0, nullptr, &cb, 0, 0);
 	return S_OK;

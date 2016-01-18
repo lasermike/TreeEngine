@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "Game.h"
-#include <directxcolors.h>
 #include "BitmapFont.h"
 #include "StockRenderStates.h"
 #include "SceneRoot.h"
@@ -696,10 +695,19 @@ void Game::Render(bool oculus)
 		stockStates.ApplyRasterizerState(m_pImmediateContext, XSF::StockRasterizerStates::Wireframe);
 	}
 
+	if (m_gameData.useAlphaBlendedRenderTarget)
+	{
+		stockStates.ApplyBlendState(m_pImmediateContext, XSF::StockBlendStates::AlphaBlend);
+	}
+	else
+	{
+		stockStates.ApplyBlendState(m_pImmediateContext, XSF::StockBlendStates::Overwrite);
+	}
+
     if (!oculus)
     {
 	    // Clear the back buffer
-	    m_pImmediateContext->ClearRenderTargetView(m_pRenderTargetView, Colors::SkyBlue);  //AliceBlue
+	    m_pImmediateContext->ClearRenderTargetView(m_pRenderTargetView, m_gameData.clearColor);  //AliceBlue
 
 	    // Clear the depth buffer to 1.0 (max depth)
 	    m_pImmediateContext->ClearDepthStencilView(m_pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);

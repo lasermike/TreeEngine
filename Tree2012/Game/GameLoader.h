@@ -8,16 +8,15 @@ class Player;
 struct GameData
 {
 	bool useShadowMaps;
+	bool useAlphaBlendedRenderTarget;
+	XMVECTORF32 clearColor;
 
 	GameData() 
 	{
 		ResetToDefaults();
 	}
 
-	void ResetToDefaults()
-	{
-		useShadowMaps = true;
-	}
+	void ResetToDefaults();
 };
 
 class GameLoader

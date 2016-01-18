@@ -259,9 +259,21 @@ float segdist(float2 p1, float2 p2, float2 a)
 	return distance(a, lerp(p1, p2, t));
 }
 
-static float4 lineColors[3] = { { 1,0,0,0 },
-						{ 0,1,0,0 },
-						{ 0,1,1,0 } };
+static float4 lineColors[12] = 
+{ 
+	{ 1,0,0,1 },
+	{ 0,1,0,1 },
+	{ 0,0,1,1 },
+	{ 1,1,0,1 },
+	{ 1,1,0,1 },
+	{ .5,0,1,1 }, 
+	{ 1,0,1,1 },
+	{ 0,1,1,1 },
+	{ 0.5,0,1,1 }, 
+	{ 1,0.5,0,1 },
+	{ 0,1,.5,1 },
+	{ 0.5,0,1,1 } 
+};
 
 float4 CalcFrag(PS_INPUT input, float columnIndex, float4 lineColor)
 {
@@ -306,11 +318,19 @@ float4 CalcFrag(PS_INPUT input, float columnIndex, float4 lineColor)
 	float line_width = delta.x;
 	float lineLum = clamp(line_width - dist, 0.0, 1.0);
 	lineLum = lineLum / delta.x;
-
-	float4 retval = float4(1, 1, 1, 1);
-	retval -= lineColor * lineLum;
-
+	
+	float4 retval;
+	retval = float4(lineColor.xyz, lineLum);
+	//retval = float4(1, 1, 1, 1);
 	return retval;
+}
+
+float4 blend(float4 A, float4 B)
+{
+	float4 C;
+	C.a = A.a + (1 - A.a) * B.a;
+	C.rgb = (1 / C.a) * (A.a * A.rgb + (1 - A.a) * B.a * B.rgb);
+	return C;
 }
 
 float4 FSGraphPS(PS_INPUT input) : SV_Target
@@ -318,13 +338,13 @@ float4 FSGraphPS(PS_INPUT input) : SV_Target
 	//const float columnIndex = .2857;
 	float srcWidth = 21.0;
 
-	float4 result = 1;
+	float4 result = 0;
 
 	[unroll]
-	for (int i = 4; i < 7; i++)
+	for (int i = 2; i < 14; i++)
 	{
 		float columnIndex = i * (1 / srcWidth);
-		result = min(result, CalcFrag(input, columnIndex, lineColors[i - 4]));
+		result = blend(result, CalcFrag(input, columnIndex, lineColors[i - 2]));
 	}
 	return result;
 }
