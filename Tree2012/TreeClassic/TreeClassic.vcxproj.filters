@@ -82,14 +82,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="Lib\LibOVR.lib">
-      <Filter>Lib</Filter>
-    </Library>
-    <Library Include="Lib\LibOVRKernel.lib">
-      <Filter>Lib</Filter>
-    </Library>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
       <Filter>Game\Shaders</Filter>
     </CustomBuild>

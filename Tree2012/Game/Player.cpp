@@ -7,13 +7,12 @@ XMMATRIX Camera::GetViewMatrix()
         XMLoadFloat4(&m_hmdRotation), m_parent->GetRotation()
         
     ));
-                                                                          
-    //XMMATRIX rotMat = XMMatrixRotationQuaternion(XMLoadFloat4(&m_hmdRotation));
-
+                                                     
 	XMVECTOR finalUp      = XMVector3Transform(XMVectorSet(0, 1, 0, 0), rotMat);
     XMVECTOR finalForward = XMVector3Transform(XMVectorSet(0, 0, 1, 0), rotMat);
 
 	XMVECTOR pos = m_parent->GetPosition();
+	pos += XMVectorSet(m_hmdPosition.x, m_hmdPosition.y, m_hmdPosition.z, 0);
 	return XMMatrixLookAtLH(pos, 
 							pos + finalForward, 
 							finalUp);

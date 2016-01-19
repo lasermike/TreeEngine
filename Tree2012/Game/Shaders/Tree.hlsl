@@ -285,12 +285,12 @@ float4 CalcFrag(PS_INPUT input, float columnIndex, float4 lineColor)
 	float2 p = float2(input.Pos.x, input.Pos.y);
 	float2 srcTC = float2(columnIndex, input.Tex.x);
 	float4 lineHeights;
-
+	 
 	float2 coord1 = float2(srcTC - delta.yx).xy;
 	float2 coord2 = float2(srcTC).xy;
 	float2 coord3 = float2(srcTC + delta.yx).xy;
 	float2 coord4 = float2(srcTC + delta.wz).xy;
-
+ 
 	lineHeights[0] = txDiffuse.Sample(samPoint, coord1).x;
 	lineHeights[1] = txDiffuse.Sample(samPoint, coord2).x;
 	lineHeights[2] = txDiffuse.Sample(samPoint, coord3).x;
