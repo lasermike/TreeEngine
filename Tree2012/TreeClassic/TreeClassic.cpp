@@ -366,8 +366,9 @@ HRESULT CreateOculusDevice(bool& detected)
 	}
 	else 
     {
-		return E_FAIL;
-        //result = ovr_CreateDebug(ovrHmd_DK2, &HMD);
+		LOG("Oculus Rift device creation FAILED.");
+		return S_FALSE;
+		//result = ovr_CreateDebug(ovrHmd_DK2, &HMD);
 		//debugOvr = true;
         //LOG("Debug Oculus Rift device created."); 
     }

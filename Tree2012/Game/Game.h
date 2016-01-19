@@ -119,7 +119,8 @@ private:
 	double								m_timeStart;
 	double								m_timeCurrent;
 	int								    m_currentScene;
-	int								    m_advanceScene;
+	bool							    m_advanceScene;
+	int								    m_advanceSceneAmount;
 
 #if defined(WIN32) && !defined(TREENGINE_XBOX)
 	HWND								m_hwnd;

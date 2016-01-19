@@ -52,6 +52,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 	m_resetTree = true;
 	m_showShadowBuffer = false;
 	m_advanceScene = 0;
+	m_advanceSceneAmount = 0;
 	m_currentScene = 0;
 
 #ifdef ENABLE_MSAA
@@ -586,13 +587,17 @@ void Game::Update(DX::StepTimer const& timer)
 		m_gameData.ResetToDefaults();
 
 		// Determine which scene to load
-		m_currentScene += m_advanceScene;
+		m_currentScene += m_advanceSceneAmount;
 		m_currentScene = m_currentScene % m_loader.GetNumScenes();
 		if (m_currentScene < 0)
 		{
 			m_currentScene += m_loader.GetNumScenes();
 		}
-		m_advanceScene = 0;
+
+		m_advanceScene = false;
+		m_advanceSceneAmount = 0;
+
+		m_timeStart = 0;
 
 		// Load the next/prev scene
 		m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
@@ -766,7 +771,7 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 {
     m_player->HandleInput(key);
 
-    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H', 'N', 'B' };
+    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H', 'N', 'B', 'R' };
 	for (char k : availableKeys)
 	{
 		if (key[k])
@@ -806,12 +811,18 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 				m_showHelp = !m_showHelp;
 				key[k] = false;
 				break;
+			case 'R':
+				m_advanceScene = true;
+				key[k] = false;
+				break;
 			case 'N':
-				m_advanceScene = 1;
+				m_advanceScene = true;
+				m_advanceSceneAmount = 1;
 				key[k] = false;
 				break;
 			case 'B':
-				m_advanceScene = -1;
+				m_advanceScene = true;
+				m_advanceSceneAmount = -1;
 				key[k] = false;
 				break;
 				//case '1':
