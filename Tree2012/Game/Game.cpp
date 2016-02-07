@@ -112,7 +112,7 @@ HRESULT Game::Initialize(HWND hwnd, bool renderToSharedTexture)
 
 	m_hwnd = hwnd;  
 	HRESULT hr = S_OK;
-	HRR(InitDevice());
+	HRR(m_renderManager.InitDevice());
 
 	UINT windowWidth = 0; 
 	UINT windowHeight = 0;
@@ -121,7 +121,7 @@ HRESULT Game::Initialize(HWND hwnd, bool renderToSharedTexture)
 	windowWidth = rect.right - rect.left;
 	windowHeight = rect.bottom - rect.top;
 
-	HRR(OnResize(windowWidth, windowHeight, m_renderToSharedTexture, this));
+	HRR(m_renderManager.OnResize(windowWidth, windowHeight, m_renderToSharedTexture, this));
 
 	return hr;
 }

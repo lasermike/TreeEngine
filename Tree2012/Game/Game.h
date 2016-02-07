@@ -44,9 +44,9 @@ public:
 #else
 	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
 #endif
-	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain);
-	//HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain); // TODO: move to platform specific code
+	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain); // TODO: move to platform specific code
 
+	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat) { return m_renderManager.UpdateProjection(pProjMat); }
 	HRESULT OnResize(UINT width, UINT height) { return m_renderManager.OnResize(width, height, m_renderToSharedTexture, this); }
 
 	HRESULT Cleanup();

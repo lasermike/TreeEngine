@@ -168,7 +168,7 @@ HRESULT Render()
 		XMStoreFloat4(&eye, g_game->GetRenderManager().GetRenderData().eyePos);
 
         //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));
-        float y = ovr_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, 0);
+        //float y = ovr_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, 0);
 
         // Get both eye poses simultaneously, with IPD offset already included. 
         ovrPosef         EyeRenderPose[2];
@@ -183,21 +183,21 @@ HRESULT Render()
         g_game->ComputeGPU();
 
         // Render Scene to Eye Buffers
-        for (int eye = 0; eye < 2; eye++)  //2
+        for (int eyeIndex = 0; eyeIndex < 2; eyeIndex++)  //2
         {
 			if (g_inputManager.GetFrameInput(0).key[VK_SPACE])
             {
                 // Reset to default camera position
-				neutralPosition = EyeRenderPose[eye].Position;
-                neutralRotation = EyeRenderPose[eye].Orientation;
+				neutralPosition = EyeRenderPose[eyeIndex].Position;
+                neutralRotation = EyeRenderPose[eyeIndex].Orientation;
             }
 
 			// COmpute position
-            Vector3f adjustedPos = Vector3f(EyeRenderPose[eye].Position) - neutralPosition;
+            Vector3f adjustedPos = Vector3f(EyeRenderPose[eyeIndex].Position) - neutralPosition;
 			XMFLOAT3 hmdPos = XMFLOAT3(adjustedPos.x, adjustedPos.y, adjustedPos.z);			 
 
             // Compute rotation.  Divide sensor data by neutral data 
-            XMVECTOR eyeQuat = RH2LH(EyeRenderPose[eye].Orientation);
+            XMVECTOR eyeQuat = RH2LH(EyeRenderPose[eyeIndex].Orientation);
             XMVECTOR neutralQuat = RH2LH(neutralRotation);
 			XMVECTOR finalQuat = eyeQuat;
 			XMFLOAT4 hmdRot;
@@ -206,21 +206,21 @@ HRESULT Render()
             g_game->GetPlayer()->GetCamera()->SetHmdState(hmdPos, hmdRot);
 
 			// Update game's project matrix
-            Matrix4f proj = ovrMatrix4f_Projection(eyeRenderDesc[eye].Fov, 0.2f, 1000.0f, ovrProjection_None);
+            Matrix4f proj = ovrMatrix4f_Projection(eyeRenderDesc[eyeIndex].Fov, 0.2f, 1000.0f, ovrProjection_None);
             XMFLOAT4X4 projxm = XMFLOAT4X4((float*) (proj.Transposed().M));
             g_game->UpdateProjection(&projxm);
 
             // Render
 
             // Increment to use next texture, just before writing
-            g_pEyeRenderTexture[eye]->AdvanceToNextTexture();
+            g_pEyeRenderTexture[eyeIndex]->AdvanceToNextTexture();
 
             // Clear and set up rendertarget
-            int texIndex = g_pEyeRenderTexture[eye]->TextureSet->CurrentIndex;
+            int texIndex = g_pEyeRenderTexture[eyeIndex]->TextureSet->CurrentIndex;
 
-            DIRECTX.SetAndClearRenderTarget(g_pEyeRenderTexture[eye]->TexRtv[texIndex], g_pEyeDepthBuffer[eye]);
+            DIRECTX.SetAndClearRenderTarget(g_pEyeRenderTexture[eyeIndex]->TexRtv[texIndex], g_pEyeDepthBuffer[eyeIndex]);
 
-            DIRECTX.SetViewport(Recti(g_eyeRenderViewport[eye]));
+            DIRECTX.SetViewport(Recti(g_eyeRenderViewport[eyeIndex]));
 
             g_game->Render(true);
         }
@@ -230,21 +230,21 @@ HRESULT Render()
         ld.Header.Type  = ovrLayerType_EyeFov;
         ld.Header.Flags = 0;
 
-        for (int eye = 0; eye < 2; eye++)
+        for (int eyeIndex = 0; eyeIndex < 2; eyeIndex++)
         {
-            ld.ColorTexture[eye] = g_pEyeRenderTexture[eye]->TextureSet;
-            ld.Viewport[eye]     = g_eyeRenderViewport[eye];
-            ld.Fov[eye]          = g_hmdDesc.DefaultEyeFov[eye];
-            ld.RenderPose[eye]   = EyeRenderPose[eye];
+            ld.ColorTexture[eyeIndex] = g_pEyeRenderTexture[eyeIndex]->TextureSet;
+            ld.Viewport[eyeIndex]     = g_eyeRenderViewport[eyeIndex];
+            ld.Fov[eyeIndex]          = g_hmdDesc.DefaultEyeFov[eyeIndex];
+            ld.RenderPose[eyeIndex]   = EyeRenderPose[eyeIndex];
         }
 
         ovrLayerHeader* layers = &ld.Header;
         ovrResult result = ovr_SubmitFrame(HMD, 0, nullptr, &layers, 1);
-        //isVisible = result == ovrSuccess;
+		ASSERTSZ(result == ovrSuccess, "Failed to configure tracking.");
 
         // Render mirror
 	    ID3D11Texture2D* pBackBuffer = nullptr;
-        HRR(g_game->GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+        HRR(g_game->GetRenderManager().GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
 
         ovrD3D11Texture* tex = (ovrD3D11Texture*)g_mirrorTexture;
         DIRECTX.Context->CopyResource(pBackBuffer, tex->D3D11.pTexture);
@@ -326,8 +326,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
     // Set up the oculus helper library
-    DIRECTX.Context = g_game->GetContext();
-    DIRECTX.SwapChain = g_game->GetSwapChain();
+    DIRECTX.Context = g_game->GetRenderManager().GetContext();
+    DIRECTX.SwapChain = g_game->GetRenderManager().GetSwapChain();
 
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
@@ -402,15 +402,15 @@ HRESULT ConfigOculusDevice()
     for (int eye = 0; eye < 2; eye++)
     {
         Sizei idealSize = ovr_GetFovTextureSize(HMD, (ovrEyeType)eye, g_hmdDesc.DefaultEyeFov[eye], 1.0f);
-        g_pEyeRenderTexture[eye]      = new OculusTexture(HMD, g_game->GetDevice(), idealSize);
-		g_pEyeDepthBuffer[eye]        = new DepthBuffer(g_game->GetDevice(), idealSize);
+        g_pEyeRenderTexture[eye]      = new OculusTexture(HMD, g_game->GetRenderManager().GetDevice(), idealSize);
+		g_pEyeDepthBuffer[eye]        = new DepthBuffer(g_game->GetRenderManager().GetDevice(), idealSize);
         g_eyeRenderViewport[eye].Pos  = Vector2i(0, 0);
         g_eyeRenderViewport[eye].Size = idealSize;
     }
 
     // Create mirror buffer same type as back buffer
 	ID3D11Texture2D* pBackBuffer = nullptr;
-    HRR(g_game->GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+    HRR(g_game->GetRenderManager().GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
     D3D11_TEXTURE2D_DESC bbDesc = {};
     pBackBuffer->GetDesc(&bbDesc);
     pBackBuffer->Release();
@@ -424,7 +424,7 @@ HRESULT ConfigOculusDevice()
     td.Usage            = D3D11_USAGE_DEFAULT;
     td.SampleDesc.Count = 1;
     td.MipLevels        = 1;
-	ovr_CreateMirrorTextureD3D11(HMD, g_game->GetDevice(), &td, 0, &g_mirrorTexture);
+	ovr_CreateMirrorTextureD3D11(HMD, g_game->GetRenderManager().GetDevice(), &td, 0, &g_mirrorTexture);
 
     // Setup VR components, filling out description
     eyeRenderDesc[0] = ovr_GetRenderDesc(HMD, ovrEye_Left, g_hmdDesc.DefaultEyeFov[0]);

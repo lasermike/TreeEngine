@@ -59,7 +59,7 @@ struct Branch
 	void SetChild(int i, int c) 
 	{ 
 		ASSERT(i < maxChildBranches);
-		ASSERT(i == children.size());
+		ASSERT(i == (int) children.size());
 		children.at(i) = c;
 	}
 };

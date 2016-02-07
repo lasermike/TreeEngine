@@ -319,7 +319,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
     m_drawScreenPixelShader.Release();
     m_drawScreenVertexShader.Release();
     m_shadowVertexShader.Release();
-	SafeDelete(&m_bitmapFont);
+	//SafeDelete(&m_bitmapFont);
 	InputLayouts::DestroyAll();
 	RenderStates::DestroyAll();
 
@@ -848,6 +848,7 @@ HRESULT RenderManager::InitDevice()
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
 
 	XSF::StockRenderStates::Initialize(m_d3dDevice);
+
 	m_bitmapFont = new XSF::BitmapFont();
 	XSF_ERROR_IF_FAILED(m_bitmapFont->Create(m_d3dDevice, L"Arial_16"));
 
@@ -1104,11 +1105,7 @@ void RenderManager::CleanupDeviceForShutdown()
 	m_immediateContext.Release();
 	m_d3dDevice1.Release(); // TODO: Device leak somewhere causing crash
 
-	if (m_bitmapFont)
-	{
-		delete m_bitmapFont;
-		m_bitmapFont = nullptr;
-	}
+	SafeDelete(&m_bitmapFont);
 
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
 	if (m_d3dDevice)
