@@ -9,8 +9,10 @@
 
 # Build results
 [Dd]ebug/
+[Dd]ebug12/
 [Dd]ebugPublic/
 [Rr]elease/
+[Rr]elease12/
 [Rr]eleases/
 [Pp]rofile/
 [Dd]urango/
