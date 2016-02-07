@@ -6,6 +6,17 @@
 
 class WorldObject;
 
+namespace XboxSampleFramework
+{
+class BitmapFont;
+};
+
+enum DisplayMode
+{
+	Monitor = 0,
+	Oculus
+};
+
 enum MaterialTypes
 {
 	LogMaterial,
@@ -20,6 +31,11 @@ enum ShaderType
 	ShaderType_VertexShader,
 	ShaderType_PixelShader,
 	ShaderType_ComputeShader,
+};
+
+interface SwapChainCreator
+{
+	virtual HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain) = 0;
 };
 
 //enum { MAT_WRAP = 1, MAT_WIRE = 2, MAT_ZALWAYS = 4, MAT_NOCULL = 8 };
@@ -169,6 +185,26 @@ class RenderManager : public IRenderFrame
 
 	RenderData							m_renderData;
 
+	// Direct3D Objects
+	D3D_DRIVER_TYPE                     m_driverType;
+	D3D_FEATURE_LEVEL                   m_featureLevel;
+	CComPtr<XSF::D3DDevice>             m_d3dDevice;
+	CComPtr<ID3D11Device1>              m_d3dDevice1;
+	CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
+	CComPtr<ID3D11DeviceContext1>       m_immediateContext1;
+	CComPtr<IDXGISwapChain>             m_pSwapChain;
+	CComPtr<IDXGISwapChain1>            m_pSwapChain1;
+	CComPtr<ID3D11RenderTargetView>     m_pRenderTargetView;
+	CComPtr<ID3D11Texture2D>            m_pSharedRenderToTexture;
+	CComPtr<ID3D11Texture2D>            m_pDepthStencil;
+	CComPtr<ID3D11DepthStencilView>		m_pDepthStencilView;
+	D3D11_VIEWPORT						m_viewPort;
+	DisplayMode							m_displayMode;
+	bool								m_enableMsaa;
+
+	CComPtr<ID3D11RasterizerState>		m_rasterState;
+	CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
+
     // TODO per material
 	CComPtr<ID3D11VertexShader>         m_vertexShader;
 	CComPtr<ID3D11PixelShader>          m_pixelShader;
@@ -191,14 +227,12 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
 	DirectionalLight					m_light;  // Doesn't belong here, will move later
 
+	// Fixed drawing features
 	CComPtr<ID3D11Buffer>				m_screenQuadVB;
 	CComPtr<ID3D11Buffer>				m_screenQuadIB;
 	CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
+	XSF::BitmapFont*					m_bitmapFont;
 
-	// Weak references.  Owned by Game
-	XSF::D3DDevice*						m_d3dDevice;
-	XSF::D3DDeviceContext*              m_immediateContext;
-	
 	HRESULT LoadTexture(const wchar_t* textureFilename);
 	HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
 	HRESULT Render(RenderUnit& renderUnit);
@@ -208,7 +242,10 @@ public:
 	RenderManager();
 	~RenderManager();
 	HRESULT Initialize();
-	void SetDXReferences(XSF::D3DDevice* device, XSF::D3DDeviceContext* immediateContext) { m_d3dDevice = device; m_immediateContext = immediateContext; }
+
+	HRESULT InitDevice();
+	HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture, SwapChainCreator* swapChainCreator);
+	void CleanupDeviceForShutdown();
 	
 	RenderData& GetRenderData() { return m_renderData; }
 	XSF::D3DDevice* GetDevice() { return m_d3dDevice; }
@@ -216,7 +253,16 @@ public:
 	ID3D11Buffer* GetVertexBuffer() { return m_vertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
 	ID3D11Buffer* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
 	GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
-	
+
+	// Accessor methods for Oculus
+	ID3D11Device* GetDevice11() { return m_d3dDevice1; }
+	ID3D11RenderTargetView* GetRTV() { return m_pRenderTargetView; }
+	ID3D11DepthStencilView* GetDSV() { return m_pDepthStencilView; }
+	ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
+	IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
+	D3D11_VIEWPORT* GetViewport() { return &m_viewPort; }
+	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
+
 	HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
 	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
 	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
@@ -234,5 +280,6 @@ public:
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
+	HRESULT DrawFrameStats();
 };
 

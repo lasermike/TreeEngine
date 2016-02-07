@@ -2,7 +2,9 @@
 #include "RenderManager.h"
 #include "RenderStates.h"
 #include "DDSTextureLoader.h" // Test texture
+#include "BitmapFont.h"
 #include "StockRenderStates.h"
+#include "ShadowMap.h"
 
 #include "Primitive.h" // TEMPTEMP
 
@@ -102,6 +104,17 @@ RenderManager::RenderManager() : m_shadowVertexShader(nullptr), m_shadowPixelSha
 						 m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
 						 m_drawScreenVertexShader(), m_drawScreenPixelShader()
 {
+	m_driverType = D3D_DRIVER_TYPE_NULL;
+	m_featureLevel = D3D_FEATURE_LEVEL_11_0;
+	m_displayMode = Monitor;
+	m_bitmapFont = nullptr;
+
+#ifdef ENABLE_MSAA
+	m_enableMsaa = true; // TODO
+#else
+	m_enableMsaa = false; // TODO: disabled for windows store
+#endif
+
 	m_renderData.frameStats = g_frameStats;
 
 	m_light.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
@@ -246,6 +259,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 
 HRESULT RenderManager::CleanUpDeviceObjects()
 {
+	SafeDelete(&GetRenderData().pShadowMap);
 
 	SafeRelease(&m_vertexBuffer);
 	SafeRelease(&m_indexBuffer);
@@ -305,6 +319,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
     m_drawScreenPixelShader.Release();
     m_drawScreenVertexShader.Release();
     m_shadowVertexShader.Release();
+	SafeDelete(&m_bitmapFont);
 	InputLayouts::DestroyAll();
 	RenderStates::DestroyAll();
 
@@ -729,4 +744,399 @@ HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11Sha
 
 	return S_OK;
 
+}
+
+//--------------------------------------------------------------------------------------
+// Structures
+//--------------------------------------------------------------------------------------
+struct CBChangeOnResize
+{
+	XMFLOAT4X4 mProjection;
+};
+
+//--------------------------------------------------------------------------------------
+// Create Direct3D device and swap chain
+//--------------------------------------------------------------------------------------
+HRESULT RenderManager::InitDevice()
+{
+	HRESULT result = S_OK;
+
+	UINT createDeviceFlags = 0;
+#ifdef _DEBUG
+	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+#if defined(_XBOX_ONE) && defined(PROFILE) 
+	createDeviceFlags |= D3D11_CREATE_DEVICE_INSTRUMENTED;
+#endif
+
+	D3D_DRIVER_TYPE driverTypes[] =
+	{
+		D3D_DRIVER_TYPE_HARDWARE,
+		D3D_DRIVER_TYPE_WARP,
+		D3D_DRIVER_TYPE_REFERENCE,
+	};
+	UINT numDriverTypes = ARRAYSIZE(driverTypes);
+
+	D3D_FEATURE_LEVEL featureLevels[] =
+	{
+		D3D_FEATURE_LEVEL_11_1,
+		D3D_FEATURE_LEVEL_11_0,
+		D3D_FEATURE_LEVEL_10_1,
+		D3D_FEATURE_LEVEL_10_0,
+	};
+	UINT numFeatureLevels = ARRAYSIZE(featureLevels);
+
+	for (UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++)
+	{
+		CComPtr<ID3D11Device> device;
+		CComPtr<ID3D11DeviceContext> d3dContext;
+
+		m_driverType = driverTypes[driverTypeIndex];
+		result = D3D11CreateDevice(nullptr, m_driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
+			D3D11_SDK_VERSION, &device, &m_featureLevel, &d3dContext);
+
+		if (SUCCEEDED(result))
+		{
+			HRR(device->QueryInterface(__uuidof(m_d3dDevice), reinterpret_cast<void**>(&m_d3dDevice)));
+			HRR(d3dContext->QueryInterface(__uuidof(m_immediateContext), reinterpret_cast<void**>(&m_immediateContext)));
+			break;
+		}
+	}
+
+	if (FAILED(result))
+		return result;
+
+#if defined(_DEBUG) && !defined(_XBOX_ONE)
+	{
+		// Debug layers
+		CComPtr<ID3D11Debug> d3dDebug;
+		HR(m_d3dDevice->QueryInterface(__uuidof(ID3D11Debug), (void**)&d3dDebug));
+
+		CComPtr<ID3D11InfoQueue> d3dInfoQueue;
+		HR(d3dDebug->QueryInterface(__uuidof(ID3D11InfoQueue), (void**)&d3dInfoQueue))
+			d3dInfoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
+		d3dInfoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
+
+		D3D11_MESSAGE_ID hide[] =
+		{
+			D3D11_MESSAGE_ID_SETPRIVATEDATA_CHANGINGPARAMS,
+			// Add more message IDs here as needed
+		};
+
+		D3D11_INFO_QUEUE_FILTER filter;
+		ZeroMemory(&filter, sizeof(filter));
+		filter.DenyList.NumIDs = _countof(hide);
+		filter.DenyList.pIDList = hide;
+		d3dInfoQueue->AddStorageFilterEntries(&filter);
+	}
+#endif
+
+	// 
+	// Create constant buffer
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(CBChangeOnResize);
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.CPUAccessFlags = 0;
+	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
+
+	m_immediateContext->VSSetConstantBuffers(1, 1, &m_pCBChangeOnResize);
+
+	// Initialize the world matrices
+	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
+
+	XSF::StockRenderStates::Initialize(m_d3dDevice);
+	m_bitmapFont = new XSF::BitmapFont();
+	XSF_ERROR_IF_FAILED(m_bitmapFont->Create(m_d3dDevice, L"Arial_16"));
+
+	return S_OK;
+}
+
+HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat)
+{
+	CBChangeOnResize cbChangesOnResize;
+	XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+	m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &cbChangesOnResize, 0, 0);
+
+	return S_OK;
+}
+
+HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture, SwapChainCreator* swapChainCreator)
+{
+	HRESULT hr = S_OK;
+
+	if (!m_immediateContext && !swapChainCreator)
+	{
+		return S_FALSE;
+	}
+
+	// Resize logic
+
+	// Create width/height dependent objects
+	m_pDepthStencilView.Release();
+	m_pDepthStencil.Release();
+
+	m_pRenderTargetView.Release();
+	m_pSwapChain1.Release();
+	m_pSwapChain.Release();
+	m_pSharedRenderToTexture.Release();
+
+	// Calculate the necessary swap chain and render target size in pixels.
+
+	// Initialize the projection matrix
+	GetRenderData().projectionData.screenWidth = windowWidth;
+	GetRenderData().projectionData.screenHeight = windowHeight;
+	GetRenderData().projectionData.fov = XM_PIDIV4;
+
+	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
+	CComPtr<IDXGIFactory1> dxgiFactory;
+	{
+		CComPtr<IDXGIDevice> dxgiDevice;
+		hr = m_d3dDevice->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
+		if (SUCCEEDED(hr))
+		{
+			CComPtr<IDXGIAdapter> adapter;
+			hr = dxgiDevice->GetAdapter(&adapter);
+			if (SUCCEEDED(hr))
+			{
+				hr = adapter->GetParent(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&dxgiFactory));
+			}
+		}
+	}
+	if (FAILED(hr))
+		return hr;
+
+	// Check MSAA support
+	UINT msaaQuality;
+	const UINT msaaCount = 4;
+	HRR(m_d3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
+	if (msaaQuality == 0)
+	{
+		m_enableMsaa = false;
+	}
+
+	// Enable MSAA
+	if (m_enableMsaa)
+	{
+		D3D11_RASTERIZER_DESC rasterDesc;
+		rasterDesc.AntialiasedLineEnable = true; // MSA
+		rasterDesc.CullMode = D3D11_CULL_BACK;
+		rasterDesc.DepthBias = 0;
+		rasterDesc.DepthBiasClamp = 0.0f;
+		rasterDesc.DepthClipEnable = true;
+		rasterDesc.FillMode = D3D11_FILL_SOLID;
+		rasterDesc.FrontCounterClockwise = false;
+		rasterDesc.MultisampleEnable = true; // MSAA
+		rasterDesc.ScissorEnable = false;
+		rasterDesc.SlopeScaledDepthBias = 0.0f;
+		HRR(m_d3dDevice->CreateRasterizerState(&rasterDesc, &m_rasterState));
+		SetDebugName(m_rasterState, "Game::m_rasterState");
+		m_immediateContext->RSSetState(m_rasterState);
+	}
+
+	// Create swap chain
+	CComPtr<IDXGIFactory2> dxgiFactory2;
+	HRR(dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2)));
+
+	// DirectX 11.1 or later
+	hr = m_d3dDevice->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void**>(&m_d3dDevice1));
+	if (SUCCEEDED(hr))
+	{
+		(void)m_immediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&m_immediateContext1));
+	}
+
+	CComPtr<ID3D11Texture2D> pBackBuffer;
+
+	if (renderToSharedTexture) // Create just a textured to render to.  No double buffering.
+	{
+		D3D11_TEXTURE2D_DESC Desc;
+		Desc.Width = 1600;
+		Desc.Height = 1080;
+		Desc.MipLevels = 1;
+		Desc.ArraySize = 1;
+		Desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		Desc.SampleDesc.Count = 1;
+		Desc.SampleDesc.Quality = 0;
+		Desc.Usage = D3D11_USAGE_DEFAULT;
+		Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+		Desc.CPUAccessFlags = 0;
+		Desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+
+		HRR(m_d3dDevice->CreateTexture2D(&Desc, NULL, &m_pSharedRenderToTexture));
+
+		pBackBuffer = m_pSharedRenderToTexture;
+	}
+	else // Create swap chain which includes render target buffer
+	{
+		DXGI_SWAP_CHAIN_DESC1 sd;
+		ZeroMemory(&sd, sizeof(sd));
+
+#if !defined(WIN32)
+		sd.Width = windowWidth;
+		sd.Height = windowHeight;
+#endif
+
+#ifdef _XBOX_ONE
+		sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+		//sd.Scaling = DXGI_SCALING_STRETCH;
+		sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
+#else //#elif !defined(WIN32)
+		sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+#endif
+		sd.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
+		sd.SampleDesc.Quality = m_enableMsaa ? msaaQuality - 1 : 0;
+		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		sd.BufferCount = 2;
+		sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+		sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+
+		
+//#if defined(WIN32) && !defined(TREENGINE_XBOX)
+//		HRR(dxgiFactory2->CreateSwapChainForHwnd(m_d3dDevice, m_hwnd, &sd, nullptr, nullptr, &m_pSwapChain1));
+//#else
+//		HRR(dxgiFactory2->CreateSwapChainForCoreWindow(m_d3dDevice, reinterpret_cast<IUnknown*>(m_window.Get()), &sd, nullptr, &m_pSwapChain1));
+//#endif 
+		HRR(swapChainCreator->CreateSwapChain(&sd, dxgiFactory2, &m_pSwapChain1));
+
+		HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
+		HRR(m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+	}
+
+	// Create a render target view
+	HRR(hr = m_d3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
+	SetDebugName(m_pRenderTargetView, "Game::m_pRenderTargetView");
+	pBackBuffer->Release();
+
+	// 
+	// Create depth stencil texture
+	//
+	D3D11_TEXTURE2D_DESC descDepth;
+	ZeroMemory(&descDepth, sizeof(descDepth));
+	descDepth.Width = windowWidth;
+	descDepth.Height = windowHeight;
+	descDepth.MipLevels = 1;
+	descDepth.ArraySize = 1;
+#ifdef _XBOX_ONE
+	descDepth.Format = DXGI_FORMAT_D32_FLOAT;
+#else
+	descDepth.Format = DXGI_FORMAT_R24G8_TYPELESS;
+#endif
+	descDepth.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
+	descDepth.SampleDesc.Quality = m_enableMsaa ? msaaQuality - 1 : 0;
+	descDepth.Usage = D3D11_USAGE_DEFAULT;
+	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	descDepth.CPUAccessFlags = 0;
+	descDepth.MiscFlags = 0;
+	HRR(m_d3dDevice->CreateTexture2D(&descDepth, nullptr, &m_pDepthStencil));
+	SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
+
+	// Create the depth stencil view
+	D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+	dsvDesc.Flags = 0;
+#ifdef _XBOX_ONE
+	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+#else
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+#endif
+	dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.Texture2D.MipSlice = 0;
+	HRR(m_d3dDevice->CreateDepthStencilView(m_pDepthStencil, &dsvDesc, &m_pDepthStencilView));
+	SetDebugName(m_pDepthStencilView, "Game::m_pDepthStencilView");
+
+	//
+	// Setup the viewport
+	//
+	m_viewPort.Width = (FLOAT)windowWidth;
+	m_viewPort.Height = (FLOAT)windowHeight;
+	m_viewPort.MinDepth = 0.0f;
+	m_viewPort.MaxDepth = 1.0f;
+	m_viewPort.TopLeftX = 0;
+	m_viewPort.TopLeftY = 0;
+	m_immediateContext->RSSetViewports(1, &m_viewPort);
+
+	// Validation
+	ASSERT(m_pRenderTargetView);
+	ASSERT(m_pSwapChain1 || m_pSharedRenderToTexture);
+
+	ASSERT(GetRenderData().projectionData.nearClippingPlane != 0);
+	ASSERT(GetRenderData().projectionData.farClippingPlane != 0);
+	ASSERT(GetRenderData().projectionData.screenWidth != 0);
+	ASSERT(GetRenderData().projectionData.screenHeight != 0);
+	ASSERT(GetRenderData().projectionData.fov != 0);
+
+	ASSERT(m_viewPort.Width != 0);
+	ASSERT(m_viewPort.Height != 0);
+
+	XMStoreFloat4x4(&GetRenderData().projection, XMMatrixPerspectiveFovLH(GetRenderData().projectionData.fov,
+		GetRenderData().projectionData.screenWidth / (float) GetRenderData().projectionData.screenHeight,
+		GetRenderData().projectionData.nearClippingPlane, GetRenderData().projectionData.farClippingPlane));
+
+	UpdateProjection(&GetRenderData().projection);
+
+	ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&GetRenderData().projection)));
+
+	return S_OK;
+}
+
+//--------------------------------------------------------------------------------------
+// Clean up the objects we've created
+//--------------------------------------------------------------------------------------
+void RenderManager::CleanupDeviceForShutdown()
+{
+	CleanUpDeviceObjects();
+
+	XSF::StockRenderStates::Shutdown();
+
+	SafeDelete(&GetRenderData().pShadowMap);
+
+	m_immediateContext.Release();
+	m_pCBChangeOnResize.Release();
+	m_rasterState.Release();
+	m_pDepthStencil.Release();
+	m_pDepthStencilView.Release();
+	m_pRenderTargetView.Release();
+	m_pSwapChain1.Release();
+	m_pSwapChain.Release();
+	m_pSharedRenderToTexture.Release();
+	m_immediateContext1.Release();
+	m_immediateContext.Release();
+	m_d3dDevice1.Release(); // TODO: Device leak somewhere causing crash
+
+	if (m_bitmapFont)
+	{
+		delete m_bitmapFont;
+		m_bitmapFont = nullptr;
+	}
+
+#if defined(_DEBUG) && !defined(_XBOX_ONE)
+	if (m_d3dDevice)
+	{
+		CComPtr<ID3D11Debug> dbg;
+		HR(m_d3dDevice->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&dbg)));
+
+		HR(dbg->ReportLiveDeviceObjects(D3D11_RLDO_SUMMARY | D3D11_RLDO_DETAIL));
+	}
+#endif
+
+	m_d3dDevice.Release();
+}
+
+HRESULT RenderManager::DrawFrameStats()
+{
+	float y = 10;
+	m_bitmapFont->Begin(m_immediateContext, &m_viewPort, false);
+
+	for (int i = 0; i < MAX_FRAME_STAT; i++)
+	{
+		wchar_t text[128];
+		swprintf(text, 128, L"%s %d", GetRenderData().frameStats[i].name,
+			GetRenderData().frameStats[i].stat);
+		m_bitmapFont->DrawText(0, y, 0x33444444, text);
+		y += 34.0f;
+	}
+	m_bitmapFont->End();
+
+	return S_OK;
 }
