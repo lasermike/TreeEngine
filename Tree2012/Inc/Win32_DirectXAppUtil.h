@@ -24,15 +24,9 @@ limitations under the License.
 
 #ifdef _XBOX_ONE
 #include <d3dcompiler_x.h>
-#include <d3d11_x.h>
 #else
 #include <d3dcompiler.h>
 #pragma comment(lib, "d3dcompiler.lib")
-
-#include <d3d11.h>
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d3d11.lib")
-
 
 #endif
 
@@ -611,19 +605,6 @@ struct Camera
 };
 
 #endif 
-
-//----------------------------------------------------
-struct Utility
-{
-    void Output(const char * fnt,...)
-    {
-        static char string_text[1000];
-        va_list args; va_start(args,fnt);
-        vsprintf_s(string_text,fnt,args);
-        va_end(args);
-        OutputDebugStringA(string_text);
-    }
-} static Util;
 
 
 #endif // OVR_Win32_DirectXAppUtil_h

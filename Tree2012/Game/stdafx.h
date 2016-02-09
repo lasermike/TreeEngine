@@ -13,13 +13,16 @@
 #include <algorithm>
 #include <map>
 #include <list>
-#include "Win32_DirectXAppUtil.h"
 
 #define XSF_USE_DX_11_1
 
 using namespace DirectX;
 using namespace std;
 
+///////////////////////////////////////////////
+//
+// Error reporting and logging
+//
 #ifdef _DEBUG
 __inline void Report(char* msg, char* file, long line, char* exp) 
 {
@@ -110,6 +113,23 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #endif
 #endif 
 
+struct Utility
+{
+	void Output(const char * fnt, ...)
+	{
+		static char string_text[1000];
+		va_list args; va_start(args, fnt);
+		vsprintf_s(string_text, fnt, args);
+		va_end(args);
+		OutputDebugStringA(string_text);
+	}
+} static Util;
+
+///////////////////////////////////////////////
+//
+// Safe macros
+//
+
 template <class T>
 void SafeRelease(T* obj)
 {
@@ -154,7 +174,12 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #if defined(_XBOX_ONE) // NAMING
 	__inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
 #else
+
+#if defined(TREE3D12)
+	void SetDebugName(ID3D12DeviceChild* child, const char* name);
+#else
 	void SetDebugName(ID3D11DeviceChild* child, const char* name);
+#endif
 
 #endif // NAMING
 
@@ -166,6 +191,10 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define XSF_SAFE_RELEASE_C( o ) if( o ) { if( (o)->Release() == 0 ) (o) = nullptr; }
 
 
+///////////////////////////////////////////////
+//
+// PIX markers and events
+//
 #ifdef XSF_USE_PIX_EVENTS
 #ifdef _XBOX_ONE
 #include <pix.h>
@@ -275,6 +304,11 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #endif
 
 
+///////////////////////////////////////////////
+//
+// Utilities
+//
+
 namespace XboxSampleFramework
 {
     // Auto-releasing D3D resources
@@ -319,8 +353,11 @@ namespace XboxSampleFramework
         //operator D3DTypePtr< t_Other >& () { return Typecast< t_Other, std::is_convertible< t_Resource, t_Other >::value >::allowed_cast( *this ); }
     };
 
-    typedef D3DTypePtr< ID3D11Buffer >              D3DBufferPtr;
-
+#if defined(TREE3D12)
+    typedef D3DTypePtr< ID3D12Resource >              D3DBufferPtr;
+#else
+	typedef D3DTypePtr< ID3D11Buffer >              D3DBufferPtr;
+#endif
 
 
 #if defined(_XBOX_ONE) && defined(_TITLE)
@@ -330,8 +367,15 @@ namespace XboxSampleFramework
     typedef ID3D11RasterizerState1  D3DRasterizerState;
     typedef D3D11_RASTERIZER_DESC1  D3DRasterizerDesc;
     typedef IDXGISwapChain1         DXGISwapChain;
+#elif defined( TREE3D12 )
+	typedef ID3D12Device            D3DDevice;
+	typedef ID3D12GraphicsCommandList  D3DDeviceContext;
+	typedef ID3D12GraphicsCommandList  D3DComputeContext;
+	//typedef ID3D12RasterizerState   D3DRasterizerState;
+	//typedef D3D12_RASTERIZER_DESC   D3DRasterizerDesc;
+	typedef IDXGISwapChain          DXGISwapChain;
 #elif defined( XSF_USE_DX_11_1 )
-    typedef ID3D11Device1           D3DDevice;
+	typedef ID3D11Device1           D3DDevice;
     typedef ID3D11DeviceContext1    D3DDeviceContext;
     typedef ID3D11DeviceContext1    D3DComputeContext;
     typedef ID3D11RasterizerState1  D3DRasterizerState;
@@ -355,9 +399,9 @@ namespace XboxSampleFramework
     _Check_return_
     HRESULT LoadBlob( _In_z_ const wchar_t* pFilename, std::vector< BYTE >& data );
     _Check_return_
-    HRESULT LoadPixelShader( _In_ ID3D11Device* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr );
+    HRESULT LoadPixelShader( _In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr );
     _Check_return_
-    HRESULT LoadVertexShader( _In_ ID3D11Device* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
+    HRESULT LoadVertexShader( _In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
                               _In_opt_ const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = NULL, _In_opt_ UINT numElements = 0, _COM_Outptr_ ID3D11InputLayout** ppInputLayout = NULL, _In_opt_ std::vector< BYTE >* pData = nullptr );
 
     //--------------------------------------------------------------------------------------

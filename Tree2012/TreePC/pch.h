@@ -1,7 +1,13 @@
 ﻿#pragma once
 #define NOMINMAX 
 #include <wrl/client.h>
+
+#if defined(TREE3D12)
+#include <d3d12.h>
+#else
 #include <d3d11_1.h>
+#endif
+
 #include <DirectXMath.h>
 #include <memory>
 #include <agile.h>

@@ -22,6 +22,8 @@
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
 
+#include "Win32_DirectXAppUtil.h"
+
 // Above this line include platform specific stuff
 #define TREENGINE_WIN32
 

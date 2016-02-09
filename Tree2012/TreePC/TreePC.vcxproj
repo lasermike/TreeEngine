@@ -189,7 +189,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug12'">
     <ClCompile>
-      <PreprocessorDefinitions>_DEBUG;TREE3D12%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;TREE3D12;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">WIN32</UndefinePreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
