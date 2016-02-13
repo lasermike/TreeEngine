@@ -220,7 +220,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Game\BitmapFont.h" />
+    <ClInclude Include="..\Game\BitmapFont12.h" />
     <ClInclude Include="..\Game\CComPtr.h" />
+    <ClInclude Include="..\Game\D3D12Util.h" />
     <ClInclude Include="..\Game\DDSTextureLoader.h" />
     <ClInclude Include="..\Game\DXMath.h" />
     <ClInclude Include="..\Game\Game.h" />
@@ -242,6 +244,7 @@
     <ClInclude Include="..\Game\stdafx.h" />
     <ClInclude Include="..\Game\StepTimer.h" />
     <ClInclude Include="..\Game\StockRenderStates.h" />
+    <ClInclude Include="..\Game\StockRenderStates12.h" />
     <ClInclude Include="..\Game\Tree.h" />
     <ClInclude Include="..\Game\TreeModel.h" />
     <ClInclude Include="..\Game\TreeModelGenerator.h" />
@@ -254,6 +257,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Game\BitmapFont.cpp" />
+    <ClCompile Include="..\Game\BitmapFont12.cpp" />
+    <ClCompile Include="..\Game\D3D12Util.cpp" />
     <ClCompile Include="..\Game\DDSTextureLoader.cpp" />
     <ClCompile Include="..\Game\Game.cpp" />
     <ClCompile Include="..\Game\GameLoader.cpp" />
@@ -271,6 +276,7 @@
     <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
     <ClCompile Include="..\Game\StockRenderStates.cpp" />
+    <ClCompile Include="..\Game\StockRenderStates12.cpp" />
     <ClCompile Include="..\Game\Tree.cpp" />
     <ClCompile Include="..\Game\TreeModel.cpp" />
     <ClCompile Include="..\Game\TreeModelGenerator.cpp" />

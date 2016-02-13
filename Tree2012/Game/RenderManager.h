@@ -43,18 +43,36 @@ interface SwapChainCreator
 struct Material
 {
 	wstring					  m_name;
+
+#if defined(TREE3D12)
+
+	ID3D12Resource*			m_texture;
+	ID3DBlob*				m_vertexShader;
+	ID3DBlob*				m_pixelShader;
+	//ID3D12InputLayout*    m_inputLayout;
+
+	CComPtr<ID3D12Resource> m_constBuffer;
+#else
 	ID3D11ShaderResourceView* m_texture;
 	ID3D11VertexShader*       m_vertexShader;
 	ID3D11PixelShader*        m_pixelShader;
     ID3D11InputLayout*        m_inputLayout;
 
-	ShaderMaterial			  m_shaderMaterial;
 	CComPtr<ID3D11Buffer>     m_constBuffer;
 
+#endif
+	ShaderMaterial			  m_shaderMaterial;
+
 	// NYI
+#if defined(TREE3D12)
+	void* m_samplerState;
+	void* m_rasterizer;
+	void* m_depthState;
+#else
 	ID3D11SamplerState*       m_samplerState;
     ID3D11RasterizerState*    m_rasterizer;
     ID3D11DepthStencilState*  m_depthState;
+#endif
 
 public:
 	Material(const wchar_t* name, ID3D11ShaderResourceView* texture, ID3D11InputLayout* inputLayout,
@@ -185,10 +203,26 @@ class RenderManager : public IRenderFrame
 
 	RenderData							m_renderData;
 
-	// Direct3D Objects
+	// Pipeline objects.
+	CComPtr<XSF::D3DDevice>             m_d3dDevice;
 	D3D_DRIVER_TYPE                     m_driverType;
 	D3D_FEATURE_LEVEL                   m_featureLevel;
-	CComPtr<XSF::D3DDevice>             m_d3dDevice;
+	static const UINT FrameCount = 2;
+
+#if defined(TREE3D12)
+	CComPtr<ID3D12CommandQueue> m_commandQueue;
+	CComPtr<ID3D12CommandAllocator> m_commandAllocator;
+	CComPtr<IDXGISwapChain3> m_swapChain;
+	CComPtr<ID3D12Resource> m_renderTargets[FrameCount];
+	CComPtr<ID3D12RootSignature> m_rootSignature;
+	CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+	CComPtr<ID3D12DescriptorHeap> m_cbvHeap;
+	CComPtr<ID3D12PipelineState> m_pipelineState;
+	CComPtr<ID3D12GraphicsCommandList> m_commandList;
+	UINT m_rtvDescriptorSize;
+	D3D12_VIEWPORT m_viewport;
+	D3D12_RECT m_scissorRect;
+#else
 	CComPtr<ID3D11Device1>              m_d3dDevice1;
 	CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
 	CComPtr<ID3D11DeviceContext1>       m_immediateContext1;
@@ -199,11 +233,26 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D11Texture2D>            m_pDepthStencil;
 	CComPtr<ID3D11DepthStencilView>		m_pDepthStencilView;
 	D3D11_VIEWPORT						m_viewPort;
+#endif
+
 	DisplayMode							m_displayMode;
 	bool								m_enableMsaa;
 
-	CComPtr<ID3D11RasterizerState>		m_rasterState;
+	struct CBChangeOnResize
+	{
+		XMFLOAT4X4 mProjection;
+	};
+
+	// App resources.
+#if defined(TREE3D12)
+	CComPtr<ID3D12Resource>               m_pCBChangeOnResize;
+	CBChangeOnResize					  m_cbChangesOnResize;
+
+#else
 	CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
+	CBChangeOnResize					m_cbChangesOnResize;
+
+	CComPtr<ID3D11RasterizerState>		m_rasterState;
 
     // TODO per material
 	CComPtr<ID3D11VertexShader>         m_vertexShader;
@@ -218,20 +267,32 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D11InputLayout>          m_vertexLayout;
 	CComPtr<ID3D11Buffer>               m_vertexBuffer;
 	CComPtr<ID3D11Buffer>               m_indexBuffer;
-	DoubleBuffer						m_instancedBuffer;
-
-	GeometryGenerator					m_geometryGenerator;
-	GeometryBufferData					m_geometryData;
 
 	CComPtr<ID3D11Buffer>               m_CBNeverChanges;
 	CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
-	DirectionalLight					m_light;  // Doesn't belong here, will move later
 
 	// Fixed drawing features
 	CComPtr<ID3D11Buffer>				m_screenQuadVB;
 	CComPtr<ID3D11Buffer>				m_screenQuadIB;
 	CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
+#endif
+
+	DoubleBuffer						m_instancedBuffer;
+
+	GeometryGenerator					m_geometryGenerator;
+	GeometryBufferData					m_geometryData;
+
+	DirectionalLight					m_light;  // Doesn't belong here, will move later
+
 	XSF::BitmapFont*					m_bitmapFont;
+
+#if defined(TREE3D12)
+	HRESULT LoadShader(_In_z_ const wchar_t* fileName, _COM_Outptr_ ID3DBlob** ppShader);
+#else
+	HRESULT LoadPixelShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr);
+	HRESULT LoadVertexShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
+								_In_opt_ const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = NULL, _In_opt_ UINT numElements = 0, _COM_Outptr_ ID3D11InputLayout** ppInputLayout = NULL, _In_opt_ std::vector< BYTE >* pData = nullptr);
+#endif
 
 	HRESULT LoadTexture(const wchar_t* textureFilename);
 	HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);

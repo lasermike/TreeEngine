@@ -1,7 +1,11 @@
 #include "pch.h"
 #include "RenderManager.h"
 #include "RenderStates.h"
+
+#if !defined(TREE3D12)
 #include "DDSTextureLoader.h" // Test texture
+#endif
+
 #include "BitmapFont.h"
 #include "StockRenderStates.h"
 #include "ShadowMap.h"
@@ -9,6 +13,10 @@
 #include "Primitive.h" // TEMPTEMP
 
 #include "DirectXTex.h"
+
+#if defined (TREE3D12)
+#include "d3d12sdklayers.h"
+#endif
 
 FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
 { 
@@ -43,11 +51,26 @@ struct CBMaterial
 
 #pragma region InputLayouts
 
+#if defined(TREE3D12)
+#define InputElementDesc D3D12_INPUT_ELEMENT_DESC
+#define InputClassificationVertex D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA
+#define InputClassificationInstance D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA
+#define AppendAlignedElement D3D12_APPEND_ALIGNED_ELEMENT
+#define ID3DInputLayout ID3D12InputLayout        
+#else
+#define InputElementDesc D3D11_INPUT_ELEMENT_DESC
+#define InputClassificationVertex D3D11_INPUT_PER_VERTEX_DATA
+#define InputClassificationInstance D3D11_INPUT_PER_INSTANCE_DATA
+#define AppendAlignedElement D3D11_APPEND_ALIGNED_ELEMENT
+#define ID3DInputLayout ID3D11InputLayout        
+#endif
+
+
 class InputLayoutDesc
 {
 public:
-	static const D3D11_INPUT_ELEMENT_DESC InstancedBasic16[8];
-	static const D3D11_INPUT_ELEMENT_DESC Basic32[3];
+	static const InputElementDesc InstancedBasic16[8];
+	static const InputElementDesc Basic32[3];
 };
 
 class InputLayouts
@@ -56,32 +79,31 @@ public:
 	static void InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen);
 	static void DestroyAll();
 
-	static ID3D11InputLayout* InstancedBasic16;
-	static ID3D11InputLayout* Basic32;
+	static ID3DInputLayout* InstancedBasic16;
+	static ID3DInputLayout* Basic32;
 };
 
-
-const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::InstancedBasic16[8] =
+const InputElementDesc InputLayoutDesc::InstancedBasic16[8] =
 {
-	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D11_INPUT_PER_VERTEX_DATA, 0},
-	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-	{ "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
+	{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, InputClassificationVertex, 0 },
+	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, InputClassificationVertex, 0 },
+	{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, InputClassificationVertex, 0},
+	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+	{ "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
 };
 
-const D3D11_INPUT_ELEMENT_DESC InputLayoutDesc::Basic32[3] = 
+const InputElementDesc InputLayoutDesc::Basic32[3] =
 {
-	{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-	{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
-	{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0},
+	{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, InputClassificationVertex, 0},
+	{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, InputClassificationVertex, 0}
 };
 
-ID3D11InputLayout* InputLayouts::InstancedBasic16 = 0;
-ID3D11InputLayout* InputLayouts::Basic32 = 0;
+ID3DInputLayout* InputLayouts::InstancedBasic16 = 0;
+ID3DInputLayout* InputLayouts::Basic32 = 0;
 
 void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
 {
@@ -100,7 +122,8 @@ void InputLayouts::DestroyAll()
 
 #pragma endregion
 
-RenderManager::RenderManager() : m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr), 
+RenderManager::RenderManager() : 
+						 m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr), 
 						 m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
 						 m_drawScreenVertexShader(), m_drawScreenPixelShader()
 {
@@ -164,13 +187,13 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	SetDebugName(m_vertexShader, "RenderManager::m_vertexShader");
 
 	// Load regular pixel Shader
-	HRR(XSF::LoadPixelShader(m_d3dDevice, L"PS.cso", &m_pixelShader));
+	HRR(LoadPixelShader(m_d3dDevice, L"PS.cso", &m_pixelShader));
 	SetDebugName(m_pixelShader, "RenderManager::m_pixelShader");
 
 	////////  Shadow map shader /////
 
 	// Load shadow shaders
-	HRR(XSF::LoadVertexShader(m_d3dDevice, L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+	HRR(LoadVertexShader(m_d3dDevice, L"BuildShadowMapVS.cso", &m_shadowVertexShader));
 	SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
 	// TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
@@ -190,7 +213,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
 
 	// Load regular pixel Shader
-	HRR(XSF::LoadPixelShader(m_d3dDevice, L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
+	HRR(LoadPixelShader(m_d3dDevice, L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
 	SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
 
 	//////
@@ -451,7 +474,11 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 	if (!texture)
 	{
 		// Load the Texture
+#if !defined (TREE3D12)
 		HRR(CreateDDSTextureFromFile(m_d3dDevice, textureFilename, nullptr, &texture));
+#else
+		assert(false);
+#endif
 		m_textures[textureFilename] = texture;
 	}
 
@@ -499,7 +526,7 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 		}
 
 		// Load regular pixel Shader
-		HRR(XSF::LoadPixelShader(m_d3dDevice, shaderFilename, &pixelShader));
+		HRR(LoadPixelShader(m_d3dDevice, shaderFilename, &pixelShader));
 
 		m_pixelShaders[shaderFilename] = pixelShader;
 
@@ -746,17 +773,144 @@ HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11Sha
 
 }
 
-//--------------------------------------------------------------------------------------
-// Structures
-//--------------------------------------------------------------------------------------
-struct CBChangeOnResize
-{
-	XMFLOAT4X4 mProjection;
-};
 
 //--------------------------------------------------------------------------------------
 // Create Direct3D device and swap chain
 //--------------------------------------------------------------------------------------
+#if defined(TREE3D12)
+HRESULT RenderManager::InitDevice()
+{
+	HRESULT hr = S_OK;
+
+#if defined(_DEBUG)
+	// Enable the D3D12 debug layer.
+	{
+		CComPtr<ID3D12Debug> debugController;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+		{
+			debugController->EnableDebugLayer();
+		}
+	}
+#endif
+
+	CComPtr<IDXGIFactory4> factory;
+	HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
+
+	const bool useWarpDevice = false;
+	if (useWarpDevice)
+	{
+		CComPtr<IDXGIAdapter> warpAdapter;
+		HRR(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
+
+		HRR(D3D12CreateDevice(
+			warpAdapter,
+			D3D_FEATURE_LEVEL_11_0,
+			IID_PPV_ARGS(&m_d3dDevice)
+			));
+	}
+	else
+	{
+		CComPtr<IDXGIAdapter1> hardwareAdapter;
+		GetHardwareAdapter(factory, &hardwareAdapter);
+
+		HRR(D3D12CreateDevice(
+			hardwareAdapter,
+			D3D_FEATURE_LEVEL_11_0,
+			IID_PPV_ARGS(&m_d3dDevice)
+			));
+	}
+
+	// Describe and create the command queue.
+	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
+	HRR(m_d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+
+	// Create descriptor heaps.
+	{
+		// Describe and create a render target view (RTV) descriptor heap.
+		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+		rtvHeapDesc.NumDescriptors = FrameCount;
+		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		HRR(m_d3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
+
+		m_rtvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+		// Describe and create a constant buffer view (CBV) descriptor heap.
+		// Flags indicate that this descriptor heap can be bound to the pipeline 
+		// and that descriptors contained in it can be referenced by a root table.
+		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
+		cbvHeapDesc.NumDescriptors = 1;
+		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		HRR(m_d3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+	}
+
+	// Create frame resources.
+	{
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+		// Create a RTV for each frame.
+		for (UINT n = 0; n < FrameCount; n++)
+		{
+			HRR(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
+			m_d3dDevice->CreateRenderTargetView(m_renderTargets[n], nullptr, rtvHandle);
+			rtvHandle.Offset(1, m_rtvDescriptorSize);
+		}
+	}
+
+	HRR(m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+
+	// 
+	// Create constant buffer
+	HRR(m_d3dDevice->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_pCBChangeOnResize)));
+
+	// Describe and create a constant buffer view.
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = m_pCBChangeOnResize->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = (sizeof(CBChangeOnResize) + 255) & ~255;	// CB size is required to be 256-byte aligned.
+	m_d3dDevice->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+
+	// Initialize and map the constant buffers. We don't unmap this until the
+	// app closes. Keeping things mapped for the lifetime of the resource is okay.
+	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
+
+	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+	HRR(m_pCBChangeOnResize->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
+	memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+
+	// D3D11
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(CBChangeOnResize);
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.CPUAccessFlags = 0;
+	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
+
+
+	// Initialize the world matrices
+	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
+
+	// Initialize render statesf
+	XSF::StockRenderStates::Initialize(m_d3dDevice);
+
+	// Init text font
+	m_bitmapFont = new XSF::BitmapFont();
+	HRR(m_bitmapFont->Create(m_d3dDevice, L"Arial_16"));
+
+	return hr;
+}
+
+#else
 HRESULT RenderManager::InitDevice()
 {
 	HRESULT result = S_OK;
@@ -808,6 +962,7 @@ HRESULT RenderManager::InitDevice()
 		return result;
 
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
+	if ((createDeviceFlags & D3D11_CREATE_DEVICE_DEBUG) == D3D11_CREATE_DEVICE_DEBUG)
 	{
 		// Debug layers
 		CComPtr<ID3D11Debug> d3dDebug;
@@ -854,12 +1009,13 @@ HRESULT RenderManager::InitDevice()
 
 	return S_OK;
 }
+#endif
 
 HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat)
 {
-	CBChangeOnResize cbChangesOnResize;
-	XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
-	m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &cbChangesOnResize, 0, 0);
+	XMStoreFloat4x4(&m_cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+
+	m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &m_cbChangesOnResize, 0, 0);
 
 	return S_OK;
 }
@@ -983,7 +1139,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
 		//sd.Scaling = DXGI_SCALING_STRETCH;
 		sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
-#else //#elif !defined(WIN32)
+#else
 		sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
 		sd.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
@@ -992,7 +1148,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		sd.BufferCount = 2;
 		sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 		sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-
 		
 //#if defined(WIN32) && !defined(TREENGINE_XBOX)
 //		HRR(dxgiFactory2->CreateSwapChainForHwnd(m_d3dDevice, m_hwnd, &sd, nullptr, nullptr, &m_pSwapChain1));
@@ -1137,3 +1292,142 @@ HRESULT RenderManager::DrawFrameStats()
 
 	return S_OK;
 }
+
+#if defined(TREE3D12)
+
+// Desc: Load a shader blob from file
+//--------------------------------------------------------------------------------------
+HRESULT RenderManager::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
+{
+	VERBOSEATGPROFILETHIS;
+
+	wchar_t tmp[1024];
+	_snwprintf_s(tmp, _TRUNCATE, L"%s%s", Details::g_strCommonFileRoot, path);
+
+	return D3DReadFileToBlob(tmp, ppShader);
+}
+
+
+//--------------------------------------------------------------------------------------
+// Name: CreateColorTextureAndViews
+// Desc: Creates the texture of a given size and all necessary views for it
+//--------------------------------------------------------------------------------------
+HRESULT RenderManager::CreateColorTextureAndViews(XSF::D3DDevice* pDevice, UINT width, UINT height, DXGI_FORMAT fmt,
+	ID3D12Resource** ppTexture, D3D12_CPU_DESCRIPTOR_HANDLE hRTV, D3D12_CPU_DESCRIPTOR_HANDLE hSRV,
+	D3D12_CLEAR_VALUE *pOptimizedClearValue, D3D12_HEAP_TYPE heapType)
+{
+	VERBOSEATGPROFILETHIS;
+
+	D3D12_RESOURCE_DESC descTex = CD3DX12_RESOURCE_DESC::Tex2D(fmt, width, height, 1, 1);
+	D3D12_HEAP_FLAGS heapMiscFlag = D3D12_HEAP_FLAG_NONE;
+	D3D12_RESOURCE_STATES usage = D3D12_RESOURCE_STATE_COMMON;
+	switch (heapType)
+	{
+	case D3D12_HEAP_TYPE_DEFAULT:
+		descTex.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+		break;
+	case D3D12_HEAP_TYPE_UPLOAD:
+		usage = D3D12_RESOURCE_STATE_GENERIC_READ;
+		break;
+	case D3D12_HEAP_TYPE_READBACK:
+	{
+		usage = D3D12_RESOURCE_STATE_COPY_DEST;
+
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout;
+		UINT NumRows;
+		UINT64 RowSize;
+		UINT64 TotalBytes;
+		pDevice->GetCopyableFootprints(&descTex, 0, 1, 0, &Layout, &NumRows, &RowSize, &TotalBytes);
+		descTex = CD3DX12_RESOURCE_DESC::Buffer(TotalBytes);
+	}
+	break;
+	}
+
+	const D3D12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(heapType);
+	XSF_ERROR_IF_FAILED(pDevice->CreateCommittedResource(
+		&heapProperties,
+		heapMiscFlag,
+		&descTex,
+		usage,
+		pOptimizedClearValue,
+		IID_GRAPHICS_PPV_ARGS(ppTexture)));
+
+	if (hRTV.ptr != 0)
+	{
+		D3D12_RENDER_TARGET_VIEW_DESC descRTV = {};
+		descRTV.Format = fmt;
+		descRTV.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		pDevice->CreateRenderTargetView(*ppTexture, &descRTV, hRTV);
+	}
+
+	if (hSRV.ptr != 0)
+	{
+		D3D12_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+		descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		descSRV.Format = fmt;
+		descSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		descSRV.Texture2D.MipLevels = 1;
+		pDevice->CreateShaderResourceView(*ppTexture, &descSRV, hSRV);
+	}
+
+	return S_OK;
+}
+#else // XSF_USE_DX_12_0
+
+//--------------------------------------------------------------------------------------
+// Name: LoadPixelShader()
+// Desc: Load a pixel shader
+//--------------------------------------------------------------------------------------
+HRESULT RenderManager::LoadPixelShader(D3DDevice* pDev, const wchar_t* path, ID3D11PixelShader** ppPS, std::vector< BYTE >* pData)
+{
+	std::vector< BYTE > data;
+	if (!pData)
+		pData = &data;
+
+	HRESULT hr = XSF::LoadBlob(path, *pData);
+	if (FAILED(hr))
+		return hr;
+
+	return pDev->CreatePixelShader(&(*pData)[0], pData->size(), nullptr, ppPS);
+}
+
+//--------------------------------------------------------------------------------------
+// Name: LoadVertexShader()
+// Desc: Load a vertex shader
+//--------------------------------------------------------------------------------------
+HRESULT RenderManager::LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID3D11VertexShader** ppVS,
+	const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc, UINT numElements, ID3D11InputLayout** ppInputLayout,
+	std::vector< BYTE >* pData)
+{
+	if (ppInputLayout)
+		*ppInputLayout = nullptr;
+
+	std::vector< BYTE > data;
+	if (!pData)
+		pData = &data;
+
+	HRESULT hr = XSF::LoadBlob(path, *pData);
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	hr = pDev->CreateVertexShader(&(*pData)[0], pData->size(), nullptr, ppVS);
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	if (pInputElementDesc && numElements && ppInputLayout)
+	{
+		hr = pDev->CreateInputLayout(pInputElementDesc, numElements, &(*pData)[0], pData->size(), ppInputLayout);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+	}
+
+	return S_OK;
+}
+
+#endif

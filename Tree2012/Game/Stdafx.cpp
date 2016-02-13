@@ -8,7 +8,6 @@
 
 namespace XboxSampleFramework
 {
-
     namespace Details
     {
         wchar_t    g_strCommonFileRoot[ 1024 ];
@@ -61,7 +60,6 @@ void XSF::SetContentFileRoot()
 // Name: LoadBlob
 // Desc: Reads a file from the read only data content path
 //--------------------------------------------------------------------------------------
-_Use_decl_annotations_
 HRESULT XSF::LoadBlob( const wchar_t* pFilename, std::vector< BYTE >& data )
 {
     data.clear();
@@ -111,63 +109,6 @@ HRESULT XSF::LoadBlob( const wchar_t* pFilename, std::vector< BYTE >& data )
     return E_FAIL;
 }
 
-//--------------------------------------------------------------------------------------
-// Name: LoadPixelShader()
-// Desc: Load a pixel shader
-//--------------------------------------------------------------------------------------
-_Use_decl_annotations_
-HRESULT XSF::LoadPixelShader( ID3D11Device* pDev, const wchar_t* path, ID3D11PixelShader** ppPS, std::vector< BYTE >* pData )
-{
-    std::vector< BYTE > data;
-    if( !pData )
-        pData = &data;
-
-    HRESULT hr = XSF::LoadBlob( path, *pData );
-    if( FAILED( hr ) )
-        return hr;
-
-    return pDev->CreatePixelShader( &(*pData)[ 0 ], pData->size(), nullptr, ppPS );
-}
-
-//--------------------------------------------------------------------------------------
-// Name: LoadVertexShader()
-// Desc: Load a vertex shader
-//--------------------------------------------------------------------------------------
-_Use_decl_annotations_
-HRESULT XSF::LoadVertexShader( ID3D11Device* pDev, const wchar_t* path, ID3D11VertexShader** ppVS, 
-                               const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc, UINT numElements, ID3D11InputLayout** ppInputLayout,
-                               std::vector< BYTE >* pData )
-{
-    if( ppInputLayout )
-        *ppInputLayout = nullptr;
-
-    std::vector< BYTE > data;
-    if( !pData )
-        pData = &data;
-
-    HRESULT hr = XSF::LoadBlob( path, *pData );
-    if( FAILED( hr ) )
-    {
-        return hr;
-    }
-
-    hr = pDev->CreateVertexShader( &(*pData)[ 0 ], pData->size(), nullptr, ppVS );
-    if( FAILED( hr ) )
-    {
-        return hr;
-    }
-
-    if ( pInputElementDesc && numElements && ppInputLayout )
-    {
-        hr = pDev->CreateInputLayout( pInputElementDesc, numElements, &(*pData)[ 0 ], pData->size(), ppInputLayout );
-        if ( FAILED( hr ) )
-        {
-            return hr;
-        }        
-    }
-
-    return S_OK;
-}
 
 //--------------------------------------------------------------------------------------
 // Name: DebugPrint
@@ -240,167 +181,7 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
     }*/
 }
 
-//--------------------------------------------------------------------------------------
-// Name: DynamicBuffer
-// Desc: Constructs an empty dynamic buffer
-//-------------------------------------------------------------------------------------
-XSF::DynamicBuffer::DynamicBuffer() : m_mappedOnContext( nullptr ),
-                                      m_bufferTailOffset( 0 ),
-                                      m_numBytesMapped( 0 ),
-                                      m_bufferSize( 0 ),
-                                      m_alwaysDiscard( FALSE )
-{
-}
-
-//--------------------------------------------------------------------------------------
-// Name: DynamicBuffer
-// Desc: Constructs an empty dynamic buffer
-//-------------------------------------------------------------------------------------
-XSF::DynamicBuffer::~DynamicBuffer()
-{
-    Destroy();
-}
-
-//--------------------------------------------------------------------------------------
-// Name: DynamicBuffer
-// Desc: Constructs an empty dynamic buffer
-//-------------------------------------------------------------------------------------
-_Use_decl_annotations_
-HRESULT XSF::DynamicBuffer::Create( D3DDevice* pDev, D3D11_BIND_FLAG bindFlags, UINT size )
-{
-    VERBOSEATGPROFILETHIS;
-
-    D3D11_BUFFER_DESC bufDesc = { 0 };
-    bufDesc.BindFlags = bindFlags;
-    bufDesc.ByteWidth = size;
-    bufDesc.Usage = D3D11_USAGE_DYNAMIC;
-    bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    XSF_RETURN_IF_FAILED( pDev->CreateBuffer( &bufDesc, nullptr, &m_spBuffer) );
-    
-    m_bufferTailOffset = 0;
-    m_numBytesMapped = 0;
-    m_bufferSize = size;
-    m_alwaysDiscard = FALSE;
-
-#ifndef _XBOX_ONE
-    // determine if hw supports map no overwrite
-    if( bindFlags & ( D3D11_BIND_CONSTANT_BUFFER | D3D11_BIND_SHADER_RESOURCE ) )
-    {
-        D3D11_FEATURE_DATA_D3D11_OPTIONS options;
-        XSF_RETURN_IF_FAILED( pDev->CheckFeatureSupport( D3D11_FEATURE_D3D11_OPTIONS, &options, sizeof(D3D11_FEATURE_DATA_D3D11_OPTIONS) ) );
-        if( ( ( bindFlags & D3D11_BIND_CONSTANT_BUFFER ) && !options.MapNoOverwriteOnDynamicConstantBuffer ) ||
-            ( ( bindFlags & D3D11_BIND_SHADER_RESOURCE ) && !options.MapNoOverwriteOnDynamicBufferSRV ) )
-        {
-            m_alwaysDiscard = TRUE;
-        }
-    }
-#endif
-
-    return S_OK;
-}
-
-//--------------------------------------------------------------------------------------
-// Name: Destroy
-// Desc: Release the internal buffer object
-//-------------------------------------------------------------------------------------
-void  XSF::DynamicBuffer::Destroy()
-{
-    m_spBuffer.Release();
-    m_bufferTailOffset = 0;
-    m_numBytesMapped = 0;
-    m_bufferSize = 0;
-}
-
-//--------------------------------------------------------------------------------------
-// Name: Map
-// Desc: Returns a pointer to mapped buffer memory
-//-------------------------------------------------------------------------------------
-_Use_decl_annotations_
-HRESULT XSF::DynamicBuffer::Map( D3DDeviceContext* pCtx, UINT numBytesToMap, void** ppData, UINT* pOffset )
-{
-    VERBOSEATGPROFILETHIS;
-
-    XSF_ASSERT( !m_mappedOnContext );
-    XSF_ASSERT( pCtx );
-    XSF_ASSERT( ppData );
-    XSF_ASSERT( numBytesToMap <= m_bufferSize );
-
-    m_mappedOnContext = pCtx;
-
-    // The first Map on a deferred context should be with a DISCARD. There is no easy way to know
-    // which one is the first call so just discard anyway
-    const BOOL bDeferred = pCtx->GetType() == D3D11_DEVICE_CONTEXT_DEFERRED;
-
-    if( m_bufferTailOffset + numBytesToMap > m_bufferSize ||
-        bDeferred || m_alwaysDiscard )
-    {
-        D3D11_MAPPED_SUBRESOURCE data;
-        XSF_RETURN_IF_FAILED( pCtx->Map( m_spBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &data ) );
-
-        *ppData = data.pData;
-        m_bufferTailOffset = 0;
-    } else
-    {
-        D3D11_MAPPED_SUBRESOURCE data;
-        XSF_RETURN_IF_FAILED( pCtx->Map( m_spBuffer, 0, D3D11_MAP_WRITE_NO_OVERWRITE, 0, &data ) );
-        
-        *ppData = (BYTE*)data.pData + m_bufferTailOffset;
-    }
-
-    if( pOffset )
-        *pOffset = m_bufferTailOffset;
-
-    m_numBytesMapped = numBytesToMap;
-
-    return S_OK;
-}
-
-//--------------------------------------------------------------------------------------
-// Name: Unmap
-// Desc: Unmaps buffer memory
-//-------------------------------------------------------------------------------------
-void XSF::DynamicBuffer::Unmap( UINT numBytesUsed )
-{
-    VERBOSEATGPROFILETHIS;
-
-    XSF_ASSERT( m_mappedOnContext );
-
-    if( !numBytesUsed )
-        numBytesUsed = m_numBytesMapped;
-
-    m_bufferTailOffset += numBytesUsed;
-
-    m_mappedOnContext->Unmap( m_spBuffer, 0 );
-    m_mappedOnContext = nullptr;
-}
-
-//--------------------------------------------------------------------------------------
-// Name: GetBuffer
-// Desc: Returns the buffer
-//-------------------------------------------------------------------------------------
-ID3D11Buffer* const&   XSF::DynamicBuffer::GetBuffer() const
-{
-    return m_spBuffer.ptr;
-}
-
-//--------------------------------------------------------------------------------------
-// Name: GetNumBytesLastMapped
-// Desc: Returns how many bytes was mapped last
-//-------------------------------------------------------------------------------------
-UINT XSF::DynamicBuffer::GetNumBytesLastMapped() const
-{
-    return m_numBytesMapped;
-}
-
-//--------------------------------------------------------------------------------------
-// Name: GetTailOffset
-// Desc: Returns the current tail offset
-//-------------------------------------------------------------------------------------
-UINT XSF::DynamicBuffer::GetTailOffset() const
-{
-    return m_bufferTailOffset;
-}
-
+#if !defined(TREE3D12)
 //
 // Naming
 //
@@ -409,5 +190,38 @@ void SetDebugName(ID3D11DeviceChild* child, const char* name)
 {
 	child->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(name), name);
 }
+
+#else
+// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
+// If no such adapter can be found, *ppAdapter will be set to nullptr.
+void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
+{
+	ComPtr<IDXGIAdapter1> adapter;
+	*ppAdapter = nullptr;
+
+	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
+	{
+		DXGI_ADAPTER_DESC1 desc;
+		adapter->GetDesc1(&desc);
+
+		if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+		{
+			// Don't select the Basic Render Driver adapter.
+			// If you want a software adapter, pass in "/warp" on the command line.
+			continue;
+		}
+
+		// Check to see if the adapter supports Direct3D 12, but don't create the
+		// actual device yet.
+		if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+		{
+			break;
+		}
+	}
+
+	*ppAdapter = adapter.Detach();
+}
+#endif // TREE3D12
+
 #endif
 

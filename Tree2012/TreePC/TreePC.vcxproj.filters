@@ -102,6 +102,15 @@
     <ClCompile Include="..\Game\Graph.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\BitmapFont12.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\StockRenderStates12.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\D3D12Util.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TreePC.h" />
@@ -192,6 +201,15 @@
     <ClInclude Include="..\Game\RenderManager.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\StockRenderStates12.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\BitmapFont12.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\D3D12Util.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
@@ -246,6 +264,7 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
       <Filter>Assets</Filter>
     </Image>
+    <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />

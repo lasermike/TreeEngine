@@ -158,7 +158,12 @@ void SafeDelete(T* obj)
 #define XSF_ASSERT( exp )  exp 
 #define XSF_RETURN_IF_FAILED( exp ) exp   
 #define XSF_ERROR_IF_FAILED( exp ) exp  
+
+#if defined(TREE3D12)
+__inline void SetDebugName(ID3D12DeviceChild* /*child*/, const char* /*name*/) { }
+#else
 __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
+#endif // DX12
 
 #else   // NDEBUG
 
@@ -177,6 +182,7 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 
 #if defined(TREE3D12)
 	void SetDebugName(ID3D12DeviceChild* child, const char* name);
+	void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter);
 #else
 	void SetDebugName(ID3D11DeviceChild* child, const char* name);
 #endif
@@ -309,6 +315,32 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 // Utilities
 //
 
+#if defined( _XBOX_ONE ) && defined( _TITLE )
+#define XSF_TEXTURE_DATA_PITCH_ALIGNMENT D3D12XBOX_TEXTURE_DATA_PITCH_ALIGNMENT
+#else
+#define XSF_TEXTURE_DATA_PITCH_ALIGNMENT D3D12_TEXTURE_DATA_PITCH_ALIGNMENT
+#endif
+
+//--------------------------------------------------------------------------------------
+// Name: IsPowerOfTwo
+// Desc: Is n a power of two?
+//--------------------------------------------------------------------------------------
+inline bool IsPowerOfTwo(UINT64 n)
+{
+	return ((n & (n - 1)) == 0 && (n) != 0);
+}
+
+//--------------------------------------------------------------------------------------
+// Name: NextMultiple
+// Desc: Next multiple after value
+//--------------------------------------------------------------------------------------
+inline UINT64 NextMultiple(UINT64 value, UINT64 multiple)
+{
+	XSF_ASSERT(IsPowerOfTwo(multiple));
+
+	return (value + multiple - 1) & ~(multiple - 1);
+}
+
 namespace XboxSampleFramework
 {
     // Auto-releasing D3D resources
@@ -354,7 +386,12 @@ namespace XboxSampleFramework
     };
 
 #if defined(TREE3D12)
-    typedef D3DTypePtr< ID3D12Resource >              D3DBufferPtr;
+    typedef D3DTypePtr< ID3D12Resource >        D3DBufferPtr;
+	typedef D3DTypePtr<ID3D12Device>            D3DDevicePtr;
+	typedef CComPtr<ID3D12RootSignature>		D3DRootSignaturePtr;
+	typedef CComPtr<ID3D12PipelineState>		D3DPipelineStatePtr;
+	typedef CComPtr<ID3DBlob>					D3DBlobPtr;
+	
 #else
 	typedef D3DTypePtr< ID3D11Buffer >              D3DBufferPtr;
 #endif
@@ -368,11 +405,12 @@ namespace XboxSampleFramework
     typedef D3D11_RASTERIZER_DESC1  D3DRasterizerDesc;
     typedef IDXGISwapChain1         DXGISwapChain;
 #elif defined( TREE3D12 )
-	typedef ID3D12Device            D3DDevice;
-	typedef ID3D12GraphicsCommandList  D3DDeviceContext;
-	typedef ID3D12GraphicsCommandList  D3DComputeContext;
-	//typedef ID3D12RasterizerState   D3DRasterizerState;
-	//typedef D3D12_RASTERIZER_DESC   D3DRasterizerDesc;
+	typedef ID3D12Device              D3DDevice;
+	typedef ID3D12GraphicsCommandList D3DDeviceContext;
+	typedef ID3D12GraphicsCommandList D3DComputeContext;
+	typedef ID3D12CommandQueue      D3DCommandQueue;
+	typedef ID3D12CommandAllocator  D3DCommandAllocator;
+	typedef ID3D12GraphicsCommandList D3DCommandList;
 	typedef IDXGISwapChain          DXGISwapChain;
 #elif defined( XSF_USE_DX_11_1 )
 	typedef ID3D11Device1           D3DDevice;
@@ -395,51 +433,21 @@ namespace XboxSampleFramework
     void PrintNoVarargs( _In_z_ const wchar_t* msg );
 
 	void SetContentFileRoot();
+	HRESULT LoadBlob(_In_z_ const wchar_t* pFilename, std::vector< BYTE >& data);
 
-    _Check_return_
-    HRESULT LoadBlob( _In_z_ const wchar_t* pFilename, std::vector< BYTE >& data );
-    _Check_return_
-    HRESULT LoadPixelShader( _In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr );
-    _Check_return_
-    HRESULT LoadVertexShader( _In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
-                              _In_opt_ const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = NULL, _In_opt_ UINT numElements = 0, _COM_Outptr_ ID3D11InputLayout** ppInputLayout = NULL, _In_opt_ std::vector< BYTE >* pData = nullptr );
-
-    //--------------------------------------------------------------------------------------
-    // Name: DynamicBuffer
-    // Desc: Implements regular dynamic vertex/index/constant buffer. Uses placement memory on ERA
-    //-------------------------------------------------------------------------------------
-    class DynamicBuffer
-    {
-        D3DBufferPtr        m_spBuffer;
-        D3DDeviceContext*   m_mappedOnContext;
-        UINT                m_bufferTailOffset;
-        UINT                m_numBytesMapped;
-        UINT                m_bufferSize;
-        BOOL                m_alwaysDiscard;
-
-    public:
-        DynamicBuffer();
-        ~DynamicBuffer();
-
-        _Check_return_
-        HRESULT Create( _In_ D3DDevice* pDev, D3D11_BIND_FLAG bindFlags, UINT size );
-        void    Destroy();
-
-        _Check_return_
-        HRESULT Map( _In_ D3DDeviceContext* pCtx, UINT numBytesToMap, _Outptr_ void** ppData, _Out_opt_ UINT* pOffset = nullptr );
-        void    Unmap( UINT numBytesUsed = 0 );
-
-        ID3D11Buffer* const&   GetBuffer() const;       // * const& is to be able to write &GetBuffer() to get a ** for passing to D3D functions
-        UINT            GetNumBytesLastMapped() const;
-        UINT            GetTailOffset() const;
-
-    private:
-        DynamicBuffer( const DynamicBuffer& );// = delete;
-        DynamicBuffer& operator = ( const DynamicBuffer& );// = delete;
-    };
 
 }
 
 namespace XSF = XboxSampleFramework;
+using namespace XSF;
 
+#endif
+
+#if defined(TREE3D12)
+
+#ifndef IID_GRAPHICS_PPV_ARGS
+#define IID_GRAPHICS_PPV_ARGS IID_PPV_ARGS
+#endif
+
+#include "D3D12Util.h"
 #endif

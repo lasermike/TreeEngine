@@ -19,6 +19,8 @@
 //--------------------------------------------------------------------------------------
 
 #include "pch.h"
+
+#if !defined(TREE3D12)
 #include <assert.h>
 #include <algorithm>
 #include <memory>
@@ -1829,3 +1831,6 @@ HRESULT DirectX::CreateDDSTextureFromFileEx( ID3D11Device* d3dDevice,
 
     return hr;
 }
+
+
+#endif

@@ -7,6 +7,9 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 //--------------------------------------------------------------------------------------
 #include <pch.h>
+
+#if !defined(TREE3D12)
+
 #include "BitmapFont.h"
 #include "StockRenderStates.h"
 
@@ -1253,3 +1256,168 @@ VOID    BitmapFont::EndQuads( UINT uNumQuadsUsed )
 
     m_pCurrentContext->DrawIndexed( 5 * uNumQuadsUsed, 0, offsetInVerts );
 }
+
+//--------------------------------------------------------------------------------------
+// Name: DynamicBuffer
+// Desc: Constructs an empty dynamic buffer
+//-------------------------------------------------------------------------------------
+XSF::DynamicBuffer::DynamicBuffer() : m_mappedOnContext(nullptr),
+m_bufferTailOffset(0),
+m_numBytesMapped(0),
+m_bufferSize(0),
+m_alwaysDiscard(FALSE)
+{
+}
+
+//--------------------------------------------------------------------------------------
+// Name: DynamicBuffer
+// Desc: Constructs an empty dynamic buffer
+//-------------------------------------------------------------------------------------
+XSF::DynamicBuffer::~DynamicBuffer()
+{
+	Destroy();
+}
+
+//--------------------------------------------------------------------------------------
+// Name: DynamicBuffer
+// Desc: Constructs an empty dynamic buffer
+//-------------------------------------------------------------------------------------
+_Use_decl_annotations_
+HRESULT XSF::DynamicBuffer::Create(D3DDevice* pDev, D3D11_BIND_FLAG bindFlags, UINT size)
+{
+	VERBOSEATGPROFILETHIS;
+
+	D3D11_BUFFER_DESC bufDesc = { 0 };
+	bufDesc.BindFlags = bindFlags;
+	bufDesc.ByteWidth = size;
+	bufDesc.Usage = D3D11_USAGE_DYNAMIC;
+	bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	XSF_RETURN_IF_FAILED(pDev->CreateBuffer(&bufDesc, nullptr, &m_spBuffer));
+
+	m_bufferTailOffset = 0;
+	m_numBytesMapped = 0;
+	m_bufferSize = size;
+	m_alwaysDiscard = FALSE;
+
+#ifndef _XBOX_ONE
+	// determine if hw supports map no overwrite
+	if (bindFlags & (D3D11_BIND_CONSTANT_BUFFER | D3D11_BIND_SHADER_RESOURCE))
+	{
+		D3D11_FEATURE_DATA_D3D11_OPTIONS options;
+		XSF_RETURN_IF_FAILED(pDev->CheckFeatureSupport(D3D11_FEATURE_D3D11_OPTIONS, &options, sizeof(D3D11_FEATURE_DATA_D3D11_OPTIONS)));
+		if (((bindFlags & D3D11_BIND_CONSTANT_BUFFER) && !options.MapNoOverwriteOnDynamicConstantBuffer) ||
+			((bindFlags & D3D11_BIND_SHADER_RESOURCE) && !options.MapNoOverwriteOnDynamicBufferSRV))
+		{
+			m_alwaysDiscard = TRUE;
+		}
+	}
+#endif
+
+	return S_OK;
+}
+
+//--------------------------------------------------------------------------------------
+// Name: Destroy
+// Desc: Release the internal buffer object
+//-------------------------------------------------------------------------------------
+void  XSF::DynamicBuffer::Destroy()
+{
+	m_spBuffer.Release();
+	m_bufferTailOffset = 0;
+	m_numBytesMapped = 0;
+	m_bufferSize = 0;
+}
+
+//--------------------------------------------------------------------------------------
+// Name: Map
+// Desc: Returns a pointer to mapped buffer memory
+//-------------------------------------------------------------------------------------
+_Use_decl_annotations_
+HRESULT XSF::DynamicBuffer::Map(D3DDeviceContext* pCtx, UINT numBytesToMap, void** ppData, UINT* pOffset)
+{
+	VERBOSEATGPROFILETHIS;
+
+	XSF_ASSERT(!m_mappedOnContext);
+	XSF_ASSERT(pCtx);
+	XSF_ASSERT(ppData);
+	XSF_ASSERT(numBytesToMap <= m_bufferSize);
+
+	m_mappedOnContext = pCtx;
+
+	// The first Map on a deferred context should be with a DISCARD. There is no easy way to know
+	// which one is the first call so just discard anyway
+	const BOOL bDeferred = pCtx->GetType() == D3D11_DEVICE_CONTEXT_DEFERRED;
+
+	if (m_bufferTailOffset + numBytesToMap > m_bufferSize ||
+		bDeferred || m_alwaysDiscard)
+	{
+		D3D11_MAPPED_SUBRESOURCE data;
+		XSF_RETURN_IF_FAILED(pCtx->Map(m_spBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &data));
+
+		*ppData = data.pData;
+		m_bufferTailOffset = 0;
+	}
+	else
+	{
+		D3D11_MAPPED_SUBRESOURCE data;
+		XSF_RETURN_IF_FAILED(pCtx->Map(m_spBuffer, 0, D3D11_MAP_WRITE_NO_OVERWRITE, 0, &data));
+
+		*ppData = (BYTE*)data.pData + m_bufferTailOffset;
+	}
+
+	if (pOffset)
+		*pOffset = m_bufferTailOffset;
+
+	m_numBytesMapped = numBytesToMap;
+
+	return S_OK;
+}
+
+//--------------------------------------------------------------------------------------
+// Name: Unmap
+// Desc: Unmaps buffer memory
+//-------------------------------------------------------------------------------------
+void XSF::DynamicBuffer::Unmap(UINT numBytesUsed)
+{
+	VERBOSEATGPROFILETHIS;
+
+	XSF_ASSERT(m_mappedOnContext);
+
+	if (!numBytesUsed)
+		numBytesUsed = m_numBytesMapped;
+
+	m_bufferTailOffset += numBytesUsed;
+
+	m_mappedOnContext->Unmap(m_spBuffer, 0);
+	m_mappedOnContext = nullptr;
+}
+
+//--------------------------------------------------------------------------------------
+// Name: GetBuffer
+// Desc: Returns the buffer
+//-------------------------------------------------------------------------------------
+ID3D11Buffer* const&   XSF::DynamicBuffer::GetBuffer() const
+{
+	return m_spBuffer.ptr;
+}
+
+//--------------------------------------------------------------------------------------
+// Name: GetNumBytesLastMapped
+// Desc: Returns how many bytes was mapped last
+//-------------------------------------------------------------------------------------
+UINT XSF::DynamicBuffer::GetNumBytesLastMapped() const
+{
+	return m_numBytesMapped;
+}
+
+//--------------------------------------------------------------------------------------
+// Name: GetTailOffset
+// Desc: Returns the current tail offset
+//-------------------------------------------------------------------------------------
+UINT XSF::DynamicBuffer::GetTailOffset() const
+{
+	return m_bufferTailOffset;
+}
+
+
+#endif	
