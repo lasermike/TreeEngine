@@ -9,6 +9,10 @@
 
 #pragma once
 
+#if defined(TREE3D12)
+#include <StockRenderStates12.h>
+#else 
+
 #ifndef STOCKRENDERSTATES_H_GUARD
 #define STOCKRENDERSTATES_H_GUARD
 
@@ -348,3 +352,5 @@ namespace XboxSampleFramework
 
 
 #endif //STOCKRENDERSTATES_H_GUARD
+
+#endif //dx12

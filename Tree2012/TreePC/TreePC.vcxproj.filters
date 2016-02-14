@@ -62,9 +62,6 @@
     <ClCompile Include="..\Game\SceneRoot.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\RenderStates.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\Primitive.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -152,9 +149,6 @@
     <ClInclude Include="..\Game\Resource.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\RenderStates.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
     <ClInclude Include="..\Game\RenderData.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
@@ -208,6 +202,9 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\D3D12Util.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\RenderPlatform.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
   </ItemGroup>
@@ -264,6 +261,7 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
       <Filter>Assets</Filter>
     </Image>
+    <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />

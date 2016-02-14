@@ -13,13 +13,26 @@
 class ShadowMap
 {
 public:
+#if defined(TREE3D12)
+	ShadowMap::ShadowMap(XSF::D3DDevice* device, ID3D12DescriptorHeap* srvHeap, UINT width, UINT height);
+#else
 	ShadowMap(XSF::D3DDevice* device, UINT width, UINT height);
+#endif
+
 	~ShadowMap();
 
-	ID3D11ShaderResourceView* DepthMapSRV();
-	ID3D11Texture2D* DepthMapBuffer();
+#if defined(TREE3D12)
+
+	D3D12_CPU_DESCRIPTOR_HANDLE* DepthMapSRV() { return mDepthMapSRV;  }
+	ID3D12Resource* DepthMapBuffer() { return mDepthMap; }
+
+	void BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList, D3D12_CPU_DESCRIPTOR_HANDLE* pTestRTV);
+#else
+	ID3D11ShaderResourceView* DepthMapSRV() { return mDepthMapSRV; }
+	ID3D11Texture2D* DepthMapBuffer() { return mDepthMap; }
 
 	void BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc, ID3D11RenderTargetView* pTestRTV);
+#endif
 
 private:
 	ShadowMap(const ShadowMap& rhs);
@@ -29,11 +42,20 @@ private:
 	UINT mWidth;
 	UINT mHeight;
 
+#if defined(TREE3D12)
+	D3D12_CPU_DESCRIPTOR_HANDLE* mDepthMapSRV;
+	D3D12_CPU_DESCRIPTOR_HANDLE* mDepthMapDSV;
+	ID3D12Resource* mDepthMap;
+
+	D3D12_VIEWPORT mViewport;
+#else
 	ID3D11ShaderResourceView* mDepthMapSRV;
 	ID3D11DepthStencilView* mDepthMapDSV;
-    ID3D11Texture2D* mDepthMap;
+	ID3D11Texture2D* mDepthMap;
 
 	D3D11_VIEWPORT mViewport;
+#endif
+
 };
 
 #endif // SHADOW_MAPPER_H

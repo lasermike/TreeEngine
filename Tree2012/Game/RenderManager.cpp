@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "RenderManager.h"
-#include "RenderStates.h"
 
 #if !defined(TREE3D12)
 #include "DDSTextureLoader.h" // Test texture
@@ -56,7 +55,7 @@ struct CBMaterial
 #define InputClassificationVertex D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA
 #define InputClassificationInstance D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA
 #define AppendAlignedElement D3D12_APPEND_ALIGNED_ELEMENT
-#define ID3DInputLayout ID3D12InputLayout        
+//#define ID3DInputLayout ID3D12InputLayout        
 #else
 #define InputElementDesc D3D11_INPUT_ELEMENT_DESC
 #define InputClassificationVertex D3D11_INPUT_PER_VERTEX_DATA
@@ -161,7 +160,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 {
     HRR(CleanUpDeviceObjects());
 
-	HRR(RenderStates::InitAll(m_d3dDevice));
+	//HRR(RenderStates::InitAll(m_d3dDevice));
 	
 	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
@@ -269,13 +268,23 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	SetDebugName(m_debugTextureRV, "RenderManager::m_debugTextureRV");
 
 	// Create instanced buffer
+#if defined (TREE3D12)
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
 	vbd.ByteWidth = sizeof(InstancedData) * maxInstances; 
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	vbd.MiscFlags = 0;
 	vbd.StructureByteStride = 0;
+	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, m_d3dDevice));
+#else
+	vbd.Usage = D3D11_USAGE_DYNAMIC;
+	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
+	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	vbd.MiscFlags = 0;
+	vbd.StructureByteStride = 0;
 	HRR(m_instancedBuffer.Create(vbd, m_d3dDevice));
+#endif
 
 	return S_OK;
 }
@@ -344,7 +353,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
     m_shadowVertexShader.Release();
 	//SafeDelete(&m_bitmapFont);
 	InputLayouts::DestroyAll();
-	RenderStates::DestroyAll();
+	//RenderStates::DestroyAll();
 
 	return S_OK;
 }
@@ -747,9 +756,13 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 	return S_OK;
 }
 
+#if defined(TREE3D12)
+HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
+#else
 HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
+#endif
 {
-	UINT stride = sizeof(SimpleVertex);
+/*	UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
 
 	pContext->IASetInputLayout(InputLayouts::Basic32);
@@ -768,7 +781,7 @@ HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11Sha
 
 	ID3D11ShaderResourceView* nullText[] = {0};
 	pContext->PSSetShaderResources(0, 1, nullText);
-
+	*/
 	return S_OK;
 
 }
