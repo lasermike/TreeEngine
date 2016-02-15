@@ -85,9 +85,6 @@ private:
 
 	void UpdateView();
 
-	void BuildShadowTransform();
-	void DrawSceneToShadowMap();
-
 	// Managers
 	GameLoader							m_loader;
 	RenderManager						m_renderManager;

@@ -292,17 +292,12 @@ void Game::ComputeCPU()
 
 void Game::ComputeGPU()
 {
+
 	// Render shadow map
 	if (m_gameData.useShadowMaps)
 	{
-		BuildShadowTransform();
-		m_renderManager.GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(m_renderManager.GetContext(), nullptr);
-		DrawSceneToShadowMap();
+		m_renderManager.RenderShadowMap();
 	}
-
-	// Restore state after shadow
-	m_renderManager.GetContext()->RSSetState(0);
-	m_renderManager.GetContext()->RSSetViewports(1, m_renderManager.GetViewport());
 }
 
 //--------------------------------------------------------------------------------------
@@ -312,73 +307,12 @@ void Game::Render(bool oculus)
 {
 	HRESULT hr = S_OK;
 
-    UpdateView();
+	m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
 
-    if (!oculus)
-    {
-	    // Bind render target and depth
-		ID3D11RenderTargetView* rtv = m_renderManager.GetRTV();
-		m_renderManager.GetContext()->OMSetRenderTargets(1, &rtv, m_renderManager.GetDSV());
-    }
+	UpdateView();
 
-	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-	if (m_wireframe)
-	{
-		stockStates.ApplyRasterizerState(m_renderManager.GetContext(), XSF::StockRasterizerStates::Wireframe);
-	}
-
-	if (m_gameData.useAlphaBlendedRenderTarget)
-	{
-		stockStates.ApplyBlendState(m_renderManager.GetContext(), XSF::StockBlendStates::AlphaBlend);
-	}
-	else
-	{
-		stockStates.ApplyBlendState(m_renderManager.GetContext(), XSF::StockBlendStates::Overwrite);
-	}
-
-    if (!oculus)
-    {
-	    // Clear the back buffer
-	    m_renderManager.GetContext()->ClearRenderTargetView(m_renderManager.GetRTV(), m_gameData.clearColor);  //AliceBlue
-
-	    // Clear the depth buffer to 1.0 (max depth)
-	    m_renderManager.GetContext()->ClearDepthStencilView(m_renderManager.GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-    }
-
-	// Make shadow map avaiable to shaders
-	if (m_gameData.useShadowMaps)
-	{
-		ID3D11ShaderResourceView* depthTexture = m_renderManager.GetRenderData().pShadowMap->DepthMapSRV();
-		m_renderManager.GetContext()->PSSetShaderResources(1, 1, &depthTexture);
-	}
-
-	// Draw everything
-	HRC(m_renderManager.Render());
-
-	// Unbind shadow texture so we can render to it next frame
-	if (m_gameData.useShadowMaps)
-	{
-		ID3D11ShaderResourceView* depthTexture = nullptr;
-		m_renderManager.GetContext()->PSSetShaderResources(1, 1, &depthTexture);
-	}
-
-	// Show frame statistics
-	if (m_showHelp)
-	{
-		m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
-		m_renderManager.DrawFrameStats();
-	}
-
-	if(m_showShadowBuffer)
-	{
-		HRC(m_renderManager.DrawScreenQuad(m_renderManager.GetContext(), m_renderManager.GetRenderData().pShadowMap->DepthMapSRV()));
-	}
-
-    if (!oculus && !m_renderToSharedTexture)
-    {
-	    // Present our back buffer to our front buffer
-	    HRC(m_renderManager.GetSwapChain()->Present(0, 0));
-    }
+	m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
+		m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);
 
 Cleanup:
 	return;
@@ -455,68 +389,6 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 	}
 }
 
-void Game::BuildShadowTransform()
-{
-	// Only the first "main" light casts a shadow.
-	XMVECTOR lightDir = XMLoadFloat3(&m_renderManager.GetRenderData().dirLights[0].Direction);
-	XMVECTOR lightPos = -2.0f * m_renderManager.GetRenderData().mSceneBounds.Radius * lightDir;
-	XMVECTOR targetPos = XMLoadFloat3(&m_renderManager.GetRenderData().mSceneBounds.Center);
-	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-	XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
-
-	// Transform bounding sphere to light space.
-	XMFLOAT3 sphereCenterLS;
-	XMStoreFloat3(&sphereCenterLS, XMVector3TransformCoord(targetPos, V));
-
-	// Ortho frustum in light space encloses scene.
-	float l = sphereCenterLS.x - m_renderManager.GetRenderData().mSceneBounds.Radius;
-	float b = sphereCenterLS.y - m_renderManager.GetRenderData().mSceneBounds.Radius;
-	float n = sphereCenterLS.z - m_renderManager.GetRenderData().mSceneBounds.Radius;
-	float r = sphereCenterLS.x + m_renderManager.GetRenderData().mSceneBounds.Radius;
-	float t = sphereCenterLS.y + m_renderManager.GetRenderData().mSceneBounds.Radius;
-	float f = sphereCenterLS.z + m_renderManager.GetRenderData().mSceneBounds.Radius;
-	XMMATRIX P = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
-
-	// Transform NDC space [-1,+1]^2 to texture space [0,1]^2
-	XMMATRIX T(
-		0.5f, 0.0f, 0.0f, 0.0f,
-		0.0f, -0.5f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.5f, 0.5f, 0.0f, 1.0f);
-
-	XMMATRIX S = V*P*T;
-
-	XMStoreFloat4x4(&m_renderManager.GetRenderData().lightView, V);
-	XMStoreFloat4x4(&m_renderManager.GetRenderData().lightProj, P);
-	XMStoreFloat4x4(&m_renderManager.GetRenderData().shadowTransform, S);
-}
-
-void Game::DrawSceneToShadowMap()
-{
-	XMMATRIX view     = XMLoadFloat4x4(&m_renderManager.GetRenderData().lightView);
-	XMMATRIX proj     = XMLoadFloat4x4(&m_renderManager.GetRenderData().lightProj);
-	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
-
-	RenderData prevRenderData(m_renderManager.GetRenderData());
-	m_renderManager.GetRenderData().view = m_renderManager.GetRenderData().lightView;
-	m_renderManager.GetRenderData().projection = m_renderManager.GetRenderData().lightProj;
-	m_renderManager.GetRenderData().pass = ShadowMapPass;
-
-	m_renderManager.UpdateProjection(&m_renderManager.GetRenderData().projection);
-
-    const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-	stockStates.ApplyRasterizerState( m_renderManager.GetContext(), XSF::StockRasterizerStates::BuildShadowMap );
-
-	// Draw everything
-	HR(m_renderManager.Render());
-
-	m_renderManager.GetRenderData() = prevRenderData;
-
-	m_renderManager.UpdateProjection(&m_renderManager.GetRenderData().projection);
-
-	stockStates.ApplyRasterizerState( m_renderManager.GetContext(), XSF::StockRasterizerStates::Solid);
-}
 
 #if !defined(WIN32) && !defined(_XBOX_ONE)
 // Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.

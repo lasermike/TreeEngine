@@ -381,7 +381,7 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 	return S_OK;
 }
 
-HRESULT RenderManager::Render()
+HRESULT RenderManager::RenderScene()
 {
 	// Set samplers
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
@@ -758,11 +758,33 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 
 #if defined(TREE3D12)
 HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
-#else
-HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
-#endif
 {
 /*	UINT stride = sizeof(SimpleVertex);
+	UINT offset = 0;
+
+	pContext->IASetInputLayout(InputLayouts::Basic32);
+	pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	pContext->IASetVertexBuffers(0, 1, &m_screenQuadVB, &stride, &offset);
+	pContext->IASetIndexBuffer(m_screenQuadIB, DXGI_FORMAT_R32_UINT, 0);
+
+	pContext->VSSetShader(m_drawScreenVertexShader, nullptr, 0);
+	pContext->PSSetShader(m_drawScreenPixelShader, nullptr, 0);
+
+	//pContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
+
+	pContext->PSSetShaderResources(0, 1, &depthTexture);
+
+	pContext->DrawIndexed(6, 0, 0);
+
+	ID3D11ShaderResourceView* nullText[] = { 0 };
+	pContext->PSSetShaderResources(0, 1, nullText);
+*/
+	return S_OK;
+}
+#else
+HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
+{
+	UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
 
 	pContext->IASetInputLayout(InputLayouts::Basic32);
@@ -781,10 +803,10 @@ HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11Sha
 
 	ID3D11ShaderResourceView* nullText[] = {0};
 	pContext->PSSetShaderResources(0, 1, nullText);
-	*/
-	return S_OK;
 
+	return S_OK;
 }
+#endif
 
 
 //--------------------------------------------------------------------------------------
@@ -1288,6 +1310,83 @@ void RenderManager::CleanupDeviceForShutdown()
 	m_d3dDevice.Release();
 }
 
+//--------------------------------------------------------------------------------------
+// Render a frame.  May be called twice for stereo rendering
+//--------------------------------------------------------------------------------------
+void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer, 
+						   bool m_renderToSharedTexture, float* clearColor)
+{
+	HRESULT hr = S_OK;
+
+	if (!oculus)
+	{
+		// Bind render target and depth
+		ID3D11RenderTargetView* rtv = GetRTV();
+		GetContext()->OMSetRenderTargets(1, &rtv, GetDSV());
+	}
+
+	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+	if (wireframe)
+	{
+		stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Wireframe);
+	}
+
+	if (useAlphaBlendedRenderTarget)
+	{
+		stockStates.ApplyBlendState(GetContext(), XSF::StockBlendStates::AlphaBlend);
+	}
+	else
+	{
+		stockStates.ApplyBlendState(GetContext(), XSF::StockBlendStates::Overwrite);
+	}
+
+	if (!oculus)
+	{
+		// Clear the back buffer
+		GetContext()->ClearRenderTargetView(GetRTV(), clearColor);
+	
+		// Clear the depth buffer to 1.0 (max depth)
+		GetContext()->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	}
+
+	// Make shadow map avaiable to shaders
+	if (useShadowMaps)
+	{
+		ID3D11ShaderResourceView* depthTexture = GetRenderData().pShadowMap->DepthMapSRV();
+		GetContext()->PSSetShaderResources(1, 1, &depthTexture);
+	}
+
+	// Draw everything
+	HRC(RenderScene());
+
+	// Unbind shadow texture so we can render to it next frame
+	if (useShadowMaps)
+	{
+		ID3D11ShaderResourceView* depthTexture = nullptr;
+		GetContext()->PSSetShaderResources(1, 1, &depthTexture);
+	}
+
+	// Show frame statistics
+	if (showHelp)
+	{
+		DrawFrameStats();
+	}
+
+	if (showShadowBuffer)
+	{
+		HRC(DrawScreenQuad(GetContext(), GetRenderData().pShadowMap->DepthMapSRV()));
+	}
+
+	if (!oculus && !m_renderToSharedTexture)
+	{
+		// Present our back buffer to our front buffer
+		HRC(GetSwapChain()->Present(0, 0));
+	}
+
+Cleanup:
+	return;
+}
+
 HRESULT RenderManager::DrawFrameStats()
 {
 	float y = 10;
@@ -1304,6 +1403,82 @@ HRESULT RenderManager::DrawFrameStats()
 	m_bitmapFont->End();
 
 	return S_OK;
+}
+
+HRESULT RenderManager::RenderShadowMap()
+{
+	BuildShadowTransform();
+	GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetContext(), nullptr);
+	DrawSceneToShadowMap();
+
+	// Restore state after shadow
+	GetContext()->RSSetState(0);
+	GetContext()->RSSetViewports(1, GetViewport());
+	
+	return S_OK;
+}
+
+void RenderManager::BuildShadowTransform()
+{
+	// Only the first "main" light casts a shadow.
+	XMVECTOR lightDir = XMLoadFloat3(&GetRenderData().dirLights[0].Direction);
+	XMVECTOR lightPos = -2.0f * GetRenderData().mSceneBounds.Radius * lightDir;
+	XMVECTOR targetPos = XMLoadFloat3(&GetRenderData().mSceneBounds.Center);
+	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+	XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
+
+	// Transform bounding sphere to light space.
+	XMFLOAT3 sphereCenterLS;
+	XMStoreFloat3(&sphereCenterLS, XMVector3TransformCoord(targetPos, V));
+
+	// Ortho frustum in light space encloses scene.
+	float l = sphereCenterLS.x - GetRenderData().mSceneBounds.Radius;
+	float b = sphereCenterLS.y - GetRenderData().mSceneBounds.Radius;
+	float n = sphereCenterLS.z - GetRenderData().mSceneBounds.Radius;
+	float r = sphereCenterLS.x + GetRenderData().mSceneBounds.Radius;
+	float t = sphereCenterLS.y + GetRenderData().mSceneBounds.Radius;
+	float f = sphereCenterLS.z + GetRenderData().mSceneBounds.Radius;
+	XMMATRIX P = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
+
+	// Transform NDC space [-1,+1]^2 to texture space [0,1]^2
+	XMMATRIX T(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+
+	XMMATRIX S = V*P*T;
+
+	XMStoreFloat4x4(&GetRenderData().lightView, V);
+	XMStoreFloat4x4(&GetRenderData().lightProj, P);
+	XMStoreFloat4x4(&GetRenderData().shadowTransform, S);
+}
+
+void RenderManager::DrawSceneToShadowMap()
+{
+	XMMATRIX view = XMLoadFloat4x4(&GetRenderData().lightView);
+	XMMATRIX proj = XMLoadFloat4x4(&GetRenderData().lightProj);
+	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
+
+	RenderData prevRenderData(GetRenderData());
+	GetRenderData().view = GetRenderData().lightView;
+	GetRenderData().projection = GetRenderData().lightProj;
+	GetRenderData().pass = ShadowMapPass;
+
+	UpdateProjection(&GetRenderData().projection);
+
+	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+	stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
+
+	// Draw everything
+	HR(RenderScene());
+
+	GetRenderData() = prevRenderData;
+
+	UpdateProjection(&GetRenderData().projection);
+
+	stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Solid);
 }
 
 #if defined(TREE3D12)

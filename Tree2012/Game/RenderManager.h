@@ -386,7 +386,11 @@ class RenderManager : public IRenderFrame
 	HRESULT LoadTexture(const wchar_t* textureFilename);
 	HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
 	HRESULT Render(RenderUnit& renderUnit);
+	HRESULT RenderScene();
 	HRESULT SetMaterial(Material& material);
+
+	void BuildShadowTransform();
+	void DrawSceneToShadowMap();
 
 public:
 	RenderManager();
@@ -438,7 +442,9 @@ public:
 
 	HRESULT BeginFrame();
 	HRESULT EndFrame();
-	HRESULT Render();
+
+	void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
+				bool m_renderToSharedTexture, float* clearColor);
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 #if defined(TREE3D12)
@@ -447,5 +453,6 @@ public:
 	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
 #endif
 	HRESULT DrawFrameStats();
+	HRESULT RenderShadowMap();
 };
 
