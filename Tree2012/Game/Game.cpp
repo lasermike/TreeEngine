@@ -314,7 +314,6 @@ void Game::Render(bool oculus)
 	m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
 		m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);
 
-Cleanup:
 	return;
 }
 

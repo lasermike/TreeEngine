@@ -72,16 +72,6 @@ public:
 	static const InputElementDesc Basic32[3];
 };
 
-class InputLayouts
-{
-public:
-	static void InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen);
-	static void DestroyAll();
-
-	static ID3DInputLayout* InstancedBasic16;
-	static ID3DInputLayout* Basic32;
-};
-
 const InputElementDesc InputLayoutDesc::InstancedBasic16[8] =
 {
 	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
@@ -101,6 +91,17 @@ const InputElementDesc InputLayoutDesc::Basic32[3] =
 	{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, InputClassificationVertex, 0}
 };
 
+#if !defined(TREE3D12)
+class InputLayouts
+{
+public:
+	static void InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen);
+	static void DestroyAll();
+
+	static ID3DInputLayout* InstancedBasic16;
+	static ID3DInputLayout* Basic32;
+};
+
 ID3DInputLayout* InputLayouts::InstancedBasic16 = 0;
 ID3DInputLayout* InputLayouts::Basic32 = 0;
 
@@ -118,6 +119,7 @@ void InputLayouts::DestroyAll()
 	SafeRelease(&InstancedBasic16);
 	SafeRelease(&Basic32);
 }
+#endif
 
 #pragma endregion
 
@@ -163,6 +165,31 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	//HRR(RenderStates::InitAll(m_d3dDevice));
 	
 	// Create the constant buffers
+#if defined(TREE3D12)
+	{
+		HR(m_d3dDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&m_CBNeverChanges)));
+
+		// Describe and create a constant buffer view.
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = m_CBNeverChanges->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes = (sizeof(CBNeverChanges) + 255) & ~255;	// CB size is required to be 256-byte aligned.
+		m_d3dDevice->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+
+		// Initialize and map the constant buffers. We don't unmap this until the
+		// app closes. Keeping things mapped for the lifetime of the resource is okay.
+		//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
+
+		CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+		HR(m_CBNeverChanges->Map(0, &readRange, reinterpret_cast<void**>(&m_CBNeverChangesDataBegin)));
+		//memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+	}
+#else
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
 	bd.Usage = D3D11_USAGE_DEFAULT;
@@ -170,27 +197,40 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_CBNeverChanges));
+#endif
+
 	SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
 
 	////////  Regular shaders /////
+
+	// Load regular shaders
+#if defined(TREE3D12)
+	HR(LoadShader(L"VS.cso", &m_vertexShader));
+	HR(LoadShader(L"PS.cso", &m_pixelShader));
+
+	////////  Shadow map shader /////
+	// Load shadow shaders
+	HRR(LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+	// TODO: load a shadow pixel shader to support transparent textures not casting shadows
+
+	////////  Debug texture /////
+	HRR(LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
+
+#else
 	// Create Instanced draw data layout
 	std::vector< BYTE > dataVS;
 	HRR(XSF::LoadBlob(L"VS.cso", dataVS));
-
-	// Create VS input layout
-	InputLayouts::InitAll(m_d3dDevice, &(dataVS)[ 0 ], dataVS.size());
-	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
-
-	// Load regular vertex Shader
 	HRR(m_d3dDevice->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader));
-	SetDebugName(m_vertexShader, "RenderManager::m_vertexShader");
 
-	// Load regular pixel Shader
 	HRR(LoadPixelShader(m_d3dDevice, L"PS.cso", &m_pixelShader));
+
+	SetDebugName(m_vertexShader, "RenderManager::m_vertexShader");
 	SetDebugName(m_pixelShader, "RenderManager::m_pixelShader");
 
-	////////  Shadow map shader /////
+	InputLayouts::InitAll(m_d3dDevice, &(dataVS)[0], dataVS.size());
+	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
 
+	////////  Shadow map shader /////
 	// Load shadow shaders
 	HRR(LoadVertexShader(m_d3dDevice, L"BuildShadowMapVS.cso", &m_shadowVertexShader));
 	SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
@@ -204,12 +244,14 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	HRR(m_d3dDevice->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_drawScreenVertexShader));
 	SetDebugName(m_drawScreenVertexShader, "RenderManager::m_drawScreenVertexShader");
 
-	HRR(m_d3dDevice->CreateInputLayout(InputLayoutDesc::Basic32, 
+
+	HRR(m_d3dDevice->CreateInputLayout(InputLayoutDesc::Basic32,
 								  ARRAYSIZE(InputLayoutDesc::Basic32), 
 								  &(dataVS)[ 0 ] /*passDesc.pIAInputSignature*/,
 								  dataVS.size() /*passDesc.IAInputSignatureSize*/, 
 								  &InputLayouts::Basic32));
 	SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
+#endif
 
 	// Load regular pixel Shader
 	HRR(LoadPixelShader(m_d3dDevice, L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
@@ -1171,12 +1213,14 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 #endif
 
 #ifdef _XBOX_ONE
-		sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+		m_swapChainFormat = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
 		//sd.Scaling = DXGI_SCALING_STRETCH;
 		sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
 #else
-		sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
+		sd.Format = m_swapChainFormat;
+
 		sd.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
 		sd.SampleDesc.Quality = m_enableMsaa ? msaaQuality - 1 : 0;
 		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -1485,7 +1529,7 @@ void RenderManager::DrawSceneToShadowMap()
 
 // Desc: Load a shader blob from file
 //--------------------------------------------------------------------------------------
-HRESULT RenderManager::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
+HRESULT RenderManager::LoadShader(wchar_t* path, ID3DBlob** ppShader)
 {
 	VERBOSEATGPROFILETHIS;
 
@@ -1560,6 +1604,38 @@ HRESULT RenderManager::CreateColorTextureAndViews(XSF::D3DDevice* pDevice, UINT 
 
 	return S_OK;
 }
+
+//--------------------------------------------------------------------------------------
+// Name: TrimUploadHeaps
+// Desc: Terminates the upload heaps whose fence has passed and optionally removes them
+//--------------------------------------------------------------------------------------
+void RenderManager::TrimUploadHeaps(bool removeTerminatedHeaps)
+{
+	const UINT64 fenceValue = m_fence->GetCompletedValue();
+	for (std::list<FencedHeap>::const_iterator iterManagedHeap = m_managedUploadHeaps.begin(); iterManagedHeap != m_managedUploadHeaps.end(); ++iterManagedHeap)
+	{
+		if (iterManagedHeap->m_pUploadHeap != nullptr && iterManagedHeap->m_fenceValue <= fenceValue)
+		{
+			iterManagedHeap->m_pUploadHeap->Terminate();
+		}
+	}
+
+	if (removeTerminatedHeaps)
+	{
+		m_managedUploadHeaps.remove_if(is_heap_terminated());
+	}
+}
+
+//--------------------------------------------------------------------------------------
+// Name: ManageUploadHeap
+// Desc: Add the upload heap to the managed list
+//--------------------------------------------------------------------------------------
+_Use_decl_annotations_
+void RenderManager::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
+{
+	m_managedUploadHeaps.push_back(FencedHeap(pUploadHeap, GetCurrentFenceValue()));
+}
+
 #else // XSF_USE_DX_12_0
 
 //--------------------------------------------------------------------------------------

@@ -30,7 +30,7 @@ using namespace XboxSampleFramework;
         DebugPrint("BitmapFont::CreateFontShaders: error %x\n", hr); \
         return hr;
 
-ID3DBlob*                   BitmapFont::s_pVS;   // Created vertex shader
+ID3DBlob*                   BitmapFont::s_pVS;    // Created vertex shader
 ID3DBlob*                   BitmapFont::s_pPS;    // Created pixel shader
 ID3D12Resource*             BitmapFont::s_pIB;
 D3D12_INPUT_ELEMENT_DESC    BitmapFont::s_pIL[] = 
@@ -165,8 +165,8 @@ HRESULT BitmapFont::CreateFontShaders(D3DDevice* const pDevice, D3DCommandList* 
         // load shaders first
         std::vector<BYTE> dataVS, dataPS;
 
-        XSF_ERROR_IF_FAILED(renderManager->LoadShader(VS_FILE_NAME, &s_pVS));
-        XSF_ERROR_IF_FAILED(renderManager->LoadShader(PS_FILE_NAME, &s_pPS));
+        HRR(m_renderManager->LoadShader(VS_FILE_NAME, &BitmapFont::s_pVS));
+        HRR(m_renderManager->LoadShader(PS_FILE_NAME, &BitmapFont::s_pPS));
 
         // IB
         {
@@ -264,7 +264,7 @@ BitmapFont::BitmapFont():
     m_windowSet(FALSE),
     m_curRTSx(0),
     m_curRTSy(0),
-	renderManager(nullptr)
+	m_renderManager(nullptr)
 {
 }
 
@@ -285,27 +285,28 @@ BitmapFont::~BitmapFont()
 //       using the XPR packed resource file
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT BitmapFont::Create(const RenderManager* const renderManagerParam, const WCHAR* strFontFileName, const D3D12_RECT* pRc)
+HRESULT BitmapFont::Create(RenderManager* const renderManager, const WCHAR* strFontFileName, const D3D12_RECT* pRc)
 {
     ATGPROFILETHIS;
 
-    XSF_ASSERT(renderManagerParam);
+    XSF_ASSERT(renderManager);
     XSF_ASSERT(strFontFileName);
 
-    if (!renderManagerParam || !strFontFileName)
+    if (!renderManager || !strFontFileName)
     {
         DebugPrint("BitmapFont::Create: error in parameters\n");
         return E_INVALIDARG;
     }
 
-	renderManager = renderManagerParam;
-    D3DDevice* const pDevice = m_pSample->GetDevice();
-    ID3D12Fence* const pFence = m_pSample->GetFence();
-    D3DCommandList* const pCmdList = m_pSample->GetCommandList();
+	m_renderManager = renderManager;
+    D3DDevice* const pDevice = m_renderManager->GetDevice();
+    ID3D12Fence* const pFence = m_renderManager->GetFence();
+    D3DCommandList* const pCmdList = m_renderManager->GetCommandList();
 
-    XSF_ERROR_IF_FAILED(m_frameHeap.Initialize(pDevice, pFence, 256 * 1024, false, m_pSample->SampleSettings().m_frameLatency, L"BitmapFont::FrameHeap"));
+    XSF_ERROR_IF_FAILED(m_frameHeap.Initialize(pDevice, pFence, 256 * 1024, false, 1 /*frame latency*/, L"BitmapFont::FrameHeap"));
     XSF_ERROR_IF_FAILED(m_uploadHeap.Initialize(pDevice, pFence, 4 * 1024 * 1024, false, 1, L"BitmapFont::UploadHeap"));
-    (const_cast<SampleFramework*>(pSample))->ManageUploadHeap(&m_uploadHeap);
+    
+	m_renderManager->ManageUploadHeap(&m_uploadHeap);
 
     // read the data
     WCHAR tmp[1024];
@@ -389,7 +390,7 @@ HRESULT BitmapFont::Create(const RenderManager* const renderManagerParam, const 
         }
     }
 
-    return Create(pSample, pTex, &m_data[ 0 ], pRc);
+    return Create(m_renderManager, pTex, &m_data[ 0 ], pRc);
 }
 
 
@@ -398,21 +399,21 @@ HRESULT BitmapFont::Create(const RenderManager* const renderManagerParam, const 
 // Desc: Create the font's internal objects (texture and array of glyph info)
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT BitmapFont::Create(const SampleFramework* const pSample, ID3D12Resource* const pFontTexture, const VOID* pFontData, const D3D12_RECT* pRc)
+HRESULT BitmapFont::Create(RenderManager* renderManager, ID3D12Resource* const pFontTexture, const VOID* pFontData, const D3D12_RECT* pRc)
 {
     ATGPROFILETHIS;
 
-    XSF_ASSERT(pSample);
+    XSF_ASSERT(renderManager);
     
-    if (!pSample || !pFontTexture || !pFontData)
+    if (!renderManager || !pFontTexture || !pFontData)
     {
         DebugPrint("BitmapFont::Create: invalid parameters\n");
         return E_INVALIDARG;
     }
 
-    m_pSample = pSample;
-    D3DDevice* const pDevice = m_pSample->GetDevice();
-    D3DCommandList* const pCmdList = m_pSample->GetCommandList();
+	m_renderManager = renderManager;
+    D3DDevice* const pDevice = m_renderManager->GetDevice();
+    D3DCommandList* const pCmdList = m_renderManager->GetCommandList();
 
     // Define root table layout
     CD3DX12_DESCRIPTOR_RANGE descRange[c_numRootParameters];
@@ -427,19 +428,19 @@ HRESULT BitmapFont::Create(const SampleFramework* const pSample, ID3D12Resource*
 
     CD3DX12_ROOT_SIGNATURE_DESC rootSignature(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
     D3DBlobPtr spSerializedSignature;
-    XSF_RETURN_IF_FAILED(D3D12SerializeRootSignature(&rootSignature, D3D_ROOT_SIGNATURE_VERSION_1, spSerializedSignature.GetAddressOf(), nullptr));
+    XSF_RETURN_IF_FAILED(D3D12SerializeRootSignature(&rootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &spSerializedSignature, nullptr));
 
     XSF_RETURN_IF_FAILED(pDevice->CreateRootSignature(
         c_nodeMask,
         spSerializedSignature->GetBufferPointer(),
         spSerializedSignature->GetBufferSize(),
-        IID_GRAPHICS_PPV_ARGS(m_spRootSignature.ReleaseAndGetAddressOf())));
+        IID_GRAPHICS_PPV_ARGS(&m_spRootSignature)));
 
     XSF_RETURN_IF_FAILED(m_CBSRVHeap.Initialize(pDevice, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, c_CBHeapEnd, true));
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Format = pSample->SampleSettings().m_swapChainFormat;
+	srvDesc.Format = m_renderManager->GetSwapChainFormat();
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = static_cast<UINT>(-1);
     pDevice->CreateShaderResourceView(pFontTexture, &srvDesc, m_CBSRVHeap.hCPU(c_iFontTexture));
@@ -510,7 +511,7 @@ HRESULT BitmapFont::Create(const SampleFramework* const pSample, ID3D12Resource*
 //--------------------------------------------------------------------------------------
 VOID BitmapFont::Destroy()
 {
-    m_spRootSignature.Reset();
+    m_spRootSignature.Release();
 
     XSF_SAFE_RELEASE(m_pFontTexture);
 
@@ -705,7 +706,7 @@ VOID BitmapFont::Begin(const D3D12_VIEWPORT* pViewport)
     if (0 == m_dwNestedBeginCount)
     {
         XSF_ASSERT(m_pCmdList == nullptr);
-        m_pCmdList = m_pSample->GetCommandList();
+        m_pCmdList = m_renderManager->GetCommandList();
 
         XSFBeginNamedEvent(m_pCmdList, 0, L"Text rendering");
 
@@ -738,7 +739,7 @@ VOID BitmapFont::Begin(const D3D12_VIEWPORT* pViewport)
         m_pCmdList->SetGraphicsRootDescriptorTable(c_rootSampler, hSampler);
         
         // obtain render target size
-        D3D12_VIEWPORT viewport = (pViewport != nullptr)? *pViewport : m_pSample->GetBackbuffer().GetViewport();
+        D3D12_VIEWPORT viewport = (pViewport != nullptr)? *pViewport : *m_renderManager->GetViewport();
         m_curRTSx = std::max(m_safeAreaInPixels * 2 + 1, static_cast<UINT>(viewport.Width));
         m_curRTSy = std::max(m_safeAreaInPixels * 2 + 1, static_cast<UINT>(viewport.Height));
         
@@ -755,7 +756,7 @@ VOID BitmapFont::Begin(const D3D12_VIEWPORT* pViewport)
         }
     }
 
-    XSF_ASSERT(m_pCmdList == m_pSample->GetCommandList());
+    XSF_ASSERT(m_pCmdList == m_renderManager->GetCommandList());
 
     // Keep track of the nested begin/end calls.
     m_dwNestedBeginCount++;
@@ -805,7 +806,7 @@ VOID BitmapFont::DrawText(FLOAT fOriginX, FLOAT fOriginY, DWORD dwColor, const W
 {
     XSF_ASSERT(m_pCmdList);
 
-    D3DDevice* const pDevice = m_pSample->GetDevice();
+    D3DDevice* const pDevice = m_renderManager->GetDevice();
 
     if (nullptr == strText)
         return;

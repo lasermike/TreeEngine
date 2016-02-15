@@ -258,13 +258,41 @@ struct DoubleBuffer
 	}
 };
 
+#if defined(TREE3D12)
+// Trim upload heaps when they're no longer in use
+struct FencedHeap
+{
+	XSF::CpuGpuHeap* m_pUploadHeap;
+	UINT64 m_fenceValue;
+
+	FencedHeap(_In_ XSF::CpuGpuHeap *pUploadHeap, UINT64 fenceValue) :
+		m_pUploadHeap(pUploadHeap),
+		m_fenceValue(fenceValue)
+	{
+	}
+
+	FencedHeap()
+	{
+		FencedHeap(nullptr, 0);
+	}
+};
+
+class is_heap_terminated : public std::unary_function<FencedHeap, bool>
+{
+public:
+	bool operator( ) (FencedHeap& fencedHeap)
+	{
+		return (fencedHeap.m_pUploadHeap == nullptr) || fencedHeap.m_pUploadHeap->IsTerminated();
+	}
+};
+#endif
 
 interface IRenderFrame
 {
 	virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
 	virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
 	virtual RenderData& GetRenderData() = 0;
-	virtual XSF::D3DDeviceContext* GetContext() = 0;
+	//virtual XSF::D3DDeviceContext* GetContext() = 0;
 };
 
 class RenderManager : public IRenderFrame
@@ -307,7 +335,7 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12PipelineState> m_pipelineState;
 	CComPtr<ID3D12GraphicsCommandList> m_commandList;
 	UINT m_rtvDescriptorSize;
-	D3D12_VIEWPORT m_viewport;
+	D3D12_VIEWPORT m_viewPort;
 	D3D12_RECT m_scissorRect;
 #else
 	CComPtr<ID3D11Device1>              m_d3dDevice1;
@@ -324,6 +352,7 @@ class RenderManager : public IRenderFrame
 
 	DisplayMode							m_displayMode;
 	bool								m_enableMsaa;
+	DXGI_FORMAT							m_swapChainFormat;
 
 	struct CBChangeOnResize
 	{
@@ -332,11 +361,34 @@ class RenderManager : public IRenderFrame
 
 	// App resources.
 #if defined(TREE3D12)
-	CComPtr<ID3D12Resource>               m_pCBChangeOnResize;
-	CBChangeOnResize					  m_cbChangesOnResize;
+	CComPtr<ID3D12Resource>             m_pCBChangeOnResize;
+	CBChangeOnResize					m_cbChangesOnResize;
 
 	CComPtr<ID3DBlob>					m_vertexShader;
 	CComPtr<ID3DBlob>					m_pixelShader;
+
+	CComPtr<ID3DBlob>					m_shadowVertexShader;
+	CComPtr<ID3DBlob>					m_shadowPixelShader;
+	CComPtr<ID3DBlob>					m_drawScreenVertexShader;
+	CComPtr<ID3DBlob>					m_drawScreenPixelShader;
+
+	// Single vertex and index buffer for all geometry in scene
+	CComPtr<ID3D12Resource>             m_vertexBuffer;
+	CComPtr<ID3D12Resource>             m_indexBuffer;
+
+	CComPtr<ID3D12Resource>             m_CBNeverChanges;
+	UINT8*								m_CBNeverChangesDataBegin;
+
+	CComPtr<ID3D12Resource>             m_CBChangesEveryFrame;
+
+	// Fixed drawing features
+	CComPtr<ID3D12Resource>				m_screenQuadVB;
+	CComPtr<ID3D12Resource>				m_screenQuadIB;
+	D3D12_RESOURCE_DESC					m_debugTextureRV;
+
+	CComPtr<ID3D12Fence>				m_fence;
+	std::list<FencedHeap>				m_managedUploadHeaps;
+
 #else
 	CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
 	CBChangeOnResize					m_cbChangesOnResize;
@@ -376,7 +428,10 @@ class RenderManager : public IRenderFrame
 	XSF::BitmapFont*					m_bitmapFont;
 
 #if defined(TREE3D12)
-	HRESULT LoadShader(_In_z_ const wchar_t* fileName, _COM_Outptr_ ID3DBlob** ppShader);
+public:
+	HRESULT LoadShader(wchar_t* fileName, ID3DBlob** ppShader);
+
+private:
 #else
 	HRESULT LoadPixelShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr);
 	HRESULT LoadVertexShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
@@ -403,31 +458,42 @@ public:
 	
 	RenderData& GetRenderData() { return m_renderData; }
 	XSF::D3DDevice* GetDevice() { return m_d3dDevice; }
-	XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
 #if defined (TREE3D12)
-	ID3DBlob* GetVertexBuffer() { return m_vertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
-	ID3DBlob* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
+	ID3D12Resource* GetVertexBuffer() { return m_vertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
+	ID3D12Resource* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
+
+	ID3D12Fence* GetFence() { return m_fence; }
+	D3DCommandList* GetCommandList() const { return m_commandList; }
+
+	void TrimUploadHeaps(bool removeTerminatedHeaps);
+	void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
+
 #else
+	XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
+
 	ID3D11Buffer* GetVertexBuffer() { return m_vertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
 	ID3D11Buffer* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
 #endif
 	GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
+	DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
 
 	// Accessor methods for Oculus
-#if !defined(TREE3D12)
+#if defined(TREE3D12)
+	D3D12_VIEWPORT* GetViewport() { return &m_viewPort; }
+#else
 	//ID3D11Device* GetDevice11() { return m_d3dDevice1; }
 	ID3D11RenderTargetView* GetRTV() { return m_pRenderTargetView; }
 	ID3D11DepthStencilView* GetDSV() { return m_pDepthStencilView; }
 	ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
 	IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
 	D3D11_VIEWPORT* GetViewport() { return &m_viewPort; }
-	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 #endif
+	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
 
 	HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
 	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
 #if defined (TREE3D12)
-	HRESULT CreateMesh(const wchar_t* name, ID3DBlob* vertexBuffer, ID3DBlob* indexBuffer,
+	HRESULT CreateMesh(const wchar_t* name, ID3D12Resource* vertexBuffer, ID3D12Resource* indexBuffer,
 		const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
 #else
 	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
