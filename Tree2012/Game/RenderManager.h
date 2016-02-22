@@ -228,8 +228,6 @@ struct DoubleBuffer
 			nullptr,
 			IID_PPV_ARGS(&buffers[1])));
 
-		//HRR(device->CreateBuffer(&bd, 0, &buffers[1]));
-
 		SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
 		SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
 
@@ -374,7 +372,10 @@ class RenderManager : public IRenderFrame
 
 	// Single vertex and index buffer for all geometry in scene
 	CComPtr<ID3D12Resource>             m_vertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW			m_VBView;
+
 	CComPtr<ID3D12Resource>             m_indexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW			m_IBView;
 
 	CComPtr<ID3D12Resource>             m_CBNeverChanges;
 	UINT8*								m_CBNeverChangesDataBegin;

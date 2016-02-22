@@ -162,33 +162,35 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 {
     HRR(CleanUpDeviceObjects());
 
+	// Create vertices and indice for geometry
+	m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
+
 	//HRR(RenderStates::InitAll(m_d3dDevice));
 	
 	// Create the constant buffers
 #if defined(TREE3D12)
-	{
-		HR(m_d3dDevice->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&m_CBNeverChanges)));
+	HR(m_d3dDevice->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(CBNeverChanges) + 255) & ~255),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_CBNeverChanges)));
 
-		// Describe and create a constant buffer view.
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-		cbvDesc.BufferLocation = m_CBNeverChanges->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = (sizeof(CBNeverChanges) + 255) & ~255;	// CB size is required to be 256-byte aligned.
-		m_d3dDevice->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+	// Describe and create a constant buffer view.
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = m_CBNeverChanges->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = (sizeof(CBNeverChanges) + 255) & ~255;	// CB size is required to be 256-byte aligned.
+	m_d3dDevice->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
 
-		// Initialize and map the constant buffers. We don't unmap this until the
-		// app closes. Keeping things mapped for the lifetime of the resource is okay.
-		//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
+	// Initialize and map the constant buffers. We don't unmap this until the
+	// app closes (TODO). Keeping things mapped for the lifetime of the resource is okay.
+	//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
-		CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
-		HR(m_CBNeverChanges->Map(0, &readRange, reinterpret_cast<void**>(&m_CBNeverChangesDataBegin)));
-		//memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-	}
+	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+	HR(m_CBNeverChanges->Map(0, &readRange, reinterpret_cast<void**>(&m_CBNeverChangesDataBegin)));
+	//TODO?  memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+
 #else
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
@@ -215,6 +217,70 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 
 	////////  Debug texture /////
 	HRR(LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
+
+	// Load regular pixel Shader
+	HRR(LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
+
+	// Create vertex buffer
+	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * m_geometryData.vertices.size());
+	HRR(m_d3dDevice->CreateCommittedResource(
+		&uploadHeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&vertexBufferDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_vertexBuffer)));
+	HRR(m_vertexBuffer->SetName(L"Vertex Buffer"));
+
+	// copy the triangle data to the vertex buffer
+	UINT8* dataBegin;
+	m_vertexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+	memcpy(dataBegin, &m_geometryData.vertices[0], sizeof(SimpleVertex) * m_geometryData.vertices.size());
+	m_vertexBuffer->Unmap(0, nullptr);
+
+	// initialize vertex buffer view
+	m_VBView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_VBView.StrideInBytes = sizeof(SimpleVertex);
+	m_VBView.SizeInBytes = sizeof(SimpleVertex) * m_geometryData.vertices.size();
+
+	// Index buffer
+	const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * m_geometryData.indices.size());
+	HRR(m_d3dDevice->CreateCommittedResource(
+		&uploadHeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&indexBufferDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_indexBuffer)));
+	HRR(m_indexBuffer->SetName(L"Index Buffer"));
+
+	// copy the index data to the index buffer
+	m_indexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+	memcpy(dataBegin, &m_geometryData.vertices[0], sizeof(UINT) * m_geometryData.indices.size());
+	m_indexBuffer->Unmap(0, nullptr);
+
+	// initialize vertex buffer view
+	m_IBView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_IBView.StrideInBytes = sizeof(UINT);
+	m_IBView.SizeInBytes = sizeof(UINT) * m_geometryData.indices.size();
+
+	// Constants per frame
+	HR(m_d3dDevice->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(CBChangesEveryFrame)),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_CBChangesEveryFrame)));
+
+	// Describe and create a constant buffer view.
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvPerFrameDesc = {};
+	cbvPerFrameDesc.BufferLocation = m_CBChangesEveryFrame->GetGPUVirtualAddress();
+	cbvPerFrameDesc.SizeInBytes = (sizeof(CBChangesEveryFrame) + 255) & ~255;	// CB size is required to be 256-byte aligned.
+	m_d3dDevice->CreateConstantBufferView(&cbvPerFrameDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
+
 
 #else
 	// Create Instanced draw data layout
@@ -251,20 +317,17 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 								  dataVS.size() /*passDesc.IAInputSignatureSize*/, 
 								  &InputLayouts::Basic32));
 	SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
-#endif
 
 	// Load regular pixel Shader
 	HRR(LoadPixelShader(m_d3dDevice, L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
 	SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
 
 	//////
-
-	// Create vertices and indice for geometry
-	m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
+	// Create vertex buffer
 	D3D11_BUFFER_DESC vbd;
 	ZeroMemory(&vbd, sizeof(vbd));
 	vbd.Usage = D3D11_USAGE_IMMUTABLE;
-	vbd.ByteWidth = (UINT) (sizeof(SimpleVertex) * m_geometryData.vertices.size());
+	vbd.ByteWidth = (UINT)(sizeof(SimpleVertex) * m_geometryData.vertices.size());
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = 0;
 	vbd.MiscFlags = 0;
@@ -277,7 +340,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	D3D11_BUFFER_DESC ibd;
 	ZeroMemory(&ibd, sizeof(ibd));
 	ibd.Usage = D3D11_USAGE_IMMUTABLE;
-	ibd.ByteWidth = (UINT) (sizeof(UINT) * m_geometryData.indices.size());
+	ibd.ByteWidth = (UINT)(sizeof(UINT) * m_geometryData.indices.size());
 	ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
 	ibd.CPUAccessFlags = 0;
 	ibd.MiscFlags = 0;
@@ -302,21 +365,19 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
 	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
 
+#endif
+
     // Debug overlay to show depth map
 	HRR(BuildScreenQuadGeometryBuffers(m_d3dDevice));
 
 	// Load the debug texture
+#if defined(TREE3D12)
+#else
 	HRR(CreateDDSTextureFromFile(m_d3dDevice, L"snow.dds", nullptr, &m_debugTextureRV));
 	SetDebugName(m_debugTextureRV, "RenderManager::m_debugTextureRV");
-
+#endif
 	// Create instanced buffer
 #if defined (TREE3D12)
-	vbd.Usage = D3D11_USAGE_DYNAMIC;
-	vbd.ByteWidth = sizeof(InstancedData) * maxInstances; 
-	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	vbd.MiscFlags = 0;
-	vbd.StructureByteStride = 0;
 	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, m_d3dDevice));
 #else
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
@@ -335,15 +396,18 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 {
 	SafeDelete(&GetRenderData().pShadowMap);
 
+#if !defined(TREE3D12)
+	SafeRelease(&m_vertexLayout);
+#endif
 	SafeRelease(&m_vertexBuffer);
 	SafeRelease(&m_indexBuffer);
-	SafeRelease(&m_vertexLayout);
 	SafeRelease(&m_vertexShader);
 	SafeRelease(&m_pixelShader);
 	SafeRelease(&m_CBNeverChanges);
 	SafeRelease(&m_CBChangesEveryFrame);
 	m_instancedBuffer.Release();
 
+#if !defined(TREE3D12)
 	for (auto& t : m_textures)
 	{
 		if (t.second)
@@ -352,6 +416,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 			t.second = nullptr;
 		}
 	}
+#endif
 	m_textures.clear();
 
 	for (auto& vs : m_vertexShaders)
@@ -525,10 +590,10 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 	if (!texture)
 	{
 		// Load the Texture
-#if !defined (TREE3D12)
-		HRR(CreateDDSTextureFromFile(m_d3dDevice, textureFilename, nullptr, &texture));
-#else
+#if defined (TREE3D12)
 		assert(false);
+#else
+		HRR(CreateDDSTextureFromFile(m_d3dDevice, textureFilename, nullptr, &texture));
 #endif
 		m_textures[textureFilename] = texture;
 	}
