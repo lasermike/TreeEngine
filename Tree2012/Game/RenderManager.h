@@ -45,9 +45,10 @@ struct Material
 {
 	wstring					  m_name;
 
-#if defined(TREE3D12)
+	//PlatformMaterial          m_platform;
 
-	ID3D12Resource*			m_texture;
+#if defined(TREE3D12)
+	D3D12_CPU_DESCRIPTOR_HANDLE			m_texture;
 	ID3DBlob*				m_vertexShader;
 	ID3DBlob*				m_pixelShader;
 	D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
@@ -78,7 +79,7 @@ struct Material
 public:
 #if defined(TREE3D12)
 	Material(const wchar_t* name,
-			 ID3D12Resource* texture, D3D12_INPUT_ELEMENT_DESC* inputLayout,
+			 D3D12_CPU_DESCRIPTOR_HANDLE texture, D3D12_INPUT_ELEMENT_DESC* inputLayout,
 			 ID3DBlob* vertexShader, ID3DBlob* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
 			 D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
 			 ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer) :
@@ -95,7 +96,7 @@ public:
 		//ASSERT(m_rasterizer != nullptr);
 		//ASSERT(m_depthState != nullptr);
 	}
-	Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
+	Material() : m_name(), m_texture(D3D12_CPU_DESCRIPTOR_HANDLE()), m_inputLayout(nullptr), m_vertexShader(nullptr),
 				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
 				 m_depthState(nullptr), m_constBuffer() { }
 
@@ -317,6 +318,7 @@ class RenderManager : public IRenderFrame
 	RenderData							m_renderData;
 
 	// Pipeline objects.
+	RenderPlatform*						m_platform;
 	CComPtr<XSF::D3DDevice>             m_d3dDevice;
 	D3D_DRIVER_TYPE                     m_driverType;
 	D3D_FEATURE_LEVEL                   m_featureLevel;
@@ -381,10 +383,14 @@ class RenderManager : public IRenderFrame
 	UINT8*								m_CBNeverChangesDataBegin;
 
 	CComPtr<ID3D12Resource>             m_CBChangesEveryFrame;
+	UINT8*								m_CBChangesEveryFrameDataBegin;
 
 	// Fixed drawing features
 	CComPtr<ID3D12Resource>				m_screenQuadVB;
+	D3D12_VERTEX_BUFFER_VIEW			m_screenQuadVBView;
 	CComPtr<ID3D12Resource>				m_screenQuadIB;
+	D3D12_VERTEX_BUFFER_VIEW			m_screenQuadIBView;
+
 	D3D12_RESOURCE_DESC					m_debugTextureRV;
 
 	CComPtr<ID3D12Fence>				m_fence;
@@ -430,7 +436,7 @@ class RenderManager : public IRenderFrame
 
 #if defined(TREE3D12)
 public:
-	HRESULT LoadShader(wchar_t* fileName, ID3DBlob** ppShader);
+	HRESULT LoadShader(const wchar_t* fileName, ID3DBlob** ppShader);
 
 private:
 #else
@@ -504,7 +510,7 @@ public:
 	HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
 	HRESULT GetInstanceIndex(WorldObject* object, UINT&);
 
-	HRESULT InitGraphics(UINT maxInstances);
+	HRESULT InitGraphics(UINT maxInstances, bool useShadowMaps);
 	virtual HRESULT CleanUpDeviceObjects();
 
 	HRESULT BeginFrame();

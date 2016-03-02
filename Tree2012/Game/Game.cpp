@@ -187,14 +187,8 @@ void Game::Regenerate()
 	m_loader.Regenerate(m_pScene);
 
     // Init render manager
-    hr = m_renderManager.InitGraphics(m_pScene->GetMaxInstances());
+    hr = m_renderManager.InitGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
 	assert(SUCCEEDED(hr));		
-
-	// Init shadow map
-	if (m_gameData.useShadowMaps)
-	{
-		m_renderManager.GetRenderData().pShadowMap = new ShadowMap(m_renderManager.GetDevice(), m_renderManager.GetRenderData().SMapWidth, m_renderManager.GetRenderData().SMapHeight);
-	}
 
 	// Init new stuff
 	hr = m_pScene->InitGraphics(m_renderManager);

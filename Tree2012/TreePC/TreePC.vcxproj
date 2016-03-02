@@ -222,6 +222,7 @@
     <ClInclude Include="..\Game\BitmapFont.h" />
     <ClInclude Include="..\Game\BitmapFont12.h" />
     <ClInclude Include="..\Game\CComPtr.h" />
+    <ClInclude Include="..\Game\D3D11Platform.h" />
     <ClInclude Include="..\Game\D3D12Util.h" />
     <ClInclude Include="..\Game\DDSTextureLoader.h" />
     <ClInclude Include="..\Game\DXMath.h" />
@@ -258,6 +259,7 @@
   <ItemGroup>
     <ClCompile Include="..\Game\BitmapFont.cpp" />
     <ClCompile Include="..\Game\BitmapFont12.cpp" />
+    <ClCompile Include="..\Game\D3D11Platform.cpp" />
     <ClCompile Include="..\Game\D3D12Util.cpp" />
     <ClCompile Include="..\Game\DDSTextureLoader.cpp" />
     <ClCompile Include="..\Game\Game.cpp" />

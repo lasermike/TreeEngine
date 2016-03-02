@@ -150,6 +150,8 @@ RenderManager::RenderManager() :
 HRESULT RenderManager::Initialize()
 {
 	m_nextInstanceBufferOffset = 0;
+	m_platform = new RenderPlatform();
+
 	return S_OK;
 }
 
@@ -158,7 +160,7 @@ RenderManager::~RenderManager()
 	CleanUpDeviceObjects();
 }
 
-HRESULT RenderManager::InitGraphics(UINT maxInstances)
+HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 {
     HRR(CleanUpDeviceObjects());
 
@@ -167,8 +169,42 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 
 	//HRR(RenderStates::InitAll(m_d3dDevice));
 	
-	// Create the constant buffers
 #if defined(TREE3D12)
+	// Create the root signature.
+	{
+		CD3DX12_DESCRIPTOR_RANGE ranges[2];
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+
+		CD3DX12_ROOT_PARAMETER rootParameters[2];
+		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
+		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_ALL);
+
+		D3D12_STATIC_SAMPLER_DESC sampler = {};
+		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.MipLODBias = 0;
+		sampler.MaxAnisotropy = 0;
+		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+		sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+		sampler.MinLOD = 0.0f;
+		sampler.MaxLOD = D3D12_FLOAT32_MAX;
+		sampler.ShaderRegister = 0;
+		sampler.RegisterSpace = 0;
+		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 2, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		CComPtr<ID3DBlob> signature;
+		CComPtr<ID3DBlob> error;
+		HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+		HRR(m_d3dDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+	}
+
+	// Create the constant buffers
 	HR(m_d3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
@@ -192,6 +228,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	//TODO?  memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 
 #else
+	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
 	bd.Usage = D3D11_USAGE_DEFAULT;
@@ -281,6 +318,27 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	m_d3dDevice->CreateConstantBufferView(&cbvPerFrameDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
 	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
 
+	HR(m_CBChangesEveryFrame->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesEveryFrameDataBegin)));
+
+	// Describe and create the graphics pipeline state object (PSO).
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
+	psoDesc.pRootSignature = m_rootSignature;
+	psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader);
+	psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader);
+	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	psoDesc.DepthStencilState.DepthEnable = FALSE;
+	psoDesc.DepthStencilState.StencilEnable = FALSE;
+	psoDesc.SampleMask = UINT_MAX;
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	psoDesc.SampleDesc.Count = 1;
+	HRR(m_d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+
+	// Create the command list.
+	HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, m_pipelineState, IID_PPV_ARGS(&m_commandList)));
 
 #else
 	// Create Instanced draw data layout
@@ -389,6 +447,16 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances)
 	HRR(m_instancedBuffer.Create(vbd, m_d3dDevice));
 #endif
 
+	// Init shadow map
+	if (useShadowMaps)
+	{
+#if defined(TREE3D12)
+		//GetRenderData().pShadowMap = new ShadowMap(GetDevice(), GetRenderData().SMapWidth, GetRenderData().SMapHeight);
+#else
+		GetRenderData().pShadowMap = new ShadowMap(GetDevice(), GetRenderData().SMapWidth, GetRenderData().SMapHeight);
+#endif
+	}
+
 	return S_OK;
 }
 
@@ -454,12 +522,15 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 	m_perFrameInstanceData.clear();
     m_screenQuadVB.Release();
     m_screenQuadIB.Release();
-    m_debugTextureRV.Release();
+
+#if !defined(TREE3D12)
+	m_debugTextureRV.Release();
+	InputLayouts::DestroyAll();
+#endif
     m_drawScreenPixelShader.Release();
     m_drawScreenVertexShader.Release();
     m_shadowVertexShader.Release();
 	//SafeDelete(&m_bitmapFont);
-	InputLayouts::DestroyAll();
 	//RenderStates::DestroyAll();
 
 	return S_OK;
@@ -467,18 +538,31 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 
 HRESULT RenderManager::BeginFrame()
 {
+#if defined(TREE3D12)
+	InstancedData* dataView = nullptr;
+	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+	HR(m_instancedBuffer.Get(m_renderData.frame)->Map(0, &readRange, reinterpret_cast<void**>(&dataView)));
+
+	//TODO should Map() in D3D12 only get called once at create time?
+#else
 	// Compute instance data
 	D3D11_MAPPED_SUBRESOURCE mappedData;
 	HRR(m_immediateContext->Map(m_instancedBuffer.Get(m_renderData.frame), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
-	m_renderData.instanceData = dataView;
+#endif
 
+	m_renderData.instanceData = dataView;
 	return S_OK;
 }
 
 HRESULT RenderManager::EndFrame()
 {
+#if defined(TREE3D12)
+	m_instancedBuffer.Get(m_renderData.frame)->Unmap(0, nullptr);
+#else
 	m_immediateContext->Unmap(m_instancedBuffer.Get(m_renderData.frame), 0);
+#endif
+
 	return S_OK;
 }
 
@@ -490,12 +574,15 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 
 HRESULT RenderManager::RenderScene()
 {
+#if defined(TREE3D12)
+	// TODO set PSO
+#else
 	// Set samplers
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
 	ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
 										stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap),
 										stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagLinearMipPointUVWClamp)
-};
+									  };
 	m_immediateContext->PSSetSamplers(0, 3, samplers);
 
 	// Set shaders
@@ -509,12 +596,17 @@ HRESULT RenderManager::RenderScene()
 		m_immediateContext->VSSetShader(m_vertexShader, nullptr, 0);
 		m_immediateContext->PSSetShader(m_pixelShader, nullptr, 0);
 	}
+#endif
 
 	// Update never changes. TODO: Move out to a place that never changes
 	CBNeverChanges cbNeverChanges;
 	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&m_renderData.view)));
+#if defined(TREE3D12)
+	memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
+#else
 	m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
 	m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
+#endif
 
 	// Update changes every frame CB.
 	// Compute world to camera matrix
@@ -524,10 +616,16 @@ HRESULT RenderManager::RenderScene()
 	XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
 	cb.shadowMatrix = m_renderData.shadowTransform;
 	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
+
+#if defined(TREE3D12)
+	memcpy(m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
+#else
 	m_immediateContext->VSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
 	m_immediateContext->PSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
 	m_immediateContext->UpdateSubresource(m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
+#endif
 
+#if !defined (TREE3D12)
 	// Set up input assembler
 	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
 	m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
@@ -538,6 +636,7 @@ HRESULT RenderManager::RenderScene()
 	UINT offset[2] = { 0, 0 };
 	ID3D11Buffer* vbs[2] = { m_vertexBuffer, m_instancedBuffer.Get(m_renderData.frame) };
 	m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+#endif
 
 	// Render each unit
 	for (auto& ru : m_renderUnits)
@@ -550,6 +649,9 @@ HRESULT RenderManager::RenderScene()
 
 HRESULT RenderManager::SetMaterial(Material& material)
 {
+#if defined(TREE3D12)
+	// TODO: Set material PSO
+#else
 	CBMaterial cb;
 	cb.material = material.m_shaderMaterial;
 
@@ -564,42 +666,55 @@ HRESULT RenderManager::SetMaterial(Material& material)
 	}
 
 	m_immediateContext->UpdateSubresource(material.m_constBuffer, 0, nullptr, &cb, 0, 0);
+#endif
+
 	return S_OK;
 }
 
 HRESULT RenderManager::Render(RenderUnit& ru)
 {
 	SetMaterial(*ru.m_material);
-	m_immediateContext->PSSetShaderResources(0, 1, &ru.m_material->m_texture);
 
+#if defined(TREE3D12)
+#else
+	m_immediateContext->PSSetShaderResources(0, 1, &ru.m_material->m_texture);
+#endif 
 	for (auto object : ru.reservations)
 	{
 		UINT startInstance = m_perFrameInstanceData[&ru][object].first;
 		UINT numInstances = m_perFrameInstanceData[&ru][object].second;
 
-		m_immediateContext->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset, 
+#if defined(TREE3D12)
+#else
+		m_immediateContext->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
 												 ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
-
+#endif
 	}
 	return S_OK;
 }
 
+#if defined(TREE3D12)
+HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
+{
+	D3D12_CPU_DESCRIPTOR_HANDLE texture = m_textures[textureFilename];
+	if (!texture.ptr)
+	{
+	}
+}
+#else
 HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 {
 	ID3D11ShaderResourceView* texture = m_textures[textureFilename];
 	if (!texture)
 	{
 		// Load the Texture
-#if defined (TREE3D12)
-		assert(false);
-#else
 		HRR(CreateDDSTextureFromFile(m_d3dDevice, textureFilename, nullptr, &texture));
-#endif
 		m_textures[textureFilename] = texture;
 	}
 
 	return S_OK;
 }
+#endif
 
 HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shaderType)
 {
@@ -613,40 +728,51 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 	{
 	case ShaderType_VertexShader:
 	{
+#if defined(TREE3D12)
+		ID3DBlob* vertexShader = m_vertexShaders[shaderFilename];
+#else
 		ID3D11VertexShader* vertexShader = m_vertexShaders[shaderFilename];
+#endif
 		if (vertexShader)
 		{
 			return S_OK;
 		}
 
+#if defined(TREE3D12)
+		HR(LoadShader(shaderFilename, &vertexShader));
+#else
 		std::vector< BYTE > shaderData;
 		HRR(XSF::LoadBlob(shaderFilename, shaderData));
 
 		// Create VS input layout
 		// Load regular vertex Shader
 		HRR(m_d3dDevice->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &vertexShader));
-
+		SetDebugName(vertexShader, sbFilename);
+#endif
 		m_vertexShaders[shaderFilename] = vertexShader;
 
-		SetDebugName(vertexShader,  sbFilename);
-
 		break;
-
 	}
 	case ShaderType_PixelShader:
 	{
+#if defined(TREE3D12)
+		ID3DBlob* pixelShader = m_pixelShaders[shaderFilename];
+#else
 		ID3D11PixelShader* pixelShader = m_pixelShaders[shaderFilename];
+#endif
 		if (pixelShader)
 		{
 			return S_OK;
 		}
 
 		// Load regular pixel Shader
+#if defined(TREE3D12)
+		HR(LoadShader(shaderFilename, &pixelShader));
+#else
 		HRR(LoadPixelShader(m_d3dDevice, shaderFilename, &pixelShader));
-
-		m_pixelShaders[shaderFilename] = pixelShader;
-
 		SetDebugName(pixelShader, sbFilename);
+#endif
+		m_pixelShaders[shaderFilename] = pixelShader;
 
 		break;
 	}
@@ -656,6 +782,8 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 
 HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height)
 {
+#if defined(TREE3D12)
+#else
 	D3D11_TEXTURE2D_DESC desc = {};
 	desc.Width = width;
 	desc.Height = height;
@@ -694,7 +822,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 	m_textures[name] = view;
 	texture.Release();
 	view.Detach();
-
+#endif
 	return S_OK;
 }
 
@@ -711,17 +839,23 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	}
 
 	// Create a new material
+#if defined(TREE3D12)
+	D3D12_CPU_DESCRIPTOR_HANDLE texture;
+#else
 	ID3D11ShaderResourceView* texture = nullptr;
-
+#endif
 	if (textureFilename && *textureFilename)
 	{
 		LoadTexture(textureFilename);
 
 		texture = m_textures[textureFilename];
-		assert(texture);
+		assert(texture.ptr);
 	}
 
 	// Create constants for material
+#if defined(TREE3D12)
+	CComPtr<ID3D12Resource> pConstBuffer;
+#else
 	CComPtr<ID3D11Buffer> pConstBuffer;
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
@@ -731,9 +865,15 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	bd.CPUAccessFlags = 0;
 	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &pConstBuffer));
 	SetDebugName(pConstBuffer, "RenderManager::CreateMaterial::pConstBuffer");
+#endif
 
+#if defined(TREE3D12)
+	ID3DBlob* vertexShader = m_vertexShader;
+	ID3DBlob* pixelShader = m_pixelShader;
+#else
 	ID3D11VertexShader* vertexShader = m_vertexShader;
 	ID3D11PixelShader* pixelShader = m_pixelShader;
+#endif
 	if (vertexShaderFilename && *vertexShaderFilename)
 	{
 		LoadShader(vertexShaderFilename, ShaderType_VertexShader);
@@ -748,9 +888,15 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 		assert(pixelShader);
 	}
 
-    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader, 
+#if defined(TREE3D12)
+    Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
 		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/, 
 		shaderMaterial, pConstBuffer);
+#else
+	Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
+		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
+		shaderMaterial, pConstBuffer);
+#endif
 	m_materials[name] = newMat;
 
 	*newMaterial = newMat;
@@ -758,8 +904,13 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	return S_OK;
 }
 
-HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
+#if defined(TREE3D12)
+HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D12Resource* vertexBuffer, ID3D12Resource* indexBuffer,
 							      const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
+#else
+HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer,
+	const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
+#endif
 {
 	m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferIndices)));
 	*newMesh = &m_meshes[name];
@@ -834,6 +985,51 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 		vertices[i].Tex    = quad.Vertices[i].TexC;
 	}
 
+#if defined(TREE3D12)
+	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * quad.Vertices.size());
+	HRR(m_d3dDevice->CreateCommittedResource(
+		&uploadHeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&vertexBufferDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_screenQuadVB)));
+	HRR(m_screenQuadVB->SetName(L"Vertex Buffer"));
+
+	// copy the quad data to the vertex buffer
+	UINT8* dataBegin;
+	m_screenQuadVB->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+	memcpy(dataBegin, &vertices[0], sizeof(SimpleVertex) * quad.Vertices.size());
+	m_screenQuadVB->Unmap(0, nullptr);
+
+	// initialize vertex buffer view
+	m_screenQuadVBView.BufferLocation = m_screenQuadVB->GetGPUVirtualAddress();
+	m_screenQuadVBView.StrideInBytes = sizeof(SimpleVertex);
+	m_screenQuadVBView.SizeInBytes = sizeof(SimpleVertex) * quad.Vertices.size();
+
+	// Index buffer
+	const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * quad.Indices.size());
+	HRR(m_d3dDevice->CreateCommittedResource(
+		&uploadHeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&indexBufferDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_screenQuadIB)));
+	HRR(m_indexBuffer->SetName(L"Index Buffer"));
+
+	// copy the index data to the index buffer
+	m_screenQuadIB->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+	memcpy(dataBegin, &quad.Indices[0], sizeof(UINT) * quad.Indices.size());
+	m_screenQuadIB->Unmap(0, nullptr);
+
+	// initialize vertex buffer view
+	m_IBView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_IBView.StrideInBytes = sizeof(UINT);
+	m_IBView.SizeInBytes = sizeof(UINT) * quad.Indices.size();
+
+#else
     D3D11_BUFFER_DESC vbd;
     vbd.Usage = D3D11_USAGE_IMMUTABLE;
     vbd.ByteWidth = (UINT) (sizeof(SimpleVertex) * quad.Vertices.size());
@@ -843,6 +1039,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 	D3D11_SUBRESOURCE_DATA vinitData = {0};
     vinitData.pSysMem = &vertices[0];
     HRR(pD3DDevice->CreateBuffer(&vbd, &vinitData, &m_screenQuadVB));
+
 	SetDebugName(m_screenQuadVB, "RenderManager::m_screenQuadVB");
 
 	//
@@ -859,6 +1056,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
     iinitData.pSysMem = &quad.Indices[0];
     HRR(pD3DDevice->CreateBuffer(&ibd, &iinitData, &m_screenQuadIB));
 	SetDebugName(m_screenQuadIB, "RenderManager::m_screenQuadIB");
+#endif
 
 	return S_OK;
 }
@@ -1594,7 +1792,7 @@ void RenderManager::DrawSceneToShadowMap()
 
 // Desc: Load a shader blob from file
 //--------------------------------------------------------------------------------------
-HRESULT RenderManager::LoadShader(wchar_t* path, ID3DBlob** ppShader)
+HRESULT RenderManager::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
 {
 	VERBOSEATGPROFILETHIS;
 
