@@ -23,7 +23,7 @@ public:
 
 #if defined(TREE3D12)
 
-	D3D12_CPU_DESCRIPTOR_HANDLE* DepthMapSRV() { return mDepthMapSRV;  }
+	D3D12_CPU_DESCRIPTOR_HANDLE DepthMapSRV() { return mDepthMapSRV;  }
 	ID3D12Resource* DepthMapBuffer() { return mDepthMap; }
 
 	void BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList, D3D12_CPU_DESCRIPTOR_HANDLE* pTestRTV);
@@ -43,8 +43,8 @@ private:
 	UINT mHeight;
 
 #if defined(TREE3D12)
-	D3D12_CPU_DESCRIPTOR_HANDLE* mDepthMapSRV;
-	D3D12_CPU_DESCRIPTOR_HANDLE* mDepthMapDSV;
+	D3D12_CPU_DESCRIPTOR_HANDLE mDepthMapSRV;
+	D3D12_CPU_DESCRIPTOR_HANDLE mDepthMapDSV;
 	ID3D12Resource* mDepthMap;
 
 	D3D12_VIEWPORT mViewport;

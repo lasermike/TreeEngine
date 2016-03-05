@@ -6,6 +6,10 @@
 //#include "Shlwapi.h"
 //#endif
 
+#if defined(TREE3D12)
+#include <D3Dcompiler.h>
+#endif
+
 namespace XboxSampleFramework
 {
     namespace Details
@@ -55,6 +59,21 @@ void XSF::SetContentFileRoot()
     //swprintf_s( Details::g_strApplicationDataPath, L"%s\\", temp );
 #endif
 }
+
+#if defined(TREE3D12)
+
+// Desc: Load a shader blob from file
+//--------------------------------------------------------------------------------------
+HRESULT XSF::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
+{
+	VERBOSEATGPROFILETHIS;
+
+	wchar_t tmp[1024];
+	_snwprintf_s(tmp, _TRUNCATE, L"%s%s", Details::g_strCommonFileRoot, path);
+
+	return D3DReadFileToBlob(tmp, ppShader);
+}
+#endif
 
 //--------------------------------------------------------------------------------------
 // Name: LoadBlob

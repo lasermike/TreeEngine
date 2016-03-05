@@ -463,16 +463,70 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 #endif
 	}
 
+#if defined(TREE3D12)
+	// Create synchronization objects and wait until assets have been uploaded to the GPU.
+	{
+		HRR(m_d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+		m_fenceValue = 1;
+
+		// Create an event handle to use for frame synchronization.
+		m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		if (m_fenceEvent == nullptr)
+		{
+			HRR(HRESULT_FROM_WIN32(GetLastError()));
+		}
+
+		// Wait for the command list to execute; we are reusing the same command 
+		// list in our main loop but for now, we just want to wait for setup to 
+		// complete before continuing.
+		WaitForPreviousFrame();
+	}
+
+#endif
+
 	return S_OK;
 }
 
+#if defined(TREE3D12)
+void RenderManager::WaitForPreviousFrame()
+{
+	// WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
+	// This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
+	// sample illustrates how to use fences for efficient resource usage and to
+	// maximize GPU utilization.
+
+	// Signal and increment the fence value.
+	const UINT64 fence = m_fenceValue;
+	HR(m_commandQueue->Signal(m_fence, fence));
+	m_fenceValue++;
+
+	// Wait until the previous frame is finished.
+	if (m_fence->GetCompletedValue() < fence)
+	{
+		HR(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
+		WaitForSingleObject(m_fenceEvent, INFINITE);
+	}
+
+	m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+}
+
+#endif
+
 HRESULT RenderManager::CleanUpDeviceObjects()
 {
-	SafeDelete(&GetRenderData().pShadowMap);
 
-#if !defined(TREE3D12)
+#if defined(TREE3D12)
+
+	// Ensure that the GPU is no longer referencing resources that are about to be
+	// cleaned up by the destructor.
+	WaitForPreviousFrame();
+	CloseHandle(m_fenceEvent);
+
+#else
 	SafeRelease(&m_vertexLayout);
 #endif
+
+	SafeDelete(&GetRenderData().pShadowMap);
 	SafeRelease(&m_vertexBuffer);
 	SafeRelease(&m_indexBuffer);
 	SafeRelease(&m_vertexShader);
@@ -706,6 +760,7 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 	if (!texture.ptr)
 	{
 	}
+	return S_OK;
 }
 #else
 HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
@@ -1781,6 +1836,39 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 {
 	HRESULT hr = S_OK;
 
+#if defined(TREE3D12)
+	// Command list allocators can only be reset when the associated 
+	// command lists have finished execution on the GPU; apps should use 
+	// fences to determine GPU execution progress.
+	HR(m_commandAllocator->Reset());
+
+	// However, when ExecuteCommandList() is called on a particular command 
+	// list, that command list can then be reset at any time and must be before 
+	// re-recording.
+	HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
+
+	// Set necessary state.
+	m_commandList->SetGraphicsRootSignature(m_rootSignature);
+
+	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap };
+	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+	m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
+	m_commandList->RSSetViewports(1, &m_viewPort);
+	m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
+	// Indicate that the back buffer will be used as a render target.
+	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+	// Record commands.
+	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+
+#else
 	if (!oculus)
 	{
 		// Bind render target and depth
@@ -1818,16 +1906,20 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 		ID3D11ShaderResourceView* depthTexture = GetRenderData().pShadowMap->DepthMapSRV();
 		GetContext()->PSSetShaderResources(1, 1, &depthTexture);
 	}
+#endif
 
 	// Draw everything
 	HRC(RenderScene());
 
+#if defined(TREE3D12)
+#else
 	// Unbind shadow texture so we can render to it next frame
 	if (useShadowMaps)
 	{
 		ID3D11ShaderResourceView* depthTexture = nullptr;
 		GetContext()->PSSetShaderResources(1, 1, &depthTexture);
 	}
+#endif
 
 	// Show frame statistics
 	if (showHelp)
@@ -1835,6 +1927,21 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 		DrawFrameStats();
 	}
 
+#if defined(TREE3D12)
+	if (showShadowBuffer)
+	{
+		HRC(DrawScreenQuad(m_commandList, GetRenderData().pShadowMap->DepthMapSRV()));
+	}
+
+	// Execute the command list.
+	ID3D12CommandList* ppCommandLists[] = { m_commandList };
+	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+	// Present the frame.
+	HR(m_pSwapChain->Present(1, 0));
+
+	WaitForPreviousFrame();
+#else
 	if (showShadowBuffer)
 	{
 		HRC(DrawScreenQuad(GetContext(), GetRenderData().pShadowMap->DepthMapSRV()));
@@ -1845,6 +1952,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 		// Present our back buffer to our front buffer
 		HRC(GetSwapChain()->Present(0, 0));
 	}
+#endif
 
 Cleanup:
 	return;
@@ -1852,6 +1960,8 @@ Cleanup:
 
 HRESULT RenderManager::DrawFrameStats()
 {
+#if defined(TREE3D12)
+#else
 	float y = 10;
 	m_bitmapFont->Begin(m_immediateContext, &m_viewPort, false);
 
@@ -1864,12 +1974,14 @@ HRESULT RenderManager::DrawFrameStats()
 		y += 34.0f;
 	}
 	m_bitmapFont->End();
-
+#endif
 	return S_OK;
 }
 
 HRESULT RenderManager::RenderShadowMap()
 {
+#if defined(TREE3D12)
+#else
 	BuildShadowTransform();
 	GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetContext(), nullptr);
 	DrawSceneToShadowMap();
@@ -1877,7 +1989,7 @@ HRESULT RenderManager::RenderShadowMap()
 	// Restore state after shadow
 	GetContext()->RSSetState(0);
 	GetContext()->RSSetViewports(1, GetViewport());
-	
+#endif	
 	return S_OK;
 }
 
@@ -1920,6 +2032,8 @@ void RenderManager::BuildShadowTransform()
 
 void RenderManager::DrawSceneToShadowMap()
 {
+#if defined(TREE3D12)
+#else
 	XMMATRIX view = XMLoadFloat4x4(&GetRenderData().lightView);
 	XMMATRIX proj = XMLoadFloat4x4(&GetRenderData().lightProj);
 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
@@ -1942,23 +2056,12 @@ void RenderManager::DrawSceneToShadowMap()
 	UpdateProjection(&GetRenderData().projection);
 
 	stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Solid);
+
+#endif
 }
 
 #if defined(TREE3D12)
-
-// Desc: Load a shader blob from file
-//--------------------------------------------------------------------------------------
-HRESULT RenderManager::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
-{
-	VERBOSEATGPROFILETHIS;
-
-	wchar_t tmp[1024];
-	_snwprintf_s(tmp, _TRUNCATE, L"%s%s", Details::g_strCommonFileRoot, path);
-
-	return D3DReadFileToBlob(tmp, ppShader);
-}
-
-
+/* ????
 //--------------------------------------------------------------------------------------
 // Name: CreateColorTextureAndViews
 // Desc: Creates the texture of a given size and all necessary views for it
@@ -2022,7 +2125,7 @@ HRESULT RenderManager::CreateColorTextureAndViews(XSF::D3DDevice* pDevice, UINT 
 	}
 
 	return S_OK;
-}
+}*/
 
 //--------------------------------------------------------------------------------------
 // Name: TrimUploadHeaps
@@ -2052,10 +2155,10 @@ void RenderManager::TrimUploadHeaps(bool removeTerminatedHeaps)
 _Use_decl_annotations_
 void RenderManager::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
 {
-	m_managedUploadHeaps.push_back(FencedHeap(pUploadHeap, GetCurrentFenceValue()));
+	m_managedUploadHeaps.push_back(FencedHeap(pUploadHeap, m_fenceValue));
 }
 
-#else // XSF_USE_DX_12_0
+#else// XSF_USE_DX_12_0
 
 //--------------------------------------------------------------------------------------
 // Name: LoadPixelShader()

@@ -411,6 +411,8 @@ class RenderManager : public IRenderFrame
 	D3D12_RESOURCE_DESC					m_debugTextureRV;
 
 	CComPtr<ID3D12Fence>				m_fence;
+	HANDLE								m_fenceEvent;
+	UINT64 								m_fenceValue;
 	std::list<FencedHeap>				m_managedUploadHeaps;
 
 #else
@@ -491,6 +493,7 @@ public:
 
 	void TrimUploadHeaps(bool removeTerminatedHeaps);
 	void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
+	void WaitForPreviousFrame();
 
 #else
 	XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }

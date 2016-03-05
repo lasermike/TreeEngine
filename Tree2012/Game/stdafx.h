@@ -435,7 +435,9 @@ namespace XboxSampleFramework
 	void SetContentFileRoot();
 	HRESULT LoadBlob(_In_z_ const wchar_t* pFilename, std::vector< BYTE >& data);
 
-
+#if defined(TREE3D12)
+	HRESULT LoadShader(const wchar_t* path, ID3DBlob** ppShader);
+#endif
 }
 
 namespace XSF = XboxSampleFramework;

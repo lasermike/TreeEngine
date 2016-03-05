@@ -10,7 +10,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, ID3D12DescriptorHeap* srvHeap, UINT
 #else
 ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 #endif
-	: mWidth(width), mHeight(height), mDepthMapSRV(0), mDepthMapDSV(0), mDepthMap(0)
+	: mWidth(width), mHeight(height), mDepthMapSRV(), mDepthMapDSV(), mDepthMap(0)
 {
     mViewport.TopLeftX = 0.0f;
     mViewport.TopLeftY = 0.0f;
@@ -64,7 +64,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Texture2D.MipSlice = 0;
-    device->CreateDepthStencilView(mDepthMap, &dsvDesc, *mDepthMapDSV);
+    device->CreateDepthStencilView(mDepthMap, &dsvDesc, mDepthMapDSV);
 	//SetDebugName(mDepthMapDSV, "ShadowMap::mDepthMapDSV");
 
 	// Describe and create a SRV for the texture.
@@ -112,9 +112,9 @@ void ShadowMap::BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList
 	//CD3DX12_CPU_DESCRIPTOR_HANDLE* renderTargets[1] = {0};
 	//renderTargets[0] = pTestRTV;
 
-	cmdList->OMSetRenderTargets(1, pTestRTV, false, mDepthMapDSV);
+	cmdList->OMSetRenderTargets(1, pTestRTV, false, &mDepthMapDSV);
     
-	cmdList->ClearDepthStencilView(*mDepthMapDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
+	cmdList->ClearDepthStencilView(mDepthMapDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
 }
 
 #else
