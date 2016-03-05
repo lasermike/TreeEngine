@@ -151,10 +151,29 @@ HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi
 
 #endif
 
+
+// TODO push this out to the platform layer
+#if defined(TREE3D12)
+HRESULT Game::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain)
+{
+	HRESULT hr = S_OK;
+
+	//CComPtr<IDXGISwapChain1> swapChain;
+
+	HRR(dxgiFactory4->CreateSwapChainForCoreWindow(m_renderManager.GetDevice(), 
+												   reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
+
+	// This sample does not support fullscreen transitions.
+	//HRR(dxgiFactory4->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
+
+	//HRR(swapChain->QueryInterface(IID_PPV_ARGS(&m_pSwapChain));
+	return hr;
+}
+#else
 HRESULT Game::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain)
 {
 	HRESULT hr = S_OK;
-	
+
 #if defined(WIN32) && !defined(TREENGINE_XBOX)
 	HRR(dxgiFactory2->CreateSwapChainForHwnd(m_renderManager.GetDevice(), m_hwnd, sd, nullptr, nullptr, swapChain));
 #else
@@ -163,6 +182,7 @@ HRESULT Game::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFact
 
 	return hr;
 }
+#endif
 
 HRESULT Game::Cleanup() 
 { 

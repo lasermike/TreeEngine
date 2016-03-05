@@ -217,7 +217,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = m_CBNeverChanges->GetGPUVirtualAddress();
 	cbvDesc.SizeInBytes = (sizeof(CBNeverChanges) + 255) & ~255;	// CB size is required to be 256-byte aligned.
-	m_d3dDevice->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+	m_d3dDevice->CreateConstantBufferView(&cbvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// Initialize and map the constant buffers. We don't unmap this until the
 	// app closes (TODO). Keeping things mapped for the lifetime of the resource is okay.
@@ -297,10 +297,10 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	memcpy(dataBegin, &m_geometryData.vertices[0], sizeof(UINT) * m_geometryData.indices.size());
 	m_indexBuffer->Unmap(0, nullptr);
 
-	// initialize vertex buffer view
+	// Initialize the index buffer view.
 	m_IBView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-	m_IBView.StrideInBytes = sizeof(UINT);
 	m_IBView.SizeInBytes = sizeof(UINT) * m_geometryData.indices.size();
+	m_IBView.Format = DXGI_FORMAT_R32_UINT;
 
 	// Constants per frame
 	HR(m_d3dDevice->CreateCommittedResource(
@@ -315,10 +315,17 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvPerFrameDesc = {};
 	cbvPerFrameDesc.BufferLocation = m_CBChangesEveryFrame->GetGPUVirtualAddress();
 	cbvPerFrameDesc.SizeInBytes = (sizeof(CBChangesEveryFrame) + 255) & ~255;	// CB size is required to be 256-byte aligned.
-	m_d3dDevice->CreateConstantBufferView(&cbvPerFrameDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+	m_d3dDevice->CreateConstantBufferView(&cbvPerFrameDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
 	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
 
 	HR(m_CBChangesEveryFrame->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesEveryFrameDataBegin)));
+
+	// Depth stencil description
+	CD3DX12_DEPTH_STENCIL_DESC depthStencilDesc(D3D12_DEFAULT);
+	depthStencilDesc.DepthEnable = true;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	depthStencilDesc.StencilEnable = FALSE;
 
 	// Describe and create the graphics pipeline state object (PSO).
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -328,8 +335,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader);
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	psoDesc.DepthStencilState.DepthEnable = FALSE;
-	psoDesc.DepthStencilState.StencilEnable = FALSE;
+	psoDesc.DepthStencilState = depthStencilDesc;
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	psoDesc.NumRenderTargets = 1;
@@ -849,7 +855,11 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 		LoadTexture(textureFilename);
 
 		texture = m_textures[textureFilename];
+#if defined(TREE3D12)
 		assert(texture.ptr);
+#else
+		assert(texture);
+#endif
 	}
 
 	// Create constants for material
@@ -1024,10 +1034,10 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 	memcpy(dataBegin, &quad.Indices[0], sizeof(UINT) * quad.Indices.size());
 	m_screenQuadIB->Unmap(0, nullptr);
 
-	// initialize vertex buffer view
+	// initialize index DXGI_FORMAT_R32_UINTbuffer view
 	m_IBView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-	m_IBView.StrideInBytes = sizeof(UINT);
 	m_IBView.SizeInBytes = sizeof(UINT) * quad.Indices.size();
+	m_IBView.Format = DXGI_FORMAT_R32_UINT;
 
 #else
     D3D11_BUFFER_DESC vbd;
@@ -1178,6 +1188,15 @@ HRESULT RenderManager::InitDevice()
 
 		m_rtvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+		// Describe and create a depth stencil view (DSV) descriptor heap.
+		// Each frame has its own depth stencils (to write shadows onto) 
+		// and then there is one for the scene itself.
+		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+		dsvHeapDesc.NumDescriptors = 1 + FrameCount * 1;
+		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		HRR(m_d3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
+
 		// Describe and create a constant buffer view (CBV) descriptor heap.
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
 		// and that descriptors contained in it can be referenced by a root table.
@@ -1185,7 +1204,15 @@ HRESULT RenderManager::InitDevice()
 		cbvHeapDesc.NumDescriptors = 1;
 		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		HRR(m_d3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+		HRR(m_d3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
+
+		// Describe and create a sampler descriptor heap.
+		D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
+		samplerHeapDesc.NumDescriptors = 2;		// One clamp and one wrap sampler.
+		samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+		samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		HRR(m_d3dDevice->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_samplerHeap)));
+		SetDebugName(m_samplerHeap, "m_samplerHeap");
 	}
 
 	// Create frame resources.
@@ -1195,7 +1222,7 @@ HRESULT RenderManager::InitDevice()
 		// Create a RTV for each frame.
 		for (UINT n = 0; n < FrameCount; n++)
 		{
-			HRR(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
+			HRR(m_pSwapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
 			m_d3dDevice->CreateRenderTargetView(m_renderTargets[n], nullptr, rtvHandle);
 			rtvHandle.Offset(1, m_rtvDescriptorSize);
 		}
@@ -1217,25 +1244,15 @@ HRESULT RenderManager::InitDevice()
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = m_pCBChangeOnResize->GetGPUVirtualAddress();
 	cbvDesc.SizeInBytes = (sizeof(CBChangeOnResize) + 255) & ~255;	// CB size is required to be 256-byte aligned.
-	m_d3dDevice->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+	m_d3dDevice->CreateConstantBufferView(&cbvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// Initialize and map the constant buffers. We don't unmap this until the
 	// app closes. Keeping things mapped for the lifetime of the resource is okay.
-	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
+	//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
-	HRR(m_pCBChangeOnResize->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
-	memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-
-	// D3D11
-	D3D11_BUFFER_DESC bd;
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(CBChangeOnResize);
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bd.CPUAccessFlags = 0;
-	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
-
+	HRR(m_pCBChangeOnResize->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesOnResizeDataBegin)));
+	memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
 
 	// Initialize the world matrices
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
@@ -1245,7 +1262,7 @@ HRESULT RenderManager::InitDevice()
 
 	// Init text font
 	m_bitmapFont = new XSF::BitmapFont();
-	HRR(m_bitmapFont->Create(m_d3dDevice, L"Arial_16"));
+	HRR(m_bitmapFont->Create(this, L"Arial_16"));
 
 	return hr;
 }
@@ -1355,7 +1372,11 @@ HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat)
 {
 	XMStoreFloat4x4(&m_cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
 
+#if defined(TREE3D12)
+	memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
+#else
 	m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &m_cbChangesOnResize, 0, 0);
+#endif
 
 	return S_OK;
 }
@@ -1364,6 +1385,23 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 {
 	HRESULT hr = S_OK;
 
+#if defined(TREE3D12)
+	if (!swapChainCreator)
+	{
+		return S_FALSE;
+	}
+
+	// Resize logic
+
+	// Create width/height dependent objects
+	m_pDepthStencilView = D3D12_RESOURCE_DESC();
+	m_pDepthStencil.Release();
+
+	m_pRenderTargetView = D3D12_RESOURCE_DESC();
+	m_pSwapChain.Release();
+	m_pSharedRenderToTexture.Release();
+
+#else
 	if (!m_immediateContext && !swapChainCreator)
 	{
 		return S_FALSE;
@@ -1379,7 +1417,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	m_pSwapChain1.Release();
 	m_pSwapChain.Release();
 	m_pSharedRenderToTexture.Release();
-
+#endif
 	// Calculate the necessary swap chain and render target size in pixels.
 
 	// Initialize the projection matrix
@@ -1405,6 +1443,8 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	if (FAILED(hr))
 		return hr;
 
+#if defined(TREE3D12)
+#else
 	// Check MSAA support
 	UINT msaaQuality;
 	const UINT msaaCount = 4;
@@ -1433,6 +1473,83 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		m_immediateContext->RSSetState(m_rasterState);
 	}
 
+#endif
+
+
+#if defined(TREE3D12)
+	CComPtr<IDXGIFactory4> factory;
+	HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
+
+	// Create swap chain
+	// Describe and create the swap chain.
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+	swapChainDesc.BufferCount = FrameCount;
+	swapChainDesc.Width = windowWidth;
+	swapChainDesc.Height = windowHeight;
+	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	swapChainDesc.SampleDesc.Count = 1;
+
+	CComPtr<IDXGISwapChain1> swapChain1;
+	
+	HRR(swapChainCreator->CreateSwapChain(&swapChainDesc, factory, m_commandQueue, &swapChain1));
+
+	HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
+	m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+
+	// Create render target views (RTVs).
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+	for (UINT i = 0; i < FrameCount; i++)
+	{
+		HRR(m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
+		m_d3dDevice->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
+		rtvHandle.Offset(1, m_rtvDescriptorSize);
+
+		CHAR name[25];
+		if (sprintf_s(name, "m_renderTargets[%u]", i) > 0)
+		{
+			SetDebugName(m_renderTargets[i], name);
+		}
+	}
+
+	// 
+	// Create depth stencil texture
+	//
+	{
+		CD3DX12_RESOURCE_DESC shadowTextureDesc(
+			D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+			0,
+			static_cast<UINT>(windowWidth),
+			static_cast<UINT>(windowHeight),
+			1,
+			1,
+			DXGI_FORMAT_D32_FLOAT,
+			1,
+			0,
+			D3D12_TEXTURE_LAYOUT_UNKNOWN,
+			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
+
+		D3D12_CLEAR_VALUE clearValue;	// Performance tip: Tell the runtime at resource creation the desired clear value.
+		clearValue.Format = DXGI_FORMAT_D32_FLOAT;
+		clearValue.DepthStencil.Depth = 1.0f;
+		clearValue.DepthStencil.Stencil = 0;
+
+		HRR(m_d3dDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&shadowTextureDesc,
+			D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			&clearValue,
+			IID_PPV_ARGS(&m_pDepthStencil)));
+
+		SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
+
+		// Create the depth stencil view.
+		m_d3dDevice->CreateDepthStencilView(m_pDepthStencil, nullptr, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+	}
+
+#else
 	// Create swap chain
 	CComPtr<IDXGIFactory2> dxgiFactory2;
 	HRR(dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2)));
@@ -1443,7 +1560,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	{
 		(void)m_immediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&m_immediateContext1));
 	}
-
 	CComPtr<ID3D11Texture2D> pBackBuffer;
 
 	if (renderToSharedTexture) // Create just a textured to render to.  No double buffering.
@@ -1491,11 +1607,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 		sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 		
-//#if defined(WIN32) && !defined(TREENGINE_XBOX)
-//		HRR(dxgiFactory2->CreateSwapChainForHwnd(m_d3dDevice, m_hwnd, &sd, nullptr, nullptr, &m_pSwapChain1));
-//#else
-//		HRR(dxgiFactory2->CreateSwapChainForCoreWindow(m_d3dDevice, reinterpret_cast<IUnknown*>(m_window.Get()), &sd, nullptr, &m_pSwapChain1));
-//#endif 
 		HRR(swapChainCreator->CreateSwapChain(&sd, dxgiFactory2, &m_pSwapChain1));
 
 		HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
@@ -1543,6 +1654,9 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	HRR(m_d3dDevice->CreateDepthStencilView(m_pDepthStencil, &dsvDesc, &m_pDepthStencilView));
 	SetDebugName(m_pDepthStencilView, "Game::m_pDepthStencilView");
 
+#endif
+
+
 	//
 	// Setup the viewport
 	//
@@ -1552,11 +1666,36 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	m_viewPort.MaxDepth = 1.0f;
 	m_viewPort.TopLeftX = 0;
 	m_viewPort.TopLeftY = 0;
+
+#if defined(TREE3D12)
+	// SetCommonPipelineState
+	// TODO Move to per-frame
+	m_commandList->SetGraphicsRootSignature(m_rootSignature);
+
+	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap, m_samplerHeap };
+	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+	m_commandList->RSSetViewports(1, &m_viewPort);
+	m_commandList->RSSetScissorRects(1, &m_scissorRect);
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+	m_commandList->IASetIndexBuffer(&m_IBView);
+	m_commandList->SetGraphicsRootDescriptorTable(3, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
+	m_commandList->OMSetStencilRef(0);
+
+	// Validation
+	ASSERT(m_renderTargets[0]);
+	ASSERT(m_renderTargets[1]);
+
+#else
 	m_immediateContext->RSSetViewports(1, &m_viewPort);
 
 	// Validation
 	ASSERT(m_pRenderTargetView);
-	ASSERT(m_pSwapChain1 || m_pSharedRenderToTexture);
+#endif
+
+	// Validation
+	ASSERT(m_pSwapChain || m_pSharedRenderToTexture);
 
 	ASSERT(GetRenderData().projectionData.nearClippingPlane != 0);
 	ASSERT(GetRenderData().projectionData.farClippingPlane != 0);
@@ -1589,18 +1728,35 @@ void RenderManager::CleanupDeviceForShutdown()
 
 	SafeDelete(&GetRenderData().pShadowMap);
 
-	m_immediateContext.Release();
-	m_pCBChangeOnResize.Release();
-	m_rasterState.Release();
 	m_pDepthStencil.Release();
+	m_pCBChangeOnResize.Release();
+
+#if defined(TREE3D12)
+	m_commandQueue.Release();
+	m_commandAllocator.Release();
+	for (UINT n = 0; n < FrameCount; n++)
+	{
+		m_renderTargets[n]->Release();
+	}
+	m_pDepthStencilView = D3D12_RESOURCE_DESC();
+	m_pRenderTargetView = D3D12_RESOURCE_DESC();
+	m_pSharedRenderToTexture.Release();
+	m_rootSignature.Release();
+	m_rtvHeap.Release();
+	m_cbvSrvHeap.Release();
+	m_pipelineState.Release();
+	m_commandList.Release();
+#else
+	m_immediateContext.Release();
+	m_rasterState.Release();
 	m_pDepthStencilView.Release();
 	m_pRenderTargetView.Release();
 	m_pSwapChain1.Release();
-	m_pSwapChain.Release();
-	m_pSharedRenderToTexture.Release();
 	m_immediateContext1.Release();
 	m_immediateContext.Release();
 	m_d3dDevice1.Release(); // TODO: Device leak somewhere causing crash
+#endif
+	m_pSwapChain.Release();
 
 	SafeDelete(&m_bitmapFont);
 

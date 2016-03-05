@@ -36,7 +36,11 @@ enum ShaderType
 
 interface SwapChainCreator
 {
+#if defined(TREE3D12)
+	virtual HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain) = 0;
+#else
 	virtual HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain) = 0;
+#endif
 };
 
 //enum { MAT_WRAP = 1, MAT_WIRE = 2, MAT_ZALWAYS = 4, MAT_NOCULL = 8 };
@@ -51,7 +55,7 @@ struct Material
 	D3D12_CPU_DESCRIPTOR_HANDLE			m_texture;
 	ID3DBlob*				m_vertexShader;
 	ID3DBlob*				m_pixelShader;
-	D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
+	const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
 
 	CComPtr<ID3D12Resource> m_constBuffer;
 #else
@@ -79,7 +83,7 @@ struct Material
 public:
 #if defined(TREE3D12)
 	Material(const wchar_t* name,
-			 D3D12_CPU_DESCRIPTOR_HANDLE texture, D3D12_INPUT_ELEMENT_DESC* inputLayout,
+			 D3D12_CPU_DESCRIPTOR_HANDLE texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
 			 ID3DBlob* vertexShader, ID3DBlob* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
 			 D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
 			 ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer) :
@@ -327,16 +331,28 @@ class RenderManager : public IRenderFrame
 #if defined(TREE3D12)
 	CComPtr<ID3D12CommandQueue> m_commandQueue;
 	CComPtr<ID3D12CommandAllocator> m_commandAllocator;
-	CComPtr<IDXGISwapChain3> m_swapChain;
+	CComPtr<IDXGISwapChain3> m_pSwapChain;
 	CComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 	CComPtr<ID3D12RootSignature> m_rootSignature;
 	CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-	CComPtr<ID3D12DescriptorHeap> m_cbvHeap;
+	CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;
+	CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
+	CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
 	CComPtr<ID3D12PipelineState> m_pipelineState;
+	CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap; //TODO
 	CComPtr<ID3D12GraphicsCommandList> m_commandList;
 	UINT m_rtvDescriptorSize;
 	D3D12_VIEWPORT m_viewPort;
 	D3D12_RECT m_scissorRect;
+
+	CComPtr<ID3D12Resource>             m_pDepthStencil;
+	D3D12_RESOURCE_DESC					m_pDepthStencilView;
+
+	D3D12_RESOURCE_DESC					m_pRenderTargetView;
+	UINT								m_frameIndex;
+
+	CComPtr<ID3D12Resource>				m_pSharedRenderToTexture;
+
 #else
 	CComPtr<ID3D11Device1>              m_d3dDevice1;
 	CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
@@ -362,6 +378,7 @@ class RenderManager : public IRenderFrame
 	// App resources.
 #if defined(TREE3D12)
 	CComPtr<ID3D12Resource>             m_pCBChangeOnResize;
+	UINT8*								m_CBChangesOnResizeDataBegin;
 	CBChangeOnResize					m_cbChangesOnResize;
 
 	CComPtr<ID3DBlob>					m_vertexShader;
@@ -377,7 +394,7 @@ class RenderManager : public IRenderFrame
 	D3D12_VERTEX_BUFFER_VIEW			m_VBView;
 
 	CComPtr<ID3D12Resource>             m_indexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW			m_IBView;
+	D3D12_INDEX_BUFFER_VIEW				m_IBView;
 
 	CComPtr<ID3D12Resource>             m_CBNeverChanges;
 	UINT8*								m_CBNeverChangesDataBegin;
