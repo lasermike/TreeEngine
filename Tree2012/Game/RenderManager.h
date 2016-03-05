@@ -454,10 +454,6 @@ class RenderManager : public IRenderFrame
 	XSF::BitmapFont*					m_bitmapFont;
 
 #if defined(TREE3D12)
-public:
-	HRESULT LoadShader(const wchar_t* fileName, ID3DBlob** ppShader);
-
-private:
 #else
 	HRESULT LoadPixelShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr);
 	HRESULT LoadVertexShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
@@ -541,7 +537,7 @@ public:
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 #if defined(TREE3D12)
-	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
+	HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
 #else
 	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
 #endif

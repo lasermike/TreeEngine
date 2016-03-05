@@ -200,22 +200,17 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
     }*/
 }
 
-#if !defined(TREE3D12)
-//
-// Naming
-//
-#if defined(_DEBUG) && !defined(_XBOX_ONE) // NAMING
-void SetDebugName(ID3D11DeviceChild* child, const char* name)
+#if defined(TREE3D12)
+void SetDebugName(ID3D12DeviceChild* child, const char* name)
 {
 	child->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(name), name);
 }
 
-#else
 // Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 // If no such adapter can be found, *ppAdapter will be set to nullptr.
 void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
 {
-	ComPtr<IDXGIAdapter1> adapter;
+	CComPtr<IDXGIAdapter1> adapter;
 	*ppAdapter = nullptr;
 
 	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
@@ -232,7 +227,7 @@ void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
 
 		// Check to see if the adapter supports Direct3D 12, but don't create the
 		// actual device yet.
-		if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+		if (SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
 		{
 			break;
 		}
@@ -240,6 +235,18 @@ void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
 
 	*ppAdapter = adapter.Detach();
 }
+
+#else
+//
+// Naming
+//
+#if defined(_DEBUG) && !defined(_XBOX_ONE) // NAMING
+void SetDebugName(ID3D11DeviceChild* child, const char* name)
+{
+	child->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(name), name);
+}
+
+#else
 #endif // TREE3D12
 
 #endif

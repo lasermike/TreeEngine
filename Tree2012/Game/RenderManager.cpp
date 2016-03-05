@@ -244,19 +244,19 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 
 	// Load regular shaders
 #if defined(TREE3D12)
-	HR(LoadShader(L"VS.cso", &m_vertexShader));
-	HR(LoadShader(L"PS.cso", &m_pixelShader));
+	HR(XSF::LoadShader(L"VS.cso", &m_vertexShader));
+	HR(XSF::LoadShader(L"PS.cso", &m_pixelShader));
 
 	////////  Shadow map shader /////
 	// Load shadow shaders
-	HRR(LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+	HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
 	// TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
 	////////  Debug texture /////
-	HRR(LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
+	HRR(XSF::LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
 
 	// Load regular pixel Shader
-	HRR(LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
+	HRR(XSF::LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
 
 	// Create vertex buffer
 	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
@@ -800,7 +800,7 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 		}
 
 #if defined(TREE3D12)
-		HR(LoadShader(shaderFilename, &vertexShader));
+		HR(XSF::LoadShader(shaderFilename, &vertexShader));
 #else
 		std::vector< BYTE > shaderData;
 		HRR(XSF::LoadBlob(shaderFilename, shaderData));
@@ -828,7 +828,7 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 
 		// Load regular pixel Shader
 #if defined(TREE3D12)
-		HR(LoadShader(shaderFilename, &pixelShader));
+		HR(XSF::LoadShader(shaderFilename, &pixelShader));
 #else
 		HRR(LoadPixelShader(m_d3dDevice, shaderFilename, &pixelShader));
 		SetDebugName(pixelShader, sbFilename);
@@ -1127,7 +1127,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 }
 
 #if defined(TREE3D12)
-HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
+HRESULT RenderManager::DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
 {
 /*	UINT stride = sizeof(SimpleVertex);
 	UINT offset = 0;

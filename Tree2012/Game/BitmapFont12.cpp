@@ -165,8 +165,8 @@ HRESULT BitmapFont::CreateFontShaders(D3DDevice* const pDevice, D3DCommandList* 
         // load shaders first
         std::vector<BYTE> dataVS, dataPS;
 
-        HRR(m_renderManager->LoadShader(VS_FILE_NAME, &BitmapFont::s_pVS));
-        HRR(m_renderManager->LoadShader(PS_FILE_NAME, &BitmapFont::s_pPS));
+        HRR(XSF::LoadShader(VS_FILE_NAME, &BitmapFont::s_pVS));
+        HRR(XSF::LoadShader(PS_FILE_NAME, &BitmapFont::s_pPS));
 
         // IB
         {
