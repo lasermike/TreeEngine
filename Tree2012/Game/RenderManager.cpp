@@ -212,9 +212,8 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	}
 
 	// Init text font
-	//TODO
-	//m_bitmapFont = new XSF::BitmapFont();
-	//HRR(m_bitmapFont->Create(this, L"Arial_16"));
+	m_bitmapFont = new XSF::BitmapFont();
+	HRR(m_bitmapFont->Create(this, L"Arial_16"));
 
 	// Create the constant buffers
 	HR(m_d3dDevice->CreateCommittedResource(
@@ -360,8 +359,10 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	psoDesc.SampleDesc.Count = 1;
 	HRR(m_d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 
-	// Create the command list.
-	//HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, m_pipelineState, IID_PPV_ARGS(&m_commandList)));
+	// Execute the command list.
+	HRR(m_commandList->Close());
+	ID3D12CommandList* ppCommandLists[] = { m_commandList };
+	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 #else
 	// Create Instanced draw data layout
@@ -1325,7 +1326,6 @@ HRESULT RenderManager::InitDevice()
 
 	// Create the command list.
 	HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
-	HRR(m_commandList->Close());
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
 	{
@@ -1763,6 +1763,9 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 
 #if defined(TREE3D12)
 
+	m_scissorRect.right = static_cast<LONG>(windowWidth);
+	m_scissorRect.bottom = static_cast<LONG>(windowHeight);
+
 	// Validation
 	ASSERT(m_renderTargets[0]);
 	ASSERT(m_renderTargets[1]);
@@ -1862,7 +1865,6 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-	//WaitForPreviousFrame();
 
 	HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
 
@@ -1888,8 +1890,6 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
 	m_commandList->IASetIndexBuffer(&m_IBView);
 	m_commandList->OMSetStencilRef(0);
-	m_commandList->RSSetViewports(1, &m_viewPort);
-	m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
 
 	m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
@@ -2009,9 +2009,14 @@ Cleanup:
 HRESULT RenderManager::DrawFrameStats()
 {
 #if defined(TREE3D12)
+	float y = 10;
+	m_bitmapFont->Begin(&m_viewPort);
+
 #else
 	float y = 10;
 	m_bitmapFont->Begin(m_immediateContext, &m_viewPort, false);
+
+#endif
 
 	for (int i = 0; i < MAX_FRAME_STAT; i++)
 	{
@@ -2022,7 +2027,7 @@ HRESULT RenderManager::DrawFrameStats()
 		y += 34.0f;
 	}
 	m_bitmapFont->End();
-#endif
+
 	return S_OK;
 }
 
