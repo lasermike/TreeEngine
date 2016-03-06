@@ -126,7 +126,7 @@ void InputLayouts::DestroyAll()
 RenderManager::RenderManager() : 
 						 m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr), 
 						 m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
-						 m_drawScreenVertexShader(), m_drawScreenPixelShader()
+						 m_drawScreenVertexShader(), m_drawScreenPixelShader(), m_fenceEvent(nullptr)
 {
 	m_driverType = D3D_DRIVER_TYPE_NULL;
 	m_featureLevel = D3D_FEATURE_LEVEL_11_0;
@@ -157,12 +157,12 @@ HRESULT RenderManager::Initialize()
 
 RenderManager::~RenderManager()
 {
-	CleanUpDeviceObjects();
+	UninitGameGraphics();
 }
 
 HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 {
-    HRR(CleanUpDeviceObjects());
+    HRR(UninitGameGraphics());
 
 	// Create vertices and indice for geometry
 	m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
@@ -170,6 +170,8 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	//HRR(RenderStates::InitAll(m_d3dDevice));
 	
 #if defined(TREE3D12)
+
+
 	// Create the root signature.
 	{
 		CD3DX12_DESCRIPTOR_RANGE ranges[2];
@@ -196,13 +198,17 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 2, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		CComPtr<ID3DBlob> signature;
 		CComPtr<ID3DBlob> error;
 		HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
 		HRR(m_d3dDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 	}
+
+	// Init text font
+	m_bitmapFont = new XSF::BitmapFont();
+	HRR(m_bitmapFont->Create(this, L"Arial_16"));
 
 	// Create the constant buffers
 	HR(m_d3dDevice->CreateCommittedResource(
@@ -228,6 +234,10 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	//TODO?  memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 
 #else
+	// Init text font
+	m_bitmapFont = new XSF::BitmapFont();
+	XSF_ERROR_IF_FAILED(m_bitmapFont->Create(m_d3dDevice, L"Arial_16"));
+
 	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
@@ -344,7 +354,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	HRR(m_d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 
 	// Create the command list.
-	HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, m_pipelineState, IID_PPV_ARGS(&m_commandList)));
+	//HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, m_pipelineState, IID_PPV_ARGS(&m_commandList)));
 
 #else
 	// Create Instanced draw data layout
@@ -463,27 +473,6 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 #endif
 	}
 
-#if defined(TREE3D12)
-	// Create synchronization objects and wait until assets have been uploaded to the GPU.
-	{
-		HRR(m_d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-		m_fenceValue = 1;
-
-		// Create an event handle to use for frame synchronization.
-		m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-		if (m_fenceEvent == nullptr)
-		{
-			HRR(HRESULT_FROM_WIN32(GetLastError()));
-		}
-
-		// Wait for the command list to execute; we are reusing the same command 
-		// list in our main loop but for now, we just want to wait for setup to 
-		// complete before continuing.
-		WaitForPreviousFrame();
-	}
-
-#endif
-
 	return S_OK;
 }
 
@@ -507,12 +496,15 @@ void RenderManager::WaitForPreviousFrame()
 		WaitForSingleObject(m_fenceEvent, INFINITE);
 	}
 
-	m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+	if (m_pSwapChain)
+	{
+		m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+	}
 }
 
 #endif
 
-HRESULT RenderManager::CleanUpDeviceObjects()
+HRESULT RenderManager::UninitGameGraphics()
 {
 
 #if defined(TREE3D12)
@@ -521,6 +513,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
 	// cleaned up by the destructor.
 	WaitForPreviousFrame();
 	CloseHandle(m_fenceEvent);
+	m_fenceEvent = nullptr;
 
 #else
 	SafeRelease(&m_vertexLayout);
@@ -590,7 +583,7 @@ HRESULT RenderManager::CleanUpDeviceObjects()
     m_drawScreenPixelShader.Release();
     m_drawScreenVertexShader.Release();
     m_shadowVertexShader.Release();
-	//SafeDelete(&m_bitmapFont);
+	SafeDelete(&m_bitmapFont);
 	//RenderStates::DestroyAll();
 
 	return S_OK;
@@ -1270,19 +1263,6 @@ HRESULT RenderManager::InitDevice()
 		SetDebugName(m_samplerHeap, "m_samplerHeap");
 	}
 
-	// Create frame resources.
-	{
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-		// Create a RTV for each frame.
-		for (UINT n = 0; n < FrameCount; n++)
-		{
-			HRR(m_pSwapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
-			m_d3dDevice->CreateRenderTargetView(m_renderTargets[n], nullptr, rtvHandle);
-			rtvHandle.Offset(1, m_rtvDescriptorSize);
-		}
-	}
-
 	HRR(m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 
 	// 
@@ -1315,9 +1295,26 @@ HRESULT RenderManager::InitDevice()
 	// Initialize render statesf
 	XSF::StockRenderStates::Initialize(m_d3dDevice);
 
-	// Init text font
-	m_bitmapFont = new XSF::BitmapFont();
-	HRR(m_bitmapFont->Create(this, L"Arial_16"));
+	// Create the command list.
+	HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
+
+	// Create synchronization objects and wait until assets have been uploaded to the GPU.
+	{
+		HRR(m_d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+		m_fenceValue = 1;
+
+		// Create an event handle to use for frame synchronization.
+		m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		if (m_fenceEvent == nullptr)
+		{
+			HRR(HRESULT_FROM_WIN32(GetLastError()));
+		}
+
+		// Wait for the command list to execute; we are reusing the same command 
+		// list in our main loop but for now, we just want to wait for setup to 
+		// complete before continuing.
+		WaitForPreviousFrame();
+	}
 
 	return hr;
 }
@@ -1416,9 +1413,6 @@ HRESULT RenderManager::InitDevice()
 
 	XSF::StockRenderStates::Initialize(m_d3dDevice);
 
-	m_bitmapFont = new XSF::BitmapFont();
-	XSF_ERROR_IF_FAILED(m_bitmapFont->Create(m_d3dDevice, L"Arial_16"));
-
 	return S_OK;
 }
 #endif
@@ -1480,6 +1474,9 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	GetRenderData().projectionData.screenHeight = windowHeight;
 	GetRenderData().projectionData.fov = XM_PIDIV4;
 
+
+#if defined(TREE3D12)
+#else
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
 	CComPtr<IDXGIFactory1> dxgiFactory;
 	{
@@ -1498,8 +1495,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	if (FAILED(hr))
 		return hr;
 
-#if defined(TREE3D12)
-#else
 	// Check MSAA support
 	UINT msaaQuality;
 	const UINT msaaCount = 4;
@@ -1552,6 +1547,19 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 
 	HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
 	m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+
+	//// Create frame resources.
+	//{
+	//	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+	//	// Create a RTV for each frame.
+	//	for (UINT n = 0; n < FrameCount; n++)
+	//	{
+	//		HRR(m_pSwapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
+	//		m_d3dDevice->CreateRenderTargetView(m_renderTargets[n], nullptr, rtvHandle);
+	//		rtvHandle.Offset(1, m_rtvDescriptorSize);
+	//	}
+	//}
 
 	// Create render target views (RTVs).
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
@@ -1735,7 +1743,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
 	m_commandList->IASetIndexBuffer(&m_IBView);
-	m_commandList->SetGraphicsRootDescriptorTable(3, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
+	//m_commandList->SetGraphicsRootDescriptorTable(3, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 	m_commandList->OMSetStencilRef(0);
 
 	// Validation
@@ -1775,9 +1783,9 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 //--------------------------------------------------------------------------------------
 // Clean up the objects we've created
 //--------------------------------------------------------------------------------------
-void RenderManager::CleanupDeviceForShutdown()
+void RenderManager::UninitDevice()
 {
-	CleanUpDeviceObjects();
+	UninitGameGraphics();
 
 	XSF::StockRenderStates::Shutdown();
 
@@ -1813,7 +1821,7 @@ void RenderManager::CleanupDeviceForShutdown()
 #endif
 	m_pSwapChain.Release();
 
-	SafeDelete(&m_bitmapFont);
+	//SafeDelete(&m_bitmapFont);
 
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
 	if (m_d3dDevice)

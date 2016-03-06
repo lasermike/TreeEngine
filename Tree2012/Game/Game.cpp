@@ -60,7 +60,7 @@ Game::~Game()
 	SafeDelete(&m_threadPool);
 	SafeDelete(&m_player);
 
-	m_renderManager.CleanupDeviceForShutdown();
+	m_renderManager.UninitDevice();
 }
 
 HRESULT Game::Initialize()
@@ -160,7 +160,7 @@ HRESULT Game::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFact
 
 	//CComPtr<IDXGISwapChain1> swapChain;
 
-	HRR(dxgiFactory4->CreateSwapChainForCoreWindow(m_renderManager.GetDevice(), 
+	HRR(dxgiFactory4->CreateSwapChainForCoreWindow(commandQueue,
 												   reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
 
 	// This sample does not support fullscreen transitions.
@@ -192,7 +192,7 @@ HRESULT Game::Cleanup()
 		SafeDelete(&m_pScene);
 	}
 
-	m_renderManager.CleanupDeviceForShutdown(); return S_OK;
+	m_renderManager.UninitDevice(); return S_OK;
 }
 
 
@@ -202,7 +202,7 @@ void Game::Regenerate()
 
 	// Clear old stuff
 	m_pScene->CleanUpDeviceObjects();
-	m_renderManager.CleanUpDeviceObjects();
+	m_renderManager.UninitGameGraphics();
 
 	m_loader.Regenerate(m_pScene);
 
@@ -223,7 +223,7 @@ void Game::Update(DX::StepTimer const& timer)
 	{
 		// Clean out game state 
 		m_pScene->DeleteAllChildren();
-		m_renderManager.CleanUpDeviceObjects();
+		m_renderManager.UninitGameGraphics();
 		m_gameData.ResetToDefaults();
 
 		// Determine which scene to load

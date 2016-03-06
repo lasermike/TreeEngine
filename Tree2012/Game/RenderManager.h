@@ -476,7 +476,7 @@ public:
 
 	HRESULT InitDevice();
 	HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture, SwapChainCreator* swapChainCreator);
-	void CleanupDeviceForShutdown();
+	void UninitDevice();
 	
 	RenderData& GetRenderData() { return m_renderData; }
 	XSF::D3DDevice* GetDevice() { return m_d3dDevice; }
@@ -527,7 +527,7 @@ public:
 	HRESULT GetInstanceIndex(WorldObject* object, UINT&);
 
 	HRESULT InitGraphics(UINT maxInstances, bool useShadowMaps);
-	virtual HRESULT CleanUpDeviceObjects();
+	virtual HRESULT UninitGameGraphics();
 
 	HRESULT BeginFrame();
 	HRESULT EndFrame();
