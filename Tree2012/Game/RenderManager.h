@@ -58,6 +58,7 @@ struct Material
 	const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
 
 	CComPtr<ID3D12Resource> m_constBuffer;
+	UINT8*					m_pConstBufferDataBegin;
 #else
 	ID3D11ShaderResourceView* m_texture;
 	ID3D11VertexShader*       m_vertexShader;
@@ -86,15 +87,16 @@ public:
 			 D3D12_CPU_DESCRIPTOR_HANDLE texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
 			 ID3DBlob* vertexShader, ID3DBlob* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
 			 D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
-			 ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer) :
+			 ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer, UINT8* pConstBufferDataBegin) :
 				m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
 				m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
-				m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer) 
+				m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer), m_pConstBufferDataBegin(pConstBufferDataBegin)
 	{
 		ASSERT(m_vertexShader != nullptr);
 		ASSERT(m_pixelShader != nullptr);
 		ASSERT(m_inputLayout != nullptr);
 		ASSERT(m_constBuffer != nullptr);
+		ASSERT(pConstBufferDataBegin != nullptr);
 		//TODO
 		//ASSERT(m_samplerState != nullptr);
 		//ASSERT(m_rasterizer != nullptr);

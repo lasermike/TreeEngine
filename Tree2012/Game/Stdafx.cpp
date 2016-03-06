@@ -51,11 +51,11 @@ void XSF::SetContentFileRoot()
 	LOG(Details::g_strCommonFileRoot);
 
 #else
-//    wchar_t temp[ 1024 ];
+    wchar_t temp[ 1024 ];
 //    GetCurrentDirectoryW( _countof( temp ), temp );
-	wcscpy_s(Details::g_strCommonFileRoot, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
+	wcscpy_s(temp, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
 
-    //swprintf_s( Details::g_strCommonFileRoot, L"%s\\", installFolder.front() );
+    swprintf_s( Details::g_strCommonFileRoot, L"%s\\", temp);
     //swprintf_s( Details::g_strApplicationDataPath, L"%s\\", temp );
 #endif
 }
