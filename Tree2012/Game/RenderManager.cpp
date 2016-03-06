@@ -1277,7 +1277,7 @@ HRESULT RenderManager::InitDevice()
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
 		// and that descriptors contained in it can be referenced by a root table.
 		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-		cbvHeapDesc.NumDescriptors = 1;
+		cbvHeapDesc.NumDescriptors = 6;
 		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		HRR(m_d3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
@@ -1891,13 +1891,13 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->RSSetViewports(1, &m_viewPort);
 	m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
-	//// Execute the command list.
-	//ID3D12CommandList* ppCommandLists[] = { m_commandList };
-	//m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
 
 	m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
 	m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
+
+	UINT32 descriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	const UINT32 firstSrv = 4;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), firstSrv, descriptorSize);
 	m_commandList->SetGraphicsRootDescriptorTable(2, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
 
 
