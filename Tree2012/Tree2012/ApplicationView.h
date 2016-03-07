@@ -42,7 +42,7 @@ private:
 
 	bool pressedButtons[7];
 
-	InputManager m_inputManager;
+	::InputManager m_inputManager;
 };
 
 // ApplicationSource - responsible for creating the Application instance
