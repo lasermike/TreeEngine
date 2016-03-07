@@ -746,6 +746,8 @@ HRESULT RenderManager::Render(RenderUnit& ru)
 		UINT numInstances = m_perFrameInstanceData[&ru][object].second;
 
 #if defined(TREE3D12)
+		m_commandList->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
+			ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
 #else
 		m_immediateContext->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
 												 ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
@@ -1112,9 +1114,9 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 	m_screenQuadIB->Unmap(0, nullptr);
 
 	// initialize index DXGI_FORMAT_R32_UINTbuffer view
-	m_IBView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-	m_IBView.SizeInBytes = sizeof(UINT) * quad.Indices.size();
-	m_IBView.Format = DXGI_FORMAT_R32_UINT;
+	m_screenQuadIBView.BufferLocation = m_screenQuadIB->GetGPUVirtualAddress();
+	m_screenQuadIBView.SizeInBytes = sizeof(UINT) * quad.Indices.size();
+	m_screenQuadIBView.Format = DXGI_FORMAT_R32_UINT;
 
 #else
     D3D11_BUFFER_DESC vbd;
@@ -1264,6 +1266,7 @@ HRESULT RenderManager::InitDevice()
 		HRR(m_d3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
 		m_rtvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		m_dsvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 		// Describe and create a depth stencil view (DSV) descriptor heap.
 		// Each frame has its own depth stencils (to write shadows onto) 
@@ -1898,14 +1901,15 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	UINT32 descriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	const UINT32 firstSrv = 4;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), firstSrv, descriptorSize);
-	m_commandList->SetGraphicsRootDescriptorTable(2, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
+	m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
 
 
 	// Indicate that the back buffer will be used as a render target.
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_dsvDescriptorSize);
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
 	// Record commands.
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);

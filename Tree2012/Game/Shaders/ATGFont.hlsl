@@ -13,7 +13,7 @@ struct VS_IN
 
 struct VS_OUT
 {
-   float4 Position : POSITION;
+   float4 Position : SV_POSITION;
    float4 Diffuse : COLOR0_center;
    float2 TexCoord0 : TEXCOORD0;
    float4 ChannelSelector : TEXCOORD1;
@@ -27,24 +27,12 @@ cbuffer OncePerDrawText : register( b0 )
 };
 
 
-sampler FontTexture : register(s0) : register( t0 );
+StructuredBuffer< VS_IN >    quadsData : register( t0 ); //u0
+//sampler FontTexture : register(s0) : register( t0 );
+SamplerState samLinear : register( s0 );
+Texture2D txDiffuse : register( t0 );
 
-#ifdef DX12
-#define     RS \
-[\
-    RootSignature\
-    (\
-       "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT),\
-        DescriptorTable(SRV(t0, numDescriptors = 1), visibility = SHADER_VISIBILITY_PIXEL),\
-        DescriptorTable(CBV(b0, numDescriptors = 1), visibility = SHADER_VISIBILITY_ALL),\
-        DescriptorTable(Sampler(s0, numDescriptors = 1), visibility = SHADER_VISIBILITY_PIXEL)"\
-    )\
-]
-#else
-#define     RS
-#endif
 
-RS
 VS_OUT FontVertexShader( VS_IN In )
 {
     VS_OUT Out;
@@ -67,11 +55,11 @@ VS_OUT FontVertexShader( VS_IN In )
     return Out;
 }
 
-RS
-float4 FontPixelShader( VS_OUT In ) : COLOR0
+float4 FontPixelShader( VS_OUT In ) : SV_Target //COLOR0
 {
     // Fetch a texel from the font texture
-    float4 FontTexel = tex2D( FontTexture, In.TexCoord0 ).zyxw;
+    //float4 FontTexel = tex2D( FontTexture, In.TexCoord0 ).zyxw;
+    float4 FontTexel = txDiffuse.Sample(samLinear, In.TexCoord0).zyxw;
       
     float4 Color = FontTexel * In.Diffuse;
 

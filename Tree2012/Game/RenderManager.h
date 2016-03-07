@@ -344,6 +344,7 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap; //TODO
 	CComPtr<ID3D12GraphicsCommandList> m_commandList;
 	UINT m_rtvDescriptorSize;
+	UINT m_dsvDescriptorSize;
 	D3D12_VIEWPORT m_viewPort;
 	D3D12_RECT m_scissorRect;
 
@@ -408,7 +409,7 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12Resource>				m_screenQuadVB;
 	D3D12_VERTEX_BUFFER_VIEW			m_screenQuadVBView;
 	CComPtr<ID3D12Resource>				m_screenQuadIB;
-	D3D12_VERTEX_BUFFER_VIEW			m_screenQuadIBView;
+	D3D12_INDEX_BUFFER_VIEW				m_screenQuadIBView;
 
 	D3D12_RESOURCE_DESC					m_debugTextureRV;
 
