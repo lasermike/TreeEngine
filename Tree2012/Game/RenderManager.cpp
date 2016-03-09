@@ -172,6 +172,41 @@ RenderManager::~RenderManager()
 	UninitGameGraphics();
 }
 
+HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT heapOffset, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
+{
+	// Constants that never change
+	const UINT allocSize = (size + 255) & ~255;
+	HR(m_d3dDevice->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(allocSize),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(buffer)));
+
+	// Describe and create a constant buffer view.
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = (*buffer)->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = allocSize;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE neverChangesCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), heapOffset, m_srvCbvDescriptorSize);
+	m_d3dDevice->CreateConstantBufferView(&cbvDesc, neverChangesCpuHandle);
+
+	// Initialize and map the constant buffers. We don't unmap this until the
+	// app closes (TODO). Keeping things mapped for the lifetime of the resource is okay.
+	//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
+
+	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+	HRR((*buffer)->Map(0, &readRange, reinterpret_cast<void**>(cpuBufferBegin)));
+	ZeroMemory(*cpuBufferBegin, allocSize);
+
+	//memset(m_CBNeverChangesDataBegin, 1, neverChangessSize);
+	//memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+
+	return S_OK;
+}
+
+
 HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 {
     HRR(UninitGameGraphics());
@@ -224,11 +259,46 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	m_bitmapFont = new XSF::BitmapFont();
 	HRR(m_bitmapFont->Create(this, L"Arial_16"));
 
-	// Create the constant buffers
+	// Constants
+	//
+	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+
+
+	// Constants per frame
+	HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), ChangesEveryFrame_HeapOffset, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
+
+	/*
+	const UINT changesEveryFrameSize = (sizeof(CBChangesEveryFrame) + 255) & ~255;
 	HR(m_d3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(CBNeverChanges) + 255) & ~255),
+		&CD3DX12_RESOURCE_DESC::Buffer(changesEveryFrameSize),	// CB size is required to be 256-byte aligned?
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_CBChangesEveryFrame)));
+
+	// Describe and create a constant buffer view.
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvPerFrameDesc = {};
+	cbvPerFrameDesc.BufferLocation = m_CBChangesEveryFrame->GetGPUVirtualAddress();
+	cbvPerFrameDesc.SizeInBytes = changesEveryFrameSize;	// CB size is required to be 256-byte aligned.
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE changesEveryFrameCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ChangesEveryFrame_HeapOffset, m_srvCbvDescriptorSize);
+	m_d3dDevice->CreateConstantBufferView(&cbvPerFrameDesc, changesEveryFrameCpuHandle);
+	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
+
+	HR(m_CBChangesEveryFrame->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesEveryFrameDataBegin)));
+	ZeroMemory(m_CBChangesEveryFrameDataBegin, changesEveryFrameSize);
+	*/
+
+	// Constants that never change
+	HR(CreateConstantBuffer(sizeof(CBNeverChanges), NeverChangesCbv_HeapOffset, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
+
+	/* // Constants that never change
+	const UINT neverChangessSize = (sizeof(CBNeverChanges) + 255) & ~255;
+	HR(m_d3dDevice->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(neverChangessSize),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&m_CBNeverChanges)));
@@ -236,7 +306,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	// Describe and create a constant buffer view.
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = m_CBNeverChanges->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = (sizeof(CBNeverChanges) + 255) & ~255;	// CB size is required to be 256-byte aligned.
+	cbvDesc.SizeInBytes = neverChangessSize;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE neverChangesCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), NeverChangesCbv_HeapOffset, m_srvCbvDescriptorSize);
 	m_d3dDevice->CreateConstantBufferView(&cbvDesc, neverChangesCpuHandle);
@@ -245,10 +315,11 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	// app closes (TODO). Keeping things mapped for the lifetime of the resource is okay.
 	//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
-	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 	HR(m_CBNeverChanges->Map(0, &readRange, reinterpret_cast<void**>(&m_CBNeverChangesDataBegin)));
-	//TODO?  memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-
+	ZeroMemory(m_CBNeverChangesDataBegin, neverChangessSize);
+	//memset(m_CBNeverChangesDataBegin, 1, neverChangessSize);
+	//memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+	*/
 #else
 	// Init text font
 	m_bitmapFont = new XSF::BitmapFont();
@@ -327,26 +398,6 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	m_IBView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 	m_IBView.SizeInBytes = sizeof(UINT) * m_geometryData.indices.size();
 	m_IBView.Format = DXGI_FORMAT_R32_UINT;
-
-	// Constants per frame
-	HR(m_d3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(CBChangesEveryFrame) + 255) & ~255),	// CB size is required to be 256-byte aligned?
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_CBChangesEveryFrame)));
-
-	// Describe and create a constant buffer view.
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvPerFrameDesc = {};
-	cbvPerFrameDesc.BufferLocation = m_CBChangesEveryFrame->GetGPUVirtualAddress();
-	cbvPerFrameDesc.SizeInBytes = (sizeof(CBChangesEveryFrame) + 255) & ~255;	// CB size is required to be 256-byte aligned.
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE changesEveryFrameCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ChangesEveryFrame_HeapOffset, m_srvCbvDescriptorSize);
-	m_d3dDevice->CreateConstantBufferView(&cbvPerFrameDesc, changesEveryFrameCpuHandle);
-	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
-
-	HR(m_CBChangesEveryFrame->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesEveryFrameDataBegin)));
 
 	// Depth stencil description
 	CD3DX12_DEPTH_STENCIL_DESC depthStencilDesc(D3D12_DEFAULT);
@@ -1304,7 +1355,7 @@ HRESULT RenderManager::InitDevice()
 		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		HRR(m_d3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
-
+		
 		// Describe and create a sampler descriptor heap.
 		D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
 		samplerHeapDesc.NumDescriptors = 2;		// One clamp and one wrap sampler.
@@ -1336,7 +1387,7 @@ HRESULT RenderManager::InitDevice()
 
 	// Initialize and map the constant buffers. We don't unmap this until the
 	// app closes. Keeping things mapped for the lifetime of the resource is okay.
-	//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
+	ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
 
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 	HRR(m_pCBChangeOnResize->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesOnResizeDataBegin)));
@@ -1919,8 +1970,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
 	m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
-	const UINT32 firstSrv = 4;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), firstSrv, m_srvCbvDescriptorSize);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NeverChangesCbv_HeapOffset, m_srvCbvDescriptorSize);
 	m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
 
 	// Indicate that the back buffer will be used as a render target.
@@ -2137,71 +2187,6 @@ void RenderManager::DrawSceneToShadowMap()
 }
 
 #if defined(TREE3D12)
-/* ????
-//--------------------------------------------------------------------------------------
-// Name: CreateColorTextureAndViews
-// Desc: Creates the texture of a given size and all necessary views for it
-//--------------------------------------------------------------------------------------
-HRESULT RenderManager::CreateColorTextureAndViews(XSF::D3DDevice* pDevice, UINT width, UINT height, DXGI_FORMAT fmt,
-	ID3D12Resource** ppTexture, D3D12_CPU_DESCRIPTOR_HANDLE hRTV, D3D12_CPU_DESCRIPTOR_HANDLE hSRV,
-	D3D12_CLEAR_VALUE *pOptimizedClearValue, D3D12_HEAP_TYPE heapType)
-{
-	VERBOSEATGPROFILETHIS;
-
-	D3D12_RESOURCE_DESC descTex = CD3DX12_RESOURCE_DESC::Tex2D(fmt, width, height, 1, 1);
-	D3D12_HEAP_FLAGS heapMiscFlag = D3D12_HEAP_FLAG_NONE;
-	D3D12_RESOURCE_STATES usage = D3D12_RESOURCE_STATE_COMMON;
-	switch (heapType)
-	{
-	case D3D12_HEAP_TYPE_DEFAULT:
-		descTex.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		break;
-	case D3D12_HEAP_TYPE_UPLOAD:
-		usage = D3D12_RESOURCE_STATE_GENERIC_READ;
-		break;
-	case D3D12_HEAP_TYPE_READBACK:
-	{
-		usage = D3D12_RESOURCE_STATE_COPY_DEST;
-
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout;
-		UINT NumRows;
-		UINT64 RowSize;
-		UINT64 TotalBytes;
-		pDevice->GetCopyableFootprints(&descTex, 0, 1, 0, &Layout, &NumRows, &RowSize, &TotalBytes);
-		descTex = CD3DX12_RESOURCE_DESC::Buffer(TotalBytes);
-	}
-	break;
-	}
-
-	const D3D12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(heapType);
-	XSF_ERROR_IF_FAILED(pDevice->CreateCommittedResource(
-		&heapProperties,
-		heapMiscFlag,
-		&descTex,
-		usage,
-		pOptimizedClearValue,
-		IID_GRAPHICS_PPV_ARGS(ppTexture)));
-
-	if (hRTV.ptr != 0)
-	{
-		D3D12_RENDER_TARGET_VIEW_DESC descRTV = {};
-		descRTV.Format = fmt;
-		descRTV.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-		pDevice->CreateRenderTargetView(*ppTexture, &descRTV, hRTV);
-	}
-
-	if (hSRV.ptr != 0)
-	{
-		D3D12_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-		descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		descSRV.Format = fmt;
-		descSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		descSRV.Texture2D.MipLevels = 1;
-		pDevice->CreateShaderResourceView(*ppTexture, &descSRV, hSRV);
-	}
-
-	return S_OK;
-}*/
 
 //--------------------------------------------------------------------------------------
 // Name: TrimUploadHeaps

@@ -457,6 +457,8 @@ class RenderManager : public IRenderFrame
 	XSF::BitmapFont*					m_bitmapFont;
 
 #if defined(TREE3D12)
+	HRESULT CreateConstantBuffer(UINT size, UINT heapOffset, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
+
 #else
 	HRESULT LoadPixelShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr);
 	HRESULT LoadVertexShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
