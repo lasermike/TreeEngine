@@ -340,8 +340,9 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;
 	CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
-	CComPtr<ID3D12PipelineState> m_pipelineState;
-	CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap; //TODO
+    CComPtr<ID3D12PipelineState> m_pipelineState;
+    CComPtr<ID3D12PipelineState> m_pipelineStateFullScreenQuad;
+    CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap; //TODO
 	CComPtr<ID3D12GraphicsCommandList> m_commandList;
 	UINT m_rtvDescriptorSize;
 	UINT m_dsvDescriptorSize;

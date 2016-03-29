@@ -172,6 +172,7 @@ RenderManager::~RenderManager()
 	UninitGameGraphics();
 }
 
+#if defined(TREE3D12)
 HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT heapOffset, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
 {
 	// Constants that never change
@@ -205,7 +206,7 @@ HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT heapOffset, ID3D12Re
 
 	return S_OK;
 }
-
+#endif
 
 HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 {
@@ -227,7 +228,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 4, 0);
 
 		CD3DX12_ROOT_PARAMETER rootParameters[3];
-		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
+		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
 		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
 		rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
 
@@ -267,59 +268,9 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	// Constants per frame
 	HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), ChangesEveryFrame_HeapOffset, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
 
-	/*
-	const UINT changesEveryFrameSize = (sizeof(CBChangesEveryFrame) + 255) & ~255;
-	HR(m_d3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(changesEveryFrameSize),	// CB size is required to be 256-byte aligned?
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_CBChangesEveryFrame)));
-
-	// Describe and create a constant buffer view.
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvPerFrameDesc = {};
-	cbvPerFrameDesc.BufferLocation = m_CBChangesEveryFrame->GetGPUVirtualAddress();
-	cbvPerFrameDesc.SizeInBytes = changesEveryFrameSize;	// CB size is required to be 256-byte aligned.
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE changesEveryFrameCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ChangesEveryFrame_HeapOffset, m_srvCbvDescriptorSize);
-	m_d3dDevice->CreateConstantBufferView(&cbvPerFrameDesc, changesEveryFrameCpuHandle);
-	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
-
-	HR(m_CBChangesEveryFrame->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesEveryFrameDataBegin)));
-	ZeroMemory(m_CBChangesEveryFrameDataBegin, changesEveryFrameSize);
-	*/
-
 	// Constants that never change
 	HR(CreateConstantBuffer(sizeof(CBNeverChanges), NeverChangesCbv_HeapOffset, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
 
-	/* // Constants that never change
-	const UINT neverChangessSize = (sizeof(CBNeverChanges) + 255) & ~255;
-	HR(m_d3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(neverChangessSize),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_CBNeverChanges)));
-
-	// Describe and create a constant buffer view.
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = m_CBNeverChanges->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = neverChangessSize;
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE neverChangesCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), NeverChangesCbv_HeapOffset, m_srvCbvDescriptorSize);
-	m_d3dDevice->CreateConstantBufferView(&cbvDesc, neverChangesCpuHandle);
-
-	// Initialize and map the constant buffers. We don't unmap this until the
-	// app closes (TODO). Keeping things mapped for the lifetime of the resource is okay.
-	//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
-
-	HR(m_CBNeverChanges->Map(0, &readRange, reinterpret_cast<void**>(&m_CBNeverChangesDataBegin)));
-	ZeroMemory(m_CBNeverChangesDataBegin, neverChangessSize);
-	//memset(m_CBNeverChangesDataBegin, 1, neverChangessSize);
-	//memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-	*/
 #else
 	// Init text font
 	m_bitmapFont = new XSF::BitmapFont();
@@ -427,6 +378,8 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	HRR(m_commandList->Close());
 	ID3D12CommandList* ppCommandLists[] = { m_commandList };
 	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+    WaitForPreviousFrame();
 
 #else
 	// Create Instanced draw data layout
@@ -584,13 +537,13 @@ HRESULT RenderManager::UninitGameGraphics()
 	// Ensure that the GPU is no longer referencing resources that are about to be
 	// cleaned up by the destructor.
 	WaitForPreviousFrame();
-	CloseHandle(m_fenceEvent);
-	m_fenceEvent = nullptr;
 
 #else
 	SafeRelease(&m_vertexLayout);
 #endif
 
+    m_pipelineState.Release();
+    m_pipelineStateFullScreenQuad.Release();
 	SafeDelete(&GetRenderData().pShadowMap);
 	SafeRelease(&m_vertexBuffer);
 	SafeRelease(&m_indexBuffer);
@@ -1184,6 +1137,24 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 	m_screenQuadIBView.SizeInBytes = sizeof(UINT) * quad.Indices.size();
 	m_screenQuadIBView.Format = DXGI_FORMAT_R32_UINT;
 
+    // Describe and create the graphics pipeline state object (PSO).
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout = { InputLayoutDesc::Basic32, _countof(InputLayoutDesc::Basic32) };
+    psoDesc.pRootSignature = m_rootSignature;
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_drawScreenVertexShader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_drawScreenPixelShader);
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState.DepthEnable = FALSE;
+    psoDesc.DepthStencilState.StencilEnable = FALSE;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    psoDesc.SampleDesc.Count = 1;
+
+    HRR(pD3DDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateFullScreenQuad)));
+
 #else
     D3D11_BUFFER_DESC vbd;
     vbd.Usage = D3D11_USAGE_IMMUTABLE;
@@ -1217,28 +1188,30 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 }
 
 #if defined(TREE3D12)
-HRESULT RenderManager::DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
+HRESULT RenderManager::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
 {
-/*	UINT stride = sizeof(SimpleVertex);
+	UINT stride = sizeof(SimpleVertex);
 	UINT offset = 0;
 
-	pContext->IASetInputLayout(InputLayouts::Basic32);
-	pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	pContext->IASetVertexBuffers(0, 1, &m_screenQuadVB, &stride, &offset);
-	pContext->IASetIndexBuffer(m_screenQuadIB, DXGI_FORMAT_R32_UINT, 0);
+    commandList->SetPipelineState(m_pipelineStateFullScreenQuad);
+    m_commandList->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
+    m_commandList->IASetIndexBuffer(&m_screenQuadIBView);
 
-	pContext->VSSetShader(m_drawScreenVertexShader, nullptr, 0);
-	pContext->PSSetShader(m_drawScreenPixelShader, nullptr, 0);
+    commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+    
+    //commandList->IASetInputLayout(InputLayouts::Basic32);
+	//pContext->VSSetShader(m_drawScreenVertexShader, nullptr, 0);
+	//pContext->PSSetShader(m_drawScreenPixelShader, nullptr, 0);
 
 	//pContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
 
-	pContext->PSSetShaderResources(0, 1, &depthTexture);
+	//pContext->PSSetShaderResources(0, 1, &depthTexture);
 
-	pContext->DrawIndexed(6, 0, 0);
+    //commandList->DrawIndexed(6, 0, 0);
 
-	ID3D11ShaderResourceView* nullText[] = { 0 };
-	pContext->PSSetShaderResources(0, 1, nullText);
-*/
+	//ID3D11ShaderResourceView* nullText[] = { 0 };
+	////pContext->PSSetShaderResources(0, 1, nullText);
+
 	return S_OK;
 }
 #else
@@ -1347,7 +1320,7 @@ HRESULT RenderManager::InitDevice()
 		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		HRR(m_d3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
 
-		// Describe and create a constant buffer view (CBV) descriptor heap.
+		// Describe and create a constant buffer view (CBV/SRV) descriptor heap.
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
 		// and that descriptors contained in it can be referenced by a root table.
 		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
@@ -1368,7 +1341,7 @@ HRESULT RenderManager::InitDevice()
 	HRR(m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 
 	// 
-	// Create constant buffer
+	// Create ChangeOnResize constant buffer
 	HRR(m_d3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
@@ -1902,8 +1875,11 @@ void RenderManager::UninitDevice()
 	m_rootSignature.Release();
 	m_rtvHeap.Release();
 	m_cbvSrvHeap.Release();
-	m_pipelineState.Release();
 	m_commandList.Release();
+
+    CloseHandle(m_fenceEvent);
+    m_fenceEvent = nullptr;
+
 #else
 	m_immediateContext.Release();
 	m_rasterState.Release();
@@ -1941,18 +1917,17 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 
 #if defined(TREE3D12)
 
-	HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
 
 	// Command list allocators can only be reset when the associated 
 	// command lists have finished execution on the GPU; apps should use 
 	// fences to determine GPU execution progress.
-	//HR(m_commandAllocator->Reset());
+	HR(m_commandAllocator->Reset());
 
-	// However, when ExecuteCommandList() is called on a particular command 
+    // However, when ExecuteCommandList() is called on a particular command 
 	// list, that command list can then be reset at any time and must be before 
 	// re-recording.
-	//HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
-
+    HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
+    
 	// Set necessary state.
 	m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
@@ -1984,6 +1959,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+
 
 #else
 	if (!oculus)
@@ -2026,7 +2002,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #endif
 
 	// Draw everything
-	HRC(RenderScene());
+//	HRC(RenderScene());
 
 #if defined(TREE3D12)
 #else
@@ -2045,9 +2021,9 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	}
 
 #if defined(TREE3D12)
-	if (showShadowBuffer)
+//	if (showShadowBuffer)
 	{
-		HRC(DrawScreenQuad(m_commandList, GetRenderData().pShadowMap->DepthMapSRV()));
+		HRC(DrawScreenQuad(m_commandList, GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
 	}
 
 	// Indicate that the back buffer will now be used to present.

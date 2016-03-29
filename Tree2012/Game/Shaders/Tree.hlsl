@@ -217,7 +217,8 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
 	float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
 	
 	// draw as grayscale
-	return float4(c.rrr, 1);
+    //return float4(c.rrr, 1);
+    return float4(1,0,0,1);
 }
  
 
