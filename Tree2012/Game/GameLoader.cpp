@@ -54,7 +54,7 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 
 void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData)
 {
-	Load(0, pScene, pRenderData, pPlayer, gameData);
+//	Load(0, pScene, pRenderData, pPlayer, gameData);
 //	LoadGraph(pScene, pRenderData, pPlayer, gameData);
 //	LoadTrees(pScene, pRenderData, pPlayer, gameData);
 //	LoadTestBlock(pScene, pRenderData, pCamera, gameData);

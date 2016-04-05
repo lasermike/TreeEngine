@@ -342,7 +342,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 
 	// copy the index data to the index buffer
 	m_indexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
-	memcpy(dataBegin, &m_geometryData.vertices[0], sizeof(UINT) * m_geometryData.indices.size());
+	memcpy(dataBegin, &m_geometryData.indices[0], sizeof(UINT) * m_geometryData.indices.size());
 	m_indexBuffer->Unmap(0, nullptr);
 
 	// Initialize the index buffer view.
@@ -2002,7 +2002,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #endif
 
 	// Draw everything
-//	HRC(RenderScene());
+	HRC(RenderScene());
 
 #if defined(TREE3D12)
 #else

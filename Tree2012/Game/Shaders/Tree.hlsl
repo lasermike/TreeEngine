@@ -218,7 +218,8 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
 	
 	// draw as grayscale
     //return float4(c.rrr, 1);
-    return float4(1,0,0,1);
+    float len = length(input.Tex - 0.5);
+    return float4(len, len, len,1);
 }
  
 
