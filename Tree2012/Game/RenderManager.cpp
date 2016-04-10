@@ -264,12 +264,12 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	//
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 
+	// Constants that never change
+	HR(CreateConstantBuffer(sizeof(CBNeverChanges), NeverChangesCbv_HeapOffset, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
 
 	// Constants per frame
 	HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), ChangesEveryFrame_HeapOffset, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
 
-	// Constants that never change
-	HR(CreateConstantBuffer(sizeof(CBNeverChanges), NeverChangesCbv_HeapOffset, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
 
 #else
 	// Init text font
@@ -680,6 +680,7 @@ HRESULT RenderManager::RenderScene()
 	CBNeverChanges cbNeverChanges;
 	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&m_renderData.view)));
 #if defined(TREE3D12)
+    // THIS IS THE ONLY ONE THAT WORKS
 	memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
 #else
 	m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
@@ -1946,7 +1947,13 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NeverChangesCbv_HeapOffset, m_srvCbvDescriptorSize);
-	m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
+    m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
+    srvHandle.Offset(1, m_srvCbvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
+    srvHandle.Offset(1, m_srvCbvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
+    srvHandle.Offset(1, m_srvCbvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
 
 	// Indicate that the back buffer will be used as a render target.
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
