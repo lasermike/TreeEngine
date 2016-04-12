@@ -203,6 +203,7 @@ struct DoubleBuffer
 {
 #if defined (TREE3D12)
 	CComPtr<ID3D12Resource> buffers[2];
+    D3D12_VERTEX_BUFFER_VIEW views[2];
 #else
 	CComPtr<ID3D11Buffer> buffers[2];
 #endif
@@ -214,7 +215,9 @@ struct DoubleBuffer
 #if defined (TREE3D12)
 	ID3D12Resource* Get(UINT frame) { return buffers[frame % 2]; }
 
-	HRESULT Create(const UINT sizeBytes, XSF::D3DDevice* device)
+    D3D12_VERTEX_BUFFER_VIEW GetView(UINT frame) { return views[frame % 2]; }
+
+	HRESULT Create(const UINT sizeBytes, const UINT numInstances, XSF::D3DDevice* device)
 	{
 		buffers[0].Release();
 		buffers[1].Release();
@@ -226,6 +229,9 @@ struct DoubleBuffer
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&buffers[0])));
+        views[0].BufferLocation = buffers[0]->GetGPUVirtualAddress();
+        views[0].SizeInBytes = sizeBytes;
+        views[0].StrideInBytes = sizeBytes / numInstances;
 
 		HRR(device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
@@ -234,6 +240,9 @@ struct DoubleBuffer
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&buffers[1])));
+        views[1].BufferLocation = buffers[1]->GetGPUVirtualAddress();
+        views[1].SizeInBytes = sizeBytes;
+        views[1].StrideInBytes = sizeBytes / numInstances;
 
 		SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
 		SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");

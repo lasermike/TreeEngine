@@ -477,7 +477,7 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 #endif
 	// Create instanced buffer
 #if defined (TREE3D12)
-	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, m_d3dDevice));
+	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, m_d3dDevice));
 #else
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
 	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
@@ -653,58 +653,68 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 HRESULT RenderManager::RenderScene()
 {
 #if defined(TREE3D12)
-	// TODO set PSO
+    // TODO set PSO
 #else
-	// Set samplers
-	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-	ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
-										stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap),
-										stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagLinearMipPointUVWClamp)
-									  };
-	m_immediateContext->PSSetSamplers(0, 3, samplers);
+    // Set samplers
+    const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+    ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
+                                        stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap),
+                                        stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagLinearMipPointUVWClamp)
+    };
+    m_immediateContext->PSSetSamplers(0, 3, samplers);
 
-	// Set shaders
-	if (m_renderData.pass == ShadowMapPass)
-	{
-		m_immediateContext->VSSetShader(m_shadowVertexShader, nullptr, 0);
-		m_immediateContext->PSSetShader(m_shadowPixelShader, nullptr, 0);
-	}
-	else if (m_renderData.pass == RegularPass)
-	{
-		m_immediateContext->VSSetShader(m_vertexShader, nullptr, 0);
-		m_immediateContext->PSSetShader(m_pixelShader, nullptr, 0);
-	}
+    // Set shaders
+    if (m_renderData.pass == ShadowMapPass)
+    {
+        m_immediateContext->VSSetShader(m_shadowVertexShader, nullptr, 0);
+        m_immediateContext->PSSetShader(m_shadowPixelShader, nullptr, 0);
+    }
+    else if (m_renderData.pass == RegularPass)
+    {
+        m_immediateContext->VSSetShader(m_vertexShader, nullptr, 0);
+        m_immediateContext->PSSetShader(m_pixelShader, nullptr, 0);
+    }
 #endif
 
-	// Update never changes. TODO: Move out to a place that never changes
-	CBNeverChanges cbNeverChanges;
-	XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&m_renderData.view)));
+    // Update never changes. TODO: Move out to a place that never changes
+    CBNeverChanges cbNeverChanges;
+    XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&m_renderData.view)));
 #if defined(TREE3D12)
     // THIS IS THE ONLY ONE THAT WORKS
-	memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
+    memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
 #else
-	m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
-	m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
+    m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
+    m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
 #endif
 
-	// Update changes every frame CB.
-	// Compute world to camera matrix
-	CBChangesEveryFrame cb;
-	cb.globalFlags = m_renderData.pShadowMap ? 0x1 : 0x0;
-	cb.light = m_renderData.dirLights[0];
-	XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
-	cb.shadowMatrix = m_renderData.shadowTransform;
-	XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
+    // Update changes every frame CB.
+    // Compute world to camera matrix
+    CBChangesEveryFrame cb;
+    cb.globalFlags = m_renderData.pShadowMap ? 0x1 : 0x0;
+    cb.light = m_renderData.dirLights[0];
+    XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
+    cb.shadowMatrix = m_renderData.shadowTransform;
+    XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
 
 #if defined(TREE3D12)
-	memcpy(m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
+    memcpy(m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
 #else
-	m_immediateContext->VSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
-	m_immediateContext->PSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
-	m_immediateContext->UpdateSubresource(m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
+    m_immediateContext->VSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
+    m_immediateContext->PSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
+    m_immediateContext->UpdateSubresource(m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
 #endif
 
-#if !defined (TREE3D12)
+
+#if defined (TREE3D12)
+    m_commandList->SetPipelineState(m_pipelineState);
+
+    D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
+    buffers[0] = m_VBView;
+    buffers[1] = m_instancedBuffer.GetView(m_renderData.frame);
+
+    m_commandList->IASetVertexBuffers(0, 2, buffers);
+    m_commandList->IASetIndexBuffer(&m_IBView);
+#else
 	// Set up input assembler
 	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
 	m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
@@ -730,6 +740,8 @@ HRESULT RenderManager::SetMaterial(Material& material)
 {
 #if defined(TREE3D12)
 	// TODO: Set material PSO
+    memcpy(material.m_pConstBufferDataBegin, &material.m_shaderMaterial, sizeof(material.m_shaderMaterial));
+
 #else
 	CBMaterial cb;
 	cb.material = material.m_shaderMaterial;
@@ -940,29 +952,11 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
 	// Create constants for material
 #if defined(TREE3D12)
-	CComPtr<ID3D12Resource> pConstBuffer;
-	// 
-	// Create constant buffer
-	HRR(m_d3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(CBMaterial) + 255) & ~255),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&pConstBuffer)));
+	CComPtr<ID3D12Resource> pCBMaterial;
+    UINT8* pMaterialConstBufferDataBegin = nullptr;
 
-	// Describe and create a constant buffer view.
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = pConstBuffer->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = (sizeof(CBMaterial) + 255) & ~255;	// CB size is required to be 256-byte aligned.
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE materialCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), MaterialCbv_HeapOffset, m_srvCbvDescriptorSize);
-	m_d3dDevice->CreateConstantBufferView(&cbvDesc, materialCpuHandle);
-
-	UINT8* pConstBufferDataBegin = nullptr;
-	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
-	HRR(pConstBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pConstBufferDataBegin)));
-	//memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(CBMaterial));
+    // Constants that never change
+    HR(CreateConstantBuffer(sizeof(CBMaterial), MaterialCbv_HeapOffset, &pCBMaterial, &pMaterialConstBufferDataBegin));
 
 #else
 	CComPtr<ID3D11Buffer> pConstBuffer;
@@ -1000,7 +994,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 #if defined(TREE3D12)
     Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
 		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/, 
-		shaderMaterial, pConstBuffer, pConstBufferDataBegin);
+		shaderMaterial, pCBMaterial, pMaterialConstBufferDataBegin);
 #else
 	Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
 		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
