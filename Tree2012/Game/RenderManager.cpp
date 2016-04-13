@@ -116,7 +116,7 @@ ID3DInputLayout* InputLayouts::Basic32 = 0;
 
 void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
 {
-	HR(device->CreateInputLayout(InputLayoutDesc::InstancedBasic16, 
+	HR(device->InputLayout(InputLayoutDesc::InstancedBasic16, 
 								 ARRAYSIZE(InputLayoutDesc::InstancedBasic16), 
 								 pShaderBytecodeWithInputSignature /*passDesc.pIAInputSignature*/,
 								 byteCodeLen /*passDesc.IAInputSignatureSize*/, &InstancedBasic16));
@@ -190,8 +190,13 @@ HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT heapOffset, ID3D12Re
 	cbvDesc.BufferLocation = (*buffer)->GetGPUVirtualAddress();
 	cbvDesc.SizeInBytes = allocSize;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE neverChangesCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), heapOffset, m_srvCbvDescriptorSize);
-	m_d3dDevice->CreateConstantBufferView(&cbvDesc, neverChangesCpuHandle);
+    int constBufferIndex = heapOffset - NeverChangesCbv_HeapOffset;
+    m_constViewDescs[constBufferIndex] = cbvDesc;
+
+	//CD3DX12_CPU_DESCRIPTOR_HANDLE neverChangesCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), heapOffset, m_srvCbvDescriptorSize);
+    //m_d3dDevice->CreateConstantBufferView(&cbvDesc, neverChangesCpuHandle);
+    //m_d3dDevice->CreateConstantBufferView(&cbvDesc, &m_constBufferAddresses[constBufferIndex]);
+    
 
 	// Initialize and map the constant buffers. We don't unmap this until the
 	// app closes (TODO). Keeping things mapped for the lifetime of the resource is okay.
@@ -222,15 +227,18 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 
 	// Create the root signature.
 	{
-		CD3DX12_DESCRIPTOR_RANGE ranges[3];
+		CD3DX12_DESCRIPTOR_RANGE ranges[2];
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0);
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 3, 0);
-		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 4, 0);
+		//ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 4, 0, 0, 2);
 
-		CD3DX12_ROOT_PARAMETER rootParameters[3];
+		CD3DX12_ROOT_PARAMETER rootParameters[6];
 		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
 		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
-		rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
+        rootParameters[2].InitAsConstantBufferView(0);
+        rootParameters[3].InitAsConstantBufferView(1);
+        rootParameters[4].InitAsConstantBufferView(2);
+        rootParameters[5].InitAsConstantBufferView(3);
 
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
 		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -365,8 +373,11 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader);
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	psoDesc.DepthStencilState = depthStencilDesc;
-	psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+//	psoDesc.DepthStencilState = depthStencilDesc;
+    psoDesc.DepthStencilState.DepthEnable = FALSE;
+    psoDesc.DepthStencilState.StencilEnable = FALSE;
+//
+    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	psoDesc.NumRenderTargets = 1;
@@ -537,13 +548,13 @@ HRESULT RenderManager::UninitGameGraphics()
 	// Ensure that the GPU is no longer referencing resources that are about to be
 	// cleaned up by the destructor.
 	WaitForPreviousFrame();
+    m_pipelineState.Release();
+    m_pipelineStateFullScreenQuad.Release();
 
 #else
 	SafeRelease(&m_vertexLayout);
 #endif
 
-    m_pipelineState.Release();
-    m_pipelineStateFullScreenQuad.Release();
 	SafeDelete(&GetRenderData().pShadowMap);
 	SafeRelease(&m_vertexBuffer);
 	SafeRelease(&m_indexBuffer);
@@ -1337,29 +1348,36 @@ HRESULT RenderManager::InitDevice()
 
 	// 
 	// Create ChangeOnResize constant buffer
-	HRR(m_d3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(CBChangeOnResize) + 255) & ~255),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_pCBChangeOnResize)));
+    // Constants that never change
+    ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
+    HR(CreateConstantBuffer(sizeof(CBChangeOnResize), ChangeOnResizeCbv_HeapOffset, &m_pCBChangeOnResize, &m_CBChangesOnResizeDataBegin));
 
-	// Describe and create a constant buffer view.
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = m_pCBChangeOnResize->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = (sizeof(CBChangeOnResize) + 255) & ~255;	// CB size is required to be 256-byte aligned.
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE changesOnResizeCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ChangeOnResizeCbv_HeapOffset, m_srvCbvDescriptorSize);
-	m_d3dDevice->CreateConstantBufferView(&cbvDesc, changesOnResizeCpuHandle);
+	//HRR(m_d3dDevice->CreateCommittedResource(
+	//	&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	//	D3D12_HEAP_FLAG_NONE,
+	//	&CD3DX12_RESOURCE_DESC::Buffer((sizeof(CBChangeOnResize) + 255) & ~255),
+	//	D3D12_RESOURCE_STATE_GENERIC_READ,
+	//	nullptr,
+	//	IID_PPV_ARGS(&m_pCBChangeOnResize)));
+
+	//// Describe and create a constant buffer view.
+	//D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	//cbvDesc.BufferLocation = m_pCBChangeOnResize->GetGPUVirtualAddress();
+	//cbvDesc.SizeInBytes = (sizeof(CBChangeOnResize) + 255) & ~255;	// CB size is required to be 256-byte aligned.
+
+ //   m_constViewDescs[ChangeOnResizeCbv_HeapOffset] = cbvDesc;
+
+	//CD3DX12_CPU_DESCRIPTOR_HANDLE changesOnResizeCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ChangeOnResizeCbv_HeapOffset, m_srvCbvDescriptorSize);
+	//m_d3dDevice->CreateConstantBufferView(&cbvDesc, changesOnResizeCpuHandle);
 
 	// Initialize and map the constant buffers. We don't unmap this until the
 	// app closes. Keeping things mapped for the lifetime of the resource is okay.
-	ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
+	//ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
 
-	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
-	HRR(m_pCBChangeOnResize->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesOnResizeDataBegin)));
-	memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
+	//CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+	//HRR(m_pCBChangeOnResize->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesOnResizeDataBegin)));
+	//memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
 
 	// Initialize the world matrices
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
@@ -1940,14 +1958,11 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
 	m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
-	CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NeverChangesCbv_HeapOffset, m_srvCbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
-    srvHandle.Offset(1, m_srvCbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
-    srvHandle.Offset(1, m_srvCbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
-    srvHandle.Offset(1, m_srvCbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
+	//CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NeverChangesCbv_HeapOffset, m_srvCbvDescriptorSize);
+    m_commandList->SetGraphicsRootConstantBufferView(2, m_constViewDescs[0].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(3, m_constViewDescs[1].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(4, m_constViewDescs[2].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(5, m_constViewDescs[3].BufferLocation);
 
 	// Indicate that the back buffer will be used as a render target.
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));

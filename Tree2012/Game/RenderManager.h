@@ -390,6 +390,10 @@ class RenderManager : public IRenderFrame
 
 	// App resources.
 #if defined(TREE3D12)
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC     m_constViewDescs[4];
+    D3D12_GPU_VIRTUAL_ADDRESS           m_constBufferAddresses[4];
+
 	CComPtr<ID3D12Resource>             m_pCBChangeOnResize;
 	UINT8*								m_CBChangesOnResizeDataBegin;
 	CBChangeOnResize					m_cbChangesOnResize;
