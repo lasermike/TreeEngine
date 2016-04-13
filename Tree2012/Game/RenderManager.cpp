@@ -116,7 +116,7 @@ ID3DInputLayout* InputLayouts::Basic32 = 0;
 
 void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
 {
-	HR(device->InputLayout(InputLayoutDesc::InstancedBasic16, 
+	HR(device->CreateInputLayout(InputLayoutDesc::InstancedBasic16, 
 								 ARRAYSIZE(InputLayoutDesc::InstancedBasic16), 
 								 pShaderBytecodeWithInputSignature /*passDesc.pIAInputSignature*/,
 								 byteCodeLen /*passDesc.IAInputSignatureSize*/, &InstancedBasic16));
@@ -193,21 +193,9 @@ HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT heapOffset, ID3D12Re
     int constBufferIndex = heapOffset - NeverChangesCbv_HeapOffset;
     m_constViewDescs[constBufferIndex] = cbvDesc;
 
-	//CD3DX12_CPU_DESCRIPTOR_HANDLE neverChangesCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), heapOffset, m_srvCbvDescriptorSize);
-    //m_d3dDevice->CreateConstantBufferView(&cbvDesc, neverChangesCpuHandle);
-    //m_d3dDevice->CreateConstantBufferView(&cbvDesc, &m_constBufferAddresses[constBufferIndex]);
-    
-
-	// Initialize and map the constant buffers. We don't unmap this until the
-	// app closes (TODO). Keeping things mapped for the lifetime of the resource is okay.
-	//ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
-
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 	HRR((*buffer)->Map(0, &readRange, reinterpret_cast<void**>(cpuBufferBegin)));
 	ZeroMemory(*cpuBufferBegin, allocSize);
-
-	//memset(m_CBNeverChangesDataBegin, 1, neverChangessSize);
-	//memcpy(m_CBNeverChangesDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 
 	return S_OK;
 }
@@ -360,10 +348,10 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 
 	// Depth stencil description
 	CD3DX12_DEPTH_STENCIL_DESC depthStencilDesc(D3D12_DEFAULT);
-	depthStencilDesc.DepthEnable = true;
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	depthStencilDesc.StencilEnable = FALSE;
+	//depthStencilDesc.DepthEnable = true;
+	//depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	//depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	//depthStencilDesc.StencilEnable = FALSE;
 
 	// Describe and create the graphics pipeline state object (PSO).
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -373,10 +361,10 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader);
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-//	psoDesc.DepthStencilState = depthStencilDesc;
-    psoDesc.DepthStencilState.DepthEnable = FALSE;
-    psoDesc.DepthStencilState.StencilEnable = FALSE;
-//
+	psoDesc.DepthStencilState = depthStencilDesc;
+//    psoDesc.DepthStencilState.DepthEnable = FALSE;
+//    psoDesc.DepthStencilState.StencilEnable = FALSE;
+
     psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -1954,11 +1942,11 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->IASetIndexBuffer(&m_IBView);
 	m_commandList->OMSetStencilRef(0);
 
-
-	m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
+    // Set root signature parameters
+    m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
 	m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
-	//CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NeverChangesCbv_HeapOffset, m_srvCbvDescriptorSize);
+    // Set root signature constant buffers
     m_commandList->SetGraphicsRootConstantBufferView(2, m_constViewDescs[0].BufferLocation);
     m_commandList->SetGraphicsRootConstantBufferView(3, m_constViewDescs[1].BufferLocation);
     m_commandList->SetGraphicsRootConstantBufferView(4, m_constViewDescs[2].BufferLocation);
@@ -1973,9 +1961,10 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 
 	// Record commands.
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    m_commandList->ClearDepthStencilView(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
-
 
 #else
 	if (!oculus)
