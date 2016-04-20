@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "RenderManager.h"
 
-#if !defined(TREE3D12)
-#include "DDSTextureLoader.h" // Test texture
+#if defined(TREE3D12)
+#include "DDSTextureLoader12.h"
+#else
+#include "DDSTextureLoader.h"
 #endif
 
 #include "BitmapFont.h"
@@ -788,10 +790,14 @@ HRESULT RenderManager::Render(RenderUnit& ru)
 #if defined(TREE3D12)
 HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 {
-	D3D12_CPU_DESCRIPTOR_HANDLE texture = m_textures[textureFilename];
-	if (!texture.ptr)
+    LoadedTexture& texture = m_textures[textureFilename];
+	if (!texture.texture)
 	{
-	}
+        int srvHeapIndex = m_textures.size() - 1;
+        CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_srvCbvDescriptorSize);
+        HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &texture.texture, newDescriptor));
+        texture.textureView = newDescriptor;
+    }
 	return S_OK;
 }
 #else
@@ -933,19 +939,19 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
 	// Create a new material
 #if defined(TREE3D12)
-	D3D12_CPU_DESCRIPTOR_HANDLE texture = D3D12_CPU_DESCRIPTOR_HANDLE();
+    LoadedTexture* texture = nullptr;
 #else
 	ID3D11ShaderResourceView* texture = nullptr;
 #endif
 	if (textureFilename && *textureFilename)
 	{
 		LoadTexture(textureFilename);
-
-		texture = m_textures[textureFilename];
 #if defined(TREE3D12)
-		//assert(texture.ptr);
+        texture = &m_textures[textureFilename];
+        assert(texture && texture->texture);
 #else
-		assert(texture);
+        texture = m_textures[textureFilename];
+        assert(texture);
 #endif
 	}
 
@@ -1314,14 +1320,14 @@ HRESULT RenderManager::InitDevice()
 		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		HRR(m_d3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
 
-		// Describe and create a constant buffer view (CBV/SRV) descriptor heap.
+		// Describe and create a SRV descriptor heap.
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
 		// and that descriptors contained in it can be referenced by a root table.
-		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-		cbvHeapDesc.NumDescriptors = 6;
-		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		HRR(m_d3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
+		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+        srvHeapDesc.NumDescriptors = 6;
+        srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		HRR(m_d3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap)));
 		
 		// Describe and create a sampler descriptor heap.
 		D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
@@ -1356,7 +1362,7 @@ HRESULT RenderManager::InitDevice()
 
  //   m_constViewDescs[ChangeOnResizeCbv_HeapOffset] = cbvDesc;
 
-	//CD3DX12_CPU_DESCRIPTOR_HANDLE changesOnResizeCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ChangeOnResizeCbv_HeapOffset, m_srvCbvDescriptorSize);
+	//CD3DX12_CPU_DESCRIPTOR_HANDLE changesOnResizeCpuHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), ChangeOnResizeCbv_HeapOffset, m_srvCbvDescriptorSize);
 	//m_d3dDevice->CreateConstantBufferView(&cbvDesc, changesOnResizeCpuHandle);
 
 	// Initialize and map the constant buffers. We don't unmap this until the
@@ -1875,7 +1881,7 @@ void RenderManager::UninitDevice()
 	m_pSharedRenderToTexture.Release();
 	m_rootSignature.Release();
 	m_rtvHeap.Release();
-	m_cbvSrvHeap.Release();
+	m_srvHeap.Release();
 	m_commandList.Release();
 
     CloseHandle(m_fenceEvent);
@@ -1932,7 +1938,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	// Set necessary state.
 	m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
-	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap, m_samplerHeap };
+	ID3D12DescriptorHeap* ppHeaps[] = { m_srvHeap, m_samplerHeap };
 	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
 	m_commandList->RSSetViewports(1, &m_viewPort);
@@ -1943,7 +1949,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->OMSetStencilRef(0);
 
     // Set root signature parameters
-    m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
+    m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 	m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
     // Set root signature constant buffers

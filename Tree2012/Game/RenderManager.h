@@ -45,6 +45,12 @@ interface SwapChainCreator
 
 //enum { MAT_WRAP = 1, MAT_WIRE = 2, MAT_ZALWAYS = 4, MAT_NOCULL = 8 };
 
+struct LoadedTexture
+{
+    ID3D12Resource* texture;
+    D3D12_CPU_DESCRIPTOR_HANDLE textureView;
+};
+
 struct Material
 {
 	wstring					  m_name;
@@ -52,13 +58,13 @@ struct Material
 	//PlatformMaterial          m_platform;
 
 #if defined(TREE3D12)
-	D3D12_CPU_DESCRIPTOR_HANDLE			m_texture;
-	ID3DBlob*				m_vertexShader;
-	ID3DBlob*				m_pixelShader;
+	LoadedTexture*                  m_texture;
+	ID3DBlob*				        m_vertexShader;
+	ID3DBlob*				        m_pixelShader;
 	const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
 
-	CComPtr<ID3D12Resource> m_constBuffer;
-	UINT8*					m_pConstBufferDataBegin;
+	CComPtr<ID3D12Resource>         m_constBuffer;
+	UINT8*					        m_pConstBufferDataBegin;
 #else
 	ID3D11ShaderResourceView* m_texture;
 	ID3D11VertexShader*       m_vertexShader;
@@ -84,7 +90,7 @@ struct Material
 public:
 #if defined(TREE3D12)
 	Material(const wchar_t* name,
-			 D3D12_CPU_DESCRIPTOR_HANDLE texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
+			 LoadedTexture* texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
 			 ID3DBlob* vertexShader, ID3DBlob* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
 			 D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
 			 ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer, UINT8* pConstBufferDataBegin) :
@@ -102,7 +108,7 @@ public:
 		//ASSERT(m_rasterizer != nullptr);
 		//ASSERT(m_depthState != nullptr);
 	}
-	Material() : m_name(), m_texture(D3D12_CPU_DESCRIPTOR_HANDLE()), m_inputLayout(nullptr), m_vertexShader(nullptr),
+	Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
 				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
 				 m_depthState(nullptr), m_constBuffer() { }
 
@@ -315,7 +321,7 @@ class RenderManager : public IRenderFrame
 	std::map<wstring, Material*>					m_materials;
 	std::map<wstring, Mesh>							m_meshes;
 #if defined(TREE3D12)
-	std::map<wstring, D3D12_CPU_DESCRIPTOR_HANDLE>	m_textures;
+	std::map<wstring, LoadedTexture>	            m_textures;
 	std::map<wstring, ID3DBlob*>					m_vertexShaders;
 	std::map<wstring, ID3DBlob*>					m_pixelShaders;
 #else
@@ -346,7 +352,7 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 	CComPtr<ID3D12RootSignature> m_rootSignature;
 	CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-	CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;
+	CComPtr<ID3D12DescriptorHeap> m_srvHeap;
 	CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     CComPtr<ID3D12PipelineState> m_pipelineState;
@@ -505,6 +511,8 @@ public:
 
 	ID3D12Fence* GetFence() { return m_fence; }
 	D3DCommandList* GetCommandList() const { return m_commandList; }
+    ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
+    ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
 
 	void TrimUploadHeaps(bool removeTerminatedHeaps);
 	void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
