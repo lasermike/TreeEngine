@@ -352,8 +352,9 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 	CComPtr<ID3D12RootSignature> m_rootSignature;
 	CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-	CComPtr<ID3D12DescriptorHeap> m_srvHeap;
-	CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
+    CComPtr<ID3D12DescriptorHeap> m_srvHeap;
+    CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;
+    CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     CComPtr<ID3D12PipelineState> m_pipelineState;
     CComPtr<ID3D12PipelineState> m_pipelineStateFullScreenQuad;

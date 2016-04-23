@@ -654,7 +654,7 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 HRESULT RenderManager::RenderScene()
 {
 #if defined(TREE3D12)
-    // TODO set PSO
+    // TODO 
 #else
     // Set samplers
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
@@ -681,7 +681,6 @@ HRESULT RenderManager::RenderScene()
     CBNeverChanges cbNeverChanges;
     XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&m_renderData.view)));
 #if defined(TREE3D12)
-    // THIS IS THE ONLY ONE THAT WORKS
     memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
 #else
     m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
@@ -743,6 +742,12 @@ HRESULT RenderManager::SetMaterial(Material& material)
 	// TODO: Set material PSO
     memcpy(material.m_pConstBufferDataBegin, &material.m_shaderMaterial, sizeof(material.m_shaderMaterial));
 
+    if (material.m_texture)
+    {
+        CD3DX12_CPU_DESCRIPTOR_HANDLE dest(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_srvCbvDescriptorSize);
+
+        m_d3dDevice->CopyDescriptorsSimple(1, dest, material.m_texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
 #else
 	CBMaterial cb;
 	cb.material = material.m_shaderMaterial;
@@ -794,7 +799,7 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 	if (!texture.texture)
 	{
         int srvHeapIndex = m_textures.size() - 1;
-        CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_srvCbvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_srvCbvDescriptorSize);
         HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &texture.texture, newDescriptor));
         texture.textureView = newDescriptor;
     }
@@ -998,7 +1003,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
 #if defined(TREE3D12)
     Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
-		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/, 
+		nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/, 
 		shaderMaterial, pCBMaterial, pMaterialConstBufferDataBegin);
 #else
 	Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
@@ -1324,10 +1329,18 @@ HRESULT RenderManager::InitDevice()
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
 		// and that descriptors contained in it can be referenced by a root table.
 		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = 6;
+        srvHeapDesc.NumDescriptors = 2;
         srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		HRR(m_d3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap)));
+
+        // Heap for loading textures
+        // TODO: Move from device owned to scene owned
+        D3D12_DESCRIPTOR_HEAP_DESC loadedTextureHeapDesc = {};
+        loadedTextureHeapDesc.NumDescriptors = 6;
+        loadedTextureHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE; //D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        HRR(m_d3dDevice->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
 		
 		// Describe and create a sampler descriptor heap.
 		D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
@@ -1345,33 +1358,6 @@ HRESULT RenderManager::InitDevice()
     // Constants that never change
     ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
     HR(CreateConstantBuffer(sizeof(CBChangeOnResize), ChangeOnResizeCbv_HeapOffset, &m_pCBChangeOnResize, &m_CBChangesOnResizeDataBegin));
-
-
-	//HRR(m_d3dDevice->CreateCommittedResource(
-	//	&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-	//	D3D12_HEAP_FLAG_NONE,
-	//	&CD3DX12_RESOURCE_DESC::Buffer((sizeof(CBChangeOnResize) + 255) & ~255),
-	//	D3D12_RESOURCE_STATE_GENERIC_READ,
-	//	nullptr,
-	//	IID_PPV_ARGS(&m_pCBChangeOnResize)));
-
-	//// Describe and create a constant buffer view.
-	//D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	//cbvDesc.BufferLocation = m_pCBChangeOnResize->GetGPUVirtualAddress();
-	//cbvDesc.SizeInBytes = (sizeof(CBChangeOnResize) + 255) & ~255;	// CB size is required to be 256-byte aligned.
-
- //   m_constViewDescs[ChangeOnResizeCbv_HeapOffset] = cbvDesc;
-
-	//CD3DX12_CPU_DESCRIPTOR_HANDLE changesOnResizeCpuHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), ChangeOnResizeCbv_HeapOffset, m_srvCbvDescriptorSize);
-	//m_d3dDevice->CreateConstantBufferView(&cbvDesc, changesOnResizeCpuHandle);
-
-	// Initialize and map the constant buffers. We don't unmap this until the
-	// app closes. Keeping things mapped for the lifetime of the resource is okay.
-	//ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
-
-	//CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
-	//HRR(m_pCBChangeOnResize->Map(0, &readRange, reinterpret_cast<void**>(&m_CBChangesOnResizeDataBegin)));
-	//memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
 
 	// Initialize the world matrices
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
@@ -1882,6 +1868,7 @@ void RenderManager::UninitDevice()
 	m_rootSignature.Release();
 	m_rtvHeap.Release();
 	m_srvHeap.Release();
+    m_loadTextureHeap.Release();
 	m_commandList.Release();
 
     CloseHandle(m_fenceEvent);
@@ -1949,6 +1936,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandList->OMSetStencilRef(0);
 
     // Set root signature parameters
+    //m_commandList->SetGraphicsRootShaderResourceView()
     m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 	m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 

@@ -14,7 +14,7 @@ using namespace concurrency;
 
 TreePC::TreePC() :
 	m_windowClosed(false),
-	m_windowVisible(true)
+	m_windowVisible(false)
 {
 }
 
@@ -84,9 +84,13 @@ void TreePC::Run()
 		}
 		else
 		{
-			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
+            //CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+            CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
 		}
 	}
+
+    int x = 0;
+    x = x;
 }
 
 void TreePC::Uninitialize()
@@ -186,4 +190,10 @@ int main(Platform::Array<Platform::String^>^)
 	auto direct3DApplicationSource = ref new Direct3DApplicationSource();
 	CoreApplication::Run(direct3DApplicationSource);
 	return 0;
+}
+
+
+void TreePC::OnClosed(Windows::UI::Core::CoreWindow ^sender, Windows::UI::Core::CoreWindowEventArgs ^args)
+{
+    throw ref new Platform::NotImplementedException();
 }
