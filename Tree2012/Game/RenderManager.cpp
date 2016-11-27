@@ -1163,7 +1163,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	// Create a render target view
 	HRR(hr = m_d3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
 	SetDebugName(m_pRenderTargetView, "Game::m_pRenderTargetView");
-	pBackBuffer->Release();
+	pBackBuffer.Release();
 
 	// 
 	// Create depth stencil texture

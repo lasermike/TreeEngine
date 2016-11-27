@@ -96,7 +96,7 @@
       <AdditionalDependencies>DirectXTex.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Debug;..\TreeClassic\Lib\Debug</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
