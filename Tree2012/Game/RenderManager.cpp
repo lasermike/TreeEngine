@@ -1257,34 +1257,43 @@ HRESULT RenderManager::InitDevice()
 
 #if defined(_DEBUG)
 	// Enable the D3D12 debug layer.
-	{
+	//{
 		CComPtr<ID3D12Debug> debugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
 			debugController->EnableDebugLayer();
 		}
-	}
-#endif
+	//}
 
-	CComPtr<IDXGIFactory4> factory;
-	HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
+    
+    CComPtr<IDXGIFactory2> factory2;
+    HRR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory2)));
+
+#else
+
+    CComPtr<IDXGIFactory2> factory2;
+    HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
+
+#endif
 
 	const bool useWarpDevice = false;
 	if (useWarpDevice)
 	{
-		CComPtr<IDXGIAdapter> warpAdapter;
-		HRR(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
+  //      CComQIPtr<IDXGIFactory4> factory4(factory2);
 
-		HRR(D3D12CreateDevice(
-			warpAdapter,
-			D3D_FEATURE_LEVEL_11_0,
-			IID_PPV_ARGS(&m_d3dDevice)
-			));
+		//CComPtr<IDXGIAdapter> warpAdapter;
+		//HRR(factory2->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
+
+		//HRR(D3D12CreateDevice(
+		//	warpAdapter,
+		//	D3D_FEATURE_LEVEL_11_0,
+		//	IID_PPV_ARGS(&m_d3dDevice)
+		//	));
 	}
 	else
 	{
 		CComPtr<IDXGIAdapter1> hardwareAdapter;
-		GetHardwareAdapter(factory, &hardwareAdapter);
+		GetHardwareAdapter(factory2, &hardwareAdapter);
 
 		HRR(D3D12CreateDevice(
 			hardwareAdapter,
@@ -2020,7 +2029,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	}
 
 #if defined(TREE3D12)
-//	if (showShadowBuffer)
+	if (showShadowBuffer)
 	{
 		HRC(DrawScreenQuad(m_commandList, GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
 	}

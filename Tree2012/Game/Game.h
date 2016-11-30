@@ -89,7 +89,7 @@ private:
 	void HandleInput(bool key[256]);
 
 
-	void UpdateView();
+	void UpdateViewMatrix();
 
 	// Managers
 	GameLoader							m_loader;

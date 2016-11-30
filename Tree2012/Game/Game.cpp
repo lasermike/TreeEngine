@@ -48,7 +48,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 	assert(m_inputMgr);
 }
 
-void Game::UpdateView()
+void Game::UpdateViewMatrix()
 {
 	XMStoreFloat4x4(&m_renderManager.GetRenderData().view, m_player->GetViewMatrix());
 	m_renderManager.GetRenderData().eyePos = m_player->GetEyePosition();
@@ -323,7 +323,7 @@ void Game::Render(bool oculus)
 
 	m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
 
-	UpdateView();
+	UpdateViewMatrix();
 
 	m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
 		m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);

@@ -2,6 +2,9 @@
 #ifndef TREEUTILS_H
 #define TREEUTILS_H
 
+#define TREE3D12 // TEMPTEMP
+
+ 
 //#define NOMINMAX 
 #include <assert.h>
 #include <iostream>
@@ -54,11 +57,11 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 #ifndef HR
 #define HR(x)                                              \
 	{                                                          \
-		HRESULT hr = (x);                                      \
-		if (FAILED(hr))                                         \
+		HRESULT hr2 = (x);                                      \
+		if (FAILED(hr2))                                         \
 		{                                                      \
-		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
-		assert(SUCCEEDED(hr)); \
+		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr2 << ", " << L#x << "\n"; \
+		assert(SUCCEEDED(hr2)); \
 		}                                                      \
 	}
 #endif
