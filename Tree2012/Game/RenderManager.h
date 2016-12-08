@@ -45,11 +45,13 @@ interface SwapChainCreator
 
 //enum { MAT_WRAP = 1, MAT_WIRE = 2, MAT_ZALWAYS = 4, MAT_NOCULL = 8 };
 
+#if defined(TREE3D12)
 struct LoadedTexture
 {
     ID3D12Resource* texture;
     D3D12_CPU_DESCRIPTOR_HANDLE textureView;
 };
+#endif 
 
 struct Material
 {

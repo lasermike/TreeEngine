@@ -1008,7 +1008,7 @@ void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
     D3D12_RESOURCE_BARRIER barrier = {};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = Dest.GetResource();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_GENERIC_READ;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
     renderManager->GetCommandList()->ResourceBarrier(1, &barrier);
 
@@ -1024,7 +1024,7 @@ void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
     // Execute the command list and wait for it to finish so we can release the upload buffer
     //InitContext.Finish(true);
 
-    // Execute the command list.
+    // Execute the comfmand list.
     HR(renderManager->GetCommandList()->Close());
     ID3D12CommandList* ppCommandLists[] = { renderManager->GetCommandList() };
     renderManager->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);

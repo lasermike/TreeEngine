@@ -96,7 +96,9 @@ call ..\Game\CopyResources.cmd $(OutDir)
       <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Release;Lib\Release</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>call ..\..\misc\copyrobo ..\$(Configuration)\TreeWin32Lib  $(OutDir) *.cso /XO ;</Command>
+      <Command>call ..\..\misc\copyrobo ..\$(Configuration)\TreeWin32Lib  $(OutDir) *.cso /XO ;
+call ..\Game\CopyResources.cmd $(OutDir) 
+</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

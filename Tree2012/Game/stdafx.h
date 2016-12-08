@@ -2,8 +2,6 @@
 #ifndef TREEUTILS_H
 #define TREEUTILS_H
 
-#define TREE3D12 // TEMPTEMP
-
  
 //#define NOMINMAX 
 #include <assert.h>

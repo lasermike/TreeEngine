@@ -2,8 +2,8 @@
 echo CMD: %*
 @REM %1 -- FXC, %2 -- OUTPUT folder, %3 -- layout folder, %4 -- input file (in project dir), %5 -- platform, %6 -- config, %7 -- incrementa flag
 @SETLOCAL EnableDelayedExpansion
-@set inputFile=%4
 @set layoutFolder=%3
+@set inputFile=%4
 @set AnyErrors=0
 
 call %~p4\commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
@@ -13,6 +13,7 @@ call %~p4\commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 @if "%7"=="1" set incremental=1
 
 @if "%incremental%"=="0" (
+    echo Incremental shader build
 	@rem Output a batch file to rebuild this shader file
 	@rem echo %~dp4 > %2%\shaderSrcPath.txt
 	@copy %0 %2

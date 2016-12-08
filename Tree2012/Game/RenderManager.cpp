@@ -207,13 +207,17 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 {
     HRR(UninitGameGraphics());
 
+#if defined(TREE3D12)
+    // Create the command list.
+    HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
+#endif
+
 	// Create vertices and indice for geometry
 	m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
 
 	//HRR(RenderStates::InitAll(m_d3dDevice));
 	
 #if defined(TREE3D12)
-
 
 	// Create the root signature.
 	{
@@ -540,6 +544,8 @@ HRESULT RenderManager::UninitGameGraphics()
 	WaitForPreviousFrame();
     m_pipelineState.Release();
     m_pipelineStateFullScreenQuad.Release();
+
+    m_commandList.Release();
 
 #else
 	SafeRelease(&m_vertexLayout);
@@ -1375,7 +1381,7 @@ HRESULT RenderManager::InitDevice()
 	XSF::StockRenderStates::Initialize(m_d3dDevice);
 
 	// Create the command list.
-	HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
+	//HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
 	{
@@ -1760,7 +1766,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	// Create a render target view
 	HRR(hr = m_d3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
 	SetDebugName(m_pRenderTargetView, "Game::m_pRenderTargetView");
-	pBackBuffer->Release();
+	pBackBuffer.Release();
 
 	// 
 	// Create depth stencil texture
@@ -1878,7 +1884,7 @@ void RenderManager::UninitDevice()
 	m_rtvHeap.Release();
 	m_srvHeap.Release();
     m_loadTextureHeap.Release();
-	m_commandList.Release();
+	//m_commandList.Release();
 
     CloseHandle(m_fenceEvent);
     m_fenceEvent = nullptr;
@@ -1919,7 +1925,6 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-
 
 	// Command list allocators can only be reset when the associated 
 	// command lists have finished execution on the GPU; apps should use 

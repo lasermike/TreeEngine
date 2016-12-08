@@ -35,7 +35,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
 	trunkMaterial.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	trunkMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
-	trunkMaterial.flags.y = false; //useTextures  TODO
+	trunkMaterial.flags.y = 1; //useTextures  TODO
 
 	// Create material, mesh, and reserve render unit
 	Material* pTrunk = nullptr;

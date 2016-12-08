@@ -246,6 +246,9 @@
     <None Include="..\Game\Arial_16.abc">
       <Filter>Game\Resources</Filter>
     </None>
+    <None Include="..\Game\CopyResources.cmd">
+      <Filter>Game\Resources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Game\bark2.dds">
@@ -276,6 +279,7 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
       <Filter>Assets</Filter>
     </Image>
+    <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
