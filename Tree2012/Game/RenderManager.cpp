@@ -175,7 +175,7 @@ RenderManager::~RenderManager()
 }
 
 #if defined(TREE3D12)
-HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT heapOffset, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
+HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT heapOffset, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
 {
 	// Constants that never change
 	const UINT allocSize = (size + 255) & ~255;
@@ -187,13 +187,12 @@ HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT heapOffset, ID3D12Re
 		nullptr,
 		IID_PPV_ARGS(buffer)));
 
-	// Describe and create a constant buffer view.
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = (*buffer)->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = allocSize;
+	// Describe a constant buffer view.
+    newViewDesc.BufferLocation = (*buffer)->GetGPUVirtualAddress();
+    newViewDesc.SizeInBytes = allocSize;
 
     int constBufferIndex = heapOffset - NeverChangesCbv_HeapOffset;
-    m_constViewDescs[constBufferIndex] = cbvDesc;
+    m_constViewDescs[constBufferIndex] = newViewDesc;
 
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 	HRR((*buffer)->Map(0, &readRange, reinterpret_cast<void**>(cpuBufferBegin)));
@@ -267,10 +266,12 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 
 	// Constants that never change
-	HR(CreateConstantBuffer(sizeof(CBNeverChanges), NeverChangesCbv_HeapOffset, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
+    D3D12_CONSTANT_BUFFER_VIEW_DESC neverChangesViewDesc = {};
+    HR(CreateConstantBuffer(sizeof(CBNeverChanges), NeverChangesCbv_HeapOffset, neverChangesViewDesc, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
 
 	// Constants per frame
-	HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), ChangesEveryFrame_HeapOffset, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
+    D3D12_CONSTANT_BUFFER_VIEW_DESC changesEachFrameViewDesc = {};
+    HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), ChangesEveryFrame_HeapOffset, changesEachFrameViewDesc, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
 
 
 #else
@@ -710,7 +711,6 @@ HRESULT RenderManager::RenderScene()
     m_immediateContext->UpdateSubresource(m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
 #endif
 
-
 #if defined (TREE3D12)
     m_commandList->SetPipelineState(m_pipelineState);
 
@@ -748,9 +748,12 @@ HRESULT RenderManager::SetMaterial(Material& material)
 	// TODO: Set material PSO
     memcpy(material.m_pConstBufferDataBegin, &material.m_shaderMaterial, sizeof(material.m_shaderMaterial));
 
+    //CD3DX12_CPU_DESCRIPTOR_HANDLE destCB(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), MaterialCbv_HeapOffset, m_srvCbvDescriptorSize);
+    //m_d3dDevice->CopyDescriptorsSimple(1, destCB, material., D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
     if (material.m_texture)
     {
-        CD3DX12_CPU_DESCRIPTOR_HANDLE dest(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_srvCbvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE dest(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), Texture0Srv_HeapOffset, m_srvCbvDescriptorSize);
 
         m_d3dDevice->CopyDescriptorsSimple(1, dest, material.m_texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
@@ -893,6 +896,7 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height)
 {
 #if defined(TREE3D12)
+    // TODO TREE3D12
 #else
 	D3D11_TEXTURE2D_DESC desc = {};
 	desc.Width = width;
@@ -972,7 +976,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     UINT8* pMaterialConstBufferDataBegin = nullptr;
 
     // Constants that never change
-    HR(CreateConstantBuffer(sizeof(CBMaterial), MaterialCbv_HeapOffset, &pCBMaterial, &pMaterialConstBufferDataBegin));
+    D3D12_CONSTANT_BUFFER_VIEW_DESC viewDesc = {};
+    HR(CreateConstantBuffer(sizeof(CBMaterial), MaterialCbv_HeapOffset, viewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
 
 #else
 	CComPtr<ID3D11Buffer> pConstBuffer;
@@ -1318,7 +1323,6 @@ HRESULT RenderManager::InitDevice()
 	// Shader visible descriptor size
 	m_srvCbvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-
 	// Create descriptor heaps.
 	{
 		// Describe and create a render target view (RTV) descriptor heap.
@@ -1372,7 +1376,8 @@ HRESULT RenderManager::InitDevice()
 	// Create ChangeOnResize constant buffer
     // Constants that never change
     ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
-    HR(CreateConstantBuffer(sizeof(CBChangeOnResize), ChangeOnResizeCbv_HeapOffset, &m_pCBChangeOnResize, &m_CBChangesOnResizeDataBegin));
+    D3D12_CONSTANT_BUFFER_VIEW_DESC changesOnResizeViewDesc = {};
+    HR(CreateConstantBuffer(sizeof(CBChangeOnResize), ChangeOnResizeCbv_HeapOffset, changesOnResizeViewDesc, &m_pCBChangeOnResize, &m_CBChangesOnResizeDataBegin));
 
 	// Initialize the world matrices
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
