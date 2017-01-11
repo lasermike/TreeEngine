@@ -34,7 +34,7 @@ cbuffer cbChangesEveryFrame : register( b2 )
 	uint globalFlags;  // bit 0 = use shadow maps
 };
 
-cbuffer cbMaterial : register (b3)
+cbuffer cbMaterial : register (b4)
 {
 	ShaderMaterial mat;
 	float4x4 texTransform;

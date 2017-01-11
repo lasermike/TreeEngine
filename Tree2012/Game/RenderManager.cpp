@@ -33,7 +33,8 @@ enum cbvSrvHeapOffsets
 	Shadow0Srv_HeapOffset,
     Material0Cbv_HeapOffset,
     Material1Cbv_HeapOffset,
-    Material2Cbv_HeapOffset
+    Material2Cbv_HeapOffset,
+    Material3Cbv_HeapOffset
 };
 
 enum constBufferRootSignatureOffsets
@@ -44,6 +45,8 @@ enum constBufferRootSignatureOffsets
     MaterialRootSignatureOffset
 };
 
+const int maxNumTextures = 2;
+const int maxNumMaterials = 4;
 
 __declspec(align(16))
 struct CBNeverChanges
@@ -199,8 +202,6 @@ HRESULT RenderManager::CreateConstantBuffer(UINT size, UINT rootSignatureOffset,
     newViewDesc.BufferLocation = (*buffer)->GetGPUVirtualAddress();
     newViewDesc.SizeInBytes = allocSize;
 
-    m_constViewDescs[rootSignatureOffset] = newViewDesc;
-
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 	HRR((*buffer)->Map(0, &readRange, reinterpret_cast<void**>(cpuBufferBegin)));
 	ZeroMemory(*cpuBufferBegin, allocSize);
@@ -240,51 +241,50 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
         //   cbuffer cbChangesEveryFrame : register(b2)
         //   cbuffer cbMaterial : register (b3)
 
-        const int maxNumTextures = 2;
-        const int maxNumMaterials = 6;
-        CD3DX12_DESCRIPTOR_RANGE ranges[2];
-		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, maxNumTextures + maxNumMaterials, 0);
-		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 3, 0);
+        CD3DX12_DESCRIPTOR_RANGE ranges[3];
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, maxNumTextures, 0);
+        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, maxNumMaterials, 4);
+        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 3, 0);
 
-		CD3DX12_ROOT_PARAMETER rootParameters[6];
-		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+        CD3DX12_ROOT_PARAMETER rootParameters[6];
+        rootParameters[0].InitAsDescriptorTable(2, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
+        rootParameters[1].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[2].InitAsConstantBufferView(0);
         rootParameters[3].InitAsConstantBufferView(1);
         rootParameters[4].InitAsConstantBufferView(2);
         rootParameters[5].InitAsConstantBufferView(3);
 
-		D3D12_STATIC_SAMPLER_DESC sampler = {};
-		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.MipLODBias = 0;
-		sampler.MaxAnisotropy = 0;
-		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-		sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-		sampler.MinLOD = 0.0f;
-		sampler.MaxLOD = D3D12_FLOAT32_MAX;
-		sampler.ShaderRegister = 0;
-		sampler.RegisterSpace = 0;
-		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        D3D12_STATIC_SAMPLER_DESC sampler = {};
+        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.MipLODBias = 0;
+        sampler.MaxAnisotropy = 0;
+        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler.MinLOD = 0.0f;
+        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+        sampler.ShaderRegister = 0;
+        sampler.RegisterSpace = 0;
+        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-		CComPtr<ID3DBlob> signature;
-		CComPtr<ID3DBlob> error;
-		HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-		HRR(m_d3dDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-	}
+        CComPtr<ID3DBlob> signature;
+        CComPtr<ID3DBlob> error;
+        HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+        HRR(m_d3dDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+    }
 
-	// Init text font
-	m_bitmapFont = new XSF::BitmapFont();
-	HRR(m_bitmapFont->Create(this, L"Arial_16"));
+    // Init text font
+    m_bitmapFont = new XSF::BitmapFont();
+    HRR(m_bitmapFont->Create(this, L"Arial_16"));
 
-	// Constants
-	//
-	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+    // Constants
+    //
+    CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 
     //NeverChangesRootSignatureSOffset,
     //ChangeOnResizeRootSignatureOffset,
@@ -294,10 +294,12 @@ HRESULT RenderManager::InitGraphics(UINT maxInstances, bool useShadowMaps)
 	// Constants that never change
     D3D12_CONSTANT_BUFFER_VIEW_DESC neverChangesViewDesc = {};
     HR(CreateConstantBuffer(sizeof(CBNeverChanges), NeverChangesRootSignatureSOffset, neverChangesViewDesc, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
+    m_constViewDescs[NeverChangesRootSignatureSOffset] = neverChangesViewDesc;
 
 	// Constants per frame
     D3D12_CONSTANT_BUFFER_VIEW_DESC changesEachFrameViewDesc = {};
     HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), ChangesEveryFrameRootSignatureOffset, changesEachFrameViewDesc, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
+    m_constViewDescs[ChangesEveryFrameRootSignatureOffset] = changesEachFrameViewDesc;
 
     // Material constant buffer
     D3D12_CONSTANT_BUFFER_VIEW_DESC constViewDesc = {};
@@ -1095,11 +1097,13 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
     // Constants that never change
     D3D12_CONSTANT_BUFFER_VIEW_DESC constViewDesc = {};
-    HR(CreateConstantBuffer(sizeof(CBMaterial), MaterialRootSignatureOffset, constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
+    HR(CreateConstantBuffer(sizeof(CBMaterial), Material0Cbv_HeapOffset + m_materialHeapCount, constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
 
     // Create constant buffer descriptor
-    CD3DX12_CPU_DESCRIPTOR_HANDLE materialHeapHandle(m_materialHeap->GetCPUDescriptorHandleForHeapStart(), m_materialHeapCount++, m_srvCbvDescriptorSize);
-    //m_d3dDevice->CreateConstantBufferView(&constViewDesc, materialHeapHandle);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE materialHeapHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), Material0Cbv_HeapOffset + m_materialHeapCount, m_srvCbvDescriptorSize);
+    m_d3dDevice->CreateConstantBufferView(&constViewDesc, materialHeapHandle);
+
+    m_materialHeapCount++;
 
 #else
 	CComPtr<ID3D11Buffer> pConstBuffer;
@@ -1470,7 +1474,7 @@ HRESULT RenderManager::InitDevice()
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
 		// and that descriptors contained in it can be referenced by a root table.
 		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = 6;
+        srvHeapDesc.NumDescriptors = maxNumTextures + maxNumMaterials;
         srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         HRR(m_d3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap)));
@@ -1508,6 +1512,7 @@ HRESULT RenderManager::InitDevice()
     ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
     D3D12_CONSTANT_BUFFER_VIEW_DESC changesOnResizeViewDesc = {};
     HR(CreateConstantBuffer(sizeof(CBChangeOnResize), ChangeOnResizeRootSignatureOffset, changesOnResizeViewDesc, &m_pCBChangeOnResize, &m_CBChangesOnResizeDataBegin));
+    m_constViewDescs[ChangeOnResizeRootSignatureOffset] = changesOnResizeViewDesc;
 
 	// Initialize the world matrices
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
@@ -2062,33 +2067,33 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 
 #if defined(TREE3D12)
 
-	// Command list allocators can only be reset when the associated 
-	// command lists have finished execution on the GPU; apps should use 
-	// fences to determine GPU execution progress.
-	HR(m_commandAllocator->Reset());
+    // Command list allocators can only be reset when the associated 
+    // command lists have finished execution on the GPU; apps should use 
+    // fences to determine GPU execution progress.
+    HR(m_commandAllocator->Reset());
 
     // However, when ExecuteCommandList() is called on a particular command 
-	// list, that command list can then be reset at any time and must be before 
-	// re-recording.
+    // list, that command list can then be reset at any time and must be before 
+    // re-recording.
     HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
-    
-	// Set necessary state.
-	m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
-	ID3D12DescriptorHeap* ppHeaps[] = { m_srvHeap, m_samplerHeap };
-	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    // Set necessary state.
+    m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
-	m_commandList->RSSetViewports(1, &m_viewPort);
-	m_commandList->RSSetScissorRects(1, &m_scissorRect);
-	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
-	m_commandList->IASetIndexBuffer(&m_IBView);
-	m_commandList->OMSetStencilRef(0);
+    ID3D12DescriptorHeap* ppHeaps[] = { m_srvHeap, m_samplerHeap };
+    m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+    m_commandList->RSSetViewports(1, &m_viewPort);
+    m_commandList->RSSetScissorRects(1, &m_scissorRect);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+    m_commandList->IASetIndexBuffer(&m_IBView);
+    m_commandList->OMSetStencilRef(0);
 
     // Set root signature parameters
     //m_commandList->SetGraphicsRootShaderResourceView()
     m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
-	m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
+    m_commandList->SetGraphicsRootDescriptorTable(1, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
     // Set root signature constant buffers
     m_commandList->SetGraphicsRootConstantBufferView(2, m_constViewDescs[0].BufferLocation);
@@ -2096,19 +2101,19 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     m_commandList->SetGraphicsRootConstantBufferView(4, m_constViewDescs[2].BufferLocation);
     m_commandList->SetGraphicsRootConstantBufferView(5, m_constViewDescs[3].BufferLocation);
 
-	// Indicate that the back buffer will be used as a render target.
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    // Indicate that the back buffer will be used as a render target.
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_dsvDescriptorSize);
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_dsvDescriptorSize);
+    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-	// Record commands.
-	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    // Record commands.
+    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->ClearDepthStencilView(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
 
 #else
 	if (!oculus)

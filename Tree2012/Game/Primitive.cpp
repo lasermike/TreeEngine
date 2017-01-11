@@ -26,7 +26,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 
 	ShaderMaterial mat;
 	mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
-	mat.Diffuse = XMFLOAT4(0, .6f, 0, 1);
+	mat.Diffuse = XMFLOAT4(0, 1.0f, 0, 1);
 	mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
 	mat.Reflect = XMFLOAT4(0, 0, 0, 1);
 	mat.flags.y = 1; //1 for textured; 
