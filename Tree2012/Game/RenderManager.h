@@ -50,14 +50,13 @@ struct LoadedTexture
 {
     ID3D12Resource* texture;
     D3D12_CPU_DESCRIPTOR_HANDLE textureView;
+    UINT textureSlot;
 };
 #endif 
 
 struct Material
 {
 	wstring					  m_name;
-
-	//PlatformMaterial          m_platform;
 
 #if defined(TREE3D12)
 	LoadedTexture*                  m_texture;
@@ -67,6 +66,8 @@ struct Material
 
 	CComPtr<ID3D12Resource>         m_constBuffer;
 	UINT8*					        m_pConstBufferDataBegin;
+    D3D12_CPU_DESCRIPTOR_HANDLE     m_constBufferDescriptor;
+
 #else
 	ID3D11ShaderResourceView* m_texture;
 	ID3D11VertexShader*       m_vertexShader;
@@ -92,13 +93,15 @@ struct Material
 public:
 #if defined(TREE3D12)
 	Material(const wchar_t* name,
-			 LoadedTexture* texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
-			 ID3DBlob* vertexShader, ID3DBlob* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
-			 D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
-			 ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer, UINT8* pConstBufferDataBegin) :
+			LoadedTexture* texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
+			ID3DBlob* vertexShader, ID3DBlob* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
+			D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
+			ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer, UINT8* pConstBufferDataBegin,
+            D3D12_CPU_DESCRIPTOR_HANDLE constBufferDescriptor) :
 				m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
 				m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
-				m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer), m_pConstBufferDataBegin(pConstBufferDataBegin)
+				m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer), m_pConstBufferDataBegin(pConstBufferDataBegin),
+                m_constBufferDescriptor(constBufferDescriptor)
 	{
 		ASSERT(m_vertexShader != nullptr);
 		ASSERT(m_pixelShader != nullptr);
@@ -110,15 +113,17 @@ public:
 		//ASSERT(m_rasterizer != nullptr);
 		//ASSERT(m_depthState != nullptr);
 	}
+
 	Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
 				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
-				 m_depthState(nullptr), m_constBuffer() { }
+				 m_depthState(nullptr), m_constBuffer(), m_constBufferDescriptor() { }
 
 	// Necessary?
     Material(Material const& rhs) :
         m_name(rhs.m_name), m_texture(rhs.m_texture), m_inputLayout(rhs.m_inputLayout), m_vertexShader(rhs.m_vertexShader),
 		m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
-		m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer) 
+		m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer),
+        m_constBufferDescriptor(rhs.m_constBufferDescriptor)
     {};        // Copy constructor
 #else
 	Material(const wchar_t* name,
@@ -354,8 +359,9 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 	CComPtr<ID3D12RootSignature> m_rootSignature;
 	CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    CComPtr<ID3D12DescriptorHeap> m_srvHeap;
-    CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;
+    CComPtr<ID3D12DescriptorHeap> m_srvHeap;            // root descriptor table heap
+    CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;    // offline heap for loading heap
+    CComPtr<ID3D12DescriptorHeap> m_materialHeap;       // offline heap for srv and cbv
     CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     CComPtr<ID3D12PipelineState> m_pipelineState;
@@ -375,6 +381,7 @@ class RenderManager : public IRenderFrame
 
 	CComPtr<ID3D12Resource>				m_pSharedRenderToTexture;
 
+    UINT                                m_materialHeapCount;
 #else
 	CComPtr<ID3D11Device1>              m_d3dDevice1;
 	CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
