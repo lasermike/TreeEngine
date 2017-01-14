@@ -51,6 +51,10 @@ struct LoadedTexture
     ID3D12Resource* texture;
     D3D12_CPU_DESCRIPTOR_HANDLE textureView;
     UINT textureSlot;
+
+    LoadedTexture() : texture(nullptr), textureView(CD3DX12_CPU_DESCRIPTOR_HANDLE()), textureSlot(0) { }
+    LoadedTexture(ID3D12Resource* textureParam, D3D12_CPU_DESCRIPTOR_HANDLE textureViewParam, UINT textureSlotParam) :
+        texture(textureParam), textureView(textureViewParam), textureSlot(textureSlotParam) { }
 };
 #endif 
 
@@ -67,6 +71,7 @@ struct Material
 	CComPtr<ID3D12Resource>         m_constBuffer;
 	UINT8*					        m_pConstBufferDataBegin;
     D3D12_CPU_DESCRIPTOR_HANDLE     m_constBufferDescriptor;
+    D3D12_GPU_DESCRIPTOR_HANDLE     m_srvHeapTable;
 
 #else
 	ID3D11ShaderResourceView* m_texture;
@@ -97,11 +102,11 @@ public:
 			ID3DBlob* vertexShader, ID3DBlob* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
 			D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
 			ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer, UINT8* pConstBufferDataBegin,
-            D3D12_CPU_DESCRIPTOR_HANDLE constBufferDescriptor) :
+            D3D12_CPU_DESCRIPTOR_HANDLE constBufferDescriptor, D3D12_GPU_DESCRIPTOR_HANDLE srvHeapTable) :
 				m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
 				m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
 				m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer), m_pConstBufferDataBegin(pConstBufferDataBegin),
-                m_constBufferDescriptor(constBufferDescriptor)
+                m_constBufferDescriptor(constBufferDescriptor), m_srvHeapTable(srvHeapTable)
 	{
 		ASSERT(m_vertexShader != nullptr);
 		ASSERT(m_pixelShader != nullptr);
@@ -116,14 +121,14 @@ public:
 
 	Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
 				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
-				 m_depthState(nullptr), m_constBuffer(), m_constBufferDescriptor() { }
+				 m_depthState(nullptr), m_constBuffer(), m_constBufferDescriptor(), m_srvHeapTable() { }
 
 	// Necessary?
     Material(Material const& rhs) :
         m_name(rhs.m_name), m_texture(rhs.m_texture), m_inputLayout(rhs.m_inputLayout), m_vertexShader(rhs.m_vertexShader),
 		m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
 		m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer),
-        m_constBufferDescriptor(rhs.m_constBufferDescriptor)
+        m_constBufferDescriptor(rhs.m_constBufferDescriptor), m_srvHeapTable(rhs.m_srvHeapTable)
     {};        // Copy constructor
 #else
 	Material(const wchar_t* name,
