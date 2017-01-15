@@ -6,11 +6,14 @@
 #include "ShadowMap.h"
 
 #if defined(TREE3D12)
-ShadowMap::ShadowMap(XSF::D3DDevice* device, ID3D12DescriptorHeap* srvHeap, UINT width, UINT height)
+
+ShadowMap::ShadowMap(XSF::D3DDevice* device, D3D12_CPU_DESCRIPTOR_HANDLE shadowMapSrvCpu, D3D12_GPU_DESCRIPTOR_HANDLE shadowMapSrvGpu,
+                     D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvCpu, UINT width, UINT height)
+    : mWidth(width), mHeight(height), mDepthMapSRVCpu(shadowMapSrvCpu), mDepthMapSRVGpu(shadowMapSrvGpu), mDepthMapDSV(shadowMapDsvCpu), mDepthMap(0)
 #else
 ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
+    : mWidth(width), mHeight(height), mDepthMapSRV(), mDepthMapDSV(), mDepthMap(0)
 #endif
-	: mWidth(width), mHeight(height), mDepthMapSRV(), mDepthMapDSV(), mDepthMap(0)
 {
     mViewport.TopLeftX = 0.0f;
     mViewport.TopLeftY = 0.0f;
@@ -19,9 +22,9 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     mViewport.MinDepth = 0.0f;
     mViewport.MaxDepth = 1.0f;
 
-	// Use typeless format because the DSV is going to interpret
-	// the bits as DXGI_FORMAT_D24_UNORM_S8_UINT, whereas the SRV is going to interpret
-	// the bits as DXGI_FORMAT_R24_UNORM_X8_TYPELESS.
+	// Use typeless format because the 
+    // DSV is going to interpret the bits as DXGI_FORMAT_D24_UNORM_S8_UINT whereas the 
+    // SRV is going to interpret the bits as DXGI_FORMAT_R24_UNORM_X8_TYPELESS.
 #if defined(TREE3D12)
 	D3D12_RESOURCE_DESC texDesc = {};
 
@@ -60,7 +63,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 	SetDebugName(mDepthMap, "ShadowMap::mDepthMap");
 
 #if defined(TREE3D12)
-    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
     dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Texture2D.MipSlice = 0;
@@ -70,10 +73,10 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 	// Describe and create a SRV for the texture.
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = texDesc.Format;
+	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
-	device->CreateShaderResourceView(mDepthMap, &srvDesc, srvHeap->GetCPUDescriptorHandleForHeapStart());
+	device->CreateShaderResourceView(mDepthMap, &srvDesc, mDepthMapSRVCpu);
 #else
 	D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
 	dsvDesc.Flags = 0;

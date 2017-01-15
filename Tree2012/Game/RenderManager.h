@@ -50,11 +50,10 @@ struct LoadedTexture
 {
     ID3D12Resource* texture;
     D3D12_CPU_DESCRIPTOR_HANDLE textureView;
-    UINT textureSlot;
 
-    LoadedTexture() : texture(nullptr), textureView(CD3DX12_CPU_DESCRIPTOR_HANDLE()), textureSlot(0) { }
+    LoadedTexture() : texture(nullptr), textureView(CD3DX12_CPU_DESCRIPTOR_HANDLE()) { }
     LoadedTexture(ID3D12Resource* textureParam, D3D12_CPU_DESCRIPTOR_HANDLE textureViewParam, UINT textureSlotParam) :
-        texture(textureParam), textureView(textureViewParam), textureSlot(textureSlotParam) { }
+        texture(textureParam), textureView(textureViewParam) { }
 };
 #endif 
 
@@ -363,9 +362,8 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 	CComPtr<ID3D12RootSignature> m_rootSignature;
 	CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    CComPtr<ID3D12DescriptorHeap> m_srvHeap;            // root descriptor table heap
+    CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
     CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;    // offline heap for loading heap
-    CComPtr<ID3D12DescriptorHeap> m_materialHeap;       // offline heap for srv and cbv
     CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     CComPtr<ID3D12PipelineState> m_pipelineState;
@@ -385,7 +383,7 @@ class RenderManager : public IRenderFrame
 
 	CComPtr<ID3D12Resource>				m_pSharedRenderToTexture;
 
-    UINT                                m_materialHeapCount;
+    UINT                                m_numMaterialsCreated;
 #else
 	CComPtr<ID3D11Device1>              m_d3dDevice1;
 	CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
@@ -567,8 +565,8 @@ public:
 	HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
 	HRESULT GetInstanceIndex(WorldObject* object, UINT&);
 
-	HRESULT InitGraphics(UINT maxInstances, bool useShadowMaps);
-	virtual HRESULT UninitGameGraphics();
+	HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
+	virtual HRESULT UninitGameLevelGraphics();
 
 	HRESULT BeginFrame();
 	HRESULT EndFrame();

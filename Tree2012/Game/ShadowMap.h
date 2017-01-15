@@ -14,7 +14,8 @@ class ShadowMap
 {
 public:
 #if defined(TREE3D12)
-	ShadowMap::ShadowMap(XSF::D3DDevice* device, ID3D12DescriptorHeap* srvHeap, UINT width, UINT height);
+    ShadowMap(XSF::D3DDevice* device, D3D12_CPU_DESCRIPTOR_HANDLE shadowMapSrvCpu, D3D12_GPU_DESCRIPTOR_HANDLE shadowMapSrvGpu,
+              D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvCpu, UINT width, UINT height);
 #else
 	ShadowMap(XSF::D3DDevice* device, UINT width, UINT height);
 #endif
@@ -23,7 +24,7 @@ public:
 
 #if defined(TREE3D12)
 
-	D3D12_CPU_DESCRIPTOR_HANDLE DepthMapSRV() { return mDepthMapSRV;  }
+	D3D12_CPU_DESCRIPTOR_HANDLE DepthMapSRV() { return mDepthMapSRVCpu;  }
 	ID3D12Resource* DepthMapBuffer() { return mDepthMap; }
 
 	void BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList, D3D12_CPU_DESCRIPTOR_HANDLE* pTestRTV);
@@ -43,8 +44,9 @@ private:
 	UINT mHeight;
 
 #if defined(TREE3D12)
-	D3D12_CPU_DESCRIPTOR_HANDLE mDepthMapSRV;
-	D3D12_CPU_DESCRIPTOR_HANDLE mDepthMapDSV;
+    D3D12_CPU_DESCRIPTOR_HANDLE mDepthMapSRVCpu;
+    D3D12_GPU_DESCRIPTOR_HANDLE mDepthMapSRVGpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE mDepthMapDSV;
 	ID3D12Resource* mDepthMap;
 
 	D3D12_VIEWPORT mViewport;

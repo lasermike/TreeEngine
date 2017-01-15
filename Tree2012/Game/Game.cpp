@@ -202,12 +202,12 @@ void Game::Regenerate()
 
 	// Clear old stuff
 	m_pScene->CleanUpDeviceObjects();
-	m_renderManager.UninitGameGraphics();
+	m_renderManager.UninitGameLevelGraphics();
 
 	m_loader.Regenerate(m_pScene);
 
     // Init render manager
-    hr = m_renderManager.InitGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
+    hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
 	assert(SUCCEEDED(hr));		
 
 	// Init new stuff
@@ -223,7 +223,7 @@ void Game::Update(DX::StepTimer const& timer)
 	{
 		// Clean out game state 
 		m_pScene->DeleteAllChildren();
-		m_renderManager.UninitGameGraphics();
+		m_renderManager.UninitGameLevelGraphics();
 		m_gameData.ResetToDefaults();
 
 		// Determine which scene to load
