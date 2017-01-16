@@ -368,7 +368,7 @@ class RenderManager : public IRenderFrame
 	CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     CComPtr<ID3D12PipelineState> m_pipelineState;
     CComPtr<ID3D12PipelineState> m_pipelineStateFullScreenQuad;
-    CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap; //TODO
+    CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap;
 	CComPtr<ID3D12GraphicsCommandList> m_commandList;
 	UINT m_rtvDescriptorSize;
 	UINT m_dsvDescriptorSize;
@@ -573,6 +573,7 @@ public:
 
 	void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
 				bool m_renderToSharedTexture, float* clearColor);
+    HRESULT RenderSetupCommon(bool resetCommandList);
 
 	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 #if defined(TREE3D12)

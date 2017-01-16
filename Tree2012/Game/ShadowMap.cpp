@@ -53,7 +53,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&texDesc,
-		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&mDepthMap)));
 #else
@@ -106,7 +106,7 @@ ShadowMap::~ShadowMap()
 
 
 #if defined(TREE3D12)
-void ShadowMap::BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList, D3D12_CPU_DESCRIPTOR_HANDLE* pTestRTV)
+void ShadowMap::BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList)
 {
 	cmdList->RSSetViewports(1, &mViewport);
 
@@ -115,20 +115,20 @@ void ShadowMap::BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList
 	//CD3DX12_CPU_DESCRIPTOR_HANDLE* renderTargets[1] = {0};
 	//renderTargets[0] = pTestRTV;
 
-	cmdList->OMSetRenderTargets(1, pTestRTV, false, &mDepthMapDSV);
+    cmdList->OMSetRenderTargets(0, nullptr, false, &mDepthMapDSV);
     
 	cmdList->ClearDepthStencilView(mDepthMapDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
 }
 
 #else
-void ShadowMap::BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc, ID3D11RenderTargetView* pTestRTV)
+void ShadowMap::BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc)
 {
 	dc->RSSetViewports(1, &mViewport);
 
 	// Set null render target because we are only going to draw to depth buffer.
 	// Setting a null render target will disable color writes.
 	ID3D11RenderTargetView* renderTargets[1] = { 0 };
-	renderTargets[0] = pTestRTV;
+	renderTargets[0] = nullptr;
 
 	dc->OMSetRenderTargets(1, renderTargets, mDepthMapDSV);
 

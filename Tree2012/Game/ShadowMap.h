@@ -24,15 +24,15 @@ public:
 
 #if defined(TREE3D12)
 
-	D3D12_CPU_DESCRIPTOR_HANDLE DepthMapSRV() { return mDepthMapSRVCpu;  }
+	D3D12_CPU_DESCRIPTOR_HANDLE DepthMapSRV() { return mDepthMapSRVCpu; }
 	ID3D12Resource* DepthMapBuffer() { return mDepthMap; }
 
-	void BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList, D3D12_CPU_DESCRIPTOR_HANDLE* pTestRTV);
+	void BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList);
 #else
 	ID3D11ShaderResourceView* DepthMapSRV() { return mDepthMapSRV; }
 	ID3D11Texture2D* DepthMapBuffer() { return mDepthMap; }
 
-	void BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc, ID3D11RenderTargetView* pTestRTV);
+	void BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc);
 #endif
 
 private:

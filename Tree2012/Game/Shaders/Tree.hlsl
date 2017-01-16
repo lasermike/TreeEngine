@@ -217,9 +217,13 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
 	float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
 	
 	// draw as grayscale
-    //return float4(c.rrr, 1);
-    float len = length(input.Tex - 0.5);
-    return float4(len, len, len,1);
+    return float4(c.rrr, 1);
+
+    //return float4(.5, 0, 0, 1);
+
+    // draw test circle 
+    //float len = length(input.Tex - 0.5);
+    //return float4(len, len, len,1);
 }
  
 

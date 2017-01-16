@@ -28,17 +28,25 @@ FrameStatistic g_frameStats[MAX_FRAME_STAT] =
 };
 
 
-enum CbvSrvHeapOffsets
+enum DsvHeapOffset
 {
-    ShadowSrv_HeapOffset = 0,
-
-    Material0_HeapOffset    = 1,
-    Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset  = 2,
-    Num_CbvSrvHeapOffsets
+    SwapChainDsv_HeapOffset = 0,
+    ShadowDsv_HeapOffset = 1
 };
 
-const int numGlobalDescriptors = 1;
+
+enum CbvSrvHeapOffsets
+{
+    ShadowSrv_HeapOffset =  0,
+    NullSrv_HeapOffset =    1,
+
+    Material0_HeapOffset =  2,
+    Material0Cbv_HeapOffset = Material0_HeapOffset,
+    Texture0Srv_HeapOffset = 3,
+    Num_CbvSrvHeapOffsets
+}; 
+
+const int numGlobalDescriptors = 2;
 
 const int numConstantBuffersPerMaterial = 1;
 const int numTexturesPerMaterial = 1;
@@ -354,8 +362,9 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 	////////  Shadow map shader /////
 	// Load shadow shaders
-	HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
-	// TODO: load a shadow pixel shader to support transparent textures not casting shadows
+    HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+    HRR(XSF::LoadShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader));
+    // TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
 	////////  Debug texture /////
 	HRR(XSF::LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
@@ -423,16 +432,31 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.DepthStencilState = depthStencilDesc;
-//    psoDesc.DepthStencilState.DepthEnable = FALSE;
-//    psoDesc.DepthStencilState.StencilEnable = FALSE;
 
-    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; //DXGI_FORMAT_D32_FLOAT;
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	psoDesc.NumRenderTargets = 1;
 	psoDesc.RTVFormats[0] = m_swapChainFormat;
 	psoDesc.SampleDesc.Count = 1;
 	HRR(m_d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+
+
+    // PSO for shadow map pass.
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
+    shadowPsoDesc.RasterizerState.DepthBias = 100000;
+    shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
+    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    //shadowPsoDesc.pRootSignature = mRootSignature.Get();
+    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(m_shadowVertexShader);
+    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(m_shadowPixelShader);
+    shadowPsoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+    // Shadow map pass does not have a render target.
+    shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+    shadowPsoDesc.NumRenderTargets = 0;
+
+    HRR(m_d3dDevice->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
 
 	// Execute the command list.
 	HRR(m_commandList->Close());
@@ -549,37 +573,31 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 #endif
 
 #if defined(TREE3D12)
-    CD3DX12_CPU_DESCRIPTOR_HANDLE shadowHandleCpu(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
-    CD3DX12_GPU_DESCRIPTOR_HANDLE shadowHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
+    // Initialize null descriptor
+    CD3DX12_CPU_DESCRIPTOR_HANDLE nullSrvHandleCpu(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
+    D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc = {};
+    nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    nullSrvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    nullSrvDesc.Texture2D.MipLevels = 1;
+    m_d3dDevice->CreateShaderResourceView(nullptr, &nullSrvDesc, nullSrvHandleCpu);
+
 #endif
 
 	// Init shadow map
 	if (useShadowMaps)
 	{
 #if defined(TREE3D12)
-        CD3DX12_CPU_DESCRIPTOR_HANDLE shadowDsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), 1, m_dsvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE shadowHandleCpu(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
+        CD3DX12_GPU_DESCRIPTOR_HANDLE shadowHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE shadowDsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), ShadowDsv_HeapOffset, m_dsvDescriptorSize);
         GetRenderData().pShadowMap = new ShadowMap(GetDevice(), shadowHandleCpu, shadowHandleGpu, shadowDsv, GetRenderData().SMapWidth, GetRenderData().SMapHeight);
 #else
         GetRenderData().pShadowMap = new ShadowMap(GetDevice(), GetRenderData().SMapWidth, GetRenderData().SMapHeight);
 #endif
-	}
-    else
-    {
-#if defined(TREE3D12)
-        // TODO doesn't really belong here?
-        D3D12_SHADER_RESOURCE_VIEW_DESC shadowDesc;
-        shadowDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        shadowDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-        shadowDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        shadowDesc.Texture2D.MostDetailedMip = 0;
-        shadowDesc.Texture2D.MipLevels = 1;
-        shadowDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-        shadowDesc.Texture2D.PlaneSlice = 0;
-        GetDevice()->CreateShaderResourceView(nullptr, &shadowDesc, shadowHandleCpu);
-#endif
     }
 
-	return S_OK;
+    return S_OK;
 }
 
 #if defined(TREE3D12)
@@ -620,6 +638,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	WaitForPreviousFrame();
     m_pipelineState.Release();
     m_pipelineStateFullScreenQuad.Release();
+    m_pipelineStateShadowMap.Release();
 
     m_commandList.Release();
 
@@ -693,6 +712,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_drawScreenPixelShader.Release();
     m_drawScreenVertexShader.Release();
     m_shadowVertexShader.Release();
+    m_shadowPixelShader.Release();
 	SafeDelete(&m_bitmapFont);
 	//RenderStates::DestroyAll();
 
@@ -702,6 +722,9 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 HRESULT RenderManager::BeginFrame()
 {
 #if defined(TREE3D12)
+
+    RenderSetupCommon(true);
+
 	InstancedData* dataView = nullptr;
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 	HR(m_instancedBuffer.Get(m_renderData.frame)->Map(0, &readRange, reinterpret_cast<void**>(&dataView)));
@@ -738,7 +761,7 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 HRESULT RenderManager::RenderScene()
 {
 #if defined(TREE3D12)
-    // TODO 
+
 #else
     // Set samplers
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
@@ -789,7 +812,6 @@ HRESULT RenderManager::RenderScene()
 #endif
 
 #if defined (TREE3D12)
-    m_commandList->SetPipelineState(m_pipelineState);
 
     D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
     buffers[0] = m_VBView;
@@ -1397,8 +1419,14 @@ HRESULT RenderManager::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, D3
     m_commandList->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
     m_commandList->IASetIndexBuffer(&m_screenQuadIBView);
 
+    CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, shadowMapHandle);
+
     commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
-    
+
+    CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
+
     //commandList->IASetInputLayout(InputLayouts::Basic32);
 	//pContext->VSSetShader(m_drawScreenVertexShader, nullptr, 0);
 	//pContext->PSSetShader(m_drawScreenPixelShader, nullptr, 0);
@@ -1532,7 +1560,7 @@ HRESULT RenderManager::InitDevice()
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
 		// and that descriptors contained in it can be referenced by a root table.
 		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = maxNumMaterials * numDescriptorsPerMaterial + 1 /* shadow */;
+        srvHeapDesc.NumDescriptors = maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors /* shadow, null, etc */;
         srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         HRR(m_d3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
@@ -2096,22 +2124,21 @@ void RenderManager::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer, 
-						   bool m_renderToSharedTexture, float* clearColor)
+HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
 {
-	HRESULT hr = S_OK;
-
+    HRESULT hr = S_OK;
 #if defined(TREE3D12)
+    if (resetCommandList)
+    {
+        // Command list allocators can only be reset when the associated command lists have finished execution on the GPU;
+        // apps should use fences to determine GPU execution progress.
+        HR(m_commandAllocator->Reset());
 
-    // Command list allocators can only be reset when the associated 
-    // command lists have finished execution on the GPU; apps should use 
-    // fences to determine GPU execution progress.
-    HR(m_commandAllocator->Reset());
-
-    // However, when ExecuteCommandList() is called on a particular command 
-    // list, that command list can then be reset at any time and must be before 
-    // re-recording.
-    HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
+        // However, when ExecuteCommandList() is called on a particular command 
+        // list, that command list can then be reset at any time and must be before 
+        // re-recording.
+        HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
+    }
 
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature);
@@ -2126,9 +2153,9 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     m_commandList->IASetIndexBuffer(&m_IBView);
     m_commandList->OMSetStencilRef(0);
 
-    // Set default material
+    // Set default material (first material).  Will be changed by calls to SetMaterial()
     CD3DX12_GPU_DESCRIPTOR_HANDLE materialHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), Material0_HeapOffset, m_srvCbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
+    m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, materialHandle);
 
     materialHandle.Offset(Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, materialHandle);
@@ -2139,19 +2166,44 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[1].BufferLocation);
     m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constViewDescs[2].BufferLocation);
 
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+
+#else
+#endif
+    return hr;
+}
+
+//--------------------------------------------------------------------------------------
+// Render a frame.  May be called twice for stereo rendering
+//--------------------------------------------------------------------------------------
+void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer, 
+						   bool m_renderToSharedTexture, float* clearColor)
+{
+	HRESULT hr = S_OK;
+
+#if defined(TREE3D12)
+    RenderSetupCommon(false);
+
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_dsvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
+    
     // Record commands.
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->ClearDepthStencilView(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+    m_commandList->SetPipelineState(m_pipelineState);
+
+    // Make shadow map available to shaders
+    if (useShadowMaps)
+    {
+        CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
+        m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, shadowMapHandle);
+    }
 
 #else
 	if (!oculus)
@@ -2185,7 +2237,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 		GetContext()->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	}
 
-	// Make shadow map avaiable to shaders
+	// Make shadow map available to shaders
 	if (useShadowMaps)
 	{
 		ID3D11ShaderResourceView* depthTexture = GetRenderData().pShadowMap->DepthMapSRV();
@@ -2193,18 +2245,20 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	}
 #endif
 
-	// Draw everything
-	HRC(RenderScene());
+    // Draw everything
+    HRC(RenderScene());
 
+    // Unbind shadow texture so we can render to it next frame
+    if (useShadowMaps)
+    {
 #if defined(TREE3D12)
+        CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
+        m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
 #else
-	// Unbind shadow texture so we can render to it next frame
-	if (useShadowMaps)
-	{
 		ID3D11ShaderResourceView* depthTexture = nullptr;
 		GetContext()->PSSetShaderResources(1, 1, &depthTexture);
-	}
 #endif
+    }
 
 	// Show frame statistics
 	if (showHelp)
@@ -2274,12 +2328,42 @@ HRESULT RenderManager::DrawFrameStats()
 
 HRESULT RenderManager::RenderShadowMap()
 {
-#if defined(TREE3D12)
-#else
-	BuildShadowTransform();
-	GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetContext(), nullptr);
-	DrawSceneToShadowMap();
+    BuildShadowTransform();
 
+#if defined(TREE3D12)
+
+    RenderSetupCommon(false);
+
+    m_commandList->SetPipelineState(m_pipelineStateShadowMap);
+
+    // Change to DEPTH_WRITE.
+    CD3DX12_RESOURCE_BARRIER toWriteBarrier = CD3DX12_RESOURCE_BARRIER::Transition(GetRenderData().pShadowMap->DepthMapBuffer(),
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    m_commandList->ResourceBarrier(1, &toWriteBarrier);
+
+    GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(m_commandList);
+#else
+    GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetContext());
+#endif
+
+    DrawSceneToShadowMap();
+
+#if defined(TREE3D12)
+    m_commandList->RSSetViewports(1, GetViewport());
+
+    // Indicate that the back buffer will now be used to present.
+    CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(GetRenderData().pShadowMap->DepthMapBuffer(),
+        D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
+    m_commandList->ResourceBarrier(1, &toReadBarrier);
+
+    m_commandList->SetPipelineState(m_pipelineState);
+
+    // Execute the command list.
+    //HR(m_commandList->Close());
+    //ID3D12CommandList* ppCommandLists[] = { m_commandList };
+    //m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+#else
 	// Restore state after shadow
 	GetContext()->RSSetState(0);
 	GetContext()->RSSetViewports(1, GetViewport());
@@ -2326,21 +2410,22 @@ void RenderManager::BuildShadowTransform()
 
 void RenderManager::DrawSceneToShadowMap()
 {
+    XMMATRIX view = XMLoadFloat4x4(&GetRenderData().lightView);
+    XMMATRIX proj = XMLoadFloat4x4(&GetRenderData().lightProj);
+    XMMATRIX viewProj = XMMatrixMultiply(view, proj);
+
+    RenderData prevRenderData(GetRenderData());
+    GetRenderData().view = GetRenderData().lightView;
+    GetRenderData().projection = GetRenderData().lightProj;
+    GetRenderData().pass = ShadowMapPass;
+
+    UpdateProjection(&GetRenderData().projection);
+
 #if defined(TREE3D12)
 #else
-	XMMATRIX view = XMLoadFloat4x4(&GetRenderData().lightView);
-	XMMATRIX proj = XMLoadFloat4x4(&GetRenderData().lightProj);
-	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
-
-	RenderData prevRenderData(GetRenderData());
-	GetRenderData().view = GetRenderData().lightView;
-	GetRenderData().projection = GetRenderData().lightProj;
-	GetRenderData().pass = ShadowMapPass;
-
-	UpdateProjection(&GetRenderData().projection);
-
 	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
 	stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
+#endif
 
 	// Draw everything
 	HR(RenderScene());
@@ -2349,8 +2434,9 @@ void RenderManager::DrawSceneToShadowMap()
 
 	UpdateProjection(&GetRenderData().projection);
 
-	stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Solid);
-
+#if defined(TREE3D12)
+#else
+    stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Solid);
 #endif
 }
 
