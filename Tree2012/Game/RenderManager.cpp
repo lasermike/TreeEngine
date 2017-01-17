@@ -57,7 +57,6 @@ enum constBufferRootSignatureOffsets
     NeverChangesRootSignatureShaderSlot,
     ChangeOnResizeRootSignatureShaderSlot,
     ChangesEveryFrameRootSignatureShaderSlot,
-    //MaterialRootSignatureShaderSlot
 };
 
 enum RootSignatureParams
@@ -444,7 +443,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
     // PSO for shadow map pass.
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
-    shadowPsoDesc.RasterizerState.DepthBias = 100000;
+    shadowPsoDesc.RasterizerState.DepthBias = 100;
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
     //shadowPsoDesc.pRootSignature = mRootSignature.Get();
@@ -574,12 +573,12 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 #if defined(TREE3D12)
     // Initialize null descriptor
-    CD3DX12_CPU_DESCRIPTOR_HANDLE nullSrvHandleCpu(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
     D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc = {};
     nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     nullSrvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     nullSrvDesc.Texture2D.MipLevels = 1;
+    CD3DX12_CPU_DESCRIPTOR_HANDLE nullSrvHandleCpu(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
     m_d3dDevice->CreateShaderResourceView(nullptr, &nullSrvDesc, nullSrvHandleCpu);
 
 #endif
@@ -1726,6 +1725,11 @@ HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat)
 
 #if defined(TREE3D12)
 	memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
+    const UINT64 fenceValue = m_fence->GetCompletedValue();
+    const UINT64 fence = m_fenceValue;
+    m_fence->Signal(fence);
+    m_commandQueue->Wait(m_fence, fence);
+    m_fenceValue++;
 #else
 	m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &m_cbChangesOnResize, 0, 0);
 #endif
@@ -2169,6 +2173,11 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
 
+    if (resetCommandList)
+    {
+        // Indicate that the back buffer will be used as a render target.
+        m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    }
 #else
 #endif
     return hr;
@@ -2183,13 +2192,10 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-    RenderSetupCommon(false);
-
-    // Indicate that the back buffer will be used as a render target.
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    //RenderSetupCommon(false);
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_dsvDescriptorSize);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainDsv_HeapOffset, m_dsvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
     
     // Record commands.
@@ -2201,8 +2207,8 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     // Make shadow map available to shaders
     if (useShadowMaps)
     {
-        CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, shadowMapHandle);
+        //CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
+        m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, GetRenderData().pShadowMap->DepthMapSRVGpu());
     }
 
 #else
@@ -2332,7 +2338,7 @@ HRESULT RenderManager::RenderShadowMap()
 
 #if defined(TREE3D12)
 
-    RenderSetupCommon(false);
+    //RenderSetupCommon(false);
 
     m_commandList->SetPipelineState(m_pipelineStateShadowMap);
 
@@ -2349,7 +2355,8 @@ HRESULT RenderManager::RenderShadowMap()
     DrawSceneToShadowMap();
 
 #if defined(TREE3D12)
-    m_commandList->RSSetViewports(1, GetViewport());
+    m_commandList->RSSetViewports(1, &m_viewPort);
+    m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
     // Indicate that the back buffer will now be used to present.
     CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(GetRenderData().pShadowMap->DepthMapBuffer(),
@@ -2357,11 +2364,6 @@ HRESULT RenderManager::RenderShadowMap()
     m_commandList->ResourceBarrier(1, &toReadBarrier);
 
     m_commandList->SetPipelineState(m_pipelineState);
-
-    // Execute the command list.
-    //HR(m_commandList->Close());
-    //ID3D12CommandList* ppCommandLists[] = { m_commandList };
-    //m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 #else
 	// Restore state after shadow

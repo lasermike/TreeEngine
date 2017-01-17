@@ -24,8 +24,9 @@ public:
 
 #if defined(TREE3D12)
 
-	D3D12_CPU_DESCRIPTOR_HANDLE DepthMapSRV() { return mDepthMapSRVCpu; }
-	ID3D12Resource* DepthMapBuffer() { return mDepthMap; }
+    D3D12_CPU_DESCRIPTOR_HANDLE DepthMapSRV() { return mDepthMapSRVCpu; }
+    D3D12_GPU_DESCRIPTOR_HANDLE DepthMapSRVGpu() { return mDepthMapSRVGpu; }
+    ID3D12Resource* DepthMapBuffer() { return mDepthMap; }
 
 	void BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList);
 #else
@@ -50,6 +51,7 @@ private:
 	ID3D12Resource* mDepthMap;
 
 	D3D12_VIEWPORT mViewport;
+    D3D12_RECT mScissorRect;
 #else
 	ID3D11ShaderResourceView* mDepthMapSRV;
 	ID3D11DepthStencilView* mDepthMapDSV;

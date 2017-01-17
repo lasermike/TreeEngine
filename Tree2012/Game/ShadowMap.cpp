@@ -31,6 +31,12 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 	texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 	texDesc.DepthOrArraySize = 1;
+
+    D3D12_CLEAR_VALUE optClear;
+    optClear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    optClear.DepthStencil.Depth = 1.0f;
+    optClear.DepthStencil.Stencil = 0;
+
 #else
 	D3D11_TEXTURE2D_DESC texDesc;
 	texDesc.ArraySize = 1;
@@ -47,6 +53,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     texDesc.SampleDesc.Count   = 1;  
     texDesc.SampleDesc.Quality = 0;  
 
+
 #if defined(TREE3D12)
 
 	HR(device->CreateCommittedResource(
@@ -54,7 +61,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 		D3D12_HEAP_FLAG_NONE,
 		&texDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
+		&optClear,
 		IID_PPV_ARGS(&mDepthMap)));
 #else
     HR(device->CreateTexture2D(&texDesc, 0, &mDepthMap));
@@ -77,6 +84,9 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
 	device->CreateShaderResourceView(mDepthMap, &srvDesc, mDepthMapSRVCpu);
+
+    mScissorRect = { 0, 0, (int)width, (int)height };
+
 #else
 	D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
 	dsvDesc.Flags = 0;
@@ -99,8 +109,6 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 
 ShadowMap::~ShadowMap()
 {
-//    SafeRelease(&mDepthMapSRV);
-//	SafeRelease(&mDepthMapDSV);
     SafeRelease(&mDepthMap);
 }
 
@@ -109,6 +117,7 @@ ShadowMap::~ShadowMap()
 void ShadowMap::BindDsvAndSetNullRenderTarget(ID3D12GraphicsCommandList* cmdList)
 {
 	cmdList->RSSetViewports(1, &mViewport);
+    cmdList->RSSetScissorRects(1, &mScissorRect);
 
 	// Set null render target because we are only going to draw to depth buffer.
 	// Setting a null render target will disable color writes.
