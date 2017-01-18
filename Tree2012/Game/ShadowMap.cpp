@@ -22,6 +22,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     mViewport.MinDepth = 0.0f;
     mViewport.MaxDepth = 1.0f;
 
+
 	// Use typeless format because the 
     // DSV is going to interpret the bits as DXGI_FORMAT_D24_UNORM_S8_UINT whereas the 
     // SRV is going to interpret the bits as DXGI_FORMAT_R24_UNORM_X8_TYPELESS.
@@ -33,7 +34,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 	texDesc.DepthOrArraySize = 1;
 
     D3D12_CLEAR_VALUE optClear;
-    optClear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    optClear.Format = Format();
     optClear.DepthStencil.Depth = 1.0f;
     optClear.DepthStencil.Stencil = 0;
 
@@ -49,7 +50,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     texDesc.Width     = mWidth;
     texDesc.Height    = mHeight;
     texDesc.MipLevels = 1;
-    texDesc.Format    = DXGI_FORMAT_R24G8_TYPELESS;
+    texDesc.Format    = FormatTypeless();
     texDesc.SampleDesc.Count   = 1;  
     texDesc.SampleDesc.Quality = 0;  
 
@@ -71,7 +72,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 
 #if defined(TREE3D12)
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-    dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    dsvDesc.Format = Format();
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Texture2D.MipSlice = 0;
     device->CreateDepthStencilView(mDepthMap, &dsvDesc, mDepthMapDSV);
@@ -80,7 +81,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 	// Describe and create a SRV for the texture.
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+    srvDesc.Format = DXGI_FORMAT_R32_FLOAT; //FormatTypeless();
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
 	device->CreateShaderResourceView(mDepthMap, &srvDesc, mDepthMapSRVCpu);

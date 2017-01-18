@@ -36,6 +36,15 @@ public:
 	void BindDsvAndSetNullRenderTarget(XSF::D3DDeviceContext* dc);
 #endif
 
+    UINT Width() { return mWidth; }
+    UINT Height() { return mHeight; }
+    
+    static DXGI_FORMAT Format() { return DXGI_FORMAT_D32_FLOAT; }
+    static DXGI_FORMAT FormatTypeless() { return DXGI_FORMAT_R32_TYPELESS; }
+
+    //static DXGI_FORMAT Format() { return DXGI_FORMAT_D24_UNORM_S8_UINT; }
+    //static DXGI_FORMAT FormatTypeless() { return DXGI_FORMAT_R24G8_TYPELESS; }
+
 private:
 	ShadowMap(const ShadowMap& rhs);
 	ShadowMap& operator=(const ShadowMap& rhs);

@@ -114,6 +114,9 @@
     <ClCompile Include="..\Game\DDSTextureLoader12.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\ScreenGrab12.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TreePC.h" />
@@ -222,6 +225,9 @@
     <ClInclude Include="..\Game\GpuResource.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\ScreenGrab12.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
@@ -279,6 +285,7 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
       <Filter>Assets</Filter>
     </Image>
+    <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />

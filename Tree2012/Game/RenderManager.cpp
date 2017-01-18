@@ -17,6 +17,7 @@
 
 #if defined (TREE3D12)
 #include "d3d12sdklayers.h"
+#include "ScreenGrab12.h"
 #endif
 
 FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
@@ -33,7 +34,6 @@ enum DsvHeapOffset
     SwapChainDsv_HeapOffset = 0,
     ShadowDsv_HeapOffset = 1
 };
-
 
 enum CbvSrvHeapOffsets
 {
@@ -68,7 +68,6 @@ enum RootSignatureParams
     NeverChangesRootSignatureParam,
     ChangeOnResizeRootSignatureParam,
     ChangesEveryFrameRootSignatureParam,
-    //MaterialRootSignatureParam
 };
 
 
@@ -440,16 +439,15 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	psoDesc.SampleDesc.Count = 1;
 	HRR(m_d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 
-
     // PSO for shadow map pass.
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
-    shadowPsoDesc.RasterizerState.DepthBias = 100;
+    shadowPsoDesc.RasterizerState.DepthBias = 10000;
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
     //shadowPsoDesc.pRootSignature = mRootSignature.Get();
     shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(m_shadowVertexShader);
     shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(m_shadowPixelShader);
-    shadowPsoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    shadowPsoDesc.DSVFormat = ShadowMap::Format();
 
     // Shadow map pass does not have a render target.
     shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
@@ -1070,7 +1068,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_srvCbvDescriptorSize);
 
         // Success
-        m_textures[name] = { texture, newDescriptor, m_textures.size() };
+        m_textures[name] = { texture, newDescriptor, (UINT) m_textures.size() };
         texture.Detach();
         //view.Detach();
 
@@ -1426,18 +1424,6 @@ HRESULT RenderManager::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, D3
     CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
 
-    //commandList->IASetInputLayout(InputLayouts::Basic32);
-	//pContext->VSSetShader(m_drawScreenVertexShader, nullptr, 0);
-	//pContext->PSSetShader(m_drawScreenPixelShader, nullptr, 0);
-
-	//pContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
-
-	//pContext->PSSetShaderResources(0, 1, &depthTexture);
-
-    //commandList->DrawIndexed(6, 0, 0);
-
-	//ID3D11ShaderResourceView* nullText[] = { 0 };
-	////pContext->PSSetShaderResources(0, 1, nullText);
 
 	return S_OK;
 }
@@ -1591,6 +1577,10 @@ HRESULT RenderManager::InitDevice()
     HR(CreateConstantBuffer(sizeof(CBChangeOnResize), nullptr, changesOnResizeViewDesc, &m_pCBChangeOnResize, &m_CBChangesOnResizeDataBegin));
     m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot] = changesOnResizeViewDesc;
 
+    // Shadow map pass constants that never change
+    ZeroMemory(&m_pCBShadowMapChangeOnResize, sizeof(m_pCBShadowMapChangeOnResize));
+    HR(CreateConstantBuffer(sizeof(CBChangeOnResize), nullptr, m_shadowChangesOnResizeConstViewDesc, &m_pCBShadowMapChangeOnResize, &m_CBShadowChangesOnResizeDataBegin));
+
 	// Initialize the world matrices
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
 
@@ -1719,17 +1709,29 @@ HRESULT RenderManager::InitDevice()
 }
 #endif
 
-HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat)
+HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
 {
 	XMStoreFloat4x4(&m_cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
 
 #if defined(TREE3D12)
-	memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
-    const UINT64 fenceValue = m_fence->GetCompletedValue();
-    const UINT64 fence = m_fenceValue;
-    m_fence->Signal(fence);
-    m_commandQueue->Wait(m_fence, fence);
-    m_fenceValue++;
+
+    if (shadowPass)
+    {
+        memcpy(m_CBShadowChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
+        if (m_commandList)
+        {
+            m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_shadowChangesOnResizeConstViewDesc.BufferLocation);
+        }
+    }
+    else
+    {
+        memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
+        if (m_commandList)
+        {
+            m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
+        }
+    }
+
 #else
 	m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &m_cbChangesOnResize, 0, 0);
 #endif
@@ -2058,7 +2060,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		GetRenderData().projectionData.screenWidth / (float) GetRenderData().projectionData.screenHeight,
 		GetRenderData().projectionData.nearClippingPlane, GetRenderData().projectionData.farClippingPlane));
 
-	UpdateProjection(&GetRenderData().projection);
+	UpdateProjection(&GetRenderData().projection, false);
 
 	ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&GetRenderData().projection)));
 
@@ -2166,9 +2168,9 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
     m_commandList->SetGraphicsRootDescriptorTable(SampleTableRootSignatureParam, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
     // Set root signature constant buffers
-    m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[0].BufferLocation);
-    m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[1].BufferLocation);
-    m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constViewDescs[2].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constViewDescs[ChangesEveryFrameRootSignatureShaderSlot].BufferLocation);
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
@@ -2192,7 +2194,6 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-    //RenderSetupCommon(false);
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainDsv_HeapOffset, m_dsvDescriptorSize);
@@ -2207,6 +2208,32 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     // Make shadow map available to shaders
     if (useShadowMaps)
     {
+#if 1
+        if (GetRenderData().frame == 100)
+        {
+            Windows::Storage::StorageFolder^ temporaryFolder = Windows::Storage::ApplicationData::Current->TemporaryFolder;
+
+            Platform::String^ output = temporaryFolder->Path + "\\shadow.dds";
+
+            HRESULT hr = (DirectX::SaveDDSTextureToFile(m_commandQueue,
+                GetRenderData().pShadowMap->DepthMapBuffer(),
+                output->Data(),
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                D3D12_RESOURCE_STATE_GENERIC_READ));
+
+            if (FAILED(hr))
+            {
+                DWORD lastError = GetLastError();
+                HR(hr);
+            }
+            else
+            {
+                Util.Output("Image saved to: %s \n", output->Data()); \
+            }
+        }
+#endif
+
+
         //CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, GetRenderData().pShadowMap->DepthMapSRVGpu());
     }
@@ -2338,8 +2365,6 @@ HRESULT RenderManager::RenderShadowMap()
 
 #if defined(TREE3D12)
 
-    //RenderSetupCommon(false);
-
     m_commandList->SetPipelineState(m_pipelineStateShadowMap);
 
     // Change to DEPTH_WRITE.
@@ -2421,7 +2446,7 @@ void RenderManager::DrawSceneToShadowMap()
     GetRenderData().projection = GetRenderData().lightProj;
     GetRenderData().pass = ShadowMapPass;
 
-    UpdateProjection(&GetRenderData().projection);
+    UpdateProjection(&GetRenderData().projection, true);
 
 #if defined(TREE3D12)
 #else
@@ -2434,7 +2459,7 @@ void RenderManager::DrawSceneToShadowMap()
 
 	GetRenderData() = prevRenderData;
 
-	UpdateProjection(&GetRenderData().projection);
+	UpdateProjection(&GetRenderData().projection, false);
 
 #if defined(TREE3D12)
 #else

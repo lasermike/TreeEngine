@@ -416,6 +416,11 @@ class RenderManager : public IRenderFrame
 	UINT8*								m_CBChangesOnResizeDataBegin;
 	CBChangeOnResize					m_cbChangesOnResize;
 
+    D3D12_CONSTANT_BUFFER_VIEW_DESC     m_shadowChangesOnResizeConstViewDesc;
+    UINT8*                              m_CBShadowChangesOnResizeDataBegin;
+    CComPtr<ID3D12Resource>             m_pCBShadowMapChangeOnResize;
+    CBChangeOnResize                    m_cbShadowMapChangesOnResize;
+
 	CComPtr<ID3DBlob>					m_vertexShader;
 	CComPtr<ID3DBlob>					m_pixelShader;
 
@@ -550,7 +555,7 @@ public:
 	IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
 	D3D11_VIEWPORT* GetViewport() { return &m_viewPort; }
 #endif
-	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
+	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
 
 	HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
 	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
