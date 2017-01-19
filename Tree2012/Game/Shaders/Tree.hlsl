@@ -127,6 +127,7 @@ float4 PS(PS_INPUT input) : SV_Target
 	if (globalFlags & 0x1)
 	{
 		shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, input.ShadowPosH);
+        //shadow[0] = clamp(shadow[0], 0, 1);
 	}
  
 	// Sum the light contribution from each light source.  

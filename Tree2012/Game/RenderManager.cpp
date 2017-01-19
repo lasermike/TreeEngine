@@ -64,12 +64,10 @@ enum RootSignatureParams
     ShadowSrvTableRootSignatureParam = 0,
     CbvTableRootSignatureParam,
     SrvTableRootSignatureParam,
-    SampleTableRootSignatureParam,
     NeverChangesRootSignatureParam,
     ChangeOnResizeRootSignatureParam,
     ChangesEveryFrameRootSignatureParam,
 };
-
 
 const int maxTotalTexturesInScene = 2;
 const int maxNumMaterials = 4;
@@ -267,48 +265,76 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
         // Root signature parameters are:
         //   0  CBV buffer descriptor table - MaterialCbv_HeapOffset
         //   1  SRV descriptor table - Texture0_HeapOffset
-        //   2  Sampler descriptor table
-        //   3  Constant buffer descriptor -NeverChangesCbv_HeapOffset,
-        //   4  Constant buffer descriptor- ChangeOnResizeCbv_HeapOffset,
-        //   5  Constant buffer descriptor- ChangesEveryFrame_HeapOffset,
+        //   2  Constant buffer descriptor -NeverChangesCbv_HeapOffset,
+        //   3  Constant buffer descriptor- ChangeOnResizeCbv_HeapOffset,
+        //   4  Constant buffer descriptor- ChangesEveryFrame_HeapOffset,
 
         //   cbuffer cbNeverChanges : register( b0 )
         //   cbuffer cbChangeOnResize : register(b1)
         //   cbuffer cbChangesEveryFrame : register(b2)
         //   cbuffer cbMaterial : register (b3)
 
-        CD3DX12_DESCRIPTOR_RANGE ranges[4];
+        CD3DX12_DESCRIPTOR_RANGE ranges[3];
         ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
         ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numTexturesPerMaterial, 0 /* t0 */);
-        ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 3, 0);
+        //ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 3, 0);
 
-        CD3DX12_ROOT_PARAMETER rootParameters[7];
+        CD3DX12_ROOT_PARAMETER rootParameters[6];
         rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[CbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[SrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[SampleTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
+        //rootParameters[SampleTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[NeverChangesRootSignatureParam].InitAsConstantBufferView(NeverChangesRootSignatureShaderSlot);
         rootParameters[ChangeOnResizeRootSignatureParam].InitAsConstantBufferView(ChangeOnResizeRootSignatureShaderSlot);
         rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
 
-        D3D12_STATIC_SAMPLER_DESC sampler = {};
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.MipLODBias = 0;
-        sampler.MaxAnisotropy = 0;
-        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        sampler.MinLOD = 0.0f;
-        sampler.MaxLOD = D3D12_FLOAT32_MAX;
-        sampler.ShaderRegister = 0;
-        sampler.RegisterSpace = 0;
-        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        D3D12_STATIC_SAMPLER_DESC sampler[3];
+        sampler[0] = D3D12_STATIC_SAMPLER_DESC();
+        sampler[1] = D3D12_STATIC_SAMPLER_DESC();
+        sampler[2] = D3D12_STATIC_SAMPLER_DESC();
+
+        sampler[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler[0].MipLODBias = 0;
+        sampler[0].MaxAnisotropy = 0;
+        sampler[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sampler[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler[0].MinLOD = 0.0f;
+        sampler[0].MaxLOD = D3D12_FLOAT32_MAX;
+        sampler[0].ShaderRegister = 0;
+        sampler[0].RegisterSpace = 0;
+        sampler[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        sampler[1].ShaderRegister = 1; // shaderRegister
+        sampler[1].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT; // filter
+        sampler[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressU
+        sampler[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressV
+        sampler[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressW
+        sampler[1].MipLODBias = 0.0f;                             // mipLODBias
+        sampler[1].MaxAnisotropy = 16;                            // maxAnisotropy
+        sampler[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        sampler[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+        sampler[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        sampler[2].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler[2].MipLODBias = 0;
+        sampler[2].MaxAnisotropy = 0;
+        sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sampler[2].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler[2].MinLOD = 0.0f;
+        sampler[2].MaxLOD = D3D12_FLOAT32_MAX;
+        sampler[2].ShaderRegister = 2;
+        sampler[2].RegisterSpace = 0;
+        sampler[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+        rootSignatureDesc.Init(_countof(rootParameters), rootParameters, _countof(sampler), sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
         CComPtr<ID3DBlob> signature;
         CComPtr<ID3DBlob> error;
@@ -1550,13 +1576,13 @@ HRESULT RenderManager::InitDevice()
         loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         HRR(m_d3dDevice->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
 		
-		// Describe and create a sampler descriptor heap.
-		D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
-		samplerHeapDesc.NumDescriptors = 2;		// One clamp and one wrap sampler.
-		samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
-		samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		HRR(m_d3dDevice->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_samplerHeap)));
-		SetDebugName(m_samplerHeap, "m_samplerHeap");
+		//// Describe and create a sampler descriptor heap.
+		//D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
+		//samplerHeapDesc.NumDescriptors = 2;		// One clamp and one wrap sampler.
+		//samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+		//samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		//HRR(m_d3dDevice->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_samplerHeap)));
+		//SetDebugName(m_samplerHeap, "m_samplerHeap");
 	}
 
 	HRR(m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
@@ -2186,7 +2212,7 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
-    ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap, m_samplerHeap };
+    ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap }; //, m_samplerHeap };
     m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     m_commandList->RSSetViewports(1, &m_viewPort);
@@ -2202,7 +2228,7 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
 
     materialHandle.Offset(Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, materialHandle);
-    m_commandList->SetGraphicsRootDescriptorTable(SampleTableRootSignatureParam, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
+    //m_commandList->SetGraphicsRootDescriptorTable(SampleTableRootSignatureParam, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
     // Set root signature constant buffers
     m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
@@ -2319,7 +2345,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     // Update chandfsges every frame CB.
     // Compute world to camera matrix
     CBChangesEveryFrame cb;
-    cb.globalFlags = 0; //m_renderData.pShadowMap ? 0x1 : 0x0;
+    cb.globalFlags = m_renderData.pShadowMap ? 0x1 : 0x0;
     cb.light = m_renderData.dirLights[0];
     XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
     cb.shadowMatrix = m_renderData.shadowTransform;
