@@ -438,6 +438,9 @@ class RenderManager : public IRenderFrame
 
 	CComPtr<ID3D12Resource>             m_CBNeverChanges;
 	UINT8*								m_CBNeverChangesDataBegin;
+    CComPtr<ID3D12Resource>             m_CBShadowNeverChanges;
+    D3D12_CONSTANT_BUFFER_VIEW_DESC     m_shadowNeverChangesConstViewDesc;
+    UINT8*								m_CBShadowPassNeverChangesDataBegin;
 
 	CComPtr<ID3D12Resource>             m_CBChangesEveryFrame;
 	UINT8*								m_CBChangesEveryFrameDataBegin;
@@ -504,9 +507,9 @@ class RenderManager : public IRenderFrame
 
 	HRESULT LoadTexture(const wchar_t* textureFilename);
 	HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
-	HRESULT Render(RenderUnit& renderUnit);
-	HRESULT RenderScene();
-	HRESULT SetMaterial(Material& material);
+	HRESULT Render(RenderUnit& renderUnit, RenderPass pass);
+	HRESULT RenderScene(RenderPass pass);
+	HRESULT SetMaterial(Material& material, RenderPass pass);
 
 	void BuildShadowTransform();
 	void DrawSceneToShadowMap();
@@ -556,6 +559,7 @@ public:
 	D3D11_VIEWPORT* GetViewport() { return &m_viewPort; }
 #endif
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+    HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);
 
 	HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
 	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);

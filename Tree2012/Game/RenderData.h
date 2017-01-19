@@ -48,7 +48,7 @@ __declspec(align(16))
 struct RenderData
 {
 	// General
-	RenderPass			pass;
+	//RenderPass			pass;
 	float				time;
 	UINT				frame;
 
@@ -78,7 +78,7 @@ struct RenderData
 	XMFLOAT4X4			lightProj;
 	XMFLOAT4X4			shadowTransform;
 
-	RenderData() : pass(RegularPass), time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr)
+	RenderData() : /*pass(RegularPass), */ time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr)
 	{
 		XMStoreFloat4x4(&world, XMMatrixIdentity());
 		XMStoreFloat4x4(&view, XMMatrixIdentity());

@@ -324,12 +324,14 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     //
     CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
 
-	// Constants that never change
+    // Constants that never change
     D3D12_CONSTANT_BUFFER_VIEW_DESC neverChangesViewDesc = {};
     HR(CreateConstantBuffer(sizeof(CBNeverChanges), nullptr, neverChangesViewDesc, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
     m_constViewDescs[NeverChangesRootSignatureShaderSlot] = neverChangesViewDesc;
 
-	// Constants per frame
+    HR(CreateConstantBuffer(sizeof(CBNeverChanges), nullptr, m_shadowNeverChangesConstViewDesc, &m_CBShadowNeverChanges, &m_CBShadowPassNeverChangesDataBegin));
+
+    // Constants per frame
     D3D12_CONSTANT_BUFFER_VIEW_DESC changesEachFrameViewDesc = {};
     HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), nullptr, changesEachFrameViewDesc, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
     m_constViewDescs[ChangesEveryFrameRootSignatureShaderSlot] = changesEachFrameViewDesc;
@@ -627,7 +629,6 @@ void RenderManager::WaitForPreviousFrame()
 
 HRESULT RenderManager::UninitGameLevelGraphics()
 {
-
 #if defined(TREE3D12)
 
 	// Ensure that the GPU is no longer referencing resources that are about to be
@@ -641,6 +642,25 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 
     m_numMaterialsCreated = 0;
 
+    // Never changes CB
+    if (m_CBNeverChanges)
+    {
+        m_CBNeverChanges->Unmap(0, nullptr);
+    }
+    m_CBNeverChanges.Release();
+
+    if (m_CBShadowNeverChanges)
+    {
+        m_CBShadowNeverChanges->Unmap(0, nullptr);
+    }
+    m_CBShadowNeverChanges.Release();
+
+    // Changes every frame CB
+    if (m_CBChangesEveryFrame)
+    {
+        m_CBChangesEveryFrame->Unmap(0, nullptr);
+    }
+    m_CBChangesEveryFrame.Release();
 #else
 	SafeRelease(&m_vertexLayout);
 #endif
@@ -755,7 +775,7 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 	return S_OK;
 }
 
-HRESULT RenderManager::RenderScene()
+HRESULT RenderManager::RenderScene(RenderPass pass)
 {
 #if defined(TREE3D12)
 
@@ -769,44 +789,18 @@ HRESULT RenderManager::RenderScene()
     m_immediateContext->PSSetSamplers(0, 3, samplers);
 
     // Set shaders
-    if (m_renderData.pass == ShadowMapPass)
+    if (pass == ShadowMapPass)
     {
         m_immediateContext->VSSetShader(m_shadowVertexShader, nullptr, 0);
         m_immediateContext->PSSetShader(m_shadowPixelShader, nullptr, 0);
     }
-    else if (m_renderData.pass == RegularPass)
+    else if (pass == RegularPass)
     {
         m_immediateContext->VSSetShader(m_vertexShader, nullptr, 0);
         m_immediateContext->PSSetShader(m_pixelShader, nullptr, 0);
     }
 #endif
 
-    // Update never changes. TODO: Move out to a place that never changes
-    CBNeverChanges cbNeverChanges;
-    XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(&m_renderData.view)));
-#if defined(TREE3D12)
-    memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
-#else
-    m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
-    m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
-#endif
-
-    // Update changes every frame CB.
-    // Compute world to camera matrix
-    CBChangesEveryFrame cb;
-    cb.globalFlags = m_renderData.pShadowMap ? 0x1 : 0x0;
-    cb.light = m_renderData.dirLights[0];
-    XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
-    cb.shadowMatrix = m_renderData.shadowTransform;
-    XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
-
-#if defined(TREE3D12)
-    memcpy(m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
-#else
-    m_immediateContext->VSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
-    m_immediateContext->PSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
-    m_immediateContext->UpdateSubresource(m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
-#endif
 
 #if defined (TREE3D12)
 
@@ -832,14 +826,14 @@ HRESULT RenderManager::RenderScene()
 	// Render each unit
 	for (auto& ru : m_renderUnits)
 	{
-		Render(ru);
+		Render(ru, pass);
 	}
 
 	return S_OK;
 }
 
 
-HRESULT RenderManager::SetMaterial(Material& material)
+HRESULT RenderManager::SetMaterial(Material& material, RenderPass pass)
 {
 #if defined(TREE3D12)
 	// TODO: Set material PSO
@@ -860,7 +854,7 @@ HRESULT RenderManager::SetMaterial(Material& material)
 	m_immediateContext->PSSetConstantBuffers(3, 1, &material.m_constBuffer);
 
 	// TODO: support arbitary vertex shaders with shadow mapping
-	if (m_renderData.pass != ShadowMapPass)
+	if (pass != ShadowMapPass)
 	{
 		m_immediateContext->VSSetShader(material.m_vertexShader, nullptr, 0);
 		m_immediateContext->PSSetShader(material.m_pixelShader, nullptr, 0);
@@ -872,9 +866,9 @@ HRESULT RenderManager::SetMaterial(Material& material)
 	return S_OK;
 }
 
-HRESULT RenderManager::Render(RenderUnit& ru)
+HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 {
-	SetMaterial(*ru.m_material);
+	SetMaterial(*ru.m_material, pass);
 
 #if defined(TREE3D12)
 #else
@@ -1441,8 +1435,6 @@ HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11Sha
 	pContext->VSSetShader(m_drawScreenVertexShader, nullptr, 0);
 	pContext->PSSetShader(m_drawScreenPixelShader, nullptr, 0);
 
-	//pContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
-
 	pContext->PSSetShaderResources(0, 1, &depthTexture);
 
 	pContext->DrawIndexed(6, 0, 0);
@@ -1708,6 +1700,38 @@ HRESULT RenderManager::InitDevice()
 	return S_OK;
 }
 #endif
+
+
+HRESULT RenderManager::UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass)
+{
+    // Update never changes. TODO: Move out to a place that never changes
+    CBNeverChanges cbNeverChanges;
+    XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+
+#if defined(TREE3D12)
+    if (shadowPass)
+    {
+        memcpy(m_CBShadowPassNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
+        if (m_commandList)
+        {
+            m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_shadowNeverChangesConstViewDesc.BufferLocation);
+        }
+    }
+    else
+    {
+        memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
+        if (m_commandList)
+        {
+            m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
+        }
+    }
+#else
+    m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
+    m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
+#endif
+
+    return S_OK;
+}
 
 HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
 {
@@ -2060,8 +2084,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		GetRenderData().projectionData.screenWidth / (float) GetRenderData().projectionData.screenHeight,
 		GetRenderData().projectionData.nearClippingPlane, GetRenderData().projectionData.farClippingPlane));
 
-	UpdateProjection(&GetRenderData().projection, false);
-
 	ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&GetRenderData().projection)));
 
 	return S_OK;
@@ -2079,7 +2101,6 @@ void RenderManager::UninitDevice()
 	SafeDelete(&GetRenderData().pShadowMap);
 
 	m_pDepthStencil.Release();
-	m_pCBChangeOnResize.Release();
 
 #if defined(TREE3D12)
 	m_commandQueue.Release();
@@ -2100,6 +2121,17 @@ void RenderManager::UninitDevice()
     CloseHandle(m_fenceEvent);
     m_fenceEvent = nullptr;
 
+    if (m_pCBChangeOnResize)
+    {
+        m_pCBChangeOnResize->Unmap(0, nullptr);
+    }
+
+    if (m_pCBShadowMapChangeOnResize)
+    {
+        m_pCBShadowMapChangeOnResize->Unmap(0, nullptr);
+    }
+    m_pCBShadowMapChangeOnResize.Release();
+
 #else
 	m_immediateContext.Release();
 	m_rasterState.Release();
@@ -2112,8 +2144,12 @@ void RenderManager::UninitDevice()
 #endif
 	m_pSwapChain.Release();
 
+    m_pCBChangeOnResize.Release();
+
 	//SafeDelete(&m_bitmapFont);
 
+#if defined(TREE3D12)
+#else
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
 	if (m_d3dDevice)
 	{
@@ -2123,6 +2159,7 @@ void RenderManager::UninitDevice()
 		HR(dbg->ReportLiveDeviceObjects(D3D11_RLDO_SUMMARY | D3D11_RLDO_DETAIL));
 	}
 #endif
+#endif // TREE3D12
 
 	m_d3dDevice.Release();
 }
@@ -2194,7 +2231,6 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainDsv_HeapOffset, m_dsvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
@@ -2232,7 +2268,6 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
             }
         }
 #endif
-
 
         //CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, GetRenderData().pShadowMap->DepthMapSRVGpu());
@@ -2278,8 +2313,28 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	}
 #endif
 
+    UpdateProjection(&GetRenderData().projection, false);
+    UpdateView(&GetRenderData().view, false);
+
+    // Update chandfsges every frame CB.
+    // Compute world to camera matrix
+    CBChangesEveryFrame cb;
+    cb.globalFlags = 0; //m_renderData.pShadowMap ? 0x1 : 0x0;
+    cb.light = m_renderData.dirLights[0];
+    XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
+    cb.shadowMatrix = m_renderData.shadowTransform;
+    XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
+
+#if defined(TREE3D12)
+    memcpy(m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
+#else
+    m_immediateContext->VSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
+    m_immediateContext->PSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
+    m_immediateContext->UpdateSubresource(m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
+#endif
+
     // Draw everything
-    HRC(RenderScene());
+    HRC(RenderScene(RegularPass));
 
     // Unbind shadow texture so we can render to it next frame
     if (useShadowMaps)
@@ -2437,29 +2492,27 @@ void RenderManager::BuildShadowTransform()
 
 void RenderManager::DrawSceneToShadowMap()
 {
-    XMMATRIX view = XMLoadFloat4x4(&GetRenderData().lightView);
-    XMMATRIX proj = XMLoadFloat4x4(&GetRenderData().lightProj);
-    XMMATRIX viewProj = XMMatrixMultiply(view, proj);
+    //RenderData prevRenderData(GetRenderData());
+    //GetRenderData().view = GetRenderData().lightView;
+    //GetRenderData().projection = GetRenderData().lightProj;
+    //GetRenderData().pass = ShadowMapPass;
 
-    RenderData prevRenderData(GetRenderData());
-    GetRenderData().view = GetRenderData().lightView;
-    GetRenderData().projection = GetRenderData().lightProj;
-    GetRenderData().pass = ShadowMapPass;
-
-    UpdateProjection(&GetRenderData().projection, true);
+    UpdateProjection(&GetRenderData().lightProj, true);
+    UpdateView(&GetRenderData().lightView, true);
 
 #if defined(TREE3D12)
 #else
-	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-	stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
+    const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+    stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
 #endif
 
 	// Draw everything
-	HR(RenderScene());
+	HR(RenderScene(ShadowMapPass));
 
-	GetRenderData() = prevRenderData;
+	//GetRenderData() = prevRenderData;
 
-	UpdateProjection(&GetRenderData().projection, false);
+    UpdateProjection(&GetRenderData().projection, false);
+    UpdateView(&GetRenderData().view, false);
 
 #if defined(TREE3D12)
 #else
