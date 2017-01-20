@@ -91,13 +91,12 @@ HRESULT Game::Initialize()
 	// Init scene bounds.
 	// Estimatation.    
 	// Ideally would loop through all world space vertices
-	m_renderManager.GetRenderData().mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	m_renderManager.GetRenderData().mSceneBounds.Radius = 6; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
+	m_renderManager.GetRenderData().mSceneBounds.Center = XMFLOAT3(0.0f, 3.0f, 0.0f);
+	m_renderManager.GetRenderData().mSceneBounds.Radius = 5 ; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
 
 	// Create thread pool
 	//may return 0 when not able to detect
 	unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
-
 	m_threadPool = new ThreadPool(concurentThreadsSupported ? concurentThreadsSupported : 1 );
 
 	return S_OK;
@@ -271,6 +270,16 @@ void Game::Update(DX::StepTimer const& timer)
 		}
 		m_renderManager.GetRenderData().time = (float) m_timeCurrent;
 	//}
+
+    if (!m_paused)
+    {
+        // Light rotation
+        XMVECTOR quat = XMQuaternionRotationNormal(XMVectorSet(0.0f, 1.0f, 0.0f, 1.f), 0.05f); //m_timeCurrent / 1000
+
+        XMVECTOR vec = XMLoadFloat3(&m_renderManager.GetRenderData().dirLights[0].Direction);
+        vec = XMVector3Rotate(vec, quat);
+        XMStoreFloat3(&m_renderManager.GetRenderData().dirLights[0].Direction, vec);
+    }
 
 	HR(m_renderManager.BeginFrame());
 

@@ -278,13 +278,11 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
         ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
         ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numTexturesPerMaterial, 0 /* t0 */);
-        //ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 3, 0);
 
         CD3DX12_ROOT_PARAMETER rootParameters[6];
         rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[CbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[SrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
-        //rootParameters[SampleTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[NeverChangesRootSignatureParam].InitAsConstantBufferView(NeverChangesRootSignatureShaderSlot);
         rootParameters[ChangeOnResizeRootSignatureParam].InitAsConstantBufferView(ChangeOnResizeRootSignatureShaderSlot);
         rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
@@ -469,7 +467,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
     // PSO for shadow map pass.
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
-    shadowPsoDesc.RasterizerState.DepthBias = 10000;
+    shadowPsoDesc.RasterizerState.DepthBias = 100000;
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
     //shadowPsoDesc.pRootSignature = mRootSignature.Get();
@@ -902,6 +900,9 @@ HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 #endif 
 	for (auto object : ru.reservations)
 	{
+        if (pass == ShadowMapPass && object->GetObjectType() == PrimitiveObjectType)
+            continue; 
+
 		UINT startInstance = m_perFrameInstanceData[&ru][object].first;
 		UINT numInstances = m_perFrameInstanceData[&ru][object].second;
 
@@ -2496,10 +2497,10 @@ void RenderManager::BuildShadowTransform()
 	// Ortho frustum in light space encloses scene.
 	float l = sphereCenterLS.x - GetRenderData().mSceneBounds.Radius;
 	float b = sphereCenterLS.y - GetRenderData().mSceneBounds.Radius;
-	float n = sphereCenterLS.z - GetRenderData().mSceneBounds.Radius;
+	float n = sphereCenterLS.z - GetRenderData().mSceneBounds.Radius / 1.25f;
 	float r = sphereCenterLS.x + GetRenderData().mSceneBounds.Radius;
 	float t = sphereCenterLS.y + GetRenderData().mSceneBounds.Radius;
-	float f = sphereCenterLS.z + GetRenderData().mSceneBounds.Radius;
+	float f = sphereCenterLS.z + GetRenderData().mSceneBounds.Radius * 2.75f;
 	XMMATRIX P = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
 
 	// Transform NDC space [-1,+1]^2 to texture space [0,1]^2

@@ -286,11 +286,19 @@ void GameLoader::LoadTrees(SceneRoot* scene, RenderData* renderData, Player* pla
 	params5->GetGeneratorParameters().thickness = .020f;	
 	scene->AddChild(new Tree(params5));
 
+    // Ground
 	WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
 	params4->position = XMFLOAT3(0,0,0);
-	params4->scale = XMFLOAT3(30, .01f, 30);
+	params4->scale = XMFLOAT3(25, .01f, 25);
 	params4->primitiveType = PrimitiveType_Cylinder;
 	scene->AddChild(new Primitive(params4));
+
+    WorldObjectParams* params7 = new WorldObjectParams(PrimitiveGeneratorType);
+    params7->position = XMFLOAT3(0, 0, 0);
+    params7->scale = XMFLOAT3(.4, .4, .4);
+    //XMStoreFloat4(&params5->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
+    params7->primitiveType = PrimitiveType_Box;
+    scene->AddChild(new Primitive(params7));
 
 	// Init lights
 	renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);

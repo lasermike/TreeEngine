@@ -210,9 +210,14 @@ float CalcShadowFactor(SamplerComparisonState samShadow,
                        Texture2D shadowMap, 
 					   float4 shadowPosH)
 {
-	// Complete projection by doing division by w.
+    if (shadowPosH.x <= 0 || shadowPosH.x >= 1 ||
+        shadowPosH.y <= 0 || shadowPosH.y >= 1)
+        return 1;
+   
+    // Complete projection by doing division by w.
 	shadowPosH.xyz /= shadowPosH.w;
 	
+
 	// Depth in NDC space.
 	float depth = shadowPosH.z;
 
