@@ -60,6 +60,7 @@ struct LoadedTexture
 struct Material
 {
 	wstring					  m_name;
+    ShaderMaterial			  m_shaderMaterial;
 
 #if defined(TREE3D12)
 	LoadedTexture*                  m_texture;
@@ -71,6 +72,10 @@ struct Material
 	UINT8*					        m_pConstBufferDataBegin;
     D3D12_GPU_DESCRIPTOR_HANDLE     m_cbvSrvHeapTable;
 
+    // NYI
+    void* m_samplerState;
+    void* m_rasterizer;
+    void* m_depthState;
 #else
 	ID3D11ShaderResourceView* m_texture;
 	ID3D11VertexShader*       m_vertexShader;
@@ -79,16 +84,8 @@ struct Material
 
 	CComPtr<ID3D11Buffer>     m_constBuffer;
 
-#endif
-	ShaderMaterial			  m_shaderMaterial;
-
-	// NYI
-#if defined(TREE3D12)
-	void* m_samplerState;
-	void* m_rasterizer;
-	void* m_depthState;
-#else
-	ID3D11SamplerState*       m_samplerState;
+    // NYI
+    ID3D11SamplerState*       m_samplerState;
     ID3D11RasterizerState*    m_rasterizer;
     ID3D11DepthStencilState*  m_depthState;
 #endif
@@ -164,8 +161,7 @@ public:
     Material& operator=(Material const& /*rhs*/)
     {
         return *this;
-    }  
-
+    }
 
 	~Material()
 	{
@@ -212,7 +208,6 @@ struct RenderUnit
 		assert(m_material);
 		assert(m_mesh);
 	}
-
 };
 
 struct DoubleBuffer	
@@ -322,7 +317,6 @@ interface IRenderFrame
 	virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
 	virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
 	virtual RenderData& GetRenderData() = 0;
-	//virtual XSF::D3DDeviceContext* GetContext() = 0;
 };
 
 class RenderManager : public IRenderFrame

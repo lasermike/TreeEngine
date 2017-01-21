@@ -210,10 +210,11 @@ float CalcShadowFactor(SamplerComparisonState samShadow,
                        Texture2D shadowMap, 
 					   float4 shadowPosH)
 {
+    // TODO: This has got to be slow
     if (shadowPosH.x <= 0 || shadowPosH.x >= 1 ||
         shadowPosH.y <= 0 || shadowPosH.y >= 1)
         return 1;
-   
+
     // Complete projection by doing division by w.
 	shadowPosH.xyz /= shadowPosH.w;
 	

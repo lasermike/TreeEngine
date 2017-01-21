@@ -5,9 +5,17 @@
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -28,6 +36,12 @@
     <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -50,6 +64,10 @@
     <IncludePath>..\Game\.;..\Inc;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);$(WindowsSDK_IncludePath);$(UniversalCRT_IncludePath)</IncludePath>
     <LibraryPath>;..\TreePC\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);$(UniversalCRT_LibraryPath_x86)</LibraryPath>
     <OutDir>$(SolutionDir)$(Configuration)\TreeClassic\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>.;..\Game\.;..\Inc;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>..\TreeClassic\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -101,21 +119,84 @@ call ..\Game\CopyResources.cmd $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>_TREE_CLASSIC;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="..\Game\graphdata.txt" />
     <Text Include="..\Game\Shaders\ShaderFiles.txt" />
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Game\BitmapFont.h" />
+    <ClInclude Include="..\Game\CComPtr.h" />
+    <ClInclude Include="..\Game\DDSTextureLoader.h" />
+    <ClInclude Include="..\Game\DXMath.h" />
+    <ClInclude Include="..\Game\Game.h" />
+    <ClInclude Include="..\Game\GameLoader.h" />
+    <ClInclude Include="..\Game\GeometryGenerator.h" />
+    <ClInclude Include="..\Game\Graph.h" />
+    <ClInclude Include="..\Game\LSystemModelGenerator.h" />
+    <ClInclude Include="..\Game\Materials.h" />
+    <ClInclude Include="..\Game\MathHelper.h" />
+    <ClInclude Include="..\Game\Model.h" />
+    <ClInclude Include="..\Game\OrbitCamera.h" />
+    <ClInclude Include="..\Game\Player.h" />
+    <ClInclude Include="..\Game\Primitive.h" />
+    <ClInclude Include="..\Game\RenderData.h" />
+    <ClInclude Include="..\Game\RenderManager.h" />
+    <ClInclude Include="..\Game\RenderStates.h" />
+    <ClInclude Include="..\Game\Resource.h" />
+    <ClInclude Include="..\Game\SceneRoot.h" />
+    <ClInclude Include="..\Game\ShadowMap.h" />
+    <ClInclude Include="..\Game\stdafx.h" />
+    <ClInclude Include="..\Game\StepTimer.h" />
+    <ClInclude Include="..\Game\StockRenderStates.h" />
+    <ClInclude Include="..\Game\Tree.h" />
+    <ClInclude Include="..\Game\TreeModel.h" />
+    <ClInclude Include="..\Game\TreeModelGenerator.h" />
+    <ClInclude Include="..\Game\WorldObject.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TreeClassic.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Game\BitmapFont.cpp" />
+    <ClCompile Include="..\Game\DDSTextureLoader.cpp" />
+    <ClCompile Include="..\Game\Game.cpp" />
+    <ClCompile Include="..\Game\GameLoader.cpp" />
+    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="..\Game\Graph.cpp" />
+    <ClCompile Include="..\Game\LSystemModelGenerator.cpp" />
+    <ClCompile Include="..\Game\Materials.cpp" />
+    <ClCompile Include="..\Game\MathHelper.cpp" />
+    <ClCompile Include="..\Game\OrbitCamera.cpp" />
+    <ClCompile Include="..\Game\Player.cpp" />
+    <ClCompile Include="..\Game\Primitive.cpp" />
+    <ClCompile Include="..\Game\RenderManager.cpp" />
+    <ClCompile Include="..\Game\RenderStates.cpp" />
+    <ClCompile Include="..\Game\SceneRoot.cpp" />
+    <ClCompile Include="..\Game\ShadowMap.cpp" />
+    <ClCompile Include="..\Game\Stdafx.cpp" />
+    <ClCompile Include="..\Game\StockRenderStates.cpp" />
+    <ClCompile Include="..\Game\Tree.cpp" />
+    <ClCompile Include="..\Game\TreeModel.cpp" />
+    <ClCompile Include="..\Game\TreeModelGenerator.cpp" />
+    <ClCompile Include="..\Game\WorldObject.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TreeClassic.cpp" />
   </ItemGroup>
@@ -123,11 +204,33 @@ call ..\Game\CopyResources.cmd $(OutDir)
     <ResourceCompile Include="TreeClassic.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Game\Arial_16.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <Image Include="..\Game\bark2.dds">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="..\Game\Bark_0005_diffuse.DDS" />
+    <Image Include="..\Game\Bark_0009_diffuse.DDS">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <None Include="..\Game\Courier_New_11.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <Image Include="..\Game\snow.dds">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
     <Image Include="small.ico" />
     <Image Include="TreeClassic.ico" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Game\Arial_16.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
     <None Include="..\Game\CopyResources.cmd" />
+    <None Include="..\Game\Courier_New_11.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
     <None Include="..\Game\Shaders\buildShaders.bat">
       <FileType>Document</FileType>
     </None>
@@ -151,12 +254,6 @@ call ..\Game\CopyResources.cmd $(OutDir)
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\TreeWin32Lib\TreeWin32Lib.vcxproj">
-      <Project>{58431921-70b6-4938-822e-8652a4cf8f28}</Project>
-      <Private>true</Private>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

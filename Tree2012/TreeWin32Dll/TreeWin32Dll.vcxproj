@@ -185,11 +185,6 @@
     <ClCompile Include="TreeWin32Dll.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\TreeWin32Lib\TreeWin32Lib.vcxproj">
-      <Project>{58431921-70b6-4938-822e-8652a4cf8f28}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>

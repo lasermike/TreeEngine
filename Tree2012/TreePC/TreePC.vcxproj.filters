@@ -4,17 +4,14 @@
     <Filter Include="Common">
       <UniqueIdentifier>9b22e637-c613-479f-bec8-59215e96eefb</UniqueIdentifier>
     </Filter>
-    <Filter Include="Assets">
-      <UniqueIdentifier>0231c883-4b58-4f5b-8174-8adc32b27604</UniqueIdentifier>
-    </Filter>
     <Image Include="Assets\Logo.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\SmallLogo.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\StoreLogo.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Filter Include="Old">
       <UniqueIdentifier>{271cec89-5e1f-4377-b741-7ee42db3037e}</UniqueIdentifier>
@@ -34,10 +31,14 @@
     <Filter Include="Game\Source">
       <UniqueIdentifier>{9ef275b0-9e01-43ab-8ed4-bfceeaf6c458}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Platform Source">
+      <UniqueIdentifier>{797ad5e4-5ced-45c1-a317-1d4028112774}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UWP">
+      <UniqueIdentifier>0231c883-4b58-4f5b-8174-8adc32b27604</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="TreePC.cpp" />
-    <ClCompile Include="pch.cpp" />
     <ClCompile Include="..\Game\WorldObject.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -92,7 +93,6 @@
     <ClCompile Include="..\Game\GameLoader.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -117,17 +117,23 @@
     <ClCompile Include="..\Game\ScreenGrab12.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\Player.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Platform Source</Filter>
+    </ClCompile>
+    <ClCompile Include="TreePC.cpp">
+      <Filter>Platform Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="TreePC.h" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="BasicTimer.h">
       <Filter>Old</Filter>
     </ClInclude>
     <ClInclude Include="DirectXHelper.h">
       <Filter>Old</Filter>
     </ClInclude>
-    <ClInclude Include="Lib\DirectXTex.h" />
     <ClInclude Include="..\Game\WorldObject.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
@@ -200,7 +206,6 @@
     <ClInclude Include="..\Game\GameLoader.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\Player.h" />
     <ClInclude Include="..\Game\RenderManager.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
@@ -228,12 +233,20 @@
     <ClInclude Include="..\Game\ScreenGrab12.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
+    <ClInclude Include="Lib\DirectXTex.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\Player.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Platform Source</Filter>
+    </ClInclude>
+    <ClInclude Include="TreePC.h">
+      <Filter>Platform Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <AppxManifest Include="Package.appxmanifest" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="TreePC_TemporaryKey.pfx" />
     <None Include="..\Game\Courier_New_11.abc">
       <Filter>Game\Resources</Filter>
     </None>
@@ -255,6 +268,9 @@
     <None Include="..\Game\CopyResources.cmd">
       <Filter>Game\Resources</Filter>
     </None>
+    <None Include="TreePC_TemporaryKey.pfx">
+      <Filter>UWP</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Game\bark2.dds">
@@ -268,22 +284,22 @@
       <Filter>Game\Resources</Filter>
     </Image>
     <Image Include="Assets\SplashScreen.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\Square44x44Logo.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\Square150x150Logo.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\LockScreenLogo.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
@@ -315,5 +331,10 @@
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
       <Filter>Game\Shaders</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <Filter>UWP</Filter>
+    </AppxManifest>
   </ItemGroup>
 </Project>
