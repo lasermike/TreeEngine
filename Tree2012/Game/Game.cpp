@@ -216,6 +216,8 @@ void Game::Regenerate()
 
 void Game::Update(DX::StepTimer const& timer)
 {
+    PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"Update");
+
 	m_renderManager.GetRenderData().frame++;
 
 	if (m_advanceScene)
@@ -252,24 +254,19 @@ void Game::Update(DX::StepTimer const& timer)
 		m_resetTree = false;
 	}
 
-	// Update our time
-	//if (m_driverType == D3D_DRIVER_TYPE_REFERENCE)
-	//{
-	//	m_renderManager.GetRenderData().time += (float)XM_PI * 0.0125f;
-	//}
-	//else
-	//{
-		if (m_timeStart == 0)
-		{
-			m_timeStart = timer.GetTotalSeconds();
-			m_timeCurrent = 0;
-		}
-		else if (!m_paused)
-		{
-			m_timeCurrent += timer.GetElapsedSeconds();
-		}
-		m_renderManager.GetRenderData().time = (float) m_timeCurrent;
-	//}
+
+    // Update our time
+    if (m_timeStart == 0)
+    {
+        m_timeStart = timer.GetTotalSeconds();
+        m_timeCurrent = 0;
+    }
+    else if (!m_paused)
+    {
+        m_timeCurrent += timer.GetElapsedSeconds();
+    }
+    m_renderManager.GetRenderData().time = (float)m_timeCurrent;
+
 
     if (!m_paused)
     {
@@ -299,7 +296,7 @@ void Game::Update(DX::StepTimer const& timer)
 void Game::ComputeCPU()
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
-    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
+    PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
 
 	// Reset stats
 	for (int i = 0; i < MAX_FRAME_STAT; i++)
@@ -327,8 +324,6 @@ void Game::ComputeGPU()
 	{
 		m_renderManager.RenderShadowMap();
 	}
-
-    PIXEndEvent();  // ComputeGPU
 }
 
 //--------------------------------------------------------------------------------------
@@ -348,6 +343,7 @@ void Game::Render(bool oculus)
 		m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);
 
     PIXEndEvent();  // Render
+    PIXEndEvent();  // Frame begin
 }
 
 void Game::HandleInput(bool key[256])  // WM_KEYDOWN

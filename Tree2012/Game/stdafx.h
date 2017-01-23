@@ -317,8 +317,8 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define VERBOSEENDATGPROFILELABEL
 
 
-const DWORD XTF_COLOR_DRAW_TEXT = 0xFF0000FF;
-const DWORD TREE_COLOR_DRAW_TEXT = 0x0000FFFF;
+const UINT64 XTF_COLOR_DRAW_TEXT = 0xFF0000FF;
+const UINT64 TREE_COLOR_DRAW_TEXT = 0x0000FFFF;
 
 ///////////////////////////////////////////////
 //

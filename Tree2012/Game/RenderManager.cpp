@@ -2252,16 +2252,18 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer, 
-						   bool m_renderToSharedTexture, float* clearColor)
+void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
+    bool m_renderToSharedTexture, float* clearColor)
 {
-	HRESULT hr = S_OK;
+    PIXScopedEvent((ID3D12GraphicsCommandList*) m_commandList, TREE_COLOR_DRAW_TEXT, L"Render");
+    
+    HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainDsv_HeapOffset, m_dsvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-    
+
     // Record commands.
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->ClearDepthStencilView(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
@@ -2301,43 +2303,43 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     }
 
 #else
-	if (!oculus)
-	{
-		// Bind render target and depth
-		ID3D11RenderTargetView* rtv = GetRTV();
-		GetContext()->OMSetRenderTargets(1, &rtv, GetDSV());
-	}
+    if (!oculus)
+    {
+        // Bind render target and depth
+        ID3D11RenderTargetView* rtv = GetRTV();
+        GetContext()->OMSetRenderTargets(1, &rtv, GetDSV());
+    }
 
-	const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-	if (wireframe)
-	{
-		stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Wireframe);
-	}
+    const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+    if (wireframe)
+    {
+        stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Wireframe);
+    }
 
-	if (useAlphaBlendedRenderTarget)
-	{
-		stockStates.ApplyBlendState(GetContext(), XSF::StockBlendStates::AlphaBlend);
-	}
-	else
-	{
-		stockStates.ApplyBlendState(GetContext(), XSF::StockBlendStates::Overwrite);
-	}
+    if (useAlphaBlendedRenderTarget)
+    {
+        stockStates.ApplyBlendState(GetContext(), XSF::StockBlendStates::AlphaBlend);
+    }
+    else
+    {
+        stockStates.ApplyBlendState(GetContext(), XSF::StockBlendStates::Overwrite);
+    }
 
-	if (!oculus)
-	{
-		// Clear the back buffer
-		GetContext()->ClearRenderTargetView(GetRTV(), clearColor);
-	
-		// Clear the depth buffer to 1.0 (max depth)
-		GetContext()->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-	}
+    if (!oculus)
+    {
+        // Clear the back buffer
+        GetContext()->ClearRenderTargetView(GetRTV(), clearColor);
 
-	// Make shadow map available to shaders
-	if (useShadowMaps)
-	{
-		ID3D11ShaderResourceView* depthTexture = GetRenderData().pShadowMap->DepthMapSRV();
-		GetContext()->PSSetShaderResources(1, 1, &depthTexture);
-	}
+        // Clear the depth buffer to 1.0 (max depth)
+        GetContext()->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    }
+
+    // Make shadow map available to shaders
+    if (useShadowMaps)
+    {
+        ID3D11ShaderResourceView* depthTexture = GetRenderData().pShadowMap->DepthMapSRV();
+        GetContext()->PSSetShaderResources(1, 1, &depthTexture);
+    }
 #endif
 
     UpdateProjection(&GetRenderData().projection, false);
@@ -2370,33 +2372,35 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
         CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
 #else
-		ID3D11ShaderResourceView* depthTexture = nullptr;
-		GetContext()->PSSetShaderResources(1, 1, &depthTexture);
+        ID3D11ShaderResourceView* depthTexture = nullptr;
+        GetContext()->PSSetShaderResources(1, 1, &depthTexture);
 #endif
     }
 
-	// Show frame statistics
-	if (showHelp)
-	{
-		DrawFrameStats();
-	}
+    // Show frame statistics
+    if (showHelp)
+    {
+        DrawFrameStats();
+    }
 
 #if defined(TREE3D12)
-	if (showShadowBuffer)
-	{
-		HRC(DrawScreenQuad(m_commandList, GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
-	}
+    if (showShadowBuffer)
+    {
+        HRC(DrawScreenQuad(m_commandList, GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
+    }
 
-	// Indicate that the back buffer will now be used to present.
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    // Indicate that the back buffer will now be used to present.
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-	// Execute the command list.
-	HR(m_commandList->Close());
-	ID3D12CommandList* ppCommandLists[] = { m_commandList };
-	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    // Execute the command list.
+    HR(m_commandList->Close());
+    ID3D12CommandList* ppCommandLists[] = { m_commandList };
+    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	// Present the frame.
-	HR(m_pSwapChain->Present(0, 0));
+    // Present the frame.
+    PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList, TREE_COLOR_DRAW_TEXT, L"Present");
+    HR(m_pSwapChain->Present(0, 0));
+    PIXEndEvent((ID3D12GraphicsCommandList*)m_commandList);
 
 	WaitForPreviousFrame();
 #else
@@ -2443,6 +2447,8 @@ HRESULT RenderManager::DrawFrameStats()
 
 HRESULT RenderManager::RenderShadowMap()
 {
+    PIXScopedEvent((ID3D12GraphicsCommandList*) m_commandList, TREE_COLOR_DRAW_TEXT, L"RenderShadowMap");
+
     BuildShadowTransform();
 
 #if defined(TREE3D12)

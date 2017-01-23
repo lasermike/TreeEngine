@@ -69,6 +69,8 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 
 HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 {
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants");
+
 	UINT startInstance = 0;
 	HRR(pFrameConfig->GetInstanceIndex(this, startInstance));
 
@@ -98,6 +100,9 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 	InstancedData* twigBuffer = dataView + startInstance + _logInstanceData.size();
 	InstancedData* leafBuffer = dataView + startInstance + _logInstanceData.size() + _twigInstanceData.size();
 
+    PIXEndEvent();
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Compute Constants memcpy");
+
 	// TODO add to render unit specific data view
 	if (_logInstanceData.size())
 	{
@@ -118,11 +123,15 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 	pFrameConfig->SetInstances(m_twigUnit, this, startInstance + (UINT) _logInstanceData.size(), (UINT)_twigInstanceData.size());
 	pFrameConfig->SetInstances(m_leafUnit, this, startInstance + (UINT) _logInstanceData.size() + (UINT) _twigInstanceData.size(), (UINT)_leafInstanceData.size());
 	
+    PIXEndEvent();
+
 	return S_OK;
 }
 
 HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBranch, Branch const* branch, const FXMVECTOR parentStart)
 {
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeTransformationsManual");
+
 	if (CalcTime(pRenderData->time) < branch->depth)
 		return S_OK;
 
@@ -135,6 +144,9 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 
 	InstancedData data;
 	XMStoreFloat4x4(&data.World, localToWorld);
+
+    PIXEndEvent();
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants push_back");
 
 	// Decide which geometry model to use
 	switch (branch->geometryType)
@@ -156,6 +168,10 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 
 			break;
 	}
+
+    PIXEndEvent();
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeBranchInstanceData");
+
 	//Compute bounding box
 	XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMVector3Transform(XMVectorSet(-1.0f,-1.0f,-1.0f, 0), localToWorld),
 												XMLoadFloat3(&_boundingBox[0]))); 
@@ -174,7 +190,9 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 		}
 	}
 
-	return S_OK;
+    PIXEndEvent();
+
+    return S_OK;
 }
 
 HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR* vComputedEnd, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart)

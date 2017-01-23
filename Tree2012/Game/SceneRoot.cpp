@@ -77,6 +77,8 @@ void SceneRoot::DeleteAllChildren()
 
 HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
 {
+    PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"SceneRoot::Update");
+
 	HRESULT hr = S_OK;
 
 	UINT numObjs = (UINT) _children.size();
