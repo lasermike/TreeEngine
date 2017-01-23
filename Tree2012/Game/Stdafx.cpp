@@ -201,10 +201,12 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
 }
 
 #if defined(TREE3D12)
+#if defined(_DEBUG)
 void SetDebugName(ID3D12DeviceChild* child, const char* name)
 {
 	child->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(name), name);
 }
+#endif //_DEBUG -> NDEBUG
 
 // Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 // If no such adapter can be found, *ppAdapter will be set to nullptr.

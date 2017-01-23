@@ -1499,7 +1499,7 @@ HRESULT RenderManager::InitDevice()
 #else
 
     CComPtr<IDXGIFactory2> factory2;
-    HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
+    HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory2)));
 
 #endif
 

@@ -162,11 +162,12 @@ void SafeDelete(T* obj)
 
 #if defined(TREE3D12)
 __inline void SetDebugName(ID3D12DeviceChild* /*child*/, const char* /*name*/) { }
+void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter);
 #else
 __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
 #endif // DX12
 
-#else   // NDEBUG
+#else   // NDEBUG -> DEBUG
 
 #define XSF_ASSERT( exp )   if( !(exp) ) { ReportError( "assertion failed: %s\n", __FILE__, __LINE__, #exp ); }
 
@@ -299,6 +300,10 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define PIXBeginEvent(ctx, color, text, ...)
 #define PIXBeginEvent(ctx, color, text)
 #define PIXEndEvent(ctx)
+
+#define PIXScopedEvent(ctx, color, text, ...)
+#define PIXScopedEvent(ctx, color, text)
+#define PIXScopedEvent(color, text)
 
 #endif
 
