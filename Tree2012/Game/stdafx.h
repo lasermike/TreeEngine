@@ -283,10 +283,6 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 
 
 
-    const DWORD XTF_COLOR_DRAW_TEXT = 0xFF0000FF;
-    const DWORD TREE_COLOR_DRAW_TEXT = 0x0000FFFF;
-
-
 #endif
 
 #else // No PIX_INSTRUMENTATION
@@ -295,16 +291,14 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define XSFBeginNamedEvent( ctx, color, text )
 #define XSFEndNamedEvent( ctx )                        
 
-#if defined(ATG_PROFILE) || defined(ATG_PROFILE_VERBOSE)
-#define XSFScopedNamedEvent( ctx, color, text, ... )   ATGPROFILELABEL(text);
-#define XSFScopedNamedEventFunc( ctx, color )          ATGPROFILETHIS;
-#else
 #define XSFSetMarkerF( ctx, color, text, ... )
 #define XSFSetMarker( ctx, color, text )               
 #define XSFScopedNamedEvent( ctx, color, text, ... )   
 #define XSFScopedNamedEventFunc( ctx, color )          
-#endif
 
+#define PIXBeginEvent(ctx, color, text, ...)
+#define PIXBeginEvent(ctx, color, text)
+#define PIXEndEvent(ctx)
 
 #endif
 
@@ -322,6 +316,9 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define VERBOSEATGPROFILELABEL( a )
 #define VERBOSEENDATGPROFILELABEL
 
+
+const DWORD XTF_COLOR_DRAW_TEXT = 0xFF0000FF;
+const DWORD TREE_COLOR_DRAW_TEXT = 0x0000FFFF;
 
 ///////////////////////////////////////////////
 //

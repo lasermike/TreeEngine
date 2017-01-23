@@ -2271,7 +2271,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     // Make shadow map available to shaders
     if (useShadowMaps)
     {
-#if 1
+#if 0
         if (GetRenderData().frame == 100)
         {
             Windows::Storage::StorageFolder^ temporaryFolder = Windows::Storage::ApplicationData::Current->TemporaryFolder;
@@ -2396,7 +2396,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 	// Present the frame.
-	HR(m_pSwapChain->Present(1, 0));
+	HR(m_pSwapChain->Present(0, 0));
 
 	WaitForPreviousFrame();
 #else
