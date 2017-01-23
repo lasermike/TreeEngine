@@ -298,6 +298,9 @@ void Game::Update(DX::StepTimer const& timer)
 //--------------------------------------------------------------------------------------
 void Game::ComputeCPU()
 {
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
+
 	// Reset stats
 	for (int i = 0; i < MAX_FRAME_STAT; i++)
 	{
@@ -311,16 +314,21 @@ void Game::ComputeCPU()
     {
         Update(m_timer);
     });
+
+    PIXEndEvent();  // ComputeCPU
 }
 
 void Game::ComputeGPU()
 {
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
 
 	// Render shadow map
 	if (m_gameData.useShadowMaps)
 	{
 		m_renderManager.RenderShadowMap();
 	}
+
+    PIXEndEvent();  // ComputeGPU
 }
 
 //--------------------------------------------------------------------------------------
@@ -328,7 +336,9 @@ void Game::ComputeGPU()
 //--------------------------------------------------------------------------------------
 void Game::Render(bool oculus)
 {
-	HRESULT hr = S_OK;
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Render");
+
+    HRESULT hr = S_OK;
 
 	m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
 
@@ -337,7 +347,7 @@ void Game::Render(bool oculus)
 	m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
 		m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);
 
-	return;
+    PIXEndEvent();  // Render
 }
 
 void Game::HandleInput(bool key[256])  // WM_KEYDOWN

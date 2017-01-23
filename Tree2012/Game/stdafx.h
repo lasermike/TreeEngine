@@ -202,16 +202,11 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 //
 // PIX markers and events
 //
-#ifdef XSF_USE_PIX_EVENTS
+#if defined(PIX_INSTRUMENTATION)
+
 #ifdef _XBOX_ONE
 #include <pix.h>
 #pragma comment(lib, "pixEvt")
-#else
-// PC doesn't support CPU timing
-#define PIXBeginEvent( ctx, color, text, ... )
-#define PIXEndEvent( ctx )
-#define PIXSetMarker( ctx, color, text, ... )
-#endif
 
 // Pass the d3d device context as a first parameter, and NULL if there is no relevant context (say, it's a CPU function)
 // The "No-op" versions of those are to enforce calling convention in release
@@ -243,25 +238,6 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define XSFScopedNamedEventFunc( ctx, color )          ::XboxSampleFramework::XsfScopedNamedEvent   XSF_PASTE( pixEvent, __LINE__ ) ( ctx, color,  XSF_PASTE( L, __FUNCTION__ ) );
 #endif
 
-#else
-
-#define XSFBeginNamedEventF( ctx, color, text, ... )   
-#define XSFBeginNamedEvent( ctx, color, text )         
-#define XSFEndNamedEvent( ctx )                        
-
-#if defined(ATG_PROFILE) || defined(ATG_PROFILE_VERBOSE)
-#define XSFScopedNamedEvent( ctx, color, text, ... )   ATGPROFILELABEL(text);
-#define XSFScopedNamedEventFunc( ctx, color )          ATGPROFILETHIS;
-#else
-#define XSFSetMarkerF( ctx, color, text, ... )         
-#define XSFSetMarker( ctx, color, text )               
-#define XSFScopedNamedEvent( ctx, color, text, ... )   
-#define XSFScopedNamedEventFunc( ctx, color )          
-#endif
-
-#endif
-
-
 #if defined(ATG_PROFILE_VERBOSE)
 
 #define ATGPROFILETHIS XboxSampleFramework::ATGProfiler::Timer __perf_timer( __FUNCSIG__ )
@@ -292,7 +268,45 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define VERBOSEATGPROFILELABEL( a )
 #define VERBOSEENDATGPROFILELABEL
 
+#endif 
+
 #else
+// PC build
+#include "pix3.h"
+
+#define XSFBeginNamedEventF( ctx, color, text, ... )   PIXBeginEvent(ctx, color, text, __VA_ARGS__)
+#define XSFBeginNamedEvent( ctx, color, text )         PIXBeginEvent(ctx, color, text)
+#define XSFEndNamedEvent( ctx )                        PIXEndEvent(ctx)
+
+#define XSFScopedNamedEvent( ctx, color, text, ... )   PIXScopedEvent(ctx, color, text, __VA_ARGS__)
+#define XSFScopedNamedEventFunc( ctx, color )          PIXScopedEvent(ctx, color, text)
+
+
+
+    const DWORD XTF_COLOR_DRAW_TEXT = 0xFF0000FF;
+    const DWORD TREE_COLOR_DRAW_TEXT = 0x0000FFFF;
+
+
+#endif
+
+#else // No PIX_INSTRUMENTATION
+
+#define XSFBeginNamedEventF( ctx, color, text, ... )
+#define XSFBeginNamedEvent( ctx, color, text )
+#define XSFEndNamedEvent( ctx )                        
+
+#if defined(ATG_PROFILE) || defined(ATG_PROFILE_VERBOSE)
+#define XSFScopedNamedEvent( ctx, color, text, ... )   ATGPROFILELABEL(text);
+#define XSFScopedNamedEventFunc( ctx, color )          ATGPROFILETHIS;
+#else
+#define XSFSetMarkerF( ctx, color, text, ... )
+#define XSFSetMarker( ctx, color, text )               
+#define XSFScopedNamedEvent( ctx, color, text, ... )   
+#define XSFScopedNamedEventFunc( ctx, color )          
+#endif
+
+
+#endif
 
 // Null versions
 #define ATGPROFILETHIS
@@ -301,14 +315,12 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define STARTATGPROFILELABEL( a )
 #define ATGPROFILELABEL( a )
 #define ENDATGPROFILELABEL
-#define VERBOSEATGPROFILETHIS
+#define VERBOSEATGPROFILETHIS ;
 #define VERBOSESTARTATGPROFILETHIS
 #define VERBOSEENDATGPROFILETHIS
 #define VERBOSESTARTATGPROFILELABEL( a )
 #define VERBOSEATGPROFILELABEL( a )
 #define VERBOSEENDATGPROFILELABEL
-
-#endif
 
 
 ///////////////////////////////////////////////

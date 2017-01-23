@@ -25,9 +25,6 @@
     <Filter Include="Game\Shaders">
       <UniqueIdentifier>{d764843c-3859-42b9-8c90-3883b7baac76}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Lib">
-      <UniqueIdentifier>{8f349712-6ffe-464d-8717-3fd2fdba4398}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Game\Source">
       <UniqueIdentifier>{9ef275b0-9e01-43ab-8ed4-bfceeaf6c458}</UniqueIdentifier>
     </Filter>
@@ -271,6 +268,7 @@
     <None Include="TreePC_TemporaryKey.pfx">
       <Filter>UWP</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Game\bark2.dds">
@@ -301,6 +299,8 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
       <Filter>UWP</Filter>
     </Image>
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
