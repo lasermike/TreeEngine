@@ -327,14 +327,12 @@ void Game::Render(bool oculus)
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Render");
 
-    HRESULT hr = S_OK;
+    m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
 
-	m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
+    UpdateViewMatrix();
 
-	UpdateViewMatrix();
-
-	m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
-		m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);
+    m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
+        m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);
 
     PIXEndEvent();  // Render
     PIXEndEvent();  // Frame begin

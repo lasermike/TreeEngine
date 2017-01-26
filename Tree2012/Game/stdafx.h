@@ -366,21 +366,21 @@ namespace XboxSampleFramework
     template< typename t_Resource >
     struct D3DTypePtr
     {
-		t_Resource* ptr;
+        t_Resource* ptr;
 
         operator t_Resource* () { return ptr; }
         operator const t_Resource* () const { return ptr; }
 
         t_Resource** operator &() { return &ptr; }
 
-		void Release()
-		{
-			if (ptr)
-			{
-				ptr->Release();
-				ptr = nullptr;
-			}
-		}
+        void Release()
+        {
+            if (ptr)
+            {
+                ptr->Release();
+                ptr = nullptr;
+            }
+        }
 
         //// This type traits infrastructure allows you to cast D3DTypePtr< t_Resource > to D3DTypePtr< t_Other > 
         //// whenever you can cast t_Resource to t_Other.
@@ -400,8 +400,8 @@ namespace XboxSampleFramework
         //    }
         //};
 
-        //template< typename t_Other > 
-        //operator D3DTypePtr< t_Other >& () { return Typecast< t_Other, std::is_convertible< t_Resource, t_Other >::value >::allowed_cast( *this ); }
+        template< typename t_Other > 
+        operator D3DTypePtr< t_Other >& () { return Typecast< t_Other, std::is_convertible< t_Resource, t_Other >::value >::allowed_cast( *this ); }
     };
 
 #if defined(TREE3D12)

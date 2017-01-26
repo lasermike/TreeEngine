@@ -168,25 +168,45 @@ public:
 	}
 };
 
-struct Mesh
+struct D3DBuffer
 {
 #if defined(TREE3D12)
-	ID3D12Resource* m_vertexBuffer;
-	ID3D12Resource* m_indexBuffer;
+    ID3D12Resource* buffer;
+    operator ID3D12Resource* () { return buffer; }
+
+    D3DBuffer(ID3D12Resource* bufferParam) : buffer(bufferParam) { }
+
 #else
-	ID3D11Buffer* m_vertexBuffer;
-	ID3D11Buffer* m_indexBuffer;
+    ID3D11Buffer* buffer;
+    operator ID3D11Buffer* () { return buffer; }
+
+    D3DBuffer(ID3D11Buffer* bufferParam) : buffer(bufferParam) { }
+
 #endif
-	const GeometryBufferData::BufferIndices* m_bufferIndices;
+
+    D3DBuffer() : buffer(nullptr) { }
+
+    void Release()
+    {
+        if (buffer)
+        {
+            buffer->Release();
+            buffer = nullptr;
+        }
+    }
+};
+
+struct Mesh
+{
+    D3DBuffer m_vertexBuffer;
+    D3DBuffer m_indexBuffer;
+
+    const GeometryBufferData::BufferIndices* m_bufferIndices;
 
 public:
-	Mesh() : m_vertexBuffer(nullptr), m_indexBuffer(nullptr), m_bufferIndices(nullptr) { } 
-#if defined(TREE3D12)
-	Mesh(ID3D12Resource* vertexBuffer, ID3D12Resource* indexBuffer, const GeometryBufferData::BufferIndices* bufferIndices) :
-#else
-	Mesh(ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, const GeometryBufferData::BufferIndices* bufferIndices) :
-#endif
-		m_vertexBuffer(vertexBuffer), m_indexBuffer(indexBuffer), m_bufferIndices(bufferIndices)  
+	Mesh() : m_vertexBuffer(), m_indexBuffer(), m_bufferIndices(nullptr) { } 
+    Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferIndices* bufferIndices) :
+		m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer), m_bufferIndices(bufferIndices)  
 	{
 		assert(m_vertexBuffer);
 		assert(m_indexBuffer);
@@ -316,21 +336,6 @@ interface IRenderFrame
 	virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
 	virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
 	virtual RenderData& GetRenderData() = 0;
-};
-
-struct D3DBuffer
-{
-#if defined(TREE3D12)
-    CComPtr<ID3D12Resource> buffer;
-    operator ID3D12Resource* () { return buffer; }
-    //ID3D12Resource** operator &() { return &buffer; }
-#else
-    CComPtr<ID3D11Buffer> buffer;
-    operator ID3D11Buffer* () { return buffer; }
-    //ID3D11Buffer** operator &() { return &buffer; }
-#endif
-
-    void Release() { buffer.Release(); }
 };
 
 
@@ -538,8 +543,6 @@ public:
     RenderData& GetRenderData() { return m_renderData; }
     XSF::D3DDevice* GetDevice() { return m_d3dDevice; }
 #if defined (TREE3D12)
-    //ID3D12Resource* GetVertexBuffer() { return m_vertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
-    //ID3D12Resource* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
 
     ID3D12Fence* GetFence() { return m_fence; }
     D3DCommandList* GetCommandList() const { return m_commandList; }
@@ -553,8 +556,6 @@ public:
 #else
     XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
 
-    //ID3D11Buffer* GetVertexBuffer() { return m_vertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
-    //ID3D11Buffer* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
 #endif
 
     D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes

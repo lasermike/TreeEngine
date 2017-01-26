@@ -1262,7 +1262,7 @@ HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, 
 //	const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
 #endif
 {
-	m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer->buffer, indexBuffer->buffer, bufferIndices)));
+	m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferIndices)));
 	*newMesh = &m_meshes[name];
 	return S_OK;
 }
