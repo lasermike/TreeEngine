@@ -60,7 +60,7 @@ struct OculusTexture
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
-HWND hWnd = nullptr;
+HWND m_hWnd = nullptr;
 bool oculusMode = false;
 
 // Tree engine
@@ -293,12 +293,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         const DWORD wsStyle = WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME;
         RECT winSize = { 0, 0, vp.w, vp.h };
         AdjustWindowRect(&winSize, wsStyle, FALSE);
-        hWnd = CreateWindowW(L"OVRAppWindow", L"Tree Engine VR", wsStyle | WS_VISIBLE,
+        m_hWnd = CreateWindowW(L"OVRAppWindow", L"Tree Engine VR", wsStyle | WS_VISIBLE,
             CW_USEDEFAULT, CW_USEDEFAULT, winSize.right - winSize.left, winSize.bottom - winSize.top,
             NULL, NULL, hInstance, NULL);
-        if (!hWnd) 
+        if (!m_hWnd) 
             return(false);
-        //SetWindowLongPtr(hWnd, 0, LONG_PTR(this));
+        //SetWindowLongPtr(m_hWnd, 0, LONG_PTR(this));
 
         WinSize = vp.GetSize();
 
@@ -308,18 +308,18 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	{
 		RECT rc = { 0, 0, 1600, 1080};
 		AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
-		hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
+		m_hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
 	}
 
-    if (!hWnd)
+    if (!m_hWnd)
     {
         return FALSE;
     }
 
 	g_game = new Game(&g_inputManager);
 
-	if (FAILED(g_game->Initialize(hWnd, false)))
+	if (FAILED(g_game->Initialize(m_hWnd, false)))
     {
 		g_game->Cleanup();
         return 0;
@@ -329,8 +329,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     DIRECTX.Context = g_game->GetRenderManager().GetContext();
     DIRECTX.SwapChain = g_game->GetRenderManager().GetSwapChain();
 
-    ShowWindow(hWnd, nCmdShow);
-    UpdateWindow(hWnd);
+    ShowWindow(m_hWnd, nCmdShow);
+    UpdateWindow(m_hWnd);
 
 	// Oculus mode
 	if (oculusMode)
@@ -435,12 +435,12 @@ HRESULT ConfigOculusDevice()
 
 void OnWindowSizeChanged()
 {
-    ASSERT(hWnd);
+    ASSERT(m_hWnd);
 
 	RECT rect = {0};
 	UINT windowWidth = 0; 
 	UINT windowHeight = 0;
-	GetClientRect(hWnd, &rect);
+	GetClientRect(m_hWnd, &rect);
 	windowWidth = rect.right - rect.left;
 	windowHeight = rect.bottom - rect.top;
 
@@ -466,7 +466,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_KEYDOWN:
 	case WM_KEYUP:
 	{
-		UINT VKCode = wParam;
+		//UINT VKCode = wParam;
 		bool WasDown = ((lParam & (1 << 30)) != 0);
 		bool IsDown = ((lParam & (1 << 31)) == 0);
 		
@@ -536,7 +536,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 
 // Registers the window class.
-ATOM MyRegisterClass(HINSTANCE hInstance)
+ATOM MyRegisterClass(HINSTANCE /*hInstance*/)
 {
     WNDCLASSW wc; memset(&wc, 0, sizeof(wc));
     wc.lpszClassName = L"OVRAppWindow";

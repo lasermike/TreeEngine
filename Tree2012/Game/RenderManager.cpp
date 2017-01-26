@@ -405,19 +405,19 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 		&vertexBufferDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&m_vertexBuffer)));
-	HRR(m_vertexBuffer->SetName(L"Vertex Buffer"));
+		IID_PPV_ARGS(&m_vertexBuffer.buffer)));
+	HRR(m_vertexBuffer.buffer->SetName(L"Vertex Buffer"));
 
 	// copy the triangle data to the vertex buffer
 	UINT8* dataBegin;
-	m_vertexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+	m_vertexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
 	memcpy(dataBegin, &m_geometryData.vertices[0], sizeof(SimpleVertex) * m_geometryData.vertices.size());
-	m_vertexBuffer->Unmap(0, nullptr);
+	m_vertexBuffer.buffer->Unmap(0, nullptr);
 
 	// initialize vertex buffer view
-	m_VBView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_VBView.BufferLocation = m_vertexBuffer.buffer->GetGPUVirtualAddress();
 	m_VBView.StrideInBytes = sizeof(SimpleVertex);
-	m_VBView.SizeInBytes = sizeof(SimpleVertex) * m_geometryData.vertices.size();
+	m_VBView.SizeInBytes = UINT(sizeof(SimpleVertex) * m_geometryData.vertices.size());
 
 	// Index buffer
 	const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * m_geometryData.indices.size());
@@ -427,17 +427,17 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 		&indexBufferDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&m_indexBuffer)));
-	HRR(m_indexBuffer->SetName(L"Index Buffer"));
+		IID_PPV_ARGS(&m_indexBuffer.buffer)));
+	HRR(m_indexBuffer.buffer->SetName(L"Index Buffer"));
 
 	// copy the index data to the index buffer
-	m_indexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+	m_indexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
 	memcpy(dataBegin, &m_geometryData.indices[0], sizeof(UINT) * m_geometryData.indices.size());
-	m_indexBuffer->Unmap(0, nullptr);
+	m_indexBuffer.buffer->Unmap(0, nullptr);
 
 	// Initialize the index buffer view.
-	m_IBView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-	m_IBView.SizeInBytes = sizeof(UINT) * m_geometryData.indices.size();
+	m_IBView.BufferLocation = m_indexBuffer.buffer->GetGPUVirtualAddress();
+	m_IBView.SizeInBytes = UINT(sizeof(UINT) * m_geometryData.indices.size());
 	m_IBView.Format = DXGI_FORMAT_R32_UINT;
 
 	// Depth stencil description
@@ -540,7 +540,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	D3D11_SUBRESOURCE_DATA vinitData;
 	ZeroMemory(&vinitData, sizeof(vinitData));
 	vinitData.pSysMem = &m_geometryData.vertices[0];
-	HRR(m_d3dDevice->CreateBuffer(&vbd, &vinitData, &m_vertexBuffer));
+	HRR(m_d3dDevice->CreateBuffer(&vbd, &vinitData, &m_vertexBuffer.buffer));
 	SetDebugName(m_vertexBuffer, "RenderManager::m_vertexBuffer");
 
 	D3D11_BUFFER_DESC ibd;
@@ -553,7 +553,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	D3D11_SUBRESOURCE_DATA iinitData;
 	ZeroMemory(&iinitData, sizeof(iinitData));
 	iinitData.pSysMem = &m_geometryData.indices[0];
-	HRR(m_d3dDevice->CreateBuffer(&ibd, &iinitData, &m_indexBuffer));
+	HRR(m_d3dDevice->CreateBuffer(&ibd, &iinitData, &m_indexBuffer.buffer));
 	SetDebugName(m_indexBuffer, "RenderManager::m_indexBuffer");
 
 	// Set index buffer
@@ -690,8 +690,8 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 #endif
 
 	SafeDelete(&GetRenderData().pShadowMap);
-	SafeRelease(&m_vertexBuffer);
-	SafeRelease(&m_indexBuffer);
+	m_vertexBuffer.Release();
+    m_indexBuffer.Release();
 	SafeRelease(&m_vertexShader);
 	SafeRelease(&m_pixelShader);
 	SafeRelease(&m_CBNeverChanges);
@@ -856,35 +856,34 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
 	return S_OK;
 }
 
-
-HRESULT RenderManager::SetMaterial(Material& material, RenderPass pass)
+HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
 {
 #if defined(TREE3D12)
 	// TODO: Set material PSO
-    memcpy(material.m_pConstBufferDataBegin, &material.m_shaderMaterial, sizeof(material.m_shaderMaterial));
+    memcpy(material->m_pConstBufferDataBegin, &material->m_shaderMaterial, sizeof(material->m_shaderMaterial));
 
     // Set constant buffer view
-    m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material.m_cbvSrvHeapTable);
+    m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material->m_cbvSrvHeapTable);
 
     // Set texture buffer view
-    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material.m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
 #else
 	CBMaterial cb;
-	cb.material = material.m_shaderMaterial;
+	cb.material = material->m_shaderMaterial;
 
-	m_immediateContext->VSSetConstantBuffers(3, 1, &material.m_constBuffer);
-	m_immediateContext->PSSetConstantBuffers(3, 1, &material.m_constBuffer);
+	m_immediateContext->VSSetConstantBuffers(3, 1, &material->m_constBuffer);
+	m_immediateContext->PSSetConstantBuffers(3, 1, &material->m_constBuffer);
 
 	// TODO: support arbitary vertex shaders with shadow mapping
 	if (pass != ShadowMapPass)
 	{
-		m_immediateContext->VSSetShader(material.m_vertexShader, nullptr, 0);
-		m_immediateContext->PSSetShader(material.m_pixelShader, nullptr, 0);
+		m_immediateContext->VSSetShader(material->m_vertexShader, nullptr, 0);
+		m_immediateContext->PSSetShader(material->m_pixelShader, nullptr, 0);
 	}
 
-	m_immediateContext->UpdateSubresource(material.m_constBuffer, 0, nullptr, &cb, 0, 0);
+	m_immediateContext->UpdateSubresource(material->m_constBuffer, 0, nullptr, &cb, 0, 0);
 #endif
 
 	return S_OK;
@@ -892,7 +891,7 @@ HRESULT RenderManager::SetMaterial(Material& material, RenderPass pass)
 
 HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 {
-	SetMaterial(*ru.m_material, pass);
+	SetMaterial(ru.m_material, pass);
 
 #if defined(TREE3D12)
 #else
@@ -923,7 +922,7 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
     LoadedTexture& texture = m_textures[textureFilename];
 	if (!texture.texture)
 	{
-        int heapIndex = m_textures.size() - 1;
+        int heapIndex = int(m_textures.size() - 1);
         CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_srvCbvDescriptorSize);
         HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &texture.texture, newDescriptor));
         texture.textureView = newDescriptor;
@@ -1085,7 +1084,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         srvDesc.Texture2D.MipLevels = 1;
         m_d3dDevice->CreateShaderResourceView(texture, &srvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
 
-        int srvHeapIndex = m_textures.size();
+        int srvHeapIndex = (int) m_textures.size();
         CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_srvCbvDescriptorSize);
 
         // Success
@@ -1252,15 +1251,18 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	return S_OK;
 }
 
+HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
+    const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
+
 #if defined(TREE3D12)
-HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D12Resource* vertexBuffer, ID3D12Resource* indexBuffer,
-							      const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
+//HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D12Resource* vertexBuffer, ID3D12Resource* indexBuffer,
+//							      const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
 #else
-HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer,
-	const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
+//HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer,
+//	const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
 #endif
 {
-	m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferIndices)));
+	m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer->buffer, indexBuffer->buffer, bufferIndices)));
 	*newMesh = &m_meshes[name];
 	return S_OK;
 }
@@ -1354,7 +1356,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 	// initialize vertex buffer view
 	m_screenQuadVBView.BufferLocation = m_screenQuadVB->GetGPUVirtualAddress();
 	m_screenQuadVBView.StrideInBytes = sizeof(SimpleVertex);
-	m_screenQuadVBView.SizeInBytes = sizeof(SimpleVertex) * quad.Vertices.size();
+	m_screenQuadVBView.SizeInBytes = UINT(sizeof(SimpleVertex) * quad.Vertices.size());
 
 	// Index buffer
 	const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * quad.Indices.size());
@@ -1365,7 +1367,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&m_screenQuadIB)));
-	HRR(m_indexBuffer->SetName(L"Index Buffer"));
+	HRR(m_indexBuffer.buffer->SetName(L"Index Buffer"));
 
 	// copy the index data to the index buffer
 	m_screenQuadIB->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
@@ -1374,7 +1376,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 
 	// initialize index DXGI_FORMAT_R32_UINTbuffer view
 	m_screenQuadIBView.BufferLocation = m_screenQuadIB->GetGPUVirtualAddress();
-	m_screenQuadIBView.SizeInBytes = sizeof(UINT) * quad.Indices.size();
+	m_screenQuadIBView.SizeInBytes = sizeof(UINT) * (UINT) quad.Indices.size();
 	m_screenQuadIBView.Format = DXGI_FORMAT_R32_UINT;
 
     // Describe and create the graphics pipeline state object (PSO).
@@ -1753,6 +1755,8 @@ HRESULT RenderManager::UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass)
         }
     }
 #else
+    shadowPass;
+
     m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
     m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
 #endif
@@ -2245,6 +2249,7 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
         m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
     }
 #else
+    resetCommandList;
 #endif
     return hr;
 }
@@ -2255,11 +2260,11 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
 void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
     bool m_renderToSharedTexture, float* clearColor)
 {
-    PIXScopedEvent((ID3D12GraphicsCommandList*) m_commandList, TREE_COLOR_DRAW_TEXT, L"Render");
-    
     HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
+    PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList, TREE_COLOR_DRAW_TEXT, L"Render");
+
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainDsv_HeapOffset, m_dsvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
@@ -2392,15 +2397,15 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     // Indicate that the back buffer will now be used to present.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
+    PIXEndEvent((ID3D12GraphicsCommandList*)m_commandList); // Render
+
     // Execute the command list.
     HR(m_commandList->Close());
     ID3D12CommandList* ppCommandLists[] = { m_commandList };
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // Present the frame.
-    PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList, TREE_COLOR_DRAW_TEXT, L"Present");
     HR(m_pSwapChain->Present(0, 0));
-    PIXEndEvent((ID3D12GraphicsCommandList*)m_commandList);
 
 	WaitForPreviousFrame();
 #else
@@ -2447,7 +2452,9 @@ HRESULT RenderManager::DrawFrameStats()
 
 HRESULT RenderManager::RenderShadowMap()
 {
-    PIXScopedEvent((ID3D12GraphicsCommandList*) m_commandList, TREE_COLOR_DRAW_TEXT, L"RenderShadowMap");
+#if defined(TREE3D12)
+    PIXScopedEvent((ID3D12GraphicsCommandList*)m_commandList, TREE_COLOR_DRAW_TEXT, L"RenderShadowMap");
+#endif
 
     BuildShadowTransform();
 

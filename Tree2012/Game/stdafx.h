@@ -97,8 +97,8 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 
 #define ASSERTSZ(x, str) \
 		if (!(x)) { \
-			assert(0 == L#x);   \
-			Util.Output("Assert failed: %s \n", L#x); \
+			assert(0);   \
+			Util.Output("Assert failed: %s \n", L#str); \
 		} 
 			//wstringstream str; \
 			//str << L"LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << L"\n"; \
@@ -297,13 +297,17 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #define XSFScopedNamedEvent( ctx, color, text, ... )   
 #define XSFScopedNamedEventFunc( ctx, color )          
 
-#define PIXBeginEvent(ctx, color, text, ...)
-#define PIXBeginEvent(ctx, color, text)
-#define PIXEndEvent(ctx)
+void PIXBeginEvent(void* /*ctx*/, DWORD /*color*/, wchar_t* /*text*/, ...);
+void PIXBeginEvent(DWORD /*color*/, wchar_t* /*text*/, ...);
 
-#define PIXScopedEvent(ctx, color, text, ...)
-#define PIXScopedEvent(ctx, color, text)
-#define PIXScopedEvent(color, text)
+void PIXBeginEvent(void* /*ctx*/);
+void PIXBeginEvent();
+
+void PIXEndEvent(void*);
+void PIXEndEvent();
+
+void PIXScopedEvent(void*, DWORD, wchar_t*, ...);
+void PIXScopedEvent(DWORD, wchar_t*, ...);
 
 #endif
 
@@ -360,7 +364,7 @@ namespace XboxSampleFramework
 {
     // Auto-releasing D3D resources
     template< typename t_Resource >
-    struct D3DTypePtr  //: public Microsoft::WRL::ComPtr< t_Resource >
+    struct D3DTypePtr
     {
 		t_Resource* ptr;
 

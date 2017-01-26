@@ -48,7 +48,6 @@ __declspec(align(16))
 struct RenderData
 {
 	// General
-	//RenderPass			pass;
 	float				time;
 	UINT				frame;
 

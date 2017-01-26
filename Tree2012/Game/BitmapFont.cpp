@@ -1398,7 +1398,7 @@ void XSF::DynamicBuffer::Unmap(UINT numBytesUsed)
 //-------------------------------------------------------------------------------------
 ID3D11Buffer* const&   XSF::DynamicBuffer::GetBuffer() const
 {
-	return m_spBuffer.ptr;
+	return (ID3D11Buffer*) m_spBuffer.ptr;
 }
 
 //--------------------------------------------------------------------------------------

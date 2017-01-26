@@ -232,7 +232,6 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
 	*vComputedEnd = (vEnd - vStart) * vMagY + vStart;
 
 	// Determine rotation
-	XMMATRIX mRot;
 	XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
 	XMVECTOR vLeft = XMVectorSet(1, 0, 0, 0);
 	XMVECTOR vDir = XMVector3Normalize(vEnd - vStart);
@@ -296,7 +295,6 @@ HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransf
 	*vChildStart = (vEnd - vStart) * vMagY + vStart;
 
 	// Determine rotation
-	XMMATRIX mRot;
 	XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
 	XMVECTOR vDiff = vEnd - vStart;
 	XMVECTOR vCross = XMVector3Cross(vUp, XMVector3Normalize(vDiff));

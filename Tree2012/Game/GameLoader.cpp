@@ -129,7 +129,7 @@ HRESULT CreateBufferOfGraphPoints(std::vector<float>& buffer, UINT& width, char*
 	}
 
 	ASSERT(buffer.size() % rows == 0);
-	columns = buffer.size() / rows;
+	columns = UINT(buffer.size() / rows);
 
 	double timeScale = 1.0 / maxTime;
 	double timeDelta = .1 / buffer[columns];
@@ -163,7 +163,7 @@ void GameLoader::LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* p
 	// Load graph points into buffer
 	UINT width = 0;
 	HR(CreateBufferOfGraphPoints(params.points, params.width, "graphdata.txt"));
-	params.height = params.points.size() / params.width;
+	params.height = UINT(params.points.size() / params.width);
 
 	scene->AddChild(new FSGraph(graphParams));
 
@@ -295,7 +295,7 @@ void GameLoader::LoadTrees(SceneRoot* scene, RenderData* renderData, Player* pla
 
     WorldObjectParams* params7 = new WorldObjectParams(PrimitiveGeneratorType);
     params7->position = XMFLOAT3(0, 0, 0);
-    params7->scale = XMFLOAT3(.4, .4, .4);
+    params7->scale = XMFLOAT3(.4f, .4f, .4f);
     //XMStoreFloat4(&params5->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
     params7->primitiveType = PrimitiveType_Box;
     scene->AddChild(new Primitive(params7));
