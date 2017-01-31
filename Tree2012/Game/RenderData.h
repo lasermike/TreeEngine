@@ -47,23 +47,23 @@ struct ProjectionData
 __declspec(align(16)) 
 struct RenderData
 {
-	// General
-	float				time;
-	UINT				frame;
+    // General
+    float               time;
+    UINT                frame;
 
-	// Transformations
+    // Transformations
     ProjectionData      projectionData;
 
-	XMFLOAT4X4			world;          // Needed?
+	XMFLOAT4X4          world;          // Needed?
 	XMFLOAT4X4          projection;
-	XMFLOAT4X4			view;           
-	XMVECTOR			eyePos;
+	XMFLOAT4X4          view;           
+	XMVECTOR            eyePos;
 
 	// Instance rendering
-	InstancedData*		instanceData;
+	InstancedData*      instanceData;
 
 	// Per frame statistics
-	FrameStatistic*		frameStats;
+	FrameStatistic*     frameStats;
 
 	// Lighting
 	DirectionalLight	dirLights[1];

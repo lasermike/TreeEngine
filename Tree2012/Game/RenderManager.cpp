@@ -169,7 +169,7 @@ void InputLayouts::DestroyAll()
 
 #pragma endregion
 
-RenderManager::RenderManager() : 
+RenderManager::RenderManager() :
 						 m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr), 
 						 m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
 						 m_drawScreenVertexShader(), m_drawScreenPixelShader()
@@ -206,7 +206,7 @@ HRESULT RenderManager::Initialize()
 
 RenderManager::~RenderManager()
 {
-	UninitGameLevelGraphics();
+    UninitDevice();
 }
 
 #if defined(TREE3D12)
@@ -379,10 +379,10 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 	////////  Regular shaders /////
 
-	// Load regular shaders
+	// Load default shaders
 #if defined(TREE3D12)
-	HR(XSF::LoadShader(L"VS.cso", &m_vertexShader));
-	HR(XSF::LoadShader(L"PS.cso", &m_pixelShader));
+	HR(XSF::LoadShader(L"VS.cso", &m_vertexShader.shader));
+	HR(XSF::LoadShader(L"PS.cso", &m_pixelShader.shader));
 
 	////////  Shadow map shader /////
 	// Load shadow shaders
@@ -451,8 +451,8 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 	psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
 	psoDesc.pRootSignature = m_rootSignature;
-	psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader);
-	psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader);
+	psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader.shader);
+	psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader.shader);
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.DepthStencilState = depthStencilDesc;
@@ -492,12 +492,12 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	// Create Instanced draw data layout
 	std::vector< BYTE > dataVS;
 	HRR(XSF::LoadBlob(L"VS.cso", dataVS));
-	HRR(m_d3dDevice->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader));
+	HRR(m_d3dDevice->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
 
-	HRR(LoadPixelShader(m_d3dDevice, L"PS.cso", &m_pixelShader));
+	HRR(LoadPixelShader(m_d3dDevice, L"PS.cso", &m_pixelShader.shader));
 
-	SetDebugName(m_vertexShader, "RenderManager::m_vertexShader");
-	SetDebugName(m_pixelShader, "RenderManager::m_pixelShader");
+	SetDebugName(m_vertexShader.shader, "RenderManager::m_vertexShader");
+	SetDebugName(m_pixelShader.shader, "RenderManager::m_pixelShader");
 
 	InputLayouts::InitAll(m_d3dDevice, &(dataVS)[0], dataVS.size());
 	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
@@ -623,6 +623,17 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     return S_OK;
 }
 
+HRESULT RenderManager::GetViewport(Viewport& viewport)
+{
+    viewport.TopLeftX = m_viewPort.TopLeftX;
+    viewport.TopLeftY = m_viewPort.TopLeftY;
+    viewport.Width = m_viewPort.Width;
+    viewport.Height = m_viewPort.Height;
+    viewport.MinDepth = m_viewPort.MinDepth;
+    viewport.MaxDepth = m_viewPort.MaxDepth;
+    return S_OK;
+}
+
 #if defined(TREE3D12)
 void RenderManager::WaitForPreviousFrame()
 {
@@ -692,30 +703,27 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	SafeDelete(&GetRenderData().pShadowMap);
 	m_vertexBuffer.Release();
     m_indexBuffer.Release();
-	SafeRelease(&m_vertexShader);
-	SafeRelease(&m_pixelShader);
+	m_vertexShader.Release();
+	m_pixelShader.Release();
 	SafeRelease(&m_CBNeverChanges);
 	SafeRelease(&m_CBChangesEveryFrame);
 	m_instancedBuffer.Release();
 
-#if !defined(TREE3D12)
 	for (auto& t : m_textures)
 	{
-		if (t.second)
+		if (t.second.texture)
 		{
-			t.second->Release();
-			t.second = nullptr;
+			t.second.texture->Release();
+			t.second.texture = nullptr;
 		}
 	}
-#endif
 	m_textures.clear();
 
 	for (auto& vs : m_vertexShaders)
 	{
 		if (vs.second)
 		{
-			vs.second->Release();
-			vs.second = nullptr;
+            SafeDelete(&vs.second);
 		}
 	}
 
@@ -723,8 +731,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	{
 		if (ps.second)
 		{
-			ps.second->Release();
-			ps.second = nullptr;
+            SafeDelete(&ps.second);
 		}
 	}
 
@@ -732,9 +739,8 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	{
         if (m.second)
 		{
-            delete m.second;
-            m.second = nullptr;
-		}
+            SafeDelete(&m.second);
+        }
 	}
 	m_materials.clear();
 
@@ -820,8 +826,8 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     }
     else if (pass == RegularPass)
     {
-        m_immediateContext->VSSetShader(m_vertexShader, nullptr, 0);
-        m_immediateContext->PSSetShader(m_pixelShader, nullptr, 0);
+        m_immediateContext->VSSetShader(m_vertexShader.shader, nullptr, 0);
+        m_immediateContext->PSSetShader(m_pixelShader.shader, nullptr, 0);
     }
 #endif
 
@@ -879,8 +885,8 @@ HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
 	// TODO: support arbitary vertex shaders with shadow mapping
 	if (pass != ShadowMapPass)
 	{
-		m_immediateContext->VSSetShader(material->m_vertexShader, nullptr, 0);
-		m_immediateContext->PSSetShader(material->m_pixelShader, nullptr, 0);
+		m_immediateContext->VSSetShader(material->m_vertexShader->shader, nullptr, 0);
+		m_immediateContext->PSSetShader(material->m_pixelShader->shader, nullptr, 0);
 	}
 
 	m_immediateContext->UpdateSubresource(material->m_constBuffer, 0, nullptr, &cb, 0, 0);
@@ -895,7 +901,14 @@ HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 
 #if defined(TREE3D12)
 #else
-	m_immediateContext->PSSetShaderResources(0, 1, &ru.m_material->m_texture);
+    ID3D11ShaderResourceView* texture = nullptr;
+
+    if (ru.m_material->m_texture)
+    {
+        texture = ru.m_material->m_texture->texture;
+    }
+
+	m_immediateContext->PSSetShaderResources(0, 1, &texture);
 #endif 
 	for (auto object : ru.reservations)
 	{
@@ -934,11 +947,11 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 #else
 HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 {
-	ID3D11ShaderResourceView* texture = m_textures[textureFilename];
-	if (!texture)
+	LoadedTexture texture = m_textures[textureFilename];
+	if (!texture.texture)
 	{
 		// Load the Texture
-		HRR(CreateDDSTextureFromFile(m_d3dDevice, textureFilename, nullptr, &texture));
+		HRR(CreateDDSTextureFromFile(m_d3dDevice, textureFilename, nullptr, &texture.texture));
 		m_textures[textureFilename] = texture;
 	}
 
@@ -958,51 +971,45 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 	{
 	case ShaderType_VertexShader:
 	{
-#if defined(TREE3D12)
-		ID3DBlob* vertexShader = m_vertexShaders[shaderFilename];
-#else
-		ID3D11VertexShader* vertexShader = m_vertexShaders[shaderFilename];
-#endif
-		if (vertexShader)
+		if (m_vertexShaders[shaderFilename])
 		{
 			return S_OK;
 		}
 
+        VertexShader vertexShader = {0};
+
 #if defined(TREE3D12)
-		HR(XSF::LoadShader(shaderFilename, &vertexShader));
+		HR(XSF::LoadShader(shaderFilename, &vertexShader.shader));
 #else
 		std::vector< BYTE > shaderData;
 		HRR(XSF::LoadBlob(shaderFilename, shaderData));
 
 		// Create VS input layout
 		// Load regular vertex Shader
-		HRR(m_d3dDevice->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &vertexShader));
-		SetDebugName(vertexShader, sbFilename);
+		HRR(m_d3dDevice->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &vertexShader.shader));
+		SetDebugName(vertexShader.shader, sbFilename);
 #endif
-		m_vertexShaders[shaderFilename] = vertexShader;
+		m_vertexShaders[shaderFilename] = new VertexShader(vertexShader);
 
 		break;
 	}
 	case ShaderType_PixelShader:
 	{
-#if defined(TREE3D12)
-		ID3DBlob* pixelShader = m_pixelShaders[shaderFilename];
-#else
-		ID3D11PixelShader* pixelShader = m_pixelShaders[shaderFilename];
-#endif
-		if (pixelShader)
+		if (m_pixelShaders[shaderFilename])
 		{
 			return S_OK;
 		}
 
+        PixelShader pixelShader = { 0 };
+
 		// Load regular pixel Shader
 #if defined(TREE3D12)
-		HR(XSF::LoadShader(shaderFilename, &pixelShader));
+		HR(XSF::LoadShader(shaderFilename, &pixelShader.shader));
 #else
-		HRR(LoadPixelShader(m_d3dDevice, shaderFilename, &pixelShader));
-		SetDebugName(pixelShader, sbFilename);
+		HRR(LoadPixelShader(m_d3dDevice, shaderFilename, &pixelShader.shader));
+		SetDebugName(pixelShader.shader, sbFilename);
 #endif
-		m_pixelShaders[shaderFilename] = pixelShader;
+		m_pixelShaders[shaderFilename] = new PixelShader(pixelShader);
 
 		break;
 	}
@@ -1136,7 +1143,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 #endif
 	
 	// Success
-	m_textures[name] = view;
+	m_textures[name].texture = view;
 	texture.Release();
 	view.Detach();
 #endif
@@ -1145,37 +1152,33 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 
 
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textureFilename,
-									  const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
-									  ShaderMaterial& shaderMaterial, Material** newMaterial)
+    const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
+    ShaderMaterial& shaderMaterial, Material** newMaterial)
 {
-	auto existing = m_materials.find(name);
-	if (existing != m_materials.end())
-	{
-		*newMaterial = m_materials[name];
-		return S_FALSE;
-	}
+    auto existing = m_materials.find(name);
+    if (existing != m_materials.end())
+    {
+        *newMaterial = m_materials[name];
+        return S_FALSE;
+    }
 
-	// Create a new material
-#if defined(TREE3D12)
+    // Create a new material
     LoadedTexture* texture = nullptr;
-#else
-	ID3D11ShaderResourceView* texture = nullptr;
-#endif
-	if (textureFilename && *textureFilename)
-	{
-		LoadTexture(textureFilename);
+    if (textureFilename && *textureFilename)
+    {
+        LoadTexture(textureFilename);
 #if defined(TREE3D12)
         texture = &m_textures[textureFilename];
         assert(texture && texture->texture);
 #else
-        texture = m_textures[textureFilename];
+        texture = &m_textures[textureFilename];
         assert(texture);
 #endif
 	}
 
 	// Create constants for material
 #if defined(TREE3D12)
-	CComPtr<ID3D12Resource> pCBMaterial;
+    CComPtr<ID3D12Resource> pCBMaterial;
     UINT8* pMaterialConstBufferDataBegin = nullptr;
 
     // Create buffer for material constants
@@ -1214,13 +1217,9 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	SetDebugName(pConstBuffer, "RenderManager::CreateMaterial::pConstBuffer");
 #endif
 
-#if defined(TREE3D12)
-	ID3DBlob* vertexShader = m_vertexShader;
-	ID3DBlob* pixelShader = m_pixelShader;
-#else
-	ID3D11VertexShader* vertexShader = m_vertexShader;
-	ID3D11PixelShader* pixelShader = m_pixelShader;
-#endif
+    VertexShader* vertexShader = &m_vertexShader;
+    PixelShader* pixelShader = &m_pixelShader;
+
 	if (vertexShaderFilename && *vertexShaderFilename)
 	{
 		LoadShader(vertexShaderFilename, ShaderType_VertexShader);
@@ -1253,14 +1252,6 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
 HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
     const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
-
-#if defined(TREE3D12)
-//HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D12Resource* vertexBuffer, ID3D12Resource* indexBuffer,
-//							      const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
-#else
-//HRESULT RenderManager::CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer,
-//	const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
-#endif
 {
 	m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferIndices)));
 	*newMesh = &m_meshes[name];
@@ -2488,7 +2479,7 @@ HRESULT RenderManager::RenderShadowMap()
 #else
 	// Restore state after shadow
 	GetContext()->RSSetState(0);
-	GetContext()->RSSetViewports(1, GetViewport());
+	GetContext()->RSSetViewports(1, &m_viewPort);
 #endif	
 	return S_OK;
 }

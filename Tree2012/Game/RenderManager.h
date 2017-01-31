@@ -44,31 +44,86 @@ interface SwapChainCreator
 };
 
 
-#if defined(TREE3D12)
 struct LoadedTexture
 {
+#if defined(TREE3D12)
     ID3D12Resource* texture;
     D3D12_CPU_DESCRIPTOR_HANDLE textureView;
 
     LoadedTexture() : texture(nullptr), textureView(CD3DX12_CPU_DESCRIPTOR_HANDLE()) { }
     LoadedTexture(ID3D12Resource* textureParam, D3D12_CPU_DESCRIPTOR_HANDLE textureViewParam, UINT textureSlotParam) :
         texture(textureParam), textureView(textureViewParam) { }
-};
+#else
+    ID3D11ShaderResourceView* texture;
+
+    LoadedTexture() : texture(nullptr) { }
+    LoadedTexture(ID3D11ShaderResourceView* textureParam) : texture(textureParam) { }
 #endif 
+};
+
+
+struct VertexShader
+{
+#if defined(TREE3D12)
+    ID3DBlob*                 shader;
+    VertexShader(ID3DBlob* blob) : shader(blob) { }
+#else
+    ID3D11VertexShader*       shader;
+    VertexShader(ID3D11VertexShader* blob) : shader(blob) { }
+#endif
+
+    VertexShader() : shader(nullptr) { }
+    ~VertexShader() { Release(); }
+
+    void Release()
+    {
+        if (shader)
+        {
+            shader->Release();
+            shader = nullptr;
+        }
+    }
+};
+
+struct PixelShader
+{
+#if defined(TREE3D12)
+    ID3DBlob*                 shader;
+    PixelShader(ID3DBlob* shaderBlob) : shader(shaderBlob) { }
+    operator ID3DBlob* () { return shader; }
+#else
+    ID3D11PixelShader*        shader;
+    PixelShader(ID3D11PixelShader* shaderBlob) : shader(shaderBlob) { }
+    operator ID3D11PixelShader* () { return shader; }
+#endif
+
+    PixelShader() : shader(nullptr) { }
+    ~PixelShader() { Release(); }
+
+    void Release()
+    {
+        if (shader)
+        {
+            shader->Release();
+            shader = nullptr;
+        }
+    }
+};
 
 struct Material
 {
-	wstring					  m_name;
-    ShaderMaterial			  m_shaderMaterial;
+    wstring                         m_name;
+    ShaderMaterial                  m_shaderMaterial;
+    LoadedTexture*                  m_texture;
+
+    VertexShader*                   m_vertexShader;
+    PixelShader*                    m_pixelShader;
 
 #if defined(TREE3D12)
-	LoadedTexture*                  m_texture;
-	ID3DBlob*				        m_vertexShader;
-	ID3DBlob*				        m_pixelShader;
-	const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
+    const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
 
-	CComPtr<ID3D12Resource>         m_constBuffer;
-	UINT8*					        m_pConstBufferDataBegin;
+    CComPtr<ID3D12Resource>         m_constBuffer;
+    UINT8*                          m_pConstBufferDataBegin;
     D3D12_GPU_DESCRIPTOR_HANDLE     m_cbvSrvHeapTable;
 
     // NYI
@@ -76,12 +131,9 @@ struct Material
     void* m_rasterizer;
     void* m_depthState;
 #else
-	ID3D11ShaderResourceView* m_texture;
-	ID3D11VertexShader*       m_vertexShader;
-	ID3D11PixelShader*        m_pixelShader;
     ID3D11InputLayout*        m_inputLayout;
 
-	CComPtr<ID3D11Buffer>     m_constBuffer;
+    CComPtr<ID3D11Buffer>     m_constBuffer;
 
     // NYI
     ID3D11SamplerState*       m_samplerState;
@@ -91,43 +143,43 @@ struct Material
 
 public:
 #if defined(TREE3D12)
-	Material(const wchar_t* name,
-			LoadedTexture* texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
-			ID3DBlob* vertexShader, ID3DBlob* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
-			D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
-			ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer, UINT8* pConstBufferDataBegin,
-            D3D12_GPU_DESCRIPTOR_HANDLE srvHeapTable) :
-				m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
-				m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
-				m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer), m_pConstBufferDataBegin(pConstBufferDataBegin),
-                m_cbvSrvHeapTable(srvHeapTable)
-	{
-		ASSERT(m_vertexShader != nullptr);
-		ASSERT(m_pixelShader != nullptr);
-		ASSERT(m_inputLayout != nullptr);
-		ASSERT(m_constBuffer != nullptr);
-		ASSERT(pConstBufferDataBegin != nullptr);
-		//TODO
-		//ASSERT(m_samplerState != nullptr);
-		//ASSERT(m_rasterizer != nullptr);
-		//ASSERT(m_depthState != nullptr);
-	}
+    Material(const wchar_t* name,
+        LoadedTexture* texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
+        VertexShader* vertexShader, PixelShader* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
+        D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
+        ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer, UINT8* pConstBufferDataBegin,
+        D3D12_GPU_DESCRIPTOR_HANDLE srvHeapTable) :
+        m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
+        m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
+        m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer), m_pConstBufferDataBegin(pConstBufferDataBegin),
+        m_cbvSrvHeapTable(srvHeapTable)
+    {
+        ASSERT(m_vertexShader != nullptr);
+        ASSERT(m_pixelShader != nullptr);
+        ASSERT(m_inputLayout != nullptr);
+        ASSERT(m_constBuffer != nullptr);
+        ASSERT(pConstBufferDataBegin != nullptr);
+        //TODO
+        //ASSERT(m_samplerState != nullptr);
+        //ASSERT(m_rasterizer != nullptr);
+        //ASSERT(m_depthState != nullptr);
+    }
 
-	Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
-				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
-				 m_depthState(nullptr), m_constBuffer(), m_cbvSrvHeapTable() { }
+    Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
+        m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
+        m_depthState(nullptr), m_constBuffer(), m_cbvSrvHeapTable() { }
 
-	// Necessary?
+    // Necessary?
     Material(Material const& rhs) :
         m_name(rhs.m_name), m_texture(rhs.m_texture), m_inputLayout(rhs.m_inputLayout), m_vertexShader(rhs.m_vertexShader),
-		m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
-		m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer),
+        m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
+        m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer),
         m_cbvSrvHeapTable(rhs.m_cbvSrvHeapTable)
     {};        // Copy constructor
 #else
 	Material(const wchar_t* name,
-		ID3D11ShaderResourceView* texture, ID3D11InputLayout* inputLayout,
-		ID3D11VertexShader* vertexShader, ID3D11PixelShader* pixelShader, ID3D11SamplerState* samplerState,
+		LoadedTexture* texture, ID3D11InputLayout* inputLayout,
+		VertexShader* vertexShader, PixelShader* pixelShader, ID3D11SamplerState* samplerState,
 		ID3D11RasterizerState* rasterizer, ID3D11DepthStencilState* depthState,
 		ShaderMaterial shaderMaterial, ID3D11Buffer* constBuffer) :
 		m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
@@ -229,7 +281,7 @@ struct RenderUnit
 	}
 };
 
-struct DoubleBuffer	
+struct DoubleBuffer
 {
 #if defined (TREE3D12)
 	CComPtr<ID3D12Resource> buffers[2];
@@ -331,31 +383,37 @@ public:
 };
 #endif
 
-interface IRenderFrame
+struct Viewport
 {
-	virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
-	virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
-	virtual RenderData& GetRenderData() = 0;
+    FLOAT TopLeftX;
+    FLOAT TopLeftY;
+    FLOAT Width;
+    FLOAT Height;
+    FLOAT MinDepth;
+    FLOAT MaxDepth;
 };
 
+
+interface IRenderFrame
+{
+    virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
+    virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
+    virtual RenderData& GetRenderData() = 0;
+};
 
 class RenderManager : public IRenderFrame
 {
     // Filled in during scene initialization
-    std::map<wstring, Material*>					m_materials;
-    std::map<wstring, Mesh>							m_meshes;
-#if defined(TREE3D12)
+    std::map<wstring, Material*>                    m_materials;
+    std::map<wstring, Mesh>                         m_meshes;
     std::map<wstring, LoadedTexture>	            m_textures;
-    std::map<wstring, ID3DBlob*>					m_vertexShaders;
-    std::map<wstring, ID3DBlob*>					m_pixelShaders;
-#else
-    std::map<wstring, ID3D11ShaderResourceView*>	m_textures;
-    std::map<wstring, ID3D11VertexShader*>			m_vertexShaders;
-    std::map<wstring, ID3D11PixelShader*>			m_pixelShaders;
-#endif
-    std::list<RenderUnit>							m_renderUnits;
-    std::map<WorldObject*, UINT>					m_objectToInstanceBufferOffset;  // Filled in during scene initialization
-    UINT											m_nextInstanceBufferOffset;		 // Used during initialization
+
+    std::map<wstring, VertexShader*>                m_vertexShaders;
+    std::map<wstring, PixelShader*>                 m_pixelShaders;
+
+    std::list<RenderUnit>                           m_renderUnits;
+    std::map<WorldObject*, UINT>                    m_objectToInstanceBufferOffset;  // Filled in during scene initialization
+    UINT                                            m_nextInstanceBufferOffset;		 // Used during initialization
 
     // Filled in each frame by each world object via SetInstances()
     std::map<RenderUnit*, std::map<WorldObject*, std::pair<UINT, UINT>>> m_perFrameInstanceData;
@@ -363,7 +421,7 @@ class RenderManager : public IRenderFrame
     RenderData                                      m_renderData;
 
     // Pipeline objects.
-    RenderPlatform*						m_platform;
+    RenderPlatform*                     m_platform;
     CComPtr<XSF::D3DDevice>             m_d3dDevice;
     D3D_DRIVER_TYPE                     m_driverType;
     D3D_FEATURE_LEVEL                   m_featureLevel;
@@ -435,8 +493,8 @@ class RenderManager : public IRenderFrame
     CComPtr<ID3D12Resource>             m_pCBShadowMapChangeOnResize;
     CBChangeOnResize                    m_cbShadowMapChangesOnResize;
 
-    CComPtr<ID3DBlob>					m_vertexShader;
-    CComPtr<ID3DBlob>					m_pixelShader;
+    VertexShader                        m_vertexShader;  // Default shader
+    PixelShader                         m_pixelShader;   // Default shader
 
     CComPtr<ID3DBlob>					m_shadowVertexShader;
     CComPtr<ID3DBlob>					m_shadowPixelShader;
@@ -479,8 +537,8 @@ class RenderManager : public IRenderFrame
     CComPtr<ID3D11RasterizerState>		m_rasterState;
 
     // TODO per material
-    CComPtr<ID3D11VertexShader>         m_vertexShader;
-    CComPtr<ID3D11PixelShader>          m_pixelShader;
+    VertexShader                        m_vertexShader;
+    PixelShader                         m_pixelShader;
 
     CComPtr<ID3D11VertexShader>			m_shadowVertexShader;
     CComPtr<ID3D11PixelShader>			m_shadowPixelShader;
@@ -565,14 +623,14 @@ public:
     DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
 
     // Accessor methods for Oculus
+    HRESULT GetViewport(Viewport& viewport);
+
 #if defined(TREE3D12)
-    D3D12_VIEWPORT* GetViewport() { return &m_viewPort; }
 #else
     ID3D11RenderTargetView* GetRTV() { return m_pRenderTargetView; }
     ID3D11DepthStencilView* GetDSV() { return m_pDepthStencilView; }
     ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
     IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
-    D3D11_VIEWPORT* GetViewport() { return &m_viewPort; }
 #endif
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
     HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);
@@ -582,14 +640,6 @@ public:
     HRESULT CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
         const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
 
-
-#if defined (TREE3D12)
-    //HRESULT CreateMesh(const wchar_t* name, ID3D12Resource* vertexBuffer, ID3D12Resource* indexBuffer,
-    //    const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
-#else
-    //HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer,
-    //    const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
-#endif
     HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
     HRESULT GetInstanceIndex(WorldObject* object, UINT&);

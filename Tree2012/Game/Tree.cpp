@@ -215,7 +215,7 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
 
 	// Scale branch
 	XMVECTOR vMag = XMVector3Length(vEnd - vStart);
-	XMVECTOR vScale;
+    XMVECTOR vScale = g_XMOne;
 	
 	switch (branch->geometryType)
 	{

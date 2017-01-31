@@ -110,6 +110,11 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
 
 ShadowMap::~ShadowMap()
 {
+#if defined(TREE3D12)
+#else
+    SafeRelease(&mDepthMapDSV);
+    SafeRelease(&mDepthMapSRV);
+#endif
     SafeRelease(&mDepthMap);
 }
 

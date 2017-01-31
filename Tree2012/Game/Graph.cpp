@@ -28,7 +28,7 @@ TreeModel* GraphModelGenerator::Create()
 	return _model;
 }
 
-void GraphModelGenerator::CreateGraph(std::vector<XMFLOAT2>& points) { }
+void GraphModelGenerator::CreateGraph(std::vector<XMFLOAT2>& /*points*/) { }
 
 
 FSGraphModel* FSGraphModelGenerator::Create()

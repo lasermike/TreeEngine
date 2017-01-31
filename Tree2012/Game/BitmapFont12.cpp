@@ -741,7 +741,17 @@ VOID BitmapFont::Begin(const D3D12_VIEWPORT* pViewport)
         m_pCmdList->SetGraphicsRootDescriptorTable(c_rootSampler, hSampler);
         
         // obtain render target size
-        D3D12_VIEWPORT viewport = (pViewport != nullptr)? *pViewport : *m_renderManager->GetViewport();
+        Viewport viewport = { 0 };
+        if (pViewport != nullptr)
+        {
+            viewport.Width = pViewport->Width;
+            viewport.Height = pViewport->Height;
+        }
+        else
+        {
+            D3D12_VIEWPORT viewport12 = { 0 };
+            m_renderManager->GetViewport(viewport);
+        }
         m_curRTSx = std::max(m_safeAreaInPixels * 2 + 1, static_cast<UINT>(viewport.Width));
         m_curRTSy = std::max(m_safeAreaInPixels * 2 + 1, static_cast<UINT>(viewport.Height));
         
