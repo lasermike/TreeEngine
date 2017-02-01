@@ -113,12 +113,12 @@ private:
 	bool							    m_advanceScene;
 	int								    m_advanceSceneAmount;
 
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-	HWND								m_hwnd;
-#else
-	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;
-#endif //Classic
-
+//#if defined(WIN32) && !defined(TREENGINE_XBOX)
+//	HWND								m_hwnd;
+//#else
+//	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;
+//#endif //Classic
+//
 	bool								m_renderToSharedTexture;
 
 	bool								m_resetTree;

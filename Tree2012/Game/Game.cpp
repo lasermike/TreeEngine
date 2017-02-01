@@ -27,11 +27,11 @@ using namespace Windows::Graphics::Display;
 
 Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 {
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-	m_hwnd = nullptr;
-#else
-	m_window = nullptr;
-#endif
+//#if defined(WIN32) && !defined(TREENGINE_XBOX)
+//	m_hwnd = nullptr;
+//#else
+//	m_window = nullptr;
+//#endif
 	m_renderToSharedTexture = false;
 	m_paused = false;
 	m_wireframe = false;
@@ -72,6 +72,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     HRR(m_renderManager.InitDevice());
 
     HRR(InitializeEngine());
+    return S_OK;
 }
 
 HRESULT Game::InitializeEngine()

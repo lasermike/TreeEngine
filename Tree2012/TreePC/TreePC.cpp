@@ -57,9 +57,9 @@ void TreePC::SetWindow(CoreWindow^ window)
 	window->KeyUp +=
 		ref new TypedEventHandler<CoreWindow^, KeyEventArgs^>(this, &TreePC::OnKeyUp);
 
-	auto m_info = DisplayInformation::GetForCurrentView();
+	auto info = DisplayInformation::GetForCurrentView();
 
-    ::GetPlatform(&m_pGame->GetRenderManager())->SetWindow(CoreWindow::GetForCurrentThread(), m_info->LogicalDpi);
+    ::GetPlatform(&m_pGame->GetRenderManager())->SetWindow(CoreWindow::GetForCurrentThread(), info->LogicalDpi);
 	m_pGame->Initialize(false /* render to shared texture 8*/);
     OnResize();
 }
@@ -102,6 +102,10 @@ void TreePC::OnResize()
 	auto windowBounds = CoreWindow::GetForCurrentThread()->Bounds;
 	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
 	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
+
+    // TEMPTEMP
+    auto info = DisplayInformation::GetForCurrentView();
+    ::GetPlatform(&m_pGame->GetRenderManager())->SetWindow(CoreWindow::GetForCurrentThread(), info->LogicalDpi);
 
 	m_pGame->OnResize(windowWidth, windowHeight);
 }
@@ -176,10 +180,10 @@ float TreePC::ConvertDipsToPixels(float dips)
 {
 	static const float dipsPerInch = 96.0f;
 
-	auto m_info = DisplayInformation::GetForCurrentView();
+	auto info = DisplayInformation::GetForCurrentView();
 
 
-	return floor(dips * m_info ->LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+	return floor(dips * info ->LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 
 	//return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 }

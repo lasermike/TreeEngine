@@ -1825,6 +1825,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 
 	// Resize logic
 
+
 	// Create width/height dependent objects
 	m_pDepthStencilView = D3D12_RESOURCE_DESC();
 	m_pDepthStencil.Release();
