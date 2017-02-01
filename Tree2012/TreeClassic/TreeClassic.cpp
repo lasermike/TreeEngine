@@ -87,6 +87,7 @@ ovrHmdDesc g_hmdDesc;
 HRESULT				CreateOculusDevice(bool& detected);
 HRESULT				ConfigOculusDevice();
 HRESULT             Render();
+void                OnWindowSizeChanged();
 
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
@@ -318,14 +319,15 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
 	g_game = new Game(&g_inputManager);
-    ::GetPlatform(&g_game->GetRenderManager())->SetWindow(m_hWnd, false);
+    ::GetPlatform(&g_game->GetRenderManager())->SetWindow(m_hWnd);
 
-	if (FAILED(g_game->Initialize()))
+	if (FAILED(g_game->Initialize(false /* render to shared texture */)))
     {
-		g_game->Cleanup();
+        g_game->Cleanup();
         return 0;
     }
 
+    OnWindowSizeChanged();
 
     // Set up the oculus helper library
     DIRECTX.Context = g_game->GetRenderManager().GetContext();

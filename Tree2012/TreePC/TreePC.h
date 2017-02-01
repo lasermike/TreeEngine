@@ -30,6 +30,7 @@ protected:
 	void OnKeyDown(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::KeyEventArgs^ args);
 	void OnKeyUp(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::KeyEventArgs^ args);
 	static float ConvertDipsToPixels(float dips);
+    void OnResize();
 
 private:
 	Game* m_pGame;

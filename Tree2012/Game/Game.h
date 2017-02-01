@@ -31,7 +31,7 @@ struct FrameInputData
 	}
 };
 
-class Game : public SwapChainCreator
+class Game /*: public SwapChainCreator*/
 {
 public:
 
@@ -45,15 +45,15 @@ public:
 //	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
 //#endif
 
-	// TODO: move to platform specific code
-#if defined(TREE3D12)
-	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain);
-#else
-	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain); 
-#endif
+//	// TODO: move to platform specific code
+//#if defined(TREE3D12)
+//	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain);
+//#else
+//	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain); 
+//#endif
 
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat) { return m_renderManager.UpdateProjection(pProjMat, false); }
-	HRESULT OnResize(UINT width, UINT height) { return m_renderManager.OnResize(width, height, m_renderToSharedTexture, this); }
+	HRESULT OnResize(UINT width, UINT height) { return m_renderManager.OnResize(width, height, m_renderToSharedTexture/*, this*/); }
 
 	HRESULT Cleanup();
 
@@ -80,7 +80,7 @@ public:
 	}
 	void operator delete(void* mem) { return _aligned_free(mem); }
 
-    HRESULT Initialize();
+    HRESULT Initialize(bool renderToSharedTexture);
 
 private:
 
@@ -117,9 +117,6 @@ private:
 	HWND								m_hwnd;
 #else
 	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;
-#if !defined(_XBOX_ONE)
-	float ConvertDipsToPixels(float dips, float logicalDpi);
-#endif // XBOX
 #endif //Classic
 
 	bool								m_renderToSharedTexture;

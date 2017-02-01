@@ -64,12 +64,14 @@ Game::~Game()
 }
 
 
-HRESULT Game::Initialize()
+HRESULT Game::Initialize(bool renderToSharedTexture)
 {
-    Initialize();
-    ::GetPlatform(&GetRenderManager())->Initialize();
+    m_renderToSharedTexture = renderToSharedTexture;
+
+    //::GetPlatform(&GetRenderManager())->Initialize();
     HRR(m_renderManager.InitDevice());
-    HRR(m_renderManager.OnResize(windowWidth, windowHeight, m_renderToSharedTexture, this));
+
+    HRR(InitializeEngine());
 }
 
 HRESULT Game::InitializeEngine()
@@ -111,32 +113,6 @@ HRESULT Game::InitializeEngine()
 	return S_OK;
 }
 
-
-// TODO push this out to the platform layer
-#if defined(TREE3D12)
-HRESULT Game::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain)
-{
-    HRESULT hr = S_OK;
-
-    HRR(dxgiFactory4->CreateSwapChainForCoreWindow(commandQueue,
-        reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
-
-    return hr;
-}
-#else
-HRESULT Game::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain)
-{
-    HRESULT hr = S_OK;
-
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-    HRR(dxgiFactory2->CreateSwapChainForHwnd(::GetPlatform(&m_renderManager)->GetDevice(), m_hwnd, sd, nullptr, nullptr, swapChain));
-#else
-    HRR(dxgiFactory2->CreateSwapChainForCoreWindow(::GetPlatform(&m_renderManager)->GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
-#endif 
-
-    return hr;
-}
-#endif
 
 HRESULT Game::Cleanup() 
 { 
@@ -370,17 +346,5 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 	}
 }
 
-
-#if !defined(WIN32) && !defined(_XBOX_ONE)
-// Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
-float Game::ConvertDipsToPixels(float dips, float logicalDpi )
-{
-	static const float dipsPerInch = 96.0f;
-
-	return floor(dips * logicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
-																				 //DisplayInformation
-	//return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
-}
-#endif
 
 

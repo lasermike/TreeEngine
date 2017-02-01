@@ -193,17 +193,18 @@ RenderManager::RenderManager() :
     m_light.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     m_light.Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
     m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
-}
 
-HRESULT RenderManager::Initialize()
-{
-    m_nextInstanceBufferOffset = 0;
-
+    // TODO: where should this go?
 #if defined(TREE3D12)
     m_platform = new RenderPlatform12();
 #else
     m_platform = new RenderPlatform11(this);
 #endif
+}
+
+HRESULT RenderManager::Initialize()
+{
+    m_nextInstanceBufferOffset = 0;
 
     return S_OK;
 }
@@ -211,6 +212,7 @@ HRESULT RenderManager::Initialize()
 RenderManager::~RenderManager()
 {
     UninitDevice();
+    SafeDelete(&m_platform);
 }
 
 #if defined(TREE3D12)
@@ -1926,7 +1928,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 
 	CComPtr<IDXGISwapChain1> swapChain1;
 	
-	HRR(swapChainCreator->CreateSwapChain(&swapChainDesc, factory, m_commandQueue, &swapChain1));
+	HRR(::GetPlatform(this)->CreateSwapChain(&swapChainDesc, factory, m_commandQueue, &swapChain1));
 
 	HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
 	m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
@@ -2040,7 +2042,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 		sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 		
-		HRR(swapChainCreator->CreateSwapChain(&sd, dxgiFactory2, &m_pSwapChain1));
+		HRR(::GetPlatform(this)->CreateSwapChain(&sd, dxgiFactory2, &m_pSwapChain1));
 
 		HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
 		HRR(m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
@@ -2695,46 +2697,79 @@ HRESULT RenderManager::LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID
 
 #endif
 
-
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-HRESULT RenderPlatform11::Initialize()
+// TODO push this out to the platform layer
+#if defined(TREE3D12)
+HRESULT RenderPlatform12::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain)
 {
     HRESULT hr = S_OK;
 
-    UINT windowWidth = 0;
-    UINT windowHeight = 0;
-    RECT rect = { 0 };
-    GetClientRect(m_hwnd, &rect);
-    windowWidth = rect.right - rect.left;
-    windowHeight = rect.bottom - rect.top;
-
-    HRR(m_renderManager->OnResize(windowWidth, windowHeight, m_renderToSharedTexture/*, this*/));
+    HRR(dxgiFactory4->CreateSwapChainForCoreWindow(commandQueue,
+        reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
 
     return hr;
 }
 #else
-
-HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi)
+HRESULT RenderPlatform11::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain)
 {
-    Initialize();
+    HRESULT hr = S_OK;
 
-    m_window = window;
-    HRR(m_renderManager.InitDevice());
-
-    auto windowBounds = m_window->Bounds;
-#if defined(_XBOX_ONE)
-    logicalDpi = logicalDpi; // Address warning 
-    UINT windowWidth = 1920;
-    UINT windowHeight = 1080;
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
+    HRR(dxgiFactory2->CreateSwapChainForHwnd(GetDevice(), m_hwnd, sd, nullptr, nullptr, swapChain));
 #else
-    UINT windowWidth = (UINT)ConvertDipsToPixels(windowBounds.Width, logicalDpi);
-    UINT windowHeight = (UINT)ConvertDipsToPixels(windowBounds.Height, logicalDpi);
-#endif
+    HRR(dxgiFactory2->CreateSwapChainForCoreWindow(::GetPlatform(&m_renderManager)->GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
+#endif 
 
-    HRR(m_renderManager.OnResize(windowWidth, windowHeight, m_renderToSharedTexture, this));
-
-    return S_OK;
+    return hr;
 }
-
 #endif
+
+
+//#if defined(WIN32) && !defined(TREENGINE_XBOX)
+//HRESULT RenderPlatform11::Initialize()
+//{
+//    HRESULT hr = S_OK;
+//
+//    UINT windowWidth = 0;
+//    UINT windowHeight = 0;
+//    RECT rect = { 0 };
+//    GetClientRect(m_hwnd, &rect);
+//    windowWidth = rect.right - rect.left;
+//    windowHeight = rect.bottom - rect.top;
+//
+//    //HRR(m_renderManager->OnResize(windowWidth, windowHeight, m_renderToSharedTexture/*, this*/));
+//
+//    return hr;
+//}
+//#else
+//
+//#if !defined(_XBOX_ONE)
+//// Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
+//float ConvertDipsToPixels(float dips, float logicalDpi)
+//{
+//    static const float dipsPerInch = 96.0f;
+//
+//    return floor(dips * logicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+//    
+//#endif
+//
+//
+//HRESULT RenderPlatform12::Initialize()
+//{
+//    m_window = window;
+//    HRR(m_renderManager.InitDevice());
+//
+//    auto windowBounds = m_window->Bounds;
+//#if defined(_XBOX_ONE)
+//    logicalDpi = logicalDpi; // Address warning 
+//    UINT windowWidth = 1920;
+//    UINT windowHeight = 1080;
+//#else
+//    UINT windowWidth = (UINT)ConvertDipsToPixels(windowBounds.Width, logicalDpi);
+//    UINT windowHeight = (UINT)ConvertDipsToPixels(windowBounds.Height, logicalDpi);
+//#endif
+//
+//    return S_OK;
+//}
+//
+//#endif
 

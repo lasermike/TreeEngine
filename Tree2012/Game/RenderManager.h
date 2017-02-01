@@ -405,7 +405,35 @@ enum RenderPlatforms
 
 class RenderPlatform
 {
+protected:
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
+    HWND                              m_hwnd;
+#else
+    //Windows::UI::Core::CoreWindow^    m_window;
+    Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;
+    
+    float                             m_logicalDpi;
+#endif
+
 public:
+
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
+    void SetWindow(HWND hwnd)
+    {
+        m_hwnd = hwnd;
+    }
+
+    HRESULT Initialize();
+
+#else
+
+    void SetWindow(Windows::UI::Core::CoreWindow^ window, float logicalDpi)
+    {
+        m_window = window;
+        m_logicalDpi = logicalDpi;
+    }
+#endif
+
     RenderPlatforms GetType() { return UNDEFINED_RENDER_PLATFORM; }
 };
 
@@ -424,6 +452,8 @@ public:
 
     HRESULT InitDevice();
     HRESULT UninitDevice();
+
+    HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain);
 };
 
 #else
@@ -436,13 +466,6 @@ class RenderPlatform11 : public RenderPlatform
 
     RenderManager*                    m_renderManager;
 
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-    HWND                              m_hwnd;
-    bool                              m_renderToSharedTexture;
-#else
-    Windows::UI::Core::CoreWindow^    m_window;
-#endif
-
 public:
 
     RenderPlatform11(RenderManager* renderManager) { m_renderManager = renderManager; }
@@ -454,29 +477,13 @@ public:
         return (XboxSampleFramework::D3DDevice*) (ID3D11Device*) m_d3dDevice;
     }
 
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-    void SetWindow(HWND hwnd, bool renderToSharedTexture)
-    {
-        m_hwnd = hwnd;
-        m_renderToSharedTexture = renderToSharedTexture;
-    }
-
-    HRESULT Initialize();
-
-    
-#else
-
-    void SetWindow(Windows::UI::Core::CoreWindow^ window, float logicalDpi)
-    {
-        m_window = window;
-    }
-#endif
-
     // TEMPTEMP
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
 
     HRESULT InitDevice();
     HRESULT UninitDevice();
+
+    HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain);
 };
 
 #endif

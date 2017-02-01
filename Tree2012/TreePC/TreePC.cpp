@@ -59,9 +59,9 @@ void TreePC::SetWindow(CoreWindow^ window)
 
 	auto m_info = DisplayInformation::GetForCurrentView();
 
-	m_pGame->Initialize(CoreWindow::GetForCurrentThread(), m_info->LogicalDpi);
-
-
+    ::GetPlatform(&m_pGame->GetRenderManager())->SetWindow(CoreWindow::GetForCurrentThread(), m_info->LogicalDpi);
+	m_pGame->Initialize(false /* render to shared texture 8*/);
+    OnResize();
 }
 
 void TreePC::Load(Platform::String^ entryPoint)
@@ -97,13 +97,18 @@ void TreePC::Uninitialize()
 {
 }
 
-void TreePC::OnWindowSizeChanged(CoreWindow^ sender, WindowSizeChangedEventArgs^ args)
+void TreePC::OnResize()
 {
 	auto windowBounds = CoreWindow::GetForCurrentThread()->Bounds;
 	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
 	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
 
 	m_pGame->OnResize(windowWidth, windowHeight);
+}
+
+void TreePC::OnWindowSizeChanged(CoreWindow^ sender, WindowSizeChangedEventArgs^ args)
+{
+    OnResize();
 }
 
 void TreePC::OnVisibilityChanged(CoreWindow^ sender, VisibilityChangedEventArgs^ args)
