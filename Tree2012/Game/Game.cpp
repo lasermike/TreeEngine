@@ -63,7 +63,16 @@ Game::~Game()
 	m_renderManager.UninitDevice();
 }
 
+
 HRESULT Game::Initialize()
+{
+    Initialize();
+    ::GetPlatform(&GetRenderManager())->Initialize();
+    HRR(m_renderManager.InitDevice());
+    HRR(m_renderManager.OnResize(windowWidth, windowHeight, m_renderToSharedTexture, this));
+}
+
+HRESULT Game::InitializeEngine()
 {
 	XSF::SetContentFileRoot();
 
@@ -101,54 +110,6 @@ HRESULT Game::Initialize()
 
 	return S_OK;
 }
-
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-HRESULT Game::Initialize(HWND hwnd, bool renderToSharedTexture)
-{ 
-	m_renderToSharedTexture = renderToSharedTexture;
-
-	Initialize();
-
-	m_hwnd = hwnd;  
-	HRESULT hr = S_OK;
-	HRR(m_renderManager.InitDevice());
-
-	UINT windowWidth = 0; 
-	UINT windowHeight = 0;
-	RECT rect = {0};
-	GetClientRect(m_hwnd, &rect);
-	windowWidth = rect.right - rect.left;
-	windowHeight = rect.bottom - rect.top;
-
-	HRR(m_renderManager.OnResize(windowWidth, windowHeight, m_renderToSharedTexture, this));
-
-	return hr;
-}
-#else
-
-HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi) 
-{ 
-	Initialize();
-
-	m_window = window; 
-	HRR(m_renderManager.InitDevice());
-
-	auto windowBounds = m_window->Bounds;
-#if defined(_XBOX_ONE)
-	logicalDpi = logicalDpi; // Address warning 
-	UINT windowWidth = 1920;
-	UINT windowHeight = 1080;
-#else
-	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width, logicalDpi);
-	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height, logicalDpi);
-#endif
-
-	HRR(m_renderManager.OnResize(windowWidth, windowHeight, m_renderToSharedTexture, this));
-	
-	return S_OK;
-}
-
-#endif
 
 
 // TODO push this out to the platform layer

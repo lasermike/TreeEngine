@@ -6,6 +6,7 @@
 #include "RenderPlatform.h"
 
 class WorldObject;
+class RenderManager;
 
 namespace XboxSampleFramework
 {
@@ -414,8 +415,12 @@ class RenderPlatform12 : public RenderPlatform
     CComPtr<ID3D12Device>             m_d3dDevice;
 
 public:
-    ID3D12Device* GetDevice() { return m_d3dDevice; }
     RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
+    ID3D12Device* GetDevice() { return m_d3dDevice; }
+    XboxSampleFramework::D3DDevice* GetD3DDevice()
+    {
+        return (XboxSampleFramework::D3DDevice*) (ID3D12Device*) m_d3dDevice;
+    }
 
     HRESULT InitDevice();
     HRESULT UninitDevice();
@@ -429,14 +434,43 @@ class RenderPlatform11 : public RenderPlatform
     D3D_DRIVER_TYPE                   m_driverType;
     D3D_FEATURE_LEVEL                 m_featureLevel;
 
+    RenderManager*                    m_renderManager;
+
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
+    HWND                              m_hwnd;
+    bool                              m_renderToSharedTexture;
+#else
+    Windows::UI::Core::CoreWindow^    m_window;
+#endif
+
 public:
+
+    RenderPlatform11(RenderManager* renderManager) { m_renderManager = renderManager; }
+
+    RenderPlatforms GetType() { return D3D11_RENDER_PLATFORM; }
     ID3D11Device* GetDevice() { return m_d3dDevice; }
     XboxSampleFramework::D3DDevice* GetD3DDevice()
     {
         return (XboxSampleFramework::D3DDevice*) (ID3D11Device*) m_d3dDevice;
     }
+
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
+    void SetWindow(HWND hwnd, bool renderToSharedTexture)
+    {
+        m_hwnd = hwnd;
+        m_renderToSharedTexture = renderToSharedTexture;
+    }
+
+    HRESULT Initialize();
+
     
-    RenderPlatforms GetType() { return D3D11_RENDER_PLATFORM; }
+#else
+
+    void SetWindow(Windows::UI::Core::CoreWindow^ window, float logicalDpi)
+    {
+        m_window = window;
+    }
+#endif
 
     // TEMPTEMP
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
@@ -636,7 +670,7 @@ public:
     HRESULT Initialize();
 
     HRESULT InitDevice();
-    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture, SwapChainCreator* swapChainCreator);
+    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture/*, SwapChainCreator* swapChainCreator*/);
     void UninitDevice();
 
     RenderPlatform* GetPlatform() { return m_platform; }

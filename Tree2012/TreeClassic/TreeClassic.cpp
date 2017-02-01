@@ -318,12 +318,14 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
 	g_game = new Game(&g_inputManager);
+    ::GetPlatform(&g_game->GetRenderManager())->SetWindow(m_hWnd, false);
 
-	if (FAILED(g_game->Initialize(m_hWnd, false)))
+	if (FAILED(g_game->Initialize()))
     {
 		g_game->Cleanup();
         return 0;
     }
+
 
     // Set up the oculus helper library
     DIRECTX.Context = g_game->GetRenderManager().GetContext();

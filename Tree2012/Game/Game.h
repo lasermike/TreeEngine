@@ -38,12 +38,12 @@ public:
 	Game(IInputManager* inputMgr);
 	~Game();
 
-	// Initialization and management
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-	HRESULT Initialize(HWND hwnd, bool renderToSharedTexture);
-#else
-	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
-#endif
+//	// Initialization and management
+//#if defined(WIN32) && !defined(TREENGINE_XBOX)
+//	HRESULT Initialize(HWND hwnd, bool renderToSharedTexture);
+//#else
+//	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
+//#endif
 
 	// TODO: move to platform specific code
 #if defined(TREE3D12)
@@ -80,9 +80,11 @@ public:
 	}
 	void operator delete(void* mem) { return _aligned_free(mem); }
 
+    HRESULT Initialize();
+
 private:
 
-	HRESULT Initialize();
+    HRESULT InitializeEngine();
 
 	void Update(DX::StepTimer const& timer);
 	void Regenerate();

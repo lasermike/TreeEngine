@@ -202,7 +202,7 @@ HRESULT RenderManager::Initialize()
 #if defined(TREE3D12)
     m_platform = new RenderPlatform12();
 #else
-    m_platform = new RenderPlatform11();
+    m_platform = new RenderPlatform11(this);
 #endif
 
     return S_OK;
@@ -1811,15 +1811,15 @@ HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
 	return S_OK;
 }
 
-HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture, SwapChainCreator* swapChainCreator)
+HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture/*, SwapChainCreator* swapChainCreator*/)
 {
 	HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-	if (!swapChainCreator)
-	{
-		return S_FALSE;
-	}
+	//if (!swapChainCreator)
+	//{
+	//	return S_FALSE;
+	//}
 
 	// Resize logic
 
@@ -1832,7 +1832,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	m_pSharedRenderToTexture.Release();
 
 #else
-	if (!m_immediateContext && !swapChainCreator)
+	if (!m_immediateContext/* && !swapChainCreator*/)
 	{
 		return S_FALSE;
 	}
@@ -2694,3 +2694,47 @@ HRESULT RenderManager::LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID
 }
 
 #endif
+
+
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
+HRESULT RenderPlatform11::Initialize()
+{
+    HRESULT hr = S_OK;
+
+    UINT windowWidth = 0;
+    UINT windowHeight = 0;
+    RECT rect = { 0 };
+    GetClientRect(m_hwnd, &rect);
+    windowWidth = rect.right - rect.left;
+    windowHeight = rect.bottom - rect.top;
+
+    HRR(m_renderManager->OnResize(windowWidth, windowHeight, m_renderToSharedTexture/*, this*/));
+
+    return hr;
+}
+#else
+
+HRESULT Game::Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi)
+{
+    Initialize();
+
+    m_window = window;
+    HRR(m_renderManager.InitDevice());
+
+    auto windowBounds = m_window->Bounds;
+#if defined(_XBOX_ONE)
+    logicalDpi = logicalDpi; // Address warning 
+    UINT windowWidth = 1920;
+    UINT windowHeight = 1080;
+#else
+    UINT windowWidth = (UINT)ConvertDipsToPixels(windowBounds.Width, logicalDpi);
+    UINT windowHeight = (UINT)ConvertDipsToPixels(windowBounds.Height, logicalDpi);
+#endif
+
+    HRR(m_renderManager.OnResize(windowWidth, windowHeight, m_renderToSharedTexture, this));
+
+    return S_OK;
+}
+
+#endif
+
