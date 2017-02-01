@@ -168,9 +168,9 @@ HRESULT Game::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFact
     HRESULT hr = S_OK;
 
 #if defined(WIN32) && !defined(TREENGINE_XBOX)
-    HRR(dxgiFactory2->CreateSwapChainForHwnd(m_renderManager.GetDevice(), m_hwnd, sd, nullptr, nullptr, swapChain));
+    HRR(dxgiFactory2->CreateSwapChainForHwnd(::GetPlatform(&m_renderManager)->GetDevice(), m_hwnd, sd, nullptr, nullptr, swapChain));
 #else
-    HRR(dxgiFactory2->CreateSwapChainForCoreWindow(m_renderManager.GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
+    HRR(dxgiFactory2->CreateSwapChainForCoreWindow(::GetPlatform(&m_renderManager)->GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
 #endif 
 
     return hr;

@@ -301,7 +301,7 @@ HRESULT BitmapFont::Create(RenderManager* const renderManager, const WCHAR* strF
     }
 
 	m_renderManager = renderManager;
-    D3DDevice* const pDevice = m_renderManager->GetDevice();
+    D3DDevice* const pDevice = GetPlatform(m_renderManager)->GetDevice();
     ID3D12Fence* const pFence = m_renderManager->GetFence();
     D3DCommandList* const pCmdList = m_renderManager->GetCommandList();
 
@@ -414,7 +414,7 @@ HRESULT BitmapFont::Create(RenderManager* renderManager, ID3D12Resource* const p
     }
 
 	m_renderManager = renderManager;
-    D3DDevice* const pDevice = m_renderManager->GetDevice();
+    D3DDevice* const pDevice = GetPlatform(m_renderManager)->GetDevice();
     D3DCommandList* const pCmdList = m_renderManager->GetCommandList();
 
     // Define root table layout
@@ -818,7 +818,7 @@ VOID BitmapFont::DrawText(FLOAT fOriginX, FLOAT fOriginY, DWORD dwColor, const W
 {
     XSF_ASSERT(m_pCmdList);
 
-    D3DDevice* const pDevice = m_renderManager->GetDevice();
+    D3DDevice* const pDevice = GetPlatform(m_renderManager)->GetDevice();
 
     if (nullptr == strText)
         return;

@@ -67,9 +67,11 @@ struct VertexShader
 #if defined(TREE3D12)
     ID3DBlob*                 shader;
     VertexShader(ID3DBlob* blob) : shader(blob) { }
+    operator ID3DBlob* () { return shader; }
 #else
     ID3D11VertexShader*       shader;
     VertexShader(ID3D11VertexShader* blob) : shader(blob) { }
+    operator ID3D11VertexShader* () { return shader; }
 #endif
 
     VertexShader() : shader(nullptr) { }
@@ -393,6 +395,57 @@ struct Viewport
     FLOAT MaxDepth;
 };
 
+enum RenderPlatforms
+{
+    UNDEFINED_RENDER_PLATFORM = 0,
+    D3D12_RENDER_PLATFORM = 1,
+    D3D11_RENDER_PLATFORM = 2,
+};
+
+class RenderPlatform
+{
+public:
+    RenderPlatforms GetType() { return UNDEFINED_RENDER_PLATFORM; }
+};
+
+#if defined(TREE3D12)
+class RenderPlatform12 : public RenderPlatform
+{
+    CComPtr<ID3D12Device>             m_d3dDevice;
+
+public:
+    ID3D12Device* GetDevice() { return m_d3dDevice; }
+    RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
+
+    HRESULT InitDevice();
+    HRESULT UninitDevice();
+};
+
+#else
+
+class RenderPlatform11 : public RenderPlatform
+{
+    CComPtr<ID3D11Device>             m_d3dDevice;
+    D3D_DRIVER_TYPE                   m_driverType;
+    D3D_FEATURE_LEVEL                 m_featureLevel;
+
+public:
+    ID3D11Device* GetDevice() { return m_d3dDevice; }
+    XboxSampleFramework::D3DDevice* GetD3DDevice()
+    {
+        return (XboxSampleFramework::D3DDevice*) (ID3D11Device*) m_d3dDevice;
+    }
+    
+    RenderPlatforms GetType() { return D3D11_RENDER_PLATFORM; }
+
+    // TEMPTEMP
+    CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
+
+    HRESULT InitDevice();
+    HRESULT UninitDevice();
+};
+
+#endif
 
 interface IRenderFrame
 {
@@ -422,9 +475,6 @@ class RenderManager : public IRenderFrame
 
     // Pipeline objects.
     RenderPlatform*                     m_platform;
-    CComPtr<XSF::D3DDevice>             m_d3dDevice;
-    D3D_DRIVER_TYPE                     m_driverType;
-    D3D_FEATURE_LEVEL                   m_featureLevel;
     static const UINT FrameCount = 2;
 
 #if defined(TREE3D12)
@@ -478,7 +528,9 @@ class RenderManager : public IRenderFrame
         XMFLOAT4X4 mProjection;
     };
 
+
     // App resources.
+
 #if defined(TREE3D12)
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC     m_constViewDescs[4];
@@ -493,19 +545,9 @@ class RenderManager : public IRenderFrame
     CComPtr<ID3D12Resource>             m_pCBShadowMapChangeOnResize;
     CBChangeOnResize                    m_cbShadowMapChangesOnResize;
 
-    VertexShader                        m_vertexShader;  // Default shader
-    PixelShader                         m_pixelShader;   // Default shader
-
-    CComPtr<ID3DBlob>					m_shadowVertexShader;
-    CComPtr<ID3DBlob>					m_shadowPixelShader;
-    CComPtr<ID3DBlob>					m_drawScreenVertexShader;
-    CComPtr<ID3DBlob>					m_drawScreenPixelShader;
-
     // Single vertex and index buffer for all geometry in scene
-    //CComPtr<ID3D12Resource>             m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW			m_VBView;
 
-    //CComPtr<ID3D12Resource>             m_indexBuffer;
     D3D12_INDEX_BUFFER_VIEW				m_IBView;
 
     CComPtr<ID3D12Resource>             m_CBNeverChanges;
@@ -536,19 +578,8 @@ class RenderManager : public IRenderFrame
 
     CComPtr<ID3D11RasterizerState>		m_rasterState;
 
-    // TODO per material
-    VertexShader                        m_vertexShader;
-    PixelShader                         m_pixelShader;
-
-    CComPtr<ID3D11VertexShader>			m_shadowVertexShader;
-    CComPtr<ID3D11PixelShader>			m_shadowPixelShader;
-    CComPtr<ID3D11VertexShader>			m_drawScreenVertexShader;
-    CComPtr<ID3D11PixelShader>			m_drawScreenPixelShader;
-
     // Single vertex and index buffer for all geometry in scene
     CComPtr<ID3D11InputLayout>          m_vertexLayout;
-    //CComPtr<ID3D11Buffer>               m_vertexBuffer;
-    //CComPtr<ID3D11Buffer>               m_indexBuffer;
 
     CComPtr<ID3D11Buffer>               m_CBNeverChanges;
     CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
@@ -558,6 +589,16 @@ class RenderManager : public IRenderFrame
     CComPtr<ID3D11Buffer>				m_screenQuadIB;
     CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
 #endif
+
+    // Default shader
+    VertexShader                        m_vertexShader;
+    PixelShader                         m_pixelShader;
+
+    VertexShader                        m_shadowVertexShader;
+    PixelShader                         m_shadowPixelShader;
+    VertexShader                        m_drawScreenVertexShader;
+    PixelShader                         m_drawScreenPixelShader;
+
 
     D3DBuffer                           m_vertexBuffer;
     D3DBuffer                           m_indexBuffer;
@@ -598,8 +639,9 @@ public:
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture, SwapChainCreator* swapChainCreator);
     void UninitDevice();
 
+    RenderPlatform* GetPlatform() { return m_platform; }
+
     RenderData& GetRenderData() { return m_renderData; }
-    XSF::D3DDevice* GetDevice() { return m_d3dDevice; }
 #if defined (TREE3D12)
 
     ID3D12Fence* GetFence() { return m_fence; }
@@ -663,4 +705,14 @@ public:
     HRESULT DrawFrameStats();
     HRESULT RenderShadowMap();
 };
+
+#if defined(TREE3D12)
+
+RenderPlatform12* GetPlatform(RenderManager* manager);
+
+#else
+
+RenderPlatform11* GetPlatform(RenderManager* manager);
+
+#endif
 

@@ -170,38 +170,42 @@ void InputLayouts::DestroyAll()
 #pragma endregion
 
 RenderManager::RenderManager() :
-						 m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr), 
-						 m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
-						 m_drawScreenVertexShader(), m_drawScreenPixelShader()
-#if defined(TREE3D)
-						, m_fenceEvent(nullptr), m_srvCbvDescriptorSize(0), m_numMaterialsCreated(0)
+    m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
+    m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
+    m_drawScreenVertexShader(), m_drawScreenPixelShader(),
+    m_platform(nullptr)
+#if defined(TREE3D12)
+    , m_fenceEvent(nullptr), m_srvCbvDescriptorSize(0), m_numMaterialsCreated(0)
 #endif
 {
-	m_driverType = D3D_DRIVER_TYPE_NULL;
-	m_featureLevel = D3D_FEATURE_LEVEL_11_0;
-	m_displayMode = Monitor;
-	m_bitmapFont = nullptr;
+    m_displayMode = Monitor;
+    m_bitmapFont = nullptr;
 
 #ifdef ENABLE_MSAA
-	m_enableMsaa = true; // TODO
+    m_enableMsaa = true; // TODO
 #else
-	m_enableMsaa = false; // TODO: disabled for windows store
+    m_enableMsaa = false; // TODO: disabled for windows store
 #endif
 
-	m_renderData.frameStats = g_frameStats;
+    m_renderData.frameStats = g_frameStats;
 
-	m_light.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-	m_light.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	m_light.Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-	m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
+    m_light.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    m_light.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    m_light.Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
 }
 
 HRESULT RenderManager::Initialize()
 {
-	m_nextInstanceBufferOffset = 0;
-	m_platform = new RenderPlatform();
+    m_nextInstanceBufferOffset = 0;
 
-	return S_OK;
+#if defined(TREE3D12)
+    m_platform = new RenderPlatform12();
+#else
+    m_platform = new RenderPlatform11();
+#endif
+
+    return S_OK;
 }
 
 RenderManager::~RenderManager()
@@ -224,7 +228,7 @@ HRESULT RenderManager::CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* he
 
 	// Constants that never change
 	const UINT allocSize = (size + 255) & ~255;
-	HR(m_d3dDevice->CreateCommittedResource(
+	HR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
 		&createdHeapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(allocSize),
@@ -250,7 +254,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 #if defined(TREE3D12)
     // Create the command list.
-    HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
+    HRR(::GetPlatform(this)->GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
 #endif
 
 	// Create vertices and indice for geometry
@@ -337,7 +341,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
         CComPtr<ID3DBlob> signature;
         CComPtr<ID3DBlob> error;
         HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-        HRR(m_d3dDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+        HRR(::GetPlatform(this)->GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
     }
 
     // Init text font
@@ -363,7 +367,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 #else
 	// Init text font
 	m_bitmapFont = new XSF::BitmapFont();
-	XSF_ERROR_IF_FAILED(m_bitmapFont->Create(m_d3dDevice, L"Arial_16"));
+	XSF_ERROR_IF_FAILED(m_bitmapFont->Create(::GetPlatform(this)->GetD3DDevice(), L"Arial_16"));
 
 	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
@@ -372,7 +376,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	bd.ByteWidth = sizeof(CBNeverChanges);
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
-	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_CBNeverChanges));
+	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &m_CBNeverChanges));
 #endif
 
 	SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
@@ -386,20 +390,20 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 	////////  Shadow map shader /////
 	// Load shadow shaders
-    HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
-    HRR(XSF::LoadShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader));
+    HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
+    HRR(XSF::LoadShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader.shader));
     // TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
-	////////  Debug texture /////
-	HRR(XSF::LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
+    ////////  Debug texture /////
+    HRR(XSF::LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader.shader));
 
 	// Load regular pixel Shader
-	HRR(XSF::LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
+	HRR(XSF::LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
 
 	// Create vertex buffer
 	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 	const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * m_geometryData.vertices.size());
-	HRR(m_d3dDevice->CreateCommittedResource(
+	HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
 		&uploadHeapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&vertexBufferDesc,
@@ -421,7 +425,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 	// Index buffer
 	const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * m_geometryData.indices.size());
-	HRR(m_d3dDevice->CreateCommittedResource(
+	HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
 		&uploadHeapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&indexBufferDesc,
@@ -463,7 +467,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	psoDesc.NumRenderTargets = 1;
 	psoDesc.RTVFormats[0] = m_swapChainFormat;
 	psoDesc.SampleDesc.Count = 1;
-	HRR(m_d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+	HRR(::GetPlatform(this)->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 
     // PSO for shadow map pass.
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
@@ -479,7 +483,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
     shadowPsoDesc.NumRenderTargets = 0;
 
-    HRR(m_d3dDevice->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
+    HRR(::GetPlatform(this)->GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
 
 	// Execute the command list.
 	HRR(m_commandList->Close());
@@ -492,19 +496,19 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	// Create Instanced draw data layout
 	std::vector< BYTE > dataVS;
 	HRR(XSF::LoadBlob(L"VS.cso", dataVS));
-	HRR(m_d3dDevice->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
+	HRR(::GetPlatform(this)->GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
 
-	HRR(LoadPixelShader(m_d3dDevice, L"PS.cso", &m_pixelShader.shader));
+	HRR(LoadPixelShader(::GetPlatform(this)->GetD3DDevice(), L"PS.cso", &m_pixelShader.shader));
 
 	SetDebugName(m_vertexShader.shader, "RenderManager::m_vertexShader");
 	SetDebugName(m_pixelShader.shader, "RenderManager::m_pixelShader");
 
-	InputLayouts::InitAll(m_d3dDevice, &(dataVS)[0], dataVS.size());
+	InputLayouts::InitAll(::GetPlatform(this)->GetDevice(), &(dataVS)[0], dataVS.size());
 	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
 
 	////////  Shadow map shader /////
 	// Load shadow shaders
-	HRR(LoadVertexShader(m_d3dDevice, L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+	HRR(LoadVertexShader(::GetPlatform(this)->GetD3DDevice(), L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
 	SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
 	// TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
@@ -513,11 +517,11 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	HRR(XSF::LoadBlob(L"DrawScreenQuadVS.cso", dataVS));
 
 	// Load regular vertex Shader
-	HRR(m_d3dDevice->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_drawScreenVertexShader));
+	HRR(::GetPlatform(this)->GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_drawScreenVertexShader.shader));
 	SetDebugName(m_drawScreenVertexShader, "RenderManager::m_drawScreenVertexShader");
 
 
-	HRR(m_d3dDevice->CreateInputLayout(InputLayoutDesc::Basic32,
+	HRR(::GetPlatform(this)->GetDevice()->CreateInputLayout(InputLayoutDesc::Basic32,
 								  ARRAYSIZE(InputLayoutDesc::Basic32), 
 								  &(dataVS)[ 0 ] /*passDesc.pIAInputSignature*/,
 								  dataVS.size() /*passDesc.IAInputSignatureSize*/, 
@@ -525,7 +529,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
 
 	// Load regular pixel Shader
-	HRR(LoadPixelShader(m_d3dDevice, L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
+	HRR(LoadPixelShader(::GetPlatform(this)->GetD3DDevice(), L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
 	SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
 
 	//////
@@ -540,7 +544,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	D3D11_SUBRESOURCE_DATA vinitData;
 	ZeroMemory(&vinitData, sizeof(vinitData));
 	vinitData.pSysMem = &m_geometryData.vertices[0];
-	HRR(m_d3dDevice->CreateBuffer(&vbd, &vinitData, &m_vertexBuffer.buffer));
+	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&vbd, &vinitData, &m_vertexBuffer.buffer));
 	SetDebugName(m_vertexBuffer, "RenderManager::m_vertexBuffer");
 
 	D3D11_BUFFER_DESC ibd;
@@ -553,7 +557,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	D3D11_SUBRESOURCE_DATA iinitData;
 	ZeroMemory(&iinitData, sizeof(iinitData));
 	iinitData.pSysMem = &m_geometryData.indices[0];
-	HRR(m_d3dDevice->CreateBuffer(&ibd, &iinitData, &m_indexBuffer.buffer));
+	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&ibd, &iinitData, &m_indexBuffer.buffer));
 	SetDebugName(m_indexBuffer, "RenderManager::m_indexBuffer");
 
 	// Set index buffer
@@ -568,23 +572,23 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	bd.ByteWidth = sizeof(CBChangesEveryFrame);
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
-	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
+	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
 	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
 
 #endif
 
     // Debug overlay to show depth map
-	HRR(BuildScreenQuadGeometryBuffers(m_d3dDevice));
+	HRR(BuildScreenQuadGeometryBuffers(::GetPlatform(this)->GetD3DDevice()));
 
 	// Load the debug texture
 #if defined(TREE3D12)
 #else
-	HRR(CreateDDSTextureFromFile(m_d3dDevice, L"snow.dds", nullptr, &m_debugTextureRV));
+	HRR(CreateDDSTextureFromFile(::GetPlatform(this)->GetDevice(), L"snow.dds", nullptr, &m_debugTextureRV));
 	SetDebugName(m_debugTextureRV, "RenderManager::m_debugTextureRV");
 #endif
 	// Create instanced buffer
 #if defined (TREE3D12)
-	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, m_d3dDevice));
+	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, ::GetPlatform(this)->GetDevice()));
 #else
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
 	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
@@ -592,7 +596,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	vbd.MiscFlags = 0;
 	vbd.StructureByteStride = 0;
-	HRR(m_instancedBuffer.Create(vbd, m_d3dDevice));
+	HRR(m_instancedBuffer.Create(vbd, ::GetPlatform(this)->GetD3DDevice()));
 #endif
 
 #if defined(TREE3D12)
@@ -603,7 +607,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     nullSrvDesc.Texture2D.MipLevels = 1;
     CD3DX12_CPU_DESCRIPTOR_HANDLE nullSrvHandleCpu(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
-    m_d3dDevice->CreateShaderResourceView(nullptr, &nullSrvDesc, nullSrvHandleCpu);
+    ::GetPlatform(this)->GetDevice()->CreateShaderResourceView(nullptr, &nullSrvDesc, nullSrvHandleCpu);
 
 #endif
 
@@ -614,9 +618,9 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
         CD3DX12_CPU_DESCRIPTOR_HANDLE shadowHandleCpu(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
         CD3DX12_GPU_DESCRIPTOR_HANDLE shadowHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE shadowDsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), ShadowDsv_HeapOffset, m_dsvDescriptorSize);
-        GetRenderData().pShadowMap = new ShadowMap(GetDevice(), shadowHandleCpu, shadowHandleGpu, shadowDsv, GetRenderData().SMapWidth, GetRenderData().SMapHeight);
+        GetRenderData().pShadowMap = new ShadowMap(::GetPlatform(this)->GetDevice(), shadowHandleCpu, shadowHandleGpu, shadowDsv, GetRenderData().SMapWidth, GetRenderData().SMapHeight);
 #else
-        GetRenderData().pShadowMap = new ShadowMap(GetDevice(), GetRenderData().SMapWidth, GetRenderData().SMapHeight);
+        GetRenderData().pShadowMap = new ShadowMap(::GetPlatform(this)->GetD3DDevice(), GetRenderData().SMapWidth, GetRenderData().SMapHeight);
 #endif
     }
 
@@ -826,8 +830,8 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     }
     else if (pass == RegularPass)
     {
-        m_immediateContext->VSSetShader(m_vertexShader.shader, nullptr, 0);
-        m_immediateContext->PSSetShader(m_pixelShader.shader, nullptr, 0);
+        m_immediateContext->VSSetShader(m_vertexShader, nullptr, 0);
+        m_immediateContext->PSSetShader(m_pixelShader, nullptr, 0);
     }
 #endif
 
@@ -951,7 +955,7 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
 	if (!texture.texture)
 	{
 		// Load the Texture
-		HRR(CreateDDSTextureFromFile(m_d3dDevice, textureFilename, nullptr, &texture.texture));
+		HRR(CreateDDSTextureFromFile(::GetPlatform(this)->GetDevice(), textureFilename, nullptr, &texture.texture));
 		m_textures[textureFilename] = texture;
 	}
 
@@ -986,7 +990,7 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 
 		// Create VS input layout
 		// Load regular vertex Shader
-		HRR(m_d3dDevice->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &vertexShader.shader));
+		HRR(::GetPlatform(this)->GetDevice()->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &vertexShader.shader));
 		SetDebugName(vertexShader.shader, sbFilename);
 #endif
 		m_vertexShaders[shaderFilename] = new VertexShader(vertexShader);
@@ -1006,7 +1010,7 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 #if defined(TREE3D12)
 		HR(XSF::LoadShader(shaderFilename, &pixelShader.shader));
 #else
-		HRR(LoadPixelShader(m_d3dDevice, shaderFilename, &pixelShader.shader));
+		HRR(LoadPixelShader(::GetPlatform(this)->GetD3DDevice(), shaderFilename, &pixelShader.shader));
 		SetDebugName(pixelShader.shader, sbFilename);
 #endif
 		m_pixelShaders[shaderFilename] = new PixelShader(pixelShader);
@@ -1041,7 +1045,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         textureDesc.SampleDesc.Quality = 0;
         textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
-        HRR(m_d3dDevice->CreateCommittedResource(
+        HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
             &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
             D3D12_HEAP_FLAG_NONE,
             &textureDesc,
@@ -1061,7 +1065,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         HeapProps.VisibleNodeMask = 1;
 
         // Create the GPU upload buffer.
-        HRR(m_d3dDevice->CreateCommittedResource(
+        HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
             &HeapProps,
             D3D12_HEAP_FLAG_NONE,
             &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
@@ -1089,7 +1093,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         srvDesc.Format = textureDesc.Format;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Texture2D.MipLevels = 1;
-        m_d3dDevice->CreateShaderResourceView(texture, &srvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
+        ::GetPlatform(this)->GetDevice()->CreateShaderResourceView(texture, &srvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
 
         int srvHeapIndex = (int) m_textures.size();
         CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_srvCbvDescriptorSize);
@@ -1124,11 +1128,11 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 	subData.SysMemSlicePitch = width * height * sizeof(float);
 
     CComPtr<ID3D11Texture2D> texture;
-	HRR(m_d3dDevice->CreateTexture2D(&desc, &subData, &texture));
+	HRR(::GetPlatform(this)->GetDevice()->CreateTexture2D(&desc, &subData, &texture));
 	SetDebugName(texture, "RenderManager::CreateTexture2::procedural");
 
 	CComPtr<ID3D11ShaderResourceView> view;
-	HRR(m_d3dDevice->CreateShaderResourceView(texture, nullptr, &view));
+	HRR(::GetPlatform(this)->GetDevice()->CreateShaderResourceView(texture, nullptr, &view));
 	SetDebugName(view, "RenderManager::CreateTexture2::proc view");
 
 #if 0
@@ -1194,14 +1198,14 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
                                                   m_srvCbvDescriptorSize);
 
     // Create descriptor
-    m_d3dDevice->CreateConstantBufferView(&constViewDesc, cpuMaterialHandle);
+    ::GetPlatform(this)->GetDevice()->CreateConstantBufferView(&constViewDesc, cpuMaterialHandle);
 
     // Copy texture descriptor from offline heap to shader visible heap
     if (texture)
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE dest(cpuMaterialHandle, Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE src(texture->textureView, 0, m_srvCbvDescriptorSize);
-        m_d3dDevice->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        ::GetPlatform(this)->GetDevice()->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
     m_numMaterialsCreated++;
 
@@ -1213,7 +1217,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	bd.ByteWidth = sizeof(CBMaterial);
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
-	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &pConstBuffer));
+	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &pConstBuffer));
 	SetDebugName(pConstBuffer, "RenderManager::CreateMaterial::pConstBuffer");
 #endif
 
@@ -1329,7 +1333,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 #if defined(TREE3D12)
 	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 	const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * quad.Vertices.size());
-	HRR(m_d3dDevice->CreateCommittedResource(
+	HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
 		&uploadHeapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&vertexBufferDesc,
@@ -1351,7 +1355,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
 
 	// Index buffer
 	const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * quad.Indices.size());
-	HRR(m_d3dDevice->CreateCommittedResource(
+	HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
 		&uploadHeapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&indexBufferDesc,
@@ -1466,26 +1470,22 @@ HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11Sha
 }
 #endif
 
-
-//--------------------------------------------------------------------------------------
-// Create Direct3D device and swap chain
-//--------------------------------------------------------------------------------------
 #if defined(TREE3D12)
-HRESULT RenderManager::InitDevice()
+HRESULT RenderPlatform12::InitDevice()
 {
-	HRESULT hr = S_OK;
+    HRESULT hr = S_OK;
 
 #if defined(_DEBUG)
-	// Enable the D3D12 debug layer.
-	//{
-		CComPtr<ID3D12Debug> debugController;
-		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-		{
-			debugController->EnableDebugLayer();
-		}
-	//}
+    // Enable the D3D12 debug layer.
+    //{
+    CComPtr<ID3D12Debug> debugController;
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+    {
+        debugController->EnableDebugLayer();
+    }
+    //}
 
-    
+
     CComPtr<IDXGIFactory2> factory2;
     HRR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory2)));
 
@@ -1496,41 +1496,54 @@ HRESULT RenderManager::InitDevice()
 
 #endif
 
-	const bool useWarpDevice = false;
-	if (useWarpDevice)
-	{
-  //      CComQIPtr<IDXGIFactory4> factory4(factory2);
+    const bool useWarpDevice = false;
+    if (useWarpDevice)
+    {
+        //      CComQIPtr<IDXGIFactory4> factory4(factory2);
 
-		//CComPtr<IDXGIAdapter> warpAdapter;
-		//HRR(factory2->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
+        //CComPtr<IDXGIAdapter> warpAdapter;
+        //HRR(factory2->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
 
-		//HRR(D3D12CreateDevice(
-		//	warpAdapter,
-		//	D3D_FEATURE_LEVEL_11_0,
-		//	IID_PPV_ARGS(&m_d3dDevice)
-		//	));
-	}
-	else
-	{
-		CComPtr<IDXGIAdapter1> hardwareAdapter;
-		GetHardwareAdapter(factory2, &hardwareAdapter);
+        //HRR(D3D12CreateDevice(
+        //	warpAdapter,
+        //	D3D_FEATURE_LEVEL_11_0,
+        //	IID_PPV_ARGS(&m_d3dDevice)
+        //	));
+    }
+    else
+    {
+        CComPtr<IDXGIAdapter1> hardwareAdapter;
+        GetHardwareAdapter(factory2, &hardwareAdapter);
 
-		HRR(D3D12CreateDevice(
-			hardwareAdapter,
-			D3D_FEATURE_LEVEL_11_0,
-			IID_PPV_ARGS(&m_d3dDevice)
-			));
-	}
+        HRR(D3D12CreateDevice(
+            hardwareAdapter,
+            D3D_FEATURE_LEVEL_11_0,
+            IID_PPV_ARGS(&m_d3dDevice)
+        ));
+    }
+
+    return hr;
+}
+
+
+//--------------------------------------------------------------------------------------
+// Create Direct3D device and swap chain
+//--------------------------------------------------------------------------------------
+HRESULT RenderManager::InitDevice()
+{
+	HRESULT hr = S_OK;
+
+    HRR(::GetPlatform(this)->InitDevice());
 
 	// Describe and create the command queue.
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-	HRR(m_d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+	HRR(::GetPlatform(this)->GetDevice()->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
 	// Shader visible descriptor size
-	m_srvCbvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_srvCbvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// Create descriptor heaps.
 	{
@@ -1539,10 +1552,10 @@ HRESULT RenderManager::InitDevice()
 		rtvHeapDesc.NumDescriptors = FrameCount;
 		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		HRR(m_d3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
+		HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
-		m_rtvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		m_dsvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+		m_rtvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		m_dsvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 		// Describe and create a depth stencil view (DSV) descriptor heap.
 		// Each frame has its own depth stencils (to write shadows onto) 
@@ -1551,7 +1564,7 @@ HRESULT RenderManager::InitDevice()
 		dsvHeapDesc.NumDescriptors = 1 + FrameCount * 1;
 		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		HRR(m_d3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
+		HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
 
 		// Describe and create a SRV descriptor heap.
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
@@ -1560,7 +1573,7 @@ HRESULT RenderManager::InitDevice()
         srvHeapDesc.NumDescriptors = maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors /* shadow, null, etc */;
         srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        HRR(m_d3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
+        HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
 
         // Heap for loading textures
         // TODO: Move from device owned to scene owned
@@ -1568,18 +1581,18 @@ HRESULT RenderManager::InitDevice()
         loadedTextureHeapDesc.NumDescriptors = maxTotalTexturesInScene;
         loadedTextureHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;;
         loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        HRR(m_d3dDevice->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
+        HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
 		
 		//// Describe and create a sampler descriptor heap.
 		//D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
 		//samplerHeapDesc.NumDescriptors = 2;		// One clamp and one wrap sampler.
 		//samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
 		//samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		//HRR(m_d3dDevice->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_samplerHeap)));
+		//HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_samplerHeap)));
 		//SetDebugName(m_samplerHeap, "m_samplerHeap");
 	}
 
-	HRR(m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+	HRR(::GetPlatform(this)->GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 
 	// 
 	// Create ChangeOnResize constant buffer
@@ -1597,14 +1610,14 @@ HRESULT RenderManager::InitDevice()
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
 
 	// Initialize render statesf
-	XSF::StockRenderStates::Initialize(m_d3dDevice);
+	XSF::StockRenderStates::Initialize(::GetPlatform(this)->GetDevice());
 
 	// Create the command list.
-	//HRR(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
+	//HRR(::GetPlatform(this)->GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
 	{
-		HRR(m_d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+		HRR(::GetPlatform(this)->GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
 		m_fenceValue = 1;
 
 		// Create an event handle to use for frame synchronization.
@@ -1624,100 +1637,113 @@ HRESULT RenderManager::InitDevice()
 }
 
 #else
-HRESULT RenderManager::InitDevice()
-{
-	HRESULT result = S_OK;
 
-	UINT createDeviceFlags = 0;
+HRESULT RenderPlatform11::InitDevice()
+{
+    HRESULT result = S_OK;
+    m_driverType = D3D_DRIVER_TYPE_NULL;
+
+    UINT createDeviceFlags = 0;
 #ifdef _DEBUG
-	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
 #if defined(_XBOX_ONE) && defined(PROFILE) 
-	createDeviceFlags |= D3D11_CREATE_DEVICE_INSTRUMENTED;
+    createDeviceFlags |= D3D11_CREATE_DEVICE_INSTRUMENTED;
 #endif
 
-	D3D_DRIVER_TYPE driverTypes[] =
-	{
-		D3D_DRIVER_TYPE_HARDWARE,
-		D3D_DRIVER_TYPE_WARP,
-		D3D_DRIVER_TYPE_REFERENCE,
-	};
-	UINT numDriverTypes = ARRAYSIZE(driverTypes);
+    D3D_DRIVER_TYPE driverTypes[] =
+    {
+        D3D_DRIVER_TYPE_HARDWARE,
+        D3D_DRIVER_TYPE_WARP,
+        D3D_DRIVER_TYPE_REFERENCE,
+    };
+    UINT numDriverTypes = ARRAYSIZE(driverTypes);
 
-	D3D_FEATURE_LEVEL featureLevels[] =
-	{
-		D3D_FEATURE_LEVEL_11_1,
-		D3D_FEATURE_LEVEL_11_0,
-		D3D_FEATURE_LEVEL_10_1,
-		D3D_FEATURE_LEVEL_10_0,
-	};
-	UINT numFeatureLevels = ARRAYSIZE(featureLevels);
+    D3D_FEATURE_LEVEL featureLevels[] =
+    {
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0,
+    };
+    UINT numFeatureLevels = ARRAYSIZE(featureLevels);
 
-	for (UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++)
-	{
-		CComPtr<ID3D11Device> device;
-		CComPtr<ID3D11DeviceContext> d3dContext;
+    for (UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++)
+    {
+        CComPtr<ID3D11Device> device;
+        CComPtr<ID3D11DeviceContext> d3dContext;
 
-		m_driverType = driverTypes[driverTypeIndex];
-		result = D3D11CreateDevice(nullptr, m_driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
-			D3D11_SDK_VERSION, &device, &m_featureLevel, &d3dContext);
+        m_driverType = driverTypes[driverTypeIndex];
+        result = D3D11CreateDevice(nullptr, m_driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
+            D3D11_SDK_VERSION, &device, &m_featureLevel, &d3dContext);
 
-		if (SUCCEEDED(result))
-		{
-			HRR(device->QueryInterface(__uuidof(m_d3dDevice), reinterpret_cast<void**>(&m_d3dDevice)));
-			HRR(d3dContext->QueryInterface(__uuidof(m_immediateContext), reinterpret_cast<void**>(&m_immediateContext)));
-			break;
-		}
-	}
+        if (SUCCEEDED(result))
+        {
+            HRR(device->QueryInterface(__uuidof(m_d3dDevice), reinterpret_cast<void**>(&m_d3dDevice)));
+            HRR(d3dContext->QueryInterface(__uuidof(m_immediateContext), reinterpret_cast<void**>(&m_immediateContext)));
+            break;
+        }
+    }
 
-	if (FAILED(result))
-		return result;
+    if (FAILED(result))
+        return result;
 
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
-	if ((createDeviceFlags & D3D11_CREATE_DEVICE_DEBUG) == D3D11_CREATE_DEVICE_DEBUG)
-	{
-		// Debug layers
-		CComPtr<ID3D11Debug> d3dDebug;
-		HR(m_d3dDevice->QueryInterface(__uuidof(ID3D11Debug), (void**)&d3dDebug));
+    if ((createDeviceFlags & D3D11_CREATE_DEVICE_DEBUG) == D3D11_CREATE_DEVICE_DEBUG)
+    {
+        // Debug layers
+        CComPtr<ID3D11Debug> d3dDebug;
+        HR(m_d3dDevice->QueryInterface(__uuidof(ID3D11Debug), (void**)&d3dDebug));
 
-		CComPtr<ID3D11InfoQueue> d3dInfoQueue;
-		HR(d3dDebug->QueryInterface(__uuidof(ID3D11InfoQueue), (void**)&d3dInfoQueue))
-			d3dInfoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
-		d3dInfoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
+        CComPtr<ID3D11InfoQueue> d3dInfoQueue;
+        HR(d3dDebug->QueryInterface(__uuidof(ID3D11InfoQueue), (void**)&d3dInfoQueue))
+            d3dInfoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
+        d3dInfoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
 
-		D3D11_MESSAGE_ID hide[] =
-		{
-			D3D11_MESSAGE_ID_SETPRIVATEDATA_CHANGINGPARAMS,
-			// Add more message IDs here as needed
-		};
+        D3D11_MESSAGE_ID hide[] =
+        {
+            D3D11_MESSAGE_ID_SETPRIVATEDATA_CHANGINGPARAMS,
+            // Add more message IDs here as needed
+        };
 
-		D3D11_INFO_QUEUE_FILTER filter;
-		ZeroMemory(&filter, sizeof(filter));
-		filter.DenyList.NumIDs = _countof(hide);
-		filter.DenyList.pIDList = hide;
-		d3dInfoQueue->AddStorageFilterEntries(&filter);
-	}
+        D3D11_INFO_QUEUE_FILTER filter;
+        ZeroMemory(&filter, sizeof(filter));
+        filter.DenyList.NumIDs = _countof(hide);
+        filter.DenyList.pIDList = hide;
+        d3dInfoQueue->AddStorageFilterEntries(&filter);
+    }
 #endif
 
-	// 
-	// Create constant buffer
-	D3D11_BUFFER_DESC bd;
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(CBChangeOnResize);
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bd.CPUAccessFlags = 0;
-	HRR(m_d3dDevice->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
+    return S_OK;
+}
 
-	m_immediateContext->VSSetConstantBuffers(1, 1, &m_pCBChangeOnResize);
+HRESULT RenderManager::InitDevice()
+{
+    HRESULT hr = S_OK;
 
-	// Initialize the world matrices
-	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
+    hr = ::GetPlatform(this)->InitDevice();
 
-	XSF::StockRenderStates::Initialize(m_d3dDevice);
+    m_immediateContext = ::GetPlatform(this)->m_immediateContext;
+    ::GetPlatform(this)->m_immediateContext.Release();
+    // 
+    // Create constant buffer
+    D3D11_BUFFER_DESC bd;
+    ZeroMemory(&bd, sizeof(bd));
+    bd.Usage = D3D11_USAGE_DEFAULT;
+    bd.ByteWidth = sizeof(CBChangeOnResize);
+    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bd.CPUAccessFlags = 0;
+    HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
 
-	return S_OK;
+    m_immediateContext->VSSetConstantBuffers(1, 1, &m_pCBChangeOnResize);
+
+    // Initialize the world matrices
+    XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
+
+    XSF::StockRenderStates::Initialize(::GetPlatform(this)->GetD3DDevice());
+
+    return hr;
 }
 #endif
 
@@ -1836,7 +1862,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	CComPtr<IDXGIFactory1> dxgiFactory;
 	{
 		CComPtr<IDXGIDevice> dxgiDevice;
-		hr = m_d3dDevice->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
+		hr = ::GetPlatform(this)->GetDevice()->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
 		if (SUCCEEDED(hr))
 		{
 			CComPtr<IDXGIAdapter> adapter;
@@ -1853,7 +1879,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	// Check MSAA support
 	UINT msaaQuality;
 	const UINT msaaCount = 4;
-	HRR(m_d3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
+	HRR(::GetPlatform(this)->GetDevice()->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
 	if (msaaQuality == 0)
 	{
 		m_enableMsaa = false;
@@ -1873,7 +1899,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		rasterDesc.MultisampleEnable = true; // MSAA
 		rasterDesc.ScissorEnable = false;
 		rasterDesc.SlopeScaledDepthBias = 0.0f;
-		HRR(m_d3dDevice->CreateRasterizerState(&rasterDesc, &m_rasterState));
+		HRR(::GetPlatform(this)->GetDevice()->CreateRasterizerState(&rasterDesc, &m_rasterState));
 		SetDebugName(m_rasterState, "Game::m_rasterState");
 		m_immediateContext->RSSetState(m_rasterState);
 	}
@@ -1910,7 +1936,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	for (UINT i = 0; i < FrameCount; i++)
 	{
 		HRR(m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
-		m_d3dDevice->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
+        ::GetPlatform(this)->GetDevice()->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
 		rtvHandle.Offset(1, m_rtvDescriptorSize);
 
 		CHAR name[25];
@@ -1942,7 +1968,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		clearValue.DepthStencil.Depth = 1.0f;
 		clearValue.DepthStencil.Stencil = 0;
 
-		HRR(m_d3dDevice->CreateCommittedResource(
+		HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 			D3D12_HEAP_FLAG_NONE,
 			&depthBufferDesc,
@@ -1953,7 +1979,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
 
 		// Create the depth stencil view.
-		m_d3dDevice->CreateDepthStencilView(m_pDepthStencil, nullptr, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+        ::GetPlatform(this)->GetDevice()->CreateDepthStencilView(m_pDepthStencil, nullptr, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 	}
 
 #else
@@ -1962,7 +1988,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	HRR(dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2)));
 
 	// DirectX 11.1 or later
-	hr = m_d3dDevice->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void**>(&m_d3dDevice1));
+	hr = ::GetPlatform(this)->GetDevice()->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void**>(&m_d3dDevice1));
 	if (SUCCEEDED(hr))
 	{
 		(void)m_immediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&m_immediateContext1));
@@ -1984,7 +2010,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 		Desc.CPUAccessFlags = 0;
 		Desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
 
-		HRR(m_d3dDevice->CreateTexture2D(&Desc, NULL, &m_pSharedRenderToTexture));
+		HRR(::GetPlatform(this)->GetDevice()->CreateTexture2D(&Desc, NULL, &m_pSharedRenderToTexture));
 
 		pBackBuffer = m_pSharedRenderToTexture;
 	}
@@ -2021,7 +2047,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	}
 
 	// Create a render target view
-	HRR(hr = m_d3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
+	HRR(hr = ::GetPlatform(this)->GetDevice()->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
 	SetDebugName(m_pRenderTargetView, "Game::m_pRenderTargetView");
 	pBackBuffer.Release();
 
@@ -2045,7 +2071,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 	descDepth.CPUAccessFlags = 0;
 	descDepth.MiscFlags = 0;
-	HRR(m_d3dDevice->CreateTexture2D(&descDepth, nullptr, &m_pDepthStencil));
+	HRR(::GetPlatform(this)->GetDevice()->CreateTexture2D(&descDepth, nullptr, &m_pDepthStencil));
 	SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
 
 	// Create the depth stencil view
@@ -2058,7 +2084,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 #endif
 	dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 	dsvDesc.Texture2D.MipSlice = 0;
-	HRR(m_d3dDevice->CreateDepthStencilView(m_pDepthStencil, &dsvDesc, &m_pDepthStencilView));
+	HRR(::GetPlatform(this)->GetDevice()->CreateDepthStencilView(m_pDepthStencil, &dsvDesc, &m_pDepthStencilView));
 	SetDebugName(m_pDepthStencilView, "Game::m_pDepthStencilView");
 
 #endif
@@ -2114,6 +2140,21 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 //--------------------------------------------------------------------------------------
 // Clean up the objects we've created
 //--------------------------------------------------------------------------------------
+
+#if defined(TREE3D12)
+HRESULT RenderPlatform12::UninitDevice()
+{
+    m_d3dDevice.Release();
+    return S_OK;
+}
+#else
+HRESULT RenderPlatform11::UninitDevice()
+{
+    m_d3dDevice.Release();
+    return S_OK;
+}
+#endif
+
 void RenderManager::UninitDevice()
 {
 	UninitGameLevelGraphics();
@@ -2173,17 +2214,17 @@ void RenderManager::UninitDevice()
 #if defined(TREE3D12)
 #else
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
-	if (m_d3dDevice)
+	if (::GetPlatform(this)->GetDevice())
 	{
 		CComPtr<ID3D11Debug> dbg;
-		HR(m_d3dDevice->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&dbg)));
+		HR(::GetPlatform(this)->GetDevice()->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&dbg)));
 
 		HR(dbg->ReportLiveDeviceObjects(D3D11_RLDO_SUMMARY | D3D11_RLDO_DETAIL));
 	}
 #endif
 #endif // TREE3D12
 
-	m_d3dDevice.Release();
+    ::GetPlatform(this)->UninitDevice();
 }
 
 //--------------------------------------------------------------------------------------
@@ -2584,7 +2625,17 @@ void RenderManager::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
 	m_managedUploadHeaps.push_back(FencedHeap(pUploadHeap, m_fenceValue));
 }
 
+RenderPlatform12* GetPlatform(RenderManager* manager)
+{
+    return (RenderPlatform12*)manager->GetPlatform();
+}
+
 #else// XSF_USE_DX_12_0
+
+RenderPlatform11* GetPlatform(RenderManager* manager)
+{
+    return (RenderPlatform11*)manager->GetPlatform();
+}
 
 //--------------------------------------------------------------------------------------
 // Name: LoadPixelShader()

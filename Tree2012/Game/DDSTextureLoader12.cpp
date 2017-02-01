@@ -999,7 +999,7 @@ void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
     BufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     BufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    HR(renderManager->GetDevice()->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE,
+    HR(GetPlatform(renderManager)->GetDevice()->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE,
         &BufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr, IID_PPV_ARGS(&UploadBuffer)));
 
@@ -1229,7 +1229,7 @@ static HRESULT CreateTextureFromDDS(_In_ RenderManager* renderManager,
 
         if (SUCCEEDED(hr))
         {
-            hr = CreateD3DResources(renderManager->GetDevice(), resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
+            hr = CreateD3DResources(GetPlatform(renderManager)->GetDevice(), resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
                 format, forceSRGB,
                 isCubeMap, initData.get(), texture, textureView);
 
@@ -1244,7 +1244,7 @@ static HRESULT CreateTextureFromDDS(_In_ RenderManager* renderManager,
                     twidth, theight, tdepth, skipMip, initData.get());
                 if (SUCCEEDED(hr))
                 {
-                    hr = CreateD3DResources(renderManager->GetDevice(), resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
+                    hr = CreateD3DResources(GetPlatform(renderManager)->GetDevice(), resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
                         format, forceSRGB,
                         isCubeMap, initData.get(), texture, textureView);
                 }
@@ -1312,7 +1312,7 @@ HRESULT CreateDDSTextureFromMemory(
         *alphaMode = DDS_ALPHA_MODE_UNKNOWN;
     }
 
-    if (!renderManager || !renderManager->GetDevice() || !ddsData)
+    if (!renderManager || !GetPlatform(renderManager)->GetDevice() || !ddsData)
     {
         return E_INVALIDARG;
     }
