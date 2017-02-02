@@ -537,11 +537,11 @@ class RenderManager : public IRenderFrame
     UINT m_dsvDescriptorSize;
     D3D12_VIEWPORT m_viewPort;
     D3D12_RECT m_scissorRect;
-    UINT								m_srvCbvDescriptorSize;
+    UINT                                m_srvCbvDescriptorSize;
     CComPtr<ID3D12Resource>             m_pDepthStencil;
-    D3D12_RESOURCE_DESC					m_pDepthStencilView;
+    D3D12_RESOURCE_DESC                 m_pDepthStencilView;
 
-    D3D12_RESOURCE_DESC					m_pRenderTargetView;
+    D3D12_RESOURCE_DESC                 m_pRenderTargetView;
     UINT								m_frameIndex;
 
     CComPtr<ID3D12Resource>				m_pSharedRenderToTexture;

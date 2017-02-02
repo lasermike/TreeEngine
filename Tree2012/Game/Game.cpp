@@ -126,7 +126,6 @@ HRESULT Game::Cleanup()
 	m_renderManager.UninitDevice(); return S_OK;
 }
 
-
 void Game::Regenerate()
 {
 	HRESULT hr = S_OK;

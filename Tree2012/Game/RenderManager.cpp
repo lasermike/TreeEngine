@@ -1818,13 +1818,27 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-	//if (!swapChainCreator)
-	//{
-	//	return S_FALSE;
-	//}
-
 	// Resize logic
+    if (m_commandList)
+    {
+        HR(m_commandAllocator->Reset());
+        HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
 
+        m_commandList->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
+
+        HRR(m_commandList->Close());
+
+        ID3D12CommandList* ppCommandLists[] = { m_commandList };
+        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+
+        WaitForPreviousFrame();
+    }
+
+    for (UINT i = 0; i < FrameCount; i++)
+    {
+        m_renderTargets[i].Release();
+    }
 
 	// Create width/height dependent objects
 	m_pDepthStencilView = D3D12_RESOURCE_DESC();
@@ -1833,6 +1847,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	m_pRenderTargetView = D3D12_RESOURCE_DESC();
 	m_pSwapChain.Release();
 	m_pSharedRenderToTexture.Release();
+
 
 #else
 	if (!m_immediateContext/* && !swapChainCreator*/)
@@ -2182,7 +2197,6 @@ void RenderManager::UninitDevice()
 	m_rtvHeap.Release();
 	m_cbvSrvHeap.Release();
     m_loadTextureHeap.Release();
-	//m_commandList.Release();
 
     CloseHandle(m_fenceEvent);
     m_fenceEvent = nullptr;
@@ -2252,7 +2266,7 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
-    ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap }; //, m_samplerHeap };
+    ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap };
     m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     m_commandList->RSSetViewports(1, &m_viewPort);
@@ -2268,7 +2282,6 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
 
     materialHandle.Offset(Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, materialHandle);
-    //m_commandList->SetGraphicsRootDescriptorTable(SampleTableRootSignatureParam, m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
 
     // Set root signature constant buffers
     m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
@@ -2717,60 +2730,10 @@ HRESULT RenderPlatform11::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactor
 #if defined(WIN32) && !defined(TREENGINE_XBOX)
     HRR(dxgiFactory2->CreateSwapChainForHwnd(GetDevice(), m_hwnd, sd, nullptr, nullptr, swapChain));
 #else
-    HRR(dxgiFactory2->CreateSwapChainForCoreWindow(::GetPlatform(&m_renderManager)->GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
+    HRR(dxgiFactory2->CreateSwapChainForCoreWindow(GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
 #endif 
 
     return hr;
 }
 #endif
-
-
-//#if defined(WIN32) && !defined(TREENGINE_XBOX)
-//HRESULT RenderPlatform11::Initialize()
-//{
-//    HRESULT hr = S_OK;
-//
-//    UINT windowWidth = 0;
-//    UINT windowHeight = 0;
-//    RECT rect = { 0 };
-//    GetClientRect(m_hwnd, &rect);
-//    windowWidth = rect.right - rect.left;
-//    windowHeight = rect.bottom - rect.top;
-//
-//    //HRR(m_renderManager->OnResize(windowWidth, windowHeight, m_renderToSharedTexture/*, this*/));
-//
-//    return hr;
-//}
-//#else
-//
-//#if !defined(_XBOX_ONE)
-//// Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
-//float ConvertDipsToPixels(float dips, float logicalDpi)
-//{
-//    static const float dipsPerInch = 96.0f;
-//
-//    return floor(dips * logicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
-//    
-//#endif
-//
-//
-//HRESULT RenderPlatform12::Initialize()
-//{
-//    m_window = window;
-//    HRR(m_renderManager.InitDevice());
-//
-//    auto windowBounds = m_window->Bounds;
-//#if defined(_XBOX_ONE)
-//    logicalDpi = logicalDpi; // Address warning 
-//    UINT windowWidth = 1920;
-//    UINT windowHeight = 1080;
-//#else
-//    UINT windowWidth = (UINT)ConvertDipsToPixels(windowBounds.Width, logicalDpi);
-//    UINT windowHeight = (UINT)ConvertDipsToPixels(windowBounds.Height, logicalDpi);
-//#endif
-//
-//    return S_OK;
-//}
-//
-//#endif
 
