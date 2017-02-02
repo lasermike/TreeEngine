@@ -27,11 +27,9 @@ using namespace Windows::Graphics::Display;
 
 Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 {
-//#if defined(WIN32) && !defined(TREENGINE_XBOX)
-//	m_hwnd = nullptr;
-//#else
-//	m_window = nullptr;
-//#endif
+    m_needsResize = false;
+    m_nextScreenWidth = 0;
+    m_nextScreenHeight = 0;
 	m_renderToSharedTexture = false;
 	m_paused = false;
 	m_wireframe = false;
@@ -229,11 +227,19 @@ void Game::ComputeCPU()
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
 
+    if (m_needsResize)
+    {
+        m_renderManager.OnResize(m_nextScreenWidth, m_nextScreenHeight, m_renderToSharedTexture/*, this*/);
+        m_needsResize = false;
+    }
+
 	// Reset stats
 	for (int i = 0; i < MAX_FRAME_STAT; i++)
 	{
 		m_renderManager.GetRenderData().frameStats[i].stat = 0;
 	}
+
+
 
 	FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
 	HandleInput(inputData.key);

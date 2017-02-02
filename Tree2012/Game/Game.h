@@ -38,22 +38,8 @@ public:
 	Game(IInputManager* inputMgr);
 	~Game();
 
-//	// Initialization and management
-//#if defined(WIN32) && !defined(TREENGINE_XBOX)
-//	HRESULT Initialize(HWND hwnd, bool renderToSharedTexture);
-//#else
-//	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
-//#endif
-
-//	// TODO: move to platform specific code
-//#if defined(TREE3D12)
-//	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain);
-//#else
-//	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain); 
-//#endif
-
 	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat) { return m_renderManager.UpdateProjection(pProjMat, false); }
-	HRESULT OnResize(UINT width, UINT height) { return m_renderManager.OnResize(width, height, m_renderToSharedTexture/*, this*/); }
+    HRESULT OnResize(UINT width, UINT height) { m_needsResize = true; m_nextScreenWidth = width; m_nextScreenHeight = height; return S_OK; }
 
 	HRESULT Cleanup();
 
@@ -113,13 +99,10 @@ private:
 	bool							    m_advanceScene;
 	int								    m_advanceSceneAmount;
 
-//#if defined(WIN32) && !defined(TREENGINE_XBOX)
-//	HWND								m_hwnd;
-//#else
-//	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;
-//#endif //Classic
-//
-	bool								m_renderToSharedTexture;
+    bool                                m_needsResize;
+    int                                 m_nextScreenWidth;
+    int                                 m_nextScreenHeight;
+    bool								m_renderToSharedTexture;
 
 	bool								m_resetTree;
 	bool								m_showShadowBuffer;

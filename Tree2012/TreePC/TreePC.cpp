@@ -103,10 +103,6 @@ void TreePC::OnResize()
 	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
 	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
 
-    // TEMPTEMP
-    auto info = DisplayInformation::GetForCurrentView();
-    ::GetPlatform(&m_pGame->GetRenderManager())->SetWindow(CoreWindow::GetForCurrentThread(), info->LogicalDpi);
-
 	m_pGame->OnResize(windowWidth, windowHeight);
 }
 

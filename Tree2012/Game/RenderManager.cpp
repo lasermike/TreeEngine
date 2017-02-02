@@ -1818,23 +1818,8 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-	// Resize logic
-    if (m_commandList)
-    {
-        HR(m_commandAllocator->Reset());
-        HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
 
-        m_commandList->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
-
-        HRR(m_commandList->Close());
-
-        ID3D12CommandList* ppCommandLists[] = { m_commandList };
-        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-
-        WaitForPreviousFrame();
-    }
-
+    // Resize logic
     for (UINT i = 0; i < FrameCount; i++)
     {
         m_renderTargets[i].Release();
