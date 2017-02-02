@@ -84,7 +84,6 @@ void TreePC::Run()
 		}
 		else
 		{
-            //CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
             CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
 		}
 	}

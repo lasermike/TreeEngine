@@ -1813,7 +1813,7 @@ HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
 	return S_OK;
 }
 
-HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture/*, SwapChainCreator* swapChainCreator*/)
+HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
 {
 	HRESULT hr = S_OK;
 
@@ -1835,7 +1835,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 
 
 #else
-	if (!m_immediateContext/* && !swapChainCreator*/)
+	if (!m_immediateContext)
 	{
 		return S_FALSE;
 	}
@@ -2628,14 +2628,14 @@ void RenderManager::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
 
 RenderPlatform12* GetPlatform(RenderManager* manager)
 {
-    return (RenderPlatform12*)manager->GetPlatform();
+    return (RenderPlatform12*)manager->GetPlatformBase();
 }
 
 #else// XSF_USE_DX_12_0
 
 RenderPlatform11* GetPlatform(RenderManager* manager)
 {
-    return (RenderPlatform11*)manager->GetPlatform();
+    return (RenderPlatform11*)manager->GetPlatformBase();
 }
 
 //--------------------------------------------------------------------------------------

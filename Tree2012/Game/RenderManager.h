@@ -35,15 +35,6 @@ enum ShaderType
 	ShaderType_ComputeShader,
 };
 
-interface SwapChainCreator
-{
-#if defined(TREE3D12)
-	virtual HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain) = 0;
-#else
-	virtual HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain) = 0;
-#endif
-};
-
 
 struct LoadedTexture
 {
@@ -514,9 +505,10 @@ class RenderManager : public IRenderFrame
 
     RenderData                                      m_renderData;
 
-    // Pipeline objects.
-    RenderPlatform*                     m_platform;
-    static const UINT FrameCount = 2;
+    // 11 or 12
+    RenderPlatform*                                 m_platform;
+
+    static const UINT                               FrameCount = 2;
 
 #if defined(TREE3D12)
     CComPtr<ID3D12CommandQueue> m_commandQueue;
@@ -615,7 +607,7 @@ class RenderManager : public IRenderFrame
 
 #else
     CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
-    CBChangeOnResize					m_cbChangesOnResize;
+    CBChangeOnResize                    m_cbChangesOnResize;
 
     CComPtr<ID3D11RasterizerState>		m_rasterState;
 
@@ -626,8 +618,8 @@ class RenderManager : public IRenderFrame
     CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
 
     // Fixed drawing features
-    CComPtr<ID3D11Buffer>				m_screenQuadVB;
-    CComPtr<ID3D11Buffer>				m_screenQuadIB;
+    CComPtr<ID3D11Buffer>               m_screenQuadVB;
+    CComPtr<ID3D11Buffer>               m_screenQuadIB;
     CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
 #endif
 
@@ -677,10 +669,10 @@ public:
     HRESULT Initialize();
 
     HRESULT InitDevice();
-    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture/*, SwapChainCreator* swapChainCreator*/);
+    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
     void UninitDevice();
 
-    RenderPlatform* GetPlatform() { return m_platform; }
+    RenderPlatform* GetPlatformBase() { return m_platform; }
 
     RenderData& GetRenderData() { return m_renderData; }
 #if defined (TREE3D12)
@@ -694,9 +686,12 @@ public:
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
     void WaitForPreviousFrame();
 
+    RenderPlatform12* GetPlatform() { return (RenderPlatform12*) m_platform; }
+
 #else
     XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
 
+    RenderPlatform11* GetPlatform() { return (RenderPlatform11*)m_platform; }
 #endif
 
     D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes

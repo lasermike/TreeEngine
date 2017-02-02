@@ -31,7 +31,7 @@ struct FrameInputData
 	}
 };
 
-class Game /*: public SwapChainCreator*/
+class Game
 {
 public:
 

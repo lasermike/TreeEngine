@@ -406,8 +406,8 @@ HRESULT ConfigOculusDevice()
     for (int eye = 0; eye < 2; eye++)
     {
         Sizei idealSize = ovr_GetFovTextureSize(HMD, (ovrEyeType)eye, g_hmdDesc.DefaultEyeFov[eye], 1.0f);
-        g_pEyeRenderTexture[eye]      = new OculusTexture(HMD, ((RenderPlatform11*) g_game->GetRenderManager().GetPlatform())->GetDevice(), idealSize);
-		g_pEyeDepthBuffer[eye]        = new DepthBuffer(((RenderPlatform11*)g_game->GetRenderManager().GetPlatform())->GetDevice(), idealSize);
+        g_pEyeRenderTexture[eye]      = new OculusTexture(HMD, ((RenderPlatform11*) g_game->GetRenderManager().GetPlatformBase())->GetDevice(), idealSize);
+		g_pEyeDepthBuffer[eye]        = new DepthBuffer(((RenderPlatform11*)g_game->GetRenderManager().GetPlatformBase())->GetDevice(), idealSize);
         g_eyeRenderViewport[eye].Pos  = Vector2i(0, 0);
         g_eyeRenderViewport[eye].Size = idealSize;
     }
@@ -428,7 +428,7 @@ HRESULT ConfigOculusDevice()
     td.Usage            = D3D11_USAGE_DEFAULT;
     td.SampleDesc.Count = 1;
     td.MipLevels        = 1;
-    ovr_CreateMirrorTextureD3D11(HMD, ((RenderPlatform11*)g_game->GetRenderManager().GetPlatform())->GetDevice(), &td, 0, &g_mirrorTexture);
+    ovr_CreateMirrorTextureD3D11(HMD, ((RenderPlatform11*)g_game->GetRenderManager().GetPlatformBase())->GetDevice(), &td, 0, &g_mirrorTexture);
 
     // Setup VR components, filling out description
     eyeRenderDesc[0] = ovr_GetRenderDesc(HMD, ovrEye_Left, g_hmdDesc.DefaultEyeFov[0]);
