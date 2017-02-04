@@ -131,6 +131,7 @@
   <ItemDefinitionGroup>
     <Link>
       <AdditionalDependencies>DirectXTex.lib; d2d1.lib; d3d12.lib; dxgi.lib;ole32.lib; windowscodecs.lib; dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/stack:1048576</AdditionalOptions>
     </Link>
     <ClCompile>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>

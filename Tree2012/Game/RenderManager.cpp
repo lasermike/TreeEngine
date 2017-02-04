@@ -29,12 +29,6 @@ FrameStatistic g_frameStats[MAX_FRAME_STAT] =
 };
 
 
-enum DsvHeapOffset
-{
-    SwapChainDsv_HeapOffset = 0,
-    ShadowDsv_HeapOffset = 1
-};
-
 enum CbvSrvHeapOffsets
 {
     ShadowSrv_HeapOffset =  0,
@@ -613,7 +607,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 #if defined(TREE3D12)
         CD3DX12_CPU_DESCRIPTOR_HANDLE shadowHandleCpu(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
         CD3DX12_GPU_DESCRIPTOR_HANDLE shadowHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE shadowDsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), ShadowDsv_HeapOffset, m_dsvDescriptorSize);
+        D3D12_CPU_DESCRIPTOR_HANDLE shadowDsv = GetPlatform()->GetShadowDepthTargetHandle();
         GetRenderData().pShadowMap = new ShadowMap(::GetPlatform(this)->GetDevice(), shadowHandleCpu, shadowHandleGpu, shadowDsv, GetRenderData().SMapWidth, GetRenderData().SMapHeight);
 #else
         GetRenderData().pShadowMap = new ShadowMap(::GetPlatform(this)->GetD3DDevice(), GetRenderData().SMapWidth, GetRenderData().SMapHeight);
@@ -654,10 +648,7 @@ void RenderManager::WaitForPreviousFrame()
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 
-    if (GetPlatform()->GetSwapChain())
-    {
-        m_frameIndex = GetPlatform()->GetSwapChain()->GetCurrentBackBufferIndex();
-    }
+    GetPlatform()->UpdateFrameIndex();
 }
 
 #endif
@@ -1467,6 +1458,7 @@ HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11Sha
 #endif
 
 #if defined(TREE3D12)
+
 HRESULT RenderPlatform12::InitDevice()
 {
     HRESULT hr = S_OK;
@@ -1518,6 +1510,11 @@ HRESULT RenderPlatform12::InitDevice()
         ));
     }
 
+    // Create descriptor heaps.
+    // Each frame has its own depth stencils and then there is one for shadows.
+    HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount));
+    HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount * 1));
+
     return hr;
 }
 
@@ -1541,29 +1538,7 @@ HRESULT RenderManager::InitDevice()
 	// Shader visible descriptor size
 	m_srvCbvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	// Create descriptor heaps.
-    HRR(m_rtvHeap.Initialize(GetPlatform()->GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RenderPlatform12::FrameCount));
-
-	{
-		//// Describe and create a render target view (RTV) descriptor heap.
-		//D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-		//rtvHeapDesc.NumDescriptors = RenderPlatform12::FrameCount;
-		//rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		//rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		//HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
-
-		m_rtvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		m_dsvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-
-		// Describe and create a depth stencil view (DSV) descriptor heap.
-		// Each frame has its own depth stencils (to write shadows onto) 
-		// and then there is one for the scene itself.
-		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-		dsvHeapDesc.NumDescriptors = 1 + RenderPlatform12::FrameCount * 1;
-		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
-
+    {
 		// Describe and create a SRV descriptor heap.
 		// Flags indicate that this descriptor heap can be bound to the pipeline 
 		// and that descriptors contained in it can be referenced by a root table.
@@ -1814,7 +1789,17 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 {
     HRESULT hr = S_OK;
 
+    for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
+    {
+        m_renderTargets[i].Release();
+    }
+
+    m_pRenderTargetView = D3D12_RESOURCE_DESC();
     m_pSharedRenderToTexture.Release();
+
+    m_pDepthStencilView = D3D12_RESOURCE_DESC();
+    m_pDepthStencil.Release();
+
     m_pSwapChain.Release();
 
     return hr;
@@ -1822,6 +1807,7 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 
 HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
 {
+    // Swap chain
     CComPtr<IDXGIFactory4> factory;
     HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
 
@@ -1845,9 +1831,61 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 
     HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
 
+    // Initial frame index
+    m_frameIndex = GetSwapChain()->GetCurrentBackBufferIndex();
+
+    // Create render target views (RTVs).
+    for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
+    {
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(i)); /*->GetCPUDescriptorHandleForHeapStart());*/
+
+        HRR(GetSwapChain()->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
+        GetDevice()->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
+
+        CHAR name[25];
+        if (sprintf_s(name, "m_renderTargets[%u]", i) > 0)
+        {
+            SetDebugName(m_renderTargets[i], name);
+        }
+    }
+
+    // Create depth stencil texture
+    CD3DX12_RESOURCE_DESC depthBufferDesc(
+        D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+        0,
+        static_cast<UINT>(windowWidth),
+        static_cast<UINT>(windowHeight),
+        1,
+        1,
+        DXGI_FORMAT_D32_FLOAT,
+        1,
+        0,
+        D3D12_TEXTURE_LAYOUT_UNKNOWN,
+        D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
+
+    D3D12_CLEAR_VALUE clearValue;	// Performance tip: Tell the runtime at resource creation the desired clear value.
+    clearValue.Format = DXGI_FORMAT_D32_FLOAT;
+    clearValue.DepthStencil.Depth = 1.0f;
+    clearValue.DepthStencil.Stencil = 0;
+
+    HRR(GetDevice()->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &depthBufferDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        &clearValue,
+        IID_PPV_ARGS(&m_pDepthStencil)));
+
+    SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
+
+    // Create the depth stencil view.
+    GetDevice()->CreateDepthStencilView(m_pDepthStencil, nullptr, m_dsvHeap.hCPU(0));
+
     // Validation
     ASSERT(m_pSwapChain);
     ASSERT(GetSwapChain() || m_pSharedRenderToTexture);
+    ASSERT(m_renderTargets[0]);
+    ASSERT(m_renderTargets[1]);
 
     return S_OK;
 }
@@ -2012,18 +2050,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 
 #if defined(TREE3D12)
 
-    // Resize logic
-
-	// Create width/height dependent objects
-	m_pDepthStencilView = D3D12_RESOURCE_DESC();
-	m_pDepthStencil.Release();
-
-    for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
-    {
-        m_renderTargets[i].Release();
-    }
-    m_pRenderTargetView = D3D12_RESOURCE_DESC();
-
 #else
 	if (!m_immediateContext)
 	{
@@ -2048,59 +2074,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
     HRR(GetPlatform()->OnResize(windowWidth, windowHeight, renderToSharedTexture));
 
 #if defined(TREE3D12)
-	m_frameIndex = GetPlatform()->GetSwapChain()->GetCurrentBackBufferIndex();
-
-	// Create render target views (RTVs).
-	for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
-	{
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(i)); /*->GetCPUDescriptorHandleForHeapStart());*/
-       
-        HRR(GetPlatform()->GetSwapChain()->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
-        ::GetPlatform(this)->GetDevice()->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
-        //rtvHandle.Offset(1, m_rtvDescriptorSize);
-
-        CHAR name[25];
-        if (sprintf_s(name, "m_renderTargets[%u]", i) > 0)
-        {
-            SetDebugName(m_renderTargets[i], name);
-        }
-    }
-
-	// 
-	// Create depth stencil texture
-	//
-	{
-		CD3DX12_RESOURCE_DESC depthBufferDesc(
-			D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-			0,
-			static_cast<UINT>(windowWidth),
-			static_cast<UINT>(windowHeight),
-			1,
-			1,
-			DXGI_FORMAT_D32_FLOAT,
-			1,
-			0,
-			D3D12_TEXTURE_LAYOUT_UNKNOWN,
-			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
-
-		D3D12_CLEAR_VALUE clearValue;	// Performance tip: Tell the runtime at resource creation the desired clear value.
-		clearValue.Format = DXGI_FORMAT_D32_FLOAT;
-		clearValue.DepthStencil.Depth = 1.0f;
-		clearValue.DepthStencil.Stencil = 0;
-
-		HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-			D3D12_HEAP_FLAG_NONE,
-			&depthBufferDesc,
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			&clearValue,
-			IID_PPV_ARGS(&m_pDepthStencil)));
-
-		SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
-
-		// Create the depth stencil view.
-        ::GetPlatform(this)->GetDevice()->CreateDepthStencilView(m_pDepthStencil, nullptr, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
-	}
 
 #else
 
@@ -2159,9 +2132,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	m_scissorRect.right = static_cast<LONG>(windowWidth);
 	m_scissorRect.bottom = static_cast<LONG>(windowHeight);
 
-	// Validation
-	ASSERT(m_renderTargets[0]);
-	ASSERT(m_renderTargets[1]);
 
 #else
 	m_immediateContext->RSSetViewports(1, &m_viewPort);
@@ -2194,6 +2164,17 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::UninitDevice()
 {
+    // OnResize objects
+    for (UINT n = 0; n < RenderPlatform12::FrameCount; n++)
+    {
+        m_renderTargets[n]->Release();
+    }
+    m_pDepthStencil.Release();
+    m_pDepthStencilView = D3D12_RESOURCE_DESC();
+    m_pRenderTargetView = D3D12_RESOURCE_DESC();
+    m_rtvHeap.Terminate();
+
+    // InitDevice objects
     m_d3dDevice.Release();
     m_pSwapChain.Release();
     return S_OK;
@@ -2218,20 +2199,12 @@ void RenderManager::UninitDevice()
 
 	SafeDelete(&GetRenderData().pShadowMap);
 
-	m_pDepthStencil.Release();
 
 #if defined(TREE3D12)
 	m_commandQueue.Release();
 	m_commandAllocator.Release();
-	for (UINT n = 0; n < RenderPlatform12::FrameCount; n++)
-	{
-		m_renderTargets[n]->Release();
-	}
-	m_pDepthStencilView = D3D12_RESOURCE_DESC();
-	m_pRenderTargetView = D3D12_RESOURCE_DESC();
-	m_rootSignature.Release();
-    m_rtvHeap.Terminate(); 
 	m_cbvSrvHeap.Release();
+    m_rootSignature.Release();
     m_loadTextureHeap.Release();
 
     CloseHandle(m_fenceEvent);
@@ -2250,7 +2223,8 @@ void RenderManager::UninitDevice()
 
 #else
 	m_immediateContext.Release();
-	m_pDepthStencilView.Release();
+    m_pDepthStencil.Release();
+    m_pDepthStencilView.Release();
 	m_immediateContext.Release();
 #endif
 
@@ -2324,7 +2298,7 @@ HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
     if (resetCommandList)
     {
         // Indicate that the back buffer will be used as a render target.
-        m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+        m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetPlatform()->GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
     }
 #else
     resetCommandList;
@@ -2343,13 +2317,13 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #if defined(TREE3D12)
     PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList, TREE_COLOR_DRAW_TEXT, L"Render");
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
-    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainDsv_HeapOffset, m_dsvDescriptorSize);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(GetPlatform()->GetCurrentRenderTargetHandle());
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(GetPlatform()->GetCurrentDepthTargetHandle());
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     // Record commands.
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    m_commandList->ClearDepthStencilView(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+    m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     m_commandList->SetPipelineState(m_pipelineState);
 
@@ -2473,7 +2447,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     }
 
     // Indicate that the back buffer will now be used to present.
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetPlatform()->GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
     PIXEndEvent((ID3D12GraphicsCommandList*)m_commandList); // Render
 

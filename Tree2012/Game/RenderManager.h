@@ -434,15 +434,33 @@ public:
 #if defined(TREE3D12)
 class RenderPlatform12 : public RenderPlatform
 {
+public:
+    static const UINT                 FrameCount = 2;
+
+private:
     CComPtr<ID3D12Device>             m_d3dDevice;
     CComPtr<IDXGISwapChain3>          m_pSwapChain;
     CComPtr<ID3D12Resource>           m_pSharedRenderToTexture;
 
+    DescriptorHeapWrapper             m_rtvHeap;
+    DescriptorHeapWrapper             m_dsvHeap;
+
+    CComPtr<ID3D12Resource>           m_renderTargets[RenderPlatform12::FrameCount];
+    D3D12_RESOURCE_DESC               m_pRenderTargetView;
+    CComPtr<ID3D12Resource>           m_pDepthStencil;
+    D3D12_RESOURCE_DESC               m_pDepthStencilView;
+
+    UINT                              m_frameIndex;
+
     RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
 
-public:
+    enum DsvHeapOffset
+    {
+        SwapChainDsv_HeapOffset = 0,
+        ShadowDsv_HeapOffset = 1
+    };
 
-    static const UINT                 FrameCount = 2;
+public:
 
     RenderPlatform12(RenderManager* renderManager) { m_renderManager = renderManager;  } 
     RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
@@ -459,6 +477,19 @@ public:
 
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
+
+    // Maybe TEMPTEMP?
+    DescriptorHeapWrapper& GetDSVHeap() { return m_dsvHeap; }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRenderTargetHandle() { return m_rtvHeap.hCPU(m_frameIndex); }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentDepthTargetHandle() { return m_dsvHeap.hCPU(SwapChainDsv_HeapOffset); }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetShadowDepthTargetHandle() { return m_dsvHeap.hCPU(ShadowDsv_HeapOffset); }
+    ID3D12Resource* GetCurrentRenderTarget() { return m_renderTargets[m_frameIndex]; }
+    void UpdateFrameIndex() {
+        if (GetSwapChain())
+        {
+            m_frameIndex = GetSwapChain()->GetCurrentBackBufferIndex();
+        }
+    }
 
 };
 
@@ -546,30 +577,20 @@ class RenderManager : public IRenderFrame
     RenderPlatform*                                 m_platform;
 
 #if defined(TREE3D12)
+
     CComPtr<ID3D12CommandQueue> m_commandQueue;
     CComPtr<ID3D12CommandAllocator> m_commandAllocator;
-    CComPtr<ID3D12Resource> m_renderTargets[RenderPlatform12::FrameCount];
-    CComPtr<ID3D12RootSignature> m_rootSignature;
-    //CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    DescriptorHeapWrapper         m_rtvHeap;
+    CComPtr<ID3D12RootSignature>      m_rootSignature;
     CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
     CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;    // offline heap for loading heap
-    CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     CComPtr<ID3D12PipelineState> m_pipelineState;
     CComPtr<ID3D12PipelineState> m_pipelineStateFullScreenQuad;
     CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap;
     CComPtr<ID3D12GraphicsCommandList> m_commandList;
-    UINT m_rtvDescriptorSize;
-    UINT m_dsvDescriptorSize;
     D3D12_VIEWPORT m_viewPort;
     D3D12_RECT m_scissorRect;
     UINT                                m_srvCbvDescriptorSize;
-    CComPtr<ID3D12Resource>             m_pDepthStencil;
-    D3D12_RESOURCE_DESC                 m_pDepthStencilView;
-
-    D3D12_RESOURCE_DESC                 m_pRenderTargetView;
-    UINT                                m_frameIndex;
 
 
     UINT                                m_numMaterialsCreated;
@@ -581,7 +602,6 @@ class RenderManager : public IRenderFrame
 #endif
 
     DisplayMode							m_displayMode;
-    //bool								m_enableMsaa;
 
     struct CBChangeOnResize
     {
