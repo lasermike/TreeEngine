@@ -239,8 +239,6 @@ void Game::ComputeCPU()
 		m_renderManager.GetRenderData().frameStats[i].stat = 0;
 	}
 
-
-
 	FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
 	HandleInput(inputData.key);
 

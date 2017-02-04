@@ -400,13 +400,16 @@ protected:
 #if defined(WIN32) && !defined(TREENGINE_XBOX)
     HWND                              m_hwnd;
 #else
-    //Windows::UI::Core::CoreWindow^    m_window;
     Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;
     
     float                             m_logicalDpi;
 #endif
 
+    DXGI_FORMAT                       m_swapChainFormat;
+
 public:
+
+    DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
 
 #if defined(WIN32) && !defined(TREENGINE_XBOX)
     void SetWindow(HWND hwnd)
@@ -432,10 +435,20 @@ public:
 class RenderPlatform12 : public RenderPlatform
 {
     CComPtr<ID3D12Device>             m_d3dDevice;
+    CComPtr<IDXGISwapChain3>          m_pSwapChain;
+    CComPtr<ID3D12Resource>           m_pSharedRenderToTexture;
+
+    RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
 
 public:
+
+    static const UINT                 FrameCount = 2;
+
+    RenderPlatform12(RenderManager* renderManager) { m_renderManager = renderManager;  } 
     RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
     ID3D12Device* GetDevice() { return m_d3dDevice; }
+    IDXGISwapChain3* GetSwapChain() { return m_pSwapChain; }
+
     XboxSampleFramework::D3DDevice* GetD3DDevice()
     {
         return (XboxSampleFramework::D3DDevice*) (ID3D12Device*) m_d3dDevice;
@@ -444,7 +457,9 @@ public:
     HRESULT InitDevice();
     HRESULT UninitDevice();
 
-    HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain);
+    HRESULT ReleaseSwapChainResources();
+    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
+
 };
 
 #else
@@ -452,21 +467,41 @@ public:
 class RenderPlatform11 : public RenderPlatform
 {
     CComPtr<ID3D11Device>             m_d3dDevice;
+    CComPtr<IDXGISwapChain>           m_pSwapChain;
+    CComPtr<ID3D11RasterizerState>    m_rasterState;
+    CComPtr<ID3D11Texture2D>          m_pSharedRenderToTexture;
+    CComPtr<ID3D11RenderTargetView>   m_pRenderTargetView;
+
     D3D_DRIVER_TYPE                   m_driverType;
     D3D_FEATURE_LEVEL                 m_featureLevel;
+    bool                              m_enableMsaa;
+    UINT                              m_msaaQuality;
 
-    RenderManager*                    m_renderManager;
+    RenderManager*                    m_renderManager; //TEMPTEMP
 
 public:
 
-    RenderPlatform11(RenderManager* renderManager) { m_renderManager = renderManager; }
+    RenderPlatform11(RenderManager* renderManager) : m_renderManager(renderManager), m_msaaQuality(0)
+    {
+#ifdef ENABLE_MSAA
+        m_enableMsaa = true; // TODO
+#else
+        m_enableMsaa = false; // TODO: disabled for windows store
+#endif
+    }
 
     RenderPlatforms GetType() { return D3D11_RENDER_PLATFORM; }
     ID3D11Device* GetDevice() { return m_d3dDevice; }
+    ID3D11RenderTargetView* GetRTV() { return m_pRenderTargetView; }
     XboxSampleFramework::D3DDevice* GetD3DDevice()
     {
         return (XboxSampleFramework::D3DDevice*) (ID3D11Device*) m_d3dDevice;
     }
+    IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
+    bool IsMSAAEnabled() { return m_enableMsaa; }
+    UINT GetMSAAQuality() { return m_msaaQuality; }
+
+    static const UINT msaaCount = 4;
 
     // TEMPTEMP
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
@@ -474,7 +509,9 @@ public:
     HRESULT InitDevice();
     HRESULT UninitDevice();
 
-    HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain);
+    HRESULT ReleaseSwapChainResources();
+    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
+    ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
 };
 
 #endif
@@ -508,15 +545,13 @@ class RenderManager : public IRenderFrame
     // 11 or 12
     RenderPlatform*                                 m_platform;
 
-    static const UINT                               FrameCount = 2;
-
 #if defined(TREE3D12)
     CComPtr<ID3D12CommandQueue> m_commandQueue;
     CComPtr<ID3D12CommandAllocator> m_commandAllocator;
-    CComPtr<IDXGISwapChain3> m_pSwapChain;
-    CComPtr<ID3D12Resource> m_renderTargets[FrameCount];
+    CComPtr<ID3D12Resource> m_renderTargets[RenderPlatform12::FrameCount];
     CComPtr<ID3D12RootSignature> m_rootSignature;
-    CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+    //CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+    DescriptorHeapWrapper         m_rtvHeap;
     CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
     CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;    // offline heap for loading heap
     CComPtr<ID3D12DescriptorHeap> m_dsvHeap;
@@ -534,27 +569,19 @@ class RenderManager : public IRenderFrame
     D3D12_RESOURCE_DESC                 m_pDepthStencilView;
 
     D3D12_RESOURCE_DESC                 m_pRenderTargetView;
-    UINT								m_frameIndex;
+    UINT                                m_frameIndex;
 
-    CComPtr<ID3D12Resource>				m_pSharedRenderToTexture;
 
     UINT                                m_numMaterialsCreated;
 #else
-    CComPtr<ID3D11Device1>              m_d3dDevice1;
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
-    CComPtr<ID3D11DeviceContext1>       m_immediateContext1;
-    CComPtr<IDXGISwapChain>             m_pSwapChain;
-    CComPtr<IDXGISwapChain1>            m_pSwapChain1;
-    CComPtr<ID3D11RenderTargetView>     m_pRenderTargetView;
-    CComPtr<ID3D11Texture2D>            m_pSharedRenderToTexture;
     CComPtr<ID3D11Texture2D>            m_pDepthStencil;
     CComPtr<ID3D11DepthStencilView>		m_pDepthStencilView;
     D3D11_VIEWPORT						m_viewPort;
 #endif
 
     DisplayMode							m_displayMode;
-    bool								m_enableMsaa;
-    DXGI_FORMAT							m_swapChainFormat;
+    //bool								m_enableMsaa;
 
     struct CBChangeOnResize
     {
@@ -608,8 +635,6 @@ class RenderManager : public IRenderFrame
 #else
     CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
     CBChangeOnResize                    m_cbChangesOnResize;
-
-    CComPtr<ID3D11RasterizerState>		m_rasterState;
 
     // Single vertex and index buffer for all geometry in scene
     CComPtr<ID3D11InputLayout>          m_vertexLayout;
@@ -698,17 +723,13 @@ public:
     D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; } 
 
     GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
-    DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
 
     // Accessor methods for Oculus
     HRESULT GetViewport(Viewport& viewport);
 
 #if defined(TREE3D12)
 #else
-    ID3D11RenderTargetView* GetRTV() { return m_pRenderTargetView; }
     ID3D11DepthStencilView* GetDSV() { return m_pDepthStencilView; }
-    ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
-    IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
 #endif
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
     HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);

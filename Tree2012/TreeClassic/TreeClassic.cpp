@@ -245,7 +245,7 @@ HRESULT Render()
 
         // Render mirror
 	    ID3D11Texture2D* pBackBuffer = nullptr;
-        HRR(g_game->GetRenderManager().GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+        HRR(g_game->GetRenderManager().GetPlatform()->GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
 
         ovrD3D11Texture* tex = (ovrD3D11Texture*)g_mirrorTexture;
         DIRECTX.Context->CopyResource(pBackBuffer, tex->D3D11.pTexture);
@@ -331,7 +331,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
     // Set up the oculus helper library
     DIRECTX.Context = g_game->GetRenderManager().GetContext();
-    DIRECTX.SwapChain = g_game->GetRenderManager().GetSwapChain();
+    DIRECTX.SwapChain = g_game->GetRenderManager().GetPlatform()->GetSwapChain();
 
     ShowWindow(m_hWnd, nCmdShow);
     UpdateWindow(m_hWnd);
@@ -407,14 +407,14 @@ HRESULT ConfigOculusDevice()
     {
         Sizei idealSize = ovr_GetFovTextureSize(HMD, (ovrEyeType)eye, g_hmdDesc.DefaultEyeFov[eye], 1.0f);
         g_pEyeRenderTexture[eye]      = new OculusTexture(HMD, ((RenderPlatform11*) g_game->GetRenderManager().GetPlatformBase())->GetDevice(), idealSize);
-		g_pEyeDepthBuffer[eye]        = new DepthBuffer(((RenderPlatform11*)g_game->GetRenderManager().GetPlatformBase())->GetDevice(), idealSize);
+        g_pEyeDepthBuffer[eye]        = new DepthBuffer(((RenderPlatform11*)g_game->GetRenderManager().GetPlatformBase())->GetDevice(), idealSize);
         g_eyeRenderViewport[eye].Pos  = Vector2i(0, 0);
         g_eyeRenderViewport[eye].Size = idealSize;
     }
 
     // Create mirror buffer same type as back buffer
-	ID3D11Texture2D* pBackBuffer = nullptr;
-    HRR(g_game->GetRenderManager().GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+    ID3D11Texture2D* pBackBuffer = nullptr;
+    HRR(g_game->GetRenderManager().GetPlatform()->GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
     D3D11_TEXTURE2D_DESC bbDesc = {};
     pBackBuffer->GetDesc(&bbDesc);
     pBackBuffer->Release();

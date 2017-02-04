@@ -181,12 +181,6 @@ RenderManager::RenderManager() :
     m_displayMode = Monitor;
     m_bitmapFont = nullptr;
 
-#ifdef ENABLE_MSAA
-    m_enableMsaa = true; // TODO
-#else
-    m_enableMsaa = false; // TODO: disabled for windows store
-#endif
-
     m_renderData.frameStats = g_frameStats;
 
     m_light.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
@@ -196,7 +190,7 @@ RenderManager::RenderManager() :
 
     // TODO: where should this go?
 #if defined(TREE3D12)
-    m_platform = new RenderPlatform12();
+    m_platform = new RenderPlatform12(this);
 #else
     m_platform = new RenderPlatform11(this);
 #endif
@@ -467,7 +461,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	psoDesc.NumRenderTargets = 1;
-	psoDesc.RTVFormats[0] = m_swapChainFormat;
+	psoDesc.RTVFormats[0] = GetPlatform()->GetSwapChainFormat();
 	psoDesc.SampleDesc.Count = 1;
 	HRR(::GetPlatform(this)->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 
@@ -643,27 +637,27 @@ HRESULT RenderManager::GetViewport(Viewport& viewport)
 #if defined(TREE3D12)
 void RenderManager::WaitForPreviousFrame()
 {
-	// WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-	// This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-	// sample illustrates how to use fences for efficient resource usage and to
-	// maximize GPU utilization.
+    // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
+    // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
+    // sample illustrates how to use fences for efficient resource usage and to
+    // maximize GPU utilization.
 
-	// Signal and increment the fence value.
-	const UINT64 fence = m_fenceValue;
-	HR(m_commandQueue->Signal(m_fence, fence));
-	m_fenceValue++;
+    // Signal and increment the fence value.
+    const UINT64 fence = m_fenceValue;
+    HR(m_commandQueue->Signal(m_fence, fence));
+    m_fenceValue++;
 
-	// Wait until the previous frame is finished.
-	if (m_fence->GetCompletedValue() < fence)
-	{
-		HR(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
-		WaitForSingleObject(m_fenceEvent, INFINITE);
-	}
+    // Wait until the previous frame is finished.
+    if (m_fence->GetCompletedValue() < fence)
+    {
+        HR(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+    }
 
-	if (m_pSwapChain)
-	{
-		m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
-	}
+    if (GetPlatform()->GetSwapChain())
+    {
+        m_frameIndex = GetPlatform()->GetSwapChain()->GetCurrentBackBufferIndex();
+    }
 }
 
 #endif
@@ -1548,13 +1542,15 @@ HRESULT RenderManager::InitDevice()
 	m_srvCbvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// Create descriptor heaps.
+    HRR(m_rtvHeap.Initialize(GetPlatform()->GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RenderPlatform12::FrameCount));
+
 	{
-		// Describe and create a render target view (RTV) descriptor heap.
-		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-		rtvHeapDesc.NumDescriptors = FrameCount;
-		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
+		//// Describe and create a render target view (RTV) descriptor heap.
+		//D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+		//rtvHeapDesc.NumDescriptors = RenderPlatform12::FrameCount;
+		//rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		//rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		//HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
 		m_rtvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		m_dsvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
@@ -1563,7 +1559,7 @@ HRESULT RenderManager::InitDevice()
 		// Each frame has its own depth stencils (to write shadows onto) 
 		// and then there is one for the scene itself.
 		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-		dsvHeapDesc.NumDescriptors = 1 + FrameCount * 1;
+		dsvHeapDesc.NumDescriptors = 1 + RenderPlatform12::FrameCount * 1;
 		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
@@ -1813,26 +1809,220 @@ HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
 	return S_OK;
 }
 
+#if defined(TREE3D12)
+HRESULT RenderPlatform12::ReleaseSwapChainResources()
+{
+    HRESULT hr = S_OK;
+
+    m_pSharedRenderToTexture.Release();
+    m_pSwapChain.Release();
+
+    return hr;
+}
+
+HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
+{
+    CComPtr<IDXGIFactory4> factory;
+    HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
+
+    m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+    // Create swap chain
+    // Describe and create the swap chain.
+    DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+    swapChainDesc.BufferCount = FrameCount;
+    swapChainDesc.Width = windowWidth;
+    swapChainDesc.Height = windowHeight;
+    swapChainDesc.Format = m_swapChainFormat;
+    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    swapChainDesc.SampleDesc.Count = 1;
+
+    CComPtr<IDXGISwapChain1> swapChain1;
+
+    HRR(factory->CreateSwapChainForCoreWindow(m_renderManager->GetCommandQueue(),
+        reinterpret_cast<IUnknown*>(m_window.Get()), &swapChainDesc, nullptr, &swapChain1));
+
+    HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
+
+    // Validation
+    ASSERT(m_pSwapChain);
+    ASSERT(GetSwapChain() || m_pSharedRenderToTexture);
+
+    return S_OK;
+}
+
+#else
+HRESULT RenderPlatform11::ReleaseSwapChainResources()
+{
+    HRESULT hr = S_OK;
+
+    m_pSwapChain.Release();
+    m_pSharedRenderToTexture.Release();
+    m_pRenderTargetView.Release();
+
+
+    return hr;
+}
+
+HRESULT RenderPlatform11::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
+{
+    HRESULT hr = S_OK;
+
+    m_pSwapChain.Release();
+
+#ifdef _XBOX_ONE
+    m_swapChainFormat = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+#else
+    m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+#endif
+
+    // Obtain DXGI factory from device (since we used nullptr for pAdapter above)
+    CComPtr<IDXGIFactory1> dxgiFactory;
+    {
+        CComPtr<IDXGIDevice> dxgiDevice;
+        hr = GetDevice()->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
+        if (SUCCEEDED(hr))
+        {
+            CComPtr<IDXGIAdapter> adapter;
+            hr = dxgiDevice->GetAdapter(&adapter);
+            if (SUCCEEDED(hr))
+            {
+                hr = adapter->GetParent(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&dxgiFactory));
+            }
+        }
+    }
+    if (FAILED(hr))
+        return hr;
+
+    // Check MSAA support
+    HRR(GetDevice()->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &m_msaaQuality));
+    if (m_msaaQuality == 0)
+    {
+        m_enableMsaa = false;
+    }
+
+    // Enable MSAA
+    if (m_enableMsaa)
+    {
+        D3D11_RASTERIZER_DESC rasterDesc;
+        rasterDesc.AntialiasedLineEnable = true; // MSA
+        rasterDesc.CullMode = D3D11_CULL_BACK;
+        rasterDesc.DepthBias = 0;
+        rasterDesc.DepthBiasClamp = 0.0f;
+        rasterDesc.DepthClipEnable = true;
+        rasterDesc.FillMode = D3D11_FILL_SOLID;
+        rasterDesc.FrontCounterClockwise = false;
+        rasterDesc.MultisampleEnable = true; // MSAA
+        rasterDesc.ScissorEnable = false;
+        rasterDesc.SlopeScaledDepthBias = 0.0f;
+        HRR(GetDevice()->CreateRasterizerState(&rasterDesc, &m_rasterState));
+        SetDebugName(m_rasterState, "Game::m_rasterState");
+        m_immediateContext->RSSetState(m_rasterState);
+    }
+
+    // Create swap chain
+    CComPtr<IDXGIFactory2> dxgiFactory2;
+    HRR(dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2)));
+
+    //// DirectX 11.1 or later
+    //hr = GetDevice()->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void**>(&m_d3dDevice1));
+    //if (SUCCEEDED(hr))
+    //{
+    //    (void)m_immediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&m_immediateContext1));
+    //}
+
+    CComPtr<ID3D11Texture2D> pBackBuffer;
+
+    if (renderToSharedTexture) // Create just a textured to render to.  No double buffering.
+    {
+        D3D11_TEXTURE2D_DESC Desc;
+        Desc.Width = 1600;
+        Desc.Height = 1080;
+        Desc.MipLevels = 1;
+        Desc.ArraySize = 1;
+        Desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        Desc.SampleDesc.Count = 1;
+        Desc.SampleDesc.Quality = 0;
+        Desc.Usage = D3D11_USAGE_DEFAULT;
+        Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        Desc.CPUAccessFlags = 0;
+        Desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+
+        HRR(GetDevice()->CreateTexture2D(&Desc, NULL, &m_pSharedRenderToTexture));
+
+        pBackBuffer = m_pSharedRenderToTexture;
+    }
+    else // Create swap chain which includes render target buffer
+    {
+        DXGI_SWAP_CHAIN_DESC1 sd;
+        ZeroMemory(&sd, sizeof(sd));
+
+#if !defined(WIN32)
+        sd.Width = windowWidth;
+        sd.Height = windowHeight;
+#endif
+
+#ifdef _XBOX_ONE
+        sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
+#endif
+        sd.Format = m_swapChainFormat;
+
+        sd.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
+        sd.SampleDesc.Quality = m_enableMsaa ? m_msaaQuality - 1 : 0;
+        sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        sd.BufferCount = 2;
+        sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+        sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+
+        CComPtr<IDXGISwapChain1> pSwapChain1;
+        //HRR(dxgiFactory->CreateSwapChain(&sd, dxgiFactory2, &pSwapChain1));
+
+#if defined(WIN32) && !defined(TREENGINE_XBOX)
+        HRR(dxgiFactory2->CreateSwapChainForHwnd(GetDevice(), m_hwnd, &sd, nullptr, nullptr, &pSwapChain1));
+#else
+        HRR(dxgiFactory2->CreateSwapChainForCoreWindow(GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
+#endif 
+
+        HRR(pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
+    }
+
+    HRR(m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
+
+    // Create a render target view
+    HRR(GetDevice()->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
+    SetDebugName(m_pRenderTargetView, "Game::m_pRenderTargetView");
+    pBackBuffer.Release();
+
+    // Validation
+    ASSERT(m_pRenderTargetView);
+    ASSERT(GetSwapChain() || m_pSharedRenderToTexture);
+
+    return S_OK;
+}
+    
+#endif
+
 HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
 {
-	HRESULT hr = S_OK;
+    HRESULT hr = S_OK;
+
+    // Release resources
+    GetPlatform()->ReleaseSwapChainResources();
 
 #if defined(TREE3D12)
 
     // Resize logic
-    for (UINT i = 0; i < FrameCount; i++)
-    {
-        m_renderTargets[i].Release();
-    }
 
 	// Create width/height dependent objects
 	m_pDepthStencilView = D3D12_RESOURCE_DESC();
 	m_pDepthStencil.Release();
 
-	m_pRenderTargetView = D3D12_RESOURCE_DESC();
-	m_pSwapChain.Release();
-	m_pSharedRenderToTexture.Release();
-
+    for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
+    {
+        m_renderTargets[i].Release();
+    }
+    m_pRenderTargetView = D3D12_RESOURCE_DESC();
 
 #else
 	if (!m_immediateContext)
@@ -1846,10 +2036,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	m_pDepthStencilView.Release();
 	m_pDepthStencil.Release();
 
-	m_pRenderTargetView.Release();
-	m_pSwapChain1.Release();
-	m_pSwapChain.Release();
-	m_pSharedRenderToTexture.Release();
 #endif
 	// Calculate the necessary swap chain and render target size in pixels.
 
@@ -1858,96 +2044,27 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	GetRenderData().projectionData.screenHeight = windowHeight;
 	GetRenderData().projectionData.fov = XM_PIDIV4;
 
+    // Create new resources
+    HRR(GetPlatform()->OnResize(windowWidth, windowHeight, renderToSharedTexture));
 
 #if defined(TREE3D12)
-#else
-	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
-	CComPtr<IDXGIFactory1> dxgiFactory;
-	{
-		CComPtr<IDXGIDevice> dxgiDevice;
-		hr = ::GetPlatform(this)->GetDevice()->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
-		if (SUCCEEDED(hr))
-		{
-			CComPtr<IDXGIAdapter> adapter;
-			hr = dxgiDevice->GetAdapter(&adapter);
-			if (SUCCEEDED(hr))
-			{
-				hr = adapter->GetParent(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&dxgiFactory));
-			}
-		}
-	}
-	if (FAILED(hr))
-		return hr;
-
-	// Check MSAA support
-	UINT msaaQuality;
-	const UINT msaaCount = 4;
-	HRR(::GetPlatform(this)->GetDevice()->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaaCount, &msaaQuality));
-	if (msaaQuality == 0)
-	{
-		m_enableMsaa = false;
-	}
-
-	// Enable MSAA
-	if (m_enableMsaa)
-	{
-		D3D11_RASTERIZER_DESC rasterDesc;
-		rasterDesc.AntialiasedLineEnable = true; // MSA
-		rasterDesc.CullMode = D3D11_CULL_BACK;
-		rasterDesc.DepthBias = 0;
-		rasterDesc.DepthBiasClamp = 0.0f;
-		rasterDesc.DepthClipEnable = true;
-		rasterDesc.FillMode = D3D11_FILL_SOLID;
-		rasterDesc.FrontCounterClockwise = false;
-		rasterDesc.MultisampleEnable = true; // MSAA
-		rasterDesc.ScissorEnable = false;
-		rasterDesc.SlopeScaledDepthBias = 0.0f;
-		HRR(::GetPlatform(this)->GetDevice()->CreateRasterizerState(&rasterDesc, &m_rasterState));
-		SetDebugName(m_rasterState, "Game::m_rasterState");
-		m_immediateContext->RSSetState(m_rasterState);
-	}
-
-#endif
-
-
-#if defined(TREE3D12)
-	CComPtr<IDXGIFactory4> factory;
-	HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
-
-	m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-
-	// Create swap chain
-	// Describe and create the swap chain.
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-	swapChainDesc.BufferCount = FrameCount;
-	swapChainDesc.Width = windowWidth;
-	swapChainDesc.Height = windowHeight;
-	swapChainDesc.Format = m_swapChainFormat;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.SampleDesc.Count = 1;
-
-	CComPtr<IDXGISwapChain1> swapChain1;
-	
-	HRR(::GetPlatform(this)->CreateSwapChain(&swapChainDesc, factory, m_commandQueue, &swapChain1));
-
-	HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
-	m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+	m_frameIndex = GetPlatform()->GetSwapChain()->GetCurrentBackBufferIndex();
 
 	// Create render target views (RTVs).
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-	for (UINT i = 0; i < FrameCount; i++)
+	for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
 	{
-		HRR(m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(i)); /*->GetCPUDescriptorHandleForHeapStart());*/
+       
+        HRR(GetPlatform()->GetSwapChain()->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
         ::GetPlatform(this)->GetDevice()->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
-		rtvHandle.Offset(1, m_rtvDescriptorSize);
+        //rtvHandle.Offset(1, m_rtvDescriptorSize);
 
-		CHAR name[25];
-		if (sprintf_s(name, "m_renderTargets[%u]", i) > 0)
-		{
-			SetDebugName(m_renderTargets[i], name);
-		}
-	}
+        CHAR name[25];
+        if (sprintf_s(name, "m_renderTargets[%u]", i) > 0)
+        {
+            SetDebugName(m_renderTargets[i], name);
+        }
+    }
 
 	// 
 	// Create depth stencil texture
@@ -1986,73 +2103,7 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 	}
 
 #else
-	// Create swap chain
-	CComPtr<IDXGIFactory2> dxgiFactory2;
-	HRR(dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2)));
 
-	// DirectX 11.1 or later
-	hr = ::GetPlatform(this)->GetDevice()->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void**>(&m_d3dDevice1));
-	if (SUCCEEDED(hr))
-	{
-		(void)m_immediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&m_immediateContext1));
-	}
-	CComPtr<ID3D11Texture2D> pBackBuffer;
-
-	if (renderToSharedTexture) // Create just a textured to render to.  No double buffering.
-	{
-		D3D11_TEXTURE2D_DESC Desc;
-		Desc.Width = 1600;
-		Desc.Height = 1080;
-		Desc.MipLevels = 1;
-		Desc.ArraySize = 1;
-		Desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-		Desc.SampleDesc.Count = 1;
-		Desc.SampleDesc.Quality = 0;
-		Desc.Usage = D3D11_USAGE_DEFAULT;
-		Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-		Desc.CPUAccessFlags = 0;
-		Desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
-
-		HRR(::GetPlatform(this)->GetDevice()->CreateTexture2D(&Desc, NULL, &m_pSharedRenderToTexture));
-
-		pBackBuffer = m_pSharedRenderToTexture;
-	}
-	else // Create swap chain which includes render target buffer
-	{
-		DXGI_SWAP_CHAIN_DESC1 sd;
-		ZeroMemory(&sd, sizeof(sd));
-
-#if !defined(WIN32)
-		sd.Width = windowWidth;
-		sd.Height = windowHeight;
-#endif
-
-#ifdef _XBOX_ONE
-		m_swapChainFormat = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-		//sd.Scaling = DXGI_SCALING_STRETCH;
-		sd.Flags |= DXGIX_SWAP_CHAIN_MATCH_OTHER_CONSOLES;
-#else
-		m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-#endif
-		sd.Format = m_swapChainFormat;
-
-		sd.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
-		sd.SampleDesc.Quality = m_enableMsaa ? msaaQuality - 1 : 0;
-		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		sd.BufferCount = 2;
-		sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-		sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-		
-		HRR(::GetPlatform(this)->CreateSwapChain(&sd, dxgiFactory2, &m_pSwapChain1));
-
-		HRR(m_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
-		HRR(m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
-	}
-
-	// Create a render target view
-	HRR(hr = ::GetPlatform(this)->GetDevice()->CreateRenderTargetView(pBackBuffer, nullptr, &m_pRenderTargetView));
-	SetDebugName(m_pRenderTargetView, "Game::m_pRenderTargetView");
-	pBackBuffer.Release();
 
 	// 
 	// Create depth stencil texture
@@ -2068,8 +2119,8 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 #else
 	descDepth.Format = DXGI_FORMAT_R24G8_TYPELESS;
 #endif
-	descDepth.SampleDesc.Count = m_enableMsaa ? msaaCount : 1;
-	descDepth.SampleDesc.Quality = m_enableMsaa ? msaaQuality - 1 : 0;
+	descDepth.SampleDesc.Count = GetPlatform()->IsMSAAEnabled() ? RenderPlatform11::msaaCount : 1;
+	descDepth.SampleDesc.Quality = GetPlatform()->IsMSAAEnabled() ? GetPlatform()->GetMSAAQuality() - 1 : 0;
 	descDepth.Usage = D3D11_USAGE_DEFAULT;
 	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 	descDepth.CPUAccessFlags = 0;
@@ -2115,12 +2166,8 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 #else
 	m_immediateContext->RSSetViewports(1, &m_viewPort);
 
-	// Validation
-	ASSERT(m_pRenderTargetView);
 #endif
 
-	// Validation
-	ASSERT(m_pSwapChain || m_pSharedRenderToTexture);
 
 	ASSERT(GetRenderData().projectionData.nearClippingPlane != 0);
 	ASSERT(GetRenderData().projectionData.farClippingPlane != 0);
@@ -2148,12 +2195,17 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 HRESULT RenderPlatform12::UninitDevice()
 {
     m_d3dDevice.Release();
+    m_pSwapChain.Release();
     return S_OK;
 }
 #else
 HRESULT RenderPlatform11::UninitDevice()
 {
     m_d3dDevice.Release();
+    m_pSwapChain.Release();
+    m_rasterState.Release();
+    m_pRenderTargetView.Release();
+
     return S_OK;
 }
 #endif
@@ -2171,15 +2223,14 @@ void RenderManager::UninitDevice()
 #if defined(TREE3D12)
 	m_commandQueue.Release();
 	m_commandAllocator.Release();
-	for (UINT n = 0; n < FrameCount; n++)
+	for (UINT n = 0; n < RenderPlatform12::FrameCount; n++)
 	{
 		m_renderTargets[n]->Release();
 	}
 	m_pDepthStencilView = D3D12_RESOURCE_DESC();
 	m_pRenderTargetView = D3D12_RESOURCE_DESC();
-	m_pSharedRenderToTexture.Release();
 	m_rootSignature.Release();
-	m_rtvHeap.Release();
+    m_rtvHeap.Terminate(); 
 	m_cbvSrvHeap.Release();
     m_loadTextureHeap.Release();
 
@@ -2199,15 +2250,9 @@ void RenderManager::UninitDevice()
 
 #else
 	m_immediateContext.Release();
-	m_rasterState.Release();
 	m_pDepthStencilView.Release();
-	m_pRenderTargetView.Release();
-	m_pSwapChain1.Release();
-	m_immediateContext1.Release();
 	m_immediateContext.Release();
-	m_d3dDevice1.Release(); // TODO: Device leak somewhere causing crash
 #endif
-	m_pSwapChain.Release();
 
     m_pCBChangeOnResize.Release();
 
@@ -2298,7 +2343,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #if defined(TREE3D12)
     PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList, TREE_COLOR_DRAW_TEXT, L"Render");
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainDsv_HeapOffset, m_dsvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
@@ -2344,7 +2389,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     if (!oculus)
     {
         // Bind render target and depth
-        ID3D11RenderTargetView* rtv = GetRTV();
+        ID3D11RenderTargetView* rtv = GetPlatform()->GetRTV();
         GetContext()->OMSetRenderTargets(1, &rtv, GetDSV());
     }
 
@@ -2366,7 +2411,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     if (!oculus)
     {
         // Clear the back buffer
-        GetContext()->ClearRenderTargetView(GetRTV(), clearColor);
+        GetContext()->ClearRenderTargetView(GetPlatform()->GetRTV(), clearColor);
 
         // Clear the depth buffer to 1.0 (max depth)
         GetContext()->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -2438,7 +2483,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // Present the frame.
-    HR(m_pSwapChain->Present(0, 0));
+    HR(GetPlatform()->GetSwapChain()->Present(0, 0));
 
 	WaitForPreviousFrame();
 #else
@@ -2450,7 +2495,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 	if (!oculus && !m_renderToSharedTexture)
 	{
 		// Present our back buffer to our front buffer
-		HRC(GetSwapChain()->Present(0, 0));
+		HRC(GetPlatform()->GetSwapChain()->Present(0, 0));
 	}
 #endif
 
@@ -2694,31 +2739,5 @@ HRESULT RenderManager::LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID
 	return S_OK;
 }
 
-#endif
-
-// TODO push this out to the platform layer
-#if defined(TREE3D12)
-HRESULT RenderPlatform12::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory4* dxgiFactory4, ID3D12CommandQueue* commandQueue, IDXGISwapChain1** swapChain)
-{
-    HRESULT hr = S_OK;
-
-    HRR(dxgiFactory4->CreateSwapChainForCoreWindow(commandQueue,
-        reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
-
-    return hr;
-}
-#else
-HRESULT RenderPlatform11::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain)
-{
-    HRESULT hr = S_OK;
-
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-    HRR(dxgiFactory2->CreateSwapChainForHwnd(GetDevice(), m_hwnd, sd, nullptr, nullptr, swapChain));
-#else
-    HRR(dxgiFactory2->CreateSwapChainForCoreWindow(GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
-#endif 
-
-    return hr;
-}
 #endif
 

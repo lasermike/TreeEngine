@@ -442,7 +442,7 @@ HRESULT BitmapFont::Create(RenderManager* renderManager, ID3D12Resource* const p
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = m_renderManager->GetSwapChainFormat();
+	srvDesc.Format = m_renderManager->GetPlatform()->GetSwapChainFormat();
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = static_cast<UINT>(-1);
     pDevice->CreateShaderResourceView(pFontTexture, &srvDesc, m_CBSRVHeap.hCPU(c_iFontTexture));
