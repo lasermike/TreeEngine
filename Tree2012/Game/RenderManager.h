@@ -500,6 +500,7 @@ private:
     CComPtr<ID3D12Resource>           m_pCBShadowMapChangeOnResize;
     CBChangeOnResize                  m_cbShadowMapChangesOnResize;
 
+
     RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
 
     enum DsvHeapOffset
@@ -559,6 +560,15 @@ public:
         }
     }
 
+    // TEMPTEMP make private 
+    // Default shader
+    VertexShader                      m_vertexShader;
+    PixelShader                       m_pixelShader;
+    VertexShader                      m_shadowVertexShader;
+    PixelShader                       m_shadowPixelShader;
+    VertexShader                      m_drawScreenVertexShader;
+    PixelShader                       m_drawScreenPixelShader;
+
 };
 
 #else
@@ -586,6 +596,14 @@ class RenderPlatform11 : public RenderPlatform
     RenderManager*                    m_renderManager; //TEMPTEMP
 
     XSF::BitmapFont*                  m_bitmapFont;
+
+    // Default shader
+    VertexShader                        m_vertexShader;
+    PixelShader                         m_pixelShader;
+    VertexShader                        m_shadowVertexShader;
+    PixelShader                         m_shadowPixelShader;
+    VertexShader                        m_drawScreenVertexShader;
+    PixelShader                         m_drawScreenPixelShader;
 
 public:
 
@@ -683,7 +701,7 @@ class RenderManager : public IRenderFrame
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
 #endif
 
-    DisplayMode							m_displayMode;
+    DisplayMode                         m_displayMode;
 
     // App resources.
 
@@ -719,14 +737,6 @@ class RenderManager : public IRenderFrame
     CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
 #endif
 
-    // Default shader
-    VertexShader                        m_vertexShader;
-    PixelShader                         m_pixelShader;
-
-    VertexShader                        m_shadowVertexShader;
-    PixelShader                         m_shadowPixelShader;
-    VertexShader                        m_drawScreenVertexShader;
-    PixelShader                         m_drawScreenPixelShader;
 
 
     D3DBuffer                           m_vertexBuffer;

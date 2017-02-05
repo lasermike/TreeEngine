@@ -154,9 +154,9 @@ void InputLayouts::DestroyAll()
 #pragma endregion
 
 RenderManager::RenderManager() :
-    m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
+    //m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
+    //m_drawScreenVertexShader(), m_drawScreenPixelShader(),
     m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
-    m_drawScreenVertexShader(), m_drawScreenPixelShader(),
     m_platform(nullptr)
 #if defined(TREE3D12)
     , m_fenceEvent(nullptr), m_srvCbvDescriptorSize(0), m_numMaterialsCreated(0)
@@ -333,6 +333,25 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
 
+    //
+    // Shaders
+    //
+    // Load default shaders
+    HR(XSF::LoadShader(L"VS.cso", &m_vertexShader.shader));
+    HR(XSF::LoadShader(L"PS.cso", &m_pixelShader.shader));
+
+    ////////  Shadow map shader /////
+    // Load shadow shaders
+    HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
+    HRR(XSF::LoadShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader.shader));
+    // TODO: load a shadow pixel shader to support transparent textures not casting shadows
+
+    ////////  Debug texture /////
+    HRR(XSF::LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader.shader));
+
+    // Load regular pixel Shader
+    HRR(XSF::LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
+
     return S_OK;
 }
 #else
@@ -361,6 +380,18 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(GetDevice()->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
     SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
 
+    //
+    // Shaders
+    //
+    // Create Instanced draw data layout
+    std::vector< BYTE > dataVS;
+    HRR(XSF::LoadBlob(L"VS.cso", dataVS));
+    HRR(::GetPlatform(this)->GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
+
+    HRR(LoadPixelShader(::GetPlatform(this)->GetD3DDevice(), L"PS.cso", &m_pixelShader.shader));
+
+    SetDebugName(m_vertexShader.shader, "RenderManager::m_vertexShader");
+    SetDebugName(m_pixelShader.shader, "RenderManager::m_pixelShader");
 
     return S_OK;
 }
@@ -377,24 +408,8 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     // Create vertices and indice for geometry
     m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
 
-	////////  Regular shaders /////
 
 #if defined(TREE3D12)
-    // Load default shaders
-    HR(XSF::LoadShader(L"VS.cso", &m_vertexShader.shader));
-	HR(XSF::LoadShader(L"PS.cso", &m_pixelShader.shader));
-
-	////////  Shadow map shader /////
-	// Load shadow shaders
-    HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
-    HRR(XSF::LoadShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader.shader));
-    // TODO: load a shadow pixel shader to support transparent textures not casting shadows
-
-    ////////  Debug texture /////
-    HRR(XSF::LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader.shader));
-
-	// Load regular pixel Shader
-	HRR(XSF::LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
 
 	// Create vertex buffer
 	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
@@ -444,8 +459,8 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 	psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
     psoDesc.pRootSignature = GetPlatform()->GetRootSignature(); 
-	psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader.shader);
-	psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader.shader);
+	psoDesc.VS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_vertexShader.shader);
+	psoDesc.PS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_pixelShader.shader);
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -464,8 +479,8 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
     //shadowPsoDesc.pRootSignature = mRootSignature.Get();
-    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(m_shadowVertexShader);
-    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(m_shadowPixelShader);
+    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_shadowVertexShader);
+    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_shadowPixelShader);
     shadowPsoDesc.DSVFormat = ShadowMap::Format();
 
     // Shadow map pass does not have a render target.
@@ -482,15 +497,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     WaitForPreviousFrame();
 
 #else
-	// Create Instanced draw data layout
-	std::vector< BYTE > dataVS;
-	HRR(XSF::LoadBlob(L"VS.cso", dataVS));
-	HRR(::GetPlatform(this)->GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
-
-	HRR(LoadPixelShader(::GetPlatform(this)->GetD3DDevice(), L"PS.cso", &m_pixelShader.shader));
-
-	SetDebugName(m_vertexShader.shader, "RenderManager::m_vertexShader");
-	SetDebugName(m_pixelShader.shader, "RenderManager::m_pixelShader");
 
 	InputLayouts::InitAll(::GetPlatform(this)->GetDevice(), &(dataVS)[0], dataVS.size());
 	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
@@ -669,6 +675,13 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeRelease(&m_CBNeverChanges);
     SafeRelease(&m_CBChangesEveryFrame);
 
+    m_vertexShader.Release();
+    m_pixelShader.Release();
+    m_drawScreenPixelShader.Release();
+    m_drawScreenVertexShader.Release();
+    m_shadowVertexShader.Release();
+    m_shadowPixelShader.Release();
+
     m_commandList.Release();
     SafeDelete(&m_bitmapFont);
 
@@ -709,8 +722,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	SafeDelete(&GetRenderData().pShadowMap);
 	m_vertexBuffer.Release();
     m_indexBuffer.Release();
-	m_vertexShader.Release();
-	m_pixelShader.Release();
 	m_instancedBuffer.Release();
 
 	for (auto& t : m_textures)
@@ -760,10 +771,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	m_debugTextureRV.Release();
 	InputLayouts::DestroyAll();
 #endif
-    m_drawScreenPixelShader.Release();
-    m_drawScreenVertexShader.Release();
-    m_shadowVertexShader.Release();
-    m_shadowPixelShader.Release();
 	//RenderStates::DestroyAll();
 
 	return S_OK;
@@ -1220,8 +1227,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	SetDebugName(pConstBuffer, "RenderManager::CreateMaterial::pConstBuffer");
 #endif
 
-    VertexShader* vertexShader = &m_vertexShader;
-    PixelShader* pixelShader = &m_pixelShader;
+    VertexShader* vertexShader = &GetPlatform()->m_vertexShader;
+    PixelShader* pixelShader = &GetPlatform()->m_pixelShader;
 
 	if (vertexShaderFilename && *vertexShaderFilename)
 	{
@@ -1377,8 +1384,8 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { InputLayoutDesc::Basic32, _countof(InputLayoutDesc::Basic32) };
     psoDesc.pRootSignature = GetPlatform()->GetRootSignature();
-    psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_drawScreenVertexShader);
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_drawScreenPixelShader);
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_drawScreenVertexShader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_drawScreenPixelShader);
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState.DepthEnable = FALSE;
@@ -1579,46 +1586,35 @@ HRESULT RenderManager::InitDevice()
         loadedTextureHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;;
         loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
-		
-		//// Describe and create a sampler descriptor heap.
-		//D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
-		//samplerHeapDesc.NumDescriptors = 2;		// One clamp and one wrap sampler.
-		//samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
-		//samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		//HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_samplerHeap)));
-		//SetDebugName(m_samplerHeap, "m_samplerHeap");
-	}
+    }
 
 	HRR(::GetPlatform(this)->GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 
-	// Initialize the world matrices
-	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
+    // Initialize the world matrices
+    XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
 
-	// Initialize render statesf
-	XSF::StockRenderStates::Initialize(::GetPlatform(this)->GetDevice());
+    // Initialize render statesf
+    XSF::StockRenderStates::Initialize(::GetPlatform(this)->GetDevice());
 
-	// Create the command list.
-	//HRR(::GetPlatform(this)->GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
+    // Create synchronization objects and wait until assets have been uploaded to the GPU.
+    {
+        HRR(::GetPlatform(this)->GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+        m_fenceValue = 1;
 
-	// Create synchronization objects and wait until assets have been uploaded to the GPU.
-	{
-		HRR(::GetPlatform(this)->GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-		m_fenceValue = 1;
+        // Create an event handle to use for frame synchronization.
+        m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        if (m_fenceEvent == nullptr)
+        {
+            HRR(HRESULT_FROM_WIN32(GetLastError()));
+        }
 
-		// Create an event handle to use for frame synchronization.
-		m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-		if (m_fenceEvent == nullptr)
-		{
-			HRR(HRESULT_FROM_WIN32(GetLastError()));
-		}
+        // Wait for the command list to execute; we are reusing the same command 
+        // list in our main loop but for now, we just want to wait for setup to 
+        // complete before continuing.
+        WaitForPreviousFrame();
+    }
 
-		// Wait for the command list to execute; we are reusing the same command 
-		// list in our main loop but for now, we just want to wait for setup to 
-		// complete before continuing.
-		WaitForPreviousFrame();
-	}
-
-	return hr;
+    return hr;
 }
 
 #else
@@ -1711,6 +1707,9 @@ HRESULT RenderPlatform11::InitDevice()
 
     m_immediateContext->VSSetConstantBuffers(1, 1, &m_pCBChangeOnResize);
 
+    // REnder states
+    XSF::StockRenderStates::Initialize(GetD3DDevice());
+
     return S_OK;
 }
 
@@ -1723,9 +1722,9 @@ HRESULT RenderManager::InitDevice()
 
     hr = ::GetPlatform(this)->InitDevice();
 
+
     m_immediateContext = ::GetPlatform(this)->m_immediateContext; //TEMPTEMP
 
-    XSF::StockRenderStates::Initialize(::GetPlatform(this)->GetD3DDevice());
 
     return hr;
 }
