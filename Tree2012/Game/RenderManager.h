@@ -401,14 +401,17 @@ protected:
     HWND                              m_hwnd;
 #else
     Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;
-    
     float                             m_logicalDpi;
 #endif
 
     DXGI_FORMAT                       m_swapChainFormat;
 
+    XSF::BitmapFont*                  m_bitmapFont;
+
 public:
 
+    RenderPlatform() : m_bitmapFont(nullptr) { }
+    
     DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
 
 #if defined(WIN32) && !defined(TREENGINE_XBOX)
@@ -450,7 +453,13 @@ private:
     CComPtr<ID3D12Resource>           m_pDepthStencil;
     D3D12_RESOURCE_DESC               m_pDepthStencilView;
 
+    CComPtr<ID3D12RootSignature>       m_rootSignature;
+    CComPtr<ID3D12GraphicsCommandList> m_commandList;
+
     UINT                              m_frameIndex;
+
+    D3D12_VIEWPORT                    m_viewPort;
+    D3D12_RECT                        m_scissorRect;
 
     RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
 
@@ -462,10 +471,11 @@ private:
 
 public:
 
-    RenderPlatform12(RenderManager* renderManager) { m_renderManager = renderManager;  } 
+    RenderPlatform12(RenderManager* renderManager) : m_renderManager(renderManager) { }
     RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     IDXGISwapChain3* GetSwapChain() { return m_pSwapChain; }
+    D3DCommandList* GetCommandList() const { return m_commandList; }
 
     XboxSampleFramework::D3DDevice* GetD3DDevice()
     {
@@ -478,12 +488,21 @@ public:
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
 
+    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
+    HRESULT UninitGameLevelGraphics();
+
+    HRESULT RenderSetupCommon(bool resetCommandList);
+
+
     // Maybe TEMPTEMP?
     DescriptorHeapWrapper& GetDSVHeap() { return m_dsvHeap; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRenderTargetHandle() { return m_rtvHeap.hCPU(m_frameIndex); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentDepthTargetHandle() { return m_dsvHeap.hCPU(SwapChainDsv_HeapOffset); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetShadowDepthTargetHandle() { return m_dsvHeap.hCPU(ShadowDsv_HeapOffset); }
     ID3D12Resource* GetCurrentRenderTarget() { return m_renderTargets[m_frameIndex]; }
+    ID3D12RootSignature* GetRootSignature() { return m_rootSignature; }
+    D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
+
     void UpdateFrameIndex() {
         if (GetSwapChain())
         {
@@ -502,6 +521,8 @@ class RenderPlatform11 : public RenderPlatform
     CComPtr<ID3D11RasterizerState>    m_rasterState;
     CComPtr<ID3D11Texture2D>          m_pSharedRenderToTexture;
     CComPtr<ID3D11RenderTargetView>   m_pRenderTargetView;
+    CComPtr<ID3D11Texture2D>          m_pDepthStencil;
+    CComPtr<ID3D11DepthStencilView>   m_pDepthStencilView;
 
     D3D_DRIVER_TYPE                   m_driverType;
     D3D_FEATURE_LEVEL                 m_featureLevel;
@@ -524,6 +545,7 @@ public:
     RenderPlatforms GetType() { return D3D11_RENDER_PLATFORM; }
     ID3D11Device* GetDevice() { return m_d3dDevice; }
     ID3D11RenderTargetView* GetRTV() { return m_pRenderTargetView; }
+    ID3D11DepthStencilView* GetDSV() { return m_pDepthStencilView; }
     XboxSampleFramework::D3DDevice* GetD3DDevice()
     {
         return (XboxSampleFramework::D3DDevice*) (ID3D11Device*) m_d3dDevice;
@@ -531,6 +553,7 @@ public:
     IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
     bool IsMSAAEnabled() { return m_enableMsaa; }
     UINT GetMSAAQuality() { return m_msaaQuality; }
+    D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
 
     static const UINT msaaCount = 4;
 
@@ -580,24 +603,17 @@ class RenderManager : public IRenderFrame
 
     CComPtr<ID3D12CommandQueue> m_commandQueue;
     CComPtr<ID3D12CommandAllocator> m_commandAllocator;
-    CComPtr<ID3D12RootSignature>      m_rootSignature;
     CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
     CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;    // offline heap for loading heap
     CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     CComPtr<ID3D12PipelineState> m_pipelineState;
     CComPtr<ID3D12PipelineState> m_pipelineStateFullScreenQuad;
     CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap;
-    CComPtr<ID3D12GraphicsCommandList> m_commandList;
-    D3D12_VIEWPORT m_viewPort;
-    D3D12_RECT m_scissorRect;
-    UINT                                m_srvCbvDescriptorSize;
 
 
     UINT                                m_numMaterialsCreated;
 #else
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
-    CComPtr<ID3D11Texture2D>            m_pDepthStencil;
-    CComPtr<ID3D11DepthStencilView>		m_pDepthStencilView;
     D3D11_VIEWPORT						m_viewPort;
 #endif
 
@@ -607,7 +623,6 @@ class RenderManager : public IRenderFrame
     {
         XMFLOAT4X4 mProjection;
     };
-
 
     // App resources.
 
@@ -688,8 +703,6 @@ class RenderManager : public IRenderFrame
 
     DirectionalLight					m_light;  // Doesn't belong here, will move later
 
-    XSF::BitmapFont*					m_bitmapFont;
-
 #if defined(TREE3D12)
     HRESULT CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
 
@@ -722,8 +735,13 @@ public:
     RenderData& GetRenderData() { return m_renderData; }
 #if defined (TREE3D12)
 
+    ID3D12DescriptorHeap* GetShaderHeap() { return m_cbvSrvHeap; }  //TEMPTEMP 
+    D3D12_VERTEX_BUFFER_VIEW& GetVBView() { return m_VBView; } //TEMPTEMP
+    D3D12_INDEX_BUFFER_VIEW GetIBView() { return m_IBView; } //TEMPTEMP
+    UINT                                m_srvCbvDescriptorSize; //TEMPTEMP
+    D3D12_CONSTANT_BUFFER_VIEW_DESC* GetConstViewDescs() { return m_constViewDescs; } //TEMPTEMP
+
     ID3D12Fence* GetFence() { return m_fence; }
-    D3DCommandList* GetCommandList() const { return m_commandList; }
     ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
     ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
 
@@ -747,10 +765,6 @@ public:
     // Accessor methods for Oculus
     HRESULT GetViewport(Viewport& viewport);
 
-#if defined(TREE3D12)
-#else
-    ID3D11DepthStencilView* GetDSV() { return m_pDepthStencilView; }
-#endif
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
     HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);
 
@@ -771,7 +785,6 @@ public:
 
     void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
         bool m_renderToSharedTexture, float* clearColor);
-    HRESULT RenderSetupCommon(bool resetCommandList);
 
     HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
 #if defined(TREE3D12)

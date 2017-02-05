@@ -977,7 +977,7 @@ void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
     UINT64 uploadBufferSize = GetRequiredIntermediateSize(Dest.GetResource(), 0, NumSubresources);
 
     //CommandContext& InitContext = CommandContext::Begin();
-    HR(renderManager->GetCommandList()->Reset(renderManager->GetCommandAllocator(), nullptr));
+    HR(renderManager->GetPlatform()->GetCommandList()->Reset(renderManager->GetCommandAllocator(), nullptr));
 
     D3D12_HEAP_PROPERTIES HeapProps;
     HeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -1010,23 +1010,23 @@ void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
     barrier.Transition.pResource = Dest.GetResource();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-    renderManager->GetCommandList()->ResourceBarrier(1, &barrier);
+    renderManager->GetPlatform()->GetCommandList()->ResourceBarrier(1, &barrier);
 
-    UpdateSubresources(renderManager->GetCommandList(), Dest.GetResource(), UploadBuffer, 0, 0, NumSubresources, SubData);
+    UpdateSubresources(renderManager->GetPlatform()->GetCommandList(), Dest.GetResource(), UploadBuffer, 0, 0, NumSubresources, SubData);
 
     //InitContext.TransitionResource(Dest, D3D12_RESOURCE_STATE_GENERIC_READ, true);
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = Dest.GetResource();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
-    renderManager->GetCommandList()->ResourceBarrier(1, &barrier);
+    renderManager->GetPlatform()->GetCommandList()->ResourceBarrier(1, &barrier);
 
     // Execute the command list and wait for it to finish so we can release the upload buffer
     //InitContext.Finish(true);
 
     // Execute the comfmand list.
-    HR(renderManager->GetCommandList()->Close());
-    ID3D12CommandList* ppCommandLists[] = { renderManager->GetCommandList() };
+    HR(renderManager->GetPlatform()->GetCommandList()->Close());
+    ID3D12CommandList* ppCommandLists[] = { renderManager->GetPlatform()->GetCommandList() };
     renderManager->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     renderManager->WaitForPreviousFrame();

@@ -303,7 +303,7 @@ HRESULT BitmapFont::Create(RenderManager* const renderManager, const WCHAR* strF
 	m_renderManager = renderManager;
     D3DDevice* const pDevice = GetPlatform(m_renderManager)->GetDevice();
     ID3D12Fence* const pFence = m_renderManager->GetFence();
-    D3DCommandList* const pCmdList = m_renderManager->GetCommandList();
+    D3DCommandList* const pCmdList = m_renderManager->GetPlatform()->GetCommandList();
 
     XSF_ERROR_IF_FAILED(m_frameHeap.Initialize(pDevice, pFence, 256 * 1024, false, 1 /*frame latency*/, L"BitmapFont::FrameHeap"));
     XSF_ERROR_IF_FAILED(m_uploadHeap.Initialize(pDevice, pFence, 4 * 1024 * 1024, false, 1, L"BitmapFont::UploadHeap"));
@@ -415,7 +415,7 @@ HRESULT BitmapFont::Create(RenderManager* renderManager, ID3D12Resource* const p
 
 	m_renderManager = renderManager;
     D3DDevice* const pDevice = GetPlatform(m_renderManager)->GetDevice();
-    D3DCommandList* const pCmdList = m_renderManager->GetCommandList();
+    D3DCommandList* const pCmdList = m_renderManager->GetPlatform()->GetCommandList();
 
     // Define root table layout
     CD3DX12_DESCRIPTOR_RANGE descRange[c_numRootParameters];
@@ -708,7 +708,7 @@ VOID BitmapFont::Begin(const D3D12_VIEWPORT* pViewport)
     if (0 == m_dwNestedBeginCount)
     {
         XSF_ASSERT(m_pCmdList == nullptr);
-        m_pCmdList = m_renderManager->GetCommandList();
+        m_pCmdList = m_renderManager->GetPlatform()->GetCommandList();
 
         XSFBeginNamedEvent(m_pCmdList, 0, L"Text rendering");
 
@@ -768,7 +768,7 @@ VOID BitmapFont::Begin(const D3D12_VIEWPORT* pViewport)
         }
     }
 
-    XSF_ASSERT(m_pCmdList == m_renderManager->GetCommandList());
+    XSF_ASSERT(m_pCmdList == m_renderManager->GetPlatform()->GetCommandList());
 
     // Keep track of the nested begin/end calls.
     m_dwNestedBeginCount++;

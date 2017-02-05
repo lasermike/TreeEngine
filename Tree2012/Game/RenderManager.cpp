@@ -173,7 +173,6 @@ RenderManager::RenderManager() :
 #endif
 {
     m_displayMode = Monitor;
-    m_bitmapFont = nullptr;
 
     m_renderData.frameStats = g_frameStats;
 
@@ -238,105 +237,115 @@ HRESULT RenderManager::CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* he
 }
 #endif
 
+#if defined(TREE3D12)
+HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
+{
+    // Create the command list.
+    HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_renderManager->GetCommandAllocator(), nullptr, IID_PPV_ARGS(&m_commandList)));
+
+    //HRR(RenderStates::InitAll(m_d3dDevice));
+
+
+
+    // Create the root signature.
+    // Root signature parameters are:
+    //   0  CBV buffer descriptor table - MaterialCbv_HeapOffset
+    //   1  SRV descriptor table - Texture0_HeapOffset
+    //   2  Constant buffer descriptor -NeverChangesCbv_HeapOffset,
+    //   3  Constant buffer descriptor- ChangeOnResizeCbv_HeapOffset,
+    //   4  Constant buffer descriptor- ChangesEveryFrame_HeapOffset,
+
+    //   cbuffer cbNeverChanges : register( b0 )
+    //   cbuffer cbChangeOnResize : register(b1)
+    //   cbuffer cbChangesEveryFrame : register(b2)
+    //   cbuffer cbMaterial : register (b3)
+
+    CD3DX12_DESCRIPTOR_RANGE ranges[3];
+    ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
+    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numTexturesPerMaterial, 0 /* t0 */);
+
+    CD3DX12_ROOT_PARAMETER rootParameters[6];
+    rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[CbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[SrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[NeverChangesRootSignatureParam].InitAsConstantBufferView(NeverChangesRootSignatureShaderSlot);
+    rootParameters[ChangeOnResizeRootSignatureParam].InitAsConstantBufferView(ChangeOnResizeRootSignatureShaderSlot);
+    rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
+
+    D3D12_STATIC_SAMPLER_DESC sampler[3];
+    sampler[0] = D3D12_STATIC_SAMPLER_DESC();
+    sampler[1] = D3D12_STATIC_SAMPLER_DESC();
+    sampler[2] = D3D12_STATIC_SAMPLER_DESC();
+
+    sampler[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    sampler[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler[0].MipLODBias = 0;
+    sampler[0].MaxAnisotropy = 0;
+    sampler[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    sampler[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    sampler[0].MinLOD = 0.0f;
+    sampler[0].MaxLOD = D3D12_FLOAT32_MAX;
+    sampler[0].ShaderRegister = 0;
+    sampler[0].RegisterSpace = 0;
+    sampler[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    sampler[1].ShaderRegister = 1; // shaderRegister
+    sampler[1].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT; // filter
+    sampler[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressU
+    sampler[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressV
+    sampler[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressW
+    sampler[1].MipLODBias = 0.0f;                             // mipLODBias
+    sampler[1].MaxAnisotropy = 16;                            // maxAnisotropy
+    sampler[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    sampler[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    sampler[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    sampler[2].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    sampler[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler[2].MipLODBias = 0;
+    sampler[2].MaxAnisotropy = 0;
+    sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    sampler[2].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    sampler[2].MinLOD = 0.0f;
+    sampler[2].MaxLOD = D3D12_FLOAT32_MAX;
+    sampler[2].ShaderRegister = 2;
+    sampler[2].RegisterSpace = 0;
+    sampler[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+    rootSignatureDesc.Init(_countof(rootParameters), rootParameters, _countof(sampler), sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+    CComPtr<ID3DBlob> signature;
+    CComPtr<ID3DBlob> error;
+    HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+    HRR(GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+
+    // Init text font
+    m_bitmapFont = new XSF::BitmapFont();
+    HRR(m_bitmapFont->Create(this->m_renderManager, L"Arial_16"));
+
+    return S_OK;
+}
+#else
+
+
+#endif
+
 HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
 {
     HRR(UninitGameLevelGraphics());
 
+    GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps);
+
+    // Create vertices and indice for geometry
+    m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
+
 #if defined(TREE3D12)
-    // Create the command list.
-    HRR(::GetPlatform(this)->GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator, nullptr, IID_PPV_ARGS(&m_commandList)));
-#endif
-
-	// Create vertices and indice for geometry
-	m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
-
-	//HRR(RenderStates::InitAll(m_d3dDevice));
-	
-#if defined(TREE3D12)
-
-	// Create the root signature.
-	{
-        // Root signature parameters are:
-        //   0  CBV buffer descriptor table - MaterialCbv_HeapOffset
-        //   1  SRV descriptor table - Texture0_HeapOffset
-        //   2  Constant buffer descriptor -NeverChangesCbv_HeapOffset,
-        //   3  Constant buffer descriptor- ChangeOnResizeCbv_HeapOffset,
-        //   4  Constant buffer descriptor- ChangesEveryFrame_HeapOffset,
-
-        //   cbuffer cbNeverChanges : register( b0 )
-        //   cbuffer cbChangeOnResize : register(b1)
-        //   cbuffer cbChangesEveryFrame : register(b2)
-        //   cbuffer cbMaterial : register (b3)
-
-        CD3DX12_DESCRIPTOR_RANGE ranges[3];
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
-        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
-        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numTexturesPerMaterial, 0 /* t0 */);
-
-        CD3DX12_ROOT_PARAMETER rootParameters[6];
-        rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[CbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[SrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[NeverChangesRootSignatureParam].InitAsConstantBufferView(NeverChangesRootSignatureShaderSlot);
-        rootParameters[ChangeOnResizeRootSignatureParam].InitAsConstantBufferView(ChangeOnResizeRootSignatureShaderSlot);
-        rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
-
-        D3D12_STATIC_SAMPLER_DESC sampler[3];
-        sampler[0] = D3D12_STATIC_SAMPLER_DESC();
-        sampler[1] = D3D12_STATIC_SAMPLER_DESC();
-        sampler[2] = D3D12_STATIC_SAMPLER_DESC();
-
-        sampler[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler[0].MipLODBias = 0;
-        sampler[0].MaxAnisotropy = 0;
-        sampler[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-        sampler[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        sampler[0].MinLOD = 0.0f;
-        sampler[0].MaxLOD = D3D12_FLOAT32_MAX;
-        sampler[0].ShaderRegister = 0;
-        sampler[0].RegisterSpace = 0;
-        sampler[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        sampler[1].ShaderRegister = 1; // shaderRegister
-        sampler[1].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT; // filter
-        sampler[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressU
-        sampler[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressV
-        sampler[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;  // addressW
-        sampler[1].MipLODBias = 0.0f;                             // mipLODBias
-        sampler[1].MaxAnisotropy = 16;                            // maxAnisotropy
-        sampler[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        sampler[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-        sampler[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        sampler[2].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler[2].MipLODBias = 0;
-        sampler[2].MaxAnisotropy = 0;
-        sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-        sampler[2].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        sampler[2].MinLOD = 0.0f;
-        sampler[2].MaxLOD = D3D12_FLOAT32_MAX;
-        sampler[2].ShaderRegister = 2;
-        sampler[2].RegisterSpace = 0;
-        sampler[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Init(_countof(rootParameters), rootParameters, _countof(sampler), sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-        CComPtr<ID3DBlob> signature;
-        CComPtr<ID3DBlob> error;
-        HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-        HRR(::GetPlatform(this)->GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-    }
-
-    // Init text font
-    m_bitmapFont = new XSF::BitmapFont();
-    HRR(m_bitmapFont->Create(this, L"Arial_16"));
 
     // Constants
     //
@@ -434,22 +443,15 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	m_IBView.SizeInBytes = UINT(sizeof(UINT) * m_geometryData.indices.size());
 	m_IBView.Format = DXGI_FORMAT_R32_UINT;
 
-	// Depth stencil description
-	CD3DX12_DEPTH_STENCIL_DESC depthStencilDesc(D3D12_DEFAULT);
-	//depthStencilDesc.DepthEnable = true;
-	//depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	//depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	//depthStencilDesc.StencilEnable = FALSE;
-
 	// Describe and create the graphics pipeline state object (PSO).
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 	psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
-	psoDesc.pRootSignature = m_rootSignature;
+    psoDesc.pRootSignature = GetPlatform()->GetRootSignature(); 
 	psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader.shader);
 	psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader.shader);
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	psoDesc.DepthStencilState = depthStencilDesc;
+	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 
     psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; //DXGI_FORMAT_D32_FLOAT;
 	psoDesc.SampleMask = UINT_MAX;
@@ -473,11 +475,11 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
     shadowPsoDesc.NumRenderTargets = 0;
 
-    HRR(::GetPlatform(this)->GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
+    HRR(GetPlatform()->GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
 
 	// Execute the command list.
-	HRR(m_commandList->Close());
-	ID3D12CommandList* ppCommandLists[] = { m_commandList };
+	HRR(GetPlatform()->GetCommandList()->Close());
+	ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
 	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     WaitForPreviousFrame();
@@ -619,12 +621,12 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 HRESULT RenderManager::GetViewport(Viewport& viewport)
 {
-    viewport.TopLeftX = m_viewPort.TopLeftX;
-    viewport.TopLeftY = m_viewPort.TopLeftY;
-    viewport.Width = m_viewPort.Width;
-    viewport.Height = m_viewPort.Height;
-    viewport.MinDepth = m_viewPort.MinDepth;
-    viewport.MaxDepth = m_viewPort.MaxDepth;
+    viewport.TopLeftX = GetPlatform()->GetViewport().TopLeftX;
+    viewport.TopLeftY = GetPlatform()->GetViewport().TopLeftY;
+    viewport.Width = GetPlatform()->GetViewport().Width;
+    viewport.Height = GetPlatform()->GetViewport().Height;
+    viewport.MinDepth = GetPlatform()->GetViewport().MinDepth;
+    viewport.MaxDepth = GetPlatform()->GetViewport().MaxDepth;
     return S_OK;
 }
 
@@ -653,18 +655,32 @@ void RenderManager::WaitForPreviousFrame()
 
 #endif
 
+#if defined(TREE3D12)
+HRESULT RenderPlatform12::UninitGameLevelGraphics()
+{
+    m_commandList.Release();
+    SafeDelete(&m_bitmapFont);
+
+    m_rootSignature.Release();
+
+    return S_OK;
+}
+#else
+#endif
+
 HRESULT RenderManager::UninitGameLevelGraphics()
 {
-#if defined(TREE3D12)
+    HRR(GetPlatform()->UninitGameLevelGraphics());
 
-	// Ensure that the GPU is no longer referencing resources that are about to be
-	// cleaned up by the destructor.
-	WaitForPreviousFrame();
+#if defined(TREE3D12)
+    
+    // Ensure that the GPU is no longer referencing resources that are about to be
+    // cleaned up by the destructor.
+    WaitForPreviousFrame();
+
     m_pipelineState.Release();
     m_pipelineStateFullScreenQuad.Release();
     m_pipelineStateShadowMap.Release();
-
-    m_commandList.Release();
 
     m_numMaterialsCreated = 0;
 
@@ -751,7 +767,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_drawScreenVertexShader.Release();
     m_shadowVertexShader.Release();
     m_shadowPixelShader.Release();
-	SafeDelete(&m_bitmapFont);
 	//RenderStates::DestroyAll();
 
 	return S_OK;
@@ -761,7 +776,7 @@ HRESULT RenderManager::BeginFrame()
 {
 #if defined(TREE3D12)
 
-    RenderSetupCommon(true);
+    GetPlatform()->RenderSetupCommon(true);
 
 	InstancedData* dataView = nullptr;
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
@@ -829,8 +844,8 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     buffers[0] = m_VBView;
     buffers[1] = m_instancedBuffer.GetView(m_renderData.frame);
 
-    m_commandList->IASetVertexBuffers(0, 2, buffers);
-    m_commandList->IASetIndexBuffer(&m_IBView);
+    GetPlatform()->GetCommandList()->IASetVertexBuffers(0, 2, buffers);
+    GetPlatform()->GetCommandList()->IASetIndexBuffer(&m_IBView);
 #else
 	// Set up input assembler
 	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
@@ -860,11 +875,11 @@ HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
     memcpy(material->m_pConstBufferDataBegin, &material->m_shaderMaterial, sizeof(material->m_shaderMaterial));
 
     // Set constant buffer view
-    m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material->m_cbvSrvHeapTable);
+    GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material->m_cbvSrvHeapTable);
 
     // Set texture buffer view
     CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
+    GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
 #else
 	CBMaterial cb;
@@ -910,7 +925,7 @@ HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 		UINT numInstances = m_perFrameInstanceData[&ru][object].second;
 
 #if defined(TREE3D12)
-		m_commandList->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
+        GetPlatform()->GetCommandList()->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
 			ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
 #else
 		m_immediateContext->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
@@ -1018,7 +1033,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
     {
         HR(m_commandAllocator->Reset());
 
-        HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
+        HR(GetPlatform()->GetCommandList()->Reset(m_commandAllocator, m_pipelineState));
 
         // Describe and create a Texture2D.
         D3D12_RESOURCE_DESC textureDesc = {};
@@ -1071,8 +1086,8 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         textureData.RowPitch = width * sizeof(float);
         textureData.SlicePitch = textureData.RowPitch * height;
 
-        UpdateSubresources(m_commandList, texture, textureUploadHeap, 0, 0, 1, &textureData);
-        m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+        UpdateSubresources(GetPlatform()->GetCommandList(), texture, textureUploadHeap, 0, 0, 1, &textureData);
+        GetPlatform()->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
 
         // Describe and create a SRV for the texture.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -1091,8 +1106,8 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         //view.Detach();
 
         // Execute the command list.
-        HRR(m_commandList->Close());
-        ID3D12CommandList* ppCommandLists[] = { m_commandList };
+        HRR(GetPlatform()->GetCommandList()->Close());
+        ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
         WaitForPreviousFrame();
@@ -1364,7 +1379,7 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
     // Describe and create the graphics pipeline state object (PSO).
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { InputLayoutDesc::Basic32, _countof(InputLayoutDesc::Basic32) };
-    psoDesc.pRootSignature = m_rootSignature;
+    psoDesc.pRootSignature = GetPlatform()->GetRootSignature();
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_drawScreenVertexShader);
     psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_drawScreenPixelShader);
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -1418,16 +1433,16 @@ HRESULT RenderManager::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, D3
 	UINT offset = 0;
 
     commandList->SetPipelineState(m_pipelineStateFullScreenQuad);
-    m_commandList->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
-    m_commandList->IASetIndexBuffer(&m_screenQuadIBView);
+    GetPlatform()->GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
+    GetPlatform()->GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
 
     CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, shadowMapHandle);
+    GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, shadowMapHandle);
 
     commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
     CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
+    GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
 
 
 	return S_OK;
@@ -1731,17 +1746,17 @@ HRESULT RenderManager::UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass)
     if (shadowPass)
     {
         memcpy(m_CBShadowPassNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
-        if (m_commandList)
+        if (GetPlatform()->GetCommandList())
         {
-            m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_shadowNeverChangesConstViewDesc.BufferLocation);
+            GetPlatform()->GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_shadowNeverChangesConstViewDesc.BufferLocation);
         }
     }
     else
     {
         memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
-        if (m_commandList)
+        if (GetPlatform()->GetCommandList())
         {
-            m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
+            GetPlatform()->GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
         }
     }
 #else
@@ -1763,17 +1778,17 @@ HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
     if (shadowPass)
     {
         memcpy(m_CBShadowChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
-        if (m_commandList)
+        if (GetPlatform()->GetCommandList())
         {
-            m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_shadowChangesOnResizeConstViewDesc.BufferLocation);
+            GetPlatform()->GetCommandList()->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_shadowChangesOnResizeConstViewDesc.BufferLocation);
         }
     }
     else
     {
         memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
-        if (m_commandList)
+        if (GetPlatform()->GetCommandList())
         {
-            m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
+            GetPlatform()->GetCommandList()->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
         }
     }
 
@@ -1807,6 +1822,17 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 
 HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
 {
+    m_scissorRect.right = static_cast<LONG>(windowWidth);
+    m_scissorRect.bottom = static_cast<LONG>(windowHeight);
+
+    // Setup the viewport
+    m_viewPort.Width = (FLOAT)windowWidth;
+    m_viewPort.Height = (FLOAT)windowHeight;
+    m_viewPort.MinDepth = 0.0f;
+    m_viewPort.MaxDepth = 1.0f;
+    m_viewPort.TopLeftX = 0;
+    m_viewPort.TopLeftY = 0;
+
     // Swap chain
     CComPtr<IDXGIFactory4> factory;
     HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
@@ -1886,6 +1912,9 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     ASSERT(GetSwapChain() || m_pSharedRenderToTexture);
     ASSERT(m_renderTargets[0]);
     ASSERT(m_renderTargets[1]);
+    ASSERT(m_viewPort.Width != 0);
+    ASSERT(m_viewPort.Height != 0);
+
 
     return S_OK;
 }
@@ -1894,6 +1923,17 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 HRESULT RenderPlatform11::ReleaseSwapChainResources()
 {
     HRESULT hr = S_OK;
+
+    if (!m_immediateContext)
+    {
+        return S_FALSE;
+    }
+
+    // Resize logic
+
+    // Create width/height dependent objects
+    m_pDepthStencilView.Release();
+    m_pDepthStencil.Release();
 
     m_pSwapChain.Release();
     m_pSharedRenderToTexture.Release();
@@ -1914,6 +1954,15 @@ HRESULT RenderPlatform11::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 #else
     m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
+
+    // Setup the viewport
+    m_viewPort.Width = (FLOAT)windowWidth;
+    m_viewPort.Height = (FLOAT)windowHeight;
+    m_viewPort.MinDepth = 0.0f;
+    m_viewPort.MaxDepth = 1.0f;
+    m_viewPort.TopLeftX = 0;
+    m_viewPort.TopLeftY = 0;
+    m_immediateContext->RSSetViewports(1, &m_viewPort);
 
     // Obtain DXGI factory from device (since we used nullptr for pAdapter above)
     CComPtr<IDXGIFactory1> dxgiFactory;
@@ -2032,9 +2081,48 @@ HRESULT RenderPlatform11::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     SetDebugName(m_pRenderTargetView, "Game::m_pRenderTargetView");
     pBackBuffer.Release();
 
+    // 
+    // Create depth stencil texture
+    //
+    D3D11_TEXTURE2D_DESC descDepth;
+    ZeroMemory(&descDepth, sizeof(descDepth));
+    descDepth.Width = windowWidth;
+    descDepth.Height = windowHeight;
+    descDepth.MipLevels = 1;
+    descDepth.ArraySize = 1;
+#ifdef _XBOX_ONE
+    descDepth.Format = DXGI_FORMAT_D32_FLOAT;
+#else
+    descDepth.Format = DXGI_FORMAT_R24G8_TYPELESS;
+#endif
+    descDepth.SampleDesc.Count = IsMSAAEnabled() ? RenderPlatform11::msaaCount : 1;
+    descDepth.SampleDesc.Quality = IsMSAAEnabled() ? GetMSAAQuality() - 1 : 0;
+    descDepth.Usage = D3D11_USAGE_DEFAULT;
+    descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    descDepth.CPUAccessFlags = 0;
+    descDepth.MiscFlags = 0;
+    HRR(GetDevice()->CreateTexture2D(&descDepth, nullptr, &m_pDepthStencil));
+    SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
+
+    // Create the depth stencil view
+    D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+    dsvDesc.Flags = 0;
+#ifdef _XBOX_ONE
+    dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+#else
+    dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+#endif
+    dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    dsvDesc.Texture2D.MipSlice = 0;
+    HRR(GetDevice()->CreateDepthStencilView(m_pDepthStencil, &dsvDesc, &m_pDepthStencilView));
+    SetDebugName(m_pDepthStencilView, "Game::m_pDepthStencilView");
+
     // Validation
     ASSERT(m_pRenderTargetView);
     ASSERT(GetSwapChain() || m_pSharedRenderToTexture);
+    ASSERT(m_viewPort.Width != 0);
+    ASSERT(m_viewPort.Height != 0);
+
 
     return S_OK;
 }
@@ -2048,113 +2136,28 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
     // Release resources
     GetPlatform()->ReleaseSwapChainResources();
 
-#if defined(TREE3D12)
-
-#else
-	if (!m_immediateContext)
-	{
-		return S_FALSE;
-	}
-
-	// Resize logic
-
-	// Create width/height dependent objects
-	m_pDepthStencilView.Release();
-	m_pDepthStencil.Release();
-
-#endif
-	// Calculate the necessary swap chain and render target size in pixels.
-
-	// Initialize the projection matrix
-	GetRenderData().projectionData.screenWidth = windowWidth;
-	GetRenderData().projectionData.screenHeight = windowHeight;
-	GetRenderData().projectionData.fov = XM_PIDIV4;
+    // Initialize the projection matrix
+    GetRenderData().projectionData.screenWidth = windowWidth;
+    GetRenderData().projectionData.screenHeight = windowHeight;
+    GetRenderData().projectionData.fov = XM_PIDIV4;
 
     // Create new resources
     HRR(GetPlatform()->OnResize(windowWidth, windowHeight, renderToSharedTexture));
 
-#if defined(TREE3D12)
 
-#else
+    ASSERT(GetRenderData().projectionData.nearClippingPlane != 0);
+    ASSERT(GetRenderData().projectionData.farClippingPlane != 0);
+    ASSERT(GetRenderData().projectionData.screenWidth != 0);
+    ASSERT(GetRenderData().projectionData.screenHeight != 0);
+    ASSERT(GetRenderData().projectionData.fov != 0);
 
+    XMStoreFloat4x4(&GetRenderData().projection, XMMatrixPerspectiveFovLH(GetRenderData().projectionData.fov,
+        GetRenderData().projectionData.screenWidth / (float)GetRenderData().projectionData.screenHeight,
+        GetRenderData().projectionData.nearClippingPlane, GetRenderData().projectionData.farClippingPlane));
 
-	// 
-	// Create depth stencil texture
-	//
-	D3D11_TEXTURE2D_DESC descDepth;
-	ZeroMemory(&descDepth, sizeof(descDepth));
-	descDepth.Width = windowWidth;
-	descDepth.Height = windowHeight;
-	descDepth.MipLevels = 1;
-	descDepth.ArraySize = 1;
-#ifdef _XBOX_ONE
-	descDepth.Format = DXGI_FORMAT_D32_FLOAT;
-#else
-	descDepth.Format = DXGI_FORMAT_R24G8_TYPELESS;
-#endif
-	descDepth.SampleDesc.Count = GetPlatform()->IsMSAAEnabled() ? RenderPlatform11::msaaCount : 1;
-	descDepth.SampleDesc.Quality = GetPlatform()->IsMSAAEnabled() ? GetPlatform()->GetMSAAQuality() - 1 : 0;
-	descDepth.Usage = D3D11_USAGE_DEFAULT;
-	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-	descDepth.CPUAccessFlags = 0;
-	descDepth.MiscFlags = 0;
-	HRR(::GetPlatform(this)->GetDevice()->CreateTexture2D(&descDepth, nullptr, &m_pDepthStencil));
-	SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
+    ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&GetRenderData().projection)));
 
-	// Create the depth stencil view
-	D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
-	dsvDesc.Flags = 0;
-#ifdef _XBOX_ONE
-	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-#else
-	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-#endif
-	dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-	dsvDesc.Texture2D.MipSlice = 0;
-	HRR(::GetPlatform(this)->GetDevice()->CreateDepthStencilView(m_pDepthStencil, &dsvDesc, &m_pDepthStencilView));
-	SetDebugName(m_pDepthStencilView, "Game::m_pDepthStencilView");
-
-#endif
-
-
-	//
-	// Setup the viewport
-	//
-	m_viewPort.Width = (FLOAT)windowWidth;
-	m_viewPort.Height = (FLOAT)windowHeight;
-	m_viewPort.MinDepth = 0.0f;
-	m_viewPort.MaxDepth = 1.0f;
-	m_viewPort.TopLeftX = 0;
-	m_viewPort.TopLeftY = 0;
-
-#if defined(TREE3D12)
-
-	m_scissorRect.right = static_cast<LONG>(windowWidth);
-	m_scissorRect.bottom = static_cast<LONG>(windowHeight);
-
-
-#else
-	m_immediateContext->RSSetViewports(1, &m_viewPort);
-
-#endif
-
-
-	ASSERT(GetRenderData().projectionData.nearClippingPlane != 0);
-	ASSERT(GetRenderData().projectionData.farClippingPlane != 0);
-	ASSERT(GetRenderData().projectionData.screenWidth != 0);
-	ASSERT(GetRenderData().projectionData.screenHeight != 0);
-	ASSERT(GetRenderData().projectionData.fov != 0);
-
-	ASSERT(m_viewPort.Width != 0);
-	ASSERT(m_viewPort.Height != 0);
-
-	XMStoreFloat4x4(&GetRenderData().projection, XMMatrixPerspectiveFovLH(GetRenderData().projectionData.fov,
-		GetRenderData().projectionData.screenWidth / (float) GetRenderData().projectionData.screenHeight,
-		GetRenderData().projectionData.nearClippingPlane, GetRenderData().projectionData.farClippingPlane));
-
-	ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&GetRenderData().projection)));
-
-	return S_OK;
+    return S_OK;
 }
 
 //--------------------------------------------------------------------------------------
@@ -2164,15 +2167,10 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::UninitDevice()
 {
-    // OnResize objects
-    for (UINT n = 0; n < RenderPlatform12::FrameCount; n++)
-    {
-        m_renderTargets[n]->Release();
-    }
-    m_pDepthStencil.Release();
-    m_pDepthStencilView = D3D12_RESOURCE_DESC();
-    m_pRenderTargetView = D3D12_RESOURCE_DESC();
+    ReleaseSwapChainResources();
+
     m_rtvHeap.Terminate();
+    m_dsvHeap.Terminate();
 
     // InitDevice objects
     m_d3dDevice.Release();
@@ -2182,10 +2180,11 @@ HRESULT RenderPlatform12::UninitDevice()
 #else
 HRESULT RenderPlatform11::UninitDevice()
 {
-    m_d3dDevice.Release();
-    m_pSwapChain.Release();
+    ReleaseSwapChainResources();
+
     m_rasterState.Release();
-    m_pRenderTargetView.Release();
+
+    m_d3dDevice.Release();
 
     return S_OK;
 }
@@ -2204,7 +2203,6 @@ void RenderManager::UninitDevice()
 	m_commandQueue.Release();
 	m_commandAllocator.Release();
 	m_cbvSrvHeap.Release();
-    m_rootSignature.Release();
     m_loadTextureHeap.Release();
 
     CloseHandle(m_fenceEvent);
@@ -2223,8 +2221,6 @@ void RenderManager::UninitDevice()
 
 #else
 	m_immediateContext.Release();
-    m_pDepthStencil.Release();
-    m_pDepthStencilView.Release();
 	m_immediateContext.Release();
 #endif
 
@@ -2251,58 +2247,55 @@ void RenderManager::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-HRESULT RenderManager::RenderSetupCommon(bool resetCommandList)
+HRESULT RenderPlatform12::RenderSetupCommon(bool resetCommandList)
 {
     HRESULT hr = S_OK;
-#if defined(TREE3D12)
     if (resetCommandList)
     {
         // Command list allocators can only be reset when the associated command lists have finished execution on the GPU;
         // apps should use fences to determine GPU execution progress.
-        HR(m_commandAllocator->Reset());
+        HR(m_renderManager->GetCommandAllocator()->Reset());
 
         // However, when ExecuteCommandList() is called on a particular command 
         // list, that command list can then be reset at any time and must be before 
         // re-recording.
-        HR(m_commandList->Reset(m_commandAllocator, m_pipelineState));
+        HR(m_commandList->Reset(m_renderManager->GetCommandAllocator(), m_renderManager->m_pipelineState));
     }
 
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
-    ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap };
+    ID3D12DescriptorHeap* ppHeaps[] = { m_renderManager->GetShaderHeap() };
     m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     m_commandList->RSSetViewports(1, &m_viewPort);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
-    m_commandList->IASetIndexBuffer(&m_IBView);
+    m_commandList->IASetVertexBuffers(0, 1, &m_renderManager->GetVBView());
+    m_commandList->IASetIndexBuffer(&m_renderManager->GetIBView());
     m_commandList->OMSetStencilRef(0);
 
     // Set default material (first material).  Will be changed by calls to SetMaterial()
-    CD3DX12_GPU_DESCRIPTOR_HANDLE materialHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), Material0_HeapOffset, m_srvCbvDescriptorSize);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE materialHandle(m_renderManager->GetShaderHeap()->GetGPUDescriptorHandleForHeapStart(), Material0_HeapOffset, m_renderManager->m_srvCbvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, materialHandle);
 
-    materialHandle.Offset(Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
+    materialHandle.Offset(Texture0Srv_HeapOffset - Material0_HeapOffset, m_renderManager->m_srvCbvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, materialHandle);
 
     // Set root signature constant buffers
-    m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
-    m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
-    m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constViewDescs[ChangesEveryFrameRootSignatureShaderSlot].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_renderManager->GetConstViewDescs()[NeverChangesRootSignatureShaderSlot].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_renderManager->GetConstViewDescs()[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_renderManager->GetConstViewDescs()[ChangesEveryFrameRootSignatureShaderSlot].BufferLocation);
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+    m_commandList->IASetVertexBuffers(0, 1, &m_renderManager->GetVBView());
 
     if (resetCommandList)
     {
         // Indicate that the back buffer will be used as a render target.
         m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetPlatform()->GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
     }
-#else
-    resetCommandList;
-#endif
+
     return hr;
 }
 
@@ -2364,7 +2357,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     {
         // Bind render target and depth
         ID3D11RenderTargetView* rtv = GetPlatform()->GetRTV();
-        GetContext()->OMSetRenderTargets(1, &rtv, GetDSV());
+        GetContext()->OMSetRenderTargets(1, &rtv, GetPlatform()->GetDSV());
     }
 
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
@@ -2388,7 +2381,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
         GetContext()->ClearRenderTargetView(GetPlatform()->GetRTV(), clearColor);
 
         // Clear the depth buffer to 1.0 (max depth)
-        GetContext()->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+        GetContext()->ClearDepthStencilView(GetPlatform()->GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
     }
 
     // Make shadow map available to shaders
