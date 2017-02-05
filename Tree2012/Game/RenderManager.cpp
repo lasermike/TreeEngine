@@ -342,6 +342,26 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_bitmapFont = new XSF::BitmapFont();
     XSF_ERROR_IF_FAILED(m_bitmapFont->Create(GetD3DDevice(), L"Arial_16"));
 
+    // Create the constant buffers
+    D3D11_BUFFER_DESC bd;
+    ZeroMemory(&bd, sizeof(bd));
+    bd.Usage = D3D11_USAGE_DEFAULT;
+    bd.ByteWidth = sizeof(CBNeverChanges);
+    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bd.CPUAccessFlags = 0;
+    HRR(GetDevice()->CreateBuffer(&bd, nullptr, &m_CBNeverChanges));
+    SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
+
+    // Create constants for per frame 
+    ZeroMemory(&bd, sizeof(bd));
+    bd.Usage = D3D11_USAGE_DEFAULT;
+    bd.ByteWidth = sizeof(CBChangesEveryFrame);
+    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bd.CPUAccessFlags = 0;
+    HRR(GetDevice()->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
+    SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
+
+
     return S_OK;
 }
 
@@ -356,22 +376,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
     // Create vertices and indice for geometry
     m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
-
-#if defined(TREE3D12)
-
-
-#else
-	// Create the constant buffers
-	D3D11_BUFFER_DESC bd;
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(CBNeverChanges);
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bd.CPUAccessFlags = 0;
-	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &m_CBNeverChanges));
-    SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
-#endif
-
 
 	////////  Regular shaders /////
 
@@ -550,15 +554,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 	// Set primitive topology
 	m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	// Create constants for per frame 
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(CBChangesEveryFrame);
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bd.CPUAccessFlags = 0;
-	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
-	SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
 
 #endif
 
@@ -1705,17 +1700,6 @@ HRESULT RenderPlatform11::InitDevice()
     }
 #endif
 
-    return S_OK;
-}
-
-HRESULT RenderManager::InitDevice()
-{
-    HRESULT hr = S_OK;
-
-    hr = ::GetPlatform(this)->InitDevice();
-
-    m_immediateContext = ::GetPlatform(this)->m_immediateContext;
-
     // Create constant buffer
     D3D11_BUFFER_DESC bd;
     ZeroMemory(&bd, sizeof(bd));
@@ -1723,12 +1707,23 @@ HRESULT RenderManager::InitDevice()
     bd.ByteWidth = sizeof(CBChangeOnResize);
     bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bd.CPUAccessFlags = 0;
-    HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
+    HRR(GetDevice()->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
 
     m_immediateContext->VSSetConstantBuffers(1, 1, &m_pCBChangeOnResize);
 
+    return S_OK;
+}
+
+HRESULT RenderManager::InitDevice()
+{
+    HRESULT hr = S_OK;
+
     // Initialize the world matrices
     XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
+
+    hr = ::GetPlatform(this)->InitDevice();
+
+    m_immediateContext = ::GetPlatform(this)->m_immediateContext; //TEMPTEMP
 
     XSF::StockRenderStates::Initialize(::GetPlatform(this)->GetD3DDevice());
 
@@ -1807,6 +1802,7 @@ HRESULT RenderPlatform11::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass
 {
     XMStoreFloat4x4(&m_cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
     m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &m_cbChangesOnResize, 0, 0);
+    return S_OK;
 }
 #endif
 
@@ -2426,9 +2422,9 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #if defined(TREE3D12)
     memcpy(GetPlatform()->m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
 #else
-    m_immediateContext->VSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
-    m_immediateContext->PSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
-    m_immediateContext->UpdateSubresource(m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
+    m_immediateContext->VSSetConstantBuffers(2, 1, &GetPlatform()->m_CBChangesEveryFrame);
+    m_immediateContext->PSSetConstantBuffers(2, 1, &GetPlatform()->m_CBChangesEveryFrame);
+    m_immediateContext->UpdateSubresource(GetPlatform()->m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
 #endif
 
     // Draw everything

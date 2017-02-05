@@ -579,6 +579,10 @@ class RenderPlatform11 : public RenderPlatform
     UINT                              m_msaaQuality;
     D3D11_VIEWPORT                    m_viewPort;
 
+    CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
+    CBChangeOnResize                    m_cbChangesOnResize;
+    CComPtr<ID3D11Buffer>               m_CBNeverChanges;
+
     RenderManager*                    m_renderManager; //TEMPTEMP
 
     XSF::BitmapFont*                  m_bitmapFont;
@@ -611,6 +615,9 @@ public:
 
     // TEMPTEMP
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
+
+    // TODO make private
+    CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
 
     HRESULT InitDevice();
     HRESULT UninitDevice();
@@ -703,14 +710,8 @@ class RenderManager : public IRenderFrame
     std::list<FencedHeap>				m_managedUploadHeaps;
 
 #else
-    CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
-    CBChangeOnResize                    m_cbChangesOnResize;
-
     // Single vertex and index buffer for all geometry in scene
     CComPtr<ID3D11InputLayout>          m_vertexLayout;
-
-    CComPtr<ID3D11Buffer>               m_CBNeverChanges;
-    CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
 
     // Fixed drawing features
     CComPtr<ID3D11Buffer>               m_screenQuadVB;
