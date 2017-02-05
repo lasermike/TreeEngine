@@ -7,7 +7,12 @@
 #include "DDSTextureLoader.h"
 #endif
 
+#if defined (TREE3D12)
+#include "BitmapFont12.h"
+#else
 #include "BitmapFont.h"
+#endif
+
 #include "StockRenderStates.h"
 #include "ShadowMap.h"
 
@@ -245,8 +250,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     //HRR(RenderStates::InitAll(m_d3dDevice));
 
-
-
     // Create the root signature.
     // Root signature parameters are:
     //   0  CBV buffer descriptor table - MaterialCbv_HeapOffset
@@ -332,6 +335,14 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     return S_OK;
 }
 #else
+HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
+{
+    // Init text font
+    m_bitmapFont = new XSF::BitmapFont();
+    XSF_ERROR_IF_FAILED(m_bitmapFont->Create(GetD3DDevice(), L"Arial_16"));
+
+    return S_OK;
+}
 
 
 #endif
@@ -364,10 +375,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     m_constViewDescs[ChangesEveryFrameRootSignatureShaderSlot] = changesEachFrameViewDesc;
 
 #else
-	// Init text font
-	m_bitmapFont = new XSF::BitmapFont();
-	XSF_ERROR_IF_FAILED(m_bitmapFont->Create(::GetPlatform(this)->GetD3DDevice(), L"Arial_16"));
-
 	// Create the constant buffers
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
@@ -666,6 +673,12 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     return S_OK;
 }
 #else
+HRESULT RenderPlatform11::UninitGameLevelGraphics()
+{
+    SafeDelete(&m_bitmapFont);
+
+    return S_OK;
+}
 #endif
 
 HRESULT RenderManager::UninitGameLevelGraphics()
@@ -1713,8 +1726,7 @@ HRESULT RenderManager::InitDevice()
     hr = ::GetPlatform(this)->InitDevice();
 
     m_immediateContext = ::GetPlatform(this)->m_immediateContext;
-    ::GetPlatform(this)->m_immediateContext.Release();
-    // 
+
     // Create constant buffer
     D3D11_BUFFER_DESC bd;
     ZeroMemory(&bd, sizeof(bd));
@@ -2221,12 +2233,10 @@ void RenderManager::UninitDevice()
 
 #else
 	m_immediateContext.Release();
-	m_immediateContext.Release();
+    ::GetPlatform(this)->m_immediateContext.Release();
 #endif
 
     m_pCBChangeOnResize.Release();
-
-	//SafeDelete(&m_bitmapFont);
 
 #if defined(TREE3D12)
 #else
@@ -2244,6 +2254,7 @@ void RenderManager::UninitDevice()
     ::GetPlatform(this)->UninitDevice();
 }
 
+#if defined(TREE3D12)
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
@@ -2298,6 +2309,7 @@ HRESULT RenderPlatform12::RenderSetupCommon(bool resetCommandList)
 
     return hr;
 }
+#endif
 
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
@@ -2490,13 +2502,14 @@ HRESULT RenderPlatform12::EndDrawText()
 }
 
 #else
+
 HRESULT RenderPlatform11::BeginDrawText()
 {
     m_bitmapFont->Begin(m_immediateContext, &m_viewPort, false);
-
     return S_OK;
 }
-HRESULT RenderPlatform11::DrawText(FLOAT sx, FLOAT sy, DWORD dwColor, const WCHAR* strText)
+
+HRESULT RenderPlatform11::DrawText2(float sx, float sy, DWORD dwColor, const WCHAR* strText)
 {
     m_bitmapFont->DrawText(sx, sy, dwColor, strText);
     return S_OK;
@@ -2507,7 +2520,6 @@ HRESULT RenderPlatform11::EndDrawText()
     m_bitmapFont->End();
     return S_OK;
 }
-
 
 #endif
 
@@ -2522,7 +2534,7 @@ HRESULT RenderManager::DrawFrameStats()
 		wchar_t text[128];
 		swprintf(text, 128, L"%s %d", GetRenderData().frameStats[i].name,
 			GetRenderData().frameStats[i].stat);
-        GetPlatform()->DrawText(0, y, 0x33444444, text);
+        GetPlatform()->DrawText2(0, y, 0x33444444, text);
 		y += 34.0f;
 	}
 	
@@ -2568,7 +2580,8 @@ HRESULT RenderManager::RenderShadowMap()
 #else
 	// Restore state after shadow
 	GetContext()->RSSetState(0);
-	GetContext()->RSSetViewports(1, &m_viewPort);
+    GetContext()->RSSetViewports(1, &GetPlatform()->GetViewport());
+
 #endif	
 	return S_OK;
 }

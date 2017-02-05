@@ -406,11 +406,9 @@ protected:
 
     DXGI_FORMAT                       m_swapChainFormat;
 
-    XSF::BitmapFont*                  m_bitmapFont;
-
 public:
 
-    RenderPlatform() : m_bitmapFont(nullptr) { }
+    RenderPlatform() { }
     
     DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
 
@@ -461,6 +459,8 @@ private:
     D3D12_VIEWPORT                    m_viewPort;
     D3D12_RECT                        m_scissorRect;
 
+    XSF::BitmapFont*                  m_bitmapFont;
+
     RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
 
     enum DsvHeapOffset
@@ -497,7 +497,6 @@ public:
     HRESULT DrawText(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
     HRESULT EndDrawText();
 
-
     // Maybe TEMPTEMP?
     DescriptorHeapWrapper& GetDSVHeap() { return m_dsvHeap; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRenderTargetHandle() { return m_rtvHeap.hCPU(m_frameIndex); }
@@ -533,8 +532,11 @@ class RenderPlatform11 : public RenderPlatform
     D3D_FEATURE_LEVEL                 m_featureLevel;
     bool                              m_enableMsaa;
     UINT                              m_msaaQuality;
+    D3D11_VIEWPORT                    m_viewPort;
 
     RenderManager*                    m_renderManager; //TEMPTEMP
+
+    XSF::BitmapFont*                  m_bitmapFont;
 
 public:
 
@@ -558,7 +560,7 @@ public:
     IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
     bool IsMSAAEnabled() { return m_enableMsaa; }
     UINT GetMSAAQuality() { return m_msaaQuality; }
-    D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
+    D3D11_VIEWPORT& GetViewport() { return m_viewPort; }
 
     static const UINT msaaCount = 4;
 
@@ -567,10 +569,16 @@ public:
 
     HRESULT InitDevice();
     HRESULT UninitDevice();
+    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
+    HRESULT UninitGameLevelGraphics();
 
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
     ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
+
+    HRESULT BeginDrawText();
+    HRESULT DrawText2(float sx, float sy, DWORD dwColor, const WCHAR* strText); 
+    HRESULT EndDrawText();
 };
 
 #endif
@@ -619,7 +627,6 @@ class RenderManager : public IRenderFrame
     UINT                                m_numMaterialsCreated;
 #else
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
-    D3D11_VIEWPORT						m_viewPort;
 #endif
 
     DisplayMode							m_displayMode;
