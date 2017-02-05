@@ -474,6 +474,8 @@ private:
 
     CComPtr<ID3D12RootSignature>       m_rootSignature;
     CComPtr<ID3D12GraphicsCommandList> m_commandList;
+    CComPtr<ID3D12CommandQueue>        m_commandQueue;
+    CComPtr<ID3D12CommandAllocator>    m_commandAllocator;
 
     UINT                              m_frameIndex;
 
@@ -500,8 +502,17 @@ private:
     CComPtr<ID3D12Resource>           m_pCBShadowMapChangeOnResize;
     CBChangeOnResize                  m_cbShadowMapChangesOnResize;
 
+    // Single vertex and index buffer for all geometry in scene
+    D3DBuffer                         m_vertexBuffer;
+    D3DBuffer                         m_indexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW          m_VBView;
+    D3D12_INDEX_BUFFER_VIEW           m_IBView;
 
-    RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
+    // Fixed drawing features
+    CComPtr<ID3D12Resource>           m_screenQuadVB;
+    D3D12_VERTEX_BUFFER_VIEW          m_screenQuadVBView;
+    CComPtr<ID3D12Resource>           m_screenQuadIB;
+    D3D12_INDEX_BUFFER_VIEW           m_screenQuadIBView;
 
     enum DsvHeapOffset
     {
@@ -528,16 +539,21 @@ public:
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
 
-    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
+    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
     HRESULT UninitGameLevelGraphics();
 
-    HRESULT RenderSetupCommon(bool resetCommandList);
+    HRESULT RenderFrameSetupCommon(bool resetCommandList);
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
     HRESULT EndDrawText();
+
+    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+
+    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
+    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; } 
 
     // TODO make private
     HRESULT CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
@@ -552,6 +568,9 @@ public:
     ID3D12RootSignature* GetRootSignature() { return m_rootSignature; }
     D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
     D3D12_RECT& GetScissorRect() { return m_scissorRect; }
+    ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
+    ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
+    RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
 
     void UpdateFrameIndex() {
         if (GetSwapChain())
@@ -569,6 +588,12 @@ public:
     VertexShader                      m_drawScreenVertexShader;
     PixelShader                       m_drawScreenPixelShader;
 
+    // TEMPTEMP make private
+    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
+
+private:
+    // Internal methods
+    HRESULT BuildScreenQuadGeometryBuffers();
 };
 
 #else
@@ -589,21 +614,24 @@ class RenderPlatform11 : public RenderPlatform
     UINT                              m_msaaQuality;
     D3D11_VIEWPORT                    m_viewPort;
 
-    CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
-    CBChangeOnResize                    m_cbChangesOnResize;
-    CComPtr<ID3D11Buffer>               m_CBNeverChanges;
-
-    RenderManager*                    m_renderManager; //TEMPTEMP
+    CComPtr<ID3D11Buffer>             m_pCBChangeOnResize;
+    CBChangeOnResize                  m_cbChangesOnResize;
+    CComPtr<ID3D11Buffer>             m_CBNeverChanges;
 
     XSF::BitmapFont*                  m_bitmapFont;
 
-    // Default shader
-    VertexShader                        m_vertexShader;
-    PixelShader                         m_pixelShader;
-    VertexShader                        m_shadowVertexShader;
-    PixelShader                         m_shadowPixelShader;
-    VertexShader                        m_drawScreenVertexShader;
-    PixelShader                         m_drawScreenPixelShader;
+    D3DBuffer                         m_vertexBuffer;
+    D3DBuffer                         m_indexBuffer;
+
+    // Single vertex and index buffer for all geometry in scene
+    CComPtr<ID3D11InputLayout>        m_vertexLayout;
+
+    // Fixed drawing features
+    CComPtr<ID3D11Buffer>             m_screenQuadVB;
+    CComPtr<ID3D11Buffer>             m_screenQuadIB;
+
+    RenderManager*                    m_renderManager; //TEMPTEMP
+
 
 public:
 
@@ -639,18 +667,37 @@ public:
 
     HRESULT InitDevice();
     HRESULT UninitDevice();
-    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
+    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
     HRESULT UninitGameLevelGraphics();
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
 
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
     ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
 
+    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
+    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; }
+
     HRESULT BeginDrawText();
     HRESULT DrawText2(float sx, float sy, DWORD dwColor, const WCHAR* strText); 
     HRESULT EndDrawText();
+
+    // TEMPTEMP TODO make privdate
+    // Default shader
+    VertexShader                        m_vertexShader;
+    PixelShader                         m_pixelShader;
+    VertexShader                        m_shadowVertexShader;
+    PixelShader                         m_shadowPixelShader;
+    VertexShader                        m_drawScreenVertexShader;
+    PixelShader                         m_drawScreenPixelShader;
+    HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
+
+private: 
+    // Internal methods
+    HRESULT BuildScreenQuadGeometryBuffers();
+
 };
 
 #endif
@@ -686,13 +733,9 @@ class RenderManager : public IRenderFrame
 
 #if defined(TREE3D12)
 
-    CComPtr<ID3D12CommandQueue> m_commandQueue;
-    CComPtr<ID3D12CommandAllocator> m_commandAllocator;
-    CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
     CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;    // offline heap for loading heap
     CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     CComPtr<ID3D12PipelineState> m_pipelineState;
-    CComPtr<ID3D12PipelineState> m_pipelineStateFullScreenQuad;
     CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap;
 
 
@@ -707,19 +750,6 @@ class RenderManager : public IRenderFrame
 
 #if defined(TREE3D12)
 
-    // Single vertex and index buffer for all geometry in scene
-    D3D12_VERTEX_BUFFER_VIEW			m_VBView;
-    D3D12_INDEX_BUFFER_VIEW				m_IBView;
-
-    //D3D12_CONSTANT_BUFFER_VIEW_DESC     m_shadowNeverChangesConstViewDesc;
-    //UINT8*								m_CBShadowPassNeverChangesDataBegin;
-
-    // Fixed drawing features
-    CComPtr<ID3D12Resource>				m_screenQuadVB;
-    D3D12_VERTEX_BUFFER_VIEW			m_screenQuadVBView;
-    CComPtr<ID3D12Resource>				m_screenQuadIB;
-    D3D12_INDEX_BUFFER_VIEW				m_screenQuadIBView;
-
     D3D12_RESOURCE_DESC					m_debugTextureRV;
 
     CComPtr<ID3D12Fence>				m_fence;
@@ -728,34 +758,15 @@ class RenderManager : public IRenderFrame
     std::list<FencedHeap>				m_managedUploadHeaps;
 
 #else
-    // Single vertex and index buffer for all geometry in scene
-    CComPtr<ID3D11InputLayout>          m_vertexLayout;
-
-    // Fixed drawing features
-    CComPtr<ID3D11Buffer>               m_screenQuadVB;
-    CComPtr<ID3D11Buffer>               m_screenQuadIB;
     CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
 #endif
 
-
-
-    D3DBuffer                           m_vertexBuffer;
-    D3DBuffer                           m_indexBuffer;
-
-    DoubleBuffer						m_instancedBuffer;
+    DoubleBuffer                        m_instancedBuffer;
 
     GeometryGenerator					m_geometryGenerator;
     GeometryBufferData					m_geometryData;
 
     DirectionalLight					m_light;  // Doesn't belong here, will move later
-
-#if defined(TREE3D12)
-
-#else
-    HRESULT LoadPixelShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr);
-    HRESULT LoadVertexShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
-        _In_opt_ const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = NULL, _In_opt_ UINT numElements = 0, _COM_Outptr_ ID3D11InputLayout** ppInputLayout = NULL, _In_opt_ std::vector< BYTE >* pData = nullptr);
-#endif
 
     HRESULT LoadTexture(const wchar_t* textureFilename);
     HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
@@ -781,14 +792,13 @@ public:
 #if defined (TREE3D12)
 
     ID3D12DescriptorHeap* GetShaderHeap() { return m_cbvSrvHeap; }  //TEMPTEMP 
-    D3D12_VERTEX_BUFFER_VIEW& GetVBView() { return m_VBView; } //TEMPTEMP
-    D3D12_INDEX_BUFFER_VIEW GetIBView() { return m_IBView; } //TEMPTEMP
     UINT                                m_srvCbvDescriptorSize; //TEMPTEMP
     ID3D12PipelineState * GetPipelineState() { return m_pipelineState; }
+    //TEMPTEMP
+    CComPtr<ID3D12PipelineState> m_pipelineStateFullScreenQuad;
+    CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
 
     ID3D12Fence* GetFence() { return m_fence; }
-    ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
-    ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
 
     void TrimUploadHeaps(bool removeTerminatedHeaps);
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
@@ -802,8 +812,6 @@ public:
     RenderPlatform11* GetPlatform() { return (RenderPlatform11*)m_platform; }
 #endif
 
-    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
-    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; } 
 
     GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
 
@@ -831,12 +839,6 @@ public:
     void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
         bool m_renderToSharedTexture, float* clearColor);
 
-    HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
-#if defined(TREE3D12)
-    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
-#else
-    HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
-#endif
     HRESULT DrawFrameStats();
     HRESULT RenderShadowMap();
 };

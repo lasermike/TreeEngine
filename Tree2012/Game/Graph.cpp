@@ -75,7 +75,7 @@ HRESULT FSGraph::InitGraphics(RenderManager& renderManager)
 
 	Mesh* newMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_FSQuad);
-	renderManager.CreateMesh(L"FSQuad", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &newMesh);
+	renderManager.CreateMesh(L"FSQuad", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &newMesh);
 
 	renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
 

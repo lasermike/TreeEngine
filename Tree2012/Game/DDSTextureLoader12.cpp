@@ -969,7 +969,7 @@ static HRESULT CreateD3DResources(_In_ ID3D12Device* d3dDevice,
     return hr;
 }
 
-void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
+void InitializeTexture(GpuResource& Dest, RenderPlatform12* renderPlatform,
                        UINT NumSubresources, D3D12_SUBRESOURCE_DATA SubData[])
 {
     ID3D12Resource* UploadBuffer;
@@ -977,7 +977,7 @@ void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
     UINT64 uploadBufferSize = GetRequiredIntermediateSize(Dest.GetResource(), 0, NumSubresources);
 
     //CommandContext& InitContext = CommandContext::Begin();
-    HR(renderManager->GetPlatform()->GetCommandList()->Reset(renderManager->GetCommandAllocator(), nullptr));
+    HR(renderPlatform->GetCommandList()->Reset(renderPlatform->GetCommandAllocator(), nullptr));
 
     D3D12_HEAP_PROPERTIES HeapProps;
     HeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -999,7 +999,7 @@ void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
     BufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     BufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    HR(GetPlatform(renderManager)->GetDevice()->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE,
+    HR(renderPlatform->GetDevice()->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE,
         &BufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr, IID_PPV_ARGS(&UploadBuffer)));
 
@@ -1010,26 +1010,26 @@ void InitializeTexture(GpuResource& Dest, RenderManager* renderManager,
     barrier.Transition.pResource = Dest.GetResource();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-    renderManager->GetPlatform()->GetCommandList()->ResourceBarrier(1, &barrier);
+    renderPlatform->GetCommandList()->ResourceBarrier(1, &barrier);
 
-    UpdateSubresources(renderManager->GetPlatform()->GetCommandList(), Dest.GetResource(), UploadBuffer, 0, 0, NumSubresources, SubData);
+    UpdateSubresources(renderPlatform->GetCommandList(), Dest.GetResource(), UploadBuffer, 0, 0, NumSubresources, SubData);
 
     //InitContext.TransitionResource(Dest, D3D12_RESOURCE_STATE_GENERIC_READ, true);
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = Dest.GetResource();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
-    renderManager->GetPlatform()->GetCommandList()->ResourceBarrier(1, &barrier);
+    renderPlatform->GetCommandList()->ResourceBarrier(1, &barrier);
 
     // Execute the command list and wait for it to finish so we can release the upload buffer
     //InitContext.Finish(true);
 
     // Execute the comfmand list.
-    HR(renderManager->GetPlatform()->GetCommandList()->Close());
-    ID3D12CommandList* ppCommandLists[] = { renderManager->GetPlatform()->GetCommandList() };
-    renderManager->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    HR(renderPlatform->GetCommandList()->Close());
+    ID3D12CommandList* ppCommandLists[] = { renderPlatform->GetCommandList() };
+    renderPlatform->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-    renderManager->WaitForPreviousFrame();
+    renderPlatform->m_renderManager->WaitForPreviousFrame();
 
     UploadBuffer->Release();
 }
@@ -1254,7 +1254,7 @@ static HRESULT CreateTextureFromDDS(_In_ RenderManager* renderManager,
         if (SUCCEEDED(hr))
         {
             GpuResource DestTexture(*texture, D3D12_RESOURCE_STATE_COMMON);
-            InitializeTexture(DestTexture, renderManager, subresourceCount, initData.get());
+            InitializeTexture(DestTexture, renderManager->GetPlatform(), subresourceCount, initData.get());
         }
     }
 

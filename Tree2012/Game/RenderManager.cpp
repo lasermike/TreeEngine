@@ -153,11 +153,7 @@ void InputLayouts::DestroyAll()
 
 #pragma endregion
 
-RenderManager::RenderManager() :
-    //m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
-    //m_drawScreenVertexShader(), m_drawScreenPixelShader(),
-    m_screenQuadVB(nullptr), m_screenQuadIB(nullptr),
-    m_platform(nullptr)
+RenderManager::RenderManager() : m_platform(nullptr)
 #if defined(TREE3D12)
     , m_fenceEvent(nullptr), m_srvCbvDescriptorSize(0), m_numMaterialsCreated(0)
 #endif
@@ -191,6 +187,66 @@ RenderManager::~RenderManager()
     UninitDevice();
     SafeDelete(&m_platform);
 }
+
+#if defined(TREE3D12)
+#else
+
+//--------------------------------------------------------------------------------------
+// Name: LoadPixelShader()
+// Desc: Load a pixel shader
+//--------------------------------------------------------------------------------------
+HRESULT LoadPixelShader(D3DDevice* pDev, const wchar_t* path, ID3D11PixelShader** ppPS, std::vector< BYTE >* pData = nullptr)
+{
+    std::vector< BYTE > data;
+    if (!pData)
+        pData = &data;
+
+    HRESULT hr = XSF::LoadBlob(path, *pData);
+    if (FAILED(hr))
+        return hr;
+
+    return pDev->CreatePixelShader(&(*pData)[0], pData->size(), nullptr, ppPS);
+}
+
+//--------------------------------------------------------------------------------------
+// Name: LoadVertexShader()
+// Desc: Load a vertex shader
+//--------------------------------------------------------------------------------------
+HRESULT LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID3D11VertexShader** ppVS,
+    const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = nullptr, UINT numElements = 0, ID3D11InputLayout** ppInputLayout = nullptr, std::vector< BYTE >* pData = nullptr)
+{
+    if (ppInputLayout)
+        *ppInputLayout = nullptr;
+
+    std::vector< BYTE > data;
+    if (!pData)
+        pData = &data;
+
+    HRESULT hr = XSF::LoadBlob(path, *pData);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+
+    hr = pDev->CreateVertexShader(&(*pData)[0], pData->size(), nullptr, ppVS);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+
+    if (pInputElementDesc && numElements && ppInputLayout)
+    {
+        hr = pDev->CreateInputLayout(pInputElementDesc, numElements, &(*pData)[0], pData->size(), ppInputLayout);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+    }
+
+    return S_OK;
+}
+
+#endif
 
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
@@ -228,10 +284,10 @@ HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES*
 #endif
 
 #if defined(TREE3D12)
-HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
+HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData)
 {
     // Create the command list.
-    HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_renderManager->GetCommandAllocator(), nullptr, IID_PPV_ARGS(&m_commandList)));
+    HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, GetCommandAllocator(), nullptr, IID_PPV_ARGS(&m_commandList)));
 
     //HRR(RenderStates::InitAll(m_d3dDevice));
 
@@ -340,7 +396,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HR(XSF::LoadShader(L"VS.cso", &m_vertexShader.shader));
     HR(XSF::LoadShader(L"PS.cso", &m_pixelShader.shader));
 
-    ////////  Shadow map shader /////
     // Load shadow shaders
     HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
     HRR(XSF::LoadShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader.shader));
@@ -352,10 +407,59 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Load regular pixel Shader
     HRR(XSF::LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
 
+    //
+    // Vertex and index buffer
+    // 
+    const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * geometryData.vertices.size());
+    HRR(GetDevice()->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &vertexBufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_vertexBuffer.buffer)));
+    HRR(m_vertexBuffer.buffer->SetName(L"Vertex Buffer"));
+
+    // copy the triangle data to the vertex buffer
+    UINT8* dataBegin;
+    m_vertexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+    memcpy(dataBegin, &geometryData.vertices[0], sizeof(SimpleVertex) * geometryData.vertices.size());
+    m_vertexBuffer.buffer->Unmap(0, nullptr);
+
+    // initialize vertex buffer view
+    m_VBView.BufferLocation = m_vertexBuffer.buffer->GetGPUVirtualAddress();
+    m_VBView.StrideInBytes = sizeof(SimpleVertex);
+    m_VBView.SizeInBytes = UINT(sizeof(SimpleVertex) * geometryData.vertices.size());
+
+    // Index buffer
+    const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * geometryData.indices.size());
+    HRR(GetDevice()->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &indexBufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_indexBuffer.buffer)));
+    HRR(m_indexBuffer.buffer->SetName(L"Index Buffer"));
+
+    // copy the index data to the index buffer
+    m_indexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+    memcpy(dataBegin, &geometryData.indices[0], sizeof(UINT) * geometryData.indices.size());
+    m_indexBuffer.buffer->Unmap(0, nullptr);
+
+    // Initialize the index buffer view.
+    m_IBView.BufferLocation = m_indexBuffer.buffer->GetGPUVirtualAddress();
+    m_IBView.SizeInBytes = UINT(sizeof(UINT) * geometryData.indices.size());
+    m_IBView.Format = DXGI_FORMAT_R32_UINT;
+
+    // Debug overlay to show depth map
+    HRR(BuildScreenQuadGeometryBuffers());
+
     return S_OK;
 }
 #else
-HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
+HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData)
 {
     // Init text font
     m_bitmapFont = new XSF::BitmapFont();
@@ -386,12 +490,79 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Create Instanced draw data layout
     std::vector< BYTE > dataVS;
     HRR(XSF::LoadBlob(L"VS.cso", dataVS));
-    HRR(::GetPlatform(this)->GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
+    HRR(GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
 
-    HRR(LoadPixelShader(::GetPlatform(this)->GetD3DDevice(), L"PS.cso", &m_pixelShader.shader));
+    HRR(LoadPixelShader(GetD3DDevice(), L"PS.cso", &m_pixelShader.shader));
 
     SetDebugName(m_vertexShader.shader, "RenderManager::m_vertexShader");
     SetDebugName(m_pixelShader.shader, "RenderManager::m_pixelShader");
+
+    // Create input layout
+    InputLayouts::InitAll(GetDevice(), &(dataVS)[0], dataVS.size());
+    m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
+
+    ////////  Shadow map shader /////
+    // Load shadow shaders
+    HRR(LoadVertexShader(GetD3DDevice(), L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
+    SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
+    // TODO: load a shadow pixel shader to support transparent textures not casting shadows
+
+    ////////  Debug texture /////
+    dataVS.clear();
+    HRR(XSF::LoadBlob(L"DrawScreenQuadVS.cso", dataVS));
+
+    // Load regular vertex Shader
+    HRR(GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_drawScreenVertexShader.shader));
+    SetDebugName(m_drawScreenVertexShader, "RenderManager::m_drawScreenVertexShader");
+
+    HRR(GetDevice()->CreateInputLayout(InputLayoutDesc::Basic32,
+        ARRAYSIZE(InputLayoutDesc::Basic32),
+        &(dataVS)[0] /*passDesc.pIAInputSignature*/,
+        dataVS.size() /*passDesc.IAInputSignatureSize*/,
+        &InputLayouts::Basic32));
+    SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
+
+    // Load regular pixel Shader
+    HRR(LoadPixelShader(GetD3DDevice(), L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
+    SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
+
+    // Debug overlay to show depth map
+    HRR(BuildScreenQuadGeometryBuffers());
+
+    //////
+    // Create vertex buffer
+    D3D11_BUFFER_DESC vbd;
+    ZeroMemory(&vbd, sizeof(vbd));
+    vbd.Usage = D3D11_USAGE_IMMUTABLE;
+    vbd.ByteWidth = (UINT)(sizeof(SimpleVertex) * geometryData.vertices.size());
+    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vbd.CPUAccessFlags = 0;
+    vbd.MiscFlags = 0;
+    D3D11_SUBRESOURCE_DATA vinitData;
+    ZeroMemory(&vinitData, sizeof(vinitData));
+    vinitData.pSysMem = &geometryData.vertices[0];
+    HRR(GetDevice()->CreateBuffer(&vbd, &vinitData, &m_vertexBuffer.buffer));
+    SetDebugName(m_vertexBuffer, "RenderManager::m_vertexBuffer");
+
+    D3D11_BUFFER_DESC ibd;
+    ZeroMemory(&ibd, sizeof(ibd));
+    ibd.Usage = D3D11_USAGE_IMMUTABLE;
+    ibd.ByteWidth = (UINT)(sizeof(UINT) * geometryData.indices.size());
+    ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    ibd.CPUAccessFlags = 0;
+    ibd.MiscFlags = 0;
+    D3D11_SUBRESOURCE_DATA iinitData;
+    ZeroMemory(&iinitData, sizeof(iinitData));
+    iinitData.pSysMem = &geometryData.indices[0];
+    HRR(GetDevice()->CreateBuffer(&ibd, &iinitData, &m_indexBuffer.buffer));
+    SetDebugName(m_indexBuffer, "RenderManager::m_indexBuffer");
+
+    // Set index buffer
+    m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+
+    // Set primitive topology
+    m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 
     return S_OK;
 }
@@ -403,57 +574,14 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 {
     HRR(UninitGameLevelGraphics());
 
-    GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps);
-
     // Create vertices and indice for geometry
     m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
+
+    GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps, m_geometryData);
 
 
 #if defined(TREE3D12)
 
-	// Create vertex buffer
-	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * m_geometryData.vertices.size());
-	HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
-		&uploadHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&vertexBufferDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_vertexBuffer.buffer)));
-	HRR(m_vertexBuffer.buffer->SetName(L"Vertex Buffer"));
-
-	// copy the triangle data to the vertex buffer
-	UINT8* dataBegin;
-	m_vertexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
-	memcpy(dataBegin, &m_geometryData.vertices[0], sizeof(SimpleVertex) * m_geometryData.vertices.size());
-	m_vertexBuffer.buffer->Unmap(0, nullptr);
-
-	// initialize vertex buffer view
-	m_VBView.BufferLocation = m_vertexBuffer.buffer->GetGPUVirtualAddress();
-	m_VBView.StrideInBytes = sizeof(SimpleVertex);
-	m_VBView.SizeInBytes = UINT(sizeof(SimpleVertex) * m_geometryData.vertices.size());
-
-	// Index buffer
-	const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * m_geometryData.indices.size());
-	HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
-		&uploadHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&indexBufferDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_indexBuffer.buffer)));
-	HRR(m_indexBuffer.buffer->SetName(L"Index Buffer"));
-
-	// copy the index data to the index buffer
-	m_indexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
-	memcpy(dataBegin, &m_geometryData.indices[0], sizeof(UINT) * m_geometryData.indices.size());
-	m_indexBuffer.buffer->Unmap(0, nullptr);
-
-	// Initialize the index buffer view.
-	m_IBView.BufferLocation = m_indexBuffer.buffer->GetGPUVirtualAddress();
-	m_IBView.SizeInBytes = UINT(sizeof(UINT) * m_geometryData.indices.size());
-	m_IBView.Format = DXGI_FORMAT_R32_UINT;
 
 	// Describe and create the graphics pipeline state object (PSO).
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -492,79 +620,13 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	// Execute the command list.
 	HRR(GetPlatform()->GetCommandList()->Close());
 	ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
-	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+	GetPlatform()->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     WaitForPreviousFrame();
 
 #else
 
-	InputLayouts::InitAll(::GetPlatform(this)->GetDevice(), &(dataVS)[0], dataVS.size());
-	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
-
-	////////  Shadow map shader /////
-	// Load shadow shaders
-	HRR(LoadVertexShader(::GetPlatform(this)->GetD3DDevice(), L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
-	SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
-	// TODO: load a shadow pixel shader to support transparent textures not casting shadows
-
-	////////  Debug texture /////
-	dataVS.clear();
-	HRR(XSF::LoadBlob(L"DrawScreenQuadVS.cso", dataVS));
-
-	// Load regular vertex Shader
-	HRR(::GetPlatform(this)->GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_drawScreenVertexShader.shader));
-	SetDebugName(m_drawScreenVertexShader, "RenderManager::m_drawScreenVertexShader");
-
-
-	HRR(::GetPlatform(this)->GetDevice()->CreateInputLayout(InputLayoutDesc::Basic32,
-								  ARRAYSIZE(InputLayoutDesc::Basic32), 
-								  &(dataVS)[ 0 ] /*passDesc.pIAInputSignature*/,
-								  dataVS.size() /*passDesc.IAInputSignatureSize*/, 
-								  &InputLayouts::Basic32));
-	SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
-
-	// Load regular pixel Shader
-	HRR(LoadPixelShader(::GetPlatform(this)->GetD3DDevice(), L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
-	SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
-
-	//////
-	// Create vertex buffer
-	D3D11_BUFFER_DESC vbd;
-	ZeroMemory(&vbd, sizeof(vbd));
-	vbd.Usage = D3D11_USAGE_IMMUTABLE;
-	vbd.ByteWidth = (UINT)(sizeof(SimpleVertex) * m_geometryData.vertices.size());
-	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vbd.CPUAccessFlags = 0;
-	vbd.MiscFlags = 0;
-	D3D11_SUBRESOURCE_DATA vinitData;
-	ZeroMemory(&vinitData, sizeof(vinitData));
-	vinitData.pSysMem = &m_geometryData.vertices[0];
-	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&vbd, &vinitData, &m_vertexBuffer.buffer));
-	SetDebugName(m_vertexBuffer, "RenderManager::m_vertexBuffer");
-
-	D3D11_BUFFER_DESC ibd;
-	ZeroMemory(&ibd, sizeof(ibd));
-	ibd.Usage = D3D11_USAGE_IMMUTABLE;
-	ibd.ByteWidth = (UINT)(sizeof(UINT) * m_geometryData.indices.size());
-	ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	ibd.CPUAccessFlags = 0;
-	ibd.MiscFlags = 0;
-	D3D11_SUBRESOURCE_DATA iinitData;
-	ZeroMemory(&iinitData, sizeof(iinitData));
-	iinitData.pSysMem = &m_geometryData.indices[0];
-	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&ibd, &iinitData, &m_indexBuffer.buffer));
-	SetDebugName(m_indexBuffer, "RenderManager::m_indexBuffer");
-
-	// Set index buffer
-	m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
-
-	// Set primitive topology
-	m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
 #endif
-
-    // Debug overlay to show depth map
-	HRR(BuildScreenQuadGeometryBuffers(::GetPlatform(this)->GetD3DDevice()));
 
 	// Load the debug texture
 #if defined(TREE3D12)
@@ -576,7 +638,9 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 #if defined (TREE3D12)
 	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, ::GetPlatform(this)->GetDevice()));
 #else
-	vbd.Usage = D3D11_USAGE_DYNAMIC;
+    D3D11_BUFFER_DESC vbd;
+    ZeroMemory(&vbd, sizeof(vbd));
+    vbd.Usage = D3D11_USAGE_DYNAMIC;
 	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -634,7 +698,7 @@ void RenderManager::WaitForPreviousFrame()
 
     // Signal and increment the fence value.
     const UINT64 fence = m_fenceValue;
-    HR(m_commandQueue->Signal(m_fence, fence));
+    HR(GetPlatform()->GetCommandQueue()->Signal(m_fence, fence));
     m_fenceValue++;
 
     // Wait until the previous frame is finished.
@@ -675,6 +739,11 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeRelease(&m_CBNeverChanges);
     SafeRelease(&m_CBChangesEveryFrame);
 
+    m_vertexBuffer.Release();
+    m_indexBuffer.Release();
+    m_screenQuadVB.Release();
+    m_screenQuadIB.Release();
+
     m_vertexShader.Release();
     m_pixelShader.Release();
     m_drawScreenPixelShader.Release();
@@ -694,6 +763,12 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 HRESULT RenderPlatform11::UninitGameLevelGraphics()
 {
     SafeDelete(&m_bitmapFont);
+
+    m_vertexBuffer.Release();
+    m_indexBuffer.Release();
+    m_screenQuadVB.Release();
+    m_screenQuadIB.Release();
+    SafeRelease(&m_vertexLayout);
 
     return S_OK;
 }
@@ -716,12 +791,9 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_numMaterialsCreated = 0;
 
 #else
-	SafeRelease(&m_vertexLayout);
 #endif
 
 	SafeDelete(&GetRenderData().pShadowMap);
-	m_vertexBuffer.Release();
-    m_indexBuffer.Release();
 	m_instancedBuffer.Release();
 
 	for (auto& t : m_textures)
@@ -764,8 +836,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	m_objectToInstanceBufferOffset.clear();
 	m_nextInstanceBufferOffset = 0;
 	m_perFrameInstanceData.clear();
-    m_screenQuadVB.Release();
-    m_screenQuadIB.Release();
 
 #if !defined(TREE3D12)
 	m_debugTextureRV.Release();
@@ -780,7 +850,7 @@ HRESULT RenderManager::BeginFrame()
 {
 #if defined(TREE3D12)
 
-    GetPlatform()->RenderSetupCommon(true);
+    GetPlatform()->RenderFrameSetupCommon(true);
 
 	InstancedData* dataView = nullptr;
 	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
@@ -815,16 +885,26 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 	return S_OK;
 }
 
-HRESULT RenderManager::RenderScene(RenderPass pass)
-{
 #if defined(TREE3D12)
+HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer)
+{
+    D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
+    buffers[0] = m_VBView;
+    buffers[1] = instancedBuffer.GetView(m_renderManager->GetRenderData().frame);
 
+    GetCommandList()->IASetVertexBuffers(0, 2, buffers);
+    GetCommandList()->IASetIndexBuffer(&m_IBView);
+
+    return S_OK;
+}
 #else
+HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer)
+{
     // Set samplers
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
     ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
-                                        stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap),
-                                        stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagLinearMipPointUVWClamp)
+        stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap),
+        stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagLinearMipPointUVWClamp)
     };
     m_immediateContext->PSSetSamplers(0, 3, samplers);
 
@@ -839,37 +919,34 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
         m_immediateContext->VSSetShader(m_vertexShader, nullptr, 0);
         m_immediateContext->PSSetShader(m_pixelShader, nullptr, 0);
     }
+
+    // Set up input assembler
+    m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
+    m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+    m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Set vertex buffer
+    UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
+    UINT offset[2] = { 0, 0 };
+    ID3D11Buffer* vbs[2] = { m_vertexBuffer, instancedBuffer.Get(m_renderManager->GetRenderData().frame) };
+    m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+
+    return S_OK;
+}
+
 #endif
 
+HRESULT RenderManager::RenderScene(RenderPass pass)
+{
+    HRR(GetPlatform()->RenderSceneSetup(pass, m_instancedBuffer));
 
-#if defined (TREE3D12)
+    // Render each unit
+    for (auto& ru : m_renderUnits)
+    {
+        Render(ru, pass);
+    }
 
-    D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
-    buffers[0] = m_VBView;
-    buffers[1] = m_instancedBuffer.GetView(m_renderData.frame);
-
-    GetPlatform()->GetCommandList()->IASetVertexBuffers(0, 2, buffers);
-    GetPlatform()->GetCommandList()->IASetIndexBuffer(&m_IBView);
-#else
-	// Set up input assembler
-	m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
-	m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
-	m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	// Set vertex buffer
-	UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
-	UINT offset[2] = { 0, 0 };
-	ID3D11Buffer* vbs[2] = { m_vertexBuffer, m_instancedBuffer.Get(m_renderData.frame) };
-	m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
-#endif
-
-	// Render each unit
-	for (auto& ru : m_renderUnits)
-	{
-		Render(ru, pass);
-	}
-
-	return S_OK;
+    return S_OK;
 }
 
 HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
@@ -1035,9 +1112,8 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 
     // Create the texture.
     {
-        HR(m_commandAllocator->Reset());
-
-        HR(GetPlatform()->GetCommandList()->Reset(m_commandAllocator, m_pipelineState));
+        HR(GetPlatform()->GetCommandAllocator()->Reset());
+        HR(GetPlatform()->GetCommandList()->Reset(GetPlatform()->GetCommandAllocator(), m_pipelineState));
 
         // Describe and create a Texture2D.
         D3D12_RESOURCE_DESC textureDesc = {};
@@ -1112,7 +1188,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         // Execute the command list.
         HRR(GetPlatform()->GetCommandList()->Close());
         ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
-        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+        GetPlatform()->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
         WaitForPreviousFrame();
 
@@ -1317,75 +1393,75 @@ HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object,
 	return S_OK;
 }
 
-HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice)
-{
-	GeometryGenerator::MeshData quad;
-
-	GeometryGenerator geoGen;
-	geoGen.CreateFullscreenQuad(quad);
-
-	// Extract the vertex elements we are interested in and pack the
-	// vertices of all the meshes into one vertex buffer.
-
-	std::vector<SimpleVertex> vertices(quad.Vertices.size());
-
-	for(UINT i = 0; i < quad.Vertices.size(); ++i)
-	{
-		vertices[i].Pos    = quad.Vertices[i].Position;
-		vertices[i].Normal = quad.Vertices[i].Normal;
-		vertices[i].Tex    = quad.Vertices[i].TexC;
-	}
-
 #if defined(TREE3D12)
-	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * quad.Vertices.size());
-	HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
-		&uploadHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&vertexBufferDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_screenQuadVB)));
-	HRR(m_screenQuadVB->SetName(L"Vertex Buffer"));
+HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
+{
+    GeometryGenerator::MeshData quad;
 
-	// copy the quad data to the vertex buffer
-	UINT8* dataBegin;
-	m_screenQuadVB->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
-	memcpy(dataBegin, &vertices[0], sizeof(SimpleVertex) * quad.Vertices.size());
-	m_screenQuadVB->Unmap(0, nullptr);
+    GeometryGenerator geoGen;
+    geoGen.CreateFullscreenQuad(quad);
 
-	// initialize vertex buffer view
-	m_screenQuadVBView.BufferLocation = m_screenQuadVB->GetGPUVirtualAddress();
-	m_screenQuadVBView.StrideInBytes = sizeof(SimpleVertex);
-	m_screenQuadVBView.SizeInBytes = UINT(sizeof(SimpleVertex) * quad.Vertices.size());
+    // Extract the vertex elements we are interested in and pack the
+    // vertices of all the meshes into one vertex buffer.
 
-	// Index buffer
-	const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * quad.Indices.size());
-	HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
-		&uploadHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&indexBufferDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_screenQuadIB)));
-	HRR(m_indexBuffer.buffer->SetName(L"Index Buffer"));
+    std::vector<SimpleVertex> vertices(quad.Vertices.size());
 
-	// copy the index data to the index buffer
-	m_screenQuadIB->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
-	memcpy(dataBegin, &quad.Indices[0], sizeof(UINT) * quad.Indices.size());
-	m_screenQuadIB->Unmap(0, nullptr);
+    for (UINT i = 0; i < quad.Vertices.size(); ++i)
+    {
+        vertices[i].Pos = quad.Vertices[i].Position;
+        vertices[i].Normal = quad.Vertices[i].Normal;
+        vertices[i].Tex = quad.Vertices[i].TexC;
+    }
 
-	// initialize index DXGI_FORMAT_R32_UINTbuffer view
-	m_screenQuadIBView.BufferLocation = m_screenQuadIB->GetGPUVirtualAddress();
-	m_screenQuadIBView.SizeInBytes = sizeof(UINT) * (UINT) quad.Indices.size();
-	m_screenQuadIBView.Format = DXGI_FORMAT_R32_UINT;
+    const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * quad.Vertices.size());
+    HRR(GetDevice()->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &vertexBufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_screenQuadVB)));
+    HRR(m_screenQuadVB->SetName(L"Vertex Buffer"));
+
+    // copy the quad data to the vertex buffer
+    UINT8* dataBegin;
+    m_screenQuadVB->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+    memcpy(dataBegin, &vertices[0], sizeof(SimpleVertex) * quad.Vertices.size());
+    m_screenQuadVB->Unmap(0, nullptr);
+
+    // initialize vertex buffer view
+    m_screenQuadVBView.BufferLocation = m_screenQuadVB->GetGPUVirtualAddress();
+    m_screenQuadVBView.StrideInBytes = sizeof(SimpleVertex);
+    m_screenQuadVBView.SizeInBytes = UINT(sizeof(SimpleVertex) * quad.Vertices.size());
+
+    // Index buffer
+    const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * quad.Indices.size());
+    HRR(GetDevice()->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &indexBufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_screenQuadIB)));
+    HRR(m_indexBuffer.buffer->SetName(L"Index Buffer"));
+
+    // copy the index data to the index buffer
+    m_screenQuadIB->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+    memcpy(dataBegin, &quad.Indices[0], sizeof(UINT) * quad.Indices.size());
+    m_screenQuadIB->Unmap(0, nullptr);
+
+    // initialize index DXGI_FORMAT_R32_UINTbuffer view
+    m_screenQuadIBView.BufferLocation = m_screenQuadIB->GetGPUVirtualAddress();
+    m_screenQuadIBView.SizeInBytes = sizeof(UINT) * (UINT)quad.Indices.size();
+    m_screenQuadIBView.Format = DXGI_FORMAT_R32_UINT;
 
     // Describe and create the graphics pipeline state object (PSO).
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { InputLayoutDesc::Basic32, _countof(InputLayoutDesc::Basic32) };
-    psoDesc.pRootSignature = GetPlatform()->GetRootSignature();
-    psoDesc.VS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_drawScreenVertexShader);
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_drawScreenPixelShader);
+    psoDesc.pRootSignature = GetRootSignature();
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_drawScreenVertexShader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_drawScreenPixelShader);
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState.DepthEnable = FALSE;
@@ -1396,63 +1472,87 @@ HRESULT RenderManager::BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice
     psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     psoDesc.SampleDesc.Count = 1;
 
-    HRR(pD3DDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateFullScreenQuad)));
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_renderManager->m_pipelineStateFullScreenQuad)));
+    
+    return S_OK;
+}
 
 #else
+HRESULT RenderPlatform11::BuildScreenQuadGeometryBuffers()
+{
+    GeometryGenerator::MeshData quad;
+
+    GeometryGenerator geoGen;
+    geoGen.CreateFullscreenQuad(quad);
+
+    // Extract the vertex elements we are interested in and pack the
+    // vertices of all the meshes into one vertex buffer.
+
+    std::vector<SimpleVertex> vertices(quad.Vertices.size());
+
+    for (UINT i = 0; i < quad.Vertices.size(); ++i)
+    {
+        vertices[i].Pos = quad.Vertices[i].Position;
+        vertices[i].Normal = quad.Vertices[i].Normal;
+        vertices[i].Tex = quad.Vertices[i].TexC;
+    }
+
     D3D11_BUFFER_DESC vbd;
     vbd.Usage = D3D11_USAGE_IMMUTABLE;
-    vbd.ByteWidth = (UINT) (sizeof(SimpleVertex) * quad.Vertices.size());
+    vbd.ByteWidth = (UINT)(sizeof(SimpleVertex) * quad.Vertices.size());
     vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     vbd.CPUAccessFlags = 0;
     vbd.MiscFlags = 0;
-	D3D11_SUBRESOURCE_DATA vinitData = {0};
+    D3D11_SUBRESOURCE_DATA vinitData = { 0 };
     vinitData.pSysMem = &vertices[0];
-    HRR(pD3DDevice->CreateBuffer(&vbd, &vinitData, &m_screenQuadVB));
+    HRR(GetDevice()->CreateBuffer(&vbd, &vinitData, &m_screenQuadVB));
 
-	SetDebugName(m_screenQuadVB, "RenderManager::m_screenQuadVB");
+    SetDebugName(m_screenQuadVB, "RenderManager::m_screenQuadVB");
 
-	//
-	// Pack the indices of all the meshes into one index buffer.
-	//
+    //
+    // Pack the indices of all the meshes into one index buffer.
+    //
 
-	D3D11_BUFFER_DESC ibd;
+    D3D11_BUFFER_DESC ibd;
     ibd.Usage = D3D11_USAGE_IMMUTABLE;
-	ibd.ByteWidth = (UINT) (sizeof(UINT) * quad.Indices.size());
+    ibd.ByteWidth = (UINT)(sizeof(UINT) * quad.Indices.size());
     ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
     ibd.CPUAccessFlags = 0;
     ibd.MiscFlags = 0;
-	D3D11_SUBRESOURCE_DATA iinitData = {0};
+    D3D11_SUBRESOURCE_DATA iinitData = { 0 };
     iinitData.pSysMem = &quad.Indices[0];
-    HRR(pD3DDevice->CreateBuffer(&ibd, &iinitData, &m_screenQuadIB));
-	SetDebugName(m_screenQuadIB, "RenderManager::m_screenQuadIB");
-#endif
+    HRR(GetDevice()->CreateBuffer(&ibd, &iinitData, &m_screenQuadIB));
+    SetDebugName(m_screenQuadIB, "RenderManager::m_screenQuadIB");
 
-	return S_OK;
+    return S_OK;
 }
 
+#endif
+
+
 #if defined(TREE3D12)
-HRESULT RenderManager::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
+HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
 {
 	UINT stride = sizeof(SimpleVertex);
 	UINT offset = 0;
 
-    commandList->SetPipelineState(m_pipelineStateFullScreenQuad);
-    GetPlatform()->GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
-    GetPlatform()->GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
+    commandList->SetPipelineState(m_renderManager->m_pipelineStateFullScreenQuad);
+    GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
+    GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
 
-    CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
-    GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, shadowMapHandle);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_renderManager->m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_renderManager->m_srvCbvDescriptorSize);
+    GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, shadowMapHandle);
 
     commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
-    CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
-    GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_renderManager->m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_renderManager->m_srvCbvDescriptorSize);
+    GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
 
 
 	return S_OK;
 }
 #else
-HRESULT RenderManager::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
+HRESULT RenderPlatform11::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
 {
 	UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
@@ -1534,6 +1634,14 @@ HRESULT RenderPlatform12::InitDevice()
     HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount));
     HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount * 1));
 
+    // Describe and create the command queue.
+    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
+    HRR(GetDevice()->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+    HRR(GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+
     // Create ChangeOnResize constant buffer
     // Constants that never change
     ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
@@ -1544,8 +1652,7 @@ HRESULT RenderPlatform12::InitDevice()
     // Shadow map pass constants that never change
     ZeroMemory(&m_pCBShadowMapChangeOnResize, sizeof(m_pCBShadowMapChangeOnResize));
     HR(CreateConstantBuffer(sizeof(CBChangeOnResize), nullptr, m_shadowChangesOnResizeConstViewDesc, &m_pCBShadowMapChangeOnResize, &m_CBShadowChangesOnResizeDataBegin));
-
-
+    
     return hr;
 }
 
@@ -1559,12 +1666,6 @@ HRESULT RenderManager::InitDevice()
 
     HRR(::GetPlatform(this)->InitDevice());
 
-	// Describe and create the command queue.
-	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
-	HRR(::GetPlatform(this)->GetDevice()->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
 	// Shader visible descriptor size
 	m_srvCbvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1587,8 +1688,6 @@ HRESULT RenderManager::InitDevice()
         loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
     }
-
-	HRR(::GetPlatform(this)->GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 
     // Initialize the world matrices
     XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
@@ -1863,7 +1962,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 
     CComPtr<IDXGISwapChain1> swapChain1;
 
-    HRR(factory->CreateSwapChainForCoreWindow(m_renderManager->GetCommandQueue(),
+    HRR(factory->CreateSwapChainForCoreWindow(GetCommandQueue(),
         reinterpret_cast<IUnknown*>(m_window.Get()), &swapChainDesc, nullptr, &swapChain1));
 
     HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
@@ -2195,6 +2294,8 @@ HRESULT RenderPlatform12::UninitDevice()
     }
     m_pCBShadowMapChangeOnResize.Release();
 
+    m_commandQueue.Release();
+    m_commandAllocator.Release();
 
     // InitDevice objects
     m_d3dDevice.Release();
@@ -2226,8 +2327,6 @@ void RenderManager::UninitDevice()
 
 
 #if defined(TREE3D12)
-	m_commandQueue.Release();
-	m_commandAllocator.Release();
 	m_cbvSrvHeap.Release();
     m_loadTextureHeap.Release();
 
@@ -2260,19 +2359,19 @@ void RenderManager::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-HRESULT RenderPlatform12::RenderSetupCommon(bool resetCommandList)
+HRESULT RenderPlatform12::RenderFrameSetupCommon(bool resetCommandList)
 {
     HRESULT hr = S_OK;
     if (resetCommandList)
     {
         // Command list allocators can only be reset when the associated command lists have finished execution on the GPU;
         // apps should use fences to determine GPU execution progress.
-        HR(m_renderManager->GetCommandAllocator()->Reset());
+        HR(GetCommandAllocator()->Reset());
 
         // However, when ExecuteCommandList() is called on a particular command 
         // list, that command list can then be reset at any time and must be before 
         // re-recording.
-        HR(m_commandList->Reset(m_renderManager->GetCommandAllocator(), m_renderManager->GetPipelineState()));
+        HR(m_commandList->Reset(GetCommandAllocator(), m_renderManager->GetPipelineState()));
     }
 
     // Set necessary state.
@@ -2284,8 +2383,8 @@ HRESULT RenderPlatform12::RenderSetupCommon(bool resetCommandList)
     m_commandList->RSSetViewports(1, &m_viewPort);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_renderManager->GetVBView());
-    m_commandList->IASetIndexBuffer(&m_renderManager->GetIBView());
+    m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
+    m_commandList->IASetIndexBuffer(&m_IBView);
     m_commandList->OMSetStencilRef(0);
 
     // Set default material (first material).  Will be changed by calls to SetMaterial()
@@ -2301,7 +2400,7 @@ HRESULT RenderPlatform12::RenderSetupCommon(bool resetCommandList)
     m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constViewDescs[ChangesEveryFrameRootSignatureShaderSlot].BufferLocation);
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_renderManager->GetVBView());
+    m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
 
     if (resetCommandList)
     {
@@ -2450,7 +2549,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #if defined(TREE3D12)
     if (showShadowBuffer)
     {
-        HRC(DrawScreenQuad(GetPlatform()->GetCommandList(), GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
+        HRC(GetPlatform()->DrawScreenQuad(GetPlatform()->GetCommandList(), GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
     }
 
     // Indicate that the back buffer will now be used to present.
@@ -2461,7 +2560,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     // Execute the command list.
     HR(GetPlatform()->GetCommandList()->Close());
     ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
-    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    GetPlatform()->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // Present the frame.
     HR(GetPlatform()->GetSwapChain()->Present(0, 0));
@@ -2470,7 +2569,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #else
 	if (showShadowBuffer)
 	{
-		HRC(DrawScreenQuad(GetContext(), GetRenderData().pShadowMap->DepthMapSRV()));
+		HRC(GetPlatform()->DrawScreenQuad(GetContext(), GetRenderData().pShadowMap->DepthMapSRV()));
 	}
 
 	if (!oculus && !m_renderToSharedTexture)
@@ -2700,61 +2799,6 @@ RenderPlatform11* GetPlatform(RenderManager* manager)
     return (RenderPlatform11*)manager->GetPlatformBase();
 }
 
-//--------------------------------------------------------------------------------------
-// Name: LoadPixelShader()
-// Desc: Load a pixel shader
-//--------------------------------------------------------------------------------------
-HRESULT RenderManager::LoadPixelShader(D3DDevice* pDev, const wchar_t* path, ID3D11PixelShader** ppPS, std::vector< BYTE >* pData)
-{
-	std::vector< BYTE > data;
-	if (!pData)
-		pData = &data;
-
-	HRESULT hr = XSF::LoadBlob(path, *pData);
-	if (FAILED(hr))
-		return hr;
-
-	return pDev->CreatePixelShader(&(*pData)[0], pData->size(), nullptr, ppPS);
-}
-
-//--------------------------------------------------------------------------------------
-// Name: LoadVertexShader()
-// Desc: Load a vertex shader
-//--------------------------------------------------------------------------------------
-HRESULT RenderManager::LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID3D11VertexShader** ppVS,
-	const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc, UINT numElements, ID3D11InputLayout** ppInputLayout,
-	std::vector< BYTE >* pData)
-{
-	if (ppInputLayout)
-		*ppInputLayout = nullptr;
-
-	std::vector< BYTE > data;
-	if (!pData)
-		pData = &data;
-
-	HRESULT hr = XSF::LoadBlob(path, *pData);
-	if (FAILED(hr))
-	{
-		return hr;
-	}
-
-	hr = pDev->CreateVertexShader(&(*pData)[0], pData->size(), nullptr, ppVS);
-	if (FAILED(hr))
-	{
-		return hr;
-	}
-
-	if (pInputElementDesc && numElements && ppInputLayout)
-	{
-		hr = pDev->CreateInputLayout(pInputElementDesc, numElements, &(*pData)[0], pData->size(), ppInputLayout);
-		if (FAILED(hr))
-		{
-			return hr;
-		}
-	}
-
-	return S_OK;
-}
 
 #endif
 

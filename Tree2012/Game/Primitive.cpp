@@ -37,7 +37,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 
 	Mesh* newMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());
-	renderManager.CreateMesh(L"ground", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &newMesh);
+	renderManager.CreateMesh(L"ground", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &newMesh);
 
 	renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
 

@@ -42,14 +42,14 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	renderManager.CreateMaterial(L"trunk", L"Bark_0005_diffuse.dds", nullptr, nullptr, trunkMaterial, &pTrunk);
 	Mesh* pNewMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Cylinder);
-	renderManager.CreateMesh(L"trunk", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
+	renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
 	renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
 
 	Material* pTwig = nullptr;
 	renderManager.CreateMaterial(L"twig", L"Bark_0005_diffuse.dds", nullptr, nullptr, trunkMaterial, &pTwig);
 	pNewMesh = nullptr;
 	pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
-	renderManager.CreateMesh(L"twig", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
+	renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
 	renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
 
 	ShaderMaterial leafMaterial;
@@ -61,7 +61,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	renderManager.CreateMaterial(L"leaf", L"", nullptr, nullptr, leafMaterial, &pLeaf);
 	pNewMesh = nullptr;
 	pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
-	renderManager.CreateMesh(L"leaf", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &pNewMesh);
+	renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
 	renderManager.ReserveRenderUnit(pLeaf, pNewMesh, this, &m_leafUnit);
 
 	return S_OK;
