@@ -493,6 +493,10 @@ public:
 
     HRESULT RenderSetupCommon(bool resetCommandList);
 
+    HRESULT BeginDrawText();
+    HRESULT DrawText(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
+    HRESULT EndDrawText();
+
 
     // Maybe TEMPTEMP?
     DescriptorHeapWrapper& GetDSVHeap() { return m_dsvHeap; }
@@ -502,6 +506,7 @@ public:
     ID3D12Resource* GetCurrentRenderTarget() { return m_renderTargets[m_frameIndex]; }
     ID3D12RootSignature* GetRootSignature() { return m_rootSignature; }
     D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
+    D3D12_RECT& GetScissorRect() { return m_scissorRect; }
 
     void UpdateFrameIndex() {
         if (GetSwapChain())
@@ -740,6 +745,7 @@ public:
     D3D12_INDEX_BUFFER_VIEW GetIBView() { return m_IBView; } //TEMPTEMP
     UINT                                m_srvCbvDescriptorSize; //TEMPTEMP
     D3D12_CONSTANT_BUFFER_VIEW_DESC* GetConstViewDescs() { return m_constViewDescs; } //TEMPTEMP
+    ID3D12PipelineState * GetPipelineState() { return m_pipelineState; }
 
     ID3D12Fence* GetFence() { return m_fence; }
     ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }

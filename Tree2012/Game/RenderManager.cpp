@@ -2259,7 +2259,7 @@ HRESULT RenderPlatform12::RenderSetupCommon(bool resetCommandList)
         // However, when ExecuteCommandList() is called on a particular command 
         // list, that command list can then be reset at any time and must be before 
         // re-recording.
-        HR(m_commandList->Reset(m_renderManager->GetCommandAllocator(), m_renderManager->m_pipelineState));
+        HR(m_commandList->Reset(m_renderManager->GetCommandAllocator(), m_renderManager->GetPipelineState()));
     }
 
     // Set necessary state.
@@ -2293,7 +2293,7 @@ HRESULT RenderPlatform12::RenderSetupCommon(bool resetCommandList)
     if (resetCommandList)
     {
         // Indicate that the back buffer will be used as a render target.
-        m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetPlatform()->GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+        m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
     }
 
     return hr;
@@ -2308,17 +2308,17 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     HRESULT hr = S_OK;
 
 #if defined(TREE3D12)
-    PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList, TREE_COLOR_DRAW_TEXT, L"Render");
+    PIXBeginEvent((ID3D12GraphicsCommandList*)GetPlatform()->GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render");
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(GetPlatform()->GetCurrentRenderTargetHandle());
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(GetPlatform()->GetCurrentDepthTargetHandle());
-    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    GetPlatform()->GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     // Record commands.
-    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+    GetPlatform()->GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    GetPlatform()->GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    m_commandList->SetPipelineState(m_pipelineState);
+    GetPlatform()->GetCommandList()->SetPipelineState(m_pipelineState);
 
     // Make shadow map available to shaders
     if (useShadowMaps)
@@ -2349,7 +2349,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #endif
 
         //CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_srvCbvDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, GetRenderData().pShadowMap->DepthMapSRVGpu());
+        GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, GetRenderData().pShadowMap->DepthMapSRVGpu());
     }
 
 #else
@@ -2420,7 +2420,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     {
 #if defined(TREE3D12)
         CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
+        GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
 #else
         ID3D11ShaderResourceView* depthTexture = nullptr;
         GetContext()->PSSetShaderResources(1, 1, &depthTexture);
@@ -2436,17 +2436,17 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 #if defined(TREE3D12)
     if (showShadowBuffer)
     {
-        HRC(DrawScreenQuad(m_commandList, GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
+        HRC(DrawScreenQuad(GetPlatform()->GetCommandList(), GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
     }
 
     // Indicate that the back buffer will now be used to present.
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetPlatform()->GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    GetPlatform()->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetPlatform()->GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-    PIXEndEvent((ID3D12GraphicsCommandList*)m_commandList); // Render
+    PIXEndEvent((ID3D12GraphicsCommandList*)GetPlatform()->GetCommandList()); // Render
 
     // Execute the command list.
-    HR(m_commandList->Close());
-    ID3D12CommandList* ppCommandLists[] = { m_commandList };
+    HR(GetPlatform()->GetCommandList()->Close());
+    ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // Present the frame.
@@ -2470,49 +2470,84 @@ Cleanup:
 	return;
 }
 
-HRESULT RenderManager::DrawFrameStats()
-{
 #if defined(TREE3D12)
-	float y = 10;
-	m_bitmapFont->Begin(&m_viewPort);
+HRESULT RenderPlatform12::BeginDrawText()
+{
+    m_bitmapFont->Begin(&m_viewPort);
+    return S_OK;
+}
+
+HRESULT RenderPlatform12::DrawText(FLOAT sx, FLOAT sy, DWORD dwColor,  const WCHAR* strText)
+{
+    m_bitmapFont->DrawText(sx, sy, dwColor, strText);
+    return S_OK;
+}
+
+HRESULT RenderPlatform12::EndDrawText()
+{
+    m_bitmapFont->End();
+    return S_OK;
+}
 
 #else
-	float y = 10;
-	m_bitmapFont->Begin(m_immediateContext, &m_viewPort, false);
+HRESULT RenderPlatform11::BeginDrawText()
+{
+    m_bitmapFont->Begin(m_immediateContext, &m_viewPort, false);
+
+    return S_OK;
+}
+HRESULT RenderPlatform11::DrawText(FLOAT sx, FLOAT sy, DWORD dwColor, const WCHAR* strText)
+{
+    m_bitmapFont->DrawText(sx, sy, dwColor, strText);
+    return S_OK;
+}
+
+HRESULT RenderPlatform11::EndDrawText()
+{
+    m_bitmapFont->End();
+    return S_OK;
+}
+
 
 #endif
+
+HRESULT RenderManager::DrawFrameStats()
+{
+    GetPlatform()->BeginDrawText();
+
+	float y = 10;
 
 	for (int i = 0; i < MAX_FRAME_STAT; i++)
 	{
 		wchar_t text[128];
 		swprintf(text, 128, L"%s %d", GetRenderData().frameStats[i].name,
 			GetRenderData().frameStats[i].stat);
-		m_bitmapFont->DrawText(0, y, 0x33444444, text);
+        GetPlatform()->DrawText(0, y, 0x33444444, text);
 		y += 34.0f;
 	}
-	m_bitmapFont->End();
-
-	return S_OK;
+	
+    GetPlatform()->EndDrawText();
+    return S_OK;
 }
 
 HRESULT RenderManager::RenderShadowMap()
 {
 #if defined(TREE3D12)
-    PIXScopedEvent((ID3D12GraphicsCommandList*)m_commandList, TREE_COLOR_DRAW_TEXT, L"RenderShadowMap");
+    PIXScopedEvent((ID3D12GraphicsCommandList*)GetPlatform()->GetCommandList(), TREE_COLOR_DRAW_TEXT, L"RenderShadowMap");
 #endif
 
     BuildShadowTransform();
 
 #if defined(TREE3D12)
 
-    m_commandList->SetPipelineState(m_pipelineStateShadowMap);
+    GetPlatform()->GetCommandList()->SetPipelineState(m_pipelineStateShadowMap);
 
     // Change to DEPTH_WRITE.
     CD3DX12_RESOURCE_BARRIER toWriteBarrier = CD3DX12_RESOURCE_BARRIER::Transition(GetRenderData().pShadowMap->DepthMapBuffer(),
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-    m_commandList->ResourceBarrier(1, &toWriteBarrier);
+    GetPlatform()->GetCommandList()->ResourceBarrier(1, &toWriteBarrier);
 
-    GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(m_commandList);
+    GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetPlatform()->GetCommandList());
 #else
     GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetContext());
 #endif
@@ -2520,15 +2555,15 @@ HRESULT RenderManager::RenderShadowMap()
     DrawSceneToShadowMap();
 
 #if defined(TREE3D12)
-    m_commandList->RSSetViewports(1, &m_viewPort);
-    m_commandList->RSSetScissorRects(1, &m_scissorRect);
+    GetPlatform()->GetCommandList()->RSSetViewports(1, &GetPlatform()->GetViewport());
+    GetPlatform()->GetCommandList()->RSSetScissorRects(1, &GetPlatform()->GetScissorRect());
 
     // Indicate that the back buffer will now be used to present.
     CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(GetRenderData().pShadowMap->DepthMapBuffer(),
         D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
-    m_commandList->ResourceBarrier(1, &toReadBarrier);
+    GetPlatform()->GetCommandList()->ResourceBarrier(1, &toReadBarrier);
 
-    m_commandList->SetPipelineState(m_pipelineState);
+    GetPlatform()->GetCommandList()->SetPipelineState(m_pipelineState);
 
 #else
 	// Restore state after shadow
