@@ -13,6 +13,27 @@ namespace XboxSampleFramework
 class BitmapFont;
 };
 
+struct CBChangeOnResize
+{
+    XMFLOAT4X4 mProjection;
+};
+
+__declspec(align(16))
+struct CBNeverChanges
+{
+    XMFLOAT4X4 mView;
+};
+
+__declspec(align(16))
+struct CBChangesEveryFrame
+{
+    DirectionalLight light;
+    XMFLOAT4 eyePos;
+    XMFLOAT4X4 worldToCamera;
+    XMFLOAT4X4 shadowMatrix;
+    UINT globalFlags;
+};
+
 enum DisplayMode
 {
 	Monitor = 0,
@@ -461,6 +482,24 @@ private:
 
     XSF::BitmapFont*                  m_bitmapFont;
 
+    D3D12_CONSTANT_BUFFER_VIEW_DESC   m_constViewDescs[4];
+    D3D12_GPU_VIRTUAL_ADDRESS         m_constBufferAddresses[4];
+    CComPtr<ID3D12Resource>           m_CBNeverChanges;
+    UINT8*                            m_CBNeverChangesDataBegin;
+    CComPtr<ID3D12Resource>           m_CBShadowNeverChanges;
+    D3D12_CONSTANT_BUFFER_VIEW_DESC   m_shadowNeverChangesConstViewDesc;
+    UINT8*                            m_CBShadowPassNeverChangesDataBegin;
+
+    CComPtr<ID3D12Resource>           m_CBChangesEveryFrame;
+    CComPtr<ID3D12Resource>           m_pCBChangeOnResize;
+    UINT8*                            m_CBChangesOnResizeDataBegin;
+    CBChangeOnResize                  m_cbChangesOnResize;
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC   m_shadowChangesOnResizeConstViewDesc;
+    UINT8*                            m_CBShadowChangesOnResizeDataBegin;
+    CComPtr<ID3D12Resource>           m_pCBShadowMapChangeOnResize;
+    CBChangeOnResize                  m_cbShadowMapChangesOnResize;
+
     RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
 
     enum DsvHeapOffset
@@ -492,10 +531,16 @@ public:
     HRESULT UninitGameLevelGraphics();
 
     HRESULT RenderSetupCommon(bool resetCommandList);
+    HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
+    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT BeginDrawText();
-    HRESULT DrawText(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
+    HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
     HRESULT EndDrawText();
+
+    // TODO make private
+    HRESULT CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
+    UINT8*                            m_CBChangesEveryFrameDataBegin;
 
     // Maybe TEMPTEMP?
     DescriptorHeapWrapper& GetDSVHeap() { return m_dsvHeap; }
@@ -571,6 +616,8 @@ public:
     HRESULT UninitDevice();
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
     HRESULT UninitGameLevelGraphics();
+    HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
+    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
@@ -631,40 +678,16 @@ class RenderManager : public IRenderFrame
 
     DisplayMode							m_displayMode;
 
-    struct CBChangeOnResize
-    {
-        XMFLOAT4X4 mProjection;
-    };
-
     // App resources.
 
 #if defined(TREE3D12)
 
-    D3D12_CONSTANT_BUFFER_VIEW_DESC     m_constViewDescs[4];
-    D3D12_GPU_VIRTUAL_ADDRESS           m_constBufferAddresses[4];
-
-    CComPtr<ID3D12Resource>             m_pCBChangeOnResize;
-    UINT8*								m_CBChangesOnResizeDataBegin;
-    CBChangeOnResize					m_cbChangesOnResize;
-
-    D3D12_CONSTANT_BUFFER_VIEW_DESC     m_shadowChangesOnResizeConstViewDesc;
-    UINT8*                              m_CBShadowChangesOnResizeDataBegin;
-    CComPtr<ID3D12Resource>             m_pCBShadowMapChangeOnResize;
-    CBChangeOnResize                    m_cbShadowMapChangesOnResize;
-
     // Single vertex and index buffer for all geometry in scene
     D3D12_VERTEX_BUFFER_VIEW			m_VBView;
-
     D3D12_INDEX_BUFFER_VIEW				m_IBView;
 
-    CComPtr<ID3D12Resource>             m_CBNeverChanges;
-    UINT8*								m_CBNeverChangesDataBegin;
-    CComPtr<ID3D12Resource>             m_CBShadowNeverChanges;
-    D3D12_CONSTANT_BUFFER_VIEW_DESC     m_shadowNeverChangesConstViewDesc;
-    UINT8*								m_CBShadowPassNeverChangesDataBegin;
-
-    CComPtr<ID3D12Resource>             m_CBChangesEveryFrame;
-    UINT8*								m_CBChangesEveryFrameDataBegin;
+    //D3D12_CONSTANT_BUFFER_VIEW_DESC     m_shadowNeverChangesConstViewDesc;
+    //UINT8*								m_CBShadowPassNeverChangesDataBegin;
 
     // Fixed drawing features
     CComPtr<ID3D12Resource>				m_screenQuadVB;
@@ -716,7 +739,6 @@ class RenderManager : public IRenderFrame
     DirectionalLight					m_light;  // Doesn't belong here, will move later
 
 #if defined(TREE3D12)
-    HRESULT CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
 
 #else
     HRESULT LoadPixelShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr);
@@ -751,7 +773,6 @@ public:
     D3D12_VERTEX_BUFFER_VIEW& GetVBView() { return m_VBView; } //TEMPTEMP
     D3D12_INDEX_BUFFER_VIEW GetIBView() { return m_IBView; } //TEMPTEMP
     UINT                                m_srvCbvDescriptorSize; //TEMPTEMP
-    D3D12_CONSTANT_BUFFER_VIEW_DESC* GetConstViewDescs() { return m_constViewDescs; } //TEMPTEMP
     ID3D12PipelineState * GetPipelineState() { return m_pipelineState; }
 
     ID3D12Fence* GetFence() { return m_fence; }

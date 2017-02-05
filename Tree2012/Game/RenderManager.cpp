@@ -1,4 +1,4 @@
-#include "pch.h"
+ #include "pch.h"
 #include "RenderManager.h"
 
 #if defined(TREE3D12)
@@ -71,21 +71,6 @@ enum RootSignatureParams
 const int maxTotalTexturesInScene = 2;
 const int maxNumMaterials = 4;
 
-__declspec(align(16))
-struct CBNeverChanges
-{
-	XMFLOAT4X4 mView;
-};
-
-__declspec(align(16))
-struct CBChangesEveryFrame
-{
-	DirectionalLight light;
-	XMFLOAT4 eyePos;
-	XMFLOAT4X4 worldToCamera;
-	XMFLOAT4X4 shadowMatrix;
-	UINT globalFlags;
-};
 
 struct CBMaterial
 {
@@ -208,7 +193,7 @@ RenderManager::~RenderManager()
 }
 
 #if defined(TREE3D12)
-HRESULT RenderManager::CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
+HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
 {
     CD3DX12_HEAP_PROPERTIES createdHeapProperties;
     if (heapProperties)
@@ -222,7 +207,7 @@ HRESULT RenderManager::CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* he
 
 	// Constants that never change
 	const UINT allocSize = (size + 255) & ~255;
-	HR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
+	HR(GetDevice()->CreateCommittedResource(
 		&createdHeapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(allocSize),
@@ -332,6 +317,22 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_bitmapFont = new XSF::BitmapFont();
     HRR(m_bitmapFont->Create(this->m_renderManager, L"Arial_16"));
 
+    // Constant buffers
+    CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+                                        // Constants that never change
+    D3D12_CONSTANT_BUFFER_VIEW_DESC neverChangesViewDesc = {};
+    HR(CreateConstantBuffer(sizeof(CBNeverChanges), nullptr, neverChangesViewDesc, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
+    m_constViewDescs[NeverChangesRootSignatureShaderSlot] = neverChangesViewDesc;
+
+    HR(CreateConstantBuffer(sizeof(CBNeverChanges), nullptr, m_shadowNeverChangesConstViewDesc, &m_CBShadowNeverChanges, &m_CBShadowPassNeverChangesDataBegin));
+
+    // Constants per frame
+    D3D12_CONSTANT_BUFFER_VIEW_DESC changesEachFrameViewDesc = {};
+    HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), nullptr, changesEachFrameViewDesc, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
+    m_constViewDescs[ChangesEveryFrameRootSignatureShaderSlot] = changesEachFrameViewDesc;
+
+    SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
+
     return S_OK;
 }
 #else
@@ -358,21 +359,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
 #if defined(TREE3D12)
 
-    // Constants
-    //
-    CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
-
-    // Constants that never change
-    D3D12_CONSTANT_BUFFER_VIEW_DESC neverChangesViewDesc = {};
-    HR(CreateConstantBuffer(sizeof(CBNeverChanges), nullptr, neverChangesViewDesc, &m_CBNeverChanges, &m_CBNeverChangesDataBegin));
-    m_constViewDescs[NeverChangesRootSignatureShaderSlot] = neverChangesViewDesc;
-
-    HR(CreateConstantBuffer(sizeof(CBNeverChanges), nullptr, m_shadowNeverChangesConstViewDesc, &m_CBShadowNeverChanges, &m_CBShadowPassNeverChangesDataBegin));
-
-    // Constants per frame
-    D3D12_CONSTANT_BUFFER_VIEW_DESC changesEachFrameViewDesc = {};
-    HR(CreateConstantBuffer(sizeof(CBChangesEveryFrame), nullptr, changesEachFrameViewDesc, &m_CBChangesEveryFrame, &m_CBChangesEveryFrameDataBegin));
-    m_constViewDescs[ChangesEveryFrameRootSignatureShaderSlot] = changesEachFrameViewDesc;
 
 #else
 	// Create the constant buffers
@@ -383,15 +369,15 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.CPUAccessFlags = 0;
 	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &m_CBNeverChanges));
+    SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
 #endif
 
-	SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
 
 	////////  Regular shaders /////
 
-	// Load default shaders
 #if defined(TREE3D12)
-	HR(XSF::LoadShader(L"VS.cso", &m_vertexShader.shader));
+    // Load default shaders
+    HR(XSF::LoadShader(L"VS.cso", &m_vertexShader.shader));
 	HR(XSF::LoadShader(L"PS.cso", &m_pixelShader.shader));
 
 	////////  Shadow map shader /////
@@ -665,10 +651,34 @@ void RenderManager::WaitForPreviousFrame()
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::UninitGameLevelGraphics()
 {
+    // Never changes CB
+    if (m_CBNeverChanges)
+    {
+        m_CBNeverChanges->Unmap(0, nullptr);
+    }
+    m_CBNeverChanges.Release();
+
+    if (m_CBShadowNeverChanges)
+    {
+        m_CBShadowNeverChanges->Unmap(0, nullptr);
+    }
+    m_CBShadowNeverChanges.Release();
+
+    // Changes every frame CB
+    if (m_CBChangesEveryFrame)
+    {
+        m_CBChangesEveryFrame->Unmap(0, nullptr);
+    }
+    m_CBChangesEveryFrame.Release();
+
+    SafeRelease(&m_CBNeverChanges);
+    SafeRelease(&m_CBChangesEveryFrame);
+
     m_commandList.Release();
     SafeDelete(&m_bitmapFont);
 
     m_rootSignature.Release();
+
 
     return S_OK;
 }
@@ -697,25 +707,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 
     m_numMaterialsCreated = 0;
 
-    // Never changes CB
-    if (m_CBNeverChanges)
-    {
-        m_CBNeverChanges->Unmap(0, nullptr);
-    }
-    m_CBNeverChanges.Release();
-
-    if (m_CBShadowNeverChanges)
-    {
-        m_CBShadowNeverChanges->Unmap(0, nullptr);
-    }
-    m_CBShadowNeverChanges.Release();
-
-    // Changes every frame CB
-    if (m_CBChangesEveryFrame)
-    {
-        m_CBChangesEveryFrame->Unmap(0, nullptr);
-    }
-    m_CBChangesEveryFrame.Release();
 #else
 	SafeRelease(&m_vertexLayout);
 #endif
@@ -725,8 +716,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_indexBuffer.Release();
 	m_vertexShader.Release();
 	m_pixelShader.Release();
-	SafeRelease(&m_CBNeverChanges);
-	SafeRelease(&m_CBChangesEveryFrame);
 	m_instancedBuffer.Release();
 
 	for (auto& t : m_textures)
@@ -1202,7 +1191,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
     // Create buffer for material constants
     D3D12_CONSTANT_BUFFER_VIEW_DESC constViewDesc = {};
-    HR(CreateConstantBuffer(sizeof(CBMaterial), nullptr, constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
+    HR(GetPlatform()->CreateConstantBuffer(sizeof(CBMaterial), nullptr, constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
 
     CD3DX12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 
                                                m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset,
@@ -1543,6 +1532,18 @@ HRESULT RenderPlatform12::InitDevice()
     HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount));
     HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount * 1));
 
+    // Create ChangeOnResize constant buffer
+    // Constants that never change
+    ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
+    D3D12_CONSTANT_BUFFER_VIEW_DESC changesOnResizeViewDesc = {};
+    HR(CreateConstantBuffer(sizeof(CBChangeOnResize), nullptr, changesOnResizeViewDesc, &m_pCBChangeOnResize, &m_CBChangesOnResizeDataBegin));
+    m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot] = changesOnResizeViewDesc;
+
+    // Shadow map pass constants that never change
+    ZeroMemory(&m_pCBShadowMapChangeOnResize, sizeof(m_pCBShadowMapChangeOnResize));
+    HR(CreateConstantBuffer(sizeof(CBChangeOnResize), nullptr, m_shadowChangesOnResizeConstViewDesc, &m_pCBShadowMapChangeOnResize, &m_CBShadowChangesOnResizeDataBegin));
+
+
     return hr;
 }
 
@@ -1594,18 +1595,6 @@ HRESULT RenderManager::InitDevice()
 	}
 
 	HRR(::GetPlatform(this)->GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
-
-	// 
-	// Create ChangeOnResize constant buffer
-    // Constants that never change
-    ZeroMemory(&m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
-    D3D12_CONSTANT_BUFFER_VIEW_DESC changesOnResizeViewDesc = {};
-    HR(CreateConstantBuffer(sizeof(CBChangeOnResize), nullptr, changesOnResizeViewDesc, &m_pCBChangeOnResize, &m_CBChangesOnResizeDataBegin));
-    m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot] = changesOnResizeViewDesc;
-
-    // Shadow map pass constants that never change
-    ZeroMemory(&m_pCBShadowMapChangeOnResize, sizeof(m_pCBShadowMapChangeOnResize));
-    HR(CreateConstantBuffer(sizeof(CBChangeOnResize), nullptr, m_shadowChangesOnResizeConstViewDesc, &m_pCBShadowMapChangeOnResize, &m_CBShadowChangesOnResizeDataBegin));
 
 	// Initialize the world matrices
 	XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
@@ -1747,6 +1736,39 @@ HRESULT RenderManager::InitDevice()
 }
 #endif
 
+#if defined(TREE3D12)
+HRESULT RenderPlatform12::UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass)
+{
+    if (shadowPass)
+    {
+        memcpy(m_CBShadowPassNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
+        if (GetCommandList())
+        {
+            GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_shadowNeverChangesConstViewDesc.BufferLocation);
+        }
+    }
+    else
+    {
+        memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
+        if (GetCommandList())
+        {
+            GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
+        }
+    }
+
+    return S_OK;
+}
+#else
+HRESULT RenderPlatform11::UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass)
+{
+    shadowPass;
+
+    m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
+    m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
+
+    return S_OK;
+}
+#endif
 
 HRESULT RenderManager::UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass)
 {
@@ -1754,61 +1776,43 @@ HRESULT RenderManager::UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass)
     CBNeverChanges cbNeverChanges;
     XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
 
-#if defined(TREE3D12)
-    if (shadowPass)
-    {
-        memcpy(m_CBShadowPassNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
-        if (GetPlatform()->GetCommandList())
-        {
-            GetPlatform()->GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_shadowNeverChangesConstViewDesc.BufferLocation);
-        }
-    }
-    else
-    {
-        memcpy(m_CBNeverChangesDataBegin, &cbNeverChanges, sizeof(cbNeverChanges));
-        if (GetPlatform()->GetCommandList())
-        {
-            GetPlatform()->GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
-        }
-    }
-#else
-    shadowPass;
-
-    m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
-    m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
-#endif
-
-    return S_OK;
+    return GetPlatform()->UpdateView(cbNeverChanges, shadowPass);
 }
 
-HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
-{
-	XMStoreFloat4x4(&m_cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
-
 #if defined(TREE3D12)
+HRESULT RenderPlatform12::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
+{
+    XMStoreFloat4x4(&m_cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
 
     if (shadowPass)
     {
         memcpy(m_CBShadowChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
-        if (GetPlatform()->GetCommandList())
+        if (GetCommandList())
         {
-            GetPlatform()->GetCommandList()->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_shadowChangesOnResizeConstViewDesc.BufferLocation);
+            GetCommandList()->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_shadowChangesOnResizeConstViewDesc.BufferLocation);
         }
     }
     else
     {
         memcpy(m_CBChangesOnResizeDataBegin, &m_cbChangesOnResize, sizeof(m_cbChangesOnResize));
-        if (GetPlatform()->GetCommandList())
+        if (GetCommandList())
         {
-            GetPlatform()->GetCommandList()->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
+            GetCommandList()->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
         }
     }
-
+    return S_OK;
+}
 #else
-	m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &m_cbChangesOnResize, 0, 0);
+HRESULT RenderPlatform11::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
+{
+    XMStoreFloat4x4(&m_cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+    m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &m_cbChangesOnResize, 0, 0);
+}
 #endif
 
-	return S_OK;
+HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
+{
+    return GetPlatform()->UpdateProjection(pProjMat, shadowPass);
 }
 
 #if defined(TREE3D12)
@@ -2184,6 +2188,19 @@ HRESULT RenderPlatform12::UninitDevice()
     m_rtvHeap.Terminate();
     m_dsvHeap.Terminate();
 
+    if (m_pCBChangeOnResize)
+    {
+        m_pCBChangeOnResize->Unmap(0, nullptr);
+    }
+    //m_pCBChangeOnResize.Release();
+
+    if (m_pCBShadowMapChangeOnResize)
+    {
+        m_pCBShadowMapChangeOnResize->Unmap(0, nullptr);
+    }
+    m_pCBShadowMapChangeOnResize.Release();
+
+
     // InitDevice objects
     m_d3dDevice.Release();
     m_pSwapChain.Release();
@@ -2193,6 +2210,8 @@ HRESULT RenderPlatform12::UninitDevice()
 HRESULT RenderPlatform11::UninitDevice()
 {
     ReleaseSwapChainResources();
+
+    m_pCBChangeOnResize.Release();
 
     m_rasterState.Release();
 
@@ -2220,23 +2239,11 @@ void RenderManager::UninitDevice()
     CloseHandle(m_fenceEvent);
     m_fenceEvent = nullptr;
 
-    if (m_pCBChangeOnResize)
-    {
-        m_pCBChangeOnResize->Unmap(0, nullptr);
-    }
-
-    if (m_pCBShadowMapChangeOnResize)
-    {
-        m_pCBShadowMapChangeOnResize->Unmap(0, nullptr);
-    }
-    m_pCBShadowMapChangeOnResize.Release();
-
 #else
 	m_immediateContext.Release();
     ::GetPlatform(this)->m_immediateContext.Release();
 #endif
 
-    m_pCBChangeOnResize.Release();
 
 #if defined(TREE3D12)
 #else
@@ -2294,9 +2301,9 @@ HRESULT RenderPlatform12::RenderSetupCommon(bool resetCommandList)
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, materialHandle);
 
     // Set root signature constant buffers
-    m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_renderManager->GetConstViewDescs()[NeverChangesRootSignatureShaderSlot].BufferLocation);
-    m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_renderManager->GetConstViewDescs()[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
-    m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_renderManager->GetConstViewDescs()[ChangesEveryFrameRootSignatureShaderSlot].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constViewDescs[NeverChangesRootSignatureShaderSlot].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constViewDescs[ChangeOnResizeRootSignatureShaderSlot].BufferLocation);
+    m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constViewDescs[ChangesEveryFrameRootSignatureShaderSlot].BufferLocation);
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, &m_renderManager->GetVBView());
@@ -2417,7 +2424,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
 
 #if defined(TREE3D12)
-    memcpy(m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
+    memcpy(GetPlatform()->m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
 #else
     m_immediateContext->VSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
     m_immediateContext->PSSetConstantBuffers(2, 1, &m_CBChangesEveryFrame);
@@ -2489,7 +2496,7 @@ HRESULT RenderPlatform12::BeginDrawText()
     return S_OK;
 }
 
-HRESULT RenderPlatform12::DrawText(FLOAT sx, FLOAT sy, DWORD dwColor,  const WCHAR* strText)
+HRESULT RenderPlatform12::DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor,  const WCHAR* strText)
 {
     m_bitmapFont->DrawText(sx, sy, dwColor, strText);
     return S_OK;
