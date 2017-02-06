@@ -22,7 +22,7 @@
 
 #include <d3d12.h>
 
-class RenderManager;
+class RenderPlatform12;
 
 #pragma warning(push)
 #pragma warning(disable : 4005)
@@ -38,7 +38,7 @@ enum DDS_ALPHA_MODE
     DDS_ALPHA_MODE_CUSTOM = 4,
 };
 
-HRESULT __cdecl CreateDDSTextureFromMemory(_In_ RenderManager* renderManager, 
+HRESULT __cdecl CreateDDSTextureFromMemory(_In_ RenderPlatform12* renderPlatform,
     _In_reads_bytes_(ddsDataSize) const uint8_t* ddsData,
     _In_ size_t ddsDataSize,
     _In_ size_t maxsize,
@@ -48,7 +48,7 @@ HRESULT __cdecl CreateDDSTextureFromMemory(_In_ RenderManager* renderManager,
     _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr
     );
 
-HRESULT __cdecl CreateDDSTextureFromFile(_In_ RenderManager* renderManager,
+HRESULT __cdecl CreateDDSTextureFromFile(_In_ RenderPlatform12* renderPlatform,
     _In_z_ const wchar_t* szFileName,
     _In_ size_t maxsize,
     _In_ bool forceSRGB,

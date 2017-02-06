@@ -155,7 +155,7 @@ void InputLayouts::DestroyAll()
 
 RenderManager::RenderManager() : m_platform(nullptr)
 #if defined(TREE3D12)
-    , m_fenceEvent(nullptr), m_srvCbvDescriptorSize(0), m_numMaterialsCreated(0)
+    , m_srvCbvDescriptorSize(0), m_numMaterialsCreated(0)
 #endif
 {
     m_displayMode = Monitor;
@@ -456,6 +456,50 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Debug overlay to show depth map
     HRR(BuildScreenQuadGeometryBuffers());
 
+    //
+    // PSOs
+    //
+    // Describe and create the graphics pipeline state object (PSO).
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
+    psoDesc.pRootSignature = GetRootSignature();
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader.shader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader.shader);
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+
+    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; //DXGI_FORMAT_D32_FLOAT;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = GetSwapChainFormat();
+    psoDesc.SampleDesc.Count = 1;
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+
+    // PSO for shadow map pass.
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
+    shadowPsoDesc.RasterizerState.DepthBias = 100000;
+    shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
+    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    //shadowPsoDesc.pRootSignature = mRootSignature.Get();
+    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(m_shadowVertexShader);
+    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(m_shadowPixelShader);
+    shadowPsoDesc.DSVFormat = ShadowMap::Format();
+
+    // Shadow map pass does not have a render target.
+    shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+    shadowPsoDesc.NumRenderTargets = 0;
+
+    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
+
+    // Execute the command list.
+    HRR(GetCommandList()->Close());
+    ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
+    GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+    WaitForPreviousFrame();
+
     return S_OK;
 }
 #else
@@ -580,59 +624,11 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps, m_geometryData);
 
 
-#if defined(TREE3D12)
-
-
-	// Describe and create the graphics pipeline state object (PSO).
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-	psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
-    psoDesc.pRootSignature = GetPlatform()->GetRootSignature(); 
-	psoDesc.VS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_vertexShader.shader);
-	psoDesc.PS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_pixelShader.shader);
-	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-
-    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; //DXGI_FORMAT_D32_FLOAT;
-	psoDesc.SampleMask = UINT_MAX;
-	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	psoDesc.NumRenderTargets = 1;
-	psoDesc.RTVFormats[0] = GetPlatform()->GetSwapChainFormat();
-	psoDesc.SampleDesc.Count = 1;
-	HRR(::GetPlatform(this)->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
-
-    // PSO for shadow map pass.
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
-    shadowPsoDesc.RasterizerState.DepthBias = 100000;
-    shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
-    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
-    //shadowPsoDesc.pRootSignature = mRootSignature.Get();
-    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_shadowVertexShader);
-    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(GetPlatform()->m_shadowPixelShader);
-    shadowPsoDesc.DSVFormat = ShadowMap::Format();
-
-    // Shadow map pass does not have a render target.
-    shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
-    shadowPsoDesc.NumRenderTargets = 0;
-
-    HRR(GetPlatform()->GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
-
-	// Execute the command list.
-	HRR(GetPlatform()->GetCommandList()->Close());
-	ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
-	GetPlatform()->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-    WaitForPreviousFrame();
-
-#else
-
-#endif
-
 	// Load the debug texture
 #if defined(TREE3D12)
 #else
-	HRR(CreateDDSTextureFromFile(::GetPlatform(this)->GetDevice(), L"snow.dds", nullptr, &m_debugTextureRV));
-	SetDebugName(m_debugTextureRV, "RenderManager::m_debugTextureRV");
+	//HRR(CreateDDSTextureFromFile(::GetPlatform(this)->GetDevice(), L"snow.dds", nullptr, &m_debugTextureRV));
+	//SetDebugName(m_debugTextureRV, "RenderManager::m_debugTextureRV");
 #endif
 	// Create instanced buffer
 #if defined (TREE3D12)
@@ -689,7 +685,7 @@ HRESULT RenderManager::GetViewport(Viewport& viewport)
 }
 
 #if defined(TREE3D12)
-void RenderManager::WaitForPreviousFrame()
+void RenderPlatform12::WaitForPreviousFrame()
 {
     // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
     // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
@@ -698,7 +694,7 @@ void RenderManager::WaitForPreviousFrame()
 
     // Signal and increment the fence value.
     const UINT64 fence = m_fenceValue;
-    HR(GetPlatform()->GetCommandQueue()->Signal(m_fence, fence));
+    HR(GetCommandQueue()->Signal(m_fence, fence));
     m_fenceValue++;
 
     // Wait until the previous frame is finished.
@@ -708,7 +704,10 @@ void RenderManager::WaitForPreviousFrame()
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 
-    GetPlatform()->UpdateFrameIndex();
+    if (GetSwapChain())
+    {
+        m_frameIndex = GetSwapChain()->GetCurrentBackBufferIndex();
+    }
 }
 
 #endif
@@ -716,6 +715,10 @@ void RenderManager::WaitForPreviousFrame()
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::UninitGameLevelGraphics()
 {
+    // Ensure that the GPU is no longer referencing resources that are about to be
+    // cleaned up by the destructor.
+    WaitForPreviousFrame();
+
     // Never changes CB
     if (m_CBNeverChanges)
     {
@@ -756,6 +759,10 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     m_rootSignature.Release();
 
+    m_pipelineState.Release();
+    m_pipelineStateFullScreenQuad.Release();
+    m_pipelineStateShadowMap.Release();
+
 
     return S_OK;
 }
@@ -779,14 +786,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     HRR(GetPlatform()->UninitGameLevelGraphics());
 
 #if defined(TREE3D12)
-    
-    // Ensure that the GPU is no longer referencing resources that are about to be
-    // cleaned up by the destructor.
-    WaitForPreviousFrame();
-
-    m_pipelineState.Release();
-    m_pipelineStateFullScreenQuad.Release();
-    m_pipelineStateShadowMap.Release();
 
     m_numMaterialsCreated = 0;
 
@@ -838,7 +837,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	m_perFrameInstanceData.clear();
 
 #if !defined(TREE3D12)
-	m_debugTextureRV.Release();
+	//m_debugTextureRV.Release();
 	InputLayouts::DestroyAll();
 #endif
 	//RenderStates::DestroyAll();
@@ -1017,34 +1016,40 @@ HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 }
 
 #if defined(TREE3D12)
-HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
+HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, LoadedTexture* texture)
 {
-    LoadedTexture& texture = m_textures[textureFilename];
-	if (!texture.texture)
-	{
-        int heapIndex = int(m_textures.size() - 1);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_srvCbvDescriptorSize);
-        HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &texture.texture, newDescriptor));
-        texture.textureView = newDescriptor;
-        m_textures[textureFilename] = texture;
-    }
+    int heapIndex = int(m_renderManager->GetTextures().size() - 1);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_renderManager->m_srvCbvDescriptorSize);
+
+    HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &texture->texture, newDescriptor));
+    
+    texture->textureView = newDescriptor;
 
 	return S_OK;
 }
 #else
-HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename)
+HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture)
 {
-	LoadedTexture texture = m_textures[textureFilename];
-	if (!texture.texture)
-	{
-		// Load the Texture
-		HRR(CreateDDSTextureFromFile(::GetPlatform(this)->GetDevice(), textureFilename, nullptr, &texture.texture));
-		m_textures[textureFilename] = texture;
-	}
+    // Load the Texture
+    HRR(CreateDDSTextureFromFile(GetDevice(), textureFilename, nullptr, &loadedTexture->texture));
 
 	return S_OK;
 }
 #endif
+
+HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture)
+{
+    *loadedTexture = m_textures[textureFilename];
+    if (!loadedTexture->texture)
+    {
+        HRR(GetPlatform()->LoadTexture(textureFilename, loadedTexture));
+        m_textures[textureFilename] = *loadedTexture;
+    }
+
+    assert(loadedTexture->texture);
+
+    return S_OK;
+}
 
 HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shaderType)
 {
@@ -1113,7 +1118,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
     // Create the texture.
     {
         HR(GetPlatform()->GetCommandAllocator()->Reset());
-        HR(GetPlatform()->GetCommandList()->Reset(GetPlatform()->GetCommandAllocator(), m_pipelineState));
+        HR(GetPlatform()->GetCommandList()->Reset(GetPlatform()->GetCommandAllocator(), GetPlatform()->GetPipelineState()));
 
         // Describe and create a Texture2D.
         D3D12_RESOURCE_DESC textureDesc = {};
@@ -1190,7 +1195,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
         GetPlatform()->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-        WaitForPreviousFrame();
+        GetPlatform()->WaitForPreviousFrame();
 
     }
 #else
@@ -1249,16 +1254,14 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     }
 
     // Create a new material
-    LoadedTexture* texture = nullptr;
+    LoadedTexture texture;
     if (textureFilename && *textureFilename)
     {
-        LoadTexture(textureFilename);
+        LoadTexture(textureFilename, &texture);
 #if defined(TREE3D12)
-        texture = &m_textures[textureFilename];
-        assert(texture && texture->texture);
+        //texture = &m_textures[textureFilename];
 #else
-        texture = &m_textures[textureFilename];
-        assert(texture);
+        //texture = &m_textures[textureFilename];
 #endif
 	}
 
@@ -1283,10 +1286,10 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     ::GetPlatform(this)->GetDevice()->CreateConstantBufferView(&constViewDesc, cpuMaterialHandle);
 
     // Copy texture descriptor from offline heap to shader visible heap
-    if (texture)
+    if (texture.texture)
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE dest(cpuMaterialHandle, Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE src(texture->textureView, 0, m_srvCbvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE src(texture.textureView, 0, m_srvCbvDescriptorSize);
         ::GetPlatform(this)->GetDevice()->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
     m_numMaterialsCreated++;
@@ -1321,11 +1324,11 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	}
 
 #if defined(TREE3D12)
-    Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
+    Material* newMat = new Material(name, &texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
 		nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/, 
 		shaderMaterial, pCBMaterial, pMaterialConstBufferDataBegin, gpuMaterialHandle);
 #else
-	Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
+	Material* newMat = new Material(name, &texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
 		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
 		shaderMaterial, pConstBuffer);
 #endif
@@ -1472,7 +1475,7 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     psoDesc.SampleDesc.Count = 1;
 
-    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_renderManager->m_pipelineStateFullScreenQuad)));
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateFullScreenQuad)));
     
     return S_OK;
 }
@@ -1536,7 +1539,7 @@ HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList,
 	UINT stride = sizeof(SimpleVertex);
 	UINT offset = 0;
 
-    commandList->SetPipelineState(m_renderManager->m_pipelineStateFullScreenQuad);
+    commandList->SetPipelineState(m_pipelineStateFullScreenQuad);
     GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
     GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
 
@@ -1629,10 +1632,21 @@ HRESULT RenderPlatform12::InitDevice()
         ));
     }
 
+    //
     // Create descriptor heaps.
+    //
     // Each frame has its own depth stencils and then there is one for shadows.
     HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount));
     HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount * 1));
+
+    // Heap for loading textures
+    // TODO: Move from device owned to scene owned
+    D3D12_DESCRIPTOR_HEAP_DESC loadedTextureHeapDesc = {};
+    loadedTextureHeapDesc.NumDescriptors = maxTotalTexturesInScene;
+    loadedTextureHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;;
+    loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    HRR(GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
+
 
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -1652,7 +1666,26 @@ HRESULT RenderPlatform12::InitDevice()
     // Shadow map pass constants that never change
     ZeroMemory(&m_pCBShadowMapChangeOnResize, sizeof(m_pCBShadowMapChangeOnResize));
     HR(CreateConstantBuffer(sizeof(CBChangeOnResize), nullptr, m_shadowChangesOnResizeConstViewDesc, &m_pCBShadowMapChangeOnResize, &m_CBShadowChangesOnResizeDataBegin));
-    
+
+    // Initialize render statesf
+    XSF::StockRenderStates::Initialize(GetDevice());
+
+    // Create synchronization objects and wait until assets have been uploaded to the GPU.
+    HRR(GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+    m_fenceValue = 1;
+
+    // Create an event handle to use for frame synchronization.
+    m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+    if (m_fenceEvent == nullptr)
+    {
+        HRR(HRESULT_FROM_WIN32(GetLastError()));
+    }
+
+    // Wait for the command list to execute; we are reusing the same command 
+    // list in our main loop but for now, we just want to wait for setup to 
+    // complete before continuing.
+    WaitForPreviousFrame();
+
     return hr;
 }
 
@@ -1670,48 +1703,19 @@ HRESULT RenderManager::InitDevice()
 	// Shader visible descriptor size
 	m_srvCbvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-    {
-		// Describe and create a SRV descriptor heap.
-		// Flags indicate that this descriptor heap can be bound to the pipeline 
-		// and that descriptors contained in it can be referenced by a root table.
-		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors /* shadow, null, etc */;
-        srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
 
-        // Heap for loading textures
-        // TODO: Move from device owned to scene owned
-        D3D12_DESCRIPTOR_HEAP_DESC loadedTextureHeapDesc = {};
-        loadedTextureHeapDesc.NumDescriptors = maxTotalTexturesInScene;
-        loadedTextureHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;;
-        loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        HRR(::GetPlatform(this)->GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
-    }
+    // Describe and create a SRV descriptor heap.
+    // Flags indicate that this descriptor heap can be bound to the pipeline 
+    // and that descriptors contained in it can be referenced by a root table.
+    D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+    srvHeapDesc.NumDescriptors = maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors /* shadow, null, etc */;
+    srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    HRR(GetPlatform()->GetDevice()->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
 
     // Initialize the world matrices
     XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
 
-    // Initialize render statesf
-    XSF::StockRenderStates::Initialize(::GetPlatform(this)->GetDevice());
-
-    // Create synchronization objects and wait until assets have been uploaded to the GPU.
-    {
-        HRR(::GetPlatform(this)->GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-        m_fenceValue = 1;
-
-        // Create an event handle to use for frame synchronization.
-        m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-        if (m_fenceEvent == nullptr)
-        {
-            HRR(HRESULT_FROM_WIN32(GetLastError()));
-        }
-
-        // Wait for the command list to execute; we are reusing the same command 
-        // list in our main loop but for now, we just want to wait for setup to 
-        // complete before continuing.
-        WaitForPreviousFrame();
-    }
 
     return hr;
 }
@@ -2297,6 +2301,12 @@ HRESULT RenderPlatform12::UninitDevice()
     m_commandQueue.Release();
     m_commandAllocator.Release();
 
+    m_loadTextureHeap.Release();
+
+    CloseHandle(m_fenceEvent);
+    m_fenceEvent = nullptr;
+
+
     // InitDevice objects
     m_d3dDevice.Release();
     m_pSwapChain.Release();
@@ -2328,10 +2338,6 @@ void RenderManager::UninitDevice()
 
 #if defined(TREE3D12)
 	m_cbvSrvHeap.Release();
-    m_loadTextureHeap.Release();
-
-    CloseHandle(m_fenceEvent);
-    m_fenceEvent = nullptr;
 
 #else
 	m_immediateContext.Release();
@@ -2371,7 +2377,7 @@ HRESULT RenderPlatform12::RenderFrameSetupCommon(bool resetCommandList)
         // However, when ExecuteCommandList() is called on a particular command 
         // list, that command list can then be reset at any time and must be before 
         // re-recording.
-        HR(m_commandList->Reset(GetCommandAllocator(), m_renderManager->GetPipelineState()));
+        HR(m_commandList->Reset(GetCommandAllocator(), GetPipelineState()));
     }
 
     // Set necessary state.
@@ -2431,7 +2437,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     GetPlatform()->GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     GetPlatform()->GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    GetPlatform()->GetCommandList()->SetPipelineState(m_pipelineState);
+    GetPlatform()->GetCommandList()->SetPipelineState(GetPlatform()->GetPipelineState());
 
     // Make shadow map available to shaders
     if (useShadowMaps)
@@ -2565,7 +2571,8 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     // Present the frame.
     HR(GetPlatform()->GetSwapChain()->Present(0, 0));
 
-	WaitForPreviousFrame();
+    GetPlatform()->WaitForPreviousFrame();
+
 #else
 	if (showShadowBuffer)
 	{
@@ -2653,7 +2660,7 @@ HRESULT RenderManager::RenderShadowMap()
 
 #if defined(TREE3D12)
 
-    GetPlatform()->GetCommandList()->SetPipelineState(m_pipelineStateShadowMap);
+    GetPlatform()->GetCommandList()->SetPipelineState(GetPlatform()->m_pipelineStateShadowMap);
 
     // Change to DEPTH_WRITE.
     CD3DX12_RESOURCE_BARRIER toWriteBarrier = CD3DX12_RESOURCE_BARRIER::Transition(GetRenderData().pShadowMap->DepthMapBuffer(),
@@ -2676,7 +2683,7 @@ HRESULT RenderManager::RenderShadowMap()
         D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
     GetPlatform()->GetCommandList()->ResourceBarrier(1, &toReadBarrier);
 
-    GetPlatform()->GetCommandList()->SetPipelineState(m_pipelineState);
+    GetPlatform()->GetCommandList()->SetPipelineState(GetPlatform()->GetPipelineState());
 
 #else
 	// Restore state after shadow
@@ -2760,7 +2767,7 @@ void RenderManager::DrawSceneToShadowMap()
 // Name: TrimUploadHeaps
 // Desc: Terminates the upload heaps whose fence has passed and optionally removes them
 //--------------------------------------------------------------------------------------
-void RenderManager::TrimUploadHeaps(bool removeTerminatedHeaps)
+void RenderPlatform12::TrimUploadHeaps(bool removeTerminatedHeaps)
 {
 	const UINT64 fenceValue = m_fence->GetCompletedValue();
 	for (std::list<FencedHeap>::const_iterator iterManagedHeap = m_managedUploadHeaps.begin(); iterManagedHeap != m_managedUploadHeaps.end(); ++iterManagedHeap)
@@ -2782,7 +2789,7 @@ void RenderManager::TrimUploadHeaps(bool removeTerminatedHeaps)
 // Desc: Add the upload heap to the managed list
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-void RenderManager::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
+void RenderPlatform12::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
 {
 	m_managedUploadHeaps.push_back(FencedHeap(pUploadHeap, m_fenceValue));
 }

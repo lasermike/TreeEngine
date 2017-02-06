@@ -302,13 +302,13 @@ HRESULT BitmapFont::Create(RenderManager* const renderManager, const WCHAR* strF
 
 	m_renderManager = renderManager;
     D3DDevice* const pDevice = GetPlatform(m_renderManager)->GetDevice();
-    ID3D12Fence* const pFence = m_renderManager->GetFence();
+    ID3D12Fence* const pFence = m_renderManager->GetPlatform()->GetFence();
     D3DCommandList* const pCmdList = m_renderManager->GetPlatform()->GetCommandList();
 
     XSF_ERROR_IF_FAILED(m_frameHeap.Initialize(pDevice, pFence, 256 * 1024, false, 1 /*frame latency*/, L"BitmapFont::FrameHeap"));
     XSF_ERROR_IF_FAILED(m_uploadHeap.Initialize(pDevice, pFence, 4 * 1024 * 1024, false, 1, L"BitmapFont::UploadHeap"));
     
-	m_renderManager->ManageUploadHeap(&m_uploadHeap);
+    m_renderManager->GetPlatform()->ManageUploadHeap(&m_uploadHeap);
 
     // read the data
     WCHAR tmp[1024];

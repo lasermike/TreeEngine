@@ -514,6 +514,16 @@ private:
     CComPtr<ID3D12Resource>           m_screenQuadIB;
     D3D12_INDEX_BUFFER_VIEW           m_screenQuadIBView;
 
+    CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading heap
+    CComPtr<ID3D12DescriptorHeap>     m_samplerHeap;
+    CComPtr<ID3D12PipelineState>      m_pipelineState;
+    CComPtr<ID3D12PipelineState>      m_pipelineStateFullScreenQuad;
+
+    CComPtr<ID3D12Fence>              m_fence;
+    HANDLE                            m_fenceEvent;
+    UINT64                            m_fenceValue;
+    std::list<FencedHeap>             m_managedUploadHeaps;
+
     enum DsvHeapOffset
     {
         SwapChainDsv_HeapOffset = 0,
@@ -522,7 +532,7 @@ private:
 
 public:
 
-    RenderPlatform12(RenderManager* renderManager) : m_renderManager(renderManager) { }
+    RenderPlatform12(RenderManager* renderManager) : m_renderManager(renderManager), m_fenceEvent(nullptr){ }
     RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     IDXGISwapChain3* GetSwapChain() { return m_pSwapChain; }
@@ -552,12 +562,19 @@ public:
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
 
+    void WaitForPreviousFrame();
+
     D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
     D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; } 
+
+    // Materials
+    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture);
+    void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
 
     // TODO make private
     HRESULT CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
     UINT8*                            m_CBChangesEveryFrameDataBegin;
+    CComPtr<ID3D12PipelineState>      m_pipelineStateShadowMap;
 
     // Maybe TEMPTEMP?
     DescriptorHeapWrapper& GetDSVHeap() { return m_dsvHeap; }
@@ -570,14 +587,8 @@ public:
     D3D12_RECT& GetScissorRect() { return m_scissorRect; }
     ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
     ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
+    ID3D12PipelineState* GetPipelineState() { return m_pipelineState; }
     RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
-
-    void UpdateFrameIndex() {
-        if (GetSwapChain())
-        {
-            m_frameIndex = GetSwapChain()->GetCurrentBackBufferIndex();
-        }
-    }
 
     // TEMPTEMP make private 
     // Default shader
@@ -590,10 +601,16 @@ public:
 
     // TEMPTEMP make private
     HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
+    //ID3D12PipelineState * GetPipelineState() { return m_pipelineState; }
+    ID3D12Fence* GetFence() { return m_fence; }
+
 
 private:
     // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
+
+    void TrimUploadHeaps(bool removeTerminatedHeaps);
+
 };
 
 #else
@@ -684,6 +701,9 @@ public:
     HRESULT DrawText2(float sx, float sy, DWORD dwColor, const WCHAR* strText); 
     HRESULT EndDrawText();
 
+    // Materials
+    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture);
+
     // TEMPTEMP TODO make privdate
     // Default shader
     VertexShader                        m_vertexShader;
@@ -714,7 +734,7 @@ class RenderManager : public IRenderFrame
     // Filled in during scene initialization
     std::map<wstring, Material*>                    m_materials;
     std::map<wstring, Mesh>                         m_meshes;
-    std::map<wstring, LoadedTexture>	            m_textures;
+    std::map<wstring, LoadedTexture>                m_textures;
 
     std::map<wstring, VertexShader*>                m_vertexShaders;
     std::map<wstring, PixelShader*>                 m_pixelShaders;
@@ -733,12 +753,6 @@ class RenderManager : public IRenderFrame
 
 #if defined(TREE3D12)
 
-    CComPtr<ID3D12DescriptorHeap> m_loadTextureHeap;    // offline heap for loading heap
-    CComPtr<ID3D12DescriptorHeap> m_samplerHeap;
-    CComPtr<ID3D12PipelineState> m_pipelineState;
-    CComPtr<ID3D12PipelineState> m_pipelineStateShadowMap;
-
-
     UINT                                m_numMaterialsCreated;
 #else
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
@@ -750,15 +764,10 @@ class RenderManager : public IRenderFrame
 
 #if defined(TREE3D12)
 
-    D3D12_RESOURCE_DESC					m_debugTextureRV;
-
-    CComPtr<ID3D12Fence>				m_fence;
-    HANDLE								m_fenceEvent;
-    UINT64 								m_fenceValue;
-    std::list<FencedHeap>				m_managedUploadHeaps;
+    //D3D12_RESOURCE_DESC					m_debugTextureRV;
 
 #else
-    CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
+    //CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
 #endif
 
     DoubleBuffer                        m_instancedBuffer;
@@ -768,7 +777,7 @@ class RenderManager : public IRenderFrame
 
     DirectionalLight					m_light;  // Doesn't belong here, will move later
 
-    HRESULT LoadTexture(const wchar_t* textureFilename);
+    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture);
     HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
     HRESULT Render(RenderUnit& renderUnit, RenderPass pass);
     HRESULT RenderScene(RenderPass pass);
@@ -793,16 +802,9 @@ public:
 
     ID3D12DescriptorHeap* GetShaderHeap() { return m_cbvSrvHeap; }  //TEMPTEMP 
     UINT                                m_srvCbvDescriptorSize; //TEMPTEMP
-    ID3D12PipelineState * GetPipelineState() { return m_pipelineState; }
     //TEMPTEMP
-    CComPtr<ID3D12PipelineState> m_pipelineStateFullScreenQuad;
     CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
-
-    ID3D12Fence* GetFence() { return m_fence; }
-
-    void TrimUploadHeaps(bool removeTerminatedHeaps);
-    void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
-    void WaitForPreviousFrame();
+    std::map<wstring, LoadedTexture>& GetTextures() { return m_textures; } //TEMPTEMP
 
     RenderPlatform12* GetPlatform() { return (RenderPlatform12*) m_platform; }
 

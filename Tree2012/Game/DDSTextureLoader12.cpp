@@ -1029,13 +1029,13 @@ void InitializeTexture(GpuResource& Dest, RenderPlatform12* renderPlatform,
     ID3D12CommandList* ppCommandLists[] = { renderPlatform->GetCommandList() };
     renderPlatform->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-    renderPlatform->m_renderManager->WaitForPreviousFrame();
+    renderPlatform->WaitForPreviousFrame();
 
     UploadBuffer->Release();
 }
 
 //--------------------------------------------------------------------------------------
-static HRESULT CreateTextureFromDDS(_In_ RenderManager* renderManager,
+static HRESULT CreateTextureFromDDS(_In_ RenderPlatform12* renderPlatform,
     _In_ const DDS_HEADER* header,
     _In_reads_bytes_(bitSize) const uint8_t* bitData,
     _In_ size_t bitSize,
@@ -1229,7 +1229,7 @@ static HRESULT CreateTextureFromDDS(_In_ RenderManager* renderManager,
 
         if (SUCCEEDED(hr))
         {
-            hr = CreateD3DResources(GetPlatform(renderManager)->GetDevice(), resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
+            hr = CreateD3DResources(renderPlatform->GetDevice(), resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
                 format, forceSRGB,
                 isCubeMap, initData.get(), texture, textureView);
 
@@ -1244,7 +1244,7 @@ static HRESULT CreateTextureFromDDS(_In_ RenderManager* renderManager,
                     twidth, theight, tdepth, skipMip, initData.get());
                 if (SUCCEEDED(hr))
                 {
-                    hr = CreateD3DResources(GetPlatform(renderManager)->GetDevice(), resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
+                    hr = CreateD3DResources(renderPlatform->GetDevice(), resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
                         format, forceSRGB,
                         isCubeMap, initData.get(), texture, textureView);
                 }
@@ -1254,7 +1254,7 @@ static HRESULT CreateTextureFromDDS(_In_ RenderManager* renderManager,
         if (SUCCEEDED(hr))
         {
             GpuResource DestTexture(*texture, D3D12_RESOURCE_STATE_COMMON);
-            InitializeTexture(DestTexture, renderManager->GetPlatform(), subresourceCount, initData.get());
+            InitializeTexture(DestTexture, renderPlatform, subresourceCount, initData.get());
         }
     }
 
@@ -1293,7 +1293,7 @@ static DDS_ALPHA_MODE GetAlphaMode(_In_ const DDS_HEADER* header)
 
 _Use_decl_annotations_
 HRESULT CreateDDSTextureFromMemory(
-    RenderManager* renderManager,
+    RenderPlatform12* renderPlatform,
     const uint8_t* ddsData,
     size_t ddsDataSize,
     size_t maxsize,
@@ -1312,7 +1312,7 @@ HRESULT CreateDDSTextureFromMemory(
         *alphaMode = DDS_ALPHA_MODE_UNKNOWN;
     }
 
-    if (!renderManager || !GetPlatform(renderManager)->GetDevice() || !ddsData)
+    if (!renderPlatform || !renderPlatform->GetDevice() || !ddsData)
     {
         return E_INVALIDARG;
     }
@@ -1351,7 +1351,7 @@ HRESULT CreateDDSTextureFromMemory(
     if (ddsDataSize < offset)
         return E_FAIL;
 
-    HRESULT hr = CreateTextureFromDDS(renderManager,
+    HRESULT hr = CreateTextureFromDDS(renderPlatform,
         header, ddsData + offset, ddsDataSize - offset, maxsize,
         forceSRGB, texture, textureView);
     if (SUCCEEDED(hr))
@@ -1371,7 +1371,7 @@ HRESULT CreateDDSTextureFromMemory(
 
 _Use_decl_annotations_
 HRESULT CreateDDSTextureFromFile(
-    RenderManager* renderManager, 
+    RenderPlatform12* renderPlatform,
     const wchar_t* fileName,
     size_t maxsize,
     bool forceSRGB,
@@ -1389,7 +1389,7 @@ HRESULT CreateDDSTextureFromFile(
         *alphaMode = DDS_ALPHA_MODE_UNKNOWN;
     }
 
-    if (!renderManager || !fileName)
+    if (!renderPlatform || !fileName)
     {
         return E_INVALIDARG;
     }
@@ -1405,7 +1405,7 @@ HRESULT CreateDDSTextureFromFile(
         return hr;
     }
 
-    hr = CreateTextureFromDDS(renderManager,
+    hr = CreateTextureFromDDS(renderPlatform,
         header, bitData, bitSize, maxsize,
         forceSRGB, texture, textureView);
 
