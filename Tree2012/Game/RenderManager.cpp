@@ -795,15 +795,15 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	SafeDelete(&GetRenderData().pShadowMap);
 	m_instancedBuffer.Release();
 
-	for (auto& t : m_textures)
-	{
-		if (t.second.texture)
-		{
-			t.second.texture->Release();
-			t.second.texture = nullptr;
-		}
-	}
-	m_textures.clear();
+    for (auto& t : m_textures)
+    {
+        if (t.second)
+        {
+            SafeRelease(&t.second->texture);
+            delete t.second;
+        }
+    }
+    m_textures.clear();
 
 	for (auto& vs : m_vertexShaders)
 	{
@@ -1016,37 +1016,50 @@ HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 }
 
 #if defined(TREE3D12)
-HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, LoadedTexture* texture)
+HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, LoadedTexture** texture)
 {
-    int heapIndex = int(m_renderManager->GetTextures().size() - 1);
+    int heapIndex = int(m_renderManager->GetTextures().size());
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_renderManager->m_srvCbvDescriptorSize);
 
-    HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &texture->texture, newDescriptor));
+    ID3D12Resource* resource = nullptr;
+    HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
     
-    texture->textureView = newDescriptor;
+    *texture = new LoadedTexture(resource, newDescriptor, (UINT)heapIndex);
+
+    assert((*texture)->texture != nullptr);
 
 	return S_OK;
 }
 #else
-HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture)
+HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture)
 {
     // Load the Texture
-    HRR(CreateDDSTextureFromFile(GetDevice(), textureFilename, nullptr, &loadedTexture->texture));
+    ID3D11ShaderResourceView* tex = nullptr;
+    HRR(CreateDDSTextureFromFile(GetDevice(), textureFilename, nullptr, &tex));
 
-	return S_OK;
+    *loadedTexture = new LoadedTexture(tex);
+
+    assert((*loadedTexture)->texture);
+
+    return S_OK;
 }
 #endif
 
-HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture)
+HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture)
 {
-    *loadedTexture = m_textures[textureFilename];
-    if (!loadedTexture->texture)
+    // Load a texture from disk unless it has already been loaded
+
+    const auto& existingTexture = m_textures.find(textureFilename);
+
+    if (existingTexture == m_textures.end())
     {
         HRR(GetPlatform()->LoadTexture(textureFilename, loadedTexture));
         m_textures[textureFilename] = *loadedTexture;
     }
-
-    assert(loadedTexture->texture);
+    else
+    {
+        *loadedTexture = existingTexture->second;
+    }
 
     return S_OK;
 }
@@ -1186,7 +1199,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_srvCbvDescriptorSize);
 
         // Success
-        m_textures[name] = { texture, newDescriptor, (UINT) m_textures.size() };
+        m_textures[name] = new LoadedTexture(texture, newDescriptor, srvHeapIndex);
         texture.Detach();
         //view.Detach();
 
@@ -1234,7 +1247,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 #endif
 	
 	// Success
-	m_textures[name].texture = view;
+	m_textures[name] = new LoadedTexture(view);
 	texture.Release();
 	view.Detach();
 #endif
@@ -1254,16 +1267,11 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     }
 
     // Create a new material
-    LoadedTexture texture;
+    LoadedTexture* texture = nullptr;
     if (textureFilename && *textureFilename)
     {
         LoadTexture(textureFilename, &texture);
-#if defined(TREE3D12)
-        //texture = &m_textures[textureFilename];
-#else
-        //texture = &m_textures[textureFilename];
-#endif
-	}
+    }
 
 	// Create constants for material
 #if defined(TREE3D12)
@@ -1286,10 +1294,10 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     ::GetPlatform(this)->GetDevice()->CreateConstantBufferView(&constViewDesc, cpuMaterialHandle);
 
     // Copy texture descriptor from offline heap to shader visible heap
-    if (texture.texture)
+    if (texture)
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE dest(cpuMaterialHandle, Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE src(texture.textureView, 0, m_srvCbvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE src(texture->textureView, 0, m_srvCbvDescriptorSize);
         ::GetPlatform(this)->GetDevice()->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
     m_numMaterialsCreated++;
@@ -1324,11 +1332,11 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 	}
 
 #if defined(TREE3D12)
-    Material* newMat = new Material(name, &texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
+    Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
 		nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/, 
 		shaderMaterial, pCBMaterial, pMaterialConstBufferDataBegin, gpuMaterialHandle);
 #else
-	Material* newMat = new Material(name, &texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
+	Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
 		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
 		shaderMaterial, pConstBuffer);
 #endif

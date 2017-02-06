@@ -71,6 +71,7 @@ struct LoadedTexture
 
     LoadedTexture() : texture(nullptr) { }
     LoadedTexture(ID3D11ShaderResourceView* textureParam) : texture(textureParam) { }
+    LoadedTexture(LoadedTexture const& rhs) : texture(rhs.texture) { }
 #endif 
 };
 
@@ -88,7 +89,7 @@ struct VertexShader
 #endif
 
     VertexShader() : shader(nullptr) { }
-    ~VertexShader() { Release(); }
+    //~VertexShader() { Release(); }
 
     void Release()
     {
@@ -113,7 +114,7 @@ struct PixelShader
 #endif
 
     PixelShader() : shader(nullptr) { }
-    ~PixelShader() { Release(); }
+    //~PixelShader() { Release(); }
 
     void Release()
     {
@@ -568,7 +569,7 @@ public:
     D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; } 
 
     // Materials
-    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture);
+    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
 
     // TODO make private
@@ -702,7 +703,7 @@ public:
     HRESULT EndDrawText();
 
     // Materials
-    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture);
+    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
 
     // TEMPTEMP TODO make privdate
     // Default shader
@@ -734,7 +735,7 @@ class RenderManager : public IRenderFrame
     // Filled in during scene initialization
     std::map<wstring, Material*>                    m_materials;
     std::map<wstring, Mesh>                         m_meshes;
-    std::map<wstring, LoadedTexture>                m_textures;
+    std::map<wstring, LoadedTexture*>               m_textures;
 
     std::map<wstring, VertexShader*>                m_vertexShaders;
     std::map<wstring, PixelShader*>                 m_pixelShaders;
@@ -777,7 +778,7 @@ class RenderManager : public IRenderFrame
 
     DirectionalLight					m_light;  // Doesn't belong here, will move later
 
-    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture* loadedTexture);
+    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
     HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
     HRESULT Render(RenderUnit& renderUnit, RenderPass pass);
     HRESULT RenderScene(RenderPass pass);
@@ -804,7 +805,7 @@ public:
     UINT                                m_srvCbvDescriptorSize; //TEMPTEMP
     //TEMPTEMP
     CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
-    std::map<wstring, LoadedTexture>& GetTextures() { return m_textures; } //TEMPTEMP
+    std::map<wstring, LoadedTexture*>& GetTextures() { return m_textures; } //TEMPTEMP
 
     RenderPlatform12* GetPlatform() { return (RenderPlatform12*) m_platform; }
 
