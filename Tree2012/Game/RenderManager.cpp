@@ -848,30 +848,20 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 
 HRESULT RenderManager::BeginFrame()
 {
-#if defined(TREE3D12)
+    D3DBuffer& buffer = m_instancedBuffer.Get(m_renderData.frame);
 
-    GetPlatform()->RenderFrameSetupCommon(true);
-
-	InstancedData* dataView = nullptr;
-	CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
-	HR(m_instancedBuffer.Get(m_renderData.frame)->Map(0, &readRange, reinterpret_cast<void**>(&dataView)));
-
-	//TODO should Map() in D3D12 only get called once at create time?
-#else
-	// Compute instance data
-	D3D11_MAPPED_SUBRESOURCE mappedData;
-	HRR(m_immediateContext->Map(m_instancedBuffer.Get(m_renderData.frame), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
-	InstancedData* dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
-#endif
+    InstancedData* dataView = nullptr;
+    GetPlatform()->BeginFrame(true, buffer, &dataView);
 
 	m_renderData.instanceData = dataView;
+
 	return S_OK;
 }
 
 HRESULT RenderManager::EndFrame()
 {
 #if defined(TREE3D12)
-	m_instancedBuffer.Get(m_renderData.frame)->Unmap(0, nullptr);
+	m_instancedBuffer.Get(m_renderData.frame).buffer->Unmap(0, nullptr);
 #else
 	m_immediateContext->Unmap(m_instancedBuffer.Get(m_renderData.frame), 0);
 #endif
@@ -2391,8 +2381,13 @@ void RenderManager::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-HRESULT RenderPlatform12::RenderFrameSetupCommon(bool resetCommandList)
+HRESULT RenderPlatform12::BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView)
 {
+    // Get a handle to the instance buffer.  Game will fill out data before calling Render()
+    CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+    HR(buffer.buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
+    //TODO should Map() in D3D12 only get called once at create time?
+
     HRESULT hr = S_OK;
     if (resetCommandList)
     {
@@ -2442,6 +2437,17 @@ HRESULT RenderPlatform12::RenderFrameSetupCommon(bool resetCommandList)
 
     return hr;
 }
+#else
+HRESULT RenderPlatform11::BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView)
+{
+    // Compute instance data
+    D3D11_MAPPED_SUBRESOURCE mappedData;
+    HRR(m_immediateContext->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
+    *dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
+
+    return S_OK;
+}
+
 #endif
 
 //--------------------------------------------------------------------------------------

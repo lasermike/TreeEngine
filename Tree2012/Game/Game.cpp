@@ -207,14 +207,14 @@ void Game::Update(DX::StepTimer const& timer)
         XMStoreFloat3(&m_renderManager.GetRenderData().dirLights[0].Direction, vec);
     }
 
-	HR(m_renderManager.BeginFrame());
+    HR(m_renderManager.BeginFrame());
 
-	// Compute per-frame values
-	HR(m_pScene->Update(m_renderManager, *m_threadPool));
+    // Compute per-frame values
+    HR(m_pScene->Update(m_renderManager, *m_threadPool));
 
     m_player->Update(timer, &m_renderManager.GetRenderData());
 
-	HR(m_renderManager.EndFrame());
+    HR(m_renderManager.EndFrame());
 
 }
 

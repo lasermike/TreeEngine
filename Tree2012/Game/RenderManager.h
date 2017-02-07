@@ -298,10 +298,12 @@ struct RenderUnit
 struct DoubleBuffer
 {
 #if defined (TREE3D12)
-	CComPtr<ID3D12Resource> buffers[2];
+    //CComPtr<ID3D12Resource> buffers[2];
+    D3DBuffer buffers[2];
     D3D12_VERTEX_BUFFER_VIEW views[2];
 #else
-	CComPtr<ID3D11Buffer> buffers[2];
+    //CComPtr<ID3D11Buffer> buffers[2];
+    D3DBuffer buffers[2];
 #endif
 
 	DoubleBuffer() 
@@ -309,7 +311,7 @@ struct DoubleBuffer
 	}
 
 #if defined (TREE3D12)
-	ID3D12Resource* Get(UINT frame) { return buffers[frame % 2]; }
+	D3DBuffer& Get(UINT frame) { return buffers[frame % 2]; }
 
     D3D12_VERTEX_BUFFER_VIEW GetView(UINT frame) { return views[frame % 2]; }
 
@@ -324,8 +326,8 @@ struct DoubleBuffer
 			&CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&buffers[0])));
-        views[0].BufferLocation = buffers[0]->GetGPUVirtualAddress();
+			IID_PPV_ARGS(&buffers[0].buffer)));
+        views[0].BufferLocation = buffers[0].buffer->GetGPUVirtualAddress();
         views[0].SizeInBytes = sizeBytes;
         views[0].StrideInBytes = sizeBytes / numInstances;
 
@@ -335,8 +337,8 @@ struct DoubleBuffer
 			&CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&buffers[1])));
-        views[1].BufferLocation = buffers[1]->GetGPUVirtualAddress();
+			IID_PPV_ARGS(&buffers[1].buffer)));
+        views[1].BufferLocation = buffers[1].buffer->GetGPUVirtualAddress();
         views[1].SizeInBytes = sizeBytes;
         views[1].StrideInBytes = sizeBytes / numInstances;
 
@@ -346,15 +348,15 @@ struct DoubleBuffer
 		return S_OK;
 	}
 #else
-	ID3D11Buffer* Get(UINT frame) { return buffers[frame % 2]; }
+	D3DBuffer& Get(UINT frame) { return buffers[frame % 2]; }
 
 	HRESULT Create(const D3D11_BUFFER_DESC& bd, XSF::D3DDevice* device)
 	{
 		buffers[0].Release();
 		buffers[1].Release();
 
-		HRR(device->CreateBuffer(&bd, 0, &buffers[0]));
-		HRR(device->CreateBuffer(&bd, 0, &buffers[1]));
+		HRR(device->CreateBuffer(&bd, 0, &buffers[0].buffer));
+		HRR(device->CreateBuffer(&bd, 0, &buffers[1].buffer));
 		SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
 		SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
 
@@ -554,15 +556,16 @@ public:
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
     HRESULT UninitGameLevelGraphics();
 
-    HRESULT RenderFrameSetupCommon(bool resetCommandList);
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+
+    HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
+    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
     HRESULT EndDrawText();
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
 
     void WaitForPreviousFrame();
 
@@ -693,8 +696,11 @@ public:
     HRESULT UninitDevice();
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
     HRESULT UninitGameLevelGraphics();
+
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+
+    HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
 
     HRESULT ReleaseSwapChainResources();
