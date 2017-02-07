@@ -48,8 +48,6 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 
 void Game::UpdateViewMatrix()
 {
-	XMStoreFloat4x4(&m_renderManager.GetRenderData().view, m_player->GetViewMatrix());
-	m_renderManager.GetRenderData().eyePos = m_player->GetEyePosition();
 }
 
 Game::~Game()
@@ -277,7 +275,8 @@ void Game::Render(bool oculus)
         PIXEndEvent();
     }
 
-    UpdateViewMatrix();
+    XMStoreFloat4x4(&m_renderManager.GetRenderData().view, m_player->GetViewMatrix());
+    m_renderManager.GetRenderData().eyePos = m_player->GetEyePosition();
 
     m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
         m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);

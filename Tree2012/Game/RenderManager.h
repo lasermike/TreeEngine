@@ -134,22 +134,22 @@ struct Material
     PixelShader*                    m_pixelShader;
 
 #if defined(TREE3D12)
-    const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
 
     CComPtr<ID3D12Resource>         m_constBuffer;
     UINT8*                          m_pConstBufferDataBegin;
     D3D12_GPU_DESCRIPTOR_HANDLE     m_cbvSrvHeapTable;
 
     // NYI
+    const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
     void* m_samplerState;
     void* m_rasterizer;
     void* m_depthState;
 #else
-    ID3D11InputLayout*        m_inputLayout;
 
     CComPtr<ID3D11Buffer>     m_constBuffer;
 
     // NYI
+    ID3D11InputLayout*        m_inputLayout;
     ID3D11SamplerState*       m_samplerState;
     ID3D11RasterizerState*    m_rasterizer;
     ID3D11DepthStencilState*  m_depthState;
@@ -173,7 +173,8 @@ public:
         ASSERT(m_inputLayout != nullptr);
         ASSERT(m_constBuffer != nullptr);
         ASSERT(pConstBufferDataBegin != nullptr);
-        //TODO
+
+        // TODO: create a pipeline state object for these
         //ASSERT(m_samplerState != nullptr);
         //ASSERT(m_rasterizer != nullptr);
         //ASSERT(m_depthState != nullptr);
@@ -470,7 +471,6 @@ private:
     DescriptorHeapWrapper             m_dsvHeap;
     DescriptorHeapWrapper             m_shaderHeap;
 
-
     CComPtr<ID3D12Resource>           m_renderTargets[RenderPlatform12::FrameCount];
     D3D12_RESOURCE_DESC               m_pRenderTargetView;
     CComPtr<ID3D12Resource>           m_pDepthStencil;
@@ -490,13 +490,16 @@ private:
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC   m_constViewDescs[4];
     D3D12_GPU_VIRTUAL_ADDRESS         m_constBufferAddresses[4];
+
     CComPtr<ID3D12Resource>           m_CBNeverChanges;
     UINT8*                            m_CBNeverChangesDataBegin;
+
     CComPtr<ID3D12Resource>           m_CBShadowNeverChanges;
-    D3D12_CONSTANT_BUFFER_VIEW_DESC   m_shadowNeverChangesConstViewDesc;
     UINT8*                            m_CBShadowPassNeverChangesDataBegin;
+    D3D12_CONSTANT_BUFFER_VIEW_DESC   m_shadowNeverChangesConstViewDesc;
 
     CComPtr<ID3D12Resource>           m_CBChangesEveryFrame;
+
     CComPtr<ID3D12Resource>           m_pCBChangeOnResize;
     UINT8*                            m_CBChangesOnResizeDataBegin;
     CBChangeOnResize                  m_cbChangesOnResize;
@@ -561,7 +564,6 @@ public:
 
     HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
-    void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer, bool m_renderToSharedTexture, float* clearColor);
     void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
     HRESULT BeginDrawText();
@@ -704,7 +706,6 @@ public:
 
     HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
-    void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer, bool m_renderToSharedTexture, float* clearColor);
     void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
     HRESULT ReleaseSwapChainResources();
