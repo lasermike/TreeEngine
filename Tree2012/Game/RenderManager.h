@@ -583,12 +583,16 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentDepthTargetHandle() { return m_dsvHeap.hCPU(SwapChainDsv_HeapOffset); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetShadowDepthTargetHandle() { return m_dsvHeap.hCPU(ShadowDsv_HeapOffset); }
     ID3D12Resource* GetCurrentRenderTarget() { return m_renderTargets[m_frameIndex]; }
+
     ID3D12RootSignature* GetRootSignature() { return m_rootSignature; }
     D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
     D3D12_RECT& GetScissorRect() { return m_scissorRect; }
+
     ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
     ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
+
     ID3D12PipelineState* GetPipelineState() { return m_pipelineState; }
+
     RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
 
     // TEMPTEMP make private 
@@ -602,7 +606,6 @@ public:
 
     // TEMPTEMP make private
     HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
-    //ID3D12PipelineState * GetPipelineState() { return m_pipelineState; }
     ID3D12Fence* GetFence() { return m_fence; }
 
 
@@ -763,20 +766,12 @@ class RenderManager : public IRenderFrame
 
     // App resources.
 
-#if defined(TREE3D12)
-
-    //D3D12_RESOURCE_DESC					m_debugTextureRV;
-
-#else
-    //CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
-#endif
-
     DoubleBuffer                        m_instancedBuffer;
 
-    GeometryGenerator					m_geometryGenerator;
-    GeometryBufferData					m_geometryData;
+    GeometryGenerator                   m_geometryGenerator;
+    GeometryBufferData                  m_geometryData;
 
-    DirectionalLight					m_light;  // Doesn't belong here, will move later
+    DirectionalLight                    m_light;  // Doesn't belong here, will move later
 
     HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
     HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
@@ -801,10 +796,12 @@ public:
     RenderData& GetRenderData() { return m_renderData; }
 #if defined (TREE3D12)
 
-    ID3D12DescriptorHeap* GetShaderHeap() { return m_cbvSrvHeap; }  //TEMPTEMP 
+    DescriptorHeapWrapper             m_shaderHeap;
+    //CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
+    DescriptorHeapWrapper& GetShaderHeap() { return m_shaderHeap; }  //TEMPTEMP 
     UINT                                m_srvCbvDescriptorSize; //TEMPTEMP
+
     //TEMPTEMP
-    CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
     std::map<wstring, LoadedTexture*>& GetTextures() { return m_textures; } //TEMPTEMP
 
     RenderPlatform12* GetPlatform() { return (RenderPlatform12*) m_platform; }
@@ -840,7 +837,7 @@ public:
     HRESULT EndFrame();
 
     void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
-        bool m_renderToSharedTexture, float* clearColor);
+                bool m_renderToSharedTexture, float* clearColor);
 
     HRESULT DrawFrameStats();
     HRESULT RenderShadowMap();

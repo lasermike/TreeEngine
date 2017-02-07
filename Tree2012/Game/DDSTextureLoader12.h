@@ -57,4 +57,7 @@ HRESULT __cdecl CreateDDSTextureFromFile(_In_ RenderPlatform12* renderPlatform,
     _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr
     );
 
+HRESULT __cdecl CreateTextureFromBits(RenderPlatform12* renderPlatform, UINT NumSubresources, int width, int height, int sizeBytes, uint8_t* bits,
+                              ID3D12Resource** texture, D3D12_CPU_DESCRIPTOR_HANDLE textureView);
+
 //size_t BitsPerPixel(_In_ DXGI_FORMAT fmt);

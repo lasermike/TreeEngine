@@ -1261,6 +1261,59 @@ static HRESULT CreateTextureFromDDS(_In_ RenderPlatform12* renderPlatform,
     return hr;
 }
 
+HRESULT CreateTextureFromBits(RenderPlatform12* renderPlatform,UINT NumSubresources, int width, int height, int sizeBytes, uint8_t* bits,
+                                     ID3D12Resource** texture, D3D12_CPU_DESCRIPTOR_HANDLE textureView)
+{
+    // Describe and create a Texture2D.
+    D3D12_RESOURCE_DESC textureDesc = {};
+    textureDesc.MipLevels = 1;
+    textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    textureDesc.DepthOrArraySize = 1;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.SampleDesc.Quality = 0;
+    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+
+    CComPtr<ID3D12Resource> createdTexture;
+
+    HRR(renderPlatform->GetDevice()->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &textureDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&createdTexture)));
+
+    createdTexture->SetName(L"raw data texture");
+
+    D3D12_SUBRESOURCE_DATA initData = {};
+
+    size_t skipMip = 0;
+    size_t twidth = 0;
+    size_t theight = 0;
+    size_t tdepth = 0;
+    HRR(FillInitData(width, height, 1 /*depth*/, 1 /*mipCount*/, 1 /*arraySize*/, textureDesc.Format, 0 /*maxsize*/, sizeBytes, bits,
+        twidth, theight, tdepth, skipMip, &initData));
+
+    GpuResource DestTexture(createdTexture, D3D12_RESOURCE_STATE_COMMON);
+    InitializeTexture(DestTexture, renderPlatform, 1 /*subresourceCount*/, &initData);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
+    SRVDesc.Format = textureDesc.Format;
+    SRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    SRVDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    SRVDesc.Texture2D.MipLevels = textureDesc.MipLevels; //(!mipCount) ? -1 : ResourceDesc.MipLevels;
+    SRVDesc.Texture2D.MostDetailedMip = 0;
+
+    renderPlatform->GetDevice()->CreateShaderResourceView(createdTexture, &SRVDesc, textureView);
+
+    *texture = createdTexture.Detach();
+    return S_OK;
+}
+
+
 
 //--------------------------------------------------------------------------------------
 static DDS_ALPHA_MODE GetAlphaMode(_In_ const DDS_HEADER* header)
