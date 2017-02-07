@@ -155,7 +155,7 @@ void InputLayouts::DestroyAll()
 
 RenderManager::RenderManager() : m_platform(nullptr)
 #if defined(TREE3D12)
-    , m_srvCbvDescriptorSize(0), m_numMaterialsCreated(0)
+    , m_numMaterialsCreated(0)
 #endif
 {
     m_displayMode = Monitor;
@@ -369,6 +369,14 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
     HRR(GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
+    // Initialize null descriptor
+    D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc = {};
+    nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    nullSrvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    nullSrvDesc.Texture2D.MipLevels = 1;
+    GetDevice()->CreateShaderResourceView(nullptr, &nullSrvDesc, m_shaderHeap.hCPU(NullSrv_HeapOffset));
+
     // Init text font
     m_bitmapFont = new XSF::BitmapFont();
     HRR(m_bitmapFont->Create(this->m_renderManager, L"Arial_16"));
@@ -500,6 +508,18 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     WaitForPreviousFrame();
 
+    // Init shadow map
+    if (useShadowMaps)
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE shadowDsv = GetShadowDepthTargetHandle();
+        m_renderManager->GetRenderData().pShadowMap = new ShadowMap(GetDevice(), 
+                                                                    m_shaderHeap.hCPU(ShadowSrv_HeapOffset), 
+                                                                    m_shaderHeap.hGPU(ShadowSrv_HeapOffset), 
+                                                                    shadowDsv, 
+                                                                    m_renderManager->GetRenderData().SMapWidth, 
+                                                                    m_renderManager->GetRenderData().SMapHeight);
+    }
+
     return S_OK;
 }
 #else
@@ -607,6 +627,10 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Set primitive topology
     m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+    if (useShadowMaps)
+    {
+        m_renderManager->GetRenderData().pShadowMap = new ShadowMap(GetD3DDevice(), m_renderManager->GetRenderData().SMapWidth, m_renderManager->GetRenderData().SMapHeight);
+    }
 
     return S_OK;
 }
@@ -624,12 +648,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps, m_geometryData);
 
 
-	// Load the debug texture
-#if defined(TREE3D12)
-#else
-	//HRR(CreateDDSTextureFromFile(::GetPlatform(this)->GetDevice(), L"snow.dds", nullptr, &m_debugTextureRV));
-	//SetDebugName(m_debugTextureRV, "RenderManager::m_debugTextureRV");
-#endif
 	// Create instanced buffer
 #if defined (TREE3D12)
 	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, ::GetPlatform(this)->GetDevice()));
@@ -644,30 +662,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 	vbd.StructureByteStride = 0;
 	HRR(m_instancedBuffer.Create(vbd, ::GetPlatform(this)->GetD3DDevice()));
 #endif
-
-#if defined(TREE3D12)
-    // Initialize null descriptor
-    D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc = {};
-    nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    nullSrvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    nullSrvDesc.Texture2D.MipLevels = 1;
-
-    ::GetPlatform(this)->GetDevice()->CreateShaderResourceView(nullptr, &nullSrvDesc, m_shaderHeap.hCPU(NullSrv_HeapOffset));
-
-#endif
-
-	// Init shadow map
-	if (useShadowMaps)
-	{
-#if defined(TREE3D12)
-        D3D12_CPU_DESCRIPTOR_HANDLE shadowDsv = GetPlatform()->GetShadowDepthTargetHandle();
-        GetRenderData().pShadowMap = new ShadowMap(::GetPlatform(this)->GetDevice(), m_shaderHeap.hCPU(ShadowSrv_HeapOffset), m_shaderHeap.hGPU(ShadowSrv_HeapOffset), shadowDsv, GetRenderData().SMapWidth, GetRenderData().SMapHeight);
-
-#else
-        GetRenderData().pShadowMap = new ShadowMap(::GetPlatform(this)->GetD3DDevice(), GetRenderData().SMapWidth, GetRenderData().SMapHeight);
-#endif
-    }
 
     return S_OK;
 }
@@ -972,7 +966,7 @@ HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
     GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material->m_cbvSrvHeapTable);
 
     // Set texture buffer view
-    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_srvCbvDescriptorSize);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, GetPlatform()->m_srvCbvDescriptorSize);
     GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
 #else
@@ -1033,7 +1027,7 @@ HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, LoadedTexture** texture)
 {
     int heapIndex = int(m_renderManager->GetTextures().size());
-    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_renderManager->m_srvCbvDescriptorSize);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_srvCbvDescriptorSize);
 
     ID3D12Resource* resource = nullptr;
     HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
@@ -1136,22 +1130,22 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 	return S_OK;
 }
 
-HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height)
-{
 #if defined(TREE3D12)
+HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, LoadedTexture** loadedTexture)
+{
     CComPtr<ID3D12Resource> texture;
 
-    int heapIndex = int(GetTextures().size());
+    // TODO: Need to manage these heap entries
+    int heapIndex = int(m_renderManager->GetTextures().size());
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_srvCbvDescriptorSize);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
-    D3D12_CPU_DESCRIPTOR_HANDLE dest = m_shaderHeap.hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
+    // TODO: copy descriptor over
+    //D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
+    //D3D12_CPU_DESCRIPTOR_HANDLE dest = m_shaderHeap.hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
 
-    HRR(CreateTextureFromBits(GetPlatform(), 1 /*NumSubresources*/, width, height, sizeof(float) * width * height /*sizeBytes*/, (uint8_t*) points,
-        &texture, dest));
+    //HRR(CreateTextureFromBits(GetPlatform(), 1 /*NumSubresources*/, width, height, sizeof(float) * width * height /*sizeBytes*/, (uint8_t*)points,
+    //    &texture, dest));
 
-    // Success
-    m_textures[name] = new LoadedTexture(texture, dest, heapIndex);
-    texture.Detach();
 
 #if 0
     // Create the texture.
@@ -1237,48 +1231,70 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
         GetPlatform()->WaitForPreviousFrame();
     }
 #endif
-    
-#else
-	D3D11_TEXTURE2D_DESC desc = {};
-	desc.Width = width;
-	desc.Height = height;
-	desc.ArraySize = 1;
-	desc.MipLevels = 1;
-	desc.SampleDesc.Count = 1;
-	desc.SampleDesc.Quality = 0;
-	desc.Format = DXGI_FORMAT_R32_FLOAT;
-	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
-	D3D11_SUBRESOURCE_DATA subData = {};
-	subData.pSysMem = points;
-	subData.SysMemPitch = width * sizeof(float);
-	subData.SysMemSlicePitch = width * height * sizeof(float);
+    return S_OK;
+}
+
+#else
+
+HRESULT RenderPlatform11::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, LoadedTexture** loadedTexture)
+{
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width = width;
+    desc.Height = height;
+    desc.ArraySize = 1;
+    desc.MipLevels = 1;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Format = DXGI_FORMAT_R32_FLOAT;
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+    D3D11_SUBRESOURCE_DATA subData = {};
+    subData.pSysMem = points;
+    subData.SysMemPitch = width * sizeof(float);
+    subData.SysMemSlicePitch = width * height * sizeof(float);
 
     CComPtr<ID3D11Texture2D> texture;
-	HRR(::GetPlatform(this)->GetDevice()->CreateTexture2D(&desc, &subData, &texture));
-	SetDebugName(texture, "RenderManager::CreateTexture2::procedural");
+    HRR(GetDevice()->CreateTexture2D(&desc, &subData, &texture));
+    SetDebugName(texture, "RenderManager::CreateTexture2::procedural");
 
-	CComPtr<ID3D11ShaderResourceView> view;
-	HRR(::GetPlatform(this)->GetDevice()->CreateShaderResourceView(texture, nullptr, &view));
-	SetDebugName(view, "RenderManager::CreateTexture2::proc view");
+    CComPtr<ID3D11ShaderResourceView> view;
+    HRR(GetDevice()->CreateShaderResourceView(texture, nullptr, &view));
+    SetDebugName(view, "RenderManager::CreateTexture2::proc view");
 
 #if 0
-	Image img;
-	img.width = width;
-	img.height = height;
-	img.format = DXGI_FORMAT_R32_FLOAT;
-	img.rowPitch = subData.SysMemPitch;
-	img.slicePitch = subData.SysMemSlicePitch ;
-	img.pixels = (uint8_t*) subData.pSysMem;
-	HR(SaveToDDSFile(img, DDS_FLAGS_NONE, L"FSGraphTexture.DDS"));
+    Image img;
+    img.width = width;
+    img.height = height;
+    img.format = DXGI_FORMAT_R32_FLOAT;
+    img.rowPitch = subData.SysMemPitch;
+    img.slicePitch = subData.SysMemSlicePitch;
+    img.pixels = (uint8_t*)subData.pSysMem;
+    HR(SaveToDDSFile(img, DDS_FLAGS_NONE, L"FSGraphTexture.DDS"));
 #endif
-	
-	// Success
-	m_textures[name] = new LoadedTexture(view);
-	texture.Release();
-	view.Detach();
+
+    // Success
+    *loadedTexture = new LoadedTexture(view);
+    texture.Release();
+    view.Detach();
+
+    return S_OK;
+}
+
 #endif
-	return S_OK;
+
+HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height)
+{
+    LoadedTexture* texture = nullptr;
+
+    HRR(GetPlatform()->CreateTexture2D(name, points, width, height, &texture));
+
+    // Success
+    assert(texture);
+
+    m_textures[name] = texture;
+
+    return S_OK;
 }
 
 
@@ -1309,8 +1325,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     D3D12_CONSTANT_BUFFER_VIEW_DESC constViewDesc = {};
     HR(GetPlatform()->CreateConstantBuffer(sizeof(CBMaterial), nullptr, constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
 
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = m_shaderHeap.hGPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = GetPlatform()->GetShaderHeap().hGPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = GetPlatform()->GetShaderHeap().hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
 
     // Create descriptor
     ::GetPlatform(this)->GetDevice()->CreateConstantBufferView(&constViewDesc, cpuMaterialHandle);
@@ -1318,7 +1334,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     // Copy texture descriptor from offline heap to shader visible heap
     if (texture)
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE dest = m_shaderHeap.hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
+        D3D12_CPU_DESCRIPTOR_HANDLE dest = GetPlatform()->GetShaderHeap().hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
         GetPlatform()->GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
     m_numMaterialsCreated++;
@@ -1572,14 +1588,12 @@ HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList,
     GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
     GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
 
-    //CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapHandle(m_renderManager->m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), ShadowSrv_HeapOffset, m_renderManager->m_srvCbvDescriptorSize);
-    D3D12_GPU_DESCRIPTOR_HANDLE shadowMapHandle = m_renderManager->GetShaderHeap().hGPU(ShadowSrv_HeapOffset);
+    D3D12_GPU_DESCRIPTOR_HANDLE shadowMapHandle = GetShaderHeap().hGPU(ShadowSrv_HeapOffset);
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, shadowMapHandle);
 
     commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
-    //CD3DX12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu(m_renderManager->m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_renderManager->m_srvCbvDescriptorSize);
-    D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_renderManager->GetShaderHeap().hGPU(NullSrv_HeapOffset);
+    D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = GetShaderHeap().hGPU(NullSrv_HeapOffset);
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
 
 
@@ -1678,6 +1692,9 @@ HRESULT RenderPlatform12::InitDevice()
     loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     HRR(GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
 
+    // Shader visible heap
+    HRR(m_shaderHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, true));
+    m_srvCbvDescriptorSize = GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -1729,22 +1746,6 @@ HRESULT RenderManager::InitDevice()
 	HRESULT hr = S_OK;
 
     HRR(::GetPlatform(this)->InitDevice());
-
-
-	// Shader visible descriptor size
-	m_srvCbvDescriptorSize = ::GetPlatform(this)->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-
-    // Describe and create a SRV descriptor heap.
-    // Flags indicate that this descriptor heap can be bound to the pipeline 
-    // and that descriptors contained in it can be referenced by a root table.
-    //D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-    //srvHeapDesc.NumDescriptors = maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors /* shadow, null, etc */;
-    //srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    //srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    //HRR(GetPlatform()->GetDevice()->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
-
-    HRR(m_shaderHeap.Initialize(GetPlatform()->GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, true));
 
     // Initialize the world matrices
     XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
@@ -2316,6 +2317,8 @@ HRESULT RenderPlatform12::UninitDevice()
 {
     ReleaseSwapChainResources();
 
+    TrimUploadHeaps(true);
+
     m_rtvHeap.Terminate();
     m_dsvHeap.Terminate();
 
@@ -2339,6 +2342,7 @@ HRESULT RenderPlatform12::UninitDevice()
     CloseHandle(m_fenceEvent);
     m_fenceEvent = nullptr;
 
+    m_shaderHeap.Terminate();
 
     // InitDevice objects
     m_d3dDevice.Release();
@@ -2370,7 +2374,6 @@ void RenderManager::UninitDevice()
 
 
 #if defined(TREE3D12)
-    m_shaderHeap.Terminate();
 
 #else
 	m_immediateContext.Release();
@@ -2416,7 +2419,7 @@ HRESULT RenderPlatform12::RenderFrameSetupCommon(bool resetCommandList)
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
-    ID3D12DescriptorHeap* ppHeaps[] = { m_renderManager->GetShaderHeap() };
+    ID3D12DescriptorHeap* ppHeaps[] = { GetShaderHeap() };
     m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     m_commandList->RSSetViewports(1, &m_viewPort);
@@ -2427,11 +2430,10 @@ HRESULT RenderPlatform12::RenderFrameSetupCommon(bool resetCommandList)
     m_commandList->OMSetStencilRef(0);
 
     // Set default material (first material).  Will be changed by calls to SetMaterial()
-    D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_renderManager->GetShaderHeap().hGPU(Material0_HeapOffset);;
+    D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = GetShaderHeap().hGPU(Material0_HeapOffset);;
     m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, materialHandle);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_renderManager->GetShaderHeap().hGPU(Texture0Srv_HeapOffset);;
-    //materialHandle.Offset(Texture0Srv_HeapOffset - Material0_HeapOffset, m_renderManager->m_srvCbvDescriptorSize);
+    D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = GetShaderHeap().hGPU(Texture0Srv_HeapOffset);;
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureHandle);
 
     // Set root signature constant buffers
@@ -2571,7 +2573,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     if (useShadowMaps)
     {
 #if defined(TREE3D12)
-        D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_shaderHeap.hGPU(NullSrv_HeapOffset); // m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
+        D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = GetPlatform()->GetShaderHeap().hGPU(NullSrv_HeapOffset); // m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), NullSrv_HeapOffset, m_srvCbvDescriptorSize);
         GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
 #else
         ID3D11ShaderResourceView* depthTexture = nullptr;
@@ -2802,19 +2804,19 @@ void RenderManager::DrawSceneToShadowMap()
 //--------------------------------------------------------------------------------------
 void RenderPlatform12::TrimUploadHeaps(bool removeTerminatedHeaps)
 {
-	const UINT64 fenceValue = m_fence->GetCompletedValue();
-	for (std::list<FencedHeap>::const_iterator iterManagedHeap = m_managedUploadHeaps.begin(); iterManagedHeap != m_managedUploadHeaps.end(); ++iterManagedHeap)
-	{
-		if (iterManagedHeap->m_pUploadHeap != nullptr && iterManagedHeap->m_fenceValue <= fenceValue)
-		{
-			iterManagedHeap->m_pUploadHeap->Terminate();
-		}
-	}
+    const UINT64 fenceValue = m_fence->GetCompletedValue();
+    for (std::list<FencedHeap>::const_iterator iterManagedHeap = m_managedUploadHeaps.begin(); iterManagedHeap != m_managedUploadHeaps.end(); ++iterManagedHeap)
+    {
+        if (iterManagedHeap->m_pUploadHeap != nullptr && iterManagedHeap->m_fenceValue <= fenceValue)
+        {
+            iterManagedHeap->m_pUploadHeap->Terminate();
+        }
+    }
 
-	if (removeTerminatedHeaps)
-	{
-		m_managedUploadHeaps.remove_if(is_heap_terminated());
-	}
+    if (removeTerminatedHeaps)
+    {
+        m_managedUploadHeaps.remove_if(is_heap_terminated());
+    }
 }
 
 //--------------------------------------------------------------------------------------
@@ -2824,7 +2826,7 @@ void RenderPlatform12::TrimUploadHeaps(bool removeTerminatedHeaps)
 _Use_decl_annotations_
 void RenderPlatform12::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
 {
-	m_managedUploadHeaps.push_back(FencedHeap(pUploadHeap, m_fenceValue));
+    m_managedUploadHeaps.push_back(FencedHeap(pUploadHeap, m_fenceValue));
 }
 
 RenderPlatform12* GetPlatform(RenderManager* manager)

@@ -89,7 +89,6 @@ struct VertexShader
 #endif
 
     VertexShader() : shader(nullptr) { }
-    //~VertexShader() { Release(); }
 
     void Release()
     {
@@ -114,7 +113,6 @@ struct PixelShader
 #endif
 
     PixelShader() : shader(nullptr) { }
-    //~PixelShader() { Release(); }
 
     void Release()
     {
@@ -459,6 +457,7 @@ class RenderPlatform12 : public RenderPlatform
 {
 public:
     static const UINT                 FrameCount = 2;
+    UINT                              m_srvCbvDescriptorSize; //TEMPTEMP
 
 private:
     CComPtr<ID3D12Device>             m_d3dDevice;
@@ -467,6 +466,8 @@ private:
 
     DescriptorHeapWrapper             m_rtvHeap;
     DescriptorHeapWrapper             m_dsvHeap;
+    DescriptorHeapWrapper             m_shaderHeap;
+
 
     CComPtr<ID3D12Resource>           m_renderTargets[RenderPlatform12::FrameCount];
     D3D12_RESOURCE_DESC               m_pRenderTargetView;
@@ -515,7 +516,7 @@ private:
     CComPtr<ID3D12Resource>           m_screenQuadIB;
     D3D12_INDEX_BUFFER_VIEW           m_screenQuadIBView;
 
-    CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading heap
+    CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading textures
     CComPtr<ID3D12DescriptorHeap>     m_samplerHeap;
     CComPtr<ID3D12PipelineState>      m_pipelineState;
     CComPtr<ID3D12PipelineState>      m_pipelineStateFullScreenQuad;
@@ -533,7 +534,7 @@ private:
 
 public:
 
-    RenderPlatform12(RenderManager* renderManager) : m_renderManager(renderManager), m_fenceEvent(nullptr){ }
+    RenderPlatform12(RenderManager* renderManager) : m_renderManager(renderManager), m_fenceEvent(nullptr), m_srvCbvDescriptorSize(0) { }
     RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     IDXGISwapChain3* GetSwapChain() { return m_pSwapChain; }
@@ -570,6 +571,7 @@ public:
 
     // Materials
     HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
+    HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, LoadedTexture** texture);
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
 
     // TODO make private
@@ -583,6 +585,7 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentDepthTargetHandle() { return m_dsvHeap.hCPU(SwapChainDsv_HeapOffset); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetShadowDepthTargetHandle() { return m_dsvHeap.hCPU(ShadowDsv_HeapOffset); }
     ID3D12Resource* GetCurrentRenderTarget() { return m_renderTargets[m_frameIndex]; }
+    DescriptorHeapWrapper& GetShaderHeap() { return m_shaderHeap; }  //TEMPTEMP 
 
     ID3D12RootSignature* GetRootSignature() { return m_rootSignature; }
     D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
@@ -707,6 +710,7 @@ public:
 
     // Materials
     HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
+    HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, LoadedTexture** texture);
 
     // TEMPTEMP TODO make privdate
     // Default shader
@@ -795,11 +799,6 @@ public:
 
     RenderData& GetRenderData() { return m_renderData; }
 #if defined (TREE3D12)
-
-    DescriptorHeapWrapper             m_shaderHeap;
-    //CComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;            // root descriptor table heap
-    DescriptorHeapWrapper& GetShaderHeap() { return m_shaderHeap; }  //TEMPTEMP 
-    UINT                                m_srvCbvDescriptorSize; //TEMPTEMP
 
     //TEMPTEMP
     std::map<wstring, LoadedTexture*>& GetTextures() { return m_textures; } //TEMPTEMP
