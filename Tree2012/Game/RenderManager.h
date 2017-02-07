@@ -570,8 +570,8 @@ public:
     D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; } 
 
     // Materials
-    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
-    HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, LoadedTexture** texture);
+    HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
+    HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
 
     // TODO make private
@@ -709,8 +709,8 @@ public:
     HRESULT EndDrawText();
 
     // Materials
-    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
-    HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, LoadedTexture** texture);
+    HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
+    HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
     // TEMPTEMP TODO make privdate
     // Default shader
@@ -760,8 +760,6 @@ class RenderManager : public IRenderFrame
     RenderPlatform*                                 m_platform;
 
 #if defined(TREE3D12)
-
-    UINT                                m_numMaterialsCreated;
 #else
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
 #endif
@@ -799,9 +797,6 @@ public:
 
     RenderData& GetRenderData() { return m_renderData; }
 #if defined (TREE3D12)
-
-    //TEMPTEMP
-    std::map<wstring, LoadedTexture*>& GetTextures() { return m_textures; } //TEMPTEMP
 
     RenderPlatform12* GetPlatform() { return (RenderPlatform12*) m_platform; }
 

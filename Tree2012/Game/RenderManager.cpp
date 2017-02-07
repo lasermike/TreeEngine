@@ -154,9 +154,6 @@ void InputLayouts::DestroyAll()
 #pragma endregion
 
 RenderManager::RenderManager() : m_platform(nullptr)
-#if defined(TREE3D12)
-    , m_numMaterialsCreated(0)
-#endif
 {
     m_displayMode = Monitor;
 
@@ -794,13 +791,11 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 
 #if defined(TREE3D12)
 
-    m_numMaterialsCreated = 0;
-
 #else
 #endif
 
-	SafeDelete(&GetRenderData().pShadowMap);
-	m_instancedBuffer.Release();
+    SafeDelete(&GetRenderData().pShadowMap);
+    m_instancedBuffer.Release();
 
     for (auto& t : m_textures)
     {
@@ -812,43 +807,41 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     }
     m_textures.clear();
 
-	for (auto& vs : m_vertexShaders)
-	{
-		if (vs.second)
-		{
+    for (auto& vs : m_vertexShaders)
+    {
+        if (vs.second)
+        {
             vs.second->Release();
             SafeDelete(&vs.second);
-		}
-	}
+        }
+    }
 
-	for (auto& ps : m_pixelShaders)
-	{
-		if (ps.second)
-		{
+    for (auto& ps : m_pixelShaders)
+    {
+        if (ps.second)
+        {
             SafeDelete(&ps.second);
-		}
-	}
+        }
+    }
 
-	for (auto m : m_materials)
-	{
+    for (auto m : m_materials)
+    {
         if (m.second)
-		{
+        {
             SafeDelete(&m.second);
         }
-	}
-	m_materials.clear();
+    }
+    m_materials.clear();
 
-	m_meshes.clear();
-	m_renderUnits.clear();
-	m_objectToInstanceBufferOffset.clear();
-	m_nextInstanceBufferOffset = 0;
-	m_perFrameInstanceData.clear();
+    m_meshes.clear();
+    m_renderUnits.clear();
+    m_objectToInstanceBufferOffset.clear();
+    m_nextInstanceBufferOffset = 0;
+    m_perFrameInstanceData.clear();
 
 #if !defined(TREE3D12)
-	//m_debugTextureRV.Release();
-	InputLayouts::DestroyAll();
+    InputLayouts::DestroyAll();
 #endif
-	//RenderStates::DestroyAll();
 
 	return S_OK;
 }
@@ -1024,22 +1017,21 @@ HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 }
 
 #if defined(TREE3D12)
-HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, LoadedTexture** texture)
+HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** texture)
 {
-    int heapIndex = int(m_renderManager->GetTextures().size());
-    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_srvCbvDescriptorSize);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_srvCbvDescriptorSize);
 
     ID3D12Resource* resource = nullptr;
     HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
     
-    *texture = new LoadedTexture(resource, newDescriptor, (UINT)heapIndex);
+    *texture = new LoadedTexture(resource, newDescriptor, (UINT)textureIndex);
 
     assert((*texture)->texture != nullptr);
 
 	return S_OK;
 }
 #else
-HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture)
+HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int /*textureIndex*/, LoadedTexture** loadedTexture)
 {
     // Load the Texture
     ID3D11ShaderResourceView* tex = nullptr;
@@ -1061,7 +1053,7 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename, LoadedTexture
 
     if (existingTexture == m_textures.end())
     {
-        HRR(GetPlatform()->LoadTexture(textureFilename, loadedTexture));
+        HRR(GetPlatform()->LoadTexture(textureFilename, (int) m_textures.size(), loadedTexture));
         m_textures[textureFilename] = *loadedTexture;
     }
     else
@@ -1131,17 +1123,16 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
 }
 
 #if defined(TREE3D12)
-HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, LoadedTexture** loadedTexture)
+HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** loadedTexture)
 {
     CComPtr<ID3D12Resource> texture;
 
-    // TODO: Need to manage these heap entries
-    int heapIndex = int(m_renderManager->GetTextures().size());
-    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), heapIndex, m_srvCbvDescriptorSize);
+    // TODO: Need to manage these heap entries better
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_srvCbvDescriptorSize);
 
     // TODO: copy descriptor over
-    //D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
-    //D3D12_CPU_DESCRIPTOR_HANDLE dest = m_shaderHeap.hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
+    //D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(materialIndex * numDescriptorsPerMaterial + Material0_HeapOffset);
+    //D3D12_CPU_DESCRIPTOR_HANDLE dest = m_shaderHeap.hCPU(materialIndex * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
 
     //HRR(CreateTextureFromBits(GetPlatform(), 1 /*NumSubresources*/, width, height, sizeof(float) * width * height /*sizeBytes*/, (uint8_t*)points,
     //    &texture, dest));
@@ -1237,7 +1228,7 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
 
 #else
 
-HRESULT RenderPlatform11::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, LoadedTexture** loadedTexture)
+HRESULT RenderPlatform11::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** loadedTexture)
 {
     D3D11_TEXTURE2D_DESC desc = {};
     desc.Width = width;
@@ -1287,7 +1278,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 {
     LoadedTexture* texture = nullptr;
 
-    HRR(GetPlatform()->CreateTexture2D(name, points, width, height, &texture));
+    HRR(GetPlatform()->CreateTexture2D(name, points, width, height, (int) m_textures.size(), &texture));
 
     // Success
     assert(texture);
@@ -1325,8 +1316,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     D3D12_CONSTANT_BUFFER_VIEW_DESC constViewDesc = {};
     HR(GetPlatform()->CreateConstantBuffer(sizeof(CBMaterial), nullptr, constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
 
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = GetPlatform()->GetShaderHeap().hGPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = GetPlatform()->GetShaderHeap().hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Material0_HeapOffset);
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = GetPlatform()->GetShaderHeap().hGPU(m_materials.size() * numDescriptorsPerMaterial + Material0_HeapOffset);
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = GetPlatform()->GetShaderHeap().hCPU(m_materials.size() * numDescriptorsPerMaterial + Material0_HeapOffset);
 
     // Create descriptor
     ::GetPlatform(this)->GetDevice()->CreateConstantBufferView(&constViewDesc, cpuMaterialHandle);
@@ -1334,10 +1325,9 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     // Copy texture descriptor from offline heap to shader visible heap
     if (texture)
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE dest = GetPlatform()->GetShaderHeap().hCPU(m_numMaterialsCreated * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
+        D3D12_CPU_DESCRIPTOR_HANDLE dest = GetPlatform()->GetShaderHeap().hCPU(m_materials.size() * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
         GetPlatform()->GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
-    m_numMaterialsCreated++;
 
 #else
 	CComPtr<ID3D11Buffer> pConstBuffer;
