@@ -252,12 +252,12 @@ void Game::ComputeCPU()
 
 void Game::ComputeGPU()
 {
-    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
+    //PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
 
 	// Render shadow map
 	if (m_gameData.useShadowMaps)
 	{
-		m_renderManager.RenderShadowMap();
+		//m_renderManager.RenderShadowMap();
 	}
 }
 
@@ -267,6 +267,13 @@ void Game::ComputeGPU()
 void Game::Render(bool oculus)
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Render");
+
+    if (m_gameData.useShadowMaps)
+    {
+        PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
+        m_renderManager.RenderShadowMap();
+        PIXEndEvent();
+    }
 
     m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
 

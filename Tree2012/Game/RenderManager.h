@@ -561,6 +561,8 @@ public:
 
     HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+    void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer, bool m_renderToSharedTexture, float* clearColor);
+    void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -702,6 +704,8 @@ public:
 
     HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+    void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer, bool m_renderToSharedTexture, float* clearColor);
+    void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);

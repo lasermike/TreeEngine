@@ -967,43 +967,59 @@ HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
 	}
 
 	m_immediateContext->UpdateSubresource(material->m_constBuffer, 0, nullptr, &cb, 0, 0);
+
+    ID3D11ShaderResourceView* texture = nullptr;
+
+    if (material->m_texture)
+    {
+        texture = material->m_texture->texture;
+    }
+
+    m_immediateContext->PSSetShaderResources(0, 1, &texture);
+
 #endif
 
 	return S_OK;
 }
 
+#if defined(TREE3D12)
+void RenderPlatform12::DrawIndexedInstanced(
+    UINT IndexCountPerInstance,
+    UINT InstanceCount,
+    UINT StartIndexLocation,
+    INT BaseVertexLocation,
+    UINT StartInstanceLocation)
+{
+    GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+}
+#else
+void RenderPlatform11::DrawIndexedInstanced(
+    UINT IndexCountPerInstance,
+    UINT InstanceCount,
+    UINT StartIndexLocation,
+    INT BaseVertexLocation,
+    UINT StartInstanceLocation)
+{
+    m_immediateContext->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+}
+#endif
+
 HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 {
-	SetMaterial(ru.m_material, pass);
+    SetMaterial(ru.m_material, pass);
 
-#if defined(TREE3D12)
-#else
-    ID3D11ShaderResourceView* texture = nullptr;
-
-    if (ru.m_material->m_texture)
+    for (auto object : ru.reservations)
     {
-        texture = ru.m_material->m_texture->texture;
-    }
-
-	m_immediateContext->PSSetShaderResources(0, 1, &texture);
-#endif 
-	for (auto object : ru.reservations)
-	{
         if (pass == ShadowMapPass && object->GetObjectType() == PrimitiveObjectType)
-            continue; 
+            continue;
 
-		UINT startInstance = m_perFrameInstanceData[&ru][object].first;
-		UINT numInstances = m_perFrameInstanceData[&ru][object].second;
+        UINT startInstance = m_perFrameInstanceData[&ru][object].first;
+        UINT numInstances = m_perFrameInstanceData[&ru][object].second;
 
-#if defined(TREE3D12)
-        GetPlatform()->GetCommandList()->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
-			ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
-#else
-		m_immediateContext->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
-												 ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
-#endif
-	}
-	return S_OK;
+        GetPlatform()->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
+            ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
+    }
+    return S_OK;
 }
 
 #if defined(TREE3D12)
@@ -2438,7 +2454,7 @@ HRESULT RenderPlatform12::BeginFrame(bool resetCommandList, D3DBuffer& buffer, I
     return hr;
 }
 #else
-HRESULT RenderPlatform11::BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView)
+HRESULT RenderPlatform11::BeginFrame(bool /*resetCommandList*/, D3DBuffer& buffer, InstancedData** dataView)
 {
     // Compute instance data
     D3D11_MAPPED_SUBRESOURCE mappedData;
