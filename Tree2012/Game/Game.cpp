@@ -268,14 +268,14 @@ void Game::Render(bool oculus)
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Render");
 
+    m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
+
     if (m_gameData.useShadowMaps)
     {
         PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
         m_renderManager.RenderShadowMap();
         PIXEndEvent();
     }
-
-    m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
 
     UpdateViewMatrix();
 
