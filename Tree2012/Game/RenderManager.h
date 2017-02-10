@@ -1,9 +1,10 @@
-#pragma once
+ #pragma once
 #include "pch.h"
 #include "GeometryGenerator.h"
 #include "RenderData.h"
 #include "Materials.h"
 #include "RenderPlatform.h"
+#include "UploadBuffer.h"
 
 class WorldObject;
 class RenderManager;
@@ -460,7 +461,6 @@ class RenderPlatform12 : public RenderPlatform
 {
 public:
     static const UINT                 FrameCount = 2;
-    UINT                              m_srvCbvDescriptorSize; //TEMPTEMP
 
 private:
     CComPtr<ID3D12Device>             m_d3dDevice;
@@ -488,26 +488,30 @@ private:
 
     XSF::BitmapFont*                  m_bitmapFont;
 
-    D3D12_CONSTANT_BUFFER_VIEW_DESC   m_constViewDescs[4];
-    D3D12_GPU_VIRTUAL_ADDRESS         m_constBufferAddresses[4];
+    //
+    // Const buffers
 
-    CComPtr<ID3D12Resource>           m_CBNeverChanges;
-    UINT8*                            m_CBNeverChangesDataBegin;
+    //enum ConstBufferIndex
+    //{
+    //    View_CBI,
+    //    Projection_CBI,
+    //    Global_Scene_CBI
+    //};
+    //std::map<ConstBufferIndex>, 
 
-    CComPtr<ID3D12Resource>           m_CBShadowNeverChanges;
-    UINT8*                            m_CBShadowPassNeverChangesDataBegin;
-    D3D12_CONSTANT_BUFFER_VIEW_DESC   m_shadowNeverChangesConstViewDesc;
+    enum ViewProjectionConstBufferSubIndex
+    {
+        NormalPass_CBSI,
+        ShadowPass_CBSI,
+        Count_CBSI
+    };
 
-    CComPtr<ID3D12Resource>           m_CBChangesEveryFrame;
+    UploadBuffer<CBNeverChanges>*      m_constBufferNeverChanges;
+    UploadBuffer<CBChangeOnResize>*    m_constBufferChangeOnResize;
+    UploadBuffer<CBChangesEveryFrame>* m_constBufferChangesEveryFrame;
 
-    CComPtr<ID3D12Resource>           m_pCBChangeOnResize;
-    UINT8*                            m_CBChangesOnResizeDataBegin;
-    CBChangeOnResize                  m_cbChangesOnResize;
-
-    D3D12_CONSTANT_BUFFER_VIEW_DESC   m_shadowChangesOnResizeConstViewDesc;
-    UINT8*                            m_CBShadowChangesOnResizeDataBegin;
-    CComPtr<ID3D12Resource>           m_pCBShadowMapChangeOnResize;
-    CBChangeOnResize                  m_cbShadowMapChangesOnResize;
+    // Vertex buffers
+    //
 
     // Single vertex and index buffer for all geometry in scene
     D3DBuffer                         m_vertexBuffer;
@@ -539,7 +543,7 @@ private:
 
 public:
 
-    RenderPlatform12(RenderManager* renderManager) : m_renderManager(renderManager), m_fenceEvent(nullptr), m_srvCbvDescriptorSize(0) { }
+    RenderPlatform12(RenderManager* renderManager) : m_renderManager(renderManager), m_fenceEvent(nullptr) { }
     RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     IDXGISwapChain3* GetSwapChain() { return m_pSwapChain; }
@@ -582,8 +586,9 @@ public:
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
 
     // TODO make private
-    HRESULT CreateConstantBuffer(UINT size, D3D12_HEAP_PROPERTIES* heapProperties, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
-    UINT8*                            m_CBChangesEveryFrameDataBegin;
+    HRESULT CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
+    void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
+
     CComPtr<ID3D12PipelineState>      m_pipelineStateShadowMap;
 
     // Maybe TEMPTEMP?
