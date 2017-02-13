@@ -650,9 +650,10 @@ class RenderPlatform11 : public RenderPlatform
     UINT                              m_msaaQuality;
     D3D11_VIEWPORT                    m_viewPort;
 
-    CComPtr<ID3D11Buffer>             m_pCBChangeOnResize;
-    CBChangeOnResize                  m_cbChangesOnResize;
-    CComPtr<ID3D11Buffer>             m_CBNeverChanges;
+    UploadBuffer<CBChangesEveryFrame>* m_constBufferChangesEveryFrame;
+    UploadBuffer<CBChangeOnResize>*   m_constBufferChangesOnResize;
+
+    UploadBuffer<CBNeverChanges>*     m_constBufferNeverChanges;
 
     XSF::BitmapFont*                  m_bitmapFont;
 
@@ -667,7 +668,6 @@ class RenderPlatform11 : public RenderPlatform
     CComPtr<ID3D11Buffer>             m_screenQuadIB;
 
     RenderManager*                    m_renderManager; //TEMPTEMP
-
 
 public:
 
@@ -698,9 +698,6 @@ public:
     // TEMPTEMP
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
 
-    // TODO make private
-    CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
-
     HRESULT InitDevice();
     HRESULT UninitDevice();
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
@@ -708,6 +705,7 @@ public:
 
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+    void SetFrameSceneData(CBChangesEveryFrame* cb);
 
     HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);

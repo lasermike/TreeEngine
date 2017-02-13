@@ -128,6 +128,9 @@
     <ClInclude Include="TreeClassic.h">
       <Filter>Platform Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\UploadBuffer.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="TreeClassic.cpp">

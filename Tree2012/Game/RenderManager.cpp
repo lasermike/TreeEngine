@@ -372,7 +372,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // Constant buffers
     m_constBufferNeverChanges = new UploadBuffer<CBNeverChanges>(GetDevice(), Count_CBSI /* normal + shadown pass */, true);
-    SetDebugName(m_constBufferNeverChanges->Resource(), "RenderManager::m_CBNeverChanges");
+    SetDebugName(m_constBufferNeverChanges->Resource(), "RenderManager::m_constBufferNeverChanges");
 
     // Constants per frame
     m_constBufferChangesEveryFrame = new UploadBuffer<CBChangesEveryFrame>(GetDevice(), 1, true);
@@ -510,23 +510,12 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     XSF_ERROR_IF_FAILED(m_bitmapFont->Create(GetD3DDevice(), L"Arial_16"));
 
     // Create the constant buffers
-    D3D11_BUFFER_DESC bd;
-    ZeroMemory(&bd, sizeof(bd));
-    bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.ByteWidth = sizeof(CBNeverChanges);
-    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    bd.CPUAccessFlags = 0;
-    HRR(GetDevice()->CreateBuffer(&bd, nullptr, &m_CBNeverChanges));
-    SetDebugName(m_CBNeverChanges, "RenderManager::m_CBNeverChanges");
+    m_constBufferNeverChanges = new UploadBuffer<CBNeverChanges>(GetDevice(), 1, true);
+    SetDebugName(m_constBufferNeverChanges->Resource(), "RenderManager::m_constBufferNeverChanges");
 
     // Create constants for per frame 
-    ZeroMemory(&bd, sizeof(bd));
-    bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.ByteWidth = sizeof(CBChangesEveryFrame);
-    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    bd.CPUAccessFlags = 0;
-    HRR(GetDevice()->CreateBuffer(&bd, nullptr, &m_CBChangesEveryFrame));
-    SetDebugName(m_CBChangesEveryFrame, "RenderManager::m_CBChangesEveryFrame");
+    m_constBufferChangesEveryFrame = new UploadBuffer<CBChangesEveryFrame>(GetDevice(), 1, true);
+    SetDebugName(m_constBufferChangesEveryFrame->Resource(), "RenderManager::m_constBufferChangesEveryFrame");
 
     //
     // Shaders
@@ -729,6 +718,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 #else
 HRESULT RenderPlatform11::UninitGameLevelGraphics()
 {
+    SafeDelete(&m_constBufferChangesEveryFrame);
+    SafeDelete(&m_constBufferNeverChanges);
     SafeDelete(&m_bitmapFont);
 
     m_vertexBuffer.Release();
@@ -1783,15 +1774,11 @@ HRESULT RenderPlatform11::InitDevice()
 #endif
 
     // Create constant buffer
-    D3D11_BUFFER_DESC bd;
-    ZeroMemory(&bd, sizeof(bd));
-    bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.ByteWidth = sizeof(CBChangeOnResize);
-    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    bd.CPUAccessFlags = 0;
-    HRR(GetDevice()->CreateBuffer(&bd, nullptr, &m_pCBChangeOnResize));
+    // TODO: Allocate second CB for shadow pass instead of uploading CB during render
+    m_constBufferChangesOnResize = new UploadBuffer<CBChangeOnResize>(GetDevice(), 1, true);
 
-    m_immediateContext->VSSetConstantBuffers(1, 1, &m_pCBChangeOnResize);
+    ID3D11Buffer* buffer = m_constBufferChangesOnResize->Resource();
+    m_immediateContext->VSSetConstantBuffers(1, 1, &buffer);
 
     // REnder states
     XSF::StockRenderStates::Initialize(GetD3DDevice());
@@ -1828,10 +1815,10 @@ HRESULT RenderPlatform12::UpdateView(CBNeverChanges& cbNeverChanges, bool shadow
 #else
 HRESULT RenderPlatform11::UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass)
 {
-    shadowPass;
+    ID3D11Buffer* buffer = m_constBufferNeverChanges->Resource();
 
-    m_immediateContext->UpdateSubresource(m_CBNeverChanges, 0, nullptr, &cbNeverChanges, 0, 0);
-    m_immediateContext->VSSetConstantBuffers(0, 1, &m_CBNeverChanges);
+    m_immediateContext->UpdateSubresource(buffer, 0, nullptr, &cbNeverChanges, 0, 0);
+    m_immediateContext->VSSetConstantBuffers(0, 1, &buffer);
 
     return S_OK;
 }
@@ -1859,8 +1846,10 @@ HRESULT RenderPlatform12::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass
 #else
 HRESULT RenderPlatform11::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
 {
-    XMStoreFloat4x4(&m_cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
-    m_immediateContext->UpdateSubresource(m_pCBChangeOnResize, 0, nullptr, &m_cbChangesOnResize, 0, 0);
+    CBChangeOnResize cbChangesOnResize;
+    XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+
+    m_immediateContext->UpdateSubresource(m_constBufferChangesOnResize->Resource(), 0, nullptr, &cbChangesOnResize, 0, 0);
     return S_OK;
 }
 #endif
@@ -2267,7 +2256,7 @@ HRESULT RenderPlatform11::UninitDevice()
 {
     ReleaseSwapChainResources();
 
-    m_pCBChangeOnResize.Release();
+    SafeDelete(&m_constBufferChangesOnResize);
 
     m_rasterState.Release();
 
@@ -2487,14 +2476,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     cb.shadowMatrix = m_renderData.shadowTransform;
     XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
 
-#if defined(TREE3D12)
     GetPlatform()->SetFrameSceneData(&cb);
-    //memcpy(GetPlatform()->m_CBChangesEveryFrameDataBegin, &cb, sizeof(cb));
-#else
-    m_immediateContext->VSSetConstantBuffers(2, 1, &GetPlatform()->m_CBChangesEveryFrame);
-    m_immediateContext->PSSetConstantBuffers(2, 1, &GetPlatform()->m_CBChangesEveryFrame);
-    m_immediateContext->UpdateSubresource(GetPlatform()->m_CBChangesEveryFrame, 0, nullptr, &cb, 0, 0);
-#endif
 
     // Draw everything
     HRC(RenderScene(RegularPass));
@@ -2554,6 +2536,18 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 Cleanup:
 	return;
 }
+
+#if defined(TREE3D12)
+#else
+void RenderPlatform11::SetFrameSceneData(CBChangesEveryFrame* cb)
+{
+    ID3D11Buffer* buffer = m_constBufferChangesEveryFrame->Resource();
+    m_immediateContext->VSSetConstantBuffers(2, 1, &buffer);
+    m_immediateContext->PSSetConstantBuffers(2, 1, &buffer);
+    m_immediateContext->UpdateSubresource(buffer, 0, nullptr, cb, 0, 0);
+
+}
+#endif
 
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::BeginDrawText()

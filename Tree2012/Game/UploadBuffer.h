@@ -1,14 +1,11 @@
 #pragma once
 
-//#include "d3dUtil.h"
-
-#if defined(TREE3D12)
-
 template<typename T>
 class UploadBuffer
 {
 public:
-    UploadBuffer(ID3D12Device* device, UINT elementCount, bool isConstantBuffer) : 
+#if defined(TREE3D12)
+    UploadBuffer(ID3D12Device* device, UINT elementCount, bool isConstantBuffer) :
         mIsConstantBuffer(isConstantBuffer)
     {
         mElementByteSize = sizeof(T);
@@ -79,8 +76,29 @@ private:
 
     UINT mElementByteSize = 0;
     bool mIsConstantBuffer = false;
-};
 
 #else
-	
+    UploadBuffer(ID3D11Device* device, UINT elementCount, bool isConstantBuffer) //:
+        //mIsConstantBuffer(isConstantBuffer)
+    {
+        // Create constants for per frame 
+        D3D11_BUFFER_DESC bd;
+        ZeroMemory(&bd, sizeof(bd));
+        bd.Usage = D3D11_USAGE_DEFAULT;
+        bd.ByteWidth = sizeof(T);
+        bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        bd.CPUAccessFlags = 0;
+        HR(device->CreateBuffer(&bd, nullptr, &mUploadBuffer));
+    }
+
+    ID3D11Buffer* Resource() const
+    {
+        return mUploadBuffer;
+    }
+
+private:
+    CComPtr<ID3D11Buffer> mUploadBuffer;
+};
+
 #endif
+    
