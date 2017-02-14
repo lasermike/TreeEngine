@@ -886,10 +886,9 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     return S_OK;
 }
 
-HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
-{
 #if defined(TREE3D12)
-
+HRESULT RenderPlatform12::SetMaterial(Material* material, RenderPass pass)
+{
     // TODO: Set material PSO
 
     CBMaterial mat = { material->m_shaderMaterial };
@@ -897,11 +896,22 @@ HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
     material->m_constBuffer->CopyData(0, mat);
 
     // Set constant buffer view
-    GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material->m_cbvSrvHeapTable);
+    GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material->m_cbvSrvHeapTable);
 
     // Set texture buffer view
-    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, GetPlatform()->GetShaderHeap().GetIncrementSize());
-    GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, GetShaderHeap().GetIncrementSize());
+    GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
+
+    return S_OK;
+}
+#else
+#endif
+
+HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
+{
+#if defined(TREE3D12)
+    
+    GetPlatform()->SetMaterial(material, pass);
 
 #else
     CBMaterial cb;
@@ -1266,67 +1276,79 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
         LoadTexture(textureFilename, &texture);
     }
 
-	// Create constants for material
-#if defined(TREE3D12)
-
-    UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetPlatform()->GetDevice(), 1, true);
-    //CComPtr<ID3D12Resource> pCBMaterial;
-    //UINT8* pMaterialConstBufferDataBegin = nullptr;
-
-    // Create buffer for material constants
-    //D3D12_CONSTANT_BUFFER_VIEW_DESC constViewDesc = {};
-    //HR(GetPlatform()->CreateConstantBuffer(sizeof(CBMaterial), constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
-
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = GetPlatform()->GetShaderHeap().hGPU(m_materials.size() * numDescriptorsPerMaterial + Material0_HeapOffset);
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = GetPlatform()->GetShaderHeap().hCPU(m_materials.size() * numDescriptorsPerMaterial + Material0_HeapOffset);
-
-    // Create descriptor
-    ::GetPlatform(this)->GetDevice()->CreateConstantBufferView(&uploadBuffer->View(), cpuMaterialHandle); //???
-
-    // Copy texture descriptor from offline heap to shader visible heap
-    if (texture)
-    {
-        D3D12_CPU_DESCRIPTOR_HANDLE dest = GetPlatform()->GetShaderHeap().hCPU(m_materials.size() * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
-        GetPlatform()->GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    }
-
-#else
-    UploadBuffer<CBMaterial>* constBuffer = new UploadBuffer<CBMaterial>(GetPlatform()->GetDevice(), 1, true);
-	SetDebugName(constBuffer->Resource(), "RenderManager::CreateMaterial::pConstBuffer");
-#endif
-
     VertexShader* vertexShader = &GetPlatform()->m_vertexShader;
     PixelShader* pixelShader = &GetPlatform()->m_pixelShader;
 
-	if (vertexShaderFilename && *vertexShaderFilename)
-	{
-		LoadShader(vertexShaderFilename, ShaderType_VertexShader);
-		vertexShader = m_vertexShaders[vertexShaderFilename];
-		assert(vertexShader);
-	}
+    if (vertexShaderFilename && *vertexShaderFilename)
+    {
+        LoadShader(vertexShaderFilename, ShaderType_VertexShader);
+        vertexShader = m_vertexShaders[vertexShaderFilename];
+        assert(vertexShader);
+    }
 
-	if (pixelShaderFilename && *pixelShaderFilename)
-	{
-		LoadShader(pixelShaderFilename, ShaderType_PixelShader);
-		pixelShader = m_pixelShaders[pixelShaderFilename];
-		assert(pixelShader);
-	}
+    if (pixelShaderFilename && *pixelShaderFilename)
+    {
+        LoadShader(pixelShaderFilename, ShaderType_PixelShader);
+        pixelShader = m_pixelShaders[pixelShaderFilename];
+        assert(pixelShader);
+    }
 
+    Material* newMat = nullptr;
+    GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shaderMaterial, m_materials.size(), &newMat);
 #if defined(TREE3D12)
-    Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
-        nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
-        shaderMaterial, uploadBuffer, gpuMaterialHandle);
+
 #else
-    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
-        nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
-        shaderMaterial, constBuffer);
 #endif
+
     m_materials[name] = newMat;
 
     *newMaterial = newMat;
 
     return S_OK;
 }
+
+#if defined(TREE3D12)
+HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
+    ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial)
+{
+    UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
+
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = GetShaderHeap().hGPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = GetShaderHeap().hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
+
+    // Create descriptor
+    GetDevice()->CreateConstantBufferView(&uploadBuffer->View(), cpuMaterialHandle); //???
+
+    // Copy texture descriptor from offline heap to shader visible heap
+    if (texture)
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE dest = GetShaderHeap().hCPU(materialNum * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
+        GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vs, ps,
+        nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
+        shaderMaterial, uploadBuffer, gpuMaterialHandle);
+
+    *newMaterial = newMat;
+
+    return S_OK;
+}
+
+#else
+HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
+    ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial)
+{
+    UploadBuffer<CBMaterial>* constBuffer = new UploadBuffer<CBMaterial>(GetPlatform()->GetDevice(), 1, true);
+    SetDebugName(constBuffer->Resource(), "RenderManager::CreateMaterial::pConstBuffer");
+
+    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
+        nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
+        shaderMaterial, constBuffer);
+
+    *newMat = newMaterial;
+}
+#endif
 
 HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
     const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)

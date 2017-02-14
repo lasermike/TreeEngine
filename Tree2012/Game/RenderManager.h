@@ -496,14 +496,6 @@ private:
     //
     // Const buffers
 
-    //enum ConstBufferIndex
-    //{
-    //    View_CBI,
-    //    Projection_CBI,
-    //    Global_Scene_CBI
-    //};
-    //std::map<ConstBufferIndex>, 
-
     enum ViewProjectionConstBufferSubIndex
     {
         NormalPass_CBSI,
@@ -579,13 +571,15 @@ public:
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
     HRESULT EndDrawText();
 
-
     void WaitForPreviousFrame();
 
     D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
     D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; } 
 
     // Materials
+    HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
+                           ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
+    HRESULT SetMaterial(Material* material, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
@@ -728,6 +722,9 @@ public:
     HRESULT EndDrawText();
 
     // Materials
+    HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
+        ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
+    HRESULT SetMaterial(Material* material, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
