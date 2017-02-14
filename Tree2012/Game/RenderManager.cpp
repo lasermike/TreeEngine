@@ -71,13 +71,6 @@ enum RootSignatureParams
 const int maxTotalTexturesInScene = 2;
 const int maxNumMaterials = 4;
 
-
-struct CBMaterial
-{
-	ShaderMaterial material;
-	XMFLOAT4X4 textureTransform;
-};
-
 #pragma region InputLayouts
 
 #if defined(TREE3D12)
@@ -896,8 +889,12 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
 HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
 {
 #if defined(TREE3D12)
-	// TODO: Set material PSO
-    memcpy(material->m_pConstBufferDataBegin, &material->m_shaderMaterial, sizeof(material->m_shaderMaterial));
+
+    // TODO: Set material PSO
+
+    CBMaterial mat = { material->m_shaderMaterial };
+
+    material->m_constBuffer->CopyData(0, mat);
 
     // Set constant buffer view
     GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material->m_cbvSrvHeapTable);
@@ -907,20 +904,22 @@ HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
     GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
 #else
-	CBMaterial cb;
-	cb.material = material->m_shaderMaterial;
+    CBMaterial cb;
+    cb.material = material->m_shaderMaterial;
 
-	m_immediateContext->VSSetConstantBuffers(3, 1, &material->m_constBuffer);
-	m_immediateContext->PSSetConstantBuffers(3, 1, &material->m_constBuffer);
+    ID3D11Buffer* constBuffer = material->m_constBuffer->Resource();
 
-	// TODO: support arbitary vertex shaders with shadow mapping
-	if (pass != ShadowMapPass)
-	{
-		m_immediateContext->VSSetShader(material->m_vertexShader->shader, nullptr, 0);
-		m_immediateContext->PSSetShader(material->m_pixelShader->shader, nullptr, 0);
-	}
+    m_immediateContext->VSSetConstantBuffers(3, 1, &constBuffer);
+    m_immediateContext->PSSetConstantBuffers(3, 1, &constBuffer);
 
-	m_immediateContext->UpdateSubresource(material->m_constBuffer, 0, nullptr, &cb, 0, 0);
+    // TODO: support arbitary vertex shaders with shadow mapping
+    if (pass != ShadowMapPass)
+    {
+        m_immediateContext->VSSetShader(material->m_vertexShader->shader, nullptr, 0);
+        m_immediateContext->PSSetShader(material->m_pixelShader->shader, nullptr, 0);
+    }
+
+    m_immediateContext->UpdateSubresource(material->m_constBuffer->Resource(), 0, nullptr, &cb, 0, 0);
 
     ID3D11ShaderResourceView* texture = nullptr;
 
@@ -1269,18 +1268,20 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
 	// Create constants for material
 #if defined(TREE3D12)
-    CComPtr<ID3D12Resource> pCBMaterial;
-    UINT8* pMaterialConstBufferDataBegin = nullptr;
+
+    UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetPlatform()->GetDevice(), 1, true);
+    //CComPtr<ID3D12Resource> pCBMaterial;
+    //UINT8* pMaterialConstBufferDataBegin = nullptr;
 
     // Create buffer for material constants
-    D3D12_CONSTANT_BUFFER_VIEW_DESC constViewDesc = {};
-    HR(GetPlatform()->CreateConstantBuffer(sizeof(CBMaterial), constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
+    //D3D12_CONSTANT_BUFFER_VIEW_DESC constViewDesc = {};
+    //HR(GetPlatform()->CreateConstantBuffer(sizeof(CBMaterial), constViewDesc, &pCBMaterial, &pMaterialConstBufferDataBegin));
 
     D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = GetPlatform()->GetShaderHeap().hGPU(m_materials.size() * numDescriptorsPerMaterial + Material0_HeapOffset);
     D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = GetPlatform()->GetShaderHeap().hCPU(m_materials.size() * numDescriptorsPerMaterial + Material0_HeapOffset);
 
     // Create descriptor
-    ::GetPlatform(this)->GetDevice()->CreateConstantBufferView(&constViewDesc, cpuMaterialHandle);
+    ::GetPlatform(this)->GetDevice()->CreateConstantBufferView(&uploadBuffer->View(), cpuMaterialHandle); //???
 
     // Copy texture descriptor from offline heap to shader visible heap
     if (texture)
@@ -1290,15 +1291,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     }
 
 #else
-	CComPtr<ID3D11Buffer> pConstBuffer;
-	D3D11_BUFFER_DESC bd;
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(CBMaterial);
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bd.CPUAccessFlags = 0;
-	HRR(::GetPlatform(this)->GetDevice()->CreateBuffer(&bd, nullptr, &pConstBuffer));
-	SetDebugName(pConstBuffer, "RenderManager::CreateMaterial::pConstBuffer");
+    UploadBuffer<CBMaterial>* constBuffer = new UploadBuffer<CBMaterial>(GetPlatform()->GetDevice(), 1, true);
+	SetDebugName(constBuffer->Resource(), "RenderManager::CreateMaterial::pConstBuffer");
 #endif
 
     VertexShader* vertexShader = &GetPlatform()->m_vertexShader;
@@ -1320,18 +1314,18 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
 #if defined(TREE3D12)
     Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vertexShader, pixelShader,
-		nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/, 
-		shaderMaterial, pCBMaterial, pMaterialConstBufferDataBegin, gpuMaterialHandle);
+        nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
+        shaderMaterial, uploadBuffer, gpuMaterialHandle);
 #else
-	Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
-		nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
-		shaderMaterial, pConstBuffer);
+    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
+        nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
+        shaderMaterial, constBuffer);
 #endif
-	m_materials[name] = newMat;
+    m_materials[name] = newMat;
 
-	*newMaterial = newMat;
+    *newMaterial = newMat;
 
-	return S_OK;
+    return S_OK;
 }
 
 HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,

@@ -242,6 +242,9 @@
     <ClInclude Include="TreePC.h">
       <Filter>Platform Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\UploadBuffer.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Game\Courier_New_11.abc">
@@ -299,6 +302,7 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
       <Filter>UWP</Filter>
     </Image>
+    <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />

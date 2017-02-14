@@ -264,6 +264,7 @@
     <ClInclude Include="..\Game\Tree.h" />
     <ClInclude Include="..\Game\TreeModel.h" />
     <ClInclude Include="..\Game\TreeModelGenerator.h" />
+    <ClInclude Include="..\Game\UploadBuffer.h" />
     <ClInclude Include="..\Game\WorldObject.h" />
     <ClInclude Include="BasicTimer.h" />
     <ClInclude Include="DirectXHelper.h" />

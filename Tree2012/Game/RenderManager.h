@@ -125,6 +125,12 @@ struct PixelShader
     }
 };
 
+struct CBMaterial
+{
+    ShaderMaterial material;
+    //XMFLOAT4X4 textureTransform;
+};
+
 struct Material
 {
     wstring                         m_name;
@@ -136,8 +142,7 @@ struct Material
 
 #if defined(TREE3D12)
 
-    CComPtr<ID3D12Resource>         m_constBuffer;
-    UINT8*                          m_pConstBufferDataBegin;
+    UploadBuffer<CBMaterial>*       m_constBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE     m_cbvSrvHeapTable;
 
     // NYI
@@ -147,7 +152,8 @@ struct Material
     void* m_depthState;
 #else
 
-    CComPtr<ID3D11Buffer>     m_constBuffer;
+    //CComPtr<ID3D11Buffer>     m_constBuffer;
+    UploadBuffer<CBMaterial>*       m_constBuffer;
 
     // NYI
     ID3D11InputLayout*        m_inputLayout;
@@ -162,18 +168,17 @@ public:
         LoadedTexture* texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
         VertexShader* vertexShader, PixelShader* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
         D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
-        ShaderMaterial shaderMaterial, ID3D12Resource* constBuffer, UINT8* pConstBufferDataBegin,
+        ShaderMaterial shaderMaterial, UploadBuffer<CBMaterial>* constBuffer,
         D3D12_GPU_DESCRIPTOR_HANDLE srvHeapTable) :
         m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
         m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
-        m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer), m_pConstBufferDataBegin(pConstBufferDataBegin),
+        m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer),
         m_cbvSrvHeapTable(srvHeapTable)
     {
         ASSERT(m_vertexShader != nullptr);
         ASSERT(m_pixelShader != nullptr);
         ASSERT(m_inputLayout != nullptr);
         ASSERT(m_constBuffer != nullptr);
-        ASSERT(pConstBufferDataBegin != nullptr);
 
         // TODO: create a pipeline state object for these
         //ASSERT(m_samplerState != nullptr);
@@ -197,7 +202,7 @@ public:
 		LoadedTexture* texture, ID3D11InputLayout* inputLayout,
 		VertexShader* vertexShader, PixelShader* pixelShader, ID3D11SamplerState* samplerState,
 		ID3D11RasterizerState* rasterizer, ID3D11DepthStencilState* depthState,
-		ShaderMaterial shaderMaterial, ID3D11Buffer* constBuffer) :
+		ShaderMaterial shaderMaterial, UploadBuffer<CBMaterial>* constBuffer) :
 		m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
 		m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
 		m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer)
@@ -224,16 +229,16 @@ public:
 
 #endif
 
-	// Necessary?
+    // Necessary?
     Material& operator=(Material const& /*rhs*/)
     {
         return *this;
     }
 
-	~Material()
-	{
-		m_constBuffer.Release();
-	}
+    ~Material()
+    {
+        SafeDelete(&m_constBuffer);
+    }
 };
 
 struct D3DBuffer
