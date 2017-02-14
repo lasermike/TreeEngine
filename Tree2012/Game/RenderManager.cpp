@@ -905,15 +905,8 @@ HRESULT RenderPlatform12::SetMaterial(Material* material, RenderPass pass)
     return S_OK;
 }
 #else
-#endif
-
-HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
+HRESULT RenderPlatform11::SetMaterial(Material* material, RenderPass pass)
 {
-#if defined(TREE3D12)
-    
-    GetPlatform()->SetMaterial(material, pass);
-
-#else
     CBMaterial cb;
     cb.material = material->m_shaderMaterial;
 
@@ -939,11 +932,9 @@ HRESULT RenderManager::SetMaterial(Material* material, RenderPass pass)
     }
 
     m_immediateContext->PSSetShaderResources(0, 1, &texture);
-
-#endif
-
-	return S_OK;
+    return S_OK;
 }
+#endif
 
 #if defined(TREE3D12)
 void RenderPlatform12::DrawIndexedInstanced(
@@ -969,7 +960,7 @@ void RenderPlatform11::DrawIndexedInstanced(
 
 HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
 {
-    SetMaterial(ru.m_material, pass);
+    GetPlatform()->SetMaterial(ru.m_material, pass);
 
     for (auto object : ru.reservations)
     {
@@ -1295,13 +1286,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
     Material* newMat = nullptr;
     GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shaderMaterial, m_materials.size(), &newMat);
-#if defined(TREE3D12)
-
-#else
-#endif
 
     m_materials[name] = newMat;
-
     *newMaterial = newMat;
 
     return S_OK;
@@ -1337,16 +1323,18 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 
 #else
 HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-    ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial)
+    ShaderMaterial& shaderMaterial, int /*materialNum*/, Material** newMaterial)
 {
-    UploadBuffer<CBMaterial>* constBuffer = new UploadBuffer<CBMaterial>(GetPlatform()->GetDevice(), 1, true);
+    UploadBuffer<CBMaterial>* constBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
     SetDebugName(constBuffer->Resource(), "RenderManager::CreateMaterial::pConstBuffer");
 
-    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vertexShader, pixelShader,
+    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vs, ps,
         nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
         shaderMaterial, constBuffer);
 
-    *newMat = newMaterial;
+    *newMaterial = newMat;
+
+    return S_OK;
 }
 #endif
 

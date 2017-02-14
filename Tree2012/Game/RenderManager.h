@@ -795,7 +795,6 @@ class RenderManager : public IRenderFrame
     HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
     HRESULT Render(RenderUnit& renderUnit, RenderPass pass);
     HRESULT RenderScene(RenderPass pass);
-    HRESULT SetMaterial(Material* material, RenderPass pass);
 
     void BuildShadowTransform();
     void DrawSceneToShadowMap();
