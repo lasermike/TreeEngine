@@ -205,7 +205,7 @@ void Game::Update(DX::StepTimer const& timer)
         XMStoreFloat3(&m_renderManager.GetRenderData().dirLights[0].Direction, vec);
     }
 
-    HR(m_renderManager.BeginFrame());
+    HR(m_renderManager.BeginNewFrame());
 
     // Compute per-frame values
     HR(m_pScene->Update(m_renderManager, *m_threadPool));
@@ -250,13 +250,13 @@ void Game::ComputeCPU()
 
 void Game::ComputeGPU()
 {
-    //PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
 
-	// Render shadow map
-	if (m_gameData.useShadowMaps)
-	{
-		//m_renderManager.RenderShadowMap();
-	}
+    //Render shadow map
+        if (m_gameData.useShadowMaps)
+        {
+            m_renderManager.RenderShadowMap();
+        }
 }
 
 //--------------------------------------------------------------------------------------
@@ -268,12 +268,12 @@ void Game::Render(bool oculus)
 
     m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
 
-    if (m_gameData.useShadowMaps)
-    {
-        PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
-        m_renderManager.RenderShadowMap();
-        PIXEndEvent();
-    }
+    //if (m_gameData.useShadowMaps)
+    //{
+    //    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
+    //    m_renderManager.RenderShadowMap();
+    //    PIXEndEvent();
+    //}
 
     XMStoreFloat4x4(&m_renderManager.GetRenderData().view, m_player->GetViewMatrix());
     m_renderManager.GetRenderData().eyePos = m_player->GetEyePosition();

@@ -793,12 +793,12 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 	return S_OK;
 }
 
-HRESULT RenderManager::BeginFrame()
+HRESULT RenderManager::BeginNewFrame()
 {
     D3DBuffer& buffer = m_instancedBuffer.Get(m_renderData.frame);
 
     InstancedData* dataView = nullptr;
-    GetPlatform()->BeginFrame(true, buffer, &dataView);
+    GetPlatform()->BeginNewFrame(true, buffer, &dataView);
 
 	m_renderData.instanceData = dataView;
 
@@ -834,7 +834,9 @@ HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer& instan
 
     return S_OK;
 }
+
 #else
+
 HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer)
 {
     // Set samplers
@@ -2307,7 +2309,7 @@ void RenderManager::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-HRESULT RenderPlatform12::BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView)
+HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView)
 {
     // Get a handle to the instance buffer.  Game will fill out data before calling Render()
     CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
@@ -2364,7 +2366,7 @@ HRESULT RenderPlatform12::BeginFrame(bool resetCommandList, D3DBuffer& buffer, I
     return hr;
 }
 #else
-HRESULT RenderPlatform11::BeginFrame(bool /*resetCommandList*/, D3DBuffer& buffer, InstancedData** dataView)
+HRESULT RenderPlatform11::BeginNewFrame(bool /*resetCommandList*/, D3DBuffer& buffer, InstancedData** dataView)
 {
     // Compute instance data
     D3D11_MAPPED_SUBRESOURCE mappedData;
@@ -2376,26 +2378,21 @@ HRESULT RenderPlatform11::BeginFrame(bool /*resetCommandList*/, D3DBuffer& buffe
 
 #endif
 
-//--------------------------------------------------------------------------------------
-// Render a frame.  May be called twice for stereo rendering
-//--------------------------------------------------------------------------------------
-void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
-    bool m_renderToSharedTexture, float* clearColor)
-{
-    HRESULT hr = S_OK;
-
 #if defined(TREE3D12)
-    PIXBeginEvent((ID3D12GraphicsCommandList*)GetPlatform()->GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render");
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(GetPlatform()->GetCurrentRenderTargetHandle());
-    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(GetPlatform()->GetCurrentDepthTargetHandle());
-    GetPlatform()->GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+void RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
+{
+    PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render");
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(GetCurrentRenderTargetHandle());
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(GetCurrentDepthTargetHandle());
+    GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     // Record commands.
-    GetPlatform()->GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    GetPlatform()->GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+    GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    GetPlatform()->GetCommandList()->SetPipelineState(GetPlatform()->GetPipelineState());
+    GetCommandList()->SetPipelineState(GetPipelineState());
 
     // Make shadow map available to shaders
     if (useShadowMaps)
@@ -2425,48 +2422,65 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
         }
 #endif
 
-        GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, GetRenderData().pShadowMap->DepthMapSRVGpu());
+        // Make shadow map available to shaders
+        if (useShadowMaps)
+        {
+            GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, m_renderManager->GetRenderData().pShadowMap->DepthMapSRVGpu());
+        }
     }
-
+}
 #else
+void RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
+{
     if (!oculus)
     {
         // Bind render target and depth
-        ID3D11RenderTargetView* rtv = GetPlatform()->GetRTV();
-        GetContext()->OMSetRenderTargets(1, &rtv, GetPlatform()->GetDSV());
+        ID3D11RenderTargetView* rtv = GetRTV();
+        m_renderManager->GetContext()->OMSetRenderTargets(1, &rtv, GetDSV());
     }
 
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
     if (wireframe)
     {
-        stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Wireframe);
+        stockStates.ApplyRasterizerState(m_renderManager->GetContext(), XSF::StockRasterizerStates::Wireframe);
     }
 
     if (useAlphaBlendedRenderTarget)
     {
-        stockStates.ApplyBlendState(GetContext(), XSF::StockBlendStates::AlphaBlend);
+        stockStates.ApplyBlendState(m_renderManager->GetContext(), XSF::StockBlendStates::AlphaBlend);
     }
     else
     {
-        stockStates.ApplyBlendState(GetContext(), XSF::StockBlendStates::Overwrite);
+        stockStates.ApplyBlendState(m_renderManager->GetContext(), XSF::StockBlendStates::Overwrite);
     }
 
     if (!oculus)
     {
         // Clear the back buffer
-        GetContext()->ClearRenderTargetView(GetPlatform()->GetRTV(), clearColor);
+        m_renderManager->GetContext()->ClearRenderTargetView(GetRTV(), clearColor);
 
         // Clear the depth buffer to 1.0 (max depth)
-        GetContext()->ClearDepthStencilView(GetPlatform()->GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+        m_renderManager->GetContext()->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
     }
 
     // Make shadow map available to shaders
     if (useShadowMaps)
     {
-        ID3D11ShaderResourceView* depthTexture = GetRenderData().pShadowMap->DepthMapSRV();
-        GetContext()->PSSetShaderResources(1, 1, &depthTexture);
+        ID3D11ShaderResourceView* depthTexture = m_renderManager->GetRenderData().pShadowMap->DepthMapSRV();
+        m_renderManager->GetContext()->PSSetShaderResources(1, 1, &depthTexture);
     }
+}
 #endif
+
+//--------------------------------------------------------------------------------------
+// Render a frame.  May be called twice for stereo rendering
+//--------------------------------------------------------------------------------------
+void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
+    bool renderToSharedTexture, float* clearColor)
+{
+    HRESULT hr = S_OK;
+
+    GetPlatform()->RenderProlog(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor);
 
     UpdateProjection(&GetRenderData().projection, false);
     UpdateView(&GetRenderData().view, false);
@@ -2485,61 +2499,81 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     // Draw everything
     HRC(RenderScene(RegularPass));
 
-    // Unbind shadow texture so we can render to it next frame
-    if (useShadowMaps)
-    {
-#if defined(TREE3D12)
-        D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = GetPlatform()->GetShaderHeap().hGPU(NullSrv_HeapOffset);
-        GetPlatform()->GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
-#else
-        ID3D11ShaderResourceView* depthTexture = nullptr;
-        GetContext()->PSSetShaderResources(1, 1, &depthTexture);
-#endif
-    }
-
     // Show frame statistics
     if (showHelp)
     {
         DrawFrameStats();
     }
 
-#if defined(TREE3D12)
-    if (showShadowBuffer)
-    {
-        HRC(GetPlatform()->DrawScreenQuad(GetPlatform()->GetCommandList(), GetRenderData().pShadowMap ? GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
-    }
-
-    // Indicate that the back buffer will now be used to present.
-    GetPlatform()->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetPlatform()->GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-    PIXEndEvent((ID3D12GraphicsCommandList*)GetPlatform()->GetCommandList()); // Render
-
-    // Execute the command list.
-    HR(GetPlatform()->GetCommandList()->Close());
-    ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
-    GetPlatform()->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-    // Present the frame.
-    HR(GetPlatform()->GetSwapChain()->Present(0, 0));
-
-    GetPlatform()->WaitForPreviousFrame();
-
-#else
-	if (showShadowBuffer)
-	{
-		HRC(GetPlatform()->DrawScreenQuad(GetContext(), GetRenderData().pShadowMap->DepthMapSRV()));
-	}
-
-	if (!oculus && !m_renderToSharedTexture)
-	{
-		// Present our back buffer to our front buffer
-		HRC(GetPlatform()->GetSwapChain()->Present(0, 0));
-	}
-#endif
+    GetPlatform()->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture);
 
 Cleanup:
 	return;
 }
+
+#if defined(TREE3D12)
+
+void RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
+{
+    HRESULT hr = S_OK;
+
+    // Unbind shadow texture so we can render to it next frame
+    if (useShadowMaps)
+    {
+        D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = GetShaderHeap().hGPU(NullSrv_HeapOffset);
+        GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
+    }
+
+    if (showShadowBuffer)
+    {
+        HRC(DrawScreenQuad(GetCommandList(), m_renderManager->GetRenderData().pShadowMap ? m_renderManager->GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
+    }
+
+    // Indicate that the back buffer will now be used to present.
+    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+    PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Render
+
+                                                                              // Execute the command list.
+    HR(GetCommandList()->Close());
+    ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
+    GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+    // Present the frame.
+    HR(GetSwapChain()->Present(0, 0));
+
+    WaitForPreviousFrame();
+Cleanup:
+    return;
+}
+
+#else
+
+void RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
+{
+    HRESULT hr = S_OK;
+
+    // Unbind shadow texture so we can render to it next frame
+    if (useShadowMaps)
+    {
+        ID3D11ShaderResourceView* depthTexture = nullptr;
+        m_renderManager->GetContext()->PSSetShaderResources(1, 1, &depthTexture);
+    }
+
+    if (showShadowBuffer)
+    {
+        HRC(DrawScreenQuad(m_renderManager->GetContext(), m_renderManager->GetRenderData().pShadowMap->DepthMapSRV()));
+    }
+
+    if (!oculus && !renderToSharedTexture)
+    {
+        // Present our back buffer to our front buffer
+        HRC(GetSwapChain()->Present(0, 0));
+    }
+Cleanup:
+    return;
+}
+#endif
 
 #if defined(TREE3D12)
 #else

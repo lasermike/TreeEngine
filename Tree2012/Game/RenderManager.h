@@ -563,8 +563,11 @@ public:
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
 
-    HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
+    HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+    void RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
+    void RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+
     void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
     HRESULT BeginDrawText();
@@ -706,9 +709,11 @@ public:
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
     void SetFrameSceneData(CBChangesEveryFrame* cb);
 
-    HRESULT BeginFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
+    HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
     void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
+    void RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
+    void RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
@@ -842,7 +847,7 @@ public:
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
     virtual HRESULT UninitGameLevelGraphics();
 
-    HRESULT BeginFrame();
+    HRESULT BeginNewFrame();
     HRESULT EndFrame();
 
     void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
