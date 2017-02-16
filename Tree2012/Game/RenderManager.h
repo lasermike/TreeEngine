@@ -423,6 +423,13 @@ enum RenderPlatforms
     D3D11_RENDER_PLATFORM = 2,
 };
 
+
+enum RenderState
+{
+    RS_TRANSITION_TO_RENDER_SHADOW_MAP,
+    RS_TRANSITION_FROM_RENDER_SHADOW_MAP
+};
+
 class RenderPlatform
 {
 protected:
@@ -570,6 +577,7 @@ public:
     void RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+    HRESULT SetRenderState(RenderState state);
 
     void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
@@ -719,6 +727,7 @@ public:
     void RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+    HRESULT RenderPlatform11::SetRenderState(RenderState state);
 
     void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 

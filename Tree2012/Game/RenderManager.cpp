@@ -2653,47 +2653,89 @@ HRESULT RenderManager::DrawFrameStats()
     return S_OK;
 }
 
+#if defined(TREE3D12)
+
+HRESULT RenderPlatform12::SetRenderState(RenderState state)
+{
+    HRESULT hr = S_OK;
+    switch (state)
+    {
+    case RS_TRANSITION_TO_RENDER_SHADOW_MAP:
+    {
+        PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"RenderShadowMap");
+
+        GetCommandList()->SetPipelineState(m_pipelineStateShadowMap);
+
+        // Change to DEPTH_WRITE.
+        CD3DX12_RESOURCE_BARRIER toWriteBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderManager->GetRenderData().pShadowMap->DepthMapBuffer(),
+            D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        GetCommandList()->ResourceBarrier(1, &toWriteBarrier);
+
+        m_renderManager->GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetCommandList());
+
+        break;
+    }
+    case RS_TRANSITION_FROM_RENDER_SHADOW_MAP:
+    {
+        GetCommandList()->RSSetViewports(1, &GetViewport());
+        GetCommandList()->RSSetScissorRects(1, &GetScissorRect());
+
+        // Indicate that the back buffer will now be used to present.
+        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderManager->GetRenderData().pShadowMap->DepthMapBuffer(),
+            D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
+        GetCommandList()->ResourceBarrier(1, &toReadBarrier);
+
+        GetCommandList()->SetPipelineState(GetPipelineState());
+
+        PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList());
+
+        break;
+    }
+    }
+
+    return hr;
+}
+
+#else
+HRESULT RenderPlatform11::SetRenderState(RenderState state)
+{
+    HRESULT hr = S_OK;
+    const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+
+    switch (state)
+    {
+    case RS_TRANSITION_TO_RENDER_SHADOW_MAP:
+    {
+        m_renderManager->GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetContext());
+
+        stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
+        break;
+    }
+    case RS_TRANSITION_FROM_RENDER_SHADOW_MAP:
+    {
+        // Restore state after shadow
+        GetContext()->RSSetState(0);
+        GetContext()->RSSetViewports(1, &GetViewport());
+
+        stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Solid);
+        break;
+    }
+    }
+
+    return hr;
+}
+#endif
+
 HRESULT RenderManager::RenderShadowMap()
 {
-#if defined(TREE3D12)
-    PIXScopedEvent((ID3D12GraphicsCommandList*)GetPlatform()->GetCommandList(), TREE_COLOR_DRAW_TEXT, L"RenderShadowMap");
-#endif
-
     BuildShadowTransform();
 
-#if defined(TREE3D12)
-
-    GetPlatform()->GetCommandList()->SetPipelineState(GetPlatform()->m_pipelineStateShadowMap);
-
-    // Change to DEPTH_WRITE.
-    CD3DX12_RESOURCE_BARRIER toWriteBarrier = CD3DX12_RESOURCE_BARRIER::Transition(GetRenderData().pShadowMap->DepthMapBuffer(),
-        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-    GetPlatform()->GetCommandList()->ResourceBarrier(1, &toWriteBarrier);
-
-    GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetPlatform()->GetCommandList());
-#else
-    GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetPlatform()->GetContext());
-#endif
+    GetPlatform()->SetRenderState(RS_TRANSITION_TO_RENDER_SHADOW_MAP);
 
     DrawSceneToShadowMap();
 
-#if defined(TREE3D12)
-    GetPlatform()->GetCommandList()->RSSetViewports(1, &GetPlatform()->GetViewport());
-    GetPlatform()->GetCommandList()->RSSetScissorRects(1, &GetPlatform()->GetScissorRect());
+    GetPlatform()->SetRenderState(RS_TRANSITION_FROM_RENDER_SHADOW_MAP);
 
-    // Indicate that the back buffer will now be used to present.
-    CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(GetRenderData().pShadowMap->DepthMapBuffer(),
-        D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
-    GetPlatform()->GetCommandList()->ResourceBarrier(1, &toReadBarrier);
-
-    GetPlatform()->GetCommandList()->SetPipelineState(GetPlatform()->GetPipelineState());
-
-#else
-    // Restore state after shadow
-    GetPlatform()->GetContext()->RSSetState(0);
-    GetPlatform()->GetContext()->RSSetViewports(1, &GetPlatform()->GetViewport());
-
-#endif
     return S_OK;
 }
 
@@ -2736,32 +2778,14 @@ void RenderManager::BuildShadowTransform()
 
 void RenderManager::DrawSceneToShadowMap()
 {
-    //RenderData prevRenderData(GetRenderData());
-    //GetRenderData().view = GetRenderData().lightView;
-    //GetRenderData().projection = GetRenderData().lightProj;
-    //GetRenderData().pass = ShadowMapPass;
-
     UpdateProjection(&GetRenderData().lightProj, true);
     UpdateView(&GetRenderData().lightView, true);
 
-#if defined(TREE3D12)
-#else
-    const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-    stockStates.ApplyRasterizerState(GetPlatform()->GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
-#endif
-
-	// Draw everything
-	HR(RenderScene(ShadowMapPass));
-
-	//GetRenderData() = prevRenderData;
+    // Draw everything
+    HR(RenderScene(ShadowMapPass));
 
     UpdateProjection(&GetRenderData().projection, false);
     UpdateView(&GetRenderData().view, false);
-
-#if defined(TREE3D12)
-#else
-    stockStates.ApplyRasterizerState(GetPlatform()->GetContext(), XSF::StockRasterizerStates::Solid);
-#endif
 }
 
 #if defined(TREE3D12)
