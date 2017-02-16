@@ -564,9 +564,12 @@ public:
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+    HRESULT EndFrame(D3DBuffer& buffer);
+
     void RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
     void RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+
+    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
 
     void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
@@ -694,6 +697,7 @@ public:
     bool IsMSAAEnabled() { return m_enableMsaa; }
     UINT GetMSAAQuality() { return m_msaaQuality; }
     D3D11_VIEWPORT& GetViewport() { return m_viewPort; }
+    XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
 
     static const UINT msaaCount = 4;
 
@@ -710,10 +714,13 @@ public:
     void SetFrameSceneData(CBChangesEveryFrame* cb);
 
     HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
-    void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
+    HRESULT EndFrame(D3DBuffer& buffer);
     void RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
     void RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+
+    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+
+    void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
@@ -780,11 +787,6 @@ class RenderManager : public IRenderFrame
     // 11 or 12
     RenderPlatform*                                 m_platform;
 
-#if defined(TREE3D12)
-#else
-    CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
-#endif
-
     DisplayMode                         m_displayMode;
 
     // App resources.
@@ -821,7 +823,6 @@ public:
     RenderPlatform12* GetPlatform() { return (RenderPlatform12*) m_platform; }
 
 #else
-    XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
 
     RenderPlatform11* GetPlatform() { return (RenderPlatform11*)m_platform; }
 #endif

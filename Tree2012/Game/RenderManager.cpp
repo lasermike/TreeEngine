@@ -805,15 +805,26 @@ HRESULT RenderManager::BeginNewFrame()
 	return S_OK;
 }
 
-HRESULT RenderManager::EndFrame()
-{
 #if defined(TREE3D12)
-	m_instancedBuffer.Get(m_renderData.frame).buffer->Unmap(0, nullptr);
+HRESULT RenderPlatform12::EndFrame(D3DBuffer& buffer)
+{
+    HRESULT hr = S_OK;
+    buffer.buffer->Unmap(0, nullptr);
+    return hr;
+}
 #else
-	m_immediateContext->Unmap(m_instancedBuffer.Get(m_renderData.frame), 0);
+HRESULT RenderPlatform11::EndFrame(D3DBuffer& buffer)
+{
+    HRESULT hr = S_OK;
+    m_immediateContext->Unmap(buffer, 0);
+    return hr;
+}
+
 #endif
 
-	return S_OK;
+HRESULT RenderManager::EndFrame()
+{
+    return GetPlatform()->EndFrame(m_instancedBuffer.Get(m_renderData.frame));
 }
 
 HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance)
@@ -1801,10 +1812,6 @@ HRESULT RenderManager::InitDevice()
 
     hr = ::GetPlatform(this)->InitDevice();
 
-
-    m_immediateContext = ::GetPlatform(this)->m_immediateContext; //TEMPTEMP
-
-
     return hr;
 }
 #endif
@@ -2266,6 +2273,7 @@ HRESULT RenderPlatform11::UninitDevice()
 
     m_rasterState.Release();
 
+    m_immediateContext.Release();
     m_d3dDevice.Release();
 
     return S_OK;
@@ -2284,8 +2292,6 @@ void RenderManager::UninitDevice()
 #if defined(TREE3D12)
 
 #else
-	m_immediateContext.Release();
-    ::GetPlatform(this)->m_immediateContext.Release();
 #endif
 
 
@@ -2436,38 +2442,38 @@ void RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlphaBl
     {
         // Bind render target and depth
         ID3D11RenderTargetView* rtv = GetRTV();
-        m_renderManager->GetContext()->OMSetRenderTargets(1, &rtv, GetDSV());
+        m_immediateContext->OMSetRenderTargets(1, &rtv, GetDSV());
     }
 
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
     if (wireframe)
     {
-        stockStates.ApplyRasterizerState(m_renderManager->GetContext(), XSF::StockRasterizerStates::Wireframe);
+        stockStates.ApplyRasterizerState(m_immediateContext, XSF::StockRasterizerStates::Wireframe);
     }
 
     if (useAlphaBlendedRenderTarget)
     {
-        stockStates.ApplyBlendState(m_renderManager->GetContext(), XSF::StockBlendStates::AlphaBlend);
+        stockStates.ApplyBlendState(m_immediateContext, XSF::StockBlendStates::AlphaBlend);
     }
     else
     {
-        stockStates.ApplyBlendState(m_renderManager->GetContext(), XSF::StockBlendStates::Overwrite);
+        stockStates.ApplyBlendState(m_immediateContext, XSF::StockBlendStates::Overwrite);
     }
 
     if (!oculus)
     {
         // Clear the back buffer
-        m_renderManager->GetContext()->ClearRenderTargetView(GetRTV(), clearColor);
+        m_immediateContext->ClearRenderTargetView(GetRTV(), clearColor);
 
         // Clear the depth buffer to 1.0 (max depth)
-        m_renderManager->GetContext()->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+        m_immediateContext->ClearDepthStencilView(GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
     }
 
     // Make shadow map available to shaders
     if (useShadowMaps)
     {
         ID3D11ShaderResourceView* depthTexture = m_renderManager->GetRenderData().pShadowMap->DepthMapSRV();
-        m_renderManager->GetContext()->PSSetShaderResources(1, 1, &depthTexture);
+        m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
     }
 }
 #endif
@@ -2508,7 +2514,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     GetPlatform()->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture);
 
 Cleanup:
-	return;
+    return;
 }
 
 #if defined(TREE3D12)
@@ -2557,12 +2563,12 @@ void RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showSh
     if (useShadowMaps)
     {
         ID3D11ShaderResourceView* depthTexture = nullptr;
-        m_renderManager->GetContext()->PSSetShaderResources(1, 1, &depthTexture);
+        m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
     }
 
     if (showShadowBuffer)
     {
-        HRC(DrawScreenQuad(m_renderManager->GetContext(), m_renderManager->GetRenderData().pShadowMap->DepthMapSRV()));
+        HRC(DrawScreenQuad(m_immediateContext, m_renderManager->GetRenderData().pShadowMap->DepthMapSRV()));
     }
 
     if (!oculus && !renderToSharedTexture)
@@ -2666,7 +2672,7 @@ HRESULT RenderManager::RenderShadowMap()
 
     GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetPlatform()->GetCommandList());
 #else
-    GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetContext());
+    GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetPlatform()->GetContext());
 #endif
 
     DrawSceneToShadowMap();
@@ -2683,12 +2689,12 @@ HRESULT RenderManager::RenderShadowMap()
     GetPlatform()->GetCommandList()->SetPipelineState(GetPlatform()->GetPipelineState());
 
 #else
-	// Restore state after shadow
-	GetContext()->RSSetState(0);
-    GetContext()->RSSetViewports(1, &GetPlatform()->GetViewport());
+    // Restore state after shadow
+    GetPlatform()->GetContext()->RSSetState(0);
+    GetPlatform()->GetContext()->RSSetViewports(1, &GetPlatform()->GetViewport());
 
-#endif	
-	return S_OK;
+#endif
+    return S_OK;
 }
 
 void RenderManager::BuildShadowTransform()
@@ -2741,7 +2747,7 @@ void RenderManager::DrawSceneToShadowMap()
 #if defined(TREE3D12)
 #else
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-    stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
+    stockStates.ApplyRasterizerState(GetPlatform()->GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
 #endif
 
 	// Draw everything
@@ -2754,7 +2760,7 @@ void RenderManager::DrawSceneToShadowMap()
 
 #if defined(TREE3D12)
 #else
-    stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Solid);
+    stockStates.ApplyRasterizerState(GetPlatform()->GetContext(), XSF::StockRasterizerStates::Solid);
 #endif
 }
 

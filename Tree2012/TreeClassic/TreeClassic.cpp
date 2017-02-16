@@ -330,7 +330,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     OnWindowSizeChanged();
 
     // Set up the oculus helper library
-    DIRECTX.Context = g_game->GetRenderManager().GetContext();
+    DIRECTX.Context = g_game->GetRenderManager().GetPlatform()->GetContext();
     DIRECTX.SwapChain = g_game->GetRenderManager().GetPlatform()->GetSwapChain();
 
     ShowWindow(m_hWnd, nCmdShow);
