@@ -8,6 +8,7 @@
 
 class WorldObject;
 class RenderManager;
+class RenderPlatform;
 
 namespace XboxSampleFramework
 {
@@ -81,12 +82,23 @@ struct VertexShader
 {
 #if defined(TREE3D12)
     ID3DBlob*                 shader;
+
     VertexShader(ID3DBlob* blob) : shader(blob) { }
     operator ID3DBlob* () { return shader; }
+
+    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform)
+    {
+        return XSF::LoadShader(shaderFilename, &shader);
+    }
+
 #else
     ID3D11VertexShader*       shader;
+
     VertexShader(ID3D11VertexShader* blob) : shader(blob) { }
     operator ID3D11VertexShader* () { return shader; }
+
+    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
+
 #endif
 
     VertexShader() : shader(nullptr) { }
@@ -105,12 +117,22 @@ struct PixelShader
 {
 #if defined(TREE3D12)
     ID3DBlob*                 shader;
+
     PixelShader(ID3DBlob* shaderBlob) : shader(shaderBlob) { }
     operator ID3DBlob* () { return shader; }
+
+    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform)
+    {
+        return XSF::LoadShader(shaderFilename, &shader);
+    }
+
 #else
     ID3D11PixelShader*        shader;
+
     PixelShader(ID3D11PixelShader* shaderBlob) : shader(shaderBlob) { }
     operator ID3D11PixelShader* () { return shader; }
+
+    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
 #endif
 
     PixelShader() : shader(nullptr) { }

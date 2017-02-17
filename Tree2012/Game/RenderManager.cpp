@@ -1037,62 +1037,80 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename, LoadedTexture
     return S_OK;
 }
 
+#if defined(TREE3D12)
+#else
+HRESULT VertexShader::Load(const wchar_t* shaderFilename, RenderPlatform* platform)
+{
+    char sbFilename[MAX_PATH];
+    size_t converted = 0;
+    size_t filenameLen = (wcslen(shaderFilename) + 1) * 2;
+    wcstombs_s(&converted, sbFilename, filenameLen, shaderFilename, filenameLen);
+    ASSERT(converted * 2 == filenameLen);
+
+    std::vector< BYTE > shaderData;
+    HRR(XSF::LoadBlob(shaderFilename, shaderData));
+
+    // Create VS input layout
+    // Load regular vertex Shader
+    HRR( ((RenderPlatform11*)platform)->GetDevice()->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &shader));
+    SetDebugName(shader, sbFilename);
+}
+
+HRESULT PixelShader::Load(const wchar_t* shaderFilename, RenderPlatform* platform)
+{
+    char sbFilename[MAX_PATH];
+    size_t converted = 0;
+    size_t filenameLen = (wcslen(shaderFilename) + 1) * 2;
+    wcstombs_s(&converted, sbFilename, filenameLen, shaderFilename, filenameLen);
+    ASSERT(converted * 2 == filenameLen);
+
+    HRR(LoadPixelShader(((RenderPlatform11*)platform)->GetD3DDevice(), shaderFilename, &shader));
+    SetDebugName(shader, sbFilename);
+
+    return S_OK;
+}
+
+
+#endif
+
 HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shaderType)
 {
-	char sbFilename[MAX_PATH];
-	size_t converted = 0;
-	size_t filenameLen = (wcslen(shaderFilename) + 1) * 2;
-	wcstombs_s(&converted, sbFilename, filenameLen, shaderFilename, filenameLen);
-	ASSERT(converted * 2 == filenameLen);
+    switch (shaderType)
+    {
+    case ShaderType_VertexShader:
+    {
+        if (m_vertexShaders[shaderFilename])
+        {
+            return S_OK;
+        }
 
-	switch (shaderType)
-	{
-	case ShaderType_VertexShader:
-	{
-		if (m_vertexShaders[shaderFilename])
-		{
-			return S_OK;
-		}
+        VertexShader vertexShader;
+        HRR(vertexShader.Load(shaderFilename, GetPlatform()));
 
-        VertexShader vertexShader = {0};
+        m_vertexShaders[shaderFilename] = new VertexShader(vertexShader);
 
+        break;
+    }
+    case ShaderType_PixelShader:
+    {
+        if (m_pixelShaders[shaderFilename])
+        {
+            return S_OK;
+        }
+
+        PixelShader pixelShader;
+        HRR(pixelShader.Load(shaderFilename, GetPlatform()));
+
+        // Load regular pixel Shader
 #if defined(TREE3D12)
-		HR(XSF::LoadShader(shaderFilename, &vertexShader.shader));
 #else
-		std::vector< BYTE > shaderData;
-		HRR(XSF::LoadBlob(shaderFilename, shaderData));
-
-		// Create VS input layout
-		// Load regular vertex Shader
-		HRR(::GetPlatform(this)->GetDevice()->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &vertexShader.shader));
-		SetDebugName(vertexShader.shader, sbFilename);
 #endif
-		m_vertexShaders[shaderFilename] = new VertexShader(vertexShader);
+        m_pixelShaders[shaderFilename] = new PixelShader(pixelShader);
 
-		break;
-	}
-	case ShaderType_PixelShader:
-	{
-		if (m_pixelShaders[shaderFilename])
-		{
-			return S_OK;
-		}
-
-        PixelShader pixelShader = { 0 };
-
-		// Load regular pixel Shader
-#if defined(TREE3D12)
-		HR(XSF::LoadShader(shaderFilename, &pixelShader.shader));
-#else
-		HRR(LoadPixelShader(::GetPlatform(this)->GetD3DDevice(), shaderFilename, &pixelShader.shader));
-		SetDebugName(pixelShader.shader, sbFilename);
-#endif
-		m_pixelShaders[shaderFilename] = new PixelShader(pixelShader);
-
-		break;
-	}
-	}
-	return S_OK;
+        break;
+    }
+    }
+    return S_OK;
 }
 
 #if defined(TREE3D12)
@@ -2638,17 +2656,17 @@ HRESULT RenderManager::DrawFrameStats()
 {
     GetPlatform()->BeginDrawText();
 
-	float y = 10;
+    float y = 10;
 
-	for (int i = 0; i < MAX_FRAME_STAT; i++)
-	{
-		wchar_t text[128];
-		swprintf(text, 128, L"%s %d", GetRenderData().frameStats[i].name,
-			GetRenderData().frameStats[i].stat);
+    for (int i = 0; i < MAX_FRAME_STAT; i++)
+    {
+        wchar_t text[128];
+        swprintf(text, 128, L"%s %d", GetRenderData().frameStats[i].name,
+            GetRenderData().frameStats[i].stat);
         GetPlatform()->DrawText2(0, y, 0x33444444, text);
-		y += 34.0f;
-	}
-	
+        y += 34.0f;
+    }
+
     GetPlatform()->EndDrawText();
     return S_OK;
 }
