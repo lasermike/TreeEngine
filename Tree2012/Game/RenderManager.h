@@ -271,6 +271,7 @@ struct D3DBuffer
 
     D3DBuffer(ID3D12Resource* bufferParam) : buffer(bufferParam) { }
 
+    D3D12_VERTEX_BUFFER_VIEW view;
 #else
     ID3D11Buffer* buffer;
     operator ID3D11Buffer* () { return buffer; }
@@ -280,6 +281,8 @@ struct D3DBuffer
 #endif
 
     D3DBuffer() : buffer(nullptr) { }
+
+    HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
 
     void Release()
     {
@@ -326,27 +329,12 @@ struct RenderUnit
 
 struct DoubleBuffer
 {
-#if defined (TREE3D12)
     D3DBuffer buffers[2];
-    D3D12_VERTEX_BUFFER_VIEW views[2];
-#else
-    D3DBuffer buffers[2];
-#endif
-
-    DoubleBuffer()
-    {
-    }
 
     HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
 
     D3DBuffer& Get(UINT frame) { return buffers[frame % 2]; }
 
-#if defined (TREE3D12)
-
-    D3D12_VERTEX_BUFFER_VIEW GetView(UINT frame) { return views[frame % 2]; }
-
-#else
-#endif
     void Release()
     {
         buffers[0].Release();

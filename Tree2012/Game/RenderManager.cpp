@@ -607,6 +607,16 @@ HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, Rend
     buffers[0].Release();
     buffers[1].Release();
 
+    HRR(buffers[0].Create(sizeBytes, numInstances, platform));
+    HRR(buffers[1].Create(sizeBytes, numInstances, platform));
+
+    return S_OK;
+}
+
+HRESULT D3DBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+{
+    this->Release();
+
     ID3D12Device* device = ((RenderPlatform12*)platform)->GetDevice();
 
     HRR(device->CreateCommittedResource(
@@ -615,27 +625,16 @@ HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, Rend
         &CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&buffers[0].buffer)));
-    views[0].BufferLocation = buffers[0].buffer->GetGPUVirtualAddress();
-    views[0].SizeInBytes = sizeBytes;
-    views[0].StrideInBytes = sizeBytes / numInstances;
+        IID_PPV_ARGS(&buffer)));
+    view.BufferLocation = buffer->GetGPUVirtualAddress();
+    view.SizeInBytes = sizeBytes;
+    view.StrideInBytes = sizeBytes / numInstances;
 
-    HRR(device->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-        D3D12_HEAP_FLAG_NONE,
-        &CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&buffers[1].buffer)));
-    views[1].BufferLocation = buffers[1].buffer->GetGPUVirtualAddress();
-    views[1].SizeInBytes = sizeBytes;
-    views[1].StrideInBytes = sizeBytes / numInstances;
-
-    SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
-    SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
+    SetDebugName(buffer, "D3DBuffer::buffer");
 
     return S_OK;
 }
+
 #else
 HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
 {
@@ -887,7 +886,7 @@ HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer& instan
 {
     D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
     buffers[0] = m_VBView;
-    buffers[1] = instancedBuffer.GetView(m_renderManager->GetRenderData().frame);
+    buffers[1] = instancedBuffer.Get(m_renderManager->GetRenderData().frame).view;
 
     GetCommandList()->IASetVertexBuffers(0, 2, buffers);
     GetCommandList()->IASetIndexBuffer(&m_IBView);
