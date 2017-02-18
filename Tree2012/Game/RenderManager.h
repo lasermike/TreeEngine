@@ -327,76 +327,31 @@ struct RenderUnit
 struct DoubleBuffer
 {
 #if defined (TREE3D12)
-    //CComPtr<ID3D12Resource> buffers[2];
     D3DBuffer buffers[2];
     D3D12_VERTEX_BUFFER_VIEW views[2];
 #else
-    //CComPtr<ID3D11Buffer> buffers[2];
     D3DBuffer buffers[2];
 #endif
 
-	DoubleBuffer() 
-	{
-	}
+    DoubleBuffer()
+    {
+    }
+
+    HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
+
+    D3DBuffer& Get(UINT frame) { return buffers[frame % 2]; }
 
 #if defined (TREE3D12)
-	D3DBuffer& Get(UINT frame) { return buffers[frame % 2]; }
 
     D3D12_VERTEX_BUFFER_VIEW GetView(UINT frame) { return views[frame % 2]; }
 
-	HRESULT Create(const UINT sizeBytes, const UINT numInstances, XSF::D3DDevice* device)
-	{
-		buffers[0].Release();
-		buffers[1].Release();
-
-		HRR(device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&buffers[0].buffer)));
-        views[0].BufferLocation = buffers[0].buffer->GetGPUVirtualAddress();
-        views[0].SizeInBytes = sizeBytes;
-        views[0].StrideInBytes = sizeBytes / numInstances;
-
-		HRR(device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&buffers[1].buffer)));
-        views[1].BufferLocation = buffers[1].buffer->GetGPUVirtualAddress();
-        views[1].SizeInBytes = sizeBytes;
-        views[1].StrideInBytes = sizeBytes / numInstances;
-
-		SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
-		SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
-
-		return S_OK;
-	}
 #else
-	D3DBuffer& Get(UINT frame) { return buffers[frame % 2]; }
-
-	HRESULT Create(const D3D11_BUFFER_DESC& bd, XSF::D3DDevice* device)
-	{
-		buffers[0].Release();
-		buffers[1].Release();
-
-		HRR(device->CreateBuffer(&bd, 0, &buffers[0].buffer));
-		HRR(device->CreateBuffer(&bd, 0, &buffers[1].buffer));
-		SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
-		SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
-
-		return S_OK;
-	}
 #endif
-	void Release()
-	{
-		buffers[0].Release();
-		buffers[1].Release();
-	}
+    void Release()
+    {
+        buffers[0].Release();
+        buffers[1].Release();
+    }
 };
 
 #if defined(TREE3D12)

@@ -600,6 +600,69 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
 #endif
 
+#if defined (TREE3D12)
+
+HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+{
+    buffers[0].Release();
+    buffers[1].Release();
+
+    ID3D12Device* device = ((RenderPlatform12*)platform)->GetDevice();
+
+    HRR(device->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        D3D12_HEAP_FLAG_NONE,
+        &CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&buffers[0].buffer)));
+    views[0].BufferLocation = buffers[0].buffer->GetGPUVirtualAddress();
+    views[0].SizeInBytes = sizeBytes;
+    views[0].StrideInBytes = sizeBytes / numInstances;
+
+    HRR(device->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        D3D12_HEAP_FLAG_NONE,
+        &CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&buffers[1].buffer)));
+    views[1].BufferLocation = buffers[1].buffer->GetGPUVirtualAddress();
+    views[1].SizeInBytes = sizeBytes;
+    views[1].StrideInBytes = sizeBytes / numInstances;
+
+    SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
+    SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
+
+    return S_OK;
+}
+#else
+HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+{
+    buffers[0].Release();
+    buffers[1].Release();
+
+    ID3D11Device* device = ((RenderPlatform11*)platform)->GetDevice();
+
+    D3D11_BUFFER_DESC bd;
+    ZeroMemory(&bd, sizeof(D3D11_BUFFER_DESC));
+    bd.Usage = D3D11_USAGE_DYNAMIC;
+    bd.ByteWidth = sizeof(InstancedData) * numInstances;
+    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    bd.MiscFlags = 0;
+    bd.StructureByteStride = 0;
+
+    HRR(device->CreateBuffer(&bd, 0, &buffers[0].buffer));
+    HRR(device->CreateBuffer(&bd, 0, &buffers[1].buffer));
+    SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
+    SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
+
+    return S_OK;
+}
+
+#endif
+
 HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
 {
     HRR(UninitGameLevelGraphics());
@@ -609,21 +672,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
     GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps, m_geometryData);
 
-
-	// Create instanced buffer
-#if defined (TREE3D12)
-	HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, ::GetPlatform(this)->GetDevice()));
-#else
-    D3D11_BUFFER_DESC vbd;
-    ZeroMemory(&vbd, sizeof(vbd));
-    vbd.Usage = D3D11_USAGE_DYNAMIC;
-	vbd.ByteWidth = sizeof(InstancedData) * maxInstances;
-	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	vbd.MiscFlags = 0;
-	vbd.StructureByteStride = 0;
-	HRR(m_instancedBuffer.Create(vbd, ::GetPlatform(this)->GetD3DDevice()));
-#endif
+    HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, GetPlatform()));
 
     return S_OK;
 }
