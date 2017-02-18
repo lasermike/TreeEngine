@@ -73,8 +73,9 @@ private:
     HRESULT InitializeEngine();
 
 	void Update(DX::StepTimer const& timer);
-	void Regenerate();
-	void HandleInput(bool key[256]);
+    void Regenerate();
+    void ReloadDevice();
+    void HandleInput(bool key[256]);
 
 
 	void UpdateViewMatrix();
@@ -98,6 +99,7 @@ private:
 	int								    m_currentScene;
 	bool							    m_advanceScene;
 	int								    m_advanceSceneAmount;
+    bool                                m_reloadDevice;
 
     bool                                m_needsResize;
     int                                 m_nextScreenWidth;

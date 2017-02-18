@@ -498,6 +498,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 #else
 HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData)
 {
+
     // Init text font
     m_bitmapFont = new XSF::BitmapFont();
     XSF_ERROR_IF_FAILED(m_bitmapFont->Create(GetD3DDevice(), L"Arial_16"));
@@ -666,6 +667,9 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 {
     HRR(UninitGameLevelGraphics());
 
+    m_lastMaxInstances = maxInstances;
+    m_lastUseShadowMaps = useShadowMaps;
+ 
     // Create vertices and indice for geometry
     m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
 
@@ -2791,6 +2795,15 @@ HRESULT RenderPlatform11::SetRenderState(RenderState state)
     return hr;
 }
 #endif
+
+HRESULT RenderManager::ChangePlatform(int platform)
+{
+    UninitDevice();
+
+    InitDevice();
+
+    return S_OK;
+}
 
 HRESULT RenderManager::RenderShadowMap()
 {

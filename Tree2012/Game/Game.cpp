@@ -40,6 +40,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 	m_advanceScene = 0;
 	m_advanceSceneAmount = 0;
 	m_currentScene = 0;
+    m_reloadDevice = false;
 
 	m_player = nullptr;
 	m_threadPool = nullptr;
@@ -122,6 +123,28 @@ HRESULT Game::Cleanup()
 	m_renderManager.UninitDevice(); return S_OK;
 }
 
+void Game::ReloadDevice()
+{
+    HRESULT hr = S_OK;
+
+    // Clear old stuff
+    m_pScene->CleanUpDeviceObjects();
+    m_renderManager.UninitGameLevelGraphics();
+
+    m_renderManager.ChangePlatform(12);
+
+    m_needsResize = true;
+
+    // Init render manager
+    hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
+    assert(SUCCEEDED(hr));
+
+    // Init new stuff
+    hr = m_pScene->InitGraphics(m_renderManager);
+    assert(SUCCEEDED(hr));
+
+}
+
 void Game::Regenerate()
 {
 	HRESULT hr = S_OK;
@@ -130,7 +153,7 @@ void Game::Regenerate()
 	m_pScene->CleanUpDeviceObjects();
 	m_renderManager.UninitGameLevelGraphics();
 
-	m_loader.Regenerate(m_pScene);
+    m_loader.Regenerate(m_pScene);
 
     // Init render manager
     hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
@@ -146,6 +169,19 @@ void Game::Update(DX::StepTimer const& timer)
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"Update");
 
 	m_renderManager.GetRenderData().frame++;
+
+    if (m_reloadDevice)
+    {
+        ReloadDevice();
+        m_reloadDevice = false;
+    }
+
+    if (m_needsResize)
+    {
+        m_renderManager.OnResize(m_nextScreenWidth, m_nextScreenHeight, m_renderToSharedTexture/*, this*/);
+        m_needsResize = false;
+    }
+
 
 	if (m_advanceScene)
 	{
@@ -180,7 +216,6 @@ void Game::Update(DX::StepTimer const& timer)
 		Regenerate();
 		m_resetTree = false;
 	}
-
 
     // Update our time
     if (m_timeStart == 0)
@@ -224,12 +259,6 @@ void Game::ComputeCPU()
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
-
-    if (m_needsResize)
-    {
-        m_renderManager.OnResize(m_nextScreenWidth, m_nextScreenHeight, m_renderToSharedTexture/*, this*/);
-        m_needsResize = false;
-    }
 
 	// Reset stats
 	for (int i = 0; i < MAX_FRAME_STAT; i++)
@@ -289,71 +318,74 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 {
     m_player->HandleInput(key);
 
-    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H', 'N', 'B', 'R' };
-	for (char k : availableKeys)
-	{
-		if (key[k])
-		{
-			switch (k)
-			{
-			case ']':
-				m_resetTree = true;
-				m_loader._currentSeed++;
-				key[k] = false;
-				break;
-			case '[':
-				if (m_loader._currentSeed > 0)
-				{
-					m_resetTree = true;
-					m_loader._currentSeed--;
-					key[k] = false;
-				}
-				break;
-			case '0':
-				m_timeStart = 0;
-				key[k] = false;
-				break;
-			case 'Z':
-				m_showShadowBuffer = !m_showShadowBuffer;
-				key[k] = false;
-				break;
-			case 'P':
-				m_paused = !m_paused;
-				key[k] = false;
-				break;
-			case '#':
-				m_wireframe = !m_wireframe;
-				key[k] = false;
-				break;
-			case 'H':
-				m_showHelp = !m_showHelp;
-				key[k] = false;
-				break;
-			case 'R':
-				m_advanceScene = true;
-				key[k] = false;
-				break;
-			case 'N':
-				m_advanceScene = true;
-				m_advanceSceneAmount = 1;
-				key[k] = false;
-				break;
-			case 'B':
-				m_advanceScene = true;
-				m_advanceSceneAmount = -1;
-				key[k] = false;
-				break;
-				//case '1':
-			//case '2':
-			//case '3':
-			//case '4':
-			//case '5':
-			//case '6':
-			//	Select(k - '0');
-			//	break;
-			}
-		}
-	}
+    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H', 'N', 'B', 'R', '1', '2' };
+    for (char k : availableKeys)
+    {
+        if (key[k])
+        {
+            switch (k)
+            {
+            case ']':
+                m_resetTree = true;
+                m_loader._currentSeed++;
+                key[k] = false;
+                break;
+            case '[':
+                if (m_loader._currentSeed > 0)
+                {
+                    m_resetTree = true;
+                    m_loader._currentSeed--;
+                    key[k] = false;
+                }
+                break;
+            case '0':
+                m_timeStart = 0;
+                key[k] = false;
+                break;
+            case 'Z':
+                m_showShadowBuffer = !m_showShadowBuffer;
+                key[k] = false;
+                break;
+            case 'P':
+                m_paused = !m_paused;
+                key[k] = false;
+                break;
+            case '#':
+                m_wireframe = !m_wireframe;
+                key[k] = false;
+                break;
+            case 'H':
+                m_showHelp = !m_showHelp;
+                key[k] = false;
+                break;
+            case 'R':
+                m_advanceScene = true;
+                key[k] = false;
+                break;
+            case 'N':
+                m_advanceScene = true;
+                m_advanceSceneAmount = 1;
+                key[k] = false;
+                break;
+            case 'B':
+                m_advanceScene = true;
+                m_advanceSceneAmount = -1;
+                key[k] = false;
+                break;
+            case '2':
+                m_reloadDevice = true;
+                break;
+                //case '1':
+            //case '2':
+            //case '3':
+            //case '4':
+            //case '5':
+            //case '6':
+            //	Select(k - '0');
+            //	break;
+            }
+        }
+    }
 }
 
 

@@ -308,7 +308,7 @@ HRESULT BitmapFont::Create(RenderManager* const renderManager, const WCHAR* strF
     XSF_ERROR_IF_FAILED(m_frameHeap.Initialize(pDevice, pFence, 256 * 1024, false, 1 /*frame latency*/, L"BitmapFont::FrameHeap"));
     XSF_ERROR_IF_FAILED(m_uploadHeap.Initialize(pDevice, pFence, 4 * 1024 * 1024, false, 1, L"BitmapFont::UploadHeap"));
     
-    m_renderManager->GetPlatform()->ManageUploadHeap(&m_uploadHeap);
+    //m_renderManager->GetPlatform()->ManageUploadHeap(&m_uploadHeap);
 
     // read the data
     WCHAR tmp[1024];

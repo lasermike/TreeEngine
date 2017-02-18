@@ -770,6 +770,9 @@ class RenderManager : public IRenderFrame
     GeometryGenerator                   m_geometryGenerator;
     GeometryBufferData                  m_geometryData;
 
+    int m_lastMaxInstances;
+    bool m_lastUseShadowMaps;
+
     DirectionalLight                    m_light;  // Doesn't belong here, will move later
 
     HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
@@ -830,6 +833,8 @@ public:
 
     HRESULT DrawFrameStats();
     HRESULT RenderShadowMap();
+
+    HRESULT ChangePlatform(int platform);
 };
 
 #if defined(TREE3D12)
