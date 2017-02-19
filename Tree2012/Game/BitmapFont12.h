@@ -132,7 +132,7 @@ namespace XboxSampleFramework
         UINT                        m_iCBQuad;
 
         // These values are passed in the Begin function
-        RenderManager*				m_renderManager;
+        RenderPlatform12*           m_renderPlatform;
         D3DCommandList*             m_pCmdList;
 
         BOOL m_bRotate;
@@ -155,8 +155,8 @@ namespace XboxSampleFramework
         ~BitmapFont();
 
         // Functions to create and destroy the internal objects
-        HRESULT Create(_In_ RenderManager* renderManager, _In_z_ const WCHAR* strFontFileName, _In_opt_ const D3D12_RECT* pRc = nullptr);
-        HRESULT Create(_In_ RenderManager* renderManager, _In_ ID3D12Resource* const pFontTexture, _In_ const VOID* pFontData, _In_opt_ const D3D12_RECT* pRc = nullptr);
+        HRESULT Create(_In_ RenderPlatform12* renderPlatform, _In_z_ const WCHAR* strFontFileName, _In_opt_ const D3D12_RECT* pRc = nullptr);
+        HRESULT Create(_In_ RenderPlatform12* renderPlatform, _In_ ID3D12Resource* const pFontTexture, _In_ const VOID* pFontData, _In_opt_ const D3D12_RECT* pRc = nullptr);
         VOID    Destroy();
 
         // Returns the dimensions of a text string

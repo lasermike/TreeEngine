@@ -159,9 +159,9 @@ RenderManager::RenderManager() : m_platform(nullptr)
 
     // TODO: where should this go?
 #if defined(TREE3D12)
-    m_platform = new RenderPlatform12(this);
+    m_platform = new RenderPlatform12(&this->GetRenderData());
 #else
-    m_platform = new RenderPlatform11(this);
+    m_platform = new RenderPlatform11(&this->GetRenderData());
 #endif
 }
 
@@ -361,7 +361,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // Init text font
     m_bitmapFont = new XSF::BitmapFont();
-    HRR(m_bitmapFont->Create(this->m_renderManager, L"Arial_16"));
+    HRR(m_bitmapFont->Create(this, L"Arial_16"));
 
     // Constant buffers
     m_constBufferNeverChanges = new UploadBuffer<CBNeverChanges>(GetDevice(), Count_CBSI /* normal + shadown pass */, true);
@@ -485,12 +485,12 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     if (useShadowMaps)
     {
         D3D12_CPU_DESCRIPTOR_HANDLE shadowDsv = GetShadowDepthTargetHandle();
-        m_renderManager->GetRenderData().pShadowMap = new ShadowMap(GetDevice(), 
+        m_renderData->pShadowMap = new ShadowMap(GetDevice(),
                                                                     m_shaderHeap.hCPU(ShadowSrv_HeapOffset), 
                                                                     m_shaderHeap.hGPU(ShadowSrv_HeapOffset), 
                                                                     shadowDsv, 
-                                                                    m_renderManager->GetRenderData().SMapWidth, 
-                                                                    m_renderManager->GetRenderData().SMapHeight);
+                                                                    m_renderData->SMapWidth, 
+                                                                    m_renderData->SMapHeight);
     }
 
     return S_OK;
@@ -592,7 +592,7 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     if (useShadowMaps)
     {
-        m_renderManager->GetRenderData().pShadowMap = new ShadowMap(GetD3DDevice(), m_renderManager->GetRenderData().SMapWidth, m_renderManager->GetRenderData().SMapHeight);
+        m_renderData->pShadowMap = new ShadowMap(GetD3DDevice(), m_renderData->SMapWidth, m_renderData->SMapHeight);
     }
 
     return S_OK;
@@ -890,7 +890,7 @@ HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer& instan
 {
     D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
     buffers[0] = m_VBView;
-    buffers[1] = instancedBuffer.Get(m_renderManager->GetRenderData().frame).view;
+    buffers[1] = instancedBuffer.Get(m_renderData->frame).view;
 
     GetCommandList()->IASetVertexBuffers(0, 2, buffers);
     GetCommandList()->IASetIndexBuffer(&m_IBView);
@@ -930,7 +930,7 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer& instan
     // Set vertex buffer
     UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
     UINT offset[2] = { 0, 0 };
-    ID3D11Buffer* vbs[2] = { m_vertexBuffer, instancedBuffer.Get(m_renderManager->GetRenderData().frame) };
+    ID3D11Buffer* vbs[2] = { m_vertexBuffer, instancedBuffer.Get(m_renderData->frame) };
     m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
 
     return S_OK;
@@ -2501,7 +2501,7 @@ void RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool useAlp
         // Make shadow map available to shaders
         if (useShadowMaps)
         {
-            GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, m_renderManager->GetRenderData().pShadowMap->DepthMapSRVGpu());
+            GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, m_renderData->pShadowMap->DepthMapSRVGpu());
         }
     }
 }
@@ -2542,7 +2542,7 @@ void RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlphaBl
     // Make shadow map available to shaders
     if (useShadowMaps)
     {
-        ID3D11ShaderResourceView* depthTexture = m_renderManager->GetRenderData().pShadowMap->DepthMapSRV();
+        ID3D11ShaderResourceView* depthTexture = m_renderData->pShadowMap->DepthMapSRV();
         m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
     }
 }
@@ -2602,7 +2602,7 @@ void RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool sh
 
     if (showShadowBuffer)
     {
-        HRC(DrawScreenQuad(GetCommandList(), m_renderManager->GetRenderData().pShadowMap ? m_renderManager->GetRenderData().pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
+        HRC(DrawScreenQuad(GetCommandList(), m_renderData->pShadowMap ? m_renderData->pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
     }
 
     // Indicate that the back buffer will now be used to present.
@@ -2638,7 +2638,7 @@ void RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showSh
 
     if (showShadowBuffer)
     {
-        HRC(DrawScreenQuad(m_immediateContext, m_renderManager->GetRenderData().pShadowMap->DepthMapSRV()));
+        HRC(DrawScreenQuad(m_immediateContext, m_renderData->pShadowMap->DepthMapSRV()));
     }
 
     if (!oculus && !renderToSharedTexture)
@@ -2737,11 +2737,11 @@ HRESULT RenderPlatform12::SetRenderState(RenderState state)
         GetCommandList()->SetPipelineState(m_pipelineStateShadowMap);
 
         // Change to DEPTH_WRITE.
-        CD3DX12_RESOURCE_BARRIER toWriteBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderManager->GetRenderData().pShadowMap->DepthMapBuffer(),
+        CD3DX12_RESOURCE_BARRIER toWriteBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pShadowMap->DepthMapBuffer(),
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
         GetCommandList()->ResourceBarrier(1, &toWriteBarrier);
 
-        m_renderManager->GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetCommandList());
+        m_renderData->pShadowMap->BindDsvAndSetNullRenderTarget(GetCommandList());
 
         break;
     }
@@ -2751,7 +2751,7 @@ HRESULT RenderPlatform12::SetRenderState(RenderState state)
         GetCommandList()->RSSetScissorRects(1, &GetScissorRect());
 
         // Indicate that the back buffer will now be used to present.
-        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderManager->GetRenderData().pShadowMap->DepthMapBuffer(),
+        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pShadowMap->DepthMapBuffer(),
             D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
         GetCommandList()->ResourceBarrier(1, &toReadBarrier);
 
@@ -2776,7 +2776,7 @@ HRESULT RenderPlatform11::SetRenderState(RenderState state)
     {
     case RS_TRANSITION_TO_RENDER_SHADOW_MAP:
     {
-        m_renderManager->GetRenderData().pShadowMap->BindDsvAndSetNullRenderTarget(GetContext());
+        m_renderData->pShadowMap->BindDsvAndSetNullRenderTarget(GetContext());
 
         stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
         break;

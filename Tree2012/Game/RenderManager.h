@@ -512,7 +512,7 @@ private:
 
 public:
 
-    RenderPlatform12(RenderManager* renderManager) : m_renderManager(renderManager), m_fenceEvent(nullptr) { }
+    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr) { }
     RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     IDXGISwapChain3* GetSwapChain() { return m_pSwapChain; }
@@ -586,7 +586,7 @@ public:
 
     ID3D12PipelineState* GetPipelineState() { return m_pipelineState; }
 
-    RenderManager*                    m_renderManager; //TEMPTEMP: remove this back reference soon!
+    RenderData*                    m_renderData;
 
     // TEMPTEMP make private 
     // Default shader
@@ -645,11 +645,11 @@ class RenderPlatform11 : public RenderPlatform
     CComPtr<ID3D11Buffer>             m_screenQuadVB;
     CComPtr<ID3D11Buffer>             m_screenQuadIB;
 
-    RenderManager*                    m_renderManager; //TEMPTEMP
+    RenderData*                    m_renderData; //TEMPTEMP
 
 public:
 
-    RenderPlatform11(RenderManager* renderManager) : m_renderManager(renderManager), m_msaaQuality(0)
+    RenderPlatform11(RenderData* renderData) : m_renderData(renderData), m_msaaQuality(0)
     {
 #ifdef ENABLE_MSAA
         m_enableMsaa = true; // TODO
