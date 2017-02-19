@@ -132,8 +132,7 @@ namespace XboxSampleFramework
         UINT                        m_iCBQuad;
 
         // These values are passed in the Begin function
-        //const SampleFramework*      m_pSample;
-		RenderManager*				m_renderManager;
+        RenderManager*				m_renderManager;
         D3DCommandList*             m_pCmdList;
 
         BOOL m_bRotate;
