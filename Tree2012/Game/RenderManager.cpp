@@ -2310,7 +2310,6 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::UninitDevice()
 {
-    ReleaseSwapChainResources();
 
     TrimUploadHeaps(true);
 
@@ -2332,6 +2331,7 @@ HRESULT RenderPlatform12::UninitDevice()
     // InitDevice objects
     m_d3dDevice.Release();
     m_pSwapChain.Release();
+    ReleaseSwapChainResources();
     return S_OK;
 }
 #else
