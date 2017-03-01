@@ -123,6 +123,9 @@
     <ClCompile Include="TreePC.cpp">
       <Filter>Platform Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\RenderPlatform.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicTimer.h">
@@ -302,6 +305,7 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
       <Filter>UWP</Filter>
     </Image>
+    <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />

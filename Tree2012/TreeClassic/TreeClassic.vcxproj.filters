@@ -205,6 +205,9 @@
     <ClCompile Include="..\Game\WorldObject.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\RenderPlatform.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="TreeClassic.rc">

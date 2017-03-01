@@ -49,6 +49,11 @@ struct ShaderMaterial
 	XMFLOAT4 flags; // x = n/a, y = useTexture
 };
 
+struct CBMaterial
+{
+    ShaderMaterial material;
+};
+
 class Materials
 {
 public:

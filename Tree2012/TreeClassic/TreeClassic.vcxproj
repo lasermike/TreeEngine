@@ -262,6 +262,7 @@ call ..\Game\CopyResources.cmd $(OutDir)
     <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp" />
+    <ClCompile Include="..\Game\RenderPlatform.cpp" />
     <ClCompile Include="..\Game\RenderStates.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
     <ClCompile Include="..\Game\ShadowMap.cpp" />

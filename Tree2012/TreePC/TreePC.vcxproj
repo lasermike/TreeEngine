@@ -290,6 +290,7 @@
     <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp" />
+    <ClCompile Include="..\Game\RenderPlatform.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
     <ClCompile Include="..\Game\ScreenGrab12.cpp" />
     <ClCompile Include="..\Game\ShadowMap.cpp" />
