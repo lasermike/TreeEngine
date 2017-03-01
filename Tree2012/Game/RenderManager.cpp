@@ -73,66 +73,6 @@ RenderManager::~RenderManager()
     SafeDelete(&m_platform);
 }
 
-#if defined(TREE3D12)
-#else
-
-//--------------------------------------------------------------------------------------
-// Name: LoadPixelShader()
-// Desc: Load a pixel shader
-//--------------------------------------------------------------------------------------
-HRESULT LoadPixelShader(D3DDevice* pDev, const wchar_t* path, ID3D11PixelShader** ppPS, std::vector< BYTE >* pData = nullptr)
-{
-    std::vector< BYTE > data;
-    if (!pData)
-        pData = &data;
-
-    HRESULT hr = XSF::LoadBlob(path, *pData);
-    if (FAILED(hr))
-        return hr;
-
-    return pDev->CreatePixelShader(&(*pData)[0], pData->size(), nullptr, ppPS);
-}
-
-//--------------------------------------------------------------------------------------
-// Name: LoadVertexShader()
-// Desc: Load a vertex shader
-//--------------------------------------------------------------------------------------
-HRESULT LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID3D11VertexShader** ppVS,
-    const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = nullptr, UINT numElements = 0, ID3D11InputLayout** ppInputLayout = nullptr, std::vector< BYTE >* pData = nullptr)
-{
-    if (ppInputLayout)
-        *ppInputLayout = nullptr;
-
-    std::vector< BYTE > data;
-    if (!pData)
-        pData = &data;
-
-    HRESULT hr = XSF::LoadBlob(path, *pData);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-
-    hr = pDev->CreateVertexShader(&(*pData)[0], pData->size(), nullptr, ppVS);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-
-    if (pInputElementDesc && numElements && ppInputLayout)
-    {
-        hr = pDev->CreateInputLayout(pInputElementDesc, numElements, &(*pData)[0], pData->size(), ppInputLayout);
-        if (FAILED(hr))
-        {
-            return hr;
-        }
-    }
-
-    return S_OK;
-}
-
-#endif
-
 HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
 {
     HRR(UninitGameLevelGraphics());
@@ -165,8 +105,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 {
     HRR(GetPlatform()->UninitGameLevelGraphics());
 
-
-    SafeDelete(&GetRenderData().pShadowMap);
     m_instancedBuffer.Release();
 
     for (auto& t : m_textures)
@@ -210,10 +148,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_objectToInstanceBufferOffset.clear();
     m_nextInstanceBufferOffset = 0;
     m_perFrameInstanceData.clear();
-
-#if !defined(TREE3D12)
-    InputLayouts::DestroyAll();
-#endif
 
 	return S_OK;
 }
@@ -456,7 +390,7 @@ HRESULT RenderManager::InitDevice()
 {
 	HRESULT hr = S_OK;
 
-    HRR(::GetPlatform(this)->InitDevice());
+    HRR(GetPlatform()->InitDevice());
 
     // Initialize the world matrices
     XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
@@ -516,9 +450,9 @@ void RenderManager::UninitDevice()
 {
     UninitGameLevelGraphics();
 
-    SafeDelete(&GetRenderData().pShadowMap);
+    //SafeDelete(&GetRenderData().pShadowMap);
 
-    ::GetPlatform(this)->UninitDevice();
+    GetPlatform()->UninitDevice();
 }
 
 //--------------------------------------------------------------------------------------
@@ -650,21 +584,21 @@ void RenderManager::DrawSceneToShadowMap()
     UpdateView(&GetRenderData().view, false);
 }
 
-
-#if defined(TREE3D12)
-
-RenderPlatform12* GetPlatform(RenderManager* manager)
-{
-    return (RenderPlatform12*)manager->GetPlatformBase();
-}
-
-#else
-
-RenderPlatform11* GetPlatform(RenderManager* manager)
-{
-    return (RenderPlatform11*)manager->GetPlatformBase();
-}
-
-
-#endif
-
+//
+//#if defined(TREE3D12)
+//
+//RenderPlatform12* GetPlatform(RenderManager* manager)
+//{
+//    return (RenderPlatform12*)manager->GetPlatformBase();
+//}
+//
+//#else
+//
+//RenderPlatform11* GetPlatform(RenderManager* manager)
+//{
+//    return (RenderPlatform11*)manager->GetPlatformBase();
+//}
+//
+//
+//#endif
+//

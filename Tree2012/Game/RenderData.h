@@ -1,5 +1,6 @@
 #pragma once
 #include "Materials.h"
+#include "ConstBufferDefinitions.h"
 
 class ShadowMap;
 struct InstancedData;

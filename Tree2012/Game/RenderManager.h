@@ -7,24 +7,24 @@ class WorldObject;
 
 enum DisplayMode
 {
-	Monitor = 0,
-	Oculus
+    Monitor = 0,
+    Oculus
 };
 
 enum MaterialTypes
 {
-	LogMaterial,
-	TwigMaterial,
-	GroundMaterial,
+    LogMaterial,
+    TwigMaterial,
+    GroundMaterial,
 
-	MaterialTypesMax
+    MaterialTypesMax
 };
 
 enum ShaderType
 {
-	ShaderType_VertexShader,
-	ShaderType_PixelShader,
-	ShaderType_ComputeShader,
+    ShaderType_VertexShader,
+    ShaderType_PixelShader,
+    ShaderType_ComputeShader,
 };
 
 struct Mesh
@@ -47,11 +47,11 @@ public:
 
 struct RenderUnit
 {
-    Material*					m_material;
-    Mesh*						m_mesh;
+    Material*                   m_material;
+    Mesh*                       m_mesh;
 
-    UINT						totalMaxInstances; // TODO Needed?
-    std::list<WorldObject*>		reservations;
+    UINT                        totalMaxInstances; // TODO Needed?
+    std::list<WorldObject*>     reservations;
 
     RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh), totalMaxInstances(0)
     {

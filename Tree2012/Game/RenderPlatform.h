@@ -650,14 +650,14 @@ private:
 
 #endif
 
-
-#if defined(TREE3D12)
-
-RenderPlatform12* GetPlatform(RenderManager* manager);
-
-#else
-
-RenderPlatform11* GetPlatform(RenderManager* manager);
-
-#endif
+//
+//#if defined(TREE3D12)
+//
+//RenderPlatform12* GetPlatform(RenderManager* manager);
+//
+//#else
+//
+//RenderPlatform11* GetPlatform(RenderManager* manager);
+//
+//#endif
 

@@ -136,7 +136,6 @@ void InputLayouts::DestroyAll()
 
 #pragma endregion
 
-
 #if defined(TREE3D12)
 #else
 
@@ -196,6 +195,7 @@ HRESULT LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID3D11VertexShade
 }
 
 #endif
+
 
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
@@ -689,6 +689,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_drawScreenVertexShader.Release();
     m_drawScreenPixelShader.Release();
 
+    SafeDelete(&m_renderData->pShadowMap);
+
     return S_OK;
 }
 #else
@@ -710,6 +712,10 @@ HRESULT RenderPlatform11::UninitGameLevelGraphics()
     m_shadowPixelShader.Release();
     m_drawScreenVertexShader.Release();
     m_drawScreenPixelShader.Release();
+
+    SafeDelete(&m_renderData->pShadowMap);
+
+    InputLayouts::DestroyAll();
 
     return S_OK;
 }
@@ -904,6 +910,8 @@ HRESULT VertexShader::Load(const wchar_t* shaderFilename, RenderPlatform* platfo
     // Load regular vertex Shader
     HRR( ((RenderPlatform11*)platform)->GetDevice()->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &shader));
     SetDebugName(shader, sbFilename);
+
+    return S_OK;
 }
 
 HRESULT PixelShader::Load(const wchar_t* shaderFilename, RenderPlatform* platform)
@@ -1815,7 +1823,7 @@ HRESULT RenderPlatform11::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 #if defined(WIN32) && !defined(TREENGINE_XBOX)
         HRR(dxgiFactory2->CreateSwapChainForHwnd(GetDevice(), m_hwnd, &sd, nullptr, nullptr, &pSwapChain1));
 #else
-        HRR(dxgiFactory2->CreateSwapChainForCoreWindow(GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), sd, nullptr, swapChain));
+        HRR(dxgiFactory2->CreateSwapChainForCoreWindow(GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), &sd, nullptr, &pSwapChain1));
 #endif 
 
         HRR(pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&m_pSwapChain)));
@@ -1914,10 +1922,10 @@ HRESULT RenderPlatform11::UninitDevice()
     XSF::StockRenderStates::Shutdown();
 
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
-    if (::GetPlatform(this)->GetDevice())
+    if (GetDevice())
     {
         CComPtr<ID3D11Debug> dbg;
-        HR(::GetPlatform(this)->GetDevice()->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&dbg)));
+        HR(GetDevice()->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&dbg)));
 
         HR(dbg->ReportLiveDeviceObjects(D3D11_RLDO_SUMMARY | D3D11_RLDO_DETAIL));
     }

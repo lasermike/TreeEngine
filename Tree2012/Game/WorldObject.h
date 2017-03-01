@@ -9,12 +9,6 @@ class RenderManager;
 
 interface IRenderFrame;
 
-// For rendering indirectly
-struct InstancedData
-{
-	XMFLOAT4X4 World;
-};
-
 enum GeneratorType
 {
 	NullGeneratorType,

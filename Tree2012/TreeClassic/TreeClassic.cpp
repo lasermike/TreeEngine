@@ -319,7 +319,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
 	g_game = new Game(&g_inputManager);
-    ::GetPlatform(&g_game->GetRenderManager())->SetWindow(m_hWnd);
+    g_game->GetRenderManager().GetPlatform()->SetWindow(m_hWnd);
 
 	if (FAILED(g_game->Initialize(false /* render to shared texture */)))
     {
