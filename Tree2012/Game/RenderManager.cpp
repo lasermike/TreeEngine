@@ -12,35 +12,6 @@ FrameStatistic g_frameStats[MAX_FRAME_STAT] =
 };
 
 
-
-/*
-class InputLayoutDesc
-{
-public:
-	static const InputElementDesc InstancedBasic16[8];
-	static const InputElementDesc Basic32[3];
-};
-
-const InputElementDesc InputLayoutDesc::InstancedBasic16[8] =
-{
-	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
-	{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, InputClassificationVertex, 0 },
-	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, InputClassificationVertex, 0 },
-	{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, InputClassificationVertex, 0},
-	{ "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
-	{ "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
-	{ "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
-	{ "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
-};
-
-const InputElementDesc InputLayoutDesc::Basic32[3] =
-{
-	{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0},
-	{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, InputClassificationVertex, 0},
-	{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, InputClassificationVertex, 0}
-};
-*/
-
 RenderManager::RenderManager() : m_platform(nullptr)
 {
     m_displayMode = Monitor;
@@ -584,21 +555,3 @@ void RenderManager::DrawSceneToShadowMap()
     UpdateView(&GetRenderData().view, false);
 }
 
-//
-//#if defined(TREE3D12)
-//
-//RenderPlatform12* GetPlatform(RenderManager* manager)
-//{
-//    return (RenderPlatform12*)manager->GetPlatformBase();
-//}
-//
-//#else
-//
-//RenderPlatform11* GetPlatform(RenderManager* manager)
-//{
-//    return (RenderPlatform11*)manager->GetPlatformBase();
-//}
-//
-//
-//#endif
-//
