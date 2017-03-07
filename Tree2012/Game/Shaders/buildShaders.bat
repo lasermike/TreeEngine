@@ -40,21 +40,25 @@ call %~p4\commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 @rem %1 = inputfile, %2 = stage, %3 = entrypoint %4 = Output dir
 @echo BuildShader: %*
 @if %2==vs (
-set target=vs_5_0
-set suffix=VS
+  set target=vs_5_0
+  set suffix=VS
 ) ELSE (
-set target=ps_5_0
-set suffix=PS
+  set target=ps_5_0
+  set suffix=PS
 )
+
 @set outputfile=%~4%~n3.cso
 @ECHO Building %1 for %target%  
 @set finalcmd=%cmdline% %1 /T%target% /E%3 /Fo"%outputfile%"
 @echo !finalcmd!
 call !finalcmd!
+
 @if ERRORLEVEL 1 goto ENDOFSCRIPT
-@if "%incremental%"=="0" (
+
+@rem @if "%incremental%"=="0" (
 	copy "%outputfile%" %layoutFolder%
-)
+@rem )
+
 @goto :EOF
 
 @rem Subroutines
