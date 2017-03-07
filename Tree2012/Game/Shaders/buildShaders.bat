@@ -47,6 +47,7 @@ call %~p4\commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
   set suffix=PS
 )
 
+@rem Compile!
 @set outputfile=%~4%~n3.cso
 @ECHO Building %1 for %target%  
 @set finalcmd=%cmdline% %1 /T%target% /E%3 /Fo"%outputfile%"
@@ -55,9 +56,8 @@ call !finalcmd!
 
 @if ERRORLEVEL 1 goto ENDOFSCRIPT
 
-@rem @if "%incremental%"=="0" (
-	copy "%outputfile%" %layoutFolder%
-@rem )
+@rem Copy output to deployment directory (AppX)
+copy "%outputfile%" %layoutFolder%
 
 @goto :EOF
 
