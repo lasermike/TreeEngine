@@ -109,87 +109,67 @@
     <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
     <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
+
+  <!-- common settings -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_TREE_CLASSIC;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libOVR.lib; libOVRKernel.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>Lib\Debug</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent />
     <PostBuildEvent>
       <Command>call ..\Game\CopyResources.cmd $(OutDir) 
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">
+   
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_TREE_CLASSIC;TREE3D12;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_TREE_CLASSIC;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>libOVR.lib; libOVRKernel.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Lib\Debug</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_TREE_CLASSIC;TREE3D12;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>libOVR.lib; libOVRKernel.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Debug;Lib\Debug</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent />
-    <PostBuildEvent>
-      <Command>call ..\..\misc\copyrobo ..\$(Configuration)\TreeWin32Lib  $(OutDir) *.cso /XO ;
-call ..\Game\CopyResources.cmd $(OutDir) 
-</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
+  
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
-      <PrecompiledHeader>Use</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_TREE_CLASSIC;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>libOVR.lib; libOVRKernel.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Release;Lib\Release</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>call ..\..\misc\copyrobo ..\$(Configuration)\TreeWin32Lib  $(OutDir) *.cso /XO ;
-call ..\Game\CopyResources.cmd $(OutDir) 
-</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup>
-    <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-    </ClCompile>
-  </ItemDefinitionGroup>
+  
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PreprocessorDefinitions>_TREE_CLASSIC;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -198,9 +178,9 @@ call ..\Game\CopyResources.cmd $(OutDir)
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
+  
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
     <ClCompile>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PreprocessorDefinitions>_TREE_CLASSIC;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -209,11 +189,13 @@ call ..\Game\CopyResources.cmd $(OutDir)
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
+  
   <ItemGroup>
     <Text Include="..\Game\graphdata.txt" />
     <Text Include="..\Game\Shaders\ShaderFiles.txt" />
     <Text Include="ReadMe.txt" />
   </ItemGroup>
+  
   <ItemGroup>
     <ClInclude Include="..\Game\BitmapFont.h" />
     <ClInclude Include="..\Game\CComPtr.h" />
