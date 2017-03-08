@@ -6,26 +6,27 @@ echo CMD: %*
 @set inputFile=%4
 @set AnyErrors=0
 
-call %~p4\commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
+call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 
 @rem Setup for hot recompile
 @set incremental=0
 @if "%7"=="1" set incremental=1
 
-@if "%incremental%"=="0" (
-    echo Incremental shader build
-	@rem Output a batch file to rebuild this shader file
-	@rem echo %~dp4 > %2%\shaderSrcPath.txt
-	@copy %0 %2
-	echo buildShaders.bat %1 %2 %3 %4 %5 %6 1 > %2build%~n4.cmd
-)
+@rem 
+@rem @if "%incremental%"=="0" (
+@rem     echo Incremental shader build
+@rem 	@rem Output a batch file to rebuild this shader file
+@rem 	echo %~dp4 > %2%\shaderSrcPath.txt
+@rem 	@copy %0 %2
+@rem 	echo buildShaders.bat %1 %2 %3 %4 %5 %6 1 > %2build%~n4.cmd
+@rem )
 
 @rem Color init
 @call :ColorInit
 
 @rem Build from each entry point in shader
 @rem format:filename,vs/ps,entry_point
-@FOR /F "tokens=1,2,3 delims=," %%G IN (%~p4ShaderFiles.txt) DO (
+@FOR /F "tokens=1,2,3 delims=," %%G IN (%~dp4ShaderFiles.txt) DO (
   if %%G==%~nx4 call :BuildShader %4 %%H %%I %2
 )
 
