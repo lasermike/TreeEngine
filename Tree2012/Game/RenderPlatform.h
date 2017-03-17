@@ -304,7 +304,8 @@ enum RenderPlatforms
 class RenderPlatform
 {
 protected:
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
+//#if defined(WIN32) && !defined(TREENGINE_XBOX)
+#if defined(_TREE_CLASSIC)
     HWND                              m_hwnd;
 #else
     Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;
