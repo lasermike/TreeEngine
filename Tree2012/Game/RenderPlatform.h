@@ -304,7 +304,6 @@ enum RenderPlatforms
 class RenderPlatform
 {
 protected:
-//#if defined(WIN32) && !defined(TREENGINE_XBOX)
 #if defined(_TREE_CLASSIC)
     HWND                              m_hwnd;
 #else
@@ -337,7 +336,20 @@ public:
     }
 #endif
 
+    //
+    // Base RenderPlatform methods
+    //
+
     RenderPlatforms GetType() { return UNDEFINED_RENDER_PLATFORM; }
+
+    // TODO: This is inconsistent with out other platform specific resources are managed
+    // Default shader
+    VertexShader                      m_vertexShader;
+    PixelShader                       m_pixelShader;
+    VertexShader                      m_shadowVertexShader;
+    PixelShader                       m_shadowPixelShader;
+    VertexShader                      m_drawScreenVertexShader;
+    PixelShader                       m_drawScreenPixelShader;
 };
 
 #if defined(TREE3D12)
@@ -420,24 +432,43 @@ private:
 
     RenderData*                    m_renderData;
 
-public:
+    // Internal methods
+    HRESULT BuildScreenQuadGeometryBuffers();
+    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
 
-    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr) { }
-    RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
-    ID3D12Device* GetDevice() { return m_d3dDevice; }
-    IDXGISwapChain3* GetSwapChain() { return m_pSwapChain; }
-    D3DCommandList* GetCommandList() const { return m_commandList; }
+    void TrimUploadHeaps(bool removeTerminatedHeaps);
 
     XboxSampleFramework::D3DDevice* GetD3DDevice()
     {
         return (XboxSampleFramework::D3DDevice*) (ID3D12Device*) m_d3dDevice;
     }
 
+public:
+
+    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr) { }
+
+    HRESULT CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
+    void WaitForPreviousFrame();
+    void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
+    ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
+    ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
+    ID3D12Fence* GetFence() { return m_fence; }
+    ID3D12Device* GetDevice() { return m_d3dDevice; }
+    D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
+    D3DCommandList* GetCommandList() const { return m_commandList; }
+
+    //
+    // Base RenderPlatform methods
+    //
+
+    RenderPlatforms GetType() { return D3D12_RENDER_PLATFORM; }
+
     HRESULT InitDevice();
     HRESULT UninitDevice();
 
     HRESULT ReleaseSwapChainResources();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
+    IDXGISwapChain* GetSwapChain();
 
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
     HRESULT UninitGameLevelGraphics();
@@ -460,8 +491,6 @@ public:
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
     HRESULT EndDrawText();
 
-    void WaitForPreviousFrame();
-
     D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
     D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; }
 
@@ -471,37 +500,8 @@ public:
     HRESULT SetMaterial(Material* material, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
-    void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
 
-    // TODO make private
-    HRESULT CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
     void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
-
-    //ID3D12RootSignature* GetRootSignature() { return m_rootSignature; }
-    D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
-
-    ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
-    ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
-
-    // TEMPTEMP make private 
-    // Default shader
-    VertexShader                      m_vertexShader;
-    PixelShader                       m_pixelShader;
-    VertexShader                      m_shadowVertexShader;
-    PixelShader                       m_shadowPixelShader;
-    VertexShader                      m_drawScreenVertexShader;
-    PixelShader                       m_drawScreenPixelShader;
-
-    // TEMPTEMP make private
-    ID3D12Fence* GetFence() { return m_fence; }
-
-
-private:
-    // Internal methods
-    HRESULT BuildScreenQuadGeometryBuffers();
-    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
-
-    void TrimUploadHeaps(bool removeTerminatedHeaps);
 
 };
 
@@ -611,12 +611,12 @@ public:
 
     // TEMPTEMP TODO make privdate
     // Default shader
-    VertexShader                        m_vertexShader;
-    PixelShader                         m_pixelShader;
-    VertexShader                        m_shadowVertexShader;
-    PixelShader                         m_shadowPixelShader;
-    VertexShader                        m_drawScreenVertexShader;
-    PixelShader                         m_drawScreenPixelShader;
+    //VertexShader                        m_vertexShader;
+    //PixelShader                         m_pixelShader;
+    //VertexShader                        m_shadowVertexShader;
+    //PixelShader                         m_shadowPixelShader;
+    //VertexShader                        m_drawScreenVertexShader;
+    //PixelShader                         m_drawScreenPixelShader;
     HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
 
 private:

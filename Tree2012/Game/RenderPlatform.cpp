@@ -642,9 +642,9 @@ void RenderPlatform12::WaitForPreviousFrame()
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 
-    if (GetSwapChain())
+    if (m_pSwapChain)
     {
-        m_frameIndex = GetSwapChain()->GetCurrentBackBufferIndex();
+        m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
     }
 }
 
@@ -1613,14 +1613,14 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
 
     // Initial frame index
-    m_frameIndex = GetSwapChain()->GetCurrentBackBufferIndex();
+    m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
 
     // Create render target views (RTVs).
     for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(i)); /*->GetCPUDescriptorHandleForHeapStart());*/
 
-        HRR(GetSwapChain()->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
+        HRR(m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
         GetDevice()->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
 
         CHAR name[25];
@@ -1664,7 +1664,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 
     // Validation
     ASSERT(m_pSwapChain);
-    ASSERT(GetSwapChain() || m_pSharedRenderToTexture);
+    ASSERT(m_pSwapChain || m_pSharedRenderToTexture);
     ASSERT(m_renderTargets[0]);
     ASSERT(m_renderTargets[1]);
     ASSERT(m_viewPort.Width != 0);
@@ -1674,6 +1674,17 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     return S_OK;
 }
 
+IDXGISwapChain* RenderPlatform12::GetSwapChain()
+{
+    IDXGISwapChain* swapChain = nullptr;
+
+    if (m_pSwapChain)
+    {
+        HR(m_pSwapChain->QueryInterface(__uuidof(IDXGISwapChain), (void**) &swapChain));
+    }
+
+    return swapChain;
+}
 #else
 HRESULT RenderPlatform11::ReleaseSwapChainResources()
 {
@@ -2140,7 +2151,7 @@ void RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool sh
     GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // Present the frame.
-    HR(GetSwapChain()->Present(0, 0));
+    HR(m_pSwapChain->Present(0, 0));
 
     WaitForPreviousFrame();
 Cleanup:

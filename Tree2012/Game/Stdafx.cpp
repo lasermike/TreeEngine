@@ -119,6 +119,7 @@ HRESULT XSF::LoadBlob( const wchar_t* pFilename, std::vector< BYTE >& data )
     if ( _wcsicmp( pFilename, L"test" ) )
     {
         DebugPrint( L"LoadBlob: Failed to open file %s\n", tmp );
+        assert(false);
     }
 
     return E_FAIL;
