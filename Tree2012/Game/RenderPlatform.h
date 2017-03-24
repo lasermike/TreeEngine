@@ -320,7 +320,7 @@ public:
 
     DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
 
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
+#if defined(TREENGINE_WIN32)
     void SetWindow(HWND hwnd)
     {
         m_hwnd = hwnd;

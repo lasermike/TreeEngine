@@ -13,6 +13,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderPlatform12", "RenderP
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderPlatform12UWP", "RenderPlatform12UWP\RenderPlatform12UWP.vcxproj", "{C21341FB-E80A-44AC-9A31-714242204EE3}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B61E9D63-9FEC-48F7-B954-1AA6243A0DEC}"
+	ProjectSection(SolutionItems) = preProject
+		Game\Stdafx.cpp = Game\Stdafx.cpp
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM

@@ -30,21 +30,22 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_needsResize = false;
     m_nextScreenWidth = 0;
     m_nextScreenHeight = 0;
-	m_renderToSharedTexture = false;
-	m_paused = false;
-	m_wireframe = false;
-	m_showHelp = false;
-	m_timeStart = 0;
-	m_resetTree = true;
-	m_showShadowBuffer = false;
-	m_advanceScene = 0;
-	m_advanceSceneAmount = 0;
-	m_currentScene = 0;
+    m_renderToSharedTexture = false;
+    m_paused = false;
+    m_wireframe = false;
+    m_showHelp = false;
+    m_timeStart = 0;
+    m_resetTree = true;
+    m_showShadowBuffer = false;
+    m_advanceScene = 0;
+    m_advanceSceneAmount = 0;
+    m_currentScene = 0;
     m_reloadDevice = false;
+    m_renderPlatformDLL = nullptr;
 
-	m_player = nullptr;
-	m_threadPool = nullptr;
-	assert(m_inputMgr);
+    m_player = nullptr;
+    m_threadPool = nullptr;
+    assert(m_inputMgr);
 }
 
 void Game::UpdateViewMatrix()
@@ -53,11 +54,10 @@ void Game::UpdateViewMatrix()
 
 Game::~Game()
 {
-	SafeDelete(&m_pScene);
-	SafeDelete(&m_threadPool);
-	SafeDelete(&m_player);
-
-	m_renderManager.UninitDevice();
+    Cleanup();
+    SafeDelete(&m_pScene);
+    SafeDelete(&m_threadPool);
+    SafeDelete(&m_player);
 }
 
 
@@ -65,18 +65,11 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 {
     m_renderToSharedTexture = renderToSharedTexture;
 
-    //::GetPlatform(&GetRenderManager())->Initialize();
-    HRR(m_renderManager.InitDevice());
+    //HRR(m_renderManager.InitDevice());
+    
+    HRR(ReloadDevice());
 
-    HRR(InitializeEngine());
-    return S_OK;
-}
-
-HRESULT Game::InitializeEngine()
-{
-	XSF::SetContentFileRoot();
-
-	m_renderManager.Initialize();
+    XSF::SetContentFileRoot();
 
 	// Init vertex/index buffer
 	m_pScene = new SceneRoot();
@@ -120,29 +113,55 @@ HRESULT Game::Cleanup()
 		SafeDelete(&m_pScene);
 	}
 
-	m_renderManager.UninitDevice(); return S_OK;
+	m_renderManager.UninitDevice(); 
+    
+    return S_OK;
 }
 
-void Game::ReloadDevice()
+HRESULT Game::ReloadDevice()
 {
     HRESULT hr = S_OK;
 
     // Clear old stuff
-    m_pScene->CleanUpDeviceObjects();
-    m_renderManager.UninitGameLevelGraphics();
+    if (m_renderPlatformDLL)
+    {
+        if (m_pScene)
+        {
+            m_pScene->CleanUpDeviceObjects();
+        }
 
-    m_renderManager.ChangePlatform(12);
+        m_renderManager.UninitGameLevelGraphics();
+
+        m_renderManager.UninitDevice();
+
+        FreeLibrary(m_renderPlatformDLL);
+        m_renderPlatformDLL = nullptr;
+
+    }
+
+#if defined(TREENGINE_WIN32)
+#else
+
+    m_renderPlatformDLL = ::LoadPackagedLibrary(L"RenderPlatform12UWP.dll", 0);
+
+#endif
+
+    m_renderManager.InitDevice();
 
     m_needsResize = true;
 
-    // Init render manager
-    hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
-    assert(SUCCEEDED(hr));
+    if (m_pScene)
+    {
+        // Init render manager
+        hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
+        assert(SUCCEEDED(hr));
 
-    // Init new stuff
-    hr = m_pScene->InitGraphics(m_renderManager);
-    assert(SUCCEEDED(hr));
+        // Init new stuff
+        hr = m_pScene->InitGraphics(m_renderManager);
+        assert(SUCCEEDED(hr));
+    }
 
+    return hr;
 }
 
 void Game::Regenerate()
@@ -172,7 +191,7 @@ void Game::Update(DX::StepTimer const& timer)
 
     if (m_reloadDevice)
     {
-        ReloadDevice();
+        HR(ReloadDevice());
         m_reloadDevice = false;
     }
 

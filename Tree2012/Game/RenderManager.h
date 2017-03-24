@@ -127,7 +127,6 @@ class RenderManager : public IRenderFrame
 public:
     RenderManager();
     ~RenderManager();
-    HRESULT Initialize();
 
     HRESULT InitDevice();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);

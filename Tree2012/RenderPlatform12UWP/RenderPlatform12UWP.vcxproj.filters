@@ -22,7 +22,31 @@
     <ClCompile Include="RenderPlatform12UWP.cpp">
       <Filter>Source\Module</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\RenderPlatform.cpp" />
+    <ClCompile Include="..\Game\Stdafx.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\RenderPlatform.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\BitmapFont12.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\D3D12Util.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\DDSTextureLoader12.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\StockRenderStates12.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\ShadowMap.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="..\Game\MathHelper.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -34,6 +58,27 @@
     <ClInclude Include="targetver.h">
       <Filter>Source\Module</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\RenderPlatform.h" />
+    <ClInclude Include="..\Game\RenderPlatform.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\BitmapFont12.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\D3D12Util.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\d3dx12.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\DDSTextureLoader12.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\StockRenderStates12.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\ShadowMap.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\GeometryGenerator.h" />
   </ItemGroup>
 </Project>

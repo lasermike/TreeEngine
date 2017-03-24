@@ -149,6 +149,9 @@
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
       <AdditionalDependencies>DirectXTex.lib; d2d1.lib; d3d12.lib; dxgi.lib; windowscodecs.lib; dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>..\..\Misc\copyrobo $(TargetDir) ..\..\..\binaries\Debug12\x64\TreePC\AppX\ $(TargetFileName)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -162,13 +165,28 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\Game\BitmapFont12.h" />
+    <ClInclude Include="..\Game\D3D12Util.h" />
+    <ClInclude Include="..\Game\d3dx12.h" />
+    <ClInclude Include="..\Game\DDSTextureLoader12.h" />
+    <ClInclude Include="..\Game\GeometryGenerator.h" />
     <ClInclude Include="..\Game\RenderPlatform.h" />
+    <ClCompile Include="..\Game\BitmapFont12.cpp" />
+    <ClCompile Include="..\Game\D3D12Util.cpp" />
+    <ClCompile Include="..\Game\DDSTextureLoader12.cpp" />
+    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="..\Game\MathHelper.cpp" />
     <ClCompile Include="..\Game\RenderPlatform.cpp" />
+    <ClInclude Include="..\Game\ShadowMap.h" />
+    <ClInclude Include="..\Game\StockRenderStates12.h" />
     <ClInclude Include="RenderPlatform12UWP.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Game\ShadowMap.cpp" />
+    <ClCompile Include="..\Game\Stdafx.cpp" />
+    <ClCompile Include="..\Game\StockRenderStates12.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="RenderPlatform12UWP.cpp" />
     <ClCompile Include="pch.cpp">

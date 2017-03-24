@@ -70,19 +70,17 @@ public:
 
 private:
 
-    HRESULT InitializeEngine();
-
-	void Update(DX::StepTimer const& timer);
+    void Update(DX::StepTimer const& timer);
     void Regenerate();
-    void ReloadDevice();
     void HandleInput(bool key[256]);
 
-
-	void UpdateViewMatrix();
+    HRESULT ReloadDevice();
+    void UpdateViewMatrix();
 
 	// Managers
 	GameLoader							m_loader;
 	RenderManager						m_renderManager;
+    HMODULE                             m_renderPlatformDLL;
 
 	// Owned objectes
 	ThreadPool*							m_threadPool;
