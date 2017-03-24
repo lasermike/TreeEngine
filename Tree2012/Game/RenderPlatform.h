@@ -491,9 +491,6 @@ public:
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
     HRESULT EndDrawText();
 
-    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
-    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; }
-
     // Materials
     HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
         ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
@@ -503,6 +500,8 @@ public:
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
 
+    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
+    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; }
 };
 
 #else
@@ -542,7 +541,12 @@ class RenderPlatform11 : public RenderPlatform
 
     RenderData*                    m_renderData; //TEMPTEMP
 
+// Internal methods
+    HRESULT BuildScreenQuadGeometryBuffers();
+    HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
+
 public:
+    static const UINT msaaCount = 4;
 
     RenderPlatform11(RenderData* renderData) : m_renderData(renderData), m_msaaQuality(0)
     {
@@ -553,50 +557,53 @@ public:
 #endif
     }
 
-    RenderPlatforms GetType() { return D3D11_RENDER_PLATFORM; }
     ID3D11Device* GetDevice() { return m_d3dDevice; }
+    ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
     ID3D11RenderTargetView* GetRTV() { return m_pRenderTargetView; }
     ID3D11DepthStencilView* GetDSV() { return m_pDepthStencilView; }
     XboxSampleFramework::D3DDevice* GetD3DDevice()
     {
         return (XboxSampleFramework::D3DDevice*) (ID3D11Device*) m_d3dDevice;
     }
-    IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
     bool IsMSAAEnabled() { return m_enableMsaa; }
     UINT GetMSAAQuality() { return m_msaaQuality; }
     D3D11_VIEWPORT& GetViewport() { return m_viewPort; }
     XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
 
-    static const UINT msaaCount = 4;
 
     // TEMPTEMP
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
 
+    //
+    // Base RenderPlatform methods
+    //
+
+    RenderPlatforms GetType() { return D3D11_RENDER_PLATFORM; }
+
     HRESULT InitDevice();
     HRESULT UninitDevice();
+
+    HRESULT ReleaseSwapChainResources();
+    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
+    IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
+
+
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
     HRESULT UninitGameLevelGraphics();
 
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
-    void SetFrameSceneData(CBChangesEveryFrame* cb);
 
     HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
     HRESULT EndFrame(D3DBuffer& buffer);
+
     void RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
     void RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
-    HRESULT RenderPlatform11::SetRenderState(RenderState state);
+    HRESULT SetRenderState(RenderState state);
 
     void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
-
-    HRESULT ReleaseSwapChainResources();
-    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
-    ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
-
-    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
-    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; }
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(float sx, float sy, DWORD dwColor, const WCHAR* strText);
@@ -609,32 +616,12 @@ public:
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
-    // TEMPTEMP TODO make privdate
-    // Default shader
-    //VertexShader                        m_vertexShader;
-    //PixelShader                         m_pixelShader;
-    //VertexShader                        m_shadowVertexShader;
-    //PixelShader                         m_shadowPixelShader;
-    //VertexShader                        m_drawScreenVertexShader;
-    //PixelShader                         m_drawScreenPixelShader;
-    HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
+    void SetFrameSceneData(CBChangesEveryFrame* cb);
 
-private:
-    // Internal methods
-    HRESULT BuildScreenQuadGeometryBuffers();
+    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
+    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; }
+
 
 };
 
 #endif
-
-//
-//#if defined(TREE3D12)
-//
-//RenderPlatform12* GetPlatform(RenderManager* manager);
-//
-//#else
-//
-//RenderPlatform11* GetPlatform(RenderManager* manager);
-//
-//#endif
-
