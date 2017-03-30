@@ -1268,8 +1268,8 @@ HRESULT RenderPlatform11::BuildScreenQuadGeometryBuffers()
 #if defined(TREE3D12)
 HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
 {
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
+    UINT stride = sizeof(SimpleVertex);
+    UINT offset = 0;
 
     commandList->SetPipelineState(m_pipelineStateFullScreenQuad);
     GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
@@ -1283,8 +1283,7 @@ HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList,
     D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_shaderHeap.hGPU(NullSrv_HeapOffset);
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
 
-
-	return S_OK;
+    return S_OK;
 }
 #else
 HRESULT RenderPlatform11::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture)
@@ -2128,17 +2127,17 @@ void RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool sh
 {
     HRESULT hr = S_OK;
 
-    // Unbind shadow texture so we can render to it next frame
-    if (useShadowMaps)
-    {
-        D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_shaderHeap.hGPU(NullSrv_HeapOffset);
-        GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
-    }
-
     if (showShadowBuffer)
     {
         HRC(DrawScreenQuad(GetCommandList(), m_renderData->pShadowMap ? m_renderData->pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
     }
+
+    //// Unbind shadow texture so we can render to it next frame
+    //if (useShadowMaps)
+    //{
+    //    D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_shaderHeap.hGPU(NullSrv_HeapOffset);
+    //    GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
+    //}
 
     // Indicate that the back buffer will now be used to present.
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -2165,11 +2164,11 @@ void RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showSh
     HRESULT hr = S_OK;
 
     // Unbind shadow texture so we can render to it next frame
-    if (useShadowMaps)
-    {
-        ID3D11ShaderResourceView* depthTexture = nullptr;
-        m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
-    }
+    //if (useShadowMaps)
+    //{
+    //    ID3D11ShaderResourceView* depthTexture = nullptr;
+    //    m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
+    //}
 
     if (showShadowBuffer)
     {

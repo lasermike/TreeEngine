@@ -342,6 +342,31 @@ public:
 
     RenderPlatforms GetType() { return UNDEFINED_RENDER_PLATFORM; }
 
+    virtual void RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) = 0;
+    virtual void RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) = 0;
+
+    virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer) = 0;
+    virtual HRESULT SetRenderState(RenderState state) = 0;
+
+    virtual void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation) = 0;
+
+    virtual HRESULT BeginDrawText() = 0;
+    virtual HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText) = 0;
+    virtual HRESULT EndDrawText() = 0;
+
+    // Materials
+    virtual HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
+        ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial) = 0;
+    virtual HRESULT SetMaterial(Material* material, RenderPass pass) = 0;
+    virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
+    virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
+
+    virtual void SetFrameSceneData(CBChangesEveryFrame* cb) = 0;
+
+    virtual D3DBuffer* GetVertexBuffer() = 0;  // TODO TEMP!  Objects should be able to load their own meshes
+    virtual D3DBuffer* GetIndexBuffer() = 0;
+
+
     // TODO: This is inconsistent with out other platform specific resources are managed
     // Default shader
     VertexShader                      m_vertexShader;

@@ -65,8 +65,6 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 {
     m_renderToSharedTexture = renderToSharedTexture;
 
-    //HRR(m_renderManager.InitDevice());
-    
     HRR(ReloadDevice());
 
     XSF::SetContentFileRoot();
@@ -105,15 +103,15 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 }
 
 
-HRESULT Game::Cleanup() 
-{ 
-	if (m_pScene)
-	{
-		m_pScene->CleanUpDeviceObjects();
-		SafeDelete(&m_pScene);
-	}
+HRESULT Game::Cleanup()
+{
+    if (m_pScene)
+    {
+        m_pScene->CleanUpDeviceObjects();
+        SafeDelete(&m_pScene);
+    }
 
-	m_renderManager.UninitDevice(); 
+    m_renderManager.UninitDevice();
     
     return S_OK;
 }
@@ -166,20 +164,20 @@ HRESULT Game::ReloadDevice()
 
 void Game::Regenerate()
 {
-	HRESULT hr = S_OK;
+    HRESULT hr = S_OK;
 
-	// Clear old stuff
-	m_pScene->CleanUpDeviceObjects();
-	m_renderManager.UninitGameLevelGraphics();
+    // Clear old stuff
+    m_pScene->CleanUpDeviceObjects();
+    m_renderManager.UninitGameLevelGraphics();
 
     m_loader.Regenerate(m_pScene);
 
     // Init render manager
     hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
-	assert(SUCCEEDED(hr));		
+    assert(SUCCEEDED(hr));
 
-	// Init new stuff
-	hr = m_pScene->InitGraphics(m_renderManager);
+    // Init new stuff
+    hr = m_pScene->InitGraphics(m_renderManager);
     assert(SUCCEEDED(hr));
 }
 
@@ -187,7 +185,7 @@ void Game::Update(DX::StepTimer const& timer)
 {
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"Update");
 
-	m_renderManager.GetRenderData().frame++;
+    m_renderManager.GetRenderData().frame++;
 
     if (m_reloadDevice)
     {
@@ -202,39 +200,39 @@ void Game::Update(DX::StepTimer const& timer)
     }
 
 
-	if (m_advanceScene)
-	{
-		// Clean out game state 
-		m_pScene->DeleteAllChildren();
-		m_renderManager.UninitGameLevelGraphics();
-		m_gameData.ResetToDefaults();
+    if (m_advanceScene)
+    {
+        // Clean out game state 
+        m_pScene->DeleteAllChildren();
+        m_renderManager.UninitGameLevelGraphics();
+        m_gameData.ResetToDefaults();
 
-		// Determine which scene to load
-		m_currentScene += m_advanceSceneAmount;
-		m_currentScene = m_currentScene % m_loader.GetNumScenes();
-		if (m_currentScene < 0)
-		{
-			m_currentScene += m_loader.GetNumScenes();
-		}
+        // Determine which scene to load
+        m_currentScene += m_advanceSceneAmount;
+        m_currentScene = m_currentScene % m_loader.GetNumScenes();
+        if (m_currentScene < 0)
+        {
+            m_currentScene += m_loader.GetNumScenes();
+        }
 
-		m_advanceScene = false;
-		m_advanceSceneAmount = 0;
+        m_advanceScene = false;
+        m_advanceSceneAmount = 0;
 
-		m_timeStart = 0;
+        m_timeStart = 0;
 
-		// Load the next/prev scene
-		m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
+        // Load the next/prev scene
+        m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
-		// Create models and device objects
-		m_resetTree = true;
-	}
+        // Create models and device objects
+        m_resetTree = true;
+    }
 
-	// Rebuild tree if necessary
-	if (m_resetTree)
-	{
-		Regenerate();
-		m_resetTree = false;
-	}
+    // Rebuild tree if necessary
+    if (m_resetTree)
+    {
+        Regenerate();
+        m_resetTree = false;
+    }
 
     // Update our time
     if (m_timeStart == 0)
@@ -301,10 +299,10 @@ void Game::ComputeGPU()
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
 
     //Render shadow map
-        if (m_gameData.useShadowMaps)
-        {
-            m_renderManager.RenderShadowMap();
-        }
+    if (m_gameData.useShadowMaps)
+    {
+        m_renderManager.RenderShadowMap();
+    }
 }
 
 //--------------------------------------------------------------------------------------
