@@ -19,6 +19,7 @@
 
 #include <agile.h>
 
+#include <stdafx.h>
+
 #include "RenderPlatform12UWP.h"
 
-#include <stdafx.h>

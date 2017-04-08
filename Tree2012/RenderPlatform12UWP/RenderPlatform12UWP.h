@@ -1,14 +1,64 @@
 ﻿#pragma once
 
-// The following ifdef block is the standard way of creating macros which make exporting 
-// from a DLL simpler. All files within this DLL are compiled with the RENDERPLATFORM12_EXPORTS
-// symbol defined on the command line. This symbol should not be defined on any project
-// that uses this DLL. This way any other project whose source files include this file see 
-// RENDERPLATFORM12_API functions as being imported from a DLL, whereas this DLL sees symbols
-// defined with this macro as being exported.
-#ifdef RENDERPLATFORM12UWP_EXPORTS
-#define RENDERPLATFORM12UWP_API __declspec(dllexport)
+#include "RenderPlatform.h"
+
+#ifdef RENDERPLATFORM_EXPORTS
+#define RENDERPLATFORM_API extern "C" __declspec(dllexport)
 #else
-#define RENDERPLATFORM12UWP_API __declspec(dllimport)
+#define RENDERPLATFORM_API extern "C" __declspec(dllimport)
 #endif
 
+RENDERPLATFORM_API HRESULT Create(RenderData* data);
+
+/////
+
+#if defined(TREENGINE_WIN32)
+RENDERPLATFORM_API void SetWindow(HWND hwnd);
+#else
+RENDERPLATFORM_API void SetWindow(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
+#endif
+
+
+RENDERPLATFORM_API HRESULT InitDevice();
+RENDERPLATFORM_API HRESULT UninitDevice();
+
+RENDERPLATFORM_API HRESULT ReleaseSwapChainResources();
+RENDERPLATFORM_API HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
+RENDERPLATFORM_API IDXGISwapChain* GetSwapChain();
+
+RENDERPLATFORM_API HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
+RENDERPLATFORM_API HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+
+RENDERPLATFORM_API HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
+RENDERPLATFORM_API HRESULT UninitGameLevelGraphics();
+
+RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
+RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer& buffer);
+
+RENDERPLATFORM_API HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
+RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+
+RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+RENDERPLATFORM_API HRESULT SetRenderState(RenderState state);
+
+RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
+
+RENDERPLATFORM_API HRESULT BeginDrawText();
+RENDERPLATFORM_API HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
+RENDERPLATFORM_API HRESULT EndDrawText();
+
+// Materials
+RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
+    ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
+RENDERPLATFORM_API HRESULT SetMaterial(Material* material, RenderPass pass);
+RENDERPLATFORM_API HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
+RENDERPLATFORM_API HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
+
+RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb);
+
+RENDERPLATFORM_API D3DBuffer* GetVertexBuffer();
+RENDERPLATFORM_API D3DBuffer* GetIndexBuffer();
+
+RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport);
+
+RENDERPLATFORM_API IUnknown* GetDevice();

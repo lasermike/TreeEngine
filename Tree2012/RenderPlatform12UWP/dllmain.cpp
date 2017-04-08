@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 
+
 BOOL APIENTRY DllMain(HMODULE /* hModule */, DWORD ul_reason_for_call, LPVOID /* lpReserved */)
 {
     switch (ul_reason_for_call)
@@ -8,6 +9,7 @@ BOOL APIENTRY DllMain(HMODULE /* hModule */, DWORD ul_reason_for_call, LPVOID /*
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
     case DLL_PROCESS_DETACH:
+//        SafeDelete(&m_pPlatform);
         break;
     }
     return TRUE;

@@ -225,6 +225,39 @@ HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_
 #endif
 
 #if defined(TREE3D12)
+
+HRESULT RenderPlatform12::GetViewport(Viewport& viewport)
+{
+    viewport.TopLeftX = m_viewPort.TopLeftX;
+    viewport.TopLeftY = m_viewPort.TopLeftY;
+    viewport.Width = m_viewPort.Width;
+    viewport.Height = m_viewPort.Height;
+    viewport.MinDepth = m_viewPort.MinDepth;
+    viewport.MaxDepth = m_viewPort.MaxDepth;
+
+    return S_OK;
+}
+
+#else
+
+HRESULT RenderPlatform11::GetViewport(Viewport& viewport)
+{
+    viewport.TopLeftX = m_viewPort.TopLeftX;
+    viewport.TopLeftY = m_viewPort.TopLeftY;
+    viewport.Width = m_viewPort.Width;
+    viewport.Height = m_viewPort.Height;
+    viewport.MinDepth = m_viewPort.MinDepth;
+    viewport.MaxDepth = m_viewPort.MaxDepth;
+
+    return S_OK;
+}
+
+
+#endif
+
+
+
+#if defined(TREE3D12)
 HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData)
 {
     // Create the command list.
@@ -842,7 +875,7 @@ HRESULT RenderPlatform11::SetMaterial(Material* material, RenderPass pass)
 #endif
 
 #if defined(TREE3D12)
-void RenderPlatform12::DrawIndexedInstanced(
+HRESULT RenderPlatform12::DrawIndexedInstanced(
     UINT IndexCountPerInstance,
     UINT InstanceCount,
     UINT StartIndexLocation,
@@ -850,9 +883,10 @@ void RenderPlatform12::DrawIndexedInstanced(
     UINT StartInstanceLocation)
 {
     GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+    return S_OK;
 }
 #else
-void RenderPlatform11::DrawIndexedInstanced(
+HRESULT RenderPlatform11::DrawIndexedInstanced(
     UINT IndexCountPerInstance,
     UINT InstanceCount,
     UINT StartIndexLocation,
@@ -860,6 +894,7 @@ void RenderPlatform11::DrawIndexedInstanced(
     UINT StartInstanceLocation)
 {
     m_immediateContext->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+    return S_OK;
 }
 #endif
 
@@ -2029,7 +2064,7 @@ HRESULT RenderPlatform11::BeginNewFrame(bool /*resetCommandList*/, D3DBuffer& bu
 
 #if defined(TREE3D12)
 
-void RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
+HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
 {
     PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render");
 
@@ -2077,9 +2112,11 @@ void RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool useAlp
             GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, m_renderData->pShadowMap->DepthMapSRVGpu());
         }
     }
+
+    return S_OK;
 }
 #else
-void RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
+HRESULT RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
 {
     if (!oculus)
     {
@@ -2118,12 +2155,14 @@ void RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlphaBl
         ID3D11ShaderResourceView* depthTexture = m_renderData->pShadowMap->DepthMapSRV();
         m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
     }
+
+    return S_OK;
 }
 #endif
 
 #if defined(TREE3D12)
 
-void RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
+HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
 {
     HRESULT hr = S_OK;
 
@@ -2154,7 +2193,7 @@ void RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool sh
 
     WaitForPreviousFrame();
 Cleanup:
-    return;
+    return hr;
 }
 
 #else
@@ -2272,7 +2311,7 @@ HRESULT RenderPlatform12::SetRenderState(RenderState state)
         GetCommandList()->ResourceBarrier(1, &toReadBarrier);
 
         GetCommandList()->SetPipelineState(m_pipelineState);
-
+ 
         PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList());
 
         break;
@@ -2345,4 +2384,66 @@ void RenderPlatform12::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
     m_managedUploadHeaps.push_back(FencedHeap(pUploadHeap, m_fenceValue));
 }
 #endif
+
+
+RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
+{
+    CreateFunc createFuncPtr =  (CreateFunc) ::GetProcAddress(module, "Create");
+    HR(createFuncPtr(data));
+
+    InitDeviceFuncPtr = (InitDeviceFunc) ::GetProcAddress(module, "InitDevice");
+
+#define ASSIGN_FUNC(METHOD) \
+    METHOD##FuncPtr = (METHOD##Func) ::GetProcAddress(module, #METHOD); \
+    ASSERT(METHOD##FuncPtr);
+
+    ASSIGN_FUNC(SetWindow);
+
+    ASSIGN_FUNC(InitDevice);
+    ASSIGN_FUNC(UninitDevice);
+
+    ASSIGN_FUNC(ReleaseSwapChainResources);
+    ASSIGN_FUNC(OnResize);
+    ASSIGN_FUNC(GetSwapChain);
+
+    ASSIGN_FUNC(UpdateView);
+    ASSIGN_FUNC(UpdateProjection);
+
+    ASSIGN_FUNC(InitGameLevelGraphics);
+    ASSIGN_FUNC(UninitGameLevelGraphics);
+
+    ASSIGN_FUNC(BeginNewFrame);
+    ASSIGN_FUNC(EndFrame);
+
+    ASSIGN_FUNC(RenderProlog);
+    ASSIGN_FUNC(RenderEpilog);
+
+    ASSIGN_FUNC(RenderSceneSetup);
+    ASSIGN_FUNC(SetRenderState);
+
+    ASSIGN_FUNC(DrawIndexedInstanced);
+
+    ASSIGN_FUNC(BeginDrawText);
+    ASSIGN_FUNC(DrawText2);
+    ASSIGN_FUNC(EndDrawText);
+
+    ASSIGN_FUNC(CreateMaterial);
+    ASSIGN_FUNC(SetMaterial);
+    ASSIGN_FUNC(LoadTexture);
+    ASSIGN_FUNC(CreateTexture2D);
+
+    ASSIGN_FUNC(SetFrameSceneData);
+
+    ASSIGN_FUNC(GetVertexBuffer);
+    ASSIGN_FUNC(GetIndexBuffer);
+
+    ASSIGN_FUNC(GetViewport);
+
+    ASSIGN_FUNC(GetDevice);
+}
+
+RenderPlatformDLL::~RenderPlatformDLL()
+{
+
+}
 

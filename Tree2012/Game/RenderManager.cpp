@@ -39,6 +39,17 @@ RenderManager::~RenderManager()
     SafeDelete(&m_platform);
 }
 
+HRESULT RenderManager::SetPlatform(HMODULE platformDLL)
+{
+    SafeDelete(&m_platform);
+
+    //m_platform = new RenderPlatform12(&m_renderData);
+    m_platform = new RenderPlatformDLL(platformDLL, &m_renderData);
+    
+    return S_OK;
+}
+
+
 HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
 {
     HRR(UninitGameLevelGraphics());
@@ -53,17 +64,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
 
     HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, GetPlatform()));
 
-    return S_OK;
-}
-
-HRESULT RenderManager::GetViewport(Viewport& viewport)
-{
-    viewport.TopLeftX = GetPlatform()->GetViewport().TopLeftX;
-    viewport.TopLeftY = GetPlatform()->GetViewport().TopLeftY;
-    viewport.Width = GetPlatform()->GetViewport().Width;
-    viewport.Height = GetPlatform()->GetViewport().Height;
-    viewport.MinDepth = GetPlatform()->GetViewport().MinDepth;
-    viewport.MaxDepth = GetPlatform()->GetViewport().MaxDepth;
     return S_OK;
 }
 
@@ -354,7 +354,7 @@ HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object,
 //--------------------------------------------------------------------------------------
 HRESULT RenderManager::InitDevice()
 {
-	HRESULT hr = S_OK;
+    HRESULT hr = S_OK;
 
     HRR(GetPlatform()->InitDevice());
 

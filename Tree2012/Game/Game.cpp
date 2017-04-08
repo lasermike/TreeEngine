@@ -142,6 +142,10 @@ HRESULT Game::ReloadDevice()
 
     m_renderPlatformDLL = ::LoadPackagedLibrary(L"RenderPlatform12UWP.dll", 0);
 
+    m_renderManager.SetPlatform(m_renderPlatformDLL);
+
+    m_renderManager.GetPlatform()->SetWindow(m_window.Get(), m_logicalDpi);
+
 #endif
 
     m_renderManager.InitDevice();
@@ -150,6 +154,12 @@ HRESULT Game::ReloadDevice()
 
     if (m_pScene)
     {
+        if (m_needsResize)
+        {
+            m_renderManager.OnResize(m_nextScreenWidth, m_nextScreenHeight, m_renderToSharedTexture/*, this*/);
+            m_needsResize = false;
+        }
+
         // Init render manager
         hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
         assert(SUCCEEDED(hr));

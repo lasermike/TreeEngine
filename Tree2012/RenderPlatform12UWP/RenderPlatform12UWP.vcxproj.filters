@@ -43,8 +43,10 @@
     <ClCompile Include="..\Game\ShadowMap.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
     <ClCompile Include="..\Game\MathHelper.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\GeometryGenerator.cpp">
       <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
@@ -79,6 +81,8 @@
     <ClInclude Include="..\Game\ShadowMap.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\GeometryGenerator.h" />
+    <ClInclude Include="..\Game\GeometryGenerator.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

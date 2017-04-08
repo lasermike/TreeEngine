@@ -61,18 +61,6 @@ struct RenderUnit
 };
 
 
-struct Viewport
-{
-    FLOAT TopLeftX;
-    FLOAT TopLeftY;
-    FLOAT Width;
-    FLOAT Height;
-    FLOAT MinDepth;
-    FLOAT MaxDepth;
-};
-
-
-
 interface IRenderFrame
 {
     virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
@@ -128,6 +116,8 @@ public:
     RenderManager();
     ~RenderManager();
 
+    HRESULT SetPlatform(HMODULE platformDLL);
+
     HRESULT InitDevice();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
     void UninitDevice();
@@ -136,17 +126,12 @@ public:
 
     RenderData& GetRenderData() { return m_renderData; }
 
-    //TODO move to platform specific
-#if defined (TREE3D12)
-    RenderPlatform12* GetPlatform() { return (RenderPlatform12*) m_platform; }
-#else
-    RenderPlatform11* GetPlatform() { return (RenderPlatform11*)m_platform; }
-#endif
+    RenderPlatform* GetPlatform() { return (RenderPlatform*)m_platform; }
 
     GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
 
     // Accessor methods for Oculus
-    HRESULT GetViewport(Viewport& viewport);
+    //HRESULT GetViewport(Viewport& viewport);
 
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
     HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);

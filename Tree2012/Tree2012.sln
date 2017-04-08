@@ -6,6 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreeXBox", "Tree2012\Tree2012.vcxproj", "{492A8733-A8A0-420B-A0FA-FC72732B1001}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreePC", "TreePC\TreePC.vcxproj", "{9B22E637-C613-479F-BEC8-59215E96EEFB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C21341FB-E80A-44AC-9A31-714242204EE3} = {C21341FB-E80A-44AC-9A31-714242204EE3}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreeClassic", "TreeClassic\TreeClassic.vcxproj", "{FF5EA045-3150-4374-83C0-17C9C97F30F2}"
 EndProject

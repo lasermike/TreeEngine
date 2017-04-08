@@ -68,6 +68,23 @@ public:
 
     HRESULT Initialize(bool renderToSharedTexture);
 
+#if defined(TREENGINE_WIN32)
+    void SetWindow(HWND hwnd)
+    {
+        m_hwnd = hwnd;
+    }
+
+    HRESULT Initialize();
+
+#else
+
+    void SetWindow(Windows::UI::Core::CoreWindow^ window, float logicalDpi)
+    {
+        m_window = window;
+        m_logicalDpi = logicalDpi;
+    }
+#endif
+
 private:
 
     void Update(DX::StepTimer const& timer);
@@ -111,6 +128,14 @@ private:
 	bool								m_showHelp;
 
 	GameData							m_gameData;
+
+#if defined(_TREE_CLASSIC)
+    HWND                              m_hwnd;
+#else
+    Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;
+    float                             m_logicalDpi;
+#endif
+
 };
 
 

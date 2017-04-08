@@ -59,8 +59,9 @@ void TreePC::SetWindow(CoreWindow^ window)
 
 	auto info = DisplayInformation::GetForCurrentView();
 
-    m_pGame->GetRenderManager().GetPlatform()->SetWindow(CoreWindow::GetForCurrentThread(), info->LogicalDpi);
-	m_pGame->Initialize(false /* render to shared texture 8*/);
+    //m_pGame->GetRenderManager().GetPlatform()->SetWindow(CoreWindow::GetForCurrentThread(), info->LogicalDpi);
+    m_pGame->SetWindow(CoreWindow::GetForCurrentThread(), info->LogicalDpi);
+    m_pGame->Initialize(false /* render to shared texture 8*/);
     OnResize();
 }
 

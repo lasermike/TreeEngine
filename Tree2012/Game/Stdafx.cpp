@@ -38,18 +38,19 @@ void XSF::SetContentFileRoot()
 
     _snwprintf_s( Details::g_strApplicationDataPath, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s\\", writeableFolder.c_str() );
 
-#elif defined(WIN32)
-	GetModuleFileName( NULL, Details::g_strCommonFileRoot, MAX_PATH );
-	//PathRemoveFileSpec(Details::g_strCommonFileRoot);
-	wstring path = Details::g_strCommonFileRoot;
+#elif defined(TREENGINE_WIN32)
+    GetModuleFileName(NULL, Details::g_strCommonFileRoot, MAX_PATH);
+    //PathRemoveFileSpec(Details::g_strCommonFileRoot);
+    wstring path = Details::g_strCommonFileRoot;
     size_t found = path.find_last_of(L"/\\");
-    _snwprintf_s( Details::g_strCommonFileRoot, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s", path.substr(0, found).c_str() );
-	LOG(Details::g_strCommonFileRoot);
+    _snwprintf_s(Details::g_strCommonFileRoot, _countof(Details::g_strApplicationDataPath), _TRUNCATE, L"%s", path.substr(0, found).c_str());
+    //PathAddBackslash(Details::g_strCommonFileRoot);
+    LOG(Details::g_strCommonFileRoot);
 
 #else
     wchar_t temp[ 1024 ];
 //    GetCurrentDirectoryW( _countof( temp ), temp );
-	wcscpy_s(temp, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
+    wcscpy_s(temp, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
 
     swprintf_s( Details::g_strCommonFileRoot, L"%s\\", temp);
     //swprintf_s( Details::g_strApplicationDataPath, L"%s\\", temp );
