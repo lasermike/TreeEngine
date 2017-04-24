@@ -42,16 +42,10 @@ struct D3DBuffer
 
     D3DBuffer() : buffer(nullptr) { }
 
-    HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
-
-    void Release()
-    {
-        if (buffer)
-        {
-            buffer->Release();
-            buffer = nullptr;
-        }
-    }
+    //HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+    //{
+    //    return platform->CreateD3DBuffer(sizeBytes, numInstances, this);
+    //}
 
 #elif defined(TREE3D11)
     ID3D11Buffer* buffer;
@@ -61,7 +55,13 @@ struct D3DBuffer
 
     D3DBuffer() : buffer(nullptr) { }
 
-    HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
+    //HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
+
+#else
+    IUnknown* buffer;
+
+    operator IUnknown* () { return buffer; }
+#endif
 
     void Release()
     {
@@ -71,7 +71,6 @@ struct D3DBuffer
             buffer = nullptr;
         }
     }
-#endif
 };
 
 struct DoubleBuffer
@@ -79,6 +78,18 @@ struct DoubleBuffer
     D3DBuffer buffers[2];
 
     HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
+    //{
+    //    buffers[0].Release();
+    //    buffers[1].Release();
+
+    //    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[0]));
+    //    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[1]));
+
+    //    //HRR(buffers[0].Create(sizeBytes, numInstances, platform));
+    //    //HRR(buffers[1].Create(sizeBytes, numInstances, platform));
+
+    //    return S_OK;
+    //}
 
     D3DBuffer& Get(UINT frame) { return buffers[frame % 2]; }
 
@@ -429,6 +440,7 @@ public:
     virtual HRESULT SetMaterial(Material* material, RenderPass pass) = 0;
     virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
     virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
+    virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer) = 0;
 
     virtual void SetFrameSceneData(CBChangesEveryFrame* cb) = 0;
 
@@ -592,6 +604,8 @@ public:
     HRESULT SetMaterial(Material* material, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
+
+    HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer);
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
 
@@ -771,6 +785,8 @@ typedef HRESULT (*SetMaterialFunc)(Material* material, RenderPass pass);
 typedef HRESULT (*LoadTextureFunc)(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
 typedef HRESULT (*CreateTexture2DFunc)(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
+typedef HRESULT (*CreateD3DBufferFunc)(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer);
+
 typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 
 typedef D3DBuffer* (*GetVertexBufferFunc)();
@@ -816,6 +832,7 @@ class RenderPlatformDLL : public RenderPlatform
     SetMaterialFunc SetMaterialFuncPtr;
     LoadTextureFunc LoadTextureFuncPtr;
     CreateTexture2DFunc CreateTexture2DFuncPtr;
+    CreateD3DBufferFunc CreateD3DBufferFuncPtr;
 
     SetFrameSceneDataFunc SetFrameSceneDataFuncPtr;
 
@@ -883,6 +900,11 @@ public:
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture)
     {
         return CreateTexture2DFuncPtr(name, points, width, height, textureIndex, texture);
+    }
+
+    HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer)
+    {
+        return CreateD3DBufferFuncPtr(sizeBytes, numInstances, d3dBuffer);
     }
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { SetFrameSceneDataFuncPtr(cb); }

@@ -1,12 +1,12 @@
 ﻿#include "pch.h"
-#include "RenderPlatform12UWP.h"
+#include "RenderPlatform11UWP.h"
 #include "RenderPlatform.h"
 
-RenderPlatform12* m_pPlatform = nullptr;
+RenderPlatform11* m_pPlatform = nullptr;
 
 extern "C" RENDERPLATFORM_API HRESULT Create(RenderData* data)
 {
-    m_pPlatform = new RenderPlatform12(data);
+    m_pPlatform = new RenderPlatform11(data);
     return S_OK;
 }
 
@@ -144,11 +144,6 @@ RENDERPLATFORM_API HRESULT LoadTexture(const wchar_t* textureFilename, int textu
 RENDERPLATFORM_API HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture)
 {
     return m_pPlatform->CreateTexture2D(name, points, width, height, textureIndex, texture);
-}
-
-RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer)
-{
-    return m_pPlatform->CreateD3DBuffer(sizeBytes, numInstances, d3dBuffer);
 }
 
 RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb)

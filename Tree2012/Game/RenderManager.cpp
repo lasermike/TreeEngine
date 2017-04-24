@@ -454,7 +454,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
         DrawFrameStats();
     }
 
-    GetPlatform()->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture);
+    HRC(GetPlatform()->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture));
 
 Cleanup:
     return;

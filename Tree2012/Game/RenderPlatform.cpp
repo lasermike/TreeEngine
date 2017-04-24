@@ -595,63 +595,74 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
 #if defined (TREE3D12)
 
-HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+//HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+//{
+//    buffers[0].Release();
+//    buffers[1].Release();
+//
+//    HRR(buffers[0].Create(sizeBytes, numInstances, platform));
+//    HRR(buffers[1].Create(sizeBytes, numInstances, platform));
+//
+//    return S_OK;
+//}
+
+HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer)
 {
-    buffers[0].Release();
-    buffers[1].Release();
+    d3dBuffer->buffer = nullptr;
 
-    HRR(buffers[0].Create(sizeBytes, numInstances, platform));
-    HRR(buffers[1].Create(sizeBytes, numInstances, platform));
-
-    return S_OK;
-}
-
-HRESULT D3DBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
-{
-    this->Release();
-
-    ID3D12Device* device = ((RenderPlatform12*)platform)->GetDevice();
-
-    HRR(device->CreateCommittedResource(
+    HRR(m_d3dDevice->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
         D3D12_HEAP_FLAG_NONE,
         &CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&buffer)));
-    view.BufferLocation = buffer->GetGPUVirtualAddress();
-    view.SizeInBytes = sizeBytes;
-    view.StrideInBytes = sizeBytes / numInstances;
+        IID_PPV_ARGS(&d3dBuffer->buffer)));
 
-    SetDebugName(buffer, "D3DBuffer::buffer");
+    //D3D12_VERTEX_BUFFER_VIEW view = {};
+
+    d3dBuffer->view.BufferLocation = d3dBuffer->buffer->GetGPUVirtualAddress();
+    d3dBuffer->view.SizeInBytes = sizeBytes;
+    d3dBuffer->view.StrideInBytes = sizeBytes / numInstances;
+
+    SetDebugName(d3dBuffer->buffer, "D3DBuffer::buffer");
 
     return S_OK;
 }
+
+//HRESULT D3DBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+//{
+//    this->Release();
+//
+//    ID3D12Device* device = ((RenderPlatform12*)platform)->GetDevice();
+//
+//
+//    return S_OK;
+//}
 
 #else
-HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
-{
-    buffers[0].Release();
-    buffers[1].Release();
-
-    ID3D11Device* device = ((RenderPlatform11*)platform)->GetDevice();
-
-    D3D11_BUFFER_DESC bd;
-    ZeroMemory(&bd, sizeof(D3D11_BUFFER_DESC));
-    bd.Usage = D3D11_USAGE_DYNAMIC;
-    bd.ByteWidth = sizeof(InstancedData) * numInstances;
-    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    bd.MiscFlags = 0;
-    bd.StructureByteStride = 0;
-
-    HRR(device->CreateBuffer(&bd, 0, &buffers[0].buffer));
-    HRR(device->CreateBuffer(&bd, 0, &buffers[1].buffer));
-    SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
-    SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
-
-    return S_OK;
-}
+//HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+//{
+//    buffers[0].Release();
+//    buffers[1].Release();
+//
+//    ID3D11Device* device = ((RenderPlatform11*)platform)->GetDevice();
+//
+//    D3D11_BUFFER_DESC bd;
+//    ZeroMemory(&bd, sizeof(D3D11_BUFFER_DESC));
+//    bd.Usage = D3D11_USAGE_DYNAMIC;
+//    bd.ByteWidth = sizeof(InstancedData) * numInstances;
+//    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+//    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+//    bd.MiscFlags = 0;
+//    bd.StructureByteStride = 0;
+//
+//    HRR(device->CreateBuffer(&bd, 0, &buffers[0].buffer));
+//    HRR(device->CreateBuffer(&bd, 0, &buffers[1].buffer));
+//    SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
+//    SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
+//
+//    return S_OK;
+//}
 
 #endif
 
@@ -1865,7 +1876,8 @@ HRESULT RenderPlatform11::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         CComPtr<IDXGISwapChain1> pSwapChain1;
         //HRR(dxgiFactory->CreateSwapChain(&sd, dxgiFactory2, &pSwapChain1));
 
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
+//#if defined(WIN32) && !defined(TREENGINE_XBOX)
+#if defined(TREENGINE_WIN32)
         HRR(dxgiFactory2->CreateSwapChainForHwnd(GetDevice(), m_hwnd, &sd, nullptr, nullptr, &pSwapChain1));
 #else
         HRR(dxgiFactory2->CreateSwapChainForCoreWindow(GetDevice(), reinterpret_cast<IUnknown*>(m_window.Get()), &sd, nullptr, &pSwapChain1));
@@ -2198,7 +2210,7 @@ Cleanup:
 
 #else
 
-void RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
+HRESULT RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
 {
     HRESULT hr = S_OK;
 
@@ -2220,7 +2232,7 @@ void RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showSh
         HRC(GetSwapChain()->Present(0, 0));
     }
 Cleanup:
-    return;
+    return hr;
 }
 #endif
 
@@ -2431,6 +2443,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(SetMaterial);
     ASSIGN_FUNC(LoadTexture);
     ASSIGN_FUNC(CreateTexture2D);
+    ASSIGN_FUNC(CreateD3DBuffer);
 
     ASSIGN_FUNC(SetFrameSceneData);
 
@@ -2447,3 +2460,17 @@ RenderPlatformDLL::~RenderPlatformDLL()
 
 }
 
+
+HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+{
+    buffers[0].Release();
+    buffers[1].Release();
+
+    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[0]));
+    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[1]));
+
+    //HRR(buffers[0].Create(sizeBytes, numInstances, platform));
+    //HRR(buffers[1].Create(sizeBytes, numInstances, platform));
+
+    return S_OK;
+}
