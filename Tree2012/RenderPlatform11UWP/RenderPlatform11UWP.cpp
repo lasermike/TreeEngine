@@ -75,12 +75,12 @@ RENDERPLATFORM_API HRESULT UninitGameLevelGraphics()
     return m_pPlatform->UninitGameLevelGraphics();
 }
 
-RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView)
+RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView)
 {
     return m_pPlatform->BeginNewFrame(resetCommandList, buffer, dataView);
 }
 
-RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer& buffer)
+RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer* buffer)
 {
     return m_pPlatform->EndFrame(buffer);
 }
@@ -95,7 +95,7 @@ RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool sh
     return m_pPlatform->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture);
 }
 
-RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer)
+RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
 {
     return m_pPlatform->RenderSceneSetup(pass, instancedBuffer);
 }

@@ -129,7 +129,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|WIN32'">
     <ClCompile>
-      <PreprocessorDefinitions>_DEBUG;TREE3D12;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>WIN32</UndefinePreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -138,7 +138,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>_DEBUG;TREE3D12;PIX_INSTRUMENTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;PIX_INSTRUMENTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
@@ -147,7 +147,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release12|WIN32'">
     <ClCompile>
-      <PreprocessorDefinitions>NDEBUG;TREE3D12;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>WIN32</UndefinePreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -156,7 +156,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release12|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>NDEBUG;TREE3D12;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>Lib\x64\Release</AdditionalLibraryDirectories>
@@ -164,7 +164,8 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>_DEBUG;TREE3D12;PIX_INSTRUMENTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;PIX_INSTRUMENTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
@@ -237,8 +238,7 @@
   <ItemGroup>
     <ClCompile Include="..\Game\BitmapFont.cpp" />
     <ClCompile Include="..\Game\BitmapFont12.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
-      </ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\Game\D3D11Platform.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
@@ -253,8 +253,7 @@
       </ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\Game\DDSTextureLoader12.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
-      </ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\Game\Game.cpp" />
     <ClCompile Include="..\Game\GameLoader.cpp" />
@@ -268,11 +267,12 @@
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp" />
     <ClCompile Include="..\Game\RenderPlatform.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
-      </ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\Game\SceneRoot.cpp" />
-    <ClCompile Include="..\Game\ScreenGrab12.cpp" />
+    <ClCompile Include="..\Game\ScreenGrab12.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
     <ClCompile Include="..\Game\StockRenderStates.cpp">
@@ -280,8 +280,7 @@
       </ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\Game\StockRenderStates12.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
-      </ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\Game\Tree.cpp" />
     <ClCompile Include="..\Game\TreeModel.cpp" />

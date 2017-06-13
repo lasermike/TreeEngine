@@ -32,36 +32,26 @@ struct Viewport
 
 struct D3DBuffer
 {
+    union
+    {
 #if defined(TREE3D12)
-    ID3D12Resource* buffer;
-    operator ID3D12Resource* () { return buffer; }
+        ID3D12Resource* buffer;
+#elif defined(TREE3D11)
+        ID3D11Buffer* buffer;
+#else
+        void* buffer;
+#endif
+    };
 
-    D3DBuffer(ID3D12Resource* bufferParam) : buffer(bufferParam) { }
+#if defined(TREE3D12)
 
     D3D12_VERTEX_BUFFER_VIEW view;
 
     D3DBuffer() : buffer(nullptr) { }
+    D3DBuffer(ID3D12Resource* bufferParam) : buffer(bufferParam) { }
+    ~D3DBuffer() { Release(); }
 
-    //HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
-    //{
-    //    return platform->CreateD3DBuffer(sizeBytes, numInstances, this);
-    //}
-
-#elif defined(TREE3D11)
-    ID3D11Buffer* buffer;
-    operator ID3D11Buffer* () { return buffer; }
-
-    D3DBuffer(ID3D11Buffer* bufferParam) : buffer(bufferParam) { }
-
-    D3DBuffer() : buffer(nullptr) { }
-
-    //HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
-
-#else
-    IUnknown* buffer;
-
-    operator IUnknown* () { return buffer; }
-#endif
+    operator ID3D12Resource* () { return buffer; }
 
     void Release()
     {
@@ -71,32 +61,54 @@ struct D3DBuffer
             buffer = nullptr;
         }
     }
+
+#elif defined(TREE3D11)
+
+    D3DBuffer() : buffer(nullptr), unknown(nullptr) { }
+    D3DBuffer(ID3D11Buffer* bufferParam) : buffer(bufferParam) { }
+    ~D3DBuffer() { Release(); }
+
+    operator ID3D11Buffer* () { return buffer; }
+
+    void Release()
+    {
+        if (buffer)
+        {
+            buffer->Release();
+            buffer = nullptr;
+        }
+    }
+
+#else
+
+    void Release()
+    {
+        // TODO!!!
+    }
+
+#endif
+
+    operator bool()
+    {
+        return buffer != nullptr;
+    }
+
 };
 
 struct DoubleBuffer
 {
-    D3DBuffer buffers[2];
+    D3DBuffer* buffers[2];
 
     HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
-    //{
-    //    buffers[0].Release();
-    //    buffers[1].Release();
 
-    //    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[0]));
-    //    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[1]));
-
-    //    //HRR(buffers[0].Create(sizeBytes, numInstances, platform));
-    //    //HRR(buffers[1].Create(sizeBytes, numInstances, platform));
-
-    //    return S_OK;
-    //}
-
-    D3DBuffer& Get(UINT frame) { return buffers[frame % 2]; }
+    D3DBuffer* Get(UINT frame) { return buffers[frame % 2]; }
 
     void Release()
     {
-        buffers[0].Release();
-        buffers[1].Release();
+        delete buffers[0];
+        delete buffers[1];
+        buffers[0] = nullptr;
+        buffers[1] = nullptr;
     }
 };
 
@@ -121,47 +133,61 @@ struct LoadedTexture
 
 struct VertexShader
 {
-#if defined(TREE3D12)
-    ID3DBlob*                 shader;
+    IUnknown* unknown;
 
-    VertexShader(ID3DBlob* blob) : shader(blob) { }
+    union
+    {
+#if defined(TREE3D12)
+        ID3DBlob*           shader;
+#elif defined(TREE3D11)
+        ID3D11VertexShader* shader;
+#endif
+        void* padding;
+    };
+
+
+#if defined(TREE3D12)
+
+    VertexShader() : shader(nullptr), unknown(nullptr) { }
+    VertexShader(ID3DBlob* blob) : shader(blob)
+    {
+        if (blob)
+        {
+            HR(blob->QueryInterface(IID_IUnknown, (void**)&unknown)); // Take extra unknown ptr for release purposes
+        }
+    }
+
     operator ID3DBlob* () { return shader; }
 
-    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform)
-    {
-        return XSF::LoadShader(shaderFilename, &shader);
-    }
-
-    VertexShader() : shader(nullptr) { }
-
-    void Release()
-    {
-        if (shader)
-        {
-            shader->Release();
-            shader = nullptr;
-        }
-    }
 
 #elif defined(TREE3D11)
-    ID3D11VertexShader*       shader;
 
-    VertexShader(ID3D11VertexShader* blob) : shader(blob) { }
+    VertexShader() : shader(nullptr), unknown(nullptr) { }
+    VertexShader(ID3D11VertexShader* blob) : shader(blob)
+    {
+        if (blob)
+        {
+            HR(blob->QueryInterface(IID_IUnknown, (void**)&unknown)); // Take extra unknown ptr for release purposes
+        }
+    }
+
     operator ID3D11VertexShader* () { return shader; }
 
-    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
 
-    VertexShader() : shader(nullptr) { }
+#endif
 
     void Release()
     {
-        if (shader)
+        if (unknown)
         {
-            shader->Release();
-            shader = nullptr;
+            unknown->Release();
+            unknown->Release();  // Extra release for QI above
+            unknown = nullptr;
+            padding = nullptr;
         }
     }
-#endif
+
+    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
 
 };
 
@@ -173,21 +199,8 @@ struct PixelShader
     PixelShader(ID3DBlob* shaderBlob) : shader(shaderBlob) { }
     operator ID3DBlob* () { return shader; }
 
-    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform)
-    {
-        return XSF::LoadShader(shaderFilename, &shader);
-    }
-
     PixelShader() : shader(nullptr) { }
 
-    void Release()
-    {
-        if (shader)
-        {
-            shader->Release();
-            shader = nullptr;
-        }
-    }
 
 #elif defined(TREE3D11)
     ID3D11PixelShader*        shader;
@@ -195,20 +208,13 @@ struct PixelShader
     PixelShader(ID3D11PixelShader* shaderBlob) : shader(shaderBlob) { }
     operator ID3D11PixelShader* () { return shader; }
 
-    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
-
     PixelShader() : shader(nullptr) { }
 
-    void Release()
-    {
-        if (shader)
-        {
-            shader->Release();
-            shader = nullptr;
-        }
-    }
-
 #endif
+
+    void Release();
+    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
+
 };
 
 struct Material
@@ -419,13 +425,13 @@ public:
     virtual HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass) = 0;
     virtual HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass) = 0;
 
-    virtual HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView) = 0;
-    virtual HRESULT EndFrame(D3DBuffer& buffer) = 0;
+    virtual HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView) = 0;
+    virtual HRESULT EndFrame(D3DBuffer* buffer) = 0;
 
     virtual HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) = 0;
     virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) = 0;
 
-    virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer) = 0;
+    virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
     virtual HRESULT SetRenderState(RenderState state) = 0;
 
     virtual HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation) = 0;
@@ -440,7 +446,9 @@ public:
     virtual HRESULT SetMaterial(Material* material, RenderPass pass) = 0;
     virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
     virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
-    virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer) = 0;
+    virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer) = 0;
+    virtual HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader) = 0;
+    virtual HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader) = 0;
 
     virtual void SetFrameSceneData(CBChangesEveryFrame* cb) = 0;
 
@@ -583,13 +591,13 @@ public:
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
 
-    HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
-    HRESULT EndFrame(D3DBuffer& buffer);
+    HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView);
+    HRESULT EndFrame(D3DBuffer* buffer);
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
     HRESULT SetRenderState(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
@@ -605,7 +613,10 @@ public:
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
-    HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer);
+    HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
+
+    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader);
+    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader);
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
 
@@ -705,13 +716,13 @@ public:
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
     HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
 
-    HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
-    HRESULT EndFrame(D3DBuffer& buffer);
+    HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView);
+    HRESULT EndFrame(D3DBuffer* buffer);
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
     HRESULT SetRenderState(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
@@ -764,13 +775,13 @@ typedef HRESULT(*UpdateProjectionFunc)(XMFLOAT4X4* pProjMat, bool shadowPass);
 typedef HRESULT(*InitGameLevelGraphicsFunc)(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
 typedef HRESULT(*UninitGameLevelGraphicsFunc)();
 
-typedef HRESULT (*BeginNewFrameFunc)(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
-typedef HRESULT (*EndFrameFunc)(D3DBuffer& buffer);
+typedef HRESULT (*BeginNewFrameFunc)(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView);
+typedef HRESULT (*EndFrameFunc)(D3DBuffer* buffer);
 
 typedef HRESULT (*RenderPrologFunc)(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
 typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
-typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer& instancedBuffer);
+typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
 typedef HRESULT (*SetRenderStateFunc)(RenderState state);
 
 typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
@@ -780,12 +791,15 @@ typedef HRESULT (*DrawText2Func)(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const
 typedef HRESULT (*EndDrawTextFunc)();
 
 typedef HRESULT (*CreateMaterialFunc)(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-    ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
+                                      ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
 typedef HRESULT (*SetMaterialFunc)(Material* material, RenderPass pass);
 typedef HRESULT (*LoadTextureFunc)(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
 typedef HRESULT (*CreateTexture2DFunc)(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
-typedef HRESULT (*CreateD3DBufferFunc)(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer);
+typedef HRESULT (*CreateD3DBufferFunc)(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
+
+typedef HRESULT (*LoadVertexShaderFunc)(const wchar_t* shaderFilename, VertexShader* shader);
+typedef HRESULT (*LoadPixelShaderFunc)(const wchar_t* shaderFilename, PixelShader* shader);
 
 typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 
@@ -834,6 +848,9 @@ class RenderPlatformDLL : public RenderPlatform
     CreateTexture2DFunc CreateTexture2DFuncPtr;
     CreateD3DBufferFunc CreateD3DBufferFuncPtr;
 
+    LoadVertexShaderFunc LoadVertexShaderFuncPtr;
+    LoadPixelShaderFunc LoadPixelShaderFuncPtr;
+
     SetFrameSceneDataFunc SetFrameSceneDataFuncPtr;
 
     GetVertexBufferFunc GetVertexBufferFuncPtr;
@@ -866,13 +883,13 @@ public:
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData) { return InitGameLevelGraphicsFuncPtr(maxInstances, useShadowMaps, geometryData); }
     HRESULT UninitGameLevelGraphics() { return UninitGameLevelGraphicsFuncPtr(); }
 
-    HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView) { return BeginNewFrameFuncPtr(resetCommandList, buffer, dataView); }
-    HRESULT EndFrame(D3DBuffer& buffer) { return EndFrameFuncPtr(buffer); }
+    HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView) { return BeginNewFrameFuncPtr(resetCommandList, buffer, dataView); }
+    HRESULT EndFrame(D3DBuffer* buffer) { return EndFrameFuncPtr(buffer); }
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) { return RenderPrologFuncPtr(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor); }
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture); }
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
+    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
     HRESULT SetRenderState(RenderState state) { return SetRenderStateFuncPtr(state); }
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation)
@@ -902,9 +919,19 @@ public:
         return CreateTexture2DFuncPtr(name, points, width, height, textureIndex, texture);
     }
 
-    HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer)
+    HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer)
     {
         return CreateD3DBufferFuncPtr(sizeBytes, numInstances, d3dBuffer);
+    }
+
+    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
+    {
+        return LoadVertexShaderFuncPtr(shaderFilename, shader);
+    }
+
+    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+    {
+        return LoadPixelShaderFuncPtr(shaderFilename, shader);
     }
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { SetFrameSceneDataFuncPtr(cb); }

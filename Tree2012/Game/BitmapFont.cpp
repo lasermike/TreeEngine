@@ -8,7 +8,7 @@
 //--------------------------------------------------------------------------------------
 #include <pch.h>
 
-#if !defined(TREE3D12)
+#if defined(TREE3D11)
 
 #include "BitmapFont.h"
 #include "StockRenderStates.h"

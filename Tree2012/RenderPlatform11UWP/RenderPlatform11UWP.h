@@ -32,13 +32,13 @@ RENDERPLATFORM_API HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPas
 RENDERPLATFORM_API HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
 RENDERPLATFORM_API HRESULT UninitGameLevelGraphics();
 
-RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
-RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer& buffer);
+RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView);
+RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer* buffer);
 
 RENDERPLATFORM_API HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
 RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
-RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
 RENDERPLATFORM_API HRESULT SetRenderState(RenderState state);
 
 RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);

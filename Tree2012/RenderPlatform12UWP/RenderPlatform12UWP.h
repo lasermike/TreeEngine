@@ -32,13 +32,13 @@ RENDERPLATFORM_API HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPas
 RENDERPLATFORM_API HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
 RENDERPLATFORM_API HRESULT UninitGameLevelGraphics();
 
-RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView);
-RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer& buffer);
+RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView);
+RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer* buffer);
 
 RENDERPLATFORM_API HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
 RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
-RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer);
+RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
 RENDERPLATFORM_API HRESULT SetRenderState(RenderState state);
 
 RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
@@ -53,7 +53,10 @@ RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* te
 RENDERPLATFORM_API HRESULT SetMaterial(Material* material, RenderPass pass);
 RENDERPLATFORM_API HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
 RENDERPLATFORM_API HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
-RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer);
+RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
+
+RENDERPLATFORM_API HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader);
+RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader);
 
 RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb);
 

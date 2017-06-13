@@ -329,6 +329,9 @@
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\Game\Shaders\ShaderFiles.txt">

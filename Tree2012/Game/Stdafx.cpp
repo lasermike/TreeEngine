@@ -202,7 +202,7 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
 #if defined(_DEBUG)
 void SetDebugName(ID3D12DeviceChild* child, const char* name)
 {
-	child->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(name), name);
+	child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
 }
 #endif //_DEBUG -> NDEBUG
 

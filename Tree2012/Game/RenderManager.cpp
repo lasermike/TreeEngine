@@ -28,7 +28,7 @@ RenderManager::RenderManager() : m_platform(nullptr)
     // TODO: where should this go?
 #if defined(TREE3D12)
     m_platform = new RenderPlatform12(&this->GetRenderData());
-#else
+#elif defined(TREE3D11)
     m_platform = new RenderPlatform11(&this->GetRenderData());
 #endif
 }
@@ -63,6 +63,17 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps, m_geometryData);
 
     HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, GetPlatform()));
+
+    return S_OK;
+}
+
+HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+{
+    delete buffers[0];
+    delete buffers[1];
+
+    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[0]));
+    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[1]));
 
     return S_OK;
 }
@@ -120,7 +131,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 
 HRESULT RenderManager::BeginNewFrame()
 {
-    D3DBuffer& buffer = m_instancedBuffer.Get(m_renderData.frame);
+    D3DBuffer* buffer = m_instancedBuffer.Get(m_renderData.frame);
 
     InstancedData* dataView = nullptr;
     GetPlatform()->BeginNewFrame(true, buffer, &dataView);
@@ -145,7 +156,7 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 
 HRESULT RenderManager::RenderScene(RenderPass pass)
 {
-    HRR(GetPlatform()->RenderSceneSetup(pass, m_instancedBuffer));
+    HRR(GetPlatform()->RenderSceneSetup(pass, &m_instancedBuffer));
 
     // Render each unit
     for (auto& ru : m_renderUnits)
@@ -206,7 +217,7 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
         }
 
         VertexShader vertexShader;
-        HRR(vertexShader.Load(shaderFilename, GetPlatform()));
+        HRR(GetPlatform()->LoadVertexShader(shaderFilename, &vertexShader));
 
         m_vertexShaders[shaderFilename] = new VertexShader(vertexShader);
 
@@ -220,7 +231,7 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
         }
 
         PixelShader pixelShader;
-        HRR(pixelShader.Load(shaderFilename, GetPlatform()));
+        HRR(GetPlatform()->LoadPixelShader(shaderFilename, &pixelShader));
 
         // Load regular pixel Shader
         m_pixelShaders[shaderFilename] = new PixelShader(pixelShader);
@@ -550,3 +561,65 @@ void RenderManager::DrawSceneToShadowMap()
     UpdateView(&GetRenderData().view, false);
 }
 
+
+RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
+{
+    CreateFunc createFuncPtr = (CreateFunc) ::GetProcAddress(module, "Create");
+    HR(createFuncPtr(data));
+
+    InitDeviceFuncPtr = (InitDeviceFunc) ::GetProcAddress(module, "InitDevice");
+
+#define ASSIGN_FUNC(METHOD) \
+    METHOD##FuncPtr = (METHOD##Func) ::GetProcAddress(module, #METHOD); \
+    ASSERT(METHOD##FuncPtr);
+
+    ASSIGN_FUNC(SetWindow);
+
+    ASSIGN_FUNC(InitDevice);
+    ASSIGN_FUNC(UninitDevice);
+
+    ASSIGN_FUNC(ReleaseSwapChainResources);
+    ASSIGN_FUNC(OnResize);
+    ASSIGN_FUNC(GetSwapChain);
+
+    ASSIGN_FUNC(UpdateView);
+    ASSIGN_FUNC(UpdateProjection);
+
+    ASSIGN_FUNC(InitGameLevelGraphics);
+    ASSIGN_FUNC(UninitGameLevelGraphics);
+
+    ASSIGN_FUNC(BeginNewFrame);
+    ASSIGN_FUNC(EndFrame);
+
+    ASSIGN_FUNC(RenderProlog);
+    ASSIGN_FUNC(RenderEpilog);
+
+    ASSIGN_FUNC(RenderSceneSetup);
+    ASSIGN_FUNC(SetRenderState);
+
+    ASSIGN_FUNC(DrawIndexedInstanced);
+
+    ASSIGN_FUNC(BeginDrawText);
+    ASSIGN_FUNC(DrawText2);
+    ASSIGN_FUNC(EndDrawText);
+
+    ASSIGN_FUNC(CreateMaterial);
+    ASSIGN_FUNC(SetMaterial);
+    ASSIGN_FUNC(LoadTexture);
+    ASSIGN_FUNC(CreateTexture2D);
+    ASSIGN_FUNC(CreateD3DBuffer);
+
+    ASSIGN_FUNC(SetFrameSceneData);
+
+    ASSIGN_FUNC(GetVertexBuffer);
+    ASSIGN_FUNC(GetIndexBuffer);
+
+    ASSIGN_FUNC(GetViewport);
+
+    ASSIGN_FUNC(GetDevice);
+}
+
+RenderPlatformDLL::~RenderPlatformDLL()
+{
+
+}

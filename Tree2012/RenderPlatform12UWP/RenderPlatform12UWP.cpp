@@ -75,12 +75,12 @@ RENDERPLATFORM_API HRESULT UninitGameLevelGraphics()
     return m_pPlatform->UninitGameLevelGraphics();
 }
 
-RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView)
+RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView)
 {
     return m_pPlatform->BeginNewFrame(resetCommandList, buffer, dataView);
 }
 
-RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer& buffer)
+RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer* buffer)
 {
     return m_pPlatform->EndFrame(buffer);
 }
@@ -95,7 +95,7 @@ RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool sh
     return m_pPlatform->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture);
 }
 
-RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer)
+RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
 {
     return m_pPlatform->RenderSceneSetup(pass, instancedBuffer);
 }
@@ -146,9 +146,19 @@ RENDERPLATFORM_API HRESULT CreateTexture2D(const wchar_t* name, const float* poi
     return m_pPlatform->CreateTexture2D(name, points, width, height, textureIndex, texture);
 }
 
-RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer)
+RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer)
 {
     return m_pPlatform->CreateD3DBuffer(sizeBytes, numInstances, d3dBuffer);
+}
+
+RENDERPLATFORM_API HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
+{
+    return m_pPlatform->LoadVertexShader(shaderFilename, shader);
+}
+
+RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+{
+    return m_pPlatform->LoadPixelShader(shaderFilename, shader);
 }
 
 RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb)

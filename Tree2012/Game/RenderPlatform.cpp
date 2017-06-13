@@ -595,20 +595,22 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
 #if defined (TREE3D12)
 
-//HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
-//{
-//    buffers[0].Release();
-//    buffers[1].Release();
-//
-//    HRR(buffers[0].Create(sizeBytes, numInstances, platform));
-//    HRR(buffers[1].Create(sizeBytes, numInstances, platform));
-//
-//    return S_OK;
-//}
-
-HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer* d3dBuffer)
+HRESULT RenderPlatform12::LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
 {
-    d3dBuffer->buffer = nullptr;
+    HRESULT hr = S_OK;
+    return hr;
+}
+
+HRESULT RenderPlatform12::LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+{
+    HRESULT hr = S_OK;
+    return hr;
+}
+
+
+HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer)
+{
+    D3DBuffer* newBuffer = new D3DBuffer();
 
     HRR(m_d3dDevice->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
@@ -616,53 +618,21 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
         &CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&d3dBuffer->buffer)));
+        IID_PPV_ARGS(&newBuffer->buffer)));
 
-    //D3D12_VERTEX_BUFFER_VIEW view = {};
+    newBuffer->view.BufferLocation = newBuffer->buffer->GetGPUVirtualAddress();
+    newBuffer->view.SizeInBytes = sizeBytes;
+    newBuffer->view.StrideInBytes = sizeBytes / numInstances;
 
-    d3dBuffer->view.BufferLocation = d3dBuffer->buffer->GetGPUVirtualAddress();
-    d3dBuffer->view.SizeInBytes = sizeBytes;
-    d3dBuffer->view.StrideInBytes = sizeBytes / numInstances;
+    SetDebugName(newBuffer->buffer, "D3DBuffer::buffer");
 
-    SetDebugName(d3dBuffer->buffer, "D3DBuffer::buffer");
+    *d3dBuffer = newBuffer;
 
     return S_OK;
 }
 
-//HRESULT D3DBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
-//{
-//    this->Release();
-//
-//    ID3D12Device* device = ((RenderPlatform12*)platform)->GetDevice();
-//
-//
-//    return S_OK;
-//}
 
 #else
-//HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
-//{
-//    buffers[0].Release();
-//    buffers[1].Release();
-//
-//    ID3D11Device* device = ((RenderPlatform11*)platform)->GetDevice();
-//
-//    D3D11_BUFFER_DESC bd;
-//    ZeroMemory(&bd, sizeof(D3D11_BUFFER_DESC));
-//    bd.Usage = D3D11_USAGE_DYNAMIC;
-//    bd.ByteWidth = sizeof(InstancedData) * numInstances;
-//    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-//    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-//    bd.MiscFlags = 0;
-//    bd.StructureByteStride = 0;
-//
-//    HRR(device->CreateBuffer(&bd, 0, &buffers[0].buffer));
-//    HRR(device->CreateBuffer(&bd, 0, &buffers[1].buffer));
-//    SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
-//    SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
-//
-//    return S_OK;
-//}
 
 #endif
 
@@ -766,14 +736,14 @@ HRESULT RenderPlatform11::UninitGameLevelGraphics()
 #endif
 
 #if defined(TREE3D12)
-HRESULT RenderPlatform12::EndFrame(D3DBuffer& buffer)
+HRESULT RenderPlatform12::EndFrame(D3DBuffer* buffer)
 {
     HRESULT hr = S_OK;
-    buffer.buffer->Unmap(0, nullptr);
+    buffer->buffer->Unmap(0, nullptr);
     return hr;
 }
 #else
-HRESULT RenderPlatform11::EndFrame(D3DBuffer& buffer)
+HRESULT RenderPlatform11::EndFrame(D3DBuffer* buffer)
 {
     HRESULT hr = S_OK;
     m_immediateContext->Unmap(buffer, 0);
@@ -783,11 +753,11 @@ HRESULT RenderPlatform11::EndFrame(D3DBuffer& buffer)
 #endif
 
 #if defined(TREE3D12)
-HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer)
+HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
 {
     D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
     buffers[0] = m_VBView;
-    buffers[1] = instancedBuffer.Get(m_renderData->frame).view;
+    buffers[1] = instancedBuffer->Get(m_renderData->frame)->view;
 
     GetCommandList()->IASetVertexBuffers(0, 2, buffers);
     GetCommandList()->IASetIndexBuffer(&m_IBView);
@@ -797,7 +767,7 @@ HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer& instan
 
 #else
 
-HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer& instancedBuffer)
+HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
 {
     // Set samplers
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
@@ -827,7 +797,7 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer& instan
     // Set vertex buffer
     UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
     UINT offset[2] = { 0, 0 };
-    ID3D11Buffer* vbs[2] = { m_vertexBuffer, instancedBuffer.Get(m_renderData->frame) };
+    ID3D11Buffer* vbs[2] = { m_vertexBuffer, instancedBuffer->Get(m_renderData->frame) };
     m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
 
     return S_OK;
@@ -2005,11 +1975,11 @@ HRESULT RenderPlatform11::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer& buffer, InstancedData** dataView)
+HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView)
 {
     // Get a handle to the instance buffer.  Game will fill out data before calling Render()
     CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
-    HR(buffer.buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
+    HR(buffer->buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
     //TODO should Map() in D3D12 only get called once at create time?
 
     HRESULT hr = S_OK;
@@ -2062,7 +2032,7 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer& buffer
     return hr;
 }
 #else
-HRESULT RenderPlatform11::BeginNewFrame(bool /*resetCommandList*/, D3DBuffer& buffer, InstancedData** dataView)
+HRESULT RenderPlatform11::BeginNewFrame(bool /*resetCommandList*/, D3DBuffer* buffer, InstancedData** dataView)
 {
     // Compute instance data
     D3D11_MAPPED_SUBRESOURCE mappedData;
@@ -2398,79 +2368,25 @@ void RenderPlatform12::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
 #endif
 
 
-RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
+#if defined(TREE3D12)
+
+
+void PixelShader::Release()
 {
-    CreateFunc createFuncPtr =  (CreateFunc) ::GetProcAddress(module, "Create");
-    HR(createFuncPtr(data));
-
-    InitDeviceFuncPtr = (InitDeviceFunc) ::GetProcAddress(module, "InitDevice");
-
-#define ASSIGN_FUNC(METHOD) \
-    METHOD##FuncPtr = (METHOD##Func) ::GetProcAddress(module, #METHOD); \
-    ASSERT(METHOD##FuncPtr);
-
-    ASSIGN_FUNC(SetWindow);
-
-    ASSIGN_FUNC(InitDevice);
-    ASSIGN_FUNC(UninitDevice);
-
-    ASSIGN_FUNC(ReleaseSwapChainResources);
-    ASSIGN_FUNC(OnResize);
-    ASSIGN_FUNC(GetSwapChain);
-
-    ASSIGN_FUNC(UpdateView);
-    ASSIGN_FUNC(UpdateProjection);
-
-    ASSIGN_FUNC(InitGameLevelGraphics);
-    ASSIGN_FUNC(UninitGameLevelGraphics);
-
-    ASSIGN_FUNC(BeginNewFrame);
-    ASSIGN_FUNC(EndFrame);
-
-    ASSIGN_FUNC(RenderProlog);
-    ASSIGN_FUNC(RenderEpilog);
-
-    ASSIGN_FUNC(RenderSceneSetup);
-    ASSIGN_FUNC(SetRenderState);
-
-    ASSIGN_FUNC(DrawIndexedInstanced);
-
-    ASSIGN_FUNC(BeginDrawText);
-    ASSIGN_FUNC(DrawText2);
-    ASSIGN_FUNC(EndDrawText);
-
-    ASSIGN_FUNC(CreateMaterial);
-    ASSIGN_FUNC(SetMaterial);
-    ASSIGN_FUNC(LoadTexture);
-    ASSIGN_FUNC(CreateTexture2D);
-    ASSIGN_FUNC(CreateD3DBuffer);
-
-    ASSIGN_FUNC(SetFrameSceneData);
-
-    ASSIGN_FUNC(GetVertexBuffer);
-    ASSIGN_FUNC(GetIndexBuffer);
-
-    ASSIGN_FUNC(GetViewport);
-
-    ASSIGN_FUNC(GetDevice);
+    if (shader)
+    {
+        shader->Release();
+        shader = nullptr;
+    }
 }
 
-RenderPlatformDLL::~RenderPlatformDLL()
+HRESULT VertexShader::Load(const wchar_t* shaderFilename, RenderPlatform* platform)
 {
-
+    return XSF::LoadShader(shaderFilename, &shader);
 }
 
 
-HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
-{
-    buffers[0].Release();
-    buffers[1].Release();
+#else
 
-    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[0]));
-    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[1]));
+#endif
 
-    //HRR(buffers[0].Create(sizeBytes, numInstances, platform));
-    //HRR(buffers[1].Create(sizeBytes, numInstances, platform));
-
-    return S_OK;
-}
