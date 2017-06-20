@@ -511,7 +511,7 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(XSF::LoadBlob(L"VS.cso", dataVS));
     HRR(GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
 
-    HRR(LoadPixelShader(GetD3DDevice(), L"PS.cso", &m_pixelShader.shader));
+    HRR(LoadPixelShader(L"PS.cso", &m_pixelShader));
 
     SetDebugName(m_vertexShader.shader, "RenderManager::m_vertexShader");
     SetDebugName(m_pixelShader.shader, "RenderManager::m_pixelShader");
@@ -522,7 +522,7 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     ////////  Shadow map shader /////
     // Load shadow shaders
-    HRR(LoadVertexShader(GetD3DDevice(), L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
+    HRR(LoadVertexShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
     SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
     // TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
@@ -542,7 +542,7 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
 
     // Load regular pixel Shader
-    HRR(LoadPixelShader(GetD3DDevice(), L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
+    HRR(LoadPixelShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
     SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
 
     // Debug overlay to show depth map
@@ -633,6 +633,25 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
 
 
 #else
+
+HRESULT RenderPlatform11::CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer)
+{
+    HRESULT hr = S_OK;
+    return hr;
+}
+
+HRESULT RenderPlatform11::LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
+{
+    HRESULT hr = S_OK;
+    return hr;
+}
+
+HRESULT RenderPlatform11::LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+{
+    HRESULT hr = S_OK;
+    return hr;
+}
+
 
 #endif
 
@@ -746,7 +765,7 @@ HRESULT RenderPlatform12::EndFrame(D3DBuffer* buffer)
 HRESULT RenderPlatform11::EndFrame(D3DBuffer* buffer)
 {
     HRESULT hr = S_OK;
-    m_immediateContext->Unmap(buffer, 0);
+    m_immediateContext->Unmap(buffer->buffer, 0);
     return hr;
 }
 
@@ -797,7 +816,7 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
     // Set vertex buffer
     UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
     UINT offset[2] = { 0, 0 };
-    ID3D11Buffer* vbs[2] = { m_vertexBuffer, instancedBuffer->Get(m_renderData->frame) };
+    ID3D11Buffer* vbs[2] = { m_vertexBuffer.buffer, *instancedBuffer->Get(m_renderData->frame) };
     m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
 
     return S_OK;
@@ -2036,7 +2055,7 @@ HRESULT RenderPlatform11::BeginNewFrame(bool /*resetCommandList*/, D3DBuffer* bu
 {
     // Compute instance data
     D3D11_MAPPED_SUBRESOURCE mappedData;
-    HRR(m_immediateContext->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
+    HRR(m_immediateContext->Map(buffer->buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
     *dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
     return S_OK;
@@ -2387,6 +2406,16 @@ HRESULT VertexShader::Load(const wchar_t* shaderFilename, RenderPlatform* platfo
 
 
 #else
+
+void PixelShader::Release()
+{
+    if (shader)
+    {
+        shader->Release();
+        shader = nullptr;
+    }
+}
+
 
 #endif
 

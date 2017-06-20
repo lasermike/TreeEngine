@@ -64,7 +64,7 @@ struct D3DBuffer
 
 #elif defined(TREE3D11)
 
-    D3DBuffer() : buffer(nullptr), unknown(nullptr) { }
+    D3DBuffer() : buffer(nullptr) { }
     D3DBuffer(ID3D11Buffer* bufferParam) : buffer(bufferParam) { }
     ~D3DBuffer() { Release(); }
 
@@ -737,6 +737,11 @@ public:
     HRESULT SetMaterial(Material* material, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
+
+    HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
+
+    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader);
+    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader);
 
     void SetFrameSceneData(CBChangesEveryFrame* cb);
 
