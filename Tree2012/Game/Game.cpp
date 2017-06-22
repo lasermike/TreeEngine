@@ -34,6 +34,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_paused = false;
     m_wireframe = false;
     m_showHelp = false;
+    m_is12Driver = false;
     m_timeStart = 0;
     m_resetTree = true;
     m_showShadowBuffer = false;
@@ -119,6 +120,7 @@ HRESULT Game::Cleanup()
 HRESULT Game::ReloadDevice()
 {
     HRESULT hr = S_OK;
+    bool firstTimeLoad = m_renderPlatformDLL == nullptr;
 
     // Clear old stuff
     if (m_renderPlatformDLL)
@@ -137,16 +139,18 @@ HRESULT Game::ReloadDevice()
 
     }
 
-#if defined(TREENGINE_WIN32)
-#else
+    if (!firstTimeLoad)
+    {
+        m_is12Driver = !m_is12Driver;
+    }
 
-    m_renderPlatformDLL = ::LoadPackagedLibrary(L"RenderPlatform11UWP.dll", 0);
+    const wchar_t* dllFilename = m_is12Driver ? L"RenderPlatform12UWP.dll" : L"RenderPlatform11UWP.dll";
+    m_renderPlatformDLL = ::LoadPackagedLibrary(dllFilename, 0);
 
     m_renderManager.SetPlatform(m_renderPlatformDLL);
 
     m_renderManager.GetPlatform()->SetWindow(m_window.Get(), m_logicalDpi);
 
-#endif
 
     m_renderManager.InitDevice();
 
@@ -195,6 +199,12 @@ void Game::Update(DX::StepTimer const& timer)
 {
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"Update");
 
+    // Reset stats
+    for (int i = 0; i < MAX_FRAME_STAT; i++)
+    {
+        m_renderManager.GetRenderData().frameStats[i].stat = 0;
+    }
+
     m_renderManager.GetRenderData().frame++;
 
     if (m_reloadDevice)
@@ -203,11 +213,14 @@ void Game::Update(DX::StepTimer const& timer)
         m_reloadDevice = false;
     }
 
+    m_renderManager.GetRenderData().frameStats[DRIVER_12_STAT].stat = m_is12Driver;
+
     if (m_needsResize)
     {
         m_renderManager.OnResize(m_nextScreenWidth, m_nextScreenHeight, m_renderToSharedTexture/*, this*/);
         m_needsResize = false;
     }
+
 
 
     if (m_advanceScene)
@@ -286,12 +299,6 @@ void Game::ComputeCPU()
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
-
-	// Reset stats
-	for (int i = 0; i < MAX_FRAME_STAT; i++)
-	{
-		m_renderManager.GetRenderData().frameStats[i].stat = 0;
-	}
 
 	FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
 	HandleInput(inputData.key);

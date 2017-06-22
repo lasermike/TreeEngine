@@ -126,8 +126,9 @@ private:
 	bool								m_paused;
 	bool								m_wireframe;
 	bool								m_showHelp;
-
+    bool                                m_is12Driver;
 	GameData							m_gameData;
+
 
 #if defined(_TREE_CLASSIC)
     HWND                              m_hwnd;

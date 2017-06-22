@@ -9,6 +9,7 @@ FrameStatistic g_frameStats[MAX_FRAME_STAT] =
 	{ WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", 0 }, 
 	{ NUM_LEAVES_STAT, L"Num leaves", 0 },
 	{ NUM_STICKS_STAT, L"Num sticks", 0 },
+    { DRIVER_12_STAT, L"DirectX 12", 0 },
 };
 
 
