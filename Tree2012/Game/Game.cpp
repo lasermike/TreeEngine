@@ -140,7 +140,7 @@ HRESULT Game::ReloadDevice()
 #if defined(TREENGINE_WIN32)
 #else
 
-    m_renderPlatformDLL = ::LoadPackagedLibrary(L"RenderPlatform12UWP.dll", 0);
+    m_renderPlatformDLL = ::LoadPackagedLibrary(L"RenderPlatform11UWP.dll", 0);
 
     m_renderManager.SetPlatform(m_renderPlatformDLL);
 

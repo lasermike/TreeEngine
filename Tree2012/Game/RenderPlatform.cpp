@@ -511,7 +511,8 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(XSF::LoadBlob(L"VS.cso", dataVS));
     HRR(GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
 
-    HRR(LoadPixelShader(L"PS.cso", &m_pixelShader));
+    HRR(::LoadPixelShader(GetD3DDevice(), L"PS.cso", &m_pixelShader.shader));
+    //HRR(XSF::LoadShader(L"PS.cso", &m_pixelShader.shader));
 
     SetDebugName(m_vertexShader.shader, "RenderManager::m_vertexShader");
     SetDebugName(m_pixelShader.shader, "RenderManager::m_pixelShader");
@@ -522,7 +523,8 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     ////////  Shadow map shader /////
     // Load shadow shaders
-    HRR(LoadVertexShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+    HRR(::LoadVertexShader(GetD3DDevice(), L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
+    //HRR(LoadVertexShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
     SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
     // TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
@@ -542,7 +544,7 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
 
     // Load regular pixel Shader
-    HRR(LoadPixelShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
+    HRR(::LoadPixelShader(GetD3DDevice(), L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
     SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
 
     // Debug overlay to show depth map
@@ -637,6 +639,20 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
 HRESULT RenderPlatform11::CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer)
 {
     HRESULT hr = S_OK;
+    D3DBuffer* newBuffer = new D3DBuffer();
+
+    D3D11_BUFFER_DESC vbd = {};
+
+    vbd.Usage = D3D11_USAGE_DYNAMIC;
+    vbd.ByteWidth = sizeBytes * numInstances;
+    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    vbd.MiscFlags = 0;
+    vbd.StructureByteStride = 0;
+    HRR(GetDevice()->CreateBuffer(&vbd, nullptr, &newBuffer->buffer));
+
+    *d3dBuffer = newBuffer;
+
     return hr;
 }
 
@@ -856,8 +872,11 @@ HRESULT RenderPlatform11::SetMaterial(Material* material, RenderPass pass)
     // TODO: support arbitary vertex shaders with shadow mapping
     if (pass != ShadowMapPass)
     {
-        m_immediateContext->VSSetShader(material->m_vertexShader->shader, nullptr, 0);
-        m_immediateContext->PSSetShader(material->m_pixelShader->shader, nullptr, 0);
+        ID3D11VertexShader* vertexShader = material->m_vertexShader->shader ? material->m_vertexShader->shader : m_vertexShader.shader;
+        m_immediateContext->VSSetShader(vertexShader, nullptr, 0);
+
+        ID3D11PixelShader* pixelShader = material->m_pixelShader->shader ? material->m_pixelShader->shader : m_pixelShader.shader;
+        m_immediateContext->PSSetShader(pixelShader, nullptr, 0);
     }
 
     m_immediateContext->UpdateSubresource(material->m_constBuffer->Resource(), 0, nullptr, &cb, 0, 0);
