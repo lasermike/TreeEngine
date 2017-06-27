@@ -99,7 +99,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     {
         if (vs.second)
         {
-            vs.second->Release();
+            //TODO vs.second->Release();
             SafeDelete(&vs.second);
         }
     }
@@ -277,8 +277,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
         LoadTexture(textureFilename, &texture);
     }
 
-    VertexShader* vertexShader = &GetPlatform()->m_vertexShader;
-    PixelShader* pixelShader = &GetPlatform()->m_pixelShader;
+    VertexShader* vertexShader = nullptr; /// &GetPlatform()->m_vertexShader;
+    PixelShader* pixelShader = nullptr; //&GetPlatform()->m_pixelShader;
 
     if (vertexShaderFilename && *vertexShaderFilename)
     {

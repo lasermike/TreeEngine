@@ -1172,6 +1172,16 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     UploadBuffer<CBMaterial>* constBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
     SetDebugName(constBuffer->Resource(), "RenderManager::CreateMaterial::pConstBuffer");
 
+    if (!vs)
+    {
+        vs = &m_vertexShader;
+    }
+
+    if (!ps)
+    {
+        ps = &m_pixelShader;
+    }
+
     Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vs, ps,
         nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
         shaderMaterial, constBuffer);
@@ -1986,6 +1996,14 @@ HRESULT RenderPlatform11::UninitDevice()
 {
     XSF::StockRenderStates::Shutdown();
 
+    ReleaseSwapChainResources();
+
+    SafeDelete(&m_constBufferChangesOnResize);
+
+    m_rasterState.Release();
+
+    m_immediateContext.Release();
+
 #if defined(_DEBUG) && !defined(_XBOX_ONE)
     if (GetDevice())
     {
@@ -1996,13 +2014,6 @@ HRESULT RenderPlatform11::UninitDevice()
     }
 #endif
 
-    ReleaseSwapChainResources();
-
-    SafeDelete(&m_constBufferChangesOnResize);
-
-    m_rasterState.Release();
-
-    m_immediateContext.Release();
     m_d3dDevice.Release();
 
     return S_OK;
@@ -2223,11 +2234,11 @@ HRESULT RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool sho
     HRESULT hr = S_OK;
 
     // Unbind shadow texture so we can render to it next frame
-    //if (useShadowMaps)
-    //{
-    //    ID3D11ShaderResourceView* depthTexture = nullptr;
-    //    m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
-    //}
+    if (useShadowMaps)
+    {
+        ID3D11ShaderResourceView* depthTexture = nullptr;
+        m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
+    }
 
     if (showShadowBuffer)
     {
@@ -2408,6 +2419,14 @@ void RenderPlatform12::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
 
 #if defined(TREE3D12)
 
+void VertexShader::Release()
+{
+    if (shader)
+    {
+        shader->Release();
+        shader = nullptr;
+    }
+}
 
 void PixelShader::Release()
 {
@@ -2424,7 +2443,16 @@ HRESULT VertexShader::Load(const wchar_t* shaderFilename, RenderPlatform* platfo
 }
 
 
-#else
+#elif defined(TREE3D11)
+
+void VertexShader::Release()
+{
+    if (shader)
+    {
+        shader->Release();
+        shader = nullptr;
+    }
+}
 
 void PixelShader::Release()
 {
@@ -2434,7 +2462,6 @@ void PixelShader::Release()
         shader = nullptr;
     }
 }
-
 
 #endif
 

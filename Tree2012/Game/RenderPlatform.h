@@ -133,8 +133,6 @@ struct LoadedTexture
 
 struct VertexShader
 {
-    IUnknown* unknown;
-
     union
     {
 #if defined(TREE3D12)
@@ -142,53 +140,23 @@ struct VertexShader
 #elif defined(TREE3D11)
         ID3D11VertexShader* shader;
 #endif
-        void* padding;
     };
 
 
 #if defined(TREE3D12)
 
-    VertexShader() : shader(nullptr), unknown(nullptr) { }
-    VertexShader(ID3DBlob* blob) : shader(blob)
-    {
-        if (blob)
-        {
-            HR(blob->QueryInterface(IID_IUnknown, (void**)&unknown)); // Take extra unknown ptr for release purposes
-        }
-    }
-
     operator ID3DBlob* () { return shader; }
-
+    VertexShader() : shader(nullptr) { }
 
 #elif defined(TREE3D11)
 
-    VertexShader() : shader(nullptr), unknown(nullptr) { }
-    VertexShader(ID3D11VertexShader* blob) : shader(blob)
-    {
-        if (blob)
-        {
-            HR(blob->QueryInterface(IID_IUnknown, (void**)&unknown)); // Take extra unknown ptr for release purposes
-        }
-    }
-
     operator ID3D11VertexShader* () { return shader; }
-
+    VertexShader() : shader(nullptr) { }
 
 #endif
 
-    void Release()
-    {
-        if (unknown)
-        {
-            unknown->Release();
-            unknown->Release();  // Extra release for QI above
-            unknown = nullptr;
-            padding = nullptr;
-        }
-    }
-
+    void Release();
     HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
-
 };
 
 struct PixelShader
@@ -196,25 +164,20 @@ struct PixelShader
 #if defined(TREE3D12)
     ID3DBlob*                 shader;
 
-    PixelShader(ID3DBlob* shaderBlob) : shader(shaderBlob) { }
-    operator ID3DBlob* () { return shader; }
-
     PixelShader() : shader(nullptr) { }
-
+    operator ID3DBlob* () { return shader; }
+    void Release();
 
 #elif defined(TREE3D11)
     ID3D11PixelShader*        shader;
 
-    PixelShader(ID3D11PixelShader* shaderBlob) : shader(shaderBlob) { }
+    PixelShader() : shader(nullptr) { }
     operator ID3D11PixelShader* () { return shader; }
 
-    PixelShader() : shader(nullptr) { }
-
+    void Release();
 #endif
 
-    void Release();
     HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
-
 };
 
 struct Material
@@ -442,7 +405,7 @@ public:
 
     // Materials
     virtual HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-        ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial) = 0;
+                                   ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial) = 0;
     virtual HRESULT SetMaterial(Material* material, RenderPass pass) = 0;
     virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
     virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
