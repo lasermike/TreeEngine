@@ -134,6 +134,8 @@ HRESULT Game::ReloadDevice()
 
         m_renderManager.UninitDevice();
 
+        m_renderManager.GetPlatform()->SetWindow(nullptr, m_logicalDpi);
+
         FreeLibrary(m_renderPlatformDLL);
         m_renderPlatformDLL = nullptr;
 

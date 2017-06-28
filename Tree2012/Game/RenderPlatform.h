@@ -624,7 +624,9 @@ class RenderPlatform11 : public RenderPlatform
     CComPtr<ID3D11Buffer>             m_screenQuadVB;
     CComPtr<ID3D11Buffer>             m_screenQuadIB;
 
-    RenderData*                    m_renderData; //TEMPTEMP
+    RenderData*                       m_renderData; //TEMPTEMP
+
+    std::vector<ID3D11Buffer*>        m_createdBuffers;
 
 // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();

@@ -651,6 +651,8 @@ HRESULT RenderPlatform11::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
     vbd.StructureByteStride = 0;
     HRR(GetDevice()->CreateBuffer(&vbd, nullptr, &newBuffer->buffer));
 
+    m_createdBuffers.push_back(newBuffer->buffer);
+
     *d3dBuffer = newBuffer;
 
     return hr;
@@ -763,6 +765,12 @@ HRESULT RenderPlatform11::UninitGameLevelGraphics()
     m_drawScreenPixelShader.Release();
 
     SafeDelete(&m_renderData->pShadowMap);
+
+    for (ID3D11Buffer* buffer : m_createdBuffers)
+    {
+        buffer->Release();
+    }
+    m_createdBuffers.clear();
 
     InputLayouts::DestroyAll();
 
@@ -1141,6 +1149,16 @@ HRESULT RenderPlatform11::CreateTexture2D(const wchar_t* name, const float* poin
 HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
     ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial)
 {
+    if (!vs)
+    {
+        vs = &m_vertexShader;
+    }
+
+    if (!ps)
+    {
+        ps = &m_pixelShader;
+    }
+
     UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
 
     D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = m_shaderHeap.hGPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
@@ -1185,6 +1203,8 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vs, ps,
         nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
         shaderMaterial, constBuffer);
+
+    m_createdBuffers.push_back(constBuffer->Resource());
 
     *newMaterial = newMat;
 
