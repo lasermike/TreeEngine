@@ -628,6 +628,8 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
 
     SetDebugName(newBuffer->buffer, "D3DBuffer::buffer");
 
+    m_gameLevelResources.push_back(newBuffer->buffer);
+
     *d3dBuffer = newBuffer;
 
     return S_OK;
@@ -651,7 +653,7 @@ HRESULT RenderPlatform11::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
     vbd.StructureByteStride = 0;
     HRR(GetDevice()->CreateBuffer(&vbd, nullptr, &newBuffer->buffer));
 
-    m_createdBuffers.push_back(newBuffer->buffer);
+    m_gameLevelBuffers.push_back(newBuffer->buffer);
 
     *d3dBuffer = newBuffer;
 
@@ -740,6 +742,13 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_drawScreenVertexShader.Release();
     m_drawScreenPixelShader.Release();
 
+    for (ID3D12Resource* resource : m_gameLevelResources)
+    {
+        resource->Release();
+    }
+    m_gameLevelResources.clear();
+
+
     SafeDelete(&m_renderData->pShadowMap);
 
     return S_OK;
@@ -766,11 +775,11 @@ HRESULT RenderPlatform11::UninitGameLevelGraphics()
 
     SafeDelete(&m_renderData->pShadowMap);
 
-    for (ID3D11Buffer* buffer : m_createdBuffers)
+    for (ID3D11Buffer* buffer : m_gameLevelBuffers)
     {
         buffer->Release();
     }
-    m_createdBuffers.clear();
+    m_gameLevelBuffers.clear();
 
     InputLayouts::DestroyAll();
 
@@ -1161,6 +1170,8 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 
     UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
 
+    m_gameLevelResources.push_back(uploadBuffer->Resource());
+
     D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = m_shaderHeap.hGPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
     D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
 
@@ -1204,7 +1215,7 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
         shaderMaterial, constBuffer);
 
-    m_createdBuffers.push_back(constBuffer->Resource());
+    m_gameLevelBuffers.push_back(constBuffer->Resource());
 
     *newMaterial = newMat;
 

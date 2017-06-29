@@ -491,6 +491,8 @@ private:
     CComPtr<ID3D12Resource>           m_screenQuadIB;
     D3D12_INDEX_BUFFER_VIEW           m_screenQuadIBView;
 
+    std::vector<ID3D12Resource*>      m_gameLevelResources;
+
     CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading textures
     CComPtr<ID3D12DescriptorHeap>     m_samplerHeap;
     CComPtr<ID3D12PipelineState>      m_pipelineState;
@@ -626,7 +628,7 @@ class RenderPlatform11 : public RenderPlatform
 
     RenderData*                       m_renderData; //TEMPTEMP
 
-    std::vector<ID3D11Buffer*>        m_createdBuffers;
+    std::vector<ID3D11Buffer*>        m_gameLevelBuffers;
 
 // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
