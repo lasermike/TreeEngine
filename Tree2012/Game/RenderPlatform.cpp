@@ -1653,18 +1653,18 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 {
     HRESULT hr = S_OK;
 
+    m_pSwapChain.Release();
+
     for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
     {
         m_renderTargets[i].Release();
     }
 
-    m_pRenderTargetView = D3D12_RESOURCE_DESC();
-    m_pSharedRenderToTexture.Release();
-
     m_pDepthStencilView = D3D12_RESOURCE_DESC();
     m_pDepthStencil.Release();
 
-    m_pSwapChain.Release();
+    m_pRenderTargetView = D3D12_RESOURCE_DESC();
+    m_pSharedRenderToTexture.Release();
 
     return hr;
 }
