@@ -667,6 +667,14 @@ HRESULT RenderPlatform11::BeginNewFrame(bool /*resetCommandList*/, D3DBuffer* bu
     return S_OK;
 }
 
+HRESULT RenderPlatform11::EndFrame(D3DBuffer* buffer)
+{
+    HRESULT hr = S_OK;
+    m_immediateContext->Unmap(buffer->buffer, 0);
+    return hr;
+}
+
+
 void RenderPlatform11::SetFrameSceneData(CBChangesEveryFrame* cb)
 {
     ID3D11Buffer* buffer = m_constBufferChangesEveryFrame->Resource();
@@ -797,6 +805,17 @@ HRESULT RenderPlatform11::EndDrawText()
     return S_OK;
 }
 
+HRESULT RenderPlatform11::DrawIndexedInstanced(
+    UINT IndexCountPerInstance,
+    UINT InstanceCount,
+    UINT StartIndexLocation,
+    INT BaseVertexLocation,
+    UINT StartInstanceLocation)
+{
+    m_immediateContext->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+    return S_OK;
+}
+
 HRESULT RenderPlatform11::SetRenderState(RenderState state)
 {
     HRESULT hr = S_OK;
@@ -825,6 +844,19 @@ HRESULT RenderPlatform11::SetRenderState(RenderState state)
     return hr;
 }
 
+HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int /*textureIndex*/, LoadedTexture** loadedTexture)
+{
+    // Load the Texture
+    ID3D11ShaderResourceView* tex = nullptr;
+    HRR(CreateDDSTextureFromFile(GetDevice(), textureFilename, nullptr, &tex));
+
+    *loadedTexture = new LoadedTexture(tex);
+
+    assert((*loadedTexture)->texture);
+
+    return S_OK;
+}
+
 HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
     ShaderMaterial& shaderMaterial, int /*materialNum*/, Material** newMaterial)
 {
@@ -848,6 +880,166 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     m_gameLevelBuffers.push_back(constBuffer->Resource());
 
     *newMaterial = newMat;
+
+    return S_OK;
+}
+
+HRESULT RenderPlatform11::SetMaterial(Material* material, RenderPass pass)
+{
+    CBMaterial cb;
+    cb.material = material->m_shaderMaterial;
+
+    ID3D11Buffer* constBuffer = material->m_constBuffer->Resource();
+
+    m_immediateContext->VSSetConstantBuffers(3, 1, &constBuffer);
+    m_immediateContext->PSSetConstantBuffers(3, 1, &constBuffer);
+
+    // TODO: support arbitary vertex shaders with shadow mapping
+    if (pass != ShadowMapPass)
+    {
+        ID3D11VertexShader* vertexShader = material->m_vertexShader->shader ? material->m_vertexShader->shader : m_vertexShader.shader;
+        m_immediateContext->VSSetShader(vertexShader, nullptr, 0);
+
+        ID3D11PixelShader* pixelShader = material->m_pixelShader->shader ? material->m_pixelShader->shader : m_pixelShader.shader;
+        m_immediateContext->PSSetShader(pixelShader, nullptr, 0);
+    }
+
+    m_immediateContext->UpdateSubresource(material->m_constBuffer->Resource(), 0, nullptr, &cb, 0, 0);
+
+    ID3D11ShaderResourceView* texture = nullptr;
+
+    if (material->m_texture)
+    {
+        texture = material->m_texture->texture;
+    }
+
+    m_immediateContext->PSSetShaderResources(0, 1, &texture);
+    return S_OK;
+}
+
+HRESULT RenderPlatform11::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** loadedTexture)
+{
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width = width;
+    desc.Height = height;
+    desc.ArraySize = 1;
+    desc.MipLevels = 1;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Format = DXGI_FORMAT_R32_FLOAT;
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+    D3D11_SUBRESOURCE_DATA subData = {};
+    subData.pSysMem = points;
+    subData.SysMemPitch = width * sizeof(float);
+    subData.SysMemSlicePitch = width * height * sizeof(float);
+
+    CComPtr<ID3D11Texture2D> texture;
+    HRR(GetDevice()->CreateTexture2D(&desc, &subData, &texture));
+    SetDebugName(texture, "RenderManager::CreateTexture2::procedural");
+
+    CComPtr<ID3D11ShaderResourceView> view;
+    HRR(GetDevice()->CreateShaderResourceView(texture, nullptr, &view));
+    SetDebugName(view, "RenderManager::CreateTexture2::proc view");
+
+#if 0
+    Image img;
+    img.width = width;
+    img.height = height;
+    img.format = DXGI_FORMAT_R32_FLOAT;
+    img.rowPitch = subData.SysMemPitch;
+    img.slicePitch = subData.SysMemSlicePitch;
+    img.pixels = (uint8_t*)subData.pSysMem;
+    HR(SaveToDDSFile(img, DDS_FLAGS_NONE, L"FSGraphTexture.DDS"));
+#endif
+
+    // Success
+    *loadedTexture = new LoadedTexture(view);
+    texture.Release();
+    view.Detach();
+
+    return S_OK;
+}
+
+HRESULT RenderPlatform11::CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer)
+{
+    HRESULT hr = S_OK;
+    D3DBuffer* newBuffer = new D3DBuffer();
+
+    D3D11_BUFFER_DESC vbd = {};
+
+    vbd.Usage = D3D11_USAGE_DYNAMIC;
+    vbd.ByteWidth = sizeBytes * numInstances;
+    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    vbd.MiscFlags = 0;
+    vbd.StructureByteStride = 0;
+    HRR(GetDevice()->CreateBuffer(&vbd, nullptr, &newBuffer->buffer));
+
+    m_gameLevelBuffers.push_back(newBuffer->buffer);
+
+    *d3dBuffer = newBuffer;
+
+    return hr;
+}
+
+HRESULT RenderPlatform11::LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
+{
+    HRESULT hr = S_OK;
+    return hr;
+}
+
+HRESULT RenderPlatform11::LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+{
+    HRESULT hr = S_OK;
+    return hr;
+}
+
+HRESULT RenderPlatform11::BuildScreenQuadGeometryBuffers()
+{
+    GeometryGenerator::MeshData quad;
+
+    GeometryGenerator geoGen;
+    geoGen.CreateFullscreenQuad(quad);
+
+    // Extract the vertex elements we are interested in and pack the
+    // vertices of all the meshes into one vertex buffer.
+
+    std::vector<SimpleVertex> vertices(quad.Vertices.size());
+
+    for (UINT i = 0; i < quad.Vertices.size(); ++i)
+    {
+        vertices[i].Pos = quad.Vertices[i].Position;
+        vertices[i].Normal = quad.Vertices[i].Normal;
+        vertices[i].Tex = quad.Vertices[i].TexC;
+    }
+
+    D3D11_BUFFER_DESC vbd;
+    vbd.Usage = D3D11_USAGE_IMMUTABLE;
+    vbd.ByteWidth = (UINT)(sizeof(SimpleVertex) * quad.Vertices.size());
+    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vbd.CPUAccessFlags = 0;
+    vbd.MiscFlags = 0;
+    D3D11_SUBRESOURCE_DATA vinitData = { 0 };
+    vinitData.pSysMem = &vertices[0];
+    HRR(GetDevice()->CreateBuffer(&vbd, &vinitData, &m_screenQuadVB));
+
+    SetDebugName(m_screenQuadVB, "RenderManager::m_screenQuadVB");
+
+    //
+    // Pack the indices of all the meshes into one index buffer.
+    //
+
+    D3D11_BUFFER_DESC ibd;
+    ibd.Usage = D3D11_USAGE_IMMUTABLE;
+    ibd.ByteWidth = (UINT)(sizeof(UINT) * quad.Indices.size());
+    ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    ibd.CPUAccessFlags = 0;
+    ibd.MiscFlags = 0;
+    D3D11_SUBRESOURCE_DATA iinitData = { 0 };
+    iinitData.pSysMem = &quad.Indices[0];
+    HRR(GetDevice()->CreateBuffer(&ibd, &iinitData, &m_screenQuadIB));
+    SetDebugName(m_screenQuadIB, "RenderManager::m_screenQuadIB");
 
     return S_OK;
 }
