@@ -49,6 +49,9 @@
     <ClCompile Include="..\Game\GeometryGenerator.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\RenderPlatform12.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">

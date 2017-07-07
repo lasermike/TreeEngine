@@ -46,6 +46,9 @@
     <ClCompile Include="..\Game\BitmapFont.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\RenderPlatform11.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
