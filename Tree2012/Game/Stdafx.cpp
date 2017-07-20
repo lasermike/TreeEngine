@@ -251,7 +251,7 @@ void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
 #if defined(_DEBUG) && !defined(_XBOX_ONE) // NAMING
 void SetDebugName(ID3D11DeviceChild* child, const char* name)
 {
-	child->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(name), name);
+	child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
 }
 
 #else

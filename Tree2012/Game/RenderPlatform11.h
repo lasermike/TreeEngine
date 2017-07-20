@@ -1,4 +1,4 @@
- #include "pch.h"
+#pragma once
 
 #include "RenderPlatform.h"
 

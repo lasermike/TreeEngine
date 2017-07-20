@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "RenderPlatform.h"
+#include "RenderPlatform11.h"
 
 #include "DDSTextureLoader.h"
 #include "BitmapFont.h"
@@ -1084,3 +1084,10 @@ void PixelShader::Release()
         shader = nullptr;
     }
 }
+
+/*
+D3DBuffer::operator bool()
+{
+    return buffer != nullptr;
+}
+*/

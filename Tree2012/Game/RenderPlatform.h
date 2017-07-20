@@ -38,8 +38,6 @@ struct D3DBuffer
         ID3D12Resource* buffer;
 #elif defined(TREE3D11)
         ID3D11Buffer* buffer;
-#else
-        void* buffer;
 #endif
     };
 
@@ -79,6 +77,11 @@ struct D3DBuffer
         }
     }
 
+    //operator bool()
+    //{
+    //    return buffer != nullptr;
+    //}
+
 #else
 
     void Release()
@@ -86,12 +89,10 @@ struct D3DBuffer
         // TODO!!!
     }
 
+
 #endif
 
-    operator bool()
-    {
-        return buffer != nullptr;
-    }
+//    operator bool();
 
 };
 

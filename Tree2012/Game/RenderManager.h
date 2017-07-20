@@ -39,9 +39,9 @@ public:
     Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferIndices* bufferIndices) :
         m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer), m_bufferIndices(bufferIndices)
     {
-        assert(m_vertexBuffer);
-        assert(m_indexBuffer);
-        assert(m_bufferIndices);
+        //assert(m_vertexBuffer);
+        //assert(m_indexBuffer);
+        //assert(m_bufferIndices);
     }
 };
 
