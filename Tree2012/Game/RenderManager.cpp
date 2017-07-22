@@ -217,10 +217,10 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
             return S_OK;
         }
 
-        VertexShader vertexShader;
-        HRR(GetPlatform()->LoadVertexShader(shaderFilename, &vertexShader));
+        VertexShader* vertexShader = new VertexShader();
+        HRR(GetPlatform()->LoadVertexShader(shaderFilename, vertexShader));
 
-        m_vertexShaders[shaderFilename] = new VertexShader(vertexShader);
+        m_vertexShaders[shaderFilename] = vertexShader;
 
         break;
     }
@@ -231,11 +231,11 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
             return S_OK;
         }
 
-        PixelShader pixelShader;
-        HRR(GetPlatform()->LoadPixelShader(shaderFilename, &pixelShader));
+        PixelShader* pixelShader = new PixelShader();
+        HRR(GetPlatform()->LoadPixelShader(shaderFilename, pixelShader));
 
         // Load regular pixel Shader
-        m_pixelShaders[shaderFilename] = new PixelShader(pixelShader);
+        m_pixelShaders[shaderFilename] = pixelShader;
 
         break;
     }
@@ -611,6 +611,9 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(CreateD3DBuffer);
 
     ASSIGN_FUNC(SetFrameSceneData);
+
+    ASSIGN_FUNC(LoadVertexShader);
+    ASSIGN_FUNC(LoadPixelShader);
 
     ASSIGN_FUNC(GetVertexBuffer);
     ASSIGN_FUNC(GetIndexBuffer);

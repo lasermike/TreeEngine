@@ -985,14 +985,12 @@ HRESULT RenderPlatform11::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
 
 HRESULT RenderPlatform11::LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
 {
-    HRESULT hr = S_OK;
-    return hr;
+    return shader->Load(shaderFilename, this);
 }
 
 HRESULT RenderPlatform11::LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
 {
-    HRESULT hr = S_OK;
-    return hr;
+    return shader->Load(shaderFilename, this);
 }
 
 HRESULT RenderPlatform11::BuildScreenQuadGeometryBuffers()

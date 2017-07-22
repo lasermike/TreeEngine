@@ -77,22 +77,7 @@ struct D3DBuffer
         }
     }
 
-    //operator bool()
-    //{
-    //    return buffer != nullptr;
-    //}
-
-#else
-
-    void Release()
-    {
-        // TODO!!!
-    }
-
-
 #endif
-
-//    operator bool();
 
 };
 
@@ -148,15 +133,16 @@ struct VertexShader
 
     operator ID3DBlob* () { return shader; }
     VertexShader() : shader(nullptr) { }
+    void Release();
 
 #elif defined(TREE3D11)
 
     operator ID3D11VertexShader* () { return shader; }
     VertexShader() : shader(nullptr) { }
+    void Release();
 
 #endif
 
-    void Release();
     HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
 };
 
