@@ -232,19 +232,22 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Shaders
     //
     // Load default shaders
-    HR(XSF::LoadShader(L"VS.cso", &m_vertexShader.shader));
-    HR(XSF::LoadShader(L"PS.cso", &m_pixelShader.shader));
+    m_vertexShader = nullptr;
+    m_pixelShader = nullptr;
+    HRR(LoadVertexShader(L"VS.cso", &m_vertexShader));
+    HRR(LoadPixelShader(L"PS.cso", &m_pixelShader));
 
     // Load shadow shaders
-    HRR(XSF::LoadShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
-    HRR(XSF::LoadShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader.shader));
-    // TODO: load a shadow pixel shader to support transparent textures not casting shadows
+    m_shadowVertexShader = nullptr;
+    m_shadowPixelShader = nullptr;
+    HRR(LoadVertexShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+    HRR(LoadPixelShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader));
 
-    ////////  Debug texture /////
-    HRR(XSF::LoadShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader.shader));
-
-    // Load regular pixel Shader
-    HRR(XSF::LoadShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
+    ////////  Debug window texture /////
+    m_drawScreenVertexShader = nullptr;
+    m_drawScreenPixelShader = nullptr;
+    HRR(LoadVertexShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
+    HRR(LoadPixelShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
 
     //
     // Vertex and index buffer
@@ -302,8 +305,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
     psoDesc.pRootSignature = m_rootSignature;
-    psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader.shader);
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader.shader);
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader->shader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader->shader);
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -322,8 +325,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
     //shadowPsoDesc.pRootSignature = mRootSignature.Get();
-    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(m_shadowVertexShader);
-    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(m_shadowPixelShader);
+    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_shadowVertexShader);
+    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_shadowPixelShader);
     shadowPsoDesc.DSVFormat = ShadowMap::Format();
 
     // Shadow map pass does not have a render target.
@@ -354,16 +357,28 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     return S_OK;
 }
 
-HRESULT RenderPlatform12::LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
+HRESULT RenderPlatform12::LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader)
 {
-    HRESULT hr = S_OK;
-    return hr;
+    VertexShader* vertexShader = new VertexShader();
+    HRR(XSF::LoadShader(shaderFilename, &vertexShader->shader));
+
+    m_gameLevelVertexShaders.push_back(vertexShader);
+
+    *shader = vertexShader;
+
+    return S_OK;
 }
 
-HRESULT RenderPlatform12::LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+HRESULT RenderPlatform12::LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader)
 {
-    HRESULT hr = S_OK;
-    return hr;
+    PixelShader* pixelShader = new PixelShader();
+    HRR(XSF::LoadShader(shaderFilename, &pixelShader->shader));
+
+    m_gameLevelPixelShaders.push_back(pixelShader);
+
+    *shader = pixelShader;
+
+    return S_OK;
 }
 
 HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer)
@@ -431,12 +446,24 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_screenQuadVB.Release();
     m_screenQuadIB.Release();
 
-    m_vertexShader.Release();
-    m_pixelShader.Release();
-    m_drawScreenPixelShader.Release();
-    m_drawScreenVertexShader.Release();
-    m_shadowVertexShader.Release();
-    m_shadowPixelShader.Release();
+    m_vertexShader = nullptr;
+    m_pixelShader = nullptr;
+    m_shadowVertexShader = nullptr;
+    m_shadowPixelShader = nullptr;
+    m_drawScreenVertexShader = nullptr;
+    m_drawScreenPixelShader = nullptr;
+
+    for (VertexShader* vs : m_gameLevelVertexShaders)
+    {
+        delete vs;
+    }
+    m_gameLevelVertexShaders.clear();
+
+    for (PixelShader* ps : m_gameLevelPixelShaders)
+    {
+        delete ps;
+    }
+    m_gameLevelPixelShaders.clear();
 
     m_commandList.Release();
     SafeDelete(&m_bitmapFont);
@@ -446,13 +473,6 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_pipelineState.Release();
     m_pipelineStateFullScreenQuad.Release();
     m_pipelineStateShadowMap.Release();
-
-    m_vertexShader.Release();
-    m_pixelShader.Release();
-    m_shadowVertexShader.Release();
-    m_shadowPixelShader.Release();
-    m_drawScreenVertexShader.Release();
-    m_drawScreenPixelShader.Release();
 
     for (ID3D12Resource* resource : m_gameLevelResources)
     {
@@ -635,12 +655,12 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 {
     if (!vs)
     {
-        vs = &m_vertexShader;
+        vs = m_vertexShader;
     }
 
     if (!ps)
     {
-        ps = &m_pixelShader;
+        ps = m_pixelShader;
     }
 
     UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
@@ -735,8 +755,8 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { InputLayoutDesc::Basic32, _countof(InputLayoutDesc::Basic32) };
     psoDesc.pRootSignature = m_rootSignature;
-    psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_drawScreenVertexShader);
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_drawScreenPixelShader);
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_drawScreenVertexShader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_drawScreenPixelShader);
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState.DepthEnable = FALSE;
@@ -1310,16 +1330,4 @@ void PixelShader::Release()
         shader = nullptr;
     }
 }
-
-HRESULT VertexShader::Load(const wchar_t* shaderFilename, RenderPlatform* platform)
-{
-    return XSF::LoadShader(shaderFilename, &shader);
-}
-
-/*
-D3DBuffer::operator bool()
-{
-    return buffer != nullptr;
-}
-*/
 

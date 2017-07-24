@@ -55,8 +55,8 @@ RENDERPLATFORM_API HRESULT LoadTexture(const wchar_t* textureFilename, int textu
 RENDERPLATFORM_API HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
 
-RENDERPLATFORM_API HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader);
-RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader);
+RENDERPLATFORM_API HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader);
+RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader);
 
 RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb);
 

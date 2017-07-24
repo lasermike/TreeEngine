@@ -73,6 +73,8 @@ void TreePC::Run()
 {
 	BasicTimer^ timer = ref new BasicTimer();
 
+    CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+
 	while (!m_windowClosed)
 	{
 		if (m_windowVisible)

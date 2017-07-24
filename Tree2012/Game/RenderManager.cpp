@@ -95,23 +95,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     }
     m_textures.clear();
 
-    for (auto& vs : m_vertexShaders)
-    {
-        if (vs.second)
-        {
-            //TODO vs.second->Release();
-            SafeDelete(&vs.second);
-        }
-    }
-
-    for (auto& ps : m_pixelShaders)
-    {
-        if (ps.second)
-        {
-            SafeDelete(&ps.second);
-        }
-    }
-
     for (auto m : m_materials)
     {
         if (m.second)
@@ -217,8 +200,8 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
             return S_OK;
         }
 
-        VertexShader* vertexShader = new VertexShader();
-        HRR(GetPlatform()->LoadVertexShader(shaderFilename, vertexShader));
+        VertexShader* vertexShader = nullptr;
+        HRR(GetPlatform()->LoadVertexShader(shaderFilename, &vertexShader));
 
         m_vertexShaders[shaderFilename] = vertexShader;
 
@@ -231,8 +214,8 @@ HRESULT RenderManager::LoadShader(const wchar_t* shaderFilename, ShaderType shad
             return S_OK;
         }
 
-        PixelShader* pixelShader = new PixelShader();
-        HRR(GetPlatform()->LoadPixelShader(shaderFilename, pixelShader));
+        PixelShader* pixelShader = nullptr;
+        HRR(GetPlatform()->LoadPixelShader(shaderFilename, &pixelShader));
 
         // Load regular pixel Shader
         m_pixelShaders[shaderFilename] = pixelShader;
@@ -277,8 +260,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
         LoadTexture(textureFilename, &texture);
     }
 
-    VertexShader* vertexShader = nullptr; /// &GetPlatform()->m_vertexShader;
-    PixelShader* pixelShader = nullptr; //&GetPlatform()->m_pixelShader;
+    VertexShader* vertexShader = nullptr;
+    PixelShader* pixelShader = nullptr;
 
     if (vertexShaderFilename && *vertexShaderFilename)
     {

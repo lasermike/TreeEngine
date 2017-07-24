@@ -91,80 +91,6 @@ HRESULT LoadPixelShader(D3DDevice* pDev, const wchar_t* path, ID3D11PixelShader*
     return pDev->CreatePixelShader(&(*pData)[0], pData->size(), nullptr, ppPS);
 }
 
-//--------------------------------------------------------------------------------------
-// Name: LoadVertexShader()
-// Desc: Load a vertex shader
-//--------------------------------------------------------------------------------------
-HRESULT LoadVertexShader(D3DDevice* pDev, const wchar_t* path, ID3D11VertexShader** ppVS,
-    const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = nullptr, UINT numElements = 0, ID3D11InputLayout** ppInputLayout = nullptr, std::vector< BYTE >* pData = nullptr)
-{
-    if (ppInputLayout)
-        *ppInputLayout = nullptr;
-
-    std::vector< BYTE > data;
-    if (!pData)
-        pData = &data;
-
-    HRESULT hr = XSF::LoadBlob(path, *pData);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-
-    hr = pDev->CreateVertexShader(&(*pData)[0], pData->size(), nullptr, ppVS);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-
-    if (pInputElementDesc && numElements && ppInputLayout)
-    {
-        hr = pDev->CreateInputLayout(pInputElementDesc, numElements, &(*pData)[0], pData->size(), ppInputLayout);
-        if (FAILED(hr))
-        {
-            return hr;
-        }
-    }
-
-    return S_OK;
-}
-
-HRESULT VertexShader::Load(const wchar_t* shaderFilename, RenderPlatform* platform)
-{
-    char sbFilename[MAX_PATH];
-    size_t converted = 0;
-    size_t filenameLen = (wcslen(shaderFilename) + 1) * 2;
-    wcstombs_s(&converted, sbFilename, filenameLen, shaderFilename, filenameLen);
-    ASSERT(converted * 2 == filenameLen);
-
-    std::vector< BYTE > shaderData;
-    HRR(XSF::LoadBlob(shaderFilename, shaderData));
-
-    // Create VS input layout
-    // Load regular vertex Shader
-    HRR(((RenderPlatform11*)platform)->GetDevice()->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &shader));
-    SetDebugName(shader, sbFilename);
-
-    return S_OK;
-}
-
-HRESULT PixelShader::Load(const wchar_t* shaderFilename, RenderPlatform* platform)
-{
-    char sbFilename[MAX_PATH];
-    size_t converted = 0;
-    size_t filenameLen = (wcslen(shaderFilename) + 1) * 2;
-    wcstombs_s(&converted, sbFilename, filenameLen, shaderFilename, filenameLen);
-    ASSERT(converted * 2 == filenameLen);
-
-    HRR(LoadPixelShader(((RenderPlatform11*)platform)->GetD3DDevice(), shaderFilename, &shader));
-    SetDebugName(shader, sbFilename);
-
-    return S_OK;
-}
-
-
-
-
 HRESULT RenderPlatform11::GetViewport(Viewport& viewport)
 {
     viewport.TopLeftX = m_viewPort.TopLeftX;
@@ -328,38 +254,16 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_constBufferChangesEveryFrame = new UploadBuffer<CBChangesEveryFrame>(GetDevice(), 1, true);
     SetDebugName(m_constBufferChangesEveryFrame->Resource(), "RenderManager::m_constBufferChangesEveryFrame");
 
-    //
-    // Shaders
-    //
-    // Create Instanced draw data layout
+    // Create input layout 1
     std::vector< BYTE > dataVS;
     HRR(XSF::LoadBlob(L"VS.cso", dataVS));
-    HRR(GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_vertexShader.shader));
 
-    HRR(::LoadPixelShader(GetD3DDevice(), L"PS.cso", &m_pixelShader.shader));
-    //HRR(XSF::LoadShader(L"PS.cso", &m_pixelShader.shader));
-
-    SetDebugName(m_vertexShader.shader, "RenderManager::m_vertexShader");
-    SetDebugName(m_pixelShader.shader, "RenderManager::m_pixelShader");
-
-    // Create input layout
     InputLayouts::InitAll(GetDevice(), &(dataVS)[0], dataVS.size());
     m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
 
-    ////////  Shadow map shader /////
-    // Load shadow shaders
-    HRR(::LoadVertexShader(GetD3DDevice(), L"BuildShadowMapVS.cso", &m_shadowVertexShader.shader));
-    //HRR(LoadVertexShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
-    SetDebugName(m_shadowVertexShader, "RenderManager::m_shadowVertexShader");
-    // TODO: load a shadow pixel shader to support transparent textures not casting shadows
-
-    ////////  Debug texture /////
+    // Create input layout 2
     dataVS.clear();
     HRR(XSF::LoadBlob(L"DrawScreenQuadVS.cso", dataVS));
-
-    // Load regular vertex Shader
-    HRR(GetDevice()->CreateVertexShader(&(dataVS)[0], dataVS.size(), nullptr, &m_drawScreenVertexShader.shader));
-    SetDebugName(m_drawScreenVertexShader, "RenderManager::m_drawScreenVertexShader");
 
     HRR(GetDevice()->CreateInputLayout(InputLayoutDesc::Basic32,
         ARRAYSIZE(InputLayoutDesc::Basic32),
@@ -368,9 +272,28 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &InputLayouts::Basic32));
     SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
 
-    // Load regular pixel Shader
-    HRR(::LoadPixelShader(GetD3DDevice(), L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader.shader));
-    SetDebugName(m_drawScreenPixelShader, "RenderManager::m_drawScreenPixelShader");
+    //
+    // Shaders
+    //
+    // Create Instanced draw data layout
+    m_vertexShader = nullptr;
+    m_pixelShader = nullptr;
+    HRR(LoadVertexShader(L"VS.cso", &m_vertexShader));
+    HRR(LoadPixelShader(L"PS.cso", &m_pixelShader));
+
+    ////////  Shadow map shader /////
+    // Load shadow shaders
+    m_shadowVertexShader = nullptr;
+    m_shadowPixelShader = nullptr;
+
+    HRR(LoadVertexShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+    // TODO: load a shadow pixel shader to support transparent textures not casting shadows
+
+    ////////  Debug window
+    m_drawScreenVertexShader = nullptr;
+    m_drawScreenPixelShader = nullptr;
+    HRR(LoadVertexShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
+    HRR(LoadPixelShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
 
     // Debug overlay to show depth map
     HRR(BuildScreenQuadGeometryBuffers());
@@ -429,14 +352,19 @@ HRESULT RenderPlatform11::UninitGameLevelGraphics()
     m_screenQuadIB.Release();
     SafeRelease(&m_vertexLayout);
 
-    m_vertexShader.Release();
-    m_pixelShader.Release();
-    m_shadowVertexShader.Release();
-    m_shadowPixelShader.Release();
-    m_drawScreenVertexShader.Release();
-    m_drawScreenPixelShader.Release();
-
     SafeDelete(&m_renderData->pShadowMap);
+
+    for (VertexShader* vs : m_gameLevelVertexShaders)
+    {
+        delete vs;
+    }
+    m_gameLevelVertexShaders.clear();
+
+    for (PixelShader* ps : m_gameLevelPixelShaders)
+    {
+        delete ps;
+    }
+    m_gameLevelPixelShaders.clear();
 
     for (ID3D11Buffer* buffer : m_gameLevelBuffers)
     {
@@ -696,13 +624,13 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
     // Set shaders
     if (pass == ShadowMapPass)
     {
-        m_immediateContext->VSSetShader(m_shadowVertexShader, nullptr, 0);
-        m_immediateContext->PSSetShader(m_shadowPixelShader, nullptr, 0);
+        m_immediateContext->VSSetShader(m_shadowVertexShader ? m_shadowVertexShader->shader : nullptr, nullptr, 0);
+        m_immediateContext->PSSetShader(m_shadowPixelShader ? m_shadowPixelShader->shader : nullptr, nullptr, 0);
     }
     else if (pass == RegularPass)
     {
-        m_immediateContext->VSSetShader(m_vertexShader, nullptr, 0);
-        m_immediateContext->PSSetShader(m_pixelShader, nullptr, 0);
+        m_immediateContext->VSSetShader(*m_vertexShader, nullptr, 0);
+        m_immediateContext->PSSetShader(*m_pixelShader, nullptr, 0);
     }
 
     // Set up input assembler
@@ -865,12 +793,12 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 
     if (!vs)
     {
-        vs = &m_vertexShader;
+        vs = m_vertexShader;
     }
 
     if (!ps)
     {
-        ps = &m_pixelShader;
+        ps = m_pixelShader;
     }
 
     Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vs, ps,
@@ -897,10 +825,10 @@ HRESULT RenderPlatform11::SetMaterial(Material* material, RenderPass pass)
     // TODO: support arbitary vertex shaders with shadow mapping
     if (pass != ShadowMapPass)
     {
-        ID3D11VertexShader* vertexShader = material->m_vertexShader->shader ? material->m_vertexShader->shader : m_vertexShader.shader;
+        ID3D11VertexShader* vertexShader = material->m_vertexShader->shader ? material->m_vertexShader->shader : m_vertexShader->shader;
         m_immediateContext->VSSetShader(vertexShader, nullptr, 0);
 
-        ID3D11PixelShader* pixelShader = material->m_pixelShader->shader ? material->m_pixelShader->shader : m_pixelShader.shader;
+        ID3D11PixelShader* pixelShader = material->m_pixelShader->shader ? material->m_pixelShader->shader : m_pixelShader->shader;
         m_immediateContext->PSSetShader(pixelShader, nullptr, 0);
     }
 
@@ -983,14 +911,54 @@ HRESULT RenderPlatform11::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
     return hr;
 }
 
-HRESULT RenderPlatform11::LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
+HRESULT RenderPlatform11::LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader)
 {
-    return shader->Load(shaderFilename, this);
+    *shader = nullptr;
+
+    VertexShader* vertexShader = new VertexShader();
+
+    char sbFilename[MAX_PATH];
+    size_t converted = 0;
+    size_t filenameLen = (wcslen(shaderFilename) + 1) * 2;
+    wcstombs_s(&converted, sbFilename, filenameLen, shaderFilename, filenameLen);
+    ASSERT(converted * 2 == filenameLen);
+
+    std::vector< BYTE > shaderData;
+    HRR(XSF::LoadBlob(shaderFilename, shaderData));
+
+    // Create VS input layout
+    // Load regular vertex Shader
+    HRR(GetDevice()->CreateVertexShader(&(shaderData)[0], shaderData.size(), nullptr, &vertexShader->shader));
+    SetDebugName(vertexShader->shader, sbFilename);
+
+    m_gameLevelVertexShaders.push_back(vertexShader);
+
+    *shader = vertexShader;
+
+    return S_OK;
 }
 
-HRESULT RenderPlatform11::LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+HRESULT RenderPlatform11::LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader)
 {
-    return shader->Load(shaderFilename, this);
+    PixelShader* pixelShader = new PixelShader();
+
+    char sbFilename[MAX_PATH];
+    size_t converted = 0;
+    size_t filenameLen = (wcslen(shaderFilename) + 1) * 2;
+    wcstombs_s(&converted, sbFilename, filenameLen, shaderFilename, filenameLen);
+    ASSERT(converted * 2 == filenameLen);
+
+    std::vector< BYTE > data;
+    HRR(XSF::LoadBlob(shaderFilename, data));
+
+    HRR(GetDevice()->CreatePixelShader(&data[0], data.size(), nullptr, &pixelShader->shader));
+    SetDebugName(pixelShader->shader, sbFilename);
+
+    m_gameLevelPixelShaders.push_back(pixelShader);
+
+    *shader = pixelShader;
+
+    return S_OK;
 }
 
 HRESULT RenderPlatform11::BuildScreenQuadGeometryBuffers()
@@ -1052,8 +1020,8 @@ HRESULT RenderPlatform11::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11
     pContext->IASetVertexBuffers(0, 1, &m_screenQuadVB, &stride, &offset);
     pContext->IASetIndexBuffer(m_screenQuadIB, DXGI_FORMAT_R32_UINT, 0);
 
-    pContext->VSSetShader(m_drawScreenVertexShader, nullptr, 0);
-    pContext->PSSetShader(m_drawScreenPixelShader, nullptr, 0);
+    pContext->VSSetShader(*m_drawScreenVertexShader, nullptr, 0);
+    pContext->PSSetShader(*m_drawScreenPixelShader, nullptr, 0);
 
     pContext->PSSetShaderResources(0, 1, &depthTexture);
 

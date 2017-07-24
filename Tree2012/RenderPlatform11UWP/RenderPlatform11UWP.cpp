@@ -151,12 +151,12 @@ RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numI
     return m_pPlatform->CreateD3DBuffer(sizeBytes, numInstances, d3dBuffer);
 }
 
-RENDERPLATFORM_API HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
+RENDERPLATFORM_API HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader)
 {
     return m_pPlatform->LoadVertexShader(shaderFilename, shader);
 }
 
-RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader)
 {
     return m_pPlatform->LoadPixelShader(shaderFilename, shader);
 }

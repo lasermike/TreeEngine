@@ -131,19 +131,20 @@ struct VertexShader
 
 #if defined(TREE3D12)
 
-    operator ID3DBlob* () { return shader; }
     VertexShader() : shader(nullptr) { }
+    ~VertexShader() { Release(); }
+
+    operator ID3DBlob* () { return shader; }
     void Release();
 
 #elif defined(TREE3D11)
 
-    operator ID3D11VertexShader* () { return shader; }
+    ~VertexShader() { Release(); }
     VertexShader() : shader(nullptr) { }
+
+    operator ID3D11VertexShader* () { return shader; }
     void Release();
-
 #endif
-
-    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
 };
 
 struct PixelShader
@@ -151,7 +152,9 @@ struct PixelShader
 #if defined(TREE3D12)
     ID3DBlob*                 shader;
 
+    ~PixelShader() { Release(); }
     PixelShader() : shader(nullptr) { }
+
     operator ID3DBlob* () { return shader; }
     void Release();
 
@@ -159,12 +162,11 @@ struct PixelShader
     ID3D11PixelShader*        shader;
 
     PixelShader() : shader(nullptr) { }
-    operator ID3D11PixelShader* () { return shader; }
+    ~PixelShader() { Release(); }
 
+    operator ID3D11PixelShader* () { return shader; }
     void Release();
 #endif
-
-    HRESULT Load(const wchar_t* shaderFilename, RenderPlatform* platform);
 };
 
 struct Material
@@ -335,7 +337,10 @@ protected:
 
 public:
 
-    RenderPlatform() { }
+    RenderPlatform() :
+        m_vertexShader(nullptr), m_pixelShader(nullptr), m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
+        m_drawScreenVertexShader(nullptr), m_drawScreenPixelShader(nullptr)
+    { }
 
     DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
 
@@ -397,8 +402,8 @@ public:
     virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
     virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
     virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer) = 0;
-    virtual HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader) = 0;
-    virtual HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader) = 0;
+    virtual HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader) = 0;
+    virtual HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader) = 0;
 
     virtual void SetFrameSceneData(CBChangesEveryFrame* cb) = 0;
 
@@ -409,12 +414,12 @@ public:
 
     // TODO: This is inconsistent with out other platform specific resources are managed
     // Default shader
-    VertexShader                      m_vertexShader;
-    PixelShader                       m_pixelShader;
-    VertexShader                      m_shadowVertexShader;
-    PixelShader                       m_shadowPixelShader;
-    VertexShader                      m_drawScreenVertexShader;
-    PixelShader                       m_drawScreenPixelShader;
+    VertexShader*                      m_vertexShader;
+    PixelShader*                       m_pixelShader;
+    VertexShader*                      m_shadowVertexShader;
+    PixelShader*                       m_shadowPixelShader;
+    VertexShader*                      m_drawScreenVertexShader;
+    PixelShader*                       m_drawScreenPixelShader;
 };
 
 #if defined(TREE3D12)
@@ -479,6 +484,8 @@ private:
     D3D12_INDEX_BUFFER_VIEW           m_screenQuadIBView;
 
     std::vector<ID3D12Resource*>      m_gameLevelResources;
+    std::vector<VertexShader*>        m_gameLevelVertexShaders;
+    std::vector<PixelShader*>         m_gameLevelPixelShaders;
 
     CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading textures
     CComPtr<ID3D12DescriptorHeap>     m_samplerHeap;
@@ -567,8 +574,8 @@ public:
 
     HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
 
-    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader);
-    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader);
+    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader);
+    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader);
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
 
@@ -616,6 +623,8 @@ class RenderPlatform11 : public RenderPlatform
     RenderData*                       m_renderData; //TEMPTEMP
 
     std::vector<ID3D11Buffer*>        m_gameLevelBuffers;
+    std::vector<VertexShader*>        m_gameLevelVertexShaders;
+    std::vector<PixelShader*>         m_gameLevelPixelShaders;
 
 // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
@@ -625,6 +634,7 @@ public:
     static const UINT msaaCount = 4;
 
     RenderPlatform11(RenderData* renderData) : m_renderData(renderData), m_msaaQuality(0)
+
     {
 #ifdef ENABLE_MSAA
         m_enableMsaa = true; // TODO
@@ -694,8 +704,8 @@ public:
 
     HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
 
-    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader);
-    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader);
+    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader);
+    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader);
 
     void SetFrameSceneData(CBChangesEveryFrame* cb);
 
@@ -757,8 +767,8 @@ typedef HRESULT (*CreateTexture2DFunc)(const wchar_t* name, const float* points,
 
 typedef HRESULT (*CreateD3DBufferFunc)(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
 
-typedef HRESULT (*LoadVertexShaderFunc)(const wchar_t* shaderFilename, VertexShader* shader);
-typedef HRESULT (*LoadPixelShaderFunc)(const wchar_t* shaderFilename, PixelShader* shader);
+typedef HRESULT (*LoadVertexShaderFunc)(const wchar_t* shaderFilename, VertexShader** shader);
+typedef HRESULT (*LoadPixelShaderFunc)(const wchar_t* shaderFilename, PixelShader** shader);
 
 typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 
@@ -883,12 +893,12 @@ public:
         return CreateD3DBufferFuncPtr(sizeBytes, numInstances, d3dBuffer);
     }
 
-    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader* shader)
+    HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader)
     {
         return LoadVertexShaderFuncPtr(shaderFilename, shader);
     }
 
-    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader* shader)
+    HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader)
     {
         return LoadPixelShaderFuncPtr(shaderFilename, shader);
     }
