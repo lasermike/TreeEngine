@@ -6,7 +6,6 @@
 #include "TreeModelGenerator.h"
 #include "Primitive.h"
 #include "ShadowMap.h"
-#include "directxtex.h"
 #include "StockRenderStates.h"
 #include "OrbitCamera.h"
 #include "GameLoader.h"

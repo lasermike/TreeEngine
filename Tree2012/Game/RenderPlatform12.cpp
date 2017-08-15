@@ -8,10 +8,13 @@
 #include "StockRenderStates.h"
 #include "ShadowMap.h"
 
-#include "DirectXTex.h"
-
 #include "d3d12sdklayers.h"
 #include "ScreenGrab12.h"
+
+#include "ResourceUploadBatch.h"
+
+using namespace DirectX;
+//using namespace DirectX::SimpleMath;
 
 
 enum CbvSrvHeapOffsets
@@ -547,12 +550,70 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
     return S_OK;
 }
 
-HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** loadedTexture)
+HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture)
 {
-    CComPtr<ID3D12Resource> texture;
-
-    // TODO: Need to manage these heap entries better
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_shaderHeap.GetIncrementSize());
+
+    //ID3D12Resource* resource = nullptr;
+
+    //HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
+
+    //int sizeBytes = width * height * sizeof(float);
+    //HRR(CreateTextureFromBits(this, 0, width, height, sizeBytes, (uint8_t*)points, &resource, newDescriptor));
+
+    ResourceUploadBatch resourceUpload(GetDevice());
+
+    resourceUpload.Begin();
+
+    // Describe and create a Texture2D.
+    D3D12_RESOURCE_DESC textureDesc = {};
+    textureDesc.MipLevels = 1;
+    textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    textureDesc.DepthOrArraySize = 1;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.SampleDesc.Quality = 0;
+    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+
+    CComPtr<ID3D12Resource> createdTexture;
+
+    HRR(GetDevice()->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &textureDesc,
+        D3D12_RESOURCE_STATE_COMMON,
+        nullptr,
+        IID_PPV_ARGS(&createdTexture)));
+
+    createdTexture->SetName(L"raw data texture");
+
+    D3D12_SUBRESOURCE_DATA initData = {};
+    initData.pData = points;
+    initData.RowPitch = width;
+    initData.SlicePitch = width * height * sizeof(float);
+
+    resourceUpload.Upload(
+        createdTexture,
+        0,
+        &initData,
+        1);
+
+    resourceUpload.Transition(
+        createdTexture,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+    // Upload the resources to the GPU.
+    auto uploadResourcesFinished = resourceUpload.End(GetCommandQueue());
+
+    // Wait for the upload thread to terminate
+    uploadResourcesFinished.wait();
+
+    *texture = new LoadedTexture(createdTexture, newDescriptor, (UINT)textureIndex);
+
+    assert((*texture)->texture != nullptr);
 
     // TODO: copy descriptor over
     //D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(materialIndex * numDescriptorsPerMaterial + Material0_HeapOffset);
@@ -561,91 +622,98 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
     //HRR(CreateTextureFromBits(GetPlatform(), 1 /*NumSubresources*/, width, height, sizeof(float) * width * height /*sizeBytes*/, (uint8_t*)points,
     //    &texture, dest));
 
-
-#if 0
+    /*
     // Create the texture.
-    {
-        HR(GetPlatform()->GetCommandAllocator()->Reset());
-        HR(GetPlatform()->GetCommandList()->Reset(GetPlatform()->GetCommandAllocator(), m_pipelineState));
+    HRR(GetCommandAllocator()->Reset());
+    HRR(GetCommandList()->Reset(GetCommandAllocator(), m_pipelineState));
 
-        // Describe and create a Texture2D.
-        D3D12_RESOURCE_DESC textureDesc = {};
-        textureDesc.MipLevels = 1;
-        textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        textureDesc.Width = width;
-        textureDesc.Height = height;
-        textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        textureDesc.DepthOrArraySize = 1;
-        textureDesc.SampleDesc.Count = 1;
-        textureDesc.SampleDesc.Quality = 0;
-        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    // Describe and create a Texture2D.
+    D3D12_RESOURCE_DESC textureDesc = {};
+    textureDesc.MipLevels = 1;
+    textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    textureDesc.DepthOrArraySize = 1;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.SampleDesc.Quality = 0;
+    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
-        HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-            D3D12_HEAP_FLAG_NONE,
-            &textureDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            IID_PPV_ARGS(&texture)));
+    CComPtr<ID3D12Resource> resource;
 
-        texture->SetName(L"FSGraph data");
+    HRR(GetDevice()->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &textureDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&resource)));
 
-        const UINT64 uploadBufferSize = GetRequiredIntermediateSize(texture, 0, 1);
+    resource->SetName(L"FSGraph data");
 
-        D3D12_HEAP_PROPERTIES HeapProps;
-        HeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        HeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        HeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        HeapProps.CreationNodeMask = 1;
-        HeapProps.VisibleNodeMask = 1;
+    const UINT64 uploadBufferSize = GetRequiredIntermediateSize(resource, 0, 1);
 
-        // Create the GPU upload buffer.
-        HRR(::GetPlatform(this)->GetDevice()->CreateCommittedResource(
-            &HeapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&textureUploadHeap)));
+    D3D12_HEAP_PROPERTIES HeapProps;
+    HeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+    HeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    HeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    HeapProps.CreationNodeMask = 1;
+    HeapProps.VisibleNodeMask = 1;
 
-        textureUploadHeap->SetName(L"FSGraph upload");
+    // Create the GPU upload buffer.
+    HRR(GetDevice()->CreateCommittedResource(
+        &HeapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&textureUploadHeap)));
 
-        // Copy data to the intermediate upload heap and then schedule a copy 
-        // from the upload heap to the Texture2D.
-        //std::vector<UINT8> texture = GenerateTextureData();
+    textureUploadHeap->SetName(L"FSGraph upload");
 
-        D3D12_SUBRESOURCE_DATA textureData = {};
-        textureData.pData = points;
-        textureData.RowPitch = width * sizeof(float);
-        textureData.SlicePitch = textureData.RowPitch * height;
+    // Copy data to the intermediate upload heap and then schedule a copy 
+    // from the upload heap to the Texture2D.
+    //std::vector<UINT8> texture = GenerateTextureData();
 
-        UpdateSubresources(GetPlatform()->GetCommandList(), texture, textureUploadHeap, 0, 0, 1, &textureData);
-        GetPlatform()->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+    D3D12_SUBRESOURCE_DATA textureData = {};
+    textureData.pData = points;
+    textureData.RowPitch = width * sizeof(float);
+    textureData.SlicePitch = textureData.RowPitch * height;
 
-        // Describe and create a SRV for the texture.
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Format = textureDesc.Format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MipLevels = 1;
-        ::GetPlatform(this)->GetDevice()->CreateShaderResourceView(texture, &srvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
+    UpdateSubresources(GetCommandList(), texture, textureUploadHeap, 0, 0, 1, &textureData);
+    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-        int srvHeapIndex = (int)m_textures.size();
-        CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_shaderHeap.GetIncrementSize());
+    // Describe and create a SRV for the texture.
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = textureDesc.Format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+    GetDevice()->CreateShaderResourceView(texture, &srvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
 
-        // Success
-        m_textures[name] = new LoadedTexture(texture, newDescriptor, srvHeapIndex);
-        texture.Detach();
-        //view.Detach();
+    int srvHeapIndex = (int)m_textures.size();
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_shaderHeap.GetIncrementSize());
 
-        // Execute the command list.
-        HRR(GetPlatform()->GetCommandList()->Close());
-        ID3D12CommandList* ppCommandLists[] = { GetPlatform()->GetCommandList() };
-        GetPlatform()->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    // Success
+    m_textures[name] = new LoadedTexture(texture, newDescriptor, srvHeapIndex);
+    texture.Detach();
+    //view.Detach();
 
-        GetPlatform()->WaitForPreviousFrame();
-    }
-#endif
+    // Execute the command list.
+    HRR(GetCommandList()->Close());
+    ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
+    GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+    WaitForPreviousFrame();
+
+    ////
+
+    //*texture = new LoadedTexture(resource, newDescriptor, (UINT)textureIndex);
+
+    assert((*texture)->texture != nullptr);
+
+    newTexture->
+    */
 
     return S_OK;
 }
@@ -841,6 +909,9 @@ HRESULT RenderPlatform12::InitDevice()
             IID_PPV_ARGS(&m_d3dDevice)
         ));
     }
+
+    // Allocate graphics memory
+    m_graphicsMemory = new GraphicsMemory(GetDevice());
 
     //
     // Create descriptor heaps.
@@ -1051,6 +1122,8 @@ IDXGISwapChain* RenderPlatform12::GetSwapChain()
 
 HRESULT RenderPlatform12::UninitDevice()
 {
+    SafeDelete(&m_graphicsMemory);
+
     XSF::StockRenderStates::Shutdown();
 
     TrimUploadHeaps(true);
@@ -1217,6 +1290,8 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
     // Present the frame.
     HR(m_pSwapChain->Present(0, 0));
+    
+    m_graphicsMemory->Commit(m_commandQueue);
 
     WaitForPreviousFrame();
 Cleanup:

@@ -2363,6 +2363,9 @@ static UINT32 BitsPerElement(_In_ DXGI_FORMAT fmt)
         return 4;
         break;
 
+    case DXGI_FORMAT_R32_FLOAT:
+        return 32;
+        break;
 #if defined(_XBOX_ONE) && defined(_TITLE)
 
     case DXGI_FORMAT_D16_UNORM_S8_UINT:

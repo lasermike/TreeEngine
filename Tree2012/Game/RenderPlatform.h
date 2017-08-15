@@ -436,6 +436,7 @@ private:
     DescriptorHeapWrapper             m_rtvHeap;
     DescriptorHeapWrapper             m_dsvHeap;
     DescriptorHeapWrapper             m_shaderHeap;
+    DirectX::GraphicsMemory*          m_graphicsMemory;
 
     CComPtr<ID3D12Resource>           m_renderTargets[RenderPlatform12::FrameCount];
     D3D12_RESOURCE_DESC               m_pRenderTargetView;

@@ -19,6 +19,9 @@
 
 #include <agile.h>
 
+//DirectXTK12
+#include "GraphicsMemory.h"
+
 #include <stdafx.h>
 
 #include "RenderPlatform12UWP.h"

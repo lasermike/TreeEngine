@@ -112,7 +112,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <GenerateManifest>false</GenerateManifest>
     <IgnoreImportLibrary>false</IgnoreImportLibrary>
-    <IncludePath>..\Game\.;..\Inc;$(WindowsSDK_IncludePath);$(VCInstallDir)include;$(UniversalCRT_IncludePath)</IncludePath>
+    <IncludePath>..\Game\.;Inc\DirectXTK12;..\Inc;$(WindowsSDK_IncludePath);$(VCInstallDir)include;$(UniversalCRT_IncludePath)</IncludePath>
     <LibraryPath>Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -152,7 +152,7 @@
       <SubSystem>Console</SubSystem>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
-      <AdditionalDependencies>DirectXTex.lib; d2d1.lib; d3d12.lib; dxgi.lib; windowscodecs.lib; dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>DirectXTK12.lib; d2d1.lib; d3d12.lib; dxgi.lib; windowscodecs.lib; dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>..\..\Misc\copyrobo $(TargetDir) ..\..\..\binaries\Debug\x64\TreePC\AppX\ $(TargetFileName) &amp;

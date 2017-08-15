@@ -1282,7 +1282,7 @@ HRESULT CreateTextureFromBits(RenderPlatform12* renderPlatform,UINT NumSubresour
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &textureDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr,
         IID_PPV_ARGS(&createdTexture)));
 

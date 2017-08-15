@@ -27,12 +27,12 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 {
 	switch (sceneNum)
 	{
-	case 0:
+	case 1:
 	{
 		LoadTrees(pScene, pRenderData, pPlayer, gameData);
 		break;
 	}
-	case 1:
+	case 3:
 	{
 		LoadGraph(pScene, pRenderData, pPlayer, gameData);
 		break;
@@ -42,7 +42,7 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 		LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
 		break;
 	}
-	case 3:
+	case 0:
 	{
 		LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
 		break;

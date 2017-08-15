@@ -109,6 +109,8 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_objectToInstanceBufferOffset.clear();
     m_nextInstanceBufferOffset = 0;
     m_perFrameInstanceData.clear();
+    m_vertexShaders.clear();
+    m_pixelShaders.clear();
 
 	return S_OK;
 }

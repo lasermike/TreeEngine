@@ -93,7 +93,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <GenerateManifest>false</GenerateManifest>
     <IgnoreImportLibrary>false</IgnoreImportLibrary>
-    <IncludePath>..\Game\.;..\Inc;$(WindowsSDK_IncludePath);$(VCInstallDir)include;$(UniversalCRT_IncludePath)</IncludePath>
+    <IncludePath>..\Game\.;Inc\DirectXTK;..\Inc;$(WindowsSDK_IncludePath);$(VCInstallDir)include;$(UniversalCRT_IncludePath)</IncludePath>
     <LibraryPath>Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
