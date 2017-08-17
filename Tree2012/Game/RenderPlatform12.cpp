@@ -468,6 +468,12 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     }
     m_gameLevelPixelShaders.clear();
 
+    for (ID3D12PipelineState* pso : m_gameLevelPSOs)
+    {
+        pso->Release();
+    }
+    m_gameLevelPSOs.clear();
+
     m_commandList.Release();
     SafeDelete(&m_bitmapFont);
 
@@ -522,6 +528,8 @@ HRESULT RenderPlatform12::SetMaterial(Material* material, RenderPass pass)
     CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_shaderHeap.GetIncrementSize());
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
+    GetCommandList()->SetPipelineState(material->m_pipelineState);
+
     return S_OK;
 }
 
@@ -554,15 +562,7 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
 {
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_shaderHeap.GetIncrementSize());
 
-    //ID3D12Resource* resource = nullptr;
-
-    //HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
-
-    //int sizeBytes = width * height * sizeof(float);
-    //HRR(CreateTextureFromBits(this, 0, width, height, sizeBytes, (uint8_t*)points, &resource, newDescriptor));
-
     ResourceUploadBatch resourceUpload(GetDevice());
-
     resourceUpload.Begin();
 
     // Describe and create a Texture2D.
@@ -589,9 +589,10 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
 
     createdTexture->SetName(L"raw data texture");
 
+
     D3D12_SUBRESOURCE_DATA initData = {};
     initData.pData = points;
-    initData.RowPitch = width;
+    initData.RowPitch = width * sizeof(float);
     initData.SlicePitch = width * height * sizeof(float);
 
     resourceUpload.Upload(
@@ -611,109 +612,21 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
     // Wait for the upload thread to terminate
     uploadResourcesFinished.wait();
 
+    // SRV
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    GetDevice()->CreateShaderResourceView(createdTexture, &srvDesc, newDescriptor);
+
     *texture = new LoadedTexture(createdTexture, newDescriptor, (UINT)textureIndex);
 
     assert((*texture)->texture != nullptr);
 
-    // TODO: copy descriptor over
-    //D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(materialIndex * numDescriptorsPerMaterial + Material0_HeapOffset);
-    //D3D12_CPU_DESCRIPTOR_HANDLE dest = m_shaderHeap.hCPU(materialIndex * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
-
-    //HRR(CreateTextureFromBits(GetPlatform(), 1 /*NumSubresources*/, width, height, sizeof(float) * width * height /*sizeBytes*/, (uint8_t*)points,
-    //    &texture, dest));
-
-    /*
-    // Create the texture.
-    HRR(GetCommandAllocator()->Reset());
-    HRR(GetCommandList()->Reset(GetCommandAllocator(), m_pipelineState));
-
-    // Describe and create a Texture2D.
-    D3D12_RESOURCE_DESC textureDesc = {};
-    textureDesc.MipLevels = 1;
-    textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
-    textureDesc.Width = width;
-    textureDesc.Height = height;
-    textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    textureDesc.DepthOrArraySize = 1;
-    textureDesc.SampleDesc.Count = 1;
-    textureDesc.SampleDesc.Quality = 0;
-    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-
-    CComPtr<ID3D12Resource> resource;
-
-    HRR(GetDevice()->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-        D3D12_HEAP_FLAG_NONE,
-        &textureDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr,
-        IID_PPV_ARGS(&resource)));
-
-    resource->SetName(L"FSGraph data");
-
-    const UINT64 uploadBufferSize = GetRequiredIntermediateSize(resource, 0, 1);
-
-    D3D12_HEAP_PROPERTIES HeapProps;
-    HeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-    HeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    HeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    HeapProps.CreationNodeMask = 1;
-    HeapProps.VisibleNodeMask = 1;
-
-    // Create the GPU upload buffer.
-    HRR(GetDevice()->CreateCommittedResource(
-        &HeapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&textureUploadHeap)));
-
-    textureUploadHeap->SetName(L"FSGraph upload");
-
-    // Copy data to the intermediate upload heap and then schedule a copy 
-    // from the upload heap to the Texture2D.
-    //std::vector<UINT8> texture = GenerateTextureData();
-
-    D3D12_SUBRESOURCE_DATA textureData = {};
-    textureData.pData = points;
-    textureData.RowPitch = width * sizeof(float);
-    textureData.SlicePitch = textureData.RowPitch * height;
-
-    UpdateSubresources(GetCommandList(), texture, textureUploadHeap, 0, 0, 1, &textureData);
-    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
-
-    // Describe and create a SRV for the texture.
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Format = textureDesc.Format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = 1;
-    GetDevice()->CreateShaderResourceView(texture, &srvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
-
-    int srvHeapIndex = (int)m_textures.size();
-    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), srvHeapIndex, m_shaderHeap.GetIncrementSize());
-
-    // Success
-    m_textures[name] = new LoadedTexture(texture, newDescriptor, srvHeapIndex);
-    texture.Detach();
-    //view.Detach();
-
-    // Execute the command list.
-    HRR(GetCommandList()->Close());
-    ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
-    GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-    WaitForPreviousFrame();
-
-    ////
-
-    //*texture = new LoadedTexture(resource, newDescriptor, (UINT)textureIndex);
-
-    assert((*texture)->texture != nullptr);
-
-    newTexture->
-    */
+    createdTexture.Detach();
 
     return S_OK;
 }
@@ -748,9 +661,29 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
+    // create PSO
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
+    psoDesc.pRootSignature = m_rootSignature;
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(vs->shader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(ps->shader);
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = GetSwapChainFormat();
+    psoDesc.SampleDesc.Count = 1;
+
+    ID3D12PipelineState* pipelineState = nullptr;
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
+    m_gameLevelPSOs.push_back(pipelineState);
+
     Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vs, ps,
         nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
-        shaderMaterial, uploadBuffer, gpuMaterialHandle);
+        shaderMaterial, uploadBuffer, gpuMaterialHandle, pipelineState);
 
     *newMaterial = newMat;
 

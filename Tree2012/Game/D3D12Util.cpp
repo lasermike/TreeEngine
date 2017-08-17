@@ -1,7 +1,5 @@
 #include <pch.h>
 
-#if defined(TREE3D12)
-
 #include <nmmintrin.h>
 #include <algorithm>
 
@@ -3065,4 +3063,3 @@ HRESULT DDSLoader12::LoadDDSFromMemory(
 
 }   // XboxSampleFramework
 
-#endif

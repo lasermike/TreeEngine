@@ -31,6 +31,7 @@
     <Filter Include="UWP">
       <UniqueIdentifier>0231c883-4b58-4f5b-8174-8adc32b27604</UniqueIdentifier>
     </Filter>
+    <Image Include="Assets\StoreLogo.png" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Game\WorldObject.cpp">
@@ -97,9 +98,6 @@
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\StockRenderStates12.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\D3D12Util.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\D3D11Platform.cpp">
@@ -210,9 +208,6 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\BitmapFont12.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\D3D12Util.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\RenderPlatform.h">

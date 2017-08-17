@@ -182,6 +182,7 @@ struct Material
 
     UploadBuffer<CBMaterial>*       m_constBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE     m_cbvSrvHeapTable;
+    ID3D12PipelineState*            m_pipelineState;
 
     // NYI
     const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
@@ -207,11 +208,11 @@ public:
         VertexShader* vertexShader, PixelShader* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
         D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
         ShaderMaterial shaderMaterial, UploadBuffer<CBMaterial>* constBuffer,
-        D3D12_GPU_DESCRIPTOR_HANDLE srvHeapTable) :
+        D3D12_GPU_DESCRIPTOR_HANDLE srvHeapTable, ID3D12PipelineState* pipelineState) :
         m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
         m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
         m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer),
-        m_cbvSrvHeapTable(srvHeapTable)
+        m_cbvSrvHeapTable(srvHeapTable), m_pipelineState(pipelineState)
     {
         ASSERT(m_vertexShader != nullptr);
         ASSERT(m_pixelShader != nullptr);
@@ -226,7 +227,7 @@ public:
 
     Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
         m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
-        m_depthState(nullptr), m_constBuffer(), m_cbvSrvHeapTable() { }
+        m_depthState(nullptr), m_constBuffer(), m_cbvSrvHeapTable(), m_pipelineState(nullptr) { }
 
     // Necessary?
     Material(Material const& rhs) :
@@ -487,6 +488,7 @@ private:
     std::vector<ID3D12Resource*>      m_gameLevelResources;
     std::vector<VertexShader*>        m_gameLevelVertexShaders;
     std::vector<PixelShader*>         m_gameLevelPixelShaders;
+    std::vector<ID3D12PipelineState*> m_gameLevelPSOs;
 
     CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading textures
     CComPtr<ID3D12DescriptorHeap>     m_samplerHeap;

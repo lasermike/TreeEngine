@@ -200,7 +200,6 @@
     <ClInclude Include="..\Game\BitmapFont12.h" />
     <ClInclude Include="..\Game\CComPtr.h" />
     <ClInclude Include="..\Game\D3D11Platform.h" />
-    <ClInclude Include="..\Game\D3D12Util.h" />
     <ClInclude Include="..\Game\DDSTextureLoader.h" />
     <ClInclude Include="..\Game\DDSTextureLoader12.h" />
     <ClInclude Include="..\Game\DXMath.h" />
@@ -243,10 +242,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\Game\D3D11Platform.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
-      </ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\Game\D3D12Util.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
       </ExcludedFromBuild>
     </ClCompile>
