@@ -8,9 +8,7 @@
 
 #include "pch.h"
 
-#if !defined(TREE3D12)
-
-#include "StockRenderStates.h"
+#include "StockRenderStates11.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Static Member variables
@@ -891,4 +889,3 @@ void XSF::StockRenderStates::CopyDepthStencilStateTemplate( D3D11_DEPTH_STENCIL_
     memcpy( &Destination, &s_StockDepthStencilTypes[ (size_t)state ], sizeof( Destination ) );
 }
 
-#endif

@@ -182,7 +182,7 @@ void GameLoader::LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* p
 
 	gameData->useShadowMaps = false;
 	gameData->clearColor = Colors::White;
-	gameData->useAlphaBlendedRenderTarget = true;
+	//gameData->useAlphaBlendedRenderTarget = true;
 }
 
 

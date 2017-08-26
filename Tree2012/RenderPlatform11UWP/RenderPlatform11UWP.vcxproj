@@ -161,7 +161,7 @@
     <ClCompile Include="..\Game\MathHelper.cpp" />
     <ClCompile Include="..\Game\RenderPlatform.cpp" />
     <ClInclude Include="..\Game\ShadowMap.h" />
-    <ClInclude Include="..\Game\StockRenderStates.h" />
+    <ClInclude Include="..\Game\StockRenderStates11.h" />
     <ClInclude Include="RenderPlatform11UWP.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="targetver.h" />
@@ -170,7 +170,7 @@
     <ClCompile Include="..\Game\RenderPlatform11.cpp" />
     <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
-    <ClCompile Include="..\Game\StockRenderStates.cpp" />
+    <ClCompile Include="..\Game\StockRenderStates11.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="RenderPlatform11UWP.cpp" />
     <ClCompile Include="pch.cpp">

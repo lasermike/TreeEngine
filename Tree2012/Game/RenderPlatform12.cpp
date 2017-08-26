@@ -5,7 +5,7 @@
 #include "DDSTextureLoader12.h"
 #include "BitmapFont12.h"
 
-#include "StockRenderStates.h"
+#include "StockRenderStates12.h"
 #include "ShadowMap.h"
 
 #include "d3d12sdklayers.h"
@@ -668,7 +668,20 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(vs->shader);
     psoDesc.PS = CD3DX12_SHADER_BYTECODE(ps->shader);
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+
+    // TEMPTEMP 
+    CD3DX12_BLEND_DESC blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    blendState.RenderTarget[0].BlendEnable = true;
+    blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+    blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_SRC_ALPHA;
+    blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+    blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    blendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL; 
+    psoDesc.BlendState = blendState;
+    //psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
     psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     psoDesc.SampleMask = UINT_MAX;

@@ -223,8 +223,6 @@
     <ClInclude Include="..\Game\ShadowMap.h" />
     <ClInclude Include="..\Game\stdafx.h" />
     <ClInclude Include="..\Game\StepTimer.h" />
-    <ClInclude Include="..\Game\StockRenderStates.h" />
-    <ClInclude Include="..\Game\StockRenderStates12.h" />
     <ClInclude Include="..\Game\Tree.h" />
     <ClInclude Include="..\Game\TreeModel.h" />
     <ClInclude Include="..\Game\TreeModelGenerator.h" />
@@ -273,13 +271,6 @@
     </ClCompile>
     <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
-    <ClCompile Include="..\Game\StockRenderStates.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
-      </ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\Game\StockRenderStates12.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\Game\Tree.cpp" />
     <ClCompile Include="..\Game\TreeModel.cpp" />
     <ClCompile Include="..\Game\TreeModelGenerator.cpp" />

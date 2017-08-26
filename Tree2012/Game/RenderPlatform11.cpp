@@ -5,7 +5,7 @@
 #include "DDSTextureLoader.h"
 #include "BitmapFont.h"
 
-#include "StockRenderStates.h"
+#include "StockRenderStates11.h"
 #include "ShadowMap.h"
 
 #include "DirectXTex.h"

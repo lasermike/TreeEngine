@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------------------------------------------------
-// StockRenderStates12.h
+// StockRenderStates.h
 // 
-// Stock Render States for D3D 12 devices
+// Stock Render States for D3D 11 devices
 //
 // Advanced Technology Group (ATG)
 // Copyright (c) Microsoft Corporation. All rights reserved.
@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "StockRenderStates.h"
+#include <StockRenderStates.h>
 
 namespace XSF = XboxSampleFramework;
 
@@ -68,6 +68,8 @@ namespace XboxSampleFramework
         // MaxLOD = No Limit.
         MinMagLinearMipPointUVWWrap,
 
+		UseShadowMap,
+
         // The total number of stock sampler states.
         SamplerStateCount
     };
@@ -105,6 +107,8 @@ namespace XboxSampleFramework
 
         // Same as Wireframe rasterizer but with no back-face culling (implies winding order agnostic)
         WireframeNoCulling,
+
+		BuildShadowMap,
 
         // The total number of stock rasterizer states
         RasterizerStateCount
@@ -145,7 +149,7 @@ namespace XboxSampleFramework
 
     //------------------------------------------------------------------------------------------------------------------
     // Name: class StockRenderStates
-    // Desc: A bundle of stock/standard heaps used in D3D12 by the framework.
+    // Desc: A bundle of stock/standard states used in D3D11 by the framework.
     //------------------------------------------------------------------------------------------------------------------
     class StockRenderStates
     {
@@ -153,24 +157,25 @@ namespace XboxSampleFramework
         static StockRenderStates* ms_pInstance;
 
         // Cached state object instances:
-        DescriptorHeapWrapper m_SamplerHeap;
-        D3D12_STATIC_SAMPLER_DESC m_StaticSampler[StockSamplerStates::SamplerStateCount];
-        D3D12_SAMPLER_DESC m_SamplerDesc[StockSamplerStates::SamplerStateCount];
-        D3D12_BLEND_DESC m_BlendDesc[StockBlendStates::BlendStateCount];
-        D3D12_RASTERIZER_DESC m_RasterizerDesc[StockRasterizerStates::RasterizerStateCount];
-        D3D12_DEPTH_STENCIL_DESC m_DepthStencilDesc[StockDepthStencilStates::DepthStencilStateCount];
+        D3DRasterizerState* m_RasterizerStates[ StockRasterizerStates::RasterizerStateCount ];
+        ID3D11BlendState* m_BlendStates[ StockBlendStates::BlendStateCount ];
+        ID3D11SamplerState* m_SamplerStates[ StockSamplerStates::SamplerStateCount ];
+        ID3D11DepthStencilState* m_DepthStencilStates[ StockDepthStencilStates::DepthStencilStateCount ];
 
         // State creation/destruction functionality:
-        HRESULT GenerateStockSamplerHeap(_In_ XSF::D3DDevice* const pDev);
-        void GenerateStockBlendDesc();
-        void GenerateStockRasterizerDesc();
-        void GenerateStockDepthStencilDesc();
+        HRESULT GenerateStockBlendStates( _In_ XSF::D3DDevice* pDev );
+        HRESULT GenerateStockSamplerStates( _In_ XSF::D3DDevice* pDev );
+        HRESULT GenerateStockRasterizerStates( _In_ XSF::D3DDevice* pDev );
+        HRESULT GenerateStockDepthStencilStates( _In_ XSF::D3DDevice* pDev );
 
-        void DestroyStockSamplerHeap();
+        void DestroyStockBlendStates();
+        void DestroyStockSamplerStates();
+        void DestroyStockRasterizerStates();
+        void DestroyStockDepthStencilStates();
 
         // Construction/Destruction/Copy (disallow copying by constructor or assignment)
-        StockRenderStates(const StockRenderStates&); /*= delete;*/
-        StockRenderStates& operator=(const StockRenderStates&); /*= delete;*/
+        StockRenderStates( const StockRenderStates& ); /*= delete;*/
+        StockRenderStates& operator=( const StockRenderStates& ); /*= delete;*/
         StockRenderStates() {} /* = default; */
         ~StockRenderStates();
 
@@ -181,42 +186,42 @@ namespace XboxSampleFramework
         // prefer).
         //--------------------------------------------------------------------------------------------------------------
         
-        void CopyBlendTemplate(_Out_ D3D12_BLEND_DESC& Destination, StockBlendStates state) const;
-        void CopySamplerTemplate(_Out_ D3D12_SAMPLER_DESC& Destination, StockSamplerStates state) const;
-        void CopyRasterizerTemplate(_Out_ D3D12_RASTERIZER_DESC& Destination, StockRasterizerStates state) const;
-        void CopyDepthStencilTemplate(_Out_ D3D12_DEPTH_STENCIL_DESC& Destination, StockDepthStencilStates state) const;
+        void CopyBlendStateTemplate( D3D11_BLEND_DESC& Destination, StockBlendStates state ) const;
+        void CopySamplerStateTemplate( D3D11_SAMPLER_DESC& Destination, StockSamplerStates state ) const;
+        void CopyRasterizerStateTemplate( D3DRasterizerDesc& Destination, StockRasterizerStates state ) const;
+        void CopyDepthStencilStateTemplate( D3D11_DEPTH_STENCIL_DESC& Destination,
+                                            StockDepthStencilStates state ) const;
 
         //--------------------------------------------------------------------------------------------------------------
-        // Apply State to PSO
+        // Apply State to Device Context functions
         //--------------------------------------------------------------------------------------------------------------
-        FORCEINLINE void ApplyBlendState(_In_ XSF::D3DCommandList* const pCmdList, _Inout_ D3D12_GRAPHICS_PIPELINE_STATE_DESC* pPipelineStateDesc, StockBlendStates state, _In_opt_ const FLOAT BlendFactor[4] = nullptr, UINT SampleMask = 0xFFFFFFFF) const;
-        FORCEINLINE void ApplyRasterizerState(_Inout_ D3D12_GRAPHICS_PIPELINE_STATE_DESC* pPipelineStateDesc, StockRasterizerStates state) const;
-        FORCEINLINE void ApplyDepthStencilState(_In_ XSF::D3DCommandList* const pCmdList, _Inout_ D3D12_GRAPHICS_PIPELINE_STATE_DESC* pPipelineStateDesc, StockDepthStencilStates state, _In_opt_ UINT StencilRef = 0) const;
+        FORCEINLINE void ApplyBlendState( _In_ D3DDeviceContext* pCtx, StockBlendStates state, 
+                                          _In_opt_ const FLOAT BlendFactor[4] = nullptr,
+                                          UINT SampleMask = 0xFFFFFFFF ) const;
+        FORCEINLINE void ApplyRasterizerState( _In_ D3DDeviceContext* pCtx, StockRasterizerStates state ) const;
+        FORCEINLINE void ApplyDepthStencilState( _In_ D3DDeviceContext* pCtx, StockDepthStencilStates state,
+                                                 UINT StencilRef = 0 ) const;
 
         //--------------------------------------------------------------------------------------------------------------
         // State Object lookup functions. Note: You do not need to Release these pointers; the StockRenderStates object
         // manages their lifetime. (Addref on an ownership boundary transition only applies to COM interfaces; we're
         // not transferring ownership here).
         //--------------------------------------------------------------------------------------------------------------
-        FORCEINLINE ID3D12DescriptorHeap* StockRenderStates::GetSamplerHeap() const;
-        FORCEINLINE D3D12_GPU_DESCRIPTOR_HANDLE GetSamplerGPUHandle(StockSamplerStates state) const;
-        FORCEINLINE D3D12_CPU_DESCRIPTOR_HANDLE GetSamplerCPUHandle(StockSamplerStates state) const;
-        FORCEINLINE void GetStaticSampler(_Out_ D3D12_STATIC_SAMPLER_DESC* staticSampler, StockSamplerStates state, UINT shaderRegister, UINT registerSpace = 0, D3D12_SHADER_VISIBILITY shaderVisibility = D3D12_SHADER_VISIBILITY_ALL) const;
-        FORCEINLINE const D3D12_SAMPLER_DESC* GetSamplerDesc(StockSamplerStates state) const;
-        FORCEINLINE const D3D12_BLEND_DESC* GetBlendDesc(StockBlendStates state) const;
-        FORCEINLINE const D3D12_RASTERIZER_DESC* GetRasterizerDesc(StockRasterizerStates state) const;
-        FORCEINLINE const D3D12_DEPTH_STENCIL_DESC* GetDepthStencilDesc(StockDepthStencilStates state) const;
+        FORCEINLINE ID3D11BlendState* GetBlendState( StockBlendStates state ) const;
+        FORCEINLINE ID3D11SamplerState* GetSamplerState( StockSamplerStates state ) const;
+        FORCEINLINE D3DRasterizerState* GetRasterizerState( StockRasterizerStates state ) const;
+        FORCEINLINE ID3D11DepthStencilState* GetDepthStencilState( StockDepthStencilStates state ) const;
 
         //--------------------------------------------------------------------------------------------------------------
         // Accessor for the single instance of the StockRenderStates object.
         //--------------------------------------------------------------------------------------------------------------
-        FORCEINLINE static const StockRenderStates& GetInstance();
+        FORCEINLINE static const StockRenderStates& GetStates();
 
         //--------------------------------------------------------------------------------------------------------------
         // Initialization / Teardown
         //--------------------------------------------------------------------------------------------------------------
-        static HRESULT Initialize(_In_ D3DDevice* const pDevice);
-        static void CleanUpAfterInitialize();
+        static HRESULT Initialize( _In_ D3DDevice* pDevice );
+        static void CleanUpAfterInitialize( bool blendState, bool samplerState, bool rasterizerState );
         static void Shutdown();
     };
 
@@ -225,148 +230,120 @@ namespace XboxSampleFramework
     
     //----------------------------------------------------------------------------------------------------------------------
     // Name: XboxSampleFramework::StockRenderStates::ApplyBlendState
-    // Desc: Applies a Blend state to the provided Pipeline State Descriptor
+    // Desc: Applies a Blend state to the provided Device Context.
     // Parameters:
-    //   pCmdList       - The command list to apply the blend factor to
-    //   pPipelineStateDesc - The pipeline state descriptor to which the state should be applied.
+    //   pCtx           - The device context to which the state should be applied.
     //   state          - The stock blend state to use
     //   BlendFactor    - The blend factors to use (default = nullptr)
     //   SampleMask     - The sample mask to use (default = 0xFFFFFFFF)
     //----------------------------------------------------------------------------------------------------------------------
-    _Use_decl_annotations_
-    void StockRenderStates::ApplyBlendState(XSF::D3DCommandList* const pCmdList, D3D12_GRAPHICS_PIPELINE_STATE_DESC* pPipelineStateDesc, StockBlendStates state,  const FLOAT BlendFactor[4], UINT SampleMask) const
+    void StockRenderStates::ApplyBlendState( _In_ D3DDeviceContext* pCtx, StockBlendStates state, 
+        _In_opt_ const FLOAT BlendFactor[4] /*= nullptr*/, UINT SampleMask /*= 0xFFFFFFFF*/ ) const
     {
-        memcpy(&pPipelineStateDesc->BlendState, GetBlendDesc(state), sizeof(pPipelineStateDesc->BlendState));
-        pPipelineStateDesc->SampleMask = SampleMask;
-        
-        pCmdList->OMSetBlendFactor(BlendFactor);
+        VERBOSEATGPROFILETHIS;
+
+        pCtx->OMSetBlendState( m_BlendStates[ (UINT)state ], BlendFactor, SampleMask );
     }
 
     
     //----------------------------------------------------------------------------------------------------------------------
     // Name: XboxSampleFramework::StockRenderStates::ApplyRasterizerState
-    // Desc: Applies a Rasterizer state to the provided Pipeline State Descriptor
+    // Desc: Applies a Rasterizer state to the provided Device Context.
     // Parameters:
-    //   pPipelineStateDesc - The pipeline state descriptor to which the state should be applied.
+    //   pCtx   - The Device Context to apply the rasterizer state to.
     //   state  - The stock rasterizer state to apply.
     //----------------------------------------------------------------------------------------------------------------------
-    _Use_decl_annotations_
-    FORCEINLINE void StockRenderStates::ApplyRasterizerState(D3D12_GRAPHICS_PIPELINE_STATE_DESC* pPipelineStateDesc, StockRasterizerStates state) const
+    FORCEINLINE void StockRenderStates::ApplyRasterizerState( _In_ D3DDeviceContext* pCtx,
+                                                              StockRasterizerStates state ) const
     {
-        memcpy(&pPipelineStateDesc->RasterizerState, GetRasterizerDesc(state), sizeof(pPipelineStateDesc->RasterizerState));
+        VERBOSEATGPROFILETHIS;
+
+        pCtx->RSSetState( m_RasterizerStates[ (UINT)state ] );
     }
 
     
     //----------------------------------------------------------------------------------------------------------------------
     // Name: XboxSampleFramework::StockRenderStates::ApplyDepthStencilState
-    // Desc: Applies a depth/stencil state to the provided Pipeline State Descriptor
+    // Desc: Applies a depth/stencil state to the provided Device Context
     // Parameters:
-    //   pPipelineStateDesc - The pipeline state descriptor to which the state should be applied.
-    //   pCmdList   - The command list to apply the stencil ref to
+    //   pCtx       - The device context to which the state should be applied.
     //   state      - The stock depth-stencil state to apply
     //   StencilRef - The stencil ref parameter (defaults to 0)
     //----------------------------------------------------------------------------------------------------------------------
-    _Use_decl_annotations_
-    FORCEINLINE void StockRenderStates::ApplyDepthStencilState(XSF::D3DCommandList* const pCmdList, D3D12_GRAPHICS_PIPELINE_STATE_DESC* pPipelineStateDesc, StockDepthStencilStates state, UINT StencilRef) const
+    FORCEINLINE void StockRenderStates::ApplyDepthStencilState( _In_ D3DDeviceContext* pCtx,
+                                                                StockDepthStencilStates state,
+                                                                UINT StencilRef /*= 0*/ ) const
     {
-        memcpy(&pPipelineStateDesc->DepthStencilState, GetDepthStencilDesc(state),sizeof(pPipelineStateDesc->DepthStencilState));
-        pCmdList->OMSetStencilRef(StencilRef);
+        VERBOSEATGPROFILETHIS;
+
+        pCtx->OMSetDepthStencilState( m_DepthStencilStates[ (UINT)state ], StencilRef );
     }
 
     
     //------------------------------------------------------------------------------------------------------------------
-    // Name: XboxSampleFramework::StockRenderStates::GetStaticSampler
-    // Desc: Obtains the static sampler for the requested StockSamplerState.
+    // Name: XboxSampleFramework::StockRenderStates::GetBlendState
+    // Desc: Obtains the Blend State object for the requested StockBlendState.
+    // 
+    // NOTE: Do NOT call Release on this pointer; the StockRenderStates object manages its lifetime, and it lives for
+    //       the entire process lifetime.
     //------------------------------------------------------------------------------------------------------------------
-    _Use_decl_annotations_
-    FORCEINLINE void StockRenderStates::GetStaticSampler(D3D12_STATIC_SAMPLER_DESC* staticSampler, StockSamplerStates state, UINT shaderRegister, UINT registerSpace, D3D12_SHADER_VISIBILITY shaderVisibility) const
+    FORCEINLINE ID3D11BlendState* StockRenderStates::GetBlendState( StockBlendStates state ) const
     {
-        XSF_ASSERT(staticSampler != nullptr);
-        XSF_ASSERT(state != StockSamplerStates::SamplerStateCount);
-
-        *staticSampler = m_StaticSampler[static_cast<UINT>(state)];
-        staticSampler->ShaderRegister = shaderRegister;
-        staticSampler->RegisterSpace = registerSpace;
-        staticSampler->ShaderVisibility = shaderVisibility;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------
-    // Name: XboxSampleFramework::StockRenderStates::GetSamplerDesc
-    // Desc: Obtains the Sampler State descriptor for the requested StockSamplerState.
-    //------------------------------------------------------------------------------------------------------------------
-    FORCEINLINE const D3D12_SAMPLER_DESC* StockRenderStates::GetSamplerDesc(StockSamplerStates state) const
-    {
-        XSF_ASSERT(state != StockSamplerStates::SamplerStateCount);
-        return &m_SamplerDesc[static_cast<UINT>(state)];
-    }
-
-
-    //------------------------------------------------------------------------------------------------------------------
-    // Name: XboxSampleFramework::StockRenderStates::GetBlendDesc
-    // Desc: Obtains the Blend State descriptor for the requested StockBlendState.
-    //------------------------------------------------------------------------------------------------------------------
-    FORCEINLINE const D3D12_BLEND_DESC* StockRenderStates::GetBlendDesc( StockBlendStates state ) const
-    {
-        XSF_ASSERT(state != StockBlendStates::BlendStateCount);
-        return &m_BlendDesc[static_cast<UINT>(state)];
+        return m_BlendStates[ (UINT)state ];
     }
 
     
     //------------------------------------------------------------------------------------------------------------------
-    // Name: XboxSampleFramework::StockRenderStates::GetSamplerGPU/CPUHandle
+    // Name: XboxSampleFramework::StockRenderStates::GetSamplerState
     // Desc: Obtains the Render State object for the requested StockRenderState
     // 
     // NOTE: There is no equivalent ApplySamplerState method for Sampler States; they're typically used in ways where
     //       such an operation by itself would not be useful.
+    //
+    // NOTE: Do NOT call Release on this pointer; the StockRenderStates object manages its lifetime, and it lives for
+    //       the entire process lifetime.
     //------------------------------------------------------------------------------------------------------------------
-    FORCEINLINE ID3D12DescriptorHeap* StockRenderStates::GetSamplerHeap() const
+    FORCEINLINE ID3D11SamplerState* StockRenderStates::GetSamplerState( StockSamplerStates state ) const
     {
-        return m_SamplerHeap;
-    }
-
-    FORCEINLINE D3D12_GPU_DESCRIPTOR_HANDLE StockRenderStates::GetSamplerGPUHandle(StockSamplerStates state) const
-    {
-        XSF_ASSERT(state != StockSamplerStates::SamplerStateCount);
-        return m_SamplerHeap.hGPU(static_cast<UINT>(state));
-    }
-
-    FORCEINLINE D3D12_CPU_DESCRIPTOR_HANDLE StockRenderStates::GetSamplerCPUHandle(StockSamplerStates state) const
-    {
-        XSF_ASSERT(state != StockSamplerStates::SamplerStateCount);
-        return m_SamplerHeap.hCPU(static_cast<UINT>(state));
+        return m_SamplerStates[ (UINT) state ];
     }
     
 
     //------------------------------------------------------------------------------------------------------------------
-    // Name: XboxSampleFramework::StockRenderStates::GetRasterizerDesc
-    // Desc: Obtains the Rasterizer State descriptor for the requested StockRasterizerState
+    // Name: XboxSampleFramework::StockRenderStates::GetRasterizerState
+    // Desc: Obtains the Rasterizer State object for the requested StockRasterizerState
+    //
+    // NOTE: Do NOT call Release on this pointer; the StockRenderStates object manages its lifetime, and it lives for
+    //       the entire process lifetime.
     //------------------------------------------------------------------------------------------------------------------
-    FORCEINLINE const D3D12_RASTERIZER_DESC* StockRenderStates::GetRasterizerDesc(StockRasterizerStates state) const
+    FORCEINLINE D3DRasterizerState* StockRenderStates::GetRasterizerState( StockRasterizerStates state ) const
     {
-        XSF_ASSERT(state != StockRasterizerStates::RasterizerStateCount);
-        return &m_RasterizerDesc[static_cast<UINT>(state)];
+        return m_RasterizerStates[ (UINT)state ];
     }
 
     
     //------------------------------------------------------------------------------------------------------------------
-    // Name: XboxSampleFramework::StockRenderStates::GetDepthStencilDesc
-    // Desc: Obtains the Depth/Stencil State descriptor for the requested StockDepthStencilState.
+    // Name: XboxSampleFramework::StockRenderStates::GetDepthStencilState
+    // Desc: Obtains the Depth/Stencil State object for the requested StockDepthStencilState.
+    //
+    // NOTE: Do NOT call Release on this pointer; the StockRenderStates object manages its lifetime, and it lives for
+    //       the entire process lifetime.
     //------------------------------------------------------------------------------------------------------------------
-    FORCEINLINE const D3D12_DEPTH_STENCIL_DESC* StockRenderStates::GetDepthStencilDesc(StockDepthStencilStates state) const
+    FORCEINLINE ID3D11DepthStencilState* StockRenderStates::GetDepthStencilState( StockDepthStencilStates state ) const
     {
-        XSF_ASSERT(state != StockDepthStencilStates::DepthStencilStateCount);
-        return &m_DepthStencilDesc[static_cast<UINT>(state)];
+        return m_DepthStencilStates[ (UINT)state ];
     }
 
     
     //----------------------------------------------------------------------------------------------------------------------
-    // Name: XboxSampleFramework::StockRenderStates::GetInstance
-    // Returns: A reference to the StockRenderStates object.
+    // Name: XboxSampleFramework::GetStockRenderStates
+    // Returns: A reference to the StockRenderState object.
     //----------------------------------------------------------------------------------------------------------------------
-    FORCEINLINE const StockRenderStates& StockRenderStates::GetInstance()
+    FORCEINLINE const StockRenderStates& StockRenderStates::GetStates()
     {
-        XSF_ASSERT(ms_pInstance != nullptr && "Not yet initialized");
+        XSF_ASSERT( ms_pInstance != nullptr && "Not yet initialized" );
         return *ms_pInstance;
     }
 
 }
+

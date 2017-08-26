@@ -11,7 +11,7 @@
 #if defined(TREE3D11)
 
 #include "BitmapFont.h"
-#include "StockRenderStates.h"
+#include "StockRenderStates11.h"
 
 using namespace XboxSampleFramework;
 
