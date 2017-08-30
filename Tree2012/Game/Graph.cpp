@@ -71,7 +71,7 @@ HRESULT FSGraph::InitGraphics(RenderManager& renderManager)
 
 	// Create material, mesh, and reserve render unit
 	Material* newMaterial = nullptr;
-	renderManager.CreateMaterial(L"line0", L"graph", L"FSGraphVS.cso", L"FSGraphPS.cso", mat, &newMaterial);
+	renderManager.CreateMaterial(L"line0", L"graph", L"FSGraphVS.cso", L"FSGraphPS.cso", mat, StockRenderState(), &newMaterial);
 
 	Mesh* newMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_FSQuad);

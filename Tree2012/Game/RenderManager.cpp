@@ -246,11 +246,12 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textureFilename,
     const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
-    ShaderMaterial& shaderMaterial, Material** newMaterial)
+    ShaderMaterial& shaderMaterial, StockRenderState renderState, Material** newMaterial)
 {
     auto existing = m_materials.find(name);
     if (existing != m_materials.end())
     {
+        // TODO: Assert if parameters do not match
         *newMaterial = m_materials[name];
         return S_FALSE;
     }
@@ -280,7 +281,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     }
 
     Material* newMat = nullptr;
-    GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shaderMaterial, (int) m_materials.size(), &newMat);
+    GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shaderMaterial,
+        renderState, (int) m_materials.size(), &newMat);
 
     m_materials[name] = newMat;
     *newMaterial = newMat;

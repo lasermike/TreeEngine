@@ -126,9 +126,9 @@ RENDERPLATFORM_API HRESULT EndDrawText()
 }
 
 RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-                                          ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial)
+                                          ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial)
 {
-    return m_pPlatform->CreateMaterial(name, texture, vs, ps, shaderMaterial, materialNum, newMaterial);
+    return m_pPlatform->CreateMaterial(name, texture, vs, ps, shaderMaterial, renderState, materialNum, newMaterial);
 }
 
 RENDERPLATFORM_API HRESULT SetMaterial(Material* material, RenderPass pass)

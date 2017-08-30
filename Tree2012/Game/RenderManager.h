@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "RenderData.h"
 #include "RenderPlatform.h"
+#include "StockRenderStates.h"
 
 class WorldObject;
 
@@ -137,7 +138,9 @@ public:
     HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
-    HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
+    HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, 
+                           const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, 
+                           ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
     HRESULT CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
         const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
 

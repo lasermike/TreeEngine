@@ -632,7 +632,7 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
 }
 
 HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-    ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial)
+    ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial)
 {
     if (!vs)
     {

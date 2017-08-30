@@ -615,9 +615,9 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
 {
     // Set samplers
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-    ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagMipLinearUVWWrap),
-        stockStates.GetSamplerState(XSF::StockSamplerStates::UseShadowMap),
-        stockStates.GetSamplerState(XSF::StockSamplerStates::MinMagLinearMipPointUVWClamp)
+    ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap),
+        stockStates.GetSamplerState(StockSamplerStates::UseShadowMap),
+        stockStates.GetSamplerState(StockSamplerStates::MinMagLinearMipPointUVWClamp)
     };
     m_immediateContext->PSSetSamplers(0, 3, samplers);
 
@@ -659,16 +659,16 @@ HRESULT RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlph
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
     if (wireframe)
     {
-        stockStates.ApplyRasterizerState(m_immediateContext, XSF::StockRasterizerStates::Wireframe);
+        stockStates.ApplyRasterizerState(m_immediateContext, StockRasterizerStates::Wireframe);
     }
 
     if (useAlphaBlendedRenderTarget)
     {
-        stockStates.ApplyBlendState(m_immediateContext, XSF::StockBlendStates::AlphaBlend);
+        stockStates.ApplyBlendState(m_immediateContext, StockBlendStates::AlphaBlend);
     }
     else
     {
-        stockStates.ApplyBlendState(m_immediateContext, XSF::StockBlendStates::Overwrite);
+        stockStates.ApplyBlendState(m_immediateContext, StockBlendStates::Overwrite);
     }
 
     if (!oculus)
@@ -755,7 +755,7 @@ HRESULT RenderPlatform11::SetRenderState(RenderState state)
     {
         m_renderData->pShadowMap->BindDsvAndSetNullRenderTarget(GetContext());
 
-        stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::BuildShadowMap);
+        stockStates.ApplyRasterizerState(GetContext(), StockRasterizerStates::BuildShadowMap);
         break;
     }
     case RS_TRANSITION_FROM_RENDER_SHADOW_MAP:
@@ -764,7 +764,7 @@ HRESULT RenderPlatform11::SetRenderState(RenderState state)
         GetContext()->RSSetState(0);
         GetContext()->RSSetViewports(1, &GetViewport());
 
-        stockStates.ApplyRasterizerState(GetContext(), XSF::StockRasterizerStates::Solid);
+        stockStates.ApplyRasterizerState(GetContext(), StockRasterizerStates::Solid);
         break;
     }
     }
@@ -786,7 +786,7 @@ HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int /*text
 }
 
 HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-    ShaderMaterial& shaderMaterial, int /*materialNum*/, Material** newMaterial)
+    ShaderMaterial& shaderMaterial, StockRenderState renderState, int /*materialNum*/, Material** newMaterial)
 {
     UploadBuffer<CBMaterial>* constBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
     SetDebugName(constBuffer->Resource(), "RenderManager::CreateMaterial::pConstBuffer");

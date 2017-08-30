@@ -4,6 +4,7 @@
 #include "Materials.h"
 #include "UploadBuffer.h"
 #include "RenderData.h"
+#include "StockRenderStates.h"
 
 class RenderPlatform;
 class RenderManager;
@@ -398,7 +399,7 @@ public:
 
     // Materials
     virtual HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-                                   ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial) = 0;
+                                   ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial) = 0;
     virtual HRESULT SetMaterial(Material* material, RenderPass pass) = 0;
     virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
     virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
@@ -570,7 +571,7 @@ public:
 
     // Materials
     HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-        ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
+        ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
     HRESULT SetMaterial(Material* material, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
@@ -700,7 +701,7 @@ public:
 
     // Materials
     HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-        ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
+        ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
     HRESULT SetMaterial(Material* material, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
@@ -763,7 +764,7 @@ typedef HRESULT (*DrawText2Func)(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const
 typedef HRESULT (*EndDrawTextFunc)();
 
 typedef HRESULT (*CreateMaterialFunc)(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-                                      ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial);
+                                      ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
 typedef HRESULT (*SetMaterialFunc)(Material* material, RenderPass pass);
 typedef HRESULT (*LoadTextureFunc)(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
 typedef HRESULT (*CreateTexture2DFunc)(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
@@ -875,9 +876,9 @@ public:
 
     // Materials
     HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-        ShaderMaterial& shaderMaterial, int materialNum, Material** newMaterial)
+        ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial)
     {
-        return CreateMaterialFuncPtr(name, texture, vs, ps, shaderMaterial, materialNum, newMaterial);
+        return CreateMaterialFuncPtr(name, texture, vs, ps, shaderMaterial, renderState, materialNum, newMaterial);
     }
 
     HRESULT SetMaterial(Material* material, RenderPass pass) { return SetMaterialFuncPtr(material, pass); }

@@ -162,7 +162,7 @@ static const D3D12_BLEND_DESC s_StockBlendTypes[] =
     }
 };
 
-static_assert(ARRAYSIZE(s_StockBlendTypes) == static_cast<UINT>(XSF::StockBlendStates::BlendStateCount),
+static_assert(ARRAYSIZE(s_StockBlendTypes) == static_cast<UINT>(StockBlendStates::BlendStateCount),
               "Blend Description count doesn't match Blend State list");
 
 #undef EMPTY_BLEND_STATE
@@ -260,7 +260,7 @@ static const D3D12_SAMPLER_DESC s_StockSamplerTypes[] =
 };
 
 
-static_assert(ARRAYSIZE(s_StockSamplerTypes) == static_cast<UINT>(XSF::StockSamplerStates::SamplerStateCount),
+static_assert(ARRAYSIZE(s_StockSamplerTypes) == static_cast<UINT>(StockSamplerStates::SamplerStateCount),
               "Sampler Description count doesn't match Sampler State list");
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -389,10 +389,10 @@ static const D3D12_RASTERIZER_DESC s_StockRasterizerTypes[] =
     }
 };
 
-static_assert( ARRAYSIZE(s_StockRasterizerTypes) == static_cast<UINT>(XSF::StockRasterizerStates::RasterizerStateCount),
+static_assert( ARRAYSIZE(s_StockRasterizerTypes) == static_cast<UINT>(StockRasterizerStates::RasterizerStateCount),
               "Rasterizer Description count doesn't match Rasterizer State list");
 
-static const D3D12_DEPTH_STENCIL_DESC s_StockDepthStencilTypes[XSF::StockDepthStencilStates::DepthStencilStateCount] =
+static const D3D12_DEPTH_STENCIL_DESC s_StockDepthStencilTypes[StockDepthStencilStates::DepthStencilStateCount] =
 {
     // AlwaysSucceed_WriteZOut_NoStencil,
     // No depth test, no stencil test, updates Z buffer
@@ -533,7 +533,7 @@ static const D3D12_DEPTH_STENCIL_DESC s_StockDepthStencilTypes[XSF::StockDepthSt
     }
 };
 
-static_assert(ARRAYSIZE(s_StockDepthStencilTypes) == static_cast<UINT>(XSF::StockDepthStencilStates::DepthStencilStateCount),
+static_assert(ARRAYSIZE(s_StockDepthStencilTypes) == static_cast<UINT>(StockDepthStencilStates::DepthStencilStateCount),
               "Depth Stencil Description count doesn't match Depth Stencil State list");
 
 
