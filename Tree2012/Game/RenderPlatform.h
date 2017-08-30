@@ -389,7 +389,7 @@ public:
     virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) = 0;
 
     virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
-    virtual HRESULT SetRenderState(RenderState state) = 0;
+    virtual HRESULT SetRenderPhase(RenderState state) = 0;
 
     virtual HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation) = 0;
 
@@ -561,7 +561,7 @@ public:
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
-    HRESULT SetRenderState(RenderState state);
+    HRESULT SetRenderPhase(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
@@ -691,7 +691,7 @@ public:
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
-    HRESULT SetRenderState(RenderState state);
+    HRESULT SetRenderPhase(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
@@ -755,7 +755,7 @@ typedef HRESULT (*RenderPrologFunc)(bool oculus, bool wireframe, bool useAlphaBl
 typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
 typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
-typedef HRESULT (*SetRenderStateFunc)(RenderState state);
+typedef HRESULT (*SetRenderPhaseFunc)(RenderState state);
 
 typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 
@@ -807,7 +807,7 @@ class RenderPlatformDLL : public RenderPlatform
     RenderEpilogFunc RenderEpilogFuncPtr;
 
     RenderSceneSetupFunc RenderSceneSetupFuncPtr;
-    SetRenderStateFunc SetRenderStateFuncPtr;
+    SetRenderPhaseFunc SetRenderPhaseFuncPtr;
 
     DrawIndexedInstancedFunc DrawIndexedInstancedFuncPtr;
 
@@ -863,7 +863,7 @@ public:
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture); }
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
-    HRESULT SetRenderState(RenderState state) { return SetRenderStateFuncPtr(state); }
+    HRESULT SetRenderPhase(RenderState state) { return SetRenderPhaseFuncPtr(state); }
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation)
     {

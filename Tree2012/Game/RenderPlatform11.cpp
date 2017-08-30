@@ -744,7 +744,7 @@ HRESULT RenderPlatform11::DrawIndexedInstanced(
     return S_OK;
 }
 
-HRESULT RenderPlatform11::SetRenderState(RenderState state)
+HRESULT RenderPlatform11::SetRenderPhase(RenderState state)
 {
     HRESULT hr = S_OK;
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();

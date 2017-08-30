@@ -491,11 +491,11 @@ HRESULT RenderManager::RenderShadowMap()
 {
     BuildShadowTransform();
 
-    GetPlatform()->SetRenderState(RS_TRANSITION_TO_RENDER_SHADOW_MAP);
+    GetPlatform()->SetRenderPhase(RS_TRANSITION_TO_RENDER_SHADOW_MAP);
 
     DrawSceneToShadowMap();
 
-    GetPlatform()->SetRenderState(RS_TRANSITION_FROM_RENDER_SHADOW_MAP);
+    GetPlatform()->SetRenderPhase(RS_TRANSITION_FROM_RENDER_SHADOW_MAP);
 
     return S_OK;
 }
@@ -583,7 +583,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(RenderEpilog);
 
     ASSIGN_FUNC(RenderSceneSetup);
-    ASSIGN_FUNC(SetRenderState);
+    ASSIGN_FUNC(SetRenderPhase);
 
     ASSIGN_FUNC(DrawIndexedInstanced);
 

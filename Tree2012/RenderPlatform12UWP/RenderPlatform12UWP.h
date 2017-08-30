@@ -39,7 +39,7 @@ RENDERPLATFORM_API HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlp
 RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
 
 RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
-RENDERPLATFORM_API HRESULT SetRenderState(RenderState state);
+RENDERPLATFORM_API HRESULT SetRenderPhase(RenderState state);
 
 RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 

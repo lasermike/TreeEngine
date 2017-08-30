@@ -1262,7 +1262,7 @@ HRESULT RenderPlatform12::EndDrawText()
     return S_OK;
 }
 
-HRESULT RenderPlatform12::SetRenderState(RenderState state)
+HRESULT RenderPlatform12::SetRenderPhase(RenderState state)
 {
     HRESULT hr = S_OK;
     switch (state)

@@ -100,9 +100,9 @@ RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* insta
     return m_pPlatform->RenderSceneSetup(pass, instancedBuffer);
 }
 
-RENDERPLATFORM_API HRESULT SetRenderState(RenderState state)
+RENDERPLATFORM_API HRESULT SetRenderPhase(RenderState state)
 {
-    return m_pPlatform->SetRenderState(state);
+    return m_pPlatform->SetRenderPhase(state);
 }
 
 RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation)
