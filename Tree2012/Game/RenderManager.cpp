@@ -491,11 +491,11 @@ HRESULT RenderManager::RenderShadowMap()
 {
     BuildShadowTransform();
 
-    GetPlatform()->SetRenderPhase(RS_TRANSITION_TO_RENDER_SHADOW_MAP);
+    GetPlatform()->SetRenderPhase(RP_TRANSITION_TO_RENDER_SHADOW_MAP);
 
     DrawSceneToShadowMap();
 
-    GetPlatform()->SetRenderPhase(RS_TRANSITION_FROM_RENDER_SHADOW_MAP);
+    GetPlatform()->SetRenderPhase(RP_TRANSITION_FROM_RENDER_SHADOW_MAP);
 
     return S_OK;
 }

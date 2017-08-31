@@ -151,4 +151,11 @@ struct StockRenderState
                          rasterizerState(StockRasterizerStates::Solid),
                          depthStencilState(StockDepthStencilStates::DepthLessThanWriteZNoStencil) 
     {}
+
+    StockRenderState(StockBlendStates blendStateParam) : blendState(blendStateParam),
+        samplerState(StockSamplerStates::MinMagLinearMipPointUVWClamp),
+        rasterizerState(StockRasterizerStates::Solid),
+        depthStencilState(StockDepthStencilStates::DepthLessThanWriteZNoStencil)
+    {}
+
 };
