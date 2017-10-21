@@ -279,32 +279,13 @@ void GameLoader::LoadNewTrees(SceneRoot* scene, RenderData* renderData, Player* 
     params2->GetGeneratorParameters().thickness = .020f;
     scene->AddChild(new Tree(params2));
 
-    //WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
-    //params5->position = XMFLOAT3(-1.3f, .5f, -1.3f);
-    //params5->_animationSpeed = 0.0f;
-    //params5->depthLOD = 1;
-    //params5->GetGeneratorParameters()._axiom = "F";
-    //params5->GetGeneratorParameters()._constants = "";
-    //params5->GetGeneratorParameters()._rules.push_back(Rule("F", "F [ & + F] F [ - > F][- > F][& F]"));
-    //params5->GetGeneratorParameters()._angle = 0.383972f;
-    //params5->GetGeneratorParameters()._numIterations = 4;
-    //params5->GetGeneratorParameters()._segmentLength = .28f;
-    //params5->GetGeneratorParameters().thickness = .020f;
-    //scene->AddChild(new Tree(params5));
-
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
     params4->primitiveType = PrimitiveType_Cylinder;
+    params4->textureFilename.push_back(L"undersea.dds");
     scene->AddChild(new Primitive(params4));
-
-    //WorldObjectParams* params7 = new WorldObjectParams(PrimitiveGeneratorType);
-    //params7->position = XMFLOAT3(0, 0, 0);
-    //params7->scale = XMFLOAT3(.4f, .4f, .4f);
-    ////XMStoreFloat4(&params5->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
-    //params7->primitiveType = PrimitiveType_Box;
-    //scene->AddChild(new Primitive(params7));
 
     // Init lights
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);

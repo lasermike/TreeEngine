@@ -31,9 +31,15 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 	mat.Reflect = XMFLOAT4(0, 0, 0, 1);
 	mat.flags.y = 1; //1 for textured; 
 
+    // Default textures
+    if (_params->textureFilename.size() < 1)
+    {
+        _params->textureFilename.push_back(L"snow.dds");
+    }
+
 	// Create material, mesh, and reserve render unit
 	Material* newMaterial = nullptr;
-	renderManager.CreateMaterial(L"ground", L"snow.dds", nullptr, nullptr, mat, StockRenderState(), &newMaterial);
+	renderManager.CreateMaterial(L"ground", _params->textureFilename[0].c_str(), nullptr, nullptr, mat, StockRenderState(), &newMaterial);
 
 	Mesh* newMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());
