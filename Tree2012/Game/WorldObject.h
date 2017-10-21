@@ -60,6 +60,7 @@ public:
     int depthLOD;
     PrimitiveType primitiveType;
     std::vector<std::wstring> textureFilename;
+    std::vector<ShaderMaterial> materials;
 };
 
 template<typename T>

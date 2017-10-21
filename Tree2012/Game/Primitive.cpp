@@ -24,12 +24,16 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 {
     HRR(CleanUpDeviceObjects());
 
-    ShaderMaterial mat;
-    mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
-    mat.Diffuse = XMFLOAT4(0, 1.0f, 0, 1);
-    mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
-    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-    mat.flags.y = 1; //1 for textured; 
+    if (_params->materials.size() < 1)
+    {
+        ShaderMaterial mat;
+        mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
+        mat.Diffuse = XMFLOAT4(0, 1.0f, 0, 1);
+        mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
+        mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+        mat.flags.y = 1; //1 for textured; 
+        _params->materials.push_back(mat);
+    }
 
     // Default textures
     if (_params->textureFilename.size() < 1)
@@ -39,7 +43,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 
     // Create material, mesh, and reserve render unit
     Material* newMaterial = nullptr;
-    renderManager.CreateMaterial(L"ground", _params->textureFilename[0].c_str(), nullptr, nullptr, mat, StockRenderState(), &newMaterial);
+    renderManager.CreateMaterial(L"ground", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
 
     Mesh* newMesh = nullptr;
     const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());

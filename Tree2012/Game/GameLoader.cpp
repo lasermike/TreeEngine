@@ -269,7 +269,21 @@ void GameLoader::LoadNewTrees(SceneRoot* scene, RenderData* renderData, Player* 
     params2->position = XMFLOAT3(0, .5f, 0);
     params2->_animationSpeed = 4.0f;
     params2->depthLOD = 1;
-    params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");
+    params2->textureFilename.push_back(L"urchinskin.dds");
+
+    ShaderMaterial trunkMaterial;
+    trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
+    trunkMaterial.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    trunkMaterial.Specular = XMFLOAT4(0, .1f, .1f, 1.0);
+    trunkMaterial.flags.y = 1; //useTextures  TODO
+    params2->materials.push_back(trunkMaterial);
+
+    ShaderMaterial leafMaterial;
+    XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
+    leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
+    leafMaterial.flags.y = false; //useTextures  TODO
+    params2->materials.push_back(leafMaterial);
+
     params2->GetGeneratorParameters()._axiom = "F";
     params2->GetGeneratorParameters()._constants = "";
     params2->GetGeneratorParameters()._rules.push_back(Rule("F", "F [z F][Z F][X y F z F][x Y F]")); //[ X Z Z Y F ] F [ - - Y x F ][Z Y F ]
@@ -285,6 +299,13 @@ void GameLoader::LoadNewTrees(SceneRoot* scene, RenderData* renderData, Player* 
     params4->scale = XMFLOAT3(25, .01f, 25);
     params4->primitiveType = PrimitiveType_Cylinder;
     params4->textureFilename.push_back(L"undersea.dds");
+    ShaderMaterial mat;
+    mat.Ambient = XMFLOAT4(.3, .3, .3, 1);
+    mat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1);
+    mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
+    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+    mat.flags.y = 1; //1 for textured; 
+    params4->materials.push_back(mat);
     scene->AddChild(new Primitive(params4));
 
     // Init lights

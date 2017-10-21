@@ -30,12 +30,21 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 {
     HRR(CleanUpDeviceObjects());
 
-    ShaderMaterial trunkMaterial;
-    //XMStoreFloat4(&_trunkMaterial.Diffuse, Colors::RosyBrown); 
-    trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    trunkMaterial.Diffuse = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
-    trunkMaterial.Specular = XMFLOAT4(0, .1f, .1f, 1.0);
-    trunkMaterial.flags.y = 1; //useTextures  TODO
+    if (_params->materials.size() < 1)
+    {
+        ShaderMaterial trunkMaterial;
+        trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+        trunkMaterial.Diffuse = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
+        trunkMaterial.Specular = XMFLOAT4(0, .1f, .1f, 1.0);
+        trunkMaterial.flags.y = 1; //useTextures  TODO
+        _params->materials.push_back(trunkMaterial);
+
+        ShaderMaterial leafMaterial;
+        XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
+        leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
+        leafMaterial.flags.y = false; //useTextures  TODO
+        _params->materials.push_back(leafMaterial);
+    }
 
     // Default textures
     if (_params->textureFilename.size() < 1)
@@ -45,26 +54,21 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 
     // Create material, mesh, and reserve render unit
     Material* pTrunk = nullptr;
-    renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), nullptr, nullptr, trunkMaterial, StockRenderState(), &pTrunk);
+    renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &pTrunk);
     Mesh* pNewMesh = nullptr;
     const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Cylinder);
     renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
     renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
 
     Material* pTwig = nullptr;
-    renderManager.CreateMaterial(L"twig", _params->textureFilename[0].c_str(), nullptr, nullptr, trunkMaterial, StockRenderState(), &pTwig);
+    renderManager.CreateMaterial(L"twig", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &pTwig);
     pNewMesh = nullptr;
     pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
     renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
     renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
 
-    ShaderMaterial leafMaterial;
-    XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
-    leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
-    leafMaterial.flags.y = false; //useTextures  TODO
-
     Material* pLeaf = nullptr;
-    renderManager.CreateMaterial(L"leaf", L"", nullptr, nullptr, leafMaterial, StockRenderState(), &pLeaf);
+    renderManager.CreateMaterial(L"leaf", L"", nullptr, nullptr, _params->materials[1], StockRenderState(), &pLeaf);
     pNewMesh = nullptr;
     pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
     renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
