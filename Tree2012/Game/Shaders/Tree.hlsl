@@ -8,58 +8,58 @@
 //--------------------------------------------------------------------------------------
 // Constant Buffer Variables
 //--------------------------------------------------------------------------------------
-Texture2D txDiffuse : register( t0 );
-Texture2D txShadowMap : register( t1 );
-SamplerState samLinear : register( s0 );
-SamplerComparisonState samShadowCompState  : register( s1 );
+Texture2D txDiffuse : register(t0);
+Texture2D txShadowMap : register(t1);
+SamplerState samLinear : register(s0);
+SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 
-cbuffer cbNeverChanges : register( b0 )
+cbuffer cbNeverChanges : register(b0)
 {
     matrix View;
-	ShaderMaterial groundMaterial;
+    ShaderMaterial groundMaterial;
 };
 
-cbuffer cbChangeOnResize : register( b1 )
+cbuffer cbChangeOnResize : register(b1)
 {
     matrix Projection;
 };
 
-cbuffer cbChangesEveryFrame : register( b2 )
+cbuffer cbChangesEveryFrame : register(b2)
 {
-	DirectionalLight light;
-	float4 eyePos;
-	matrix worldToCamera;
-	matrix shadowMatrix;
-	uint globalFlags;  // bit 0 = use shadow maps
+    DirectionalLight light;
+    float4 eyePos;
+    matrix worldToCamera;
+    matrix shadowMatrix;
+    uint globalFlags;  // bit 0 = use shadow maps
 };
 
 cbuffer cbMaterial : register (b3)
 {
-	ShaderMaterial mat;
-	float4x4 texTransform;
+    ShaderMaterial mat;
+    float4x4 texTransform;
 };
 
 //--------------------------------------------------------------------------------------
 struct VS_INPUT
 {
     float3 Pos : POSITION;
-	float3 NormalL : NORMAL;
-	float2 Tex : TEXCOORD0;
-	float3 TangentL : TANGENT;
-	float4x4 World  : WORLD;
+    float3 NormalL : NORMAL;
+    float2 Tex : TEXCOORD0;
+    float3 TangentL : TANGENT;
+    float4x4 World  : WORLD;
 };
 
 struct PS_INPUT
 {
     float4 Pos : SV_POSITION;
-	float3 PosW : POSITION;
-	float2 Tex : TEXCOORD0;
-	float4 ShadowPosH : TEXCOORD1;
-	float3 ViewDirection : NORMAL1;
-	float3 T : TEXCOORD3;
-	float3 B : TEXCOORD4;
-	float3 N : TEXCOORD5;
+    float3 PosW : POSITION;
+    float2 Tex : TEXCOORD0;
+    float4 ShadowPosH : TEXCOORD1;
+    float3 ViewDirection : NORMAL1;
+    float3 T : TEXCOORD3;
+    float3 B : TEXCOORD4;
+    float3 N : TEXCOORD5;
 };
 
 static const bool TSLights = true;
@@ -69,31 +69,31 @@ static const bool TSLights = true;
 //--------------------------------------------------------------------------------------
 PS_INPUT VS(VS_INPUT input)
 {
-	PS_INPUT output = (PS_INPUT)0;
-	output.PosW = mul(float4(input.Pos, 1.0f), input.World).xyz;
+    PS_INPUT output = (PS_INPUT)0;
+    output.PosW = mul(float4(input.Pos, 1.0f), input.World).xyz;
 
-	output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
-	output.Pos = mul(output.Pos, transpose(Projection));
-	output.Tex = input.Tex;
+    output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
+    output.Pos = mul(output.Pos, transpose(Projection));
+    output.Tex = input.Tex;
 
-	// View direction.  Calcuate here and have it interpolated by to the pixel shader
-	output.ViewDirection = normalize(eyePos.xyz - output.PosW);
+    // View direction.  Calcuate here and have it interpolated by to the pixel shader
+    output.ViewDirection = normalize(eyePos.xyz - output.PosW);
 
-	// TBN vectors for tangent space
-	float3 worldNormal = mul( input.NormalL, (float3x3) input.World );
-	output.N = normalize( worldNormal );
+    // TBN vectors for tangent space
+    float3 worldNormal = mul(input.NormalL, (float3x3) input.World);
+    output.N = normalize(worldNormal);
 
-	float3 worldTangent = mul( input.TangentL, (float3x3) input.World );
-	output.T = normalize(worldTangent);
+    float3 worldTangent = mul(input.TangentL, (float3x3) input.World);
+    output.T = normalize(worldTangent);
 
-	float3 worldBinormal = normalize(cross(output.N, output.T));
-	worldBinormal =	mul( worldBinormal, (float3x3) input.World );
-	output.B = worldBinormal; 
+    float3 worldBinormal = normalize(cross(output.N, output.T));
+    worldBinormal = mul(worldBinormal, (float3x3) input.World);
+    output.B = worldBinormal;
 
-	// Generate projective tex-coords to project shadow map onto scene.
-	output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
+    // Generate projective tex-coords to project shadow map onto scene.
+    output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
 
-	return output;
+    return output;
 }
 
 //--------------------------------------------------------------------------------------
@@ -101,72 +101,72 @@ PS_INPUT VS(VS_INPUT input)
 //--------------------------------------------------------------------------------------
 float4 PS(PS_INPUT input) : SV_Target
 {
-	// The toEye vector is used in lighting.
-	float3 toEye = normalize(input.ViewDirection);
+    // The toEye vector is used in lighting.
+    float3 toEye = normalize(input.ViewDirection);
 
-	//transforms world=>tangent space
-	float3x3 TBN = float3x3(normalize(input.T), normalize(input.B), normalize(input.N));
+    //transforms world=>tangent space
+    float3x3 TBN = float3x3(normalize(input.T), normalize(input.B), normalize(input.N));
 
-	// Transform tangent normal to world normal	
-	float3 normal = mul(float3(0,0,1), TBN);
+    // Transform tangent normal to world normal	
+    float3 normal = mul(float3(0,0,1), TBN);
 
-	// Start with a sum of zero. 
-	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
-	float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-	float4 spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    // Start with a sum of zero. 
+    float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    float4 spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
 
-	float4 textureColor;
-	if (mat.flags.y > 0)  //use texture
-		textureColor = txDiffuse.Sample(samLinear, input.Tex);
-	else
-		textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    float4 textureColor;
+    if (mat.flags.y > 0)  //use texture
+        textureColor = txDiffuse.Sample(samLinear, input.Tex);
+    else
+        textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	// Only the first light casts a shadow.
-	float3 shadow = float3(1.0f, 1.0f, 1.0f);
+    // Only the first light casts a shadow.
+    float3 shadow = float3(1.0f, 1.0f, 1.0f);
 
-	if (globalFlags & 0x1)
-	{
-		shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, input.ShadowPosH);
-	}
- 
-	// Sum the light contribution from each light source.  
-	//[unroll]
-	//for (int i = 0; i < gLightCount; ++i)
-	//{
-		float4 A, D, S;
-		ComputeDirectionalLight(mat, textureColor, light /*gDirLights[i]*/, normal, toEye, A, D, S);
+    if (globalFlags & 0x1)
+    {
+        shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, input.ShadowPosH);
+    }
 
-		ambient += A;
-		diffuse += shadow[0]*D; // diffuse += D
-		spec    += shadow[0]*S; // spec += S;
-	//}
+    // Sum the light contribution from each light source.  
+    //[unroll]
+    //for (int i = 0; i < gLightCount; ++i)
+    //{
+        float4 A, D, S;
+        ComputeDirectionalLight(mat, textureColor, light /*gDirLights[i]*/, normal, toEye, A, D, S);
 
-	float4 litColor = ambient + diffuse + spec;
+        ambient += A;
+        diffuse += shadow[0] * D; // diffuse += D
+        spec += shadow[0] * S; // spec += S;
+    //}
 
-	// Common to take alpha from diffuse material.
-	litColor.a = mat.Diffuse.a;
+    float4 litColor = ambient + diffuse + spec;
 
-	return litColor;
+    // Common to take alpha from diffuse material.
+    litColor.a = mat.Diffuse.a;
+
+    return litColor;
 }
 
 struct ShadowMapVertexOut
 {
-	float4 PosH : SV_POSITION;
-	float2 Tex  : TEXCOORD;
+    float4 PosH : SV_POSITION;
+    float2 Tex  : TEXCOORD;
 };
- 
+
 
 ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 {
-	ShadowMapVertexOut output;
+    ShadowMapVertexOut output;
 
-	float4 pos = mul(float4(input.Pos, 1.0f), input.World);
-	pos = mul(pos, transpose(View));
-	output.PosH = mul(pos, transpose(Projection));
-	output.Tex = input.Tex;
+    float4 pos = mul(float4(input.Pos, 1.0f), input.World);
+    pos = mul(pos, transpose(View));
+    output.PosH = mul(pos, transpose(Projection));
+    output.Tex = input.Tex;
 
 
-	return output;
+    return output;
 }
 
 // This is only used for alpha cut out geometry, so that shadows 
@@ -174,49 +174,49 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 // texture can use a NULL pixel shader for depth pass.
 void BuildShadowMapPS(ShadowMapVertexOut input)
 {
-	// TODO support alpha map
-	//float4 diffuse = gDiffuseMap.Sample(samLinear, input.Tex);
+    // TODO support alpha map
+    //float4 diffuse = gDiffuseMap.Sample(samLinear, input.Tex);
 
-	// Don't write transparent pixels to the shadow map.
-	//clip(diffuse.a - 0.15f);
+    // Don't write transparent pixels to the shadow map.
+    //clip(diffuse.a - 0.15f);
 }
 
 struct DSVertexIn
 {
-	float3 PosL    : POSITION;
-	float3 NormalL : NORMAL;
-	float2 Tex     : TEXCOORD;
+    float3 PosL    : POSITION;
+    float3 NormalL : NORMAL;
+    float2 Tex     : TEXCOORD;
 };
 
 struct DSVertexOut
 {
-	float4 PosH : SV_POSITION;
-	float2 Tex  : TEXCOORD;
+    float4 PosH : SV_POSITION;
+    float2 Tex  : TEXCOORD;
 };
- 
+
 
 DSVertexOut DrawScreenQuadVS(DSVertexIn vin)
 {
-	DSVertexOut vout;
+    DSVertexOut vout;
 
-	float4x4 worldViewProj = float4x4(
-		0.5f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.5f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.5f, -0.5f, 0.0f, 1.0f);
+    float4x4 worldViewProj = float4x4(
+        0.5f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.5f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.5f, -0.5f, 0.0f, 1.0f);
 
-	vout.PosH = mul(float4(vin.PosL, 1.0f), worldViewProj);
+    vout.PosH = mul(float4(vin.PosL, 1.0f), worldViewProj);
 
-	vout.Tex  = vin.Tex;
-	
-	return vout;
+    vout.Tex = vin.Tex;
+
+    return vout;
 }
 
 float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
 {
-	float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
-	
-	// draw as grayscale
+    float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
+
+    // draw as grayscale
     return float4(c.rrr, 1);
 
     //return float4(.5, 0, 0, 1);
@@ -225,145 +225,145 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
     //float len = length(input.Tex - 0.5);
     //return float4(len, len, len,1);
 }
- 
+
 
 /********* FS GRAPH ********/
 
 PS_INPUT FSGraphVS(VS_INPUT input)
 {
-	PS_INPUT output = (PS_INPUT)0;
+    PS_INPUT output = (PS_INPUT)0;
 
-	//float4x4 worldViewProj = float4x4(
-	//	1.0f, 0.0f, 0.0f, 0.0f,
-	//	0.0f, 1.0f, 0.0f, 0.0f,
-	//	0.0f, 0.0f, 1.0f, 0.0f,
-	//	0.0f, 0.0f, 0.0f, 1.0f);
+    //float4x4 worldViewProj = float4x4(
+    //	1.0f, 0.0f, 0.0f, 0.0f,
+    //	0.0f, 1.0f, 0.0f, 0.0f,
+    //	0.0f, 0.0f, 1.0f, 0.0f,
+    //	0.0f, 0.0f, 0.0f, 1.0f);
 
-	output.Pos = float4(input.Pos, 1); //mul(float4(input.Pos, 1.0f), worldViewProj);
+    output.Pos = float4(input.Pos, 1); //mul(float4(input.Pos, 1.0f), worldViewProj);
 
-	output.Tex = input.Tex;
+    output.Tex = input.Tex;
 
-	return output;
+    return output;
 }
 
 
 float4 FSGraphPS_Old(PS_INPUT input) : SV_Target
 {
-	//float4 c = txDiffuse.Sample(samPoint, input.Tex).r;
-	float4 c = txDiffuse.Sample(samPoint, float2(.75, input.Tex.x)).r;
-	//float4 c = txDiffuse.Load(input.Tex).r;
-	//float4 c = float4(1.0, 0, 0, 1);
-	//float4 c = float4(input.Tex.x, input.Tex.y, 0, 1);
+    //float4 c = txDiffuse.Sample(samPoint, input.Tex).r;
+    float4 c = txDiffuse.Sample(samPoint, float2(.75, input.Tex.x)).r;
+    //float4 c = txDiffuse.Load(input.Tex).r;
+    //float4 c = float4(1.0, 0, 0, 1);
+    //float4 c = float4(input.Tex.x, input.Tex.y, 0, 1);
 
-	return c; //float4(c.rrr, 1);
+    return c; //float4(c.rrr, 1);
 }
 
 float segdist(float2 p1, float2 p2, float2 a)
 {
-	float d = max(1e-10, dot(p2 - p1, p2 - p1));
-	float t = clamp(dot(a - p1, p2 - p1) / d, 0.0, 1.0);
-	return distance(a, lerp(p1, p2, t));
+    float d = max(1e-10, dot(p2 - p1, p2 - p1));
+    float t = clamp(dot(a - p1, p2 - p1) / d, 0.0, 1.0);
+    return distance(a, lerp(p1, p2, t));
 }
 
-static float4 lineColors[12] = 
-{ 
-	{ 1,0,0,1 },
-	{ 0,1,0,1 },
-	{ 0,0,1,1 },
-	{ 1,1,0,1 },
-	{ 1,1,0,1 },
-	{ .5,0,1,1 }, 
-	{ 1,0,1,1 },
-	{ 0,1,1,1 },
-	{ 0.5,0,1,1 }, 
-	{ 1,0.5,0,1 },
-	{ 0,1,.5,1 },
-	{ 0.5,0,1,1 } 
+static float4 lineColors[12] =
+{
+    { 1,0,0,1 },
+    { 0,1,0,1 },
+    { 0,0,1,1 },
+    { 1,1,0,1 },
+    { 1,1,0,1 },
+    { .5,0,1,1 },
+    { 1,0,1,1 },
+    { 0,1,1,1 },
+    { 0.5,0,1,1 },
+    { 1,0.5,0,1 },
+    { 0,1,.5,1 },
+    { 0.5,0,1,1 }
 };
 
 float4 CalcFrag(PS_INPUT input, float columnIndex, float4 lineColor)
 {
-	float srcWidth = 21.0;
-	float srcHeight = 857.0;
-	float dot_size = 2.0;
-	float4 delta = float4(1.0 / srcHeight, 0.0, 2.0 / srcHeight, 0.0);
+    float srcWidth = 21.0;
+    float srcHeight = 857.0;
+    float dot_size = 2.0;
+    float4 delta = float4(1.0 / srcHeight, 0.0, 2.0 / srcHeight, 0.0);
 
-	float2 p = float2(input.Pos.x, input.Pos.y);
-	float2 srcTC = float2(columnIndex, input.Tex.x);
-	float4 lineHeights;
-	 
-	float2 coord1 = float2(srcTC - delta.yx).xy;
-	float2 coord2 = float2(srcTC).xy;
-	float2 coord3 = float2(srcTC + delta.yx).xy;
-	float2 coord4 = float2(srcTC + delta.wz).xy;
- 
-	lineHeights[0] = txDiffuse.Sample(samPoint, coord1).x;
-	lineHeights[1] = txDiffuse.Sample(samPoint, coord2).x;
-	lineHeights[2] = txDiffuse.Sample(samPoint, coord3).x;
-	lineHeights[3] = txDiffuse.Sample(samPoint, coord4).x;
+    float2 p = float2(input.Pos.x, input.Pos.y);
+    float2 srcTC = float2(columnIndex, input.Tex.x);
+    float4 lineHeights;
 
-	float2 srcPos0 = float2((input.Tex.x - delta.x), lineHeights[0]);
-	float2 srcPos1 = float2(input.Tex.x, lineHeights[1]);
-	float2 srcPos2 = float2((input.Tex.x + delta.x), lineHeights[2] );
-	float2 srcPos3 = float2(input.Tex.x + delta.z, lineHeights[3]);
-	float2 destPos = float2(input.Tex.x, 1 - input.Tex.y );
+    float2 coord1 = float2(srcTC - delta.yx).xy;
+    float2 coord2 = float2(srcTC).xy;
+    float2 coord3 = float2(srcTC + delta.yx).xy;
+    float2 coord4 = float2(srcTC + delta.wz).xy;
 
-	/* Compute distance to segments */	
-	float dist = segdist(srcPos0, srcPos1, destPos);
-	dist = min(dist, segdist(srcPos1, srcPos2, destPos));
-	dist = min(dist, segdist(srcPos2, srcPos3, destPos));
-	dist = min(dist, segdist(srcPos2, srcPos3, destPos));
+    lineHeights[0] = txDiffuse.Sample(samPoint, coord1).x;
+    lineHeights[1] = txDiffuse.Sample(samPoint, coord2).x;
+    lineHeights[2] = txDiffuse.Sample(samPoint, coord3).x;
+    lineHeights[3] = txDiffuse.Sample(samPoint, coord4).x;
 
-	/* Compute distance to dots */
-	//dist = min(dist, length(destPos - srcPos0) - dot_size);
-	//dist = min(dist, length(destPos - srcPos1) - dot_size);
-	//d = min(d, length(a - p2) - dot_size);
-	//d = min(d, length(a - p3) - dot_size);
+    float2 srcPos0 = float2((input.Tex.x - delta.x), lineHeights[0]);
+    float2 srcPos1 = float2(input.Tex.x, lineHeights[1]);
+    float2 srcPos2 = float2((input.Tex.x + delta.x), lineHeights[2]);
+    float2 srcPos3 = float2(input.Tex.x + delta.z, lineHeights[3]);
+    float2 destPos = float2(input.Tex.x, 1 - input.Tex.y);
 
-	/* Add line width */
-	float line_width = delta.x;
-	float lineLum = clamp(line_width - dist, 0.0, 1.0);
-	lineLum = lineLum / delta.x;
-	
-	float4 retval;
-	retval = float4(lineColor.xyz, lineLum);
-	//retval = float4(1, 1, 1, 1);
-	return retval;
+    /* Compute distance to segments */
+    float dist = segdist(srcPos0, srcPos1, destPos);
+    dist = min(dist, segdist(srcPos1, srcPos2, destPos));
+    dist = min(dist, segdist(srcPos2, srcPos3, destPos));
+    dist = min(dist, segdist(srcPos2, srcPos3, destPos));
+
+    /* Compute distance to dots */
+    //dist = min(dist, length(destPos - srcPos0) - dot_size);
+    //dist = min(dist, length(destPos - srcPos1) - dot_size);
+    //d = min(d, length(a - p2) - dot_size);
+    //d = min(d, length(a - p3) - dot_size);
+
+    /* Add line width */
+    float line_width = delta.x;
+    float lineLum = clamp(line_width - dist, 0.0, 1.0);
+    lineLum = lineLum / delta.x;
+
+    float4 retval;
+    retval = float4(lineColor.xyz, lineLum);
+    //retval = float4(1, 1, 1, 1);
+    return retval;
 }
 
 float4 blend(float4 A, float4 B)
 {
-	float4 C;
-	C.a = A.a + (1 - A.a) * B.a;
-	C.rgb = (1 / C.a) * (A.a * A.rgb + (1 - A.a) * B.a * B.rgb);
-	return C;
+    float4 C;
+    C.a = A.a + (1 - A.a) * B.a;
+    C.rgb = (1 / C.a) * (A.a * A.rgb + (1 - A.a) * B.a * B.rgb);
+    return C;
 }
 
 float4 FSGraphPS(PS_INPUT input) : SV_Target
 {
-	//const float columnIndex = .2857;
-	float srcWidth = 21.0;
+    //const float columnIndex = .2857;
+    float srcWidth = 21.0;
 
-	float4 result = 0;
+    float4 result = 0;
 
-	[unroll]
-	for (int i = 2; i < 14; i++)
-	{
-		float columnIndex = i * (1 / srcWidth);
-		result = blend(result, CalcFrag(input, columnIndex, lineColors[i - 2]));
-	}
-	return result;
+    [unroll]
+    for (int i = 2; i < 14; i++)
+    {
+        float columnIndex = i * (1 / srcWidth);
+        result = blend(result, CalcFrag(input, columnIndex, lineColors[i - 2]));
+    }
+    return result;
 }
 
 
 /*
 matrix MatrixTransformation
 (
-    float3 ScalingOrigin, 
-    float4 ScalingOrientationQuaternion, 
-    float3 Scaling, 
-    float3 RotationOrigin, 
-    float4 RotationQuaternion, 
+    float3 ScalingOrigin,
+    float4 ScalingOrientationQuaternion,
+    float3 Scaling,
+    float3 RotationOrigin,
+    float4 RotationQuaternion,
     float3 Translation
 )
 {

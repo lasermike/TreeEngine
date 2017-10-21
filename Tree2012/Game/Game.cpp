@@ -69,37 +69,37 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     XSF::SetContentFileRoot();
 
-	// Init vertex/index buffer
-	m_pScene = new SceneRoot();
+    // Init vertex/index buffer
+    m_pScene = new SceneRoot();
 
-	// Create player
-	WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
-	playerParams->position = XMFLOAT3(-4.0f, 1.5f, -4.0f);
-	XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0,1,0,1), XM_PIDIV4));	
-	m_player = new Player(playerParams);
+    // Create player
+    WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
+    playerParams->position = XMFLOAT3(-4.0f, 1.5f, -4.0f);
+    XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+    m_player = new Player(playerParams);
 
-	// Rendering defaults
-	m_renderManager.GetRenderData().frame = 0;
-	m_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
-	m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
-	m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
+    // Rendering defaults
+    m_renderManager.GetRenderData().frame = 0;
+    m_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
+    m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
+    m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
-	m_currentScene = 0;
-	m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
-	//m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
+    m_currentScene = 0;
+    m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
+    //m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
-	// Init scene bounds.
-	// Estimatation.    
-	// Ideally would loop through all world space vertices
-	m_renderManager.GetRenderData().mSceneBounds.Center = XMFLOAT3(0.0f, 3.0f, 0.0f);
-	m_renderManager.GetRenderData().mSceneBounds.Radius = 5 ; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
+    // Init scene bounds.
+    // Estimatation.    
+    // Ideally would loop through all world space vertices
+    m_renderManager.GetRenderData().mSceneBounds.Center = XMFLOAT3(0.0f, 3.0f, 0.0f);
+    m_renderManager.GetRenderData().mSceneBounds.Radius = 5; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
 
-	// Create thread pool
-	//may return 0 when not able to detect
-	unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
-	m_threadPool = new ThreadPool(concurentThreadsSupported ? concurentThreadsSupported : 1 );
+    // Create thread pool
+    //may return 0 when not able to detect
+    unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
+    m_threadPool = new ThreadPool(concurentThreadsSupported ? concurentThreadsSupported : 1);
 
-	return S_OK;
+    return S_OK;
 }
 
 
@@ -112,7 +112,7 @@ HRESULT Game::Cleanup()
     }
 
     m_renderManager.UninitDevice();
-    
+
     return S_OK;
 }
 
@@ -301,8 +301,8 @@ void Game::ComputeCPU()
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
 
-	FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
-	HandleInput(inputData.key);
+    FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
+    HandleInput(inputData.key);
 
     m_timer.Tick([&]()
     {
