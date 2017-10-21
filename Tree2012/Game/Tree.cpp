@@ -37,16 +37,22 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 	trunkMaterial.Specular = XMFLOAT4(0, .1f, .1f, 1.0);
 	trunkMaterial.flags.y = 1; //useTextures  TODO
 
+    // Default textures
+    if (_params->textureFilename.size() < 1)
+    {
+        _params->textureFilename.push_back(L"Bark_0005_diffuse.dds");
+    }
+
 	// Create material, mesh, and reserve render unit
 	Material* pTrunk = nullptr;
-	renderManager.CreateMaterial(L"trunk", L"Bark_0005_diffuse.dds", nullptr, nullptr, trunkMaterial, StockRenderState(), &pTrunk);
+	renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), nullptr, nullptr, trunkMaterial, StockRenderState(), &pTrunk);
 	Mesh* pNewMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Cylinder);
 	renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
 	renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
 
 	Material* pTwig = nullptr;
-	renderManager.CreateMaterial(L"twig", L"Bark_0005_diffuse.dds", nullptr, nullptr, trunkMaterial, StockRenderState(), &pTwig);
+	renderManager.CreateMaterial(L"twig", _params->textureFilename[0].c_str(), nullptr, nullptr, trunkMaterial, StockRenderState(), &pTwig);
 	pNewMesh = nullptr;
 	pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
 	renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);

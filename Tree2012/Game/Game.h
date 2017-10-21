@@ -127,6 +127,7 @@ private:
 	bool								m_wireframe;
 	bool								m_showHelp;
     bool                                m_is12Driver;
+    bool                                m_rotateLights;
 	GameData							m_gameData;
 
 

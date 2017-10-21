@@ -99,24 +99,30 @@ void LSystemModelGenerator::CreateSkeleton2(string& axiom)
 		switch (cmd)
 		{
 		case '&':
-			currentState.dir = XMQuaternionMultiply(currentState.dir, yQuadPos);
+        case 'Y':
+            currentState.dir = XMQuaternionMultiply(currentState.dir, yQuadPos);
 			break;
 		case '^':
-			currentState.dir = XMQuaternionMultiply(currentState.dir, yQuadNeg);
+        case 'y':
+            currentState.dir = XMQuaternionMultiply(currentState.dir, yQuadNeg);
 			break;
 		case '<':
 		case '\\':
-			currentState.dir = XMQuaternionMultiply(currentState.dir, xQuadPos);
+        case 'X':
+            currentState.dir = XMQuaternionMultiply(currentState.dir, xQuadPos);
 			break;
 		case '>':
 		case '/':
-			currentState.dir = XMQuaternionMultiply(currentState.dir, xQuadNeg);
+        case 'x':
+            currentState.dir = XMQuaternionMultiply(currentState.dir, xQuadNeg);
 			break;
 		case '+':
-			currentState.dir = XMQuaternionMultiply(currentState.dir, zQuadPos);
+        case 'Z':
+            currentState.dir = XMQuaternionMultiply(currentState.dir, zQuadPos);
 			break;
 		case '-':
-			currentState.dir = XMQuaternionMultiply(currentState.dir, zQuadNeg);
+        case 'z':
+            currentState.dir = XMQuaternionMultiply(currentState.dir, zQuadNeg);
 			break;
 		case '|':
 			currentState.dir = XMQuaternionMultiply(currentState.dir, xQuad180);
@@ -146,7 +152,7 @@ void LSystemModelGenerator::CreateSkeleton2(string& axiom)
 			// TODO color
 			c++;
 			break;
-		case 'X':
+		//case 'X':
 		case ' ':
 			break; // noop
 		default: 

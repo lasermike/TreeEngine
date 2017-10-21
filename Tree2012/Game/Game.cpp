@@ -33,6 +33,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_wireframe = false;
     m_showHelp = false;
     m_is12Driver = false;
+    m_rotateLights = false;
     m_timeStart = 0;
     m_resetTree = true;
     m_showShadowBuffer = false;
@@ -270,7 +271,7 @@ void Game::Update(DX::StepTimer const& timer)
     m_renderManager.GetRenderData().time = (float)m_timeCurrent;
 
 
-    if (!m_paused)
+    if (!m_paused && m_rotateLights)
     {
         // Light rotation
         XMVECTOR quat = XMQuaternionRotationNormal(XMVectorSet(0.0f, 1.0f, 0.0f, 1.f), 0.05f); //m_timeCurrent / 1000
@@ -331,13 +332,6 @@ void Game::Render(bool oculus)
 
     m_renderManager.GetRenderData().frameStats[FPS_STAT].stat = m_timer.GetFramesPerSecond();
 
-    //if (m_gameData.useShadowMaps)
-    //{
-    //    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
-    //    m_renderManager.RenderShadowMap();
-    //    PIXEndEvent();
-    //}
-
     XMStoreFloat4x4(&m_renderManager.GetRenderData().view, m_player->GetViewMatrix());
     m_renderManager.GetRenderData().eyePos = m_player->GetEyePosition();
 
@@ -352,7 +346,7 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 {
     m_player->HandleInput(key);
 
-    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H', 'N', 'B', 'R', '1', '2' };
+    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H', 'N', 'B', 'R', '1', '2', '3' };
     for (char k : availableKeys)
     {
         if (key[k])
@@ -408,6 +402,10 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
                 break;
             case '2':
                 m_reloadDevice = true;
+                break;
+            case '3':
+                m_rotateLights = !m_rotateLights;
+                key[k] = false;
                 break;
                 //case '1':
             //case '2':

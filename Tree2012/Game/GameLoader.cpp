@@ -27,12 +27,17 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 {
 	switch (sceneNum)
 	{
-	case 1:
+    case 0:
+    {
+        LoadNewTrees(pScene, pRenderData, pPlayer, gameData);
+        break;
+    }
+    case 1:
 	{
 		LoadTrees(pScene, pRenderData, pPlayer, gameData);
 		break;
 	}
-	case 3:
+	case 4:
 	{
 		LoadGraph(pScene, pRenderData, pPlayer, gameData);
 		break;
@@ -42,7 +47,7 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 		LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
 		break;
 	}
-	case 0:
+	case 3:
 	{
 		LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
 		break;
@@ -253,6 +258,66 @@ void GameLoader::LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player*
 	player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
+void GameLoader::LoadNewTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+{
+    //WorldObjectParams* params3 = new WorldObjectParams(FixedTreeGeneratorType);
+    //params3->depthLOD = 2;
+    //params3->position = XMFLOAT3(-1.3f, 0.5f, 1.3f);
+    //scene->AddChild(new Tree(params3));
+
+    WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    params2->position = XMFLOAT3(0, .5f, 0);
+    params2->_animationSpeed = 4.0f;
+    params2->depthLOD = 1;
+    params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");
+    params2->GetGeneratorParameters()._axiom = "F";
+    params2->GetGeneratorParameters()._constants = "";
+    params2->GetGeneratorParameters()._rules.push_back(Rule("F", "F [z F][Z F][X y F z F][x Y F]")); //[ X Z Z Y F ] F [ - - Y x F ][Z Y F ]
+    params2->GetGeneratorParameters()._angle = 0.383972f;
+    params2->GetGeneratorParameters()._numIterations = 4;
+    params2->GetGeneratorParameters()._segmentLength = .28f;
+    params2->GetGeneratorParameters().thickness = .020f;
+    scene->AddChild(new Tree(params2));
+
+    //WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    //params5->position = XMFLOAT3(-1.3f, .5f, -1.3f);
+    //params5->_animationSpeed = 0.0f;
+    //params5->depthLOD = 1;
+    //params5->GetGeneratorParameters()._axiom = "F";
+    //params5->GetGeneratorParameters()._constants = "";
+    //params5->GetGeneratorParameters()._rules.push_back(Rule("F", "F [ & + F] F [ - > F][- > F][& F]"));
+    //params5->GetGeneratorParameters()._angle = 0.383972f;
+    //params5->GetGeneratorParameters()._numIterations = 4;
+    //params5->GetGeneratorParameters()._segmentLength = .28f;
+    //params5->GetGeneratorParameters().thickness = .020f;
+    //scene->AddChild(new Tree(params5));
+
+    // Ground
+    WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+    params4->position = XMFLOAT3(0, 0, 0);
+    params4->scale = XMFLOAT3(25, .01f, 25);
+    params4->primitiveType = PrimitiveType_Cylinder;
+    scene->AddChild(new Primitive(params4));
+
+    //WorldObjectParams* params7 = new WorldObjectParams(PrimitiveGeneratorType);
+    //params7->position = XMFLOAT3(0, 0, 0);
+    //params7->scale = XMFLOAT3(.4f, .4f, .4f);
+    ////XMStoreFloat4(&params5->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
+    //params7->primitiveType = PrimitiveType_Box;
+    //scene->AddChild(new Primitive(params7));
+
+    // Init lights
+    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderData->dirLights[0].Direction = XMFLOAT3(-0.0, -0.7f, 0.7f);
+    renderData->time = 0;
+
+    // Camera
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+}
+
 void GameLoader::LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
 	WorldObjectParams* params3 = new WorldObjectParams(FixedTreeGeneratorType);
@@ -319,8 +384,8 @@ void GameLoader::LoadTrees2(SceneRoot* scene, RenderData* renderData, Player* pl
 	params5->_animationSpeed = 50.0f;
 	params5->depthLOD = 1;
 	params5->GetGeneratorParameters()._constants = "";
-	params5->GetGeneratorParameters()._axiom = "X";
-	params5->GetGeneratorParameters()._rules.push_back(Rule("X", "F[+X][-X]FX"));
+	params5->GetGeneratorParameters()._axiom = "M";
+	params5->GetGeneratorParameters()._rules.push_back(Rule("M", "F[+ ][- ]F "));
 	params5->GetGeneratorParameters()._rules.push_back(Rule("F", "FF"));
 	params5->GetGeneratorParameters()._angle = 0.47996554429844063365401496133436f;
 	params5->GetGeneratorParameters()._numIterations = 5;

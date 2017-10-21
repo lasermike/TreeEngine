@@ -52,13 +52,14 @@ public:
 
 	virtual ~WorldObjectParams() { }
 
-	XMFLOAT3 position;
+    XMFLOAT3 position;
 	XMFLOAT3 scale;
 	XMFLOAT4 rotation; // Quaternion
 	GeneratorType generatorType;
 	float _animationSpeed;
 	int depthLOD;
 	PrimitiveType primitiveType;
+    std::vector<std::wstring> textureFilename;
 };
 
 template<typename T>

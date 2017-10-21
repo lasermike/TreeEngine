@@ -26,6 +26,7 @@ class GameLoader
 	void LoadTrees(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
 	void LoadTrees2(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
 	void LoadTrees3(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
+    void LoadNewTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData);
 	void LoadTestBlock(SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData);
 	void LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData);
 
