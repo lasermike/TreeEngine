@@ -274,7 +274,7 @@ void GameLoader::LoadNewTrees(SceneRoot* scene, RenderData* renderData, Player* 
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
     trunkMaterial.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    trunkMaterial.Specular = XMFLOAT4(0, .1f, .1f, 1.0);
+    trunkMaterial.Specular = XMFLOAT4(0.1, .1f, .1f, 1.0);
     trunkMaterial.flags.y = 1; //useTextures  TODO
     params2->materials.push_back(trunkMaterial);
 
@@ -284,7 +284,7 @@ void GameLoader::LoadNewTrees(SceneRoot* scene, RenderData* renderData, Player* 
     leafMaterial.flags.y = false; //useTextures  TODO
     params2->materials.push_back(leafMaterial);
 
-    params2->GetGeneratorParameters()._axiom = "F";
+    params2->GetGeneratorParameters()._axiom = "z y F Z F";
     params2->GetGeneratorParameters()._constants = "";
     params2->GetGeneratorParameters()._rules.push_back(Rule("F", "F [z F][Z F][X y F z F][x Y F]")); //[ X Z Z Y F ] F [ - - Y x F ][Z Y F ]
     params2->GetGeneratorParameters()._angle = 0.383972f;
