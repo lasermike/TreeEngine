@@ -287,7 +287,7 @@ void GameLoader::LoadNewTrees(SceneRoot* scene, RenderData* renderData, Player* 
     params2->GetGeneratorParameters()._axiom = "z y F Z F";
     params2->GetGeneratorParameters()._constants = "";
     params2->GetGeneratorParameters()._rules.push_back(Rule("F", "F [z F][Z F][X y F z F][x Y F]")); //[ X Z Z Y F ] F [ - - Y x F ][Z Y F ]
-    params2->GetGeneratorParameters()._angle = 0.383972f;
+    params2->GetGeneratorParameters()._angle = 0.453972f;
     params2->GetGeneratorParameters()._numIterations = 4;
     params2->GetGeneratorParameters()._segmentLength = .28f;
     params2->GetGeneratorParameters().thickness = .020f;

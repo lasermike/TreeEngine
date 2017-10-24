@@ -38,9 +38,14 @@ struct Rule
 //    }
 //};
 
+struct LSystemParams;
+
+typedef float (*LengthFunc)(LSystemParams* params);
 
 struct LSystemParams
 {
+    LSystemParams();
+
     int _numIterations;
     float _angle;
     float _segmentLength;
@@ -49,9 +54,8 @@ struct LSystemParams
     string _axiom;
     vector<Rule> _rules;
 
-    LSystemParams() : _numIterations(0), _angle(0), _constants(), _axiom(), _rules() { };
+    LengthFunc SegmentLength;
 };
-
 
 struct BuildState
 {
@@ -75,5 +79,4 @@ public:
 
 protected:
     void CreateSkeleton(string& cmd);
-    void CreateSkeleton2(string& cmd);
 };

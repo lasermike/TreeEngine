@@ -2,6 +2,18 @@
 #include "LSystemModelGenerator.h"
 #include <stack>
 
+float DefaultLength(LSystemParams* params)
+{
+    return params->_segmentLength;
+}
+
+LSystemParams::LSystemParams() :
+    _numIterations(0), _angle(0), _constants(), _axiom(), _rules()
+{
+    SegmentLength = DefaultLength;
+};
+
+
 LSystemModelGenerator::LSystemModelGenerator(LSystemParams& params) : TreeModelGenerator(), _params(params)
 {
 }
@@ -32,12 +44,12 @@ TreeModel* LSystemModelGenerator::Create()
 
     OutputDebugStringA(axiom.c_str());
     OutputDebugStringA("\n");
-    CreateSkeleton2(axiom);
+    CreateSkeleton(axiom);
 
     return _model;
 }
 
-void LSystemModelGenerator::CreateSkeleton2(string& axiom)
+void LSystemModelGenerator::CreateSkeleton(string& axiom)
 {
     BuildState initialState;
     initialState.pos = XMVectorSet(0, 0, 0, 1);
@@ -55,7 +67,7 @@ void LSystemModelGenerator::CreateSkeleton2(string& axiom)
 
     XMVECTOR axis;  float angle;
     XMQuaternionToAxisAngle(&axis, &angle, initialState.dir);
-    XMStoreFloat4(&_model->trunk->end, initialState.pos + axis * _params._segmentLength);
+    XMStoreFloat4(&_model->trunk->end, initialState.pos + axis * _params.SegmentLength(&_params));
     _model->trunk->thickness = _params.thickness;
     _model->trunk->depth = 0;
     initialState.branch = _model->trunk;
@@ -134,9 +146,9 @@ void LSystemModelGenerator::CreateSkeleton2(string& axiom)
             prevPos = currentState.pos;
 
             {
-                float randLen = rand() / (float)RAND_MAX * 0.2f + _params._segmentLength;
+                float len = rand() / (float)RAND_MAX * 0.2f + _params.SegmentLength(&_params);
                 axis = XMVector3TransformNormal(yVec, XMMatrixRotationQuaternion(currentState.dir));
-                currentState.pos = currentState.pos + axis * randLen * (cmd == 'L' ? 0.5f : 1.0f);
+                currentState.pos = currentState.pos + axis * len * (cmd == 'L' ? 0.5f : 1.0f);
             }
 
             XMStoreFloat4(&tmpPrev, prevPos);
@@ -163,111 +175,10 @@ void LSystemModelGenerator::CreateSkeleton2(string& axiom)
             break;
         }
 
-        //previousState = currentState;
         pos++;
         done.push_back(cmd);
     }
 
     LOG(unknown.c_str());
-}
-
-void LSystemModelGenerator::CreateSkeleton(string& axiom)
-{
-    //BuildState initialState;
-    //initialState.pos = XMFLOAT4(0, 0, 0, 1);
-    //initialState.dir = XMFLOAT3(0, 1, 0);
-
-    //int id = _model->treeData.numBranches++;
-    //Branch* child = &_model->treeData.pBranches[id];
-
-    //_model->trunk = child;
-    //_model->trunk->id = id;
-    //_model->trunk->parent = -1;
-    //_model->trunk->start = initialState.pos;
-    //XMStoreFloat4(&_model->trunk->end, XMLoadFloat4(&initialState.pos) + XMLoadFloat3(&initialState.dir) * _params._segmentLength);
-    //_model->trunk->thickness = _params.thickness;
-    //_model->trunk->depth = 0;
-    //initialState.branch = _model->trunk;
-
-    //BuildState previousState = initialState, currentState;
-
-    //XMFLOAT4 zAxis(0, 0, 1, 1);
-    //XMMATRIX rotateZPosMat = XMMatrixRotationAxis(XMLoadFloat4(&zAxis), _params._angle);
-    //XMMATRIX rotateZNegMat = XMMatrixRotationAxis(XMLoadFloat4(&zAxis), -_params._angle);
-
-    //XMFLOAT4 xAxis(1, 0, 0, 1);
-    //XMMATRIX rotateXPosMat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), _params._angle);
-    //XMMATRIX rotateXNegMat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), _params._angle);
-    //XMMATRIX rotate180Mat = XMMatrixRotationAxis(XMLoadFloat4(&xAxis), XM_PI);
-
-    //XMFLOAT4 yAxis(0, 1, 0, 1);
-    //XMMATRIX rotateYPosMat = XMMatrixRotationAxis(XMLoadFloat4(&yAxis), _params._angle);
-    //XMMATRIX rotateYNegMat = XMMatrixRotationAxis(XMLoadFloat4(&yAxis), _params._angle);
-
-
-    //stack<BuildState> stateStack;
-
-    //int pos = 0;
-    //string done;
-    //for (auto c = axiom.begin(); c != axiom.end(); c++)
-    //{
-    //	currentState = previousState;
-
-    //	char cmd = *c;
-    //	switch (cmd)
-    //	{
-    //	case '&':
-    //		XMStoreFloat3(&currentState.dir, XMVector4Normalize(XMVector3TransformNormal(XMLoadFloat3(&currentState.dir), rotateYPosMat)));
-    //		break;
-    //	case '^':
-    //		XMStoreFloat3(&currentState.dir, XMVector4Normalize(XMVector3TransformNormal(XMLoadFloat3(&currentState.dir), rotateYNegMat)));
-    //		break;
-    //	case '<':
-    //	case '\\':
-    //		XMStoreFloat3(&currentState.dir, XMVector4Normalize(XMVector3TransformNormal(XMLoadFloat3(&currentState.dir), rotateXPosMat)));
-    //		break;
-    //	case '>':
-    //	case '/':
-    //		XMStoreFloat3(&currentState.dir, XMVector4Normalize(XMVector3TransformNormal(XMLoadFloat3(&currentState.dir), rotateXNegMat)));
-    //		break;
-    //	case '+':
-    //		XMStoreFloat3(&currentState.dir, XMVector4Normalize(XMVector3TransformNormal(XMLoadFloat3(&currentState.dir), rotateZPosMat)));
-    //		break;
-    //	case '-':
-    //		XMStoreFloat3(&currentState.dir, XMVector4Normalize(XMVector3TransformNormal(XMLoadFloat3(&currentState.dir), rotateZNegMat)));
-    //		break;
-    //	case '|':
-    //		XMStoreFloat3(&currentState.dir, XMVector3TransformNormal(XMLoadFloat3(&currentState.dir), rotate180Mat));
-    //		break;
-    //		//case 'A':
-    //		//case 'B':
-    //	case 'f':
-    //		XMStoreFloat4(&currentState.pos, XMLoadFloat4(&currentState.pos) + XMLoadFloat3(&currentState.dir) * _params._segmentLength * 0.2f);
-    //		currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos, Leaf);
-    //		break;
-    //	case 'F':
-    //		XMStoreFloat4(&currentState.pos, XMLoadFloat4(&currentState.pos) + XMLoadFloat3(&currentState.dir) * _params._segmentLength);
-    //		currentState.branch = AddBranch(previousState.branch, previousState.pos, currentState.pos, Stick);
-    //		break;
-    //	case '[':
-    //		stateStack.push(currentState);
-    //		break;
-    //	case ']':
-    //		currentState = stateStack.top();
-    //		stateStack.pop();
-    //		break;
-    //	case 'C':
-    //		c++;
-    //		// TODO color
-    //		break;
-    //	case 'X':
-    //	case ' ':
-    //		break; // noop
-    //	}
-    //	previousState = currentState;
-    //	pos++;
-    //	done.push_back(cmd);
-    //}
-
 }
 
