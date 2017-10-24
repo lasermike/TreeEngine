@@ -105,8 +105,6 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     string done, unknown;
     for (auto c = axiom.begin(); c != axiom.end(); c++)
     {
-        //currentState = previousState;
-
         char cmd = *c;
         switch (cmd)
         {
@@ -141,8 +139,6 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             break;
         case 'F':
         case 'L':
-            //case 'A':
-            //case 'S':
             prevPos = currentState.pos;
 
             {
