@@ -142,7 +142,7 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             prevPos = currentState.pos;
 
             {
-                float len = rand() / (float)RAND_MAX * 0.2f + _params.SegmentLength(&_params);
+                float len = _params.SegmentLength(&_params); 
                 axis = XMVector3TransformNormal(yVec, XMMatrixRotationQuaternion(currentState.dir));
                 currentState.pos = currentState.pos + axis * len * (cmd == 'L' ? 0.5f : 1.0f);
             }
