@@ -217,7 +217,7 @@ void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, Gam
 }
 
 
-float SegLengthPlusRand(LSystemParams* params)
+float SegLengthPlusRand(LSystemParams* params, float cmdParam)
 {
     float len = rand() / (float)RAND_MAX * 0.2f + params->_segmentLength;
     return len;

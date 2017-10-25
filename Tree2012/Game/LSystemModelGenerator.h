@@ -40,7 +40,7 @@ struct Rule
 
 struct LSystemParams;
 
-typedef float (*LengthFunc)(LSystemParams* params);
+typedef float (*LengthFunc)(LSystemParams* params, float cmdParam);
 
 struct LSystemParams
 {

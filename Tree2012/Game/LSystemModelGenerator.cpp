@@ -2,7 +2,7 @@
 #include "LSystemModelGenerator.h"
 #include <stack>
 
-float DefaultLength(LSystemParams* params)
+float DefaultLength(LSystemParams* params, float cmdParam)
 {
     return params->_segmentLength;
 }
@@ -18,8 +18,10 @@ LSystemModelGenerator::LSystemModelGenerator(LSystemParams& params) : TreeModelG
 {
 }
 
-void replaceAll(string &s, const string &search, const string &replace) {
-    for (size_t pos = 0; ; pos += replace.length()) {
+void replaceAll(string &s, const string &search, const string &replace)
+{
+    for (size_t pos = 0; ; pos += replace.length())
+    {
         // Locate the substring to replace
         pos = s.find(search, pos);
         if (pos == string::npos) break;
@@ -49,6 +51,49 @@ TreeModel* LSystemModelGenerator::Create()
     return _model;
 }
 
+float GetParam(string::iterator& cmdIt, string::iterator end)
+{
+    float param = 0.0f;
+    int decimalPosition = 0;
+    auto paramIt = cmdIt + 1;
+    while (paramIt != end)
+    {
+        if (paramIt == cmdIt + 1)  // First position
+        {
+            if (*paramIt != '(') // No param
+                break;
+        }
+        else
+        {
+            if (*paramIt == ')') // Param end
+            {
+                cmdIt = paramIt; // Move iterator to end of param
+                break;
+            }
+            char digit = *paramIt;
+            if (digit >= 48 && digit <= 57)
+            {
+                if (decimalPosition)
+                {
+                    param += digit / 10.0f * decimalPosition;
+                    decimalPosition++;
+                }
+                else
+                {
+                    param *= 10.0f;
+                    param += digit;
+                }
+            }
+            else if (digit == '.')
+            {
+                decimalPosition = 1;
+            }
+        }
+    }
+
+    return param;
+}
+
 void LSystemModelGenerator::CreateSkeleton(string& axiom)
 {
     BuildState initialState;
@@ -67,7 +112,7 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
     XMVECTOR axis;  float angle;
     XMQuaternionToAxisAngle(&axis, &angle, initialState.dir);
-    XMStoreFloat4(&_model->trunk->end, initialState.pos + axis * _params.SegmentLength(&_params));
+    XMStoreFloat4(&_model->trunk->end, initialState.pos + axis * _params.SegmentLength(&_params, 0.0f));
     _model->trunk->thickness = _params.thickness;
     _model->trunk->depth = 0;
     initialState.branch = _model->trunk;
@@ -103,9 +148,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     XMVECTOR prevPos;
     int pos = 0;
     string done, unknown;
-    for (auto c = axiom.begin(); c != axiom.end(); c++)
+    for (auto cmdIt = axiom.begin(); cmdIt != axiom.end(); cmdIt++)
     {
-        char cmd = *c;
+        char cmd = *cmdIt;
         switch (cmd)
         {
         case '&':
@@ -142,7 +187,8 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             prevPos = currentState.pos;
 
             {
-                float len = _params.SegmentLength(&_params); 
+                float cmdParam = GetParam(cmdIt, axiom.end());
+                float len = _params.SegmentLength(&_params, cmdParam);
                 axis = XMVector3TransformNormal(yVec, XMMatrixRotationQuaternion(currentState.dir));
                 currentState.pos = currentState.pos + axis * len * (cmd == 'L' ? 0.5f : 1.0f);
             }
@@ -161,9 +207,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             break;
         case 'C':
             // TODO color
-            c++;
+            //cmdIt++;
             break;
-            //case 'X':
+        //case 'X':
         case ' ':
             break; // noop
         default:
