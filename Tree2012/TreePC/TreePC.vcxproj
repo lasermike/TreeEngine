@@ -124,6 +124,7 @@
     <ClCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions Condition="'$(Platform)'=='Win32'">WIN32</UndefinePreprocessorDefinitions>
+      <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BrowseInformation>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories Condition="'$(Platform)'=='Win32'">Lib\Debug</AdditionalLibraryDirectories>

@@ -18,17 +18,198 @@ LSystemModelGenerator::LSystemModelGenerator(LSystemParams& params) : TreeModelG
 {
 }
 
-void replaceAll(string &s, const string &search, const string &replace)
+
+enum EquationType
 {
-    for (size_t pos = 0; ; pos += replace.length())
+    ET_UNKNOWN,
+    ET_ADD,
+    ET_MULTIPLY
+};
+
+enum ParamType
+{
+    PT_UNKNOWN,
+    PT_SYMBOL,
+    PT_FLOAT,
+    PT_EQUATION
+};
+
+struct Param
+{
+    char raw[64];
+    ParamType paramType;
+    float floatVal;
+    char symbol;
+    EquationType equationType;
+};
+
+struct Command
+{
+    char symbol;
+    Param param;
+};
+
+bool GetCommand(string::const_iterator cmdIt, string::const_iterator end, ParamType paramType, Command* result)
+{
+    ZeroMemory(result, sizeof(Command));
+
+    if (cmdIt == end || cmdIt + 1 == end)
     {
-        // Locate the substring to replace
-        pos = s.find(search, pos);
-        if (pos == string::npos) break;
-        // Replace by erasing and inserting
-        s.erase(pos, search.length());
-        s.insert(pos, replace);
+        return false;
     }
+
+    float param = 0.0f;
+    int decimalPosition = 0;
+    bool parsingFloat = false;
+    auto paramIt = cmdIt;
+    while (paramIt + 1 != end)
+    {
+        paramIt++;
+
+        if (paramIt == cmdIt + 1)  // First position
+        {
+            if (*paramIt != '(') // No param found
+            {
+                return false;
+            }
+        }
+        else
+        {
+            if (*paramIt == ')') // Param end
+            {
+                cmdIt = paramIt; // Move iterator to end of param
+                result->param.paramType = paramType;
+                return true;
+            }
+
+            char ch = *paramIt;
+            if (paramType == PT_SYMBOL || paramType == PT_EQUATION)
+            {
+                if (ch >= 'a' && ch <= 'z')
+                {
+                    result->symbol = ch;
+                }
+            }
+
+            if (paramType == PT_EQUATION)
+            {
+                switch (ch)
+                {
+                case '+':
+                    result->param.equationType = ET_MULTIPLY;
+                    break;
+                case '*':
+                    result->param.equationType = ET_MULTIPLY;
+                    break;
+                }
+            }
+
+            if (result->param.paramType == PT_FLOAT || result->param.paramType == PT_EQUATION)
+            {
+                if (ch >= '0' && ch <= '9')
+                {
+                    byte digit = ch - '0';
+                    if (decimalPosition)
+                    {
+                        result->param.floatVal += digit / (10.0f * decimalPosition);
+                        decimalPosition++;
+                    }
+                    else
+                    {
+                        result->param.floatVal *= 10.0f;
+                        result->param.floatVal += digit;
+                    }
+                }
+                else if (ch == '.')
+                {
+                    decimalPosition = 1;
+                }
+            }
+        } 
+    }
+
+    return false;
+}
+
+void replaceAll(string& inout, const string &search, const string &replace)
+{
+    // First tokenize all strings
+    Command searchCmd = {};
+
+    for (auto searchIt = search.begin(); searchIt != search.end(); searchIt++)
+    {
+        GetCommand(searchIt, search.end(), PT_SYMBOL, &searchCmd);
+    }
+
+    std::vector<Command> replaceCmds;
+    for (auto& replaceIt = replace.begin(); replaceIt != replace.end(); replaceIt++)
+    {
+        Command repCmd = {};
+        if (GetCommand(replaceIt, replace.end(), PT_EQUATION, &repCmd))
+        {
+            replaceCmds.push_back(repCmd);
+        }
+    }
+
+    size_t pos = 0;
+    std::vector<Command> inputCmds;
+    for (auto inoutIt = inout.begin(); inoutIt != inout.end(); inoutIt++)
+    {
+        Command inoutCmd = {};
+        if (GetCommand(inoutIt, inout.end(), PT_EQUATION, &inoutCmd))
+        {
+            inputCmds.push_back(inoutCmd);
+        }
+    }
+
+    // Second do search/replace
+    std::vector<Command> outputCmds;
+    for (auto& inputCmd : inputCmds)
+    {
+        if (inputCmd.symbol == searchCmd.symbol)
+        {
+            for(auto& replaceCmd : replaceCmds)
+            {
+                outputCmds.push_back(replaceCmd);
+            }
+        }
+        else
+        {
+            outputCmds.push_back(inputCmd);
+        }
+    }
+
+    std::stringstream ss;
+
+    for(auto& outputCmd : outputCmds)
+    {
+        ss << outputCmd.symbol;
+    }
+
+    inout = ss.str();
+
+    //for (size_t pos = 0; ; pos += replace.length())
+    //{
+    //    // Locate the substring to replace
+    //    pos = input.find(command.symbol, pos);
+    //    if (pos == string::npos) break;
+    //    // Replace by erasing and inserting
+    //    ParamData inputParam = {};
+    //    if (!GetParam(input.begin() + 1, input.end(), PT_EQUATION, &inputParam)
+    //    {
+    //        assert(false); // Maybe this should be allowed
+    //    }
+
+    //    ParamData replaceParam = {};
+    //    if (!GetParam(replace.begin() + 1, replace.end(), PT_EQUATION, &replaceParam))
+    //    {
+    //        assert(false); // Maybe this should be allowed
+    //    }
+
+    //    int cmdLen = paramFound ? /*cmd(raw) */ : search.length();
+    //    input.erase(pos, cmdLen);
+    //    input.insert(pos, replace);
+    //}
 }
 
 TreeModel* LSystemModelGenerator::Create()
@@ -49,49 +230,6 @@ TreeModel* LSystemModelGenerator::Create()
     CreateSkeleton(axiom);
 
     return _model;
-}
-
-float GetParam(string::iterator& cmdIt, string::iterator end)
-{
-    float param = 0.0f;
-    int decimalPosition = 0;
-    auto paramIt = cmdIt + 1;
-    while (paramIt != end)
-    {
-        if (paramIt == cmdIt + 1)  // First position
-        {
-            if (*paramIt != '(') // No param
-                break;
-        }
-        else
-        {
-            if (*paramIt == ')') // Param end
-            {
-                cmdIt = paramIt; // Move iterator to end of param
-                break;
-            }
-            char digit = *paramIt;
-            if (digit >= 48 && digit <= 57)
-            {
-                if (decimalPosition)
-                {
-                    param += digit / 10.0f * decimalPosition;
-                    decimalPosition++;
-                }
-                else
-                {
-                    param *= 10.0f;
-                    param += digit;
-                }
-            }
-            else if (digit == '.')
-            {
-                decimalPosition = 1;
-            }
-        }
-    }
-
-    return param;
 }
 
 void LSystemModelGenerator::CreateSkeleton(string& axiom)
@@ -187,7 +325,7 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             prevPos = currentState.pos;
 
             {
-                float cmdParam = GetParam(cmdIt, axiom.end());
+                float cmdParam = 0.0f;  //GetParam(cmdIt, axiom.end());
                 float len = _params.SegmentLength(&_params, cmdParam);
                 axis = XMVector3TransformNormal(yVec, XMMatrixRotationQuaternion(currentState.dir));
                 currentState.pos = currentState.pos + axis * len * (cmd == 'L' ? 0.5f : 1.0f);

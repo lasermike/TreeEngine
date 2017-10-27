@@ -35,6 +35,7 @@
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Game\WorldObject.cpp">
