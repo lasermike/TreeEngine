@@ -304,12 +304,13 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
 
     params2->GetGeneratorParameters()._axiom = "F(1)";
     params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.5) X F(a*0.5) x x F(a*0.5) X F(a*0.5)"));
+    //params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.5) X F(a*0.5) x x F(a*0.5) X F(a*0.5)"));
     params2->GetGeneratorParameters()._constants = "";
-    params2->GetGeneratorParameters()._angle = 0.453972f;
-    params2->GetGeneratorParameters()._numIterations = 1;
+    params2->GetGeneratorParameters()._angle = 1.047198f;
+    params2->GetGeneratorParameters()._numIterations = 4;
     params2->GetGeneratorParameters()._segmentLength = .28f;
     params2->GetGeneratorParameters().thickness = .020f;
-    params2->GetGeneratorParameters().SegmentLength = SegLengthPlusRand;
+    //params2->GetGeneratorParameters().SegmentLength = SegLengthPlusRand;
     scene->AddChild(new Tree(params2));
 
     // Ground

@@ -218,29 +218,6 @@ void replaceAll(string& inout, const string &search, const string &replace)
     }
 
     inout = ss.str();
-
-    //for (size_t pos = 0; ; pos += replace.length())
-    //{
-    //    // Locate the substring to replace
-    //    pos = input.find(command.symbol, pos);
-    //    if (pos == string::npos) break;
-    //    // Replace by erasing and inserting
-    //    ParamData inputParam = {};
-    //    if (!GetParam(input.begin() + 1, input.end(), PT_EQUATION, &inputParam)
-    //    {
-    //        assert(false); // Maybe this should be allowed
-    //    }
-
-    //    ParamData replaceParam = {};
-    //    if (!GetParam(replace.begin() + 1, replace.end(), PT_EQUATION, &replaceParam))
-    //    {
-    //        assert(false); // Maybe this should be allowed
-    //    }
-
-    //    int cmdLen = paramFound ? /*cmd(raw) */ : search.length();
-    //    input.erase(pos, cmdLen);
-    //    input.insert(pos, replace);
-    //}
 }
 
 TreeModel* LSystemModelGenerator::Create()
@@ -319,8 +296,14 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     string done, unknown;
     for (auto cmdIt = axiom.begin(); cmdIt != axiom.end(); cmdIt++)
     {
-        char cmd = *cmdIt;
-        switch (cmd)
+        //char cmd = *cmdIt;
+        Command command = {};
+        if (!GetCommand(cmdIt, axiom.end(), PT_FLOAT, &command))
+        {
+            assert(false);
+        }
+
+        switch (command.symbol)
         {
         case '&':
         case 'Y':
@@ -354,18 +337,17 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         case 'F':
         case 'L':
             prevPos = currentState.pos;
-
             {
-                float cmdParam = 0.0f;  //GetParam(cmdIt, axiom.end());
+                float cmdParam = command.param.paramType == PT_FLOAT ? command.param.floatVal : 0.0f;
                 float len = _params.SegmentLength(&_params, cmdParam);
                 axis = XMVector3TransformNormal(yVec, XMMatrixRotationQuaternion(currentState.dir));
-                currentState.pos = currentState.pos + axis * len * (cmd == 'L' ? 0.5f : 1.0f);
+                currentState.pos = currentState.pos + axis * len * (command.symbol == 'L' ? 0.5f : 1.0f);
             }
 
             XMStoreFloat4(&tmpPrev, prevPos);
             XMStoreFloat4(&tmpNext, currentState.pos);
 
-            currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (cmd == 'L' ? Leaf : Stick), _params.thickness);
+            currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (command.symbol == 'L' ? Leaf : Stick), _params.thickness);
             break;
         case '[':
             stateStack.push(currentState);
@@ -381,12 +363,12 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         case ' ':
             break; // noop
         default:
-            unknown.push_back(cmd);
+            unknown.push_back(command.symbol);
             break;
         }
 
         pos++;
-        done.push_back(cmd);
+        done.push_back(command.symbol);
     }
 
     LOG(unknown.c_str());
