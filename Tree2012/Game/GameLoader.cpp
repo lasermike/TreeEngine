@@ -303,7 +303,7 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params2->materials.push_back(leafMaterial);
 
     params2->GetGeneratorParameters()._axiom = "F(1)";
-    params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a/2) X F(a/2) x x F(a/2) X F(a/2)"));
+    params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.5) X F(a*0.5) x x F(a*0.5) X F(a*0.5)"));
     params2->GetGeneratorParameters()._constants = "";
     params2->GetGeneratorParameters()._angle = 0.453972f;
     params2->GetGeneratorParameters()._numIterations = 1;

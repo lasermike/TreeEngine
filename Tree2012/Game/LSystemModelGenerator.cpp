@@ -29,7 +29,6 @@ enum EquationType
 enum ParamType
 {
     PT_UNKNOWN,
-    PT_SYMBOL,
     PT_FLOAT,
     PT_EQUATION
 };
@@ -49,15 +48,24 @@ struct Command
     Param param;
 };
 
-bool GetCommand(string::const_iterator cmdIt, string::const_iterator end, ParamType paramType, Command* result)
+bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, ParamType paramType, Command* result)
 {
     ZeroMemory(result, sizeof(Command));
 
-    if (cmdIt == end || cmdIt + 1 == end)
+    // Skip white space
+    while (cmdIt != end && *cmdIt == ' ')
+    {
+        cmdIt++;
+    }
+
+    if (cmdIt == end)
     {
         return false;
     }
 
+    result->symbol = *cmdIt;
+
+    ParamType outputParamType = PT_UNKNOWN;
     float param = 0.0f;
     int decimalPosition = 0;
     bool parsingFloat = false;
@@ -70,7 +78,7 @@ bool GetCommand(string::const_iterator cmdIt, string::const_iterator end, ParamT
         {
             if (*paramIt != '(') // No param found
             {
-                return false;
+                return true;
             }
         }
         else
@@ -78,25 +86,23 @@ bool GetCommand(string::const_iterator cmdIt, string::const_iterator end, ParamT
             if (*paramIt == ')') // Param end
             {
                 cmdIt = paramIt; // Move iterator to end of param
-                result->param.paramType = paramType;
+                result->param.paramType = outputParamType;
                 return true;
             }
 
             char ch = *paramIt;
-            if (paramType == PT_SYMBOL || paramType == PT_EQUATION)
+            if (paramType == PT_EQUATION)
             {
                 if (ch >= 'a' && ch <= 'z')
                 {
-                    result->symbol = ch;
+                    result->param.symbol = ch;
+                    outputParamType = PT_EQUATION;
                 }
-            }
 
-            if (paramType == PT_EQUATION)
-            {
                 switch (ch)
                 {
                 case '+':
-                    result->param.equationType = ET_MULTIPLY;
+                    result->param.equationType = ET_ADD;
                     break;
                 case '*':
                     result->param.equationType = ET_MULTIPLY;
@@ -104,7 +110,7 @@ bool GetCommand(string::const_iterator cmdIt, string::const_iterator end, ParamT
                 }
             }
 
-            if (result->param.paramType == PT_FLOAT || result->param.paramType == PT_EQUATION)
+            if (paramType == PT_FLOAT || paramType == PT_EQUATION)
             {
                 if (ch >= '0' && ch <= '9')
                 {
@@ -119,6 +125,9 @@ bool GetCommand(string::const_iterator cmdIt, string::const_iterator end, ParamT
                         result->param.floatVal *= 10.0f;
                         result->param.floatVal += digit;
                     }
+
+                    outputParamType = outputParamType == PT_UNKNOWN ? PT_FLOAT : outputParamType;
+
                 }
                 else if (ch == '.')
                 {
@@ -128,7 +137,7 @@ bool GetCommand(string::const_iterator cmdIt, string::const_iterator end, ParamT
         } 
     }
 
-    return false;
+    return true;
 }
 
 void replaceAll(string& inout, const string &search, const string &replace)
@@ -138,7 +147,7 @@ void replaceAll(string& inout, const string &search, const string &replace)
 
     for (auto searchIt = search.begin(); searchIt != search.end(); searchIt++)
     {
-        GetCommand(searchIt, search.end(), PT_SYMBOL, &searchCmd);
+        GetCommand(searchIt, search.end(), PT_EQUATION, &searchCmd);
     }
 
     std::vector<Command> replaceCmds;
@@ -168,8 +177,23 @@ void replaceAll(string& inout, const string &search, const string &replace)
     {
         if (inputCmd.symbol == searchCmd.symbol)
         {
-            for(auto& replaceCmd : replaceCmds)
+            for(auto replaceCmd : replaceCmds)
             {
+                if (replaceCmd.param.paramType == PT_EQUATION)
+                {
+                    assert(inputCmd.param.paramType == PT_FLOAT);
+                    if (replaceCmd.param.equationType == ET_MULTIPLY)
+                    {
+                        replaceCmd.param.floatVal = inputCmd.param.floatVal * replaceCmd.param.floatVal;
+                    }
+                    else if (replaceCmd.param.equationType == ET_ADD)
+                    {
+                        replaceCmd.param.floatVal = inputCmd.param.floatVal + replaceCmd.param.floatVal;
+                    }
+
+                    replaceCmd.param.paramType = PT_FLOAT;
+                }
+
                 outputCmds.push_back(replaceCmd);
             }
         }
@@ -184,6 +208,13 @@ void replaceAll(string& inout, const string &search, const string &replace)
     for(auto& outputCmd : outputCmds)
     {
         ss << outputCmd.symbol;
+        if (outputCmd.param.paramType != PT_UNKNOWN)
+        {
+            assert(outputCmd.param.paramType == PT_FLOAT);
+            ss << '(';
+            ss << outputCmd.param.floatVal;
+            ss << ')';
+        }
     }
 
     inout = ss.str();
@@ -347,7 +378,6 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             // TODO color
             //cmdIt++;
             break;
-        //case 'X':
         case ' ':
             break; // noop
         default:
