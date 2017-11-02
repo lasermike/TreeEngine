@@ -244,7 +244,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 {
     BuildState initialState;
     initialState.pos = XMVectorSet(0, 0, 0, 1);
-    initialState.dir = XMQuaternionRotationAxis(XMVectorSet(0, 1.0f, 0, 0), XM_PI);
+    //initialState.dir = XMQuaternionRotationAxis(XMVectorSet(0, 1.0f, 0, 0), 0 /*XM_PI*/);
+    //XMVectorSet(0, 1.0f, 0, 0.0f); // 
+    initialState.dir = XMQuaternionRotationRollPitchYaw(0, 0, 0);
 
     // Create trunk
     int id = _model->treeData.numBranches++;

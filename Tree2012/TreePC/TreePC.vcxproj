@@ -129,6 +129,7 @@
     <Link>
       <AdditionalLibraryDirectories Condition="'$(Platform)'=='Win32'">Lib\Debug</AdditionalLibraryDirectories>
       <AdditionalLibraryDirectories Condition="'$(Platform)'=='x64'">Lib\x64\Debug</AdditionalLibraryDirectories>
+      <StackReserveSize Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">3145728</StackReserveSize>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|WIN32'">

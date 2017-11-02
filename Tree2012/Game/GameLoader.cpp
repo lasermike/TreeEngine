@@ -283,11 +283,19 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
 void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
+    // Koch curve
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
-    params2->position = XMFLOAT3(0, .5f, 0);
-    params2->_animationSpeed = 4.0f;
     params2->depthLOD = 1;
     params2->textureFilename.push_back(L"urchinskin.dds");
+    params2->_animationSpeed = 150.0f;
+    params2->position = XMFLOAT3(2, 0.5, 0);
+    params2->GetGeneratorParameters()._axiom = "F(1)";
+    params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.33) X F(a*0.33) x x F(a*0.33) X F(a*0.33)"));
+    params2->GetGeneratorParameters()._constants = "";
+    params2->GetGeneratorParameters()._angle = 1.047198f;
+    params2->GetGeneratorParameters()._numIterations = 4;
+    params2->GetGeneratorParameters()._segmentLength = 0.05f;
+    params2->GetGeneratorParameters().thickness = .010f;
 
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
@@ -302,16 +310,48 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     leafMaterial.flags.y = false; //useTextures  TODO
     params2->materials.push_back(leafMaterial);
 
-    params2->GetGeneratorParameters()._axiom = "F(1)";
-    params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.5) X F(a*0.5) x x F(a*0.5) X F(a*0.5)"));
-    //params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.5) X F(a*0.5) x x F(a*0.5) X F(a*0.5)"));
-    params2->GetGeneratorParameters()._constants = "";
-    params2->GetGeneratorParameters()._angle = 1.047198f;
-    params2->GetGeneratorParameters()._numIterations = 4;
-    params2->GetGeneratorParameters()._segmentLength = .28f;
-    params2->GetGeneratorParameters().thickness = .020f;
-    //params2->GetGeneratorParameters().SegmentLength = SegLengthPlusRand;
     scene->AddChild(new Tree(params2));
+
+    // Hilbert curve
+    WorldObjectParameters<LSystemParams>* params3 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    params3->depthLOD = 1;
+    params3->textureFilename.push_back(L"urchinskin.dds");
+    params3->position = XMFLOAT3(-2, 1.0, 0);
+    params3->GetGeneratorParameters()._axiom = "A";
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z A F A x F Y z z A F A y F z A y z"));
+
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "A X F A Y F A Y F A x F A x F A y F A y F A X"));
+
+    ;
+
+    /*
+    + Yaw Y
+    - Yaw y
+    ^ Pitch X
+    & Pitch x
+    < Roll Z
+    > Roll z
+
+
+    */
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z z A F A x F Y z z A F A y F z A y z"));
+
+
+
+    //params3->GetGeneratorParameters()._axiom = "A";
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "z B F Z A F A Z F B z"));
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("B", "Z A F z B F B z F A Z"));
+    params3->GetGeneratorParameters()._constants = "";
+    params3->GetGeneratorParameters()._angle = XM_PI / 2.0f;
+    params3->GetGeneratorParameters()._numIterations = 2;
+    params3->GetGeneratorParameters()._segmentLength = 0.05f;
+    params3->GetGeneratorParameters().thickness = .010f;
+    params3->_animationSpeed = 40.0f;
+    params3->materials.push_back(trunkMaterial);
+    params3->materials.push_back(leafMaterial);
+    scene->AddChild(new Tree(params3));
 
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
