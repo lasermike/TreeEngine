@@ -60,7 +60,8 @@ struct LSystemParams
 struct BuildState
 {
     XMVECTOR pos;
-    XMVECTOR dir;
+    //XMVECTOR dir;
+    XMMATRIX matDir;
     Branch* branch;
 
     BuildState()

@@ -242,11 +242,48 @@ TreeModel* LSystemModelGenerator::Create()
 
 void LSystemModelGenerator::CreateSkeleton(string& axiom)
 {
+    // Constants
+    XMFLOAT3 xAxis(1, 0, 0);
+    XMVECTOR xVec = XMLoadFloat3(&xAxis);
+    XMFLOAT3 yAxis(0, 1, 0);
+    XMVECTOR yVec = XMLoadFloat3(&yAxis);
+    XMFLOAT3 zAxis(0, 0, 1);
+    XMVECTOR zVec = XMLoadFloat3(&zAxis);
+    XMVECTOR zeroVec = XMVectorSet(0,0,0,0);
+
+
     BuildState initialState;
     initialState.pos = XMVectorSet(0, 0, 0, 1);
-    //initialState.dir = XMQuaternionRotationAxis(XMVectorSet(0, 1.0f, 0, 0), 0 /*XM_PI*/);
-    //XMVectorSet(0, 1.0f, 0, 0.0f); // 
-    initialState.dir = XMQuaternionRotationRollPitchYaw(0, 0, 0);
+    XMVECTOR startDir = XMVectorSet(0.0f, 1.0f, 0.0f, 0);
+
+    //initialState.dir = XMQuaternionRotationNormal(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), XM_PI);
+    initialState.matDir = XMMatrixIdentity();
+    //initialState.matDir = XMMatrixLookToLH(initialState.pos, startDir, -zVec);
+    //initialState.matDir = XMMatrixRotationY(XM_PIDIV2);
+
+    float xSign = 1.0f;
+    float ySign = 1.0f;
+    float zSign = 1.0f;
+
+    //XMVECTOR xQuadPos = XMQuaternionRotationAxis(xVec, _params._angle);
+    //XMVECTOR xQuadNeg = XMQuaternionRotationAxis(xVec, -_params._angle);
+    //XMVECTOR xQuad180 = XMQuaternionRotationAxis(xVec, XM_PI);
+    XMMATRIX rotateXPosMat = XMMatrixRotationNormal(xVec, _params._angle * xSign);
+    XMMATRIX rotateXNegMat = XMMatrixRotationNormal(xVec, _params._angle * -xSign);
+
+    //XMVECTOR yQuadPos = XMQuaternionRotationAxis(XMLoadFloat3(&yAxis), -_params._angle);
+    //XMVECTOR yQuadNeg = XMQuaternionRotationAxis(XMLoadFloat3(&yAxis), _params._angle);
+    //XMVECTOR yQuad180 = XMQuaternionRotationAxis(yVec, XM_PI);
+    XMMATRIX rotateYPosMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), _params._angle * ySign);
+    XMMATRIX rotateYNegMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), _params._angle * -ySign);
+
+    //XMVECTOR zQuadPos = XMQuaternionRotationAxis(XMLoadFloat3(&zAxis), _params._angle);
+    //XMVECTOR zQuadNeg = XMQuaternionRotationAxis(XMLoadFloat3(&zAxis), -_params._angle);
+    XMMATRIX rotateZPosMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), _params._angle * zSign);
+    XMMATRIX rotateZNegMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), _params._angle * -zSign);
+
+    XMMATRIX rotate180Mat = XMMatrixRotationNormal(yVec, XM_PI);
+
 
     // Create trunk
     int id = _model->treeData.numBranches++;
@@ -257,48 +294,27 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     _model->trunk->parent = -1;
     XMStoreFloat4(&_model->trunk->start, initialState.pos);
 
+    //XMQuaternionToAxisAngle(&axis, &angle, initialState.dir);
+    //XMStoreFloat4(&_model->trunk->end, initialState.pos + axis * _params.SegmentLength(&_params, 0.0f));
 
-    XMVECTOR axis;  float angle;
-    XMQuaternionToAxisAngle(&axis, &angle, initialState.dir);
-    XMStoreFloat4(&_model->trunk->end, initialState.pos + axis * _params.SegmentLength(&_params, 0.0f));
+    XMStoreFloat4(&_model->trunk->end, initialState.pos);
     _model->trunk->thickness = _params.thickness;
     _model->trunk->depth = 0;
     initialState.branch = _model->trunk;
 
     BuildState currentState = initialState;
-    currentState.pos = XMLoadFloat4(&_model->trunk->end);
+    ///currentState.pos = XMLoadFloat4(&_model->trunk->end);
 
-    XMFLOAT3 zAxis(0, 0, 1);
-    XMVECTOR zQuadPos = XMQuaternionRotationAxis(XMLoadFloat3(&zAxis), _params._angle);
-    XMVECTOR zQuadNeg = XMQuaternionRotationAxis(XMLoadFloat3(&zAxis), -_params._angle);
-    XMMATRIX rotateZPosMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), _params._angle);
-    XMMATRIX rotateZNegMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), -_params._angle);
+    //    _params._angle *= 2.0f; // WHy?
 
-    XMFLOAT3 xAxis(1, 0, 0);
-    XMVECTOR xVec = XMLoadFloat3(&xAxis);
-    XMVECTOR xQuadPos = XMQuaternionRotationAxis(xVec, _params._angle);
-    XMVECTOR xQuadNeg = XMQuaternionRotationAxis(xVec, -_params._angle);
-    XMVECTOR xQuad180 = XMQuaternionRotationAxis(xVec, XM_PI);
-    XMMATRIX rotateXPosMat = XMMatrixRotationNormal(xVec, _params._angle);
-    XMMATRIX rotateXNegMat = XMMatrixRotationNormal(xVec, -_params._angle);
-    XMMATRIX rotate180Mat = XMMatrixRotationNormal(xVec, XM_PI);
-
-    XMFLOAT3 yAxis(0, 1, 0);
-    XMVECTOR yVec = XMLoadFloat3(&yAxis);
-    XMVECTOR yQuadPos = XMQuaternionRotationAxis(XMLoadFloat3(&yAxis), _params._angle);
-    XMVECTOR yQuadNeg = XMQuaternionRotationAxis(XMLoadFloat3(&yAxis), -_params._angle);
-    XMMATRIX rotateYPosMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), _params._angle);
-    XMMATRIX rotateYNegMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), -_params._angle);
+    //XMFLOAT4 startPosNMinus1(1.0f, .0f, 0, 1.0f);
+    //XMVECTOR prevPos = XMLoadFloat4(&startPosNMinus1);
 
     stack<BuildState> stateStack;
-
-    XMFLOAT4 tmpPrev, tmpNext;
-    XMVECTOR prevPos;
     int pos = 0;
     string done, unknown;
     for (auto cmdIt = axiom.begin(); cmdIt != axiom.end(); cmdIt++)
     {
-        //char cmd = *cmdIt;
         Command command = {};
         if (!GetCommand(cmdIt, axiom.end(), PT_FLOAT, &command))
         {
@@ -309,47 +325,77 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         {
         case '&':
         case 'Y':
-            currentState.dir = XMQuaternionMultiply(currentState.dir, yQuadPos);
+            //currentState.dir = XMQuaternionMultiply(yQuadPos, currentState.dir);
+            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateYPosMat);
             break;
         case '^':
         case 'y':
-            currentState.dir = XMQuaternionMultiply(currentState.dir, yQuadNeg);
+            //currentState.dir = XMQuaternionMultiply(yQuadNeg, currentState.dir);
+            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateYNegMat);
             break;
         case '<':
         case '\\':
         case 'X':
-            currentState.dir = XMQuaternionMultiply(currentState.dir, xQuadPos);
+            //currentState.dir = XMQuaternionMultiply(xQuadPos, currentState.dir);
+            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateXPosMat);
             break;
         case '>':
         case '/':
         case 'x':
-            currentState.dir = XMQuaternionMultiply(currentState.dir, xQuadNeg);
+            //currentState.dir = XMQuaternionMultiply(xQuadNeg, currentState.dir);
+            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateXNegMat);
             break;
         case '+':
         case 'Z':
-            currentState.dir = XMQuaternionMultiply(currentState.dir, zQuadPos);
+            //currentState.dir = XMQuaternionMultiply(zQuadPos, currentState.dir);
+            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateZPosMat);
             break;
         case '-':
         case 'z':
-            currentState.dir = XMQuaternionMultiply(currentState.dir, zQuadNeg);
+            //currentState.dir = XMQuaternionMultiply(zQuadNeg, currentState.dir);
+            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateZNegMat);
             break;
         case '|':
-            currentState.dir = XMQuaternionMultiply(currentState.dir, xQuad180);
+            //currentState.dir = XMQuaternionMultiply(yQuad180, currentState.dir);
+            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotate180Mat);
             break;
         case 'F':
         case 'L':
-            prevPos = currentState.pos;
             {
                 float cmdParam = command.param.paramType == PT_FLOAT ? command.param.floatVal : 0.0f;
                 float len = _params.SegmentLength(&_params, cmdParam);
-                axis = XMVector3TransformNormal(yVec, XMMatrixRotationQuaternion(currentState.dir));
-                currentState.pos = currentState.pos + axis * len * (command.symbol == 'L' ? 0.5f : 1.0f);
+
+#if 0
+                //XMVECTOR axis = XMVectorSet(0, 0, 0, 0);
+                //float angle = 0;
+                ////axis = XMVector3TransformNormal(yVec, XMMatrixRotationQuaternion(currentState.dir));
+                //XMQuaternionToAxisAngle(&axis, &angle, currentState.dir);
+
+                //XMFLOAT4 axisFloat4;
+                //XMStoreFloat4(&axisFloat4, axis);
+                //axisFloat4.w = 0;
+                //axis = XMLoadFloat4(&axisFloat4);
+
+                //XMVECTOR prevPos = currentState.pos;
+                //currentState.pos = currentState.pos + axis * len * (command.symbol == 'L' ? 0.5f : 1.0f);
+#else
+                //XMVECTOR quat = XMQuaternionRotationMatrix(currentState.matDir);
+                //XMVECTOR axis;  float angle;
+                //XMQuaternionToAxisAngle(&axis, &angle, quat);
+                //axis = XMVector3Normalize(axis);
+
+                XMVECTOR axis = XMVector3Transform(yVec, currentState.matDir);
+
+                XMVECTOR prevPos = currentState.pos;
+                currentState.pos = currentState.pos + axis * len * (command .symbol == 'L' ? 0.5f : 1.0f);
+#endif
+                XMFLOAT4 tmpPrev, tmpNext;
+                XMStoreFloat4(&tmpPrev, prevPos);
+                XMStoreFloat4(&tmpNext, currentState.pos);
+
+                currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (command.symbol == 'L' ? Leaf : Stick), _params.thickness);
             }
 
-            XMStoreFloat4(&tmpPrev, prevPos);
-            XMStoreFloat4(&tmpNext, currentState.pos);
-
-            currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (command.symbol == 'L' ? Leaf : Stick), _params.thickness);
             break;
         case '[':
             stateStack.push(currentState);

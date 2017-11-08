@@ -283,33 +283,32 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
 void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
-    // Koch curve
-    WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
-    params2->depthLOD = 1;
-    params2->textureFilename.push_back(L"urchinskin.dds");
-    params2->_animationSpeed = 150.0f;
-    params2->position = XMFLOAT3(2, 0.5, 0);
-    params2->GetGeneratorParameters()._axiom = "F(1)";
-    params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.33) X F(a*0.33) x x F(a*0.33) X F(a*0.33)"));
-    params2->GetGeneratorParameters()._constants = "";
-    params2->GetGeneratorParameters()._angle = 1.047198f;
-    params2->GetGeneratorParameters()._numIterations = 4;
-    params2->GetGeneratorParameters()._segmentLength = 0.05f;
-    params2->GetGeneratorParameters().thickness = .010f;
-
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
     trunkMaterial.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     trunkMaterial.Specular = XMFLOAT4(0.1f, .1f, .1f, 1.0f);
     trunkMaterial.flags.y = 1; //useTextures  TODO
-    params2->materials.push_back(trunkMaterial);
 
     ShaderMaterial leafMaterial;
     XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
     leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
     leafMaterial.flags.y = false; //useTextures  TODO
-    params2->materials.push_back(leafMaterial);
 
+    // Koch curve
+    WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    params2->depthLOD = 1;
+    params2->textureFilename.push_back(L"urchinskin.dds");
+    params2->_animationSpeed = 150.0f;
+    params2->position = XMFLOAT3(2, 2, 0);
+    params2->GetGeneratorParameters()._axiom = "F(1) x F(1) x F(1) x F(1) x F(1) x F(1) x";
+    params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.33) X F(a*0.33) x x F(a*0.33) X F(a*0.33)"));
+    params2->GetGeneratorParameters()._constants = "";
+    params2->GetGeneratorParameters()._angle = 1.047198f;
+    params2->GetGeneratorParameters()._numIterations = 3;
+    params2->GetGeneratorParameters()._segmentLength = 0.05f;
+    params2->GetGeneratorParameters().thickness = .010f;
+    params2->materials.push_back(trunkMaterial);
+    params2->materials.push_back(leafMaterial);
     scene->AddChild(new Tree(params2));
 
     // Hilbert curve
@@ -317,14 +316,32 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params3->depthLOD = 1;
     params3->textureFilename.push_back(L"urchinskin.dds");
     params3->position = XMFLOAT3(-2, 1.0, 0);
+    params3->GetGeneratorParameters()._constants = "";
+    params3->GetGeneratorParameters()._angle = XM_PI / 2.0f;
+    params3->GetGeneratorParameters()._numIterations = 2;
+    params3->GetGeneratorParameters()._segmentLength = 0.1f; //  0.05f;
+    params3->GetGeneratorParameters().thickness = .010f;
+    params3->_animationSpeed = 55.0f;
     params3->GetGeneratorParameters()._axiom = "A";
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z A F A x F Y z z A F A y F z A y z"));
 
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "A X F A Y F A Y F A x F A x F A y F A y F A X"));
 
-    ;
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "y A F A Z F Z A F Yx F xy A F A XY F zY A F"));
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F X F"));
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F Z F Y F Y F Z F X F Y F Y F X"));
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"));
 
     /*
+
+    X CW?
+    x CCW?
+    Y CW
+    y CCW
+    Z CCW
+    z CW
+
     + Yaw Y
     - Yaw y
     ^ Pitch X
@@ -332,23 +349,39 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     < Roll Z
     > Roll z
 
+    Orig:   X F Y F Y F x F x F Y F Y F X
+    Work:   X F Y F Y F x F x F y F y F X
+    Better: X F Y F Y F x F z F Y F Y F y
+    2 it  : X F Y F Y F x F z F Y F Y F Z A
+
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "^<AF^<AFA-F^>>AFA&F+>>AFA-F>A->"));
+
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "^<AF^<AFA-F^>>AFAvF+>>AFA-F>A->"));
+    
+
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "ByFYCFCYFyDxF X DyFYxxCFCYFYBZZ"));
+    params3->GetGeneratorParameters()._rules.push_back(Rule("B", "AxF X CFB X F X D XX yFyD X| F X B | FC X F X AZZ"));
+    params3->GetGeneratorParameters()._rules.push_back(Rule("C", "| D X| F X ByFYC X F X AxxFAxF X CYFYB X F X DZZ"));
+    params3->GetGeneratorParameters()._rules.push_back(Rule("D", "| CFByFYB | FAxF X AxxFByFYB | FCZZ"));
+
+
 
     */
 
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z A F A x F Y z z A F A y F z A y z"));
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "A X F A Y F A Y F A x F A x F A y F A y F A X"));
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F x F Y F z F"));
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z A F A x F Y z z A F A y F z A y z"));
+
     //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z z A F A x F Y z z A F A y F z A y z"));
 
-
-
     //params3->GetGeneratorParameters()._axiom = "A";
-
     //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "z B F Z A F A Z F B z"));
     //params3->GetGeneratorParameters()._rules.push_back(Rule("B", "Z A F z B F B z F A Z"));
-    params3->GetGeneratorParameters()._constants = "";
-    params3->GetGeneratorParameters()._angle = XM_PI / 2.0f;
-    params3->GetGeneratorParameters()._numIterations = 2;
-    params3->GetGeneratorParameters()._segmentLength = 0.05f;
-    params3->GetGeneratorParameters().thickness = .010f;
-    params3->_animationSpeed = 40.0f;
+
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
     scene->AddChild(new Tree(params3));
@@ -376,8 +409,8 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     renderData->time = 0;
 
     // Camera
-    player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
-    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
 }
 
 
