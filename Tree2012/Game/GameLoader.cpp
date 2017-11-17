@@ -318,77 +318,15 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params3->position = XMFLOAT3(-2, 1.0, 0);
     params3->GetGeneratorParameters()._constants = "";
     params3->GetGeneratorParameters()._angle = XM_PI / 2.0f;
-    params3->GetGeneratorParameters()._numIterations = 2;
+    params3->GetGeneratorParameters()._numIterations = 3;
     params3->GetGeneratorParameters()._segmentLength = 0.1f; //  0.05f;
     params3->GetGeneratorParameters().thickness = .010f;
+    params3->GetGeneratorParameters()._initialDirection = XMFLOAT3(1.0f, 0.0, 0.0);
     params3->_animationSpeed = 55.0f;
     params3->GetGeneratorParameters()._axiom = "A";
 
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "A x F X F X F yZ F YX F zY F x F"));
-
-    // Another, busted
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F X F X F yZ F YX F zY F x F"));
-
-    // Best yet but wrong
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "y A F A Z F Z A F Yx F xy A F A XY F zY A F"));
-
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F X F"));
-
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F Z F Y F Y F Z F X F Y F Y F X"));
-
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "YXAF YXAFAzFYxxAFAyFZxxAFAzFxAzx"));
     params3->GetGeneratorParameters()._rules.push_back(Rule("A", "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"));
 
-    //YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx
-
-    /*
-
-    X CW?
-    x CCW?
-    Y CW
-    y CCW
-    Z CCW
-    z CW
-
-    + Yaw Y
-    - Yaw y
-    ^ Pitch X
-    & Pitch x
-    < Roll Z
-    > Roll z
-
-    Orig:   X F Y F Y F x F x F Y F Y F X
-    Work:   X F Y F Y F x F x F y F y F X
-    Better: X F Y F Y F x F z F Y F Y F y
-    2 it  : X F Y F Y F x F z F Y F Y F Z A
-
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "^<AF^<AFA-F^>>AFA&F+>>AFA-F>A->"));
-
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "^<AF^<AFA-F^>>AFAvF+>>AFA-F>A->"));
-    
-
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "ByFYCFCYFyDxF X DyFYxxCFCYFYBZZ"));
-    params3->GetGeneratorParameters()._rules.push_back(Rule("B", "AxF X CFB X F X D XX yFyD X| F X B | FC X F X AZZ"));
-    params3->GetGeneratorParameters()._rules.push_back(Rule("C", "| D X| F X ByFYC X F X AxxFAxF X CYFYB X F X DZZ"));
-    params3->GetGeneratorParameters()._rules.push_back(Rule("D", "| CFByFYB | FAxF X AxxFByFYB | FCZZ"));
-
-
-
-    */
-
-
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z A F A x F Y z z A F A y F z A y z"));
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "A X F A Y F A Y F A x F A x F A y F A y F A X"));
-
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F x F Y F z F"));
-
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z A F A x F Y z z A F A y F z A y z"));
-
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "X Z A F X Z A F A y F X z z A F A x F Y z z A F A y F z A y z"));
-
-    //params3->GetGeneratorParameters()._axiom = "A";
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "z B F Z A F A Z F B z"));
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("B", "Z A F z B F B z F A Z"));
 
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);

@@ -52,6 +52,7 @@ struct LSystemParams
     string _constants;
     float thickness;
     string _axiom;
+    XMFLOAT3 _initialDirection;
     vector<Rule> _rules;
 
     LengthFunc SegmentLength;
@@ -60,7 +61,6 @@ struct LSystemParams
 struct BuildState
 {
     XMVECTOR pos;
-    XMVECTOR dir;
     XMMATRIX matDir;
     Branch* branch;
 
