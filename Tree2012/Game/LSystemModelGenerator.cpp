@@ -251,10 +251,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     XMVECTOR zVec = XMLoadFloat3(&zAxis);
     XMVECTOR zeroVec = XMVectorSet(0,0,0,0);
 
-
     BuildState initialState;
     initialState.pos = XMVectorSet(0, 0, 0, 1);
-    XMVECTOR startDir = XMVectorSet(0.0f, 1.0f, 0.0f, 0);
+    XMVECTOR startDir = XMVectorSet(0.0f, 0.0f, 1.0f, 0);
 
     //initialState.dir = XMQuaternionRotationNormal(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), XM_PI);
     initialState.matDir = XMMatrixIdentity();
@@ -284,7 +283,6 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
     XMMATRIX rotate180Mat = XMMatrixRotationNormal(yVec, XM_PI);
 
-
     // Create trunk
     int id = _model->treeData.numBranches++;
     Branch* child = &_model->treeData.pBranches[id];
@@ -303,12 +301,6 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     initialState.branch = _model->trunk;
 
     BuildState currentState = initialState;
-    ///currentState.pos = XMLoadFloat4(&_model->trunk->end);
-
-    //    _params._angle *= 2.0f; // WHy?
-
-    //XMFLOAT4 startPosNMinus1(1.0f, .0f, 0, 1.0f);
-    //XMVECTOR prevPos = XMLoadFloat4(&startPosNMinus1);
 
     stack<BuildState> stateStack;
     int pos = 0;
@@ -325,39 +317,40 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         {
         case '&':
         case 'Y':
-            //currentState.dir = XMQuaternionMultiply(yQuadPos, currentState.dir);
-            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateYPosMat);
+            currentState.matDir = XMMatrixMultiply(rotateYPosMat, currentState.matDir);
+            //XMVECTOR axis = XMVector3Transform(zVec, currentState.matDir);
+            currentState.dir = yVec;
             break;
         case '^':
         case 'y':
-            //currentState.dir = XMQuaternionMultiply(yQuadNeg, currentState.dir);
-            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateYNegMat);
+            currentState.dir = -yVec;
+            currentState.matDir = XMMatrixMultiply(rotateYNegMat, currentState.matDir);
             break;
         case '<':
         case '\\':
         case 'X':
-            //currentState.dir = XMQuaternionMultiply(xQuadPos, currentState.dir);
-            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateXPosMat);
+            currentState.dir = xVec;
+            currentState.matDir = XMMatrixMultiply(rotateXPosMat, currentState.matDir);
             break;
         case '>':
         case '/':
         case 'x':
-            //currentState.dir = XMQuaternionMultiply(xQuadNeg, currentState.dir);
-            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateXNegMat);
+            currentState.dir = -xVec;
+            currentState.matDir = XMMatrixMultiply(rotateXNegMat, currentState.matDir);
             break;
         case '+':
         case 'Z':
-            //currentState.dir = XMQuaternionMultiply(zQuadPos, currentState.dir);
-            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateZPosMat);
+            currentState.dir = zVec;
+            currentState.matDir = XMMatrixMultiply(rotateZPosMat, currentState.matDir);
             break;
         case '-':
         case 'z':
-            //currentState.dir = XMQuaternionMultiply(zQuadNeg, currentState.dir);
-            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotateZNegMat);
+            currentState.dir = -zVec;
+            currentState.matDir = XMMatrixMultiply(rotateZNegMat, currentState.matDir);
             break;
         case '|':
-            //currentState.dir = XMQuaternionMultiply(yQuad180, currentState.dir);
-            currentState.matDir = XMMatrixMultiply(currentState.matDir, rotate180Mat);
+            //currentState.dir = -zVec;
+            currentState.matDir = XMMatrixMultiply(rotate180Mat, currentState.matDir);
             break;
         case 'F':
         case 'L':
@@ -384,7 +377,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
                 //XMQuaternionToAxisAngle(&axis, &angle, quat);
                 //axis = XMVector3Normalize(axis);
 
-                XMVECTOR axis = XMVector3Transform(yVec, currentState.matDir);
+                XMVECTOR axis = XMVector3Transform(xVec, currentState.matDir);
+
+                //XMVECTOR axis = currentState.dir;
 
                 XMVECTOR prevPos = currentState.pos;
                 currentState.pos = currentState.pos + axis * len * (command .symbol == 'L' ? 0.5f : 1.0f);

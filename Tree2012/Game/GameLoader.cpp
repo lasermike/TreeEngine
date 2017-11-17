@@ -324,14 +324,22 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params3->_animationSpeed = 55.0f;
     params3->GetGeneratorParameters()._axiom = "A";
 
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "A x F X F X F yZ F YX F zY F x F"));
 
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "y A F A Z F Z A F Yx F xy A F A XY F zY A F"));
+    // Another, busted
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F X F X F yZ F YX F zY F x F"));
+
+    // Best yet but wrong
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "y A F A Z F Z A F Yx F xy A F A XY F zY A F"));
 
     //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F X F"));
 
     //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F Z F Y F Y F Z F X F Y F Y F X"));
 
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"));
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "YXAF YXAFAzFYxxAFAyFZxxAFAzFxAzx"));
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"));
+
+    //YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx
 
     /*
 
