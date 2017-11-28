@@ -152,6 +152,8 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
     XMMATRIX localToWorld;
     ComputeTransformationsManual(&localToWorld, &vChildStart, CalcTime(pRenderData->time), branch, &pRenderData->world, parentStart);
 
+    localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
+
     InstancedData data;
     XMStoreFloat4x4(&data.World, localToWorld);
 

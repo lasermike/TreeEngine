@@ -72,6 +72,11 @@ private:
 public:
     WorldObjectParameters(GeneratorType genType) : WorldObjectParams(genType) { }
 
+    WorldObjectParameters(WorldObjectParameters<T>& src) : WorldObjectParams(src)
+    {
+        generatorParameters = src.generatorParameters;
+    }
+
     T& GetGeneratorParameters()
     {
         return generatorParameters;

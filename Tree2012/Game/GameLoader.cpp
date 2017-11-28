@@ -299,13 +299,14 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params2->depthLOD = 1;
     params2->textureFilename.push_back(L"urchinskin.dds");
     params2->_animationSpeed = 150.0f;
-    params2->position = XMFLOAT3(2, 2, 0);
+    params2->position = XMFLOAT3(-1, 1, 2);
+    XMStoreFloat4(&params2->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), XM_PIDIV2));
     params2->GetGeneratorParameters()._axiom = "F(1) x F(1) x F(1) x F(1) x F(1) x F(1) x";
     params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.33) X F(a*0.33) x x F(a*0.33) X F(a*0.33)"));
     params2->GetGeneratorParameters()._constants = "";
     params2->GetGeneratorParameters()._angle = 1.047198f;
     params2->GetGeneratorParameters()._numIterations = 3;
-    params2->GetGeneratorParameters()._segmentLength = 0.05f;
+    params2->GetGeneratorParameters()._segmentLength = 0.03f;
     params2->GetGeneratorParameters().thickness = .010f;
     params2->materials.push_back(trunkMaterial);
     params2->materials.push_back(leafMaterial);
@@ -327,10 +328,23 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
 
     params3->GetGeneratorParameters()._rules.push_back(Rule("A", "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"));
 
-
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
+
     scene->AddChild(new Tree(params3));
+
+    WorldObjectParameters<LSystemParams>* params3A = new WorldObjectParameters<LSystemParams>(*params3);
+    params3A->position = XMFLOAT3(-1, 1.0, 0);
+    params3A->GetGeneratorParameters()._numIterations = 2;
+    params3A->_animationSpeed = 15.0f;
+    scene->AddChild(new Tree(params3A));
+
+    WorldObjectParameters<LSystemParams>* params3B = new WorldObjectParameters<LSystemParams>(*params3);
+    params3B->position = XMFLOAT3(0, 1.0, 0);
+    params3B->GetGeneratorParameters()._numIterations = 1;
+    params3B->_animationSpeed = 2.0f;
+    scene->AddChild(new Tree(params3B));
+
 
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
