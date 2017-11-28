@@ -4,42 +4,42 @@
 
 WorldObject::WorldObject(WorldObjectParams* pParams) : _params(pParams), _drawInstanced(true)
 {
-	_position = XMFLOAT3(0,0,0);
-	XMStoreFloat4(&_rotation, XMQuaternionIdentity());
-	_scale = XMFLOAT3(1,1,1);
+    _position = XMFLOAT3(0,0,0);
+    XMStoreFloat4(&_rotation, XMQuaternionIdentity());
+    _scale = XMFLOAT3(1,1,1);
 
-	_boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
+    _boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
 
-	if (pParams)
-	{
-		_position = pParams->position;
-		_rotation = pParams->rotation;
-		_scale = pParams->scale;
-	}
+    if (pParams)
+    {
+        _position = pParams->position;
+        _rotation = pParams->rotation;
+        _scale = pParams->scale;
+    }
 }
 
 WorldObject::~WorldObject(void)
 {
-	CleanUpDeviceObjects();
-	_params.reset();
+    CleanUpDeviceObjects();
+    _params.reset();
 }
 
 HRESULT WorldObject::InitGraphics(RenderManager& /*renderManager*/)
 {
-	return S_OK;
+    return S_OK;
 }
 
 HRESULT WorldObject::CleanUpDeviceObjects()
 {
-	return S_OK;
+    return S_OK;
 }
 
 HRESULT WorldObject::ComputeConstants(IRenderFrame* /*pFrameConfig*/)
 {
-	return E_NOTIMPL;
+    return E_NOTIMPL;
 }
 
 XMVECTOR WorldObject::GetExtents(Extent extent)
 {
-	return XMLoadFloat3(&_extents[extent]); // + XMLoadFloat3(&_position); 
+    return XMLoadFloat3(&_extents[extent]); // + XMLoadFloat3(&_position); 
 }

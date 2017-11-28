@@ -12,7 +12,7 @@ namespace XboxSampleFramework
     {
         wchar_t    g_strCommonFileRoot[ 1024 ];
         wchar_t    g_strApplicationDataPath[ 1024 ];
-	}
+    }
 }
 
 //--------------------------------------------------------------------------------------
@@ -63,12 +63,12 @@ void XSF::SetContentFileRoot()
 //--------------------------------------------------------------------------------------
 HRESULT XSF::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
 {
-	VERBOSEATGPROFILETHIS;
+    VERBOSEATGPROFILETHIS;
 
-	wchar_t tmp[1024];
-	_snwprintf_s(tmp, _TRUNCATE, L"%s%s", Details::g_strCommonFileRoot, path);
+    wchar_t tmp[1024];
+    _snwprintf_s(tmp, _TRUNCATE, L"%s%s", Details::g_strCommonFileRoot, path);
 
-	return D3DReadFileToBlob(tmp, ppShader);
+    return D3DReadFileToBlob(tmp, ppShader);
 }
 #endif
 
@@ -202,7 +202,7 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
 #if defined(_DEBUG)
 void SetDebugName(ID3D12DeviceChild* child, const char* name)
 {
-	child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
+    child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
 }
 #endif //_DEBUG -> NDEBUG
 
@@ -210,38 +210,38 @@ void SetDebugName(ID3D12DeviceChild* child, const char* name)
 // If no such adapter can be found, *ppAdapter will be set to nullptr.
 void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
 {
-	CComPtr<IDXGIAdapter1> adapter;
-	*ppAdapter = nullptr;
+    CComPtr<IDXGIAdapter1> adapter;
+    *ppAdapter = nullptr;
 
-	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
-	{
-		DXGI_ADAPTER_DESC1 desc;
-		adapter->GetDesc1(&desc);
+    for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
+    {
+        DXGI_ADAPTER_DESC1 desc;
+        adapter->GetDesc1(&desc);
 
         if (wcsstr(desc.Description, L"Intel") != nullptr)
         {
             continue;
         }
 
-		if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-		{
-			// Don't select the Basic Render Driver adapter.
-			// If you want a software adapter, pass in "/warp" on the command line.
-			continue;
-		}
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+        {
+            // Don't select the Basic Render Driver adapter.
+            // If you want a software adapter, pass in "/warp" on the command line.
+            continue;
+        }
 
-		// Check to see if the adapter supports Direct3D 12, but don't create the
-		// actual device yet.
+        // Check to see if the adapter supports Direct3D 12, but don't create the
+        // actual device yet.
         HRESULT hr = D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr);
 
         HR(hr);
-		if (SUCCEEDED(hr))
-		{
-			break;
-		}
-	}
+        if (SUCCEEDED(hr))
+        {
+            break;
+        }
+    }
 
-	*ppAdapter = adapter.Detach();
+    *ppAdapter = adapter.Detach();
 }
 
 #else
@@ -251,7 +251,7 @@ void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
 #if defined(_DEBUG) && !defined(_XBOX_ONE) // NAMING
 void SetDebugName(ID3D11DeviceChild* child, const char* name)
 {
-	child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
+    child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
 }
 
 #else

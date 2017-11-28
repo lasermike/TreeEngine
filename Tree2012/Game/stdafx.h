@@ -27,19 +27,19 @@ using namespace std;
 #ifdef _DEBUG
 __inline void Report(char* msg, char* file, long line, char* exp) 
 {
-	std::cerr << msg << " " << file << " " << line << " " << exp << "\n"; 
+    std::cerr << msg << " " << file << " " << line << " " << exp << "\n"; 
 }
 
 __inline void ReportError(char* msg, char* file, long line, char* exp) 
 {
-	Report(msg, file, line, exp);
-	assert(false); 
+    Report(msg, file, line, exp);
+    assert(false); 
 }
 
 __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) 
 {
-	std::cerr << msg << " " << file << " " << line << " " << hr << "\n"; 
-	assert(SUCCEEDED(hr)); 
+    std::cerr << msg << " " << file << " " << line << " " << hr << "\n"; 
+    assert(SUCCEEDED(hr)); 
 }
 
 
@@ -54,55 +54,55 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 
 #ifndef HR
 #define HR(x)                                              \
-	{                                                          \
-		HRESULT hr2 = (x);                                      \
-		if (FAILED(hr2))                                         \
-		{                                                      \
-		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr2 << ", " << L#x << "\n"; \
-		assert(SUCCEEDED(hr2)); \
-		}                                                      \
-	}
+    {                                                          \
+        HRESULT hr2 = (x);                                      \
+        if (FAILED(hr2))                                         \
+        {                                                      \
+        std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr2 << ", " << L#x << "\n"; \
+        assert(SUCCEEDED(hr2)); \
+        }                                                      \
+    }
 #endif
 
 #ifndef HRR
 #define HRR(x)                                              \
-	{                                                          \
-		HRESULT hr2 = (x);                                      \
-		if (FAILED(hr2))                                         \
-		{                                                      \
-		std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr2 << ", " << L#x << "\n"; \
-		assert(SUCCEEDED(hr2)); \
-		return hr2; \
-		}                                                      \
-	}
+    {                                                          \
+        HRESULT hr2 = (x);                                      \
+        if (FAILED(hr2))                                         \
+        {                                                      \
+        std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr2 << ", " << L#x << "\n"; \
+        assert(SUCCEEDED(hr2)); \
+        return hr2; \
+        }                                                      \
+    }
 #endif
 
 #ifndef HRC
 #define HRC(x)                                              \
-		hr = (x);                                      \
-		if (FAILED(hr))                                         \
-		{                                                      \
-			std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
-			assert(SUCCEEDED(hr)); \
-			goto Cleanup; \
-		}                                                      
+        hr = (x);                                      \
+        if (FAILED(hr))                                         \
+        {                                                      \
+            std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
+            assert(SUCCEEDED(hr)); \
+            goto Cleanup; \
+        }                                                      
 #endif
 
 #ifndef LOG
-#define LOG(x)	\
-		{		\
+#define LOG(x)    \
+        {        \
             Util.Output("Log: %s \n", x);  \
-		}        
+        }        
 #endif 
 
 #define ASSERTSZ(x, str) \
-		if (!(x)) { \
-			assert(0);   \
-			Util.Output("Assert failed: %s \n", L#str); \
-		} 
-			//wstringstream str; \
-			//str << L"LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << L"\n"; \
-			//OutputDebugString(str.str().c_str());  \
+        if (!(x)) { \
+            assert(0);   \
+            Util.Output("Assert failed: %s \n", L#str); \
+        } 
+            //wstringstream str; \
+            //str << L"LOG: " << __FILE__ << ": " << (DWORD)__LINE__ << ", " << L#x << L"\n"; \
+            //OutputDebugString(str.str().c_str());  \
 
 #else
 #ifndef HRR
@@ -116,14 +116,14 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
 
 struct Utility
 {
-	void Output(const char * fnt, ...)
-	{
-		static char string_text[1000];
-		va_list args; va_start(args, fnt);
-		vsprintf_s(string_text, fnt, args);
-		va_end(args);
-		OutputDebugStringA(string_text);
-	}
+    void Output(const char * fnt, ...)
+    {
+        static char string_text[1000];
+        va_list args; va_start(args, fnt);
+        vsprintf_s(string_text, fnt, args);
+        va_end(args);
+        OutputDebugStringA(string_text);
+    }
 } static Util;
 
 ///////////////////////////////////////////////
@@ -134,21 +134,21 @@ struct Utility
 template <class T>
 void SafeRelease(T* obj)
 {
-	if (*obj)
-	{
-		(*obj)->Release();
-		(*obj) = nullptr;
-	}
+    if (*obj)
+    {
+        (*obj)->Release();
+        (*obj) = nullptr;
+    }
 }
 
 template <class T>
 void SafeDelete(T* obj)
 {
-	if (*obj)
-	{
-		delete (*obj);
-		(*obj) = nullptr;
-	}
+    if (*obj)
+    {
+        delete (*obj);
+        (*obj) = nullptr;
+    }
 }
 
 // XSF macros
@@ -179,14 +179,14 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 // Naming of objects
 //
 #if defined(_XBOX_ONE) // NAMING
-	__inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
+    __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
 #else
 
 #if defined(TREE3D12)
-	void SetDebugName(ID3D12DeviceChild* child, const char* name);
-	void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter);
+    void SetDebugName(ID3D12DeviceChild* child, const char* name);
+    void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter);
 #else
-	void SetDebugName(ID3D11DeviceChild* child, const char* name);
+    void SetDebugName(ID3D11DeviceChild* child, const char* name);
 #endif
 
 #endif // NAMING
@@ -346,7 +346,7 @@ const UINT64 TREE_COLOR_DRAW_TEXT = 0x0000FFFF;
 //--------------------------------------------------------------------------------------
 inline bool IsPowerOfTwo(UINT64 n)
 {
-	return ((n & (n - 1)) == 0 && (n) != 0);
+    return ((n & (n - 1)) == 0 && (n) != 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -355,9 +355,9 @@ inline bool IsPowerOfTwo(UINT64 n)
 //--------------------------------------------------------------------------------------
 inline UINT64 NextMultiple(UINT64 value, UINT64 multiple)
 {
-	XSF_ASSERT(IsPowerOfTwo(multiple));
+    XSF_ASSERT(IsPowerOfTwo(multiple));
 
-	return (value + multiple - 1) & ~(multiple - 1);
+    return (value + multiple - 1) & ~(multiple - 1);
 }
 
 namespace XboxSampleFramework
@@ -406,13 +406,13 @@ namespace XboxSampleFramework
 
 #if defined(TREE3D12)
     typedef D3DTypePtr< ID3D12Resource >        D3DBufferPtr;
-	typedef D3DTypePtr<ID3D12Device>            D3DDevicePtr;
-	typedef CComPtr<ID3D12RootSignature>		D3DRootSignaturePtr;
-	typedef CComPtr<ID3D12PipelineState>		D3DPipelineStatePtr;
-	typedef CComPtr<ID3DBlob>					D3DBlobPtr;
-	
+    typedef D3DTypePtr<ID3D12Device>            D3DDevicePtr;
+    typedef CComPtr<ID3D12RootSignature>        D3DRootSignaturePtr;
+    typedef CComPtr<ID3D12PipelineState>        D3DPipelineStatePtr;
+    typedef CComPtr<ID3DBlob>                    D3DBlobPtr;
+    
 #else
-	typedef D3DTypePtr< ID3D11Buffer >              D3DBufferPtr;
+    typedef D3DTypePtr< ID3D11Buffer >              D3DBufferPtr;
 #endif
 
 
@@ -424,15 +424,15 @@ namespace XboxSampleFramework
     typedef D3D11_RASTERIZER_DESC1  D3DRasterizerDesc;
     typedef IDXGISwapChain1         DXGISwapChain;
 #elif defined( TREE3D12 )
-	typedef ID3D12Device              D3DDevice;
-	typedef ID3D12GraphicsCommandList D3DDeviceContext;
-	typedef ID3D12GraphicsCommandList D3DComputeContext;
-	typedef ID3D12CommandQueue      D3DCommandQueue;
-	typedef ID3D12CommandAllocator  D3DCommandAllocator;
-	typedef ID3D12GraphicsCommandList D3DCommandList;
-	typedef IDXGISwapChain          DXGISwapChain;
+    typedef ID3D12Device              D3DDevice;
+    typedef ID3D12GraphicsCommandList D3DDeviceContext;
+    typedef ID3D12GraphicsCommandList D3DComputeContext;
+    typedef ID3D12CommandQueue      D3DCommandQueue;
+    typedef ID3D12CommandAllocator  D3DCommandAllocator;
+    typedef ID3D12GraphicsCommandList D3DCommandList;
+    typedef IDXGISwapChain          DXGISwapChain;
 #elif defined( XSF_USE_DX_11_1 )
-	typedef ID3D11Device1           D3DDevice;
+    typedef ID3D11Device1           D3DDevice;
     typedef ID3D11DeviceContext1    D3DDeviceContext;
     typedef ID3D11DeviceContext1    D3DComputeContext;
     typedef ID3D11RasterizerState1  D3DRasterizerState;
@@ -451,11 +451,11 @@ namespace XboxSampleFramework
     void DebugPrint( _In_z_ const wchar_t* msg, ... );
     void PrintNoVarargs( _In_z_ const wchar_t* msg );
 
-	void SetContentFileRoot();
-	HRESULT LoadBlob(_In_z_ const wchar_t* pFilename, std::vector< BYTE >& data);
+    void SetContentFileRoot();
+    HRESULT LoadBlob(_In_z_ const wchar_t* pFilename, std::vector< BYTE >& data);
 
 #if defined(TREE3D12)
-	HRESULT LoadShader(const wchar_t* path, ID3DBlob** ppShader);
+    HRESULT LoadShader(const wchar_t* path, ID3DBlob** ppShader);
 #endif
 }
 

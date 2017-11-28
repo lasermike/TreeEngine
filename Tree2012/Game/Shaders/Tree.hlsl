@@ -149,12 +149,14 @@ float4 PS(PS_INPUT input) : SV_Target
     return litColor;
 }
 
+/////////////////////////////////////////////////////////
+/********* FS GRAPH ********/
+
 struct ShadowMapVertexOut
 {
     float4 PosH : SV_POSITION;
     float2 Tex  : TEXCOORD;
 };
-
 
 ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 {
@@ -164,7 +166,6 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
     pos = mul(pos, transpose(View));
     output.PosH = mul(pos, transpose(Projection));
     output.Tex = input.Tex;
-
 
     return output;
 }
@@ -180,6 +181,9 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
     // Don't write transparent pixels to the shadow map.
     //clip(diffuse.a - 0.15f);
 }
+
+/////////////////////////////////////////////////////////
+/********* FS GRAPH ********/
 
 struct DSVertexIn
 {
@@ -219,43 +223,22 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
     // draw as grayscale
     return float4(c.rrr, 1);
 
-    //return float4(.5, 0, 0, 1);
-
     // draw test circle 
     //float len = length(input.Tex - 0.5);
     //return float4(len, len, len,1);
 }
 
-
+/////////////////////////////////////////////////////////
 /********* FS GRAPH ********/
 
 PS_INPUT FSGraphVS(VS_INPUT input)
 {
     PS_INPUT output = (PS_INPUT)0;
 
-    //float4x4 worldViewProj = float4x4(
-    //	1.0f, 0.0f, 0.0f, 0.0f,
-    //	0.0f, 1.0f, 0.0f, 0.0f,
-    //	0.0f, 0.0f, 1.0f, 0.0f,
-    //	0.0f, 0.0f, 0.0f, 1.0f);
-
-    output.Pos = float4(input.Pos, 1); //mul(float4(input.Pos, 1.0f), worldViewProj);
-
+    output.Pos = float4(input.Pos, 1);
     output.Tex = input.Tex;
 
     return output;
-}
-
-
-float4 FSGraphPS_Old(PS_INPUT input) : SV_Target
-{
-    //float4 c = txDiffuse.Sample(samPoint, input.Tex).r;
-    float4 c = txDiffuse.Sample(samPoint, float2(.75, input.Tex.x)).r;
-    //float4 c = txDiffuse.Load(input.Tex).r;
-    //float4 c = float4(1.0, 0, 0, 1);
-    //float4 c = float4(input.Tex.x, input.Tex.y, 0, 1);
-
-    return c; //float4(c.rrr, 1);
 }
 
 float segdist(float2 p1, float2 p2, float2 a)
@@ -314,12 +297,6 @@ float4 CalcFrag(PS_INPUT input, float columnIndex, float4 lineColor)
     dist = min(dist, segdist(srcPos2, srcPos3, destPos));
     dist = min(dist, segdist(srcPos2, srcPos3, destPos));
 
-    /* Compute distance to dots */
-    //dist = min(dist, length(destPos - srcPos0) - dot_size);
-    //dist = min(dist, length(destPos - srcPos1) - dot_size);
-    //d = min(d, length(a - p2) - dot_size);
-    //d = min(d, length(a - p3) - dot_size);
-
     /* Add line width */
     float line_width = delta.x;
     float lineLum = clamp(line_width - dist, 0.0, 1.0);
@@ -327,7 +304,6 @@ float4 CalcFrag(PS_INPUT input, float columnIndex, float4 lineColor)
 
     float4 retval;
     retval = float4(lineColor.xyz, lineLum);
-    //retval = float4(1, 1, 1, 1);
     return retval;
 }
 
@@ -341,7 +317,6 @@ float4 blend(float4 A, float4 B)
 
 float4 FSGraphPS(PS_INPUT input) : SV_Target
 {
-    //const float columnIndex = .2857;
     float srcWidth = 21.0;
 
     float4 result = 0;

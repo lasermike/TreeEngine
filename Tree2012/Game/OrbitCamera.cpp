@@ -18,27 +18,27 @@ static const float c_MinPitchAngle = -XM_PI * 0.49f;
 static const float c_MaxPitchAngle =  XM_PI * 0.49f;
 
 OrbitCamera::OrbitCamera(void)
-	: m_Dolly(0)
+    : m_Dolly(0)
     , m_DollyVelocity(0)
     , m_DollyVelocityAttenuation(20)
-	, m_Heading(0)
-	, m_HeadingVelocity(0)
-	, m_HeadingVelocityAttenuation(60)
-	, m_Pitch(0)
-	, m_PitchVelocity(0)
-	, m_PitchVelocityAttenuation(60)
+    , m_Heading(0)
+    , m_HeadingVelocity(0)
+    , m_HeadingVelocityAttenuation(60)
+    , m_Pitch(0)
+    , m_PitchVelocity(0)
+    , m_PitchVelocityAttenuation(60)
     , m_DistanceMin(1.0f)
     , m_DistanceMax(FLT_MAX)
 {
-	m_EyePosition = XMVectorZero();
-	m_FocusPosition = XMVectorZero();
-	m_FocusPositionVelocity = XMVectorZero();
-	m_Transform = XMMatrixIdentity();
-	m_ViewMatrix = XMMatrixIdentity();
-	m_boundingBox[0] = XMFLOAT3(0,0,0);
-	m_boundingBox[1] = XMFLOAT3(0,0,0);
+    m_EyePosition = XMVectorZero();
+    m_FocusPosition = XMVectorZero();
+    m_FocusPositionVelocity = XMVectorZero();
+    m_Transform = XMMatrixIdentity();
+    m_ViewMatrix = XMMatrixIdentity();
+    m_boundingBox[0] = XMFLOAT3(0,0,0);
+    m_boundingBox[1] = XMFLOAT3(0,0,0);
 
-	Update(0);
+    Update(0);
 }
 
 OrbitCamera::~OrbitCamera(void)
@@ -47,27 +47,27 @@ OrbitCamera::~OrbitCamera(void)
 
 void OrbitCamera::SetDolly( float v ) 
 { 
-	m_Dolly = MathHelper::Clamp( v, m_DistanceMin, m_DistanceMax );
+    m_Dolly = MathHelper::Clamp( v, m_DistanceMin, m_DistanceMax );
 }
 
 void OrbitCamera::AddDollyVelocity( float v ) 
 { 
-	m_DollyVelocity = m_DollyVelocity + v; 
+    m_DollyVelocity = m_DollyVelocity + v; 
 }
 
 void OrbitCamera::SetHeading( float h )
 {
-	m_Heading = MathHelper::WrapHalfPi(h);
+    m_Heading = MathHelper::WrapHalfPi(h);
 }
 
 void OrbitCamera::SetPitch( float p )
 {
-	m_Pitch = MathHelper::Clamp(p, -c_MaxPitchAngle, c_MaxPitchAngle);
+    m_Pitch = MathHelper::Clamp(p, -c_MaxPitchAngle, c_MaxPitchAngle);
 }
 
 void OrbitCamera::SetDollyDistanceLimits( float mins, float maxs )
 {
-	if ( mins > maxs ) MathHelper::Swap( mins, maxs );
+    if ( mins > maxs ) MathHelper::Swap( mins, maxs );
     m_DistanceMin = mins;
     m_DistanceMax = maxs;
     m_Dolly = MathHelper::Clamp( m_Dolly, mins, maxs );
@@ -83,30 +83,30 @@ const XMMATRIX& OrbitCamera::Update( _In_ float delta )
         velocityScaleFactor = 0.1f + sqrtf(curve) * 0.9f;
     }
 
-	m_Dolly += m_DollyVelocity * velocityScaleFactor * delta;
-	m_DollyVelocity *= XMMax(0.0f, 1 - (delta * m_DollyVelocityAttenuation));
+    m_Dolly += m_DollyVelocity * velocityScaleFactor * delta;
+    m_DollyVelocity *= XMMax(0.0f, 1 - (delta * m_DollyVelocityAttenuation));
 
-	m_Pitch += m_PitchVelocity * delta;
-	m_PitchVelocity *= XMMax(0.0f, 1 - (delta * m_PitchVelocityAttenuation));
+    m_Pitch += m_PitchVelocity * delta;
+    m_PitchVelocity *= XMMax(0.0f, 1 - (delta * m_PitchVelocityAttenuation));
 
-	m_Heading += m_HeadingVelocity * delta;
-	m_HeadingVelocity *= XMMax(0.0f, 1 - (delta * m_HeadingVelocityAttenuation));
+    m_Heading += m_HeadingVelocity * delta;
+    m_HeadingVelocity *= XMMax(0.0f, 1 - (delta * m_HeadingVelocityAttenuation));
 
-	m_Heading = MathHelper::WrapHalfPi(m_Heading);
-	m_Pitch = MathHelper::Clamp(m_Pitch, c_MinPitchAngle, c_MaxPitchAngle);
-	m_Dolly = MathHelper::Clamp(m_Dolly, m_DistanceMin, m_DistanceMax);
+    m_Heading = MathHelper::WrapHalfPi(m_Heading);
+    m_Pitch = MathHelper::Clamp(m_Pitch, c_MinPitchAngle, c_MaxPitchAngle);
+    m_Dolly = MathHelper::Clamp(m_Dolly, m_DistanceMin, m_DistanceMax);
 
-	XMMATRIX MRotation = XMMatrixMultiply(
+    XMMATRIX MRotation = XMMatrixMultiply(
         XMMatrixRotationX(m_Pitch),
-	    XMMatrixRotationY(m_Heading) );
+        XMMatrixRotationY(m_Heading) );
 
     XMVECTOR position = XMVector4Transform( 
         XMVectorSet( 0, 0, m_Dolly, 1 ),
         MRotation );
 
-	m_FocusPosition += m_FocusPositionVelocity * delta;
-	m_FocusPositionVelocity *= XMMax(0.0f, 1 - (delta * m_PitchVelocityAttenuation));
-	 
+    m_FocusPosition += m_FocusPositionVelocity * delta;
+    m_FocusPositionVelocity *= XMMax(0.0f, 1 - (delta * m_PitchVelocityAttenuation));
+     
 
     m_EyePosition = XMVectorAdd( m_FocusPosition, position );
 
@@ -120,8 +120,8 @@ const XMMATRIX& OrbitCamera::Update( _In_ float delta )
         m_ViewMatrix = XMMatrixLookAtLH( m_EyePosition, m_FocusPosition, XMVectorSet( 0, 1, 0, 0 ) );
     }
 
-	XMVECTOR determinant = XMMatrixDeterminant(m_ViewMatrix);
-	m_Transform = XMMatrixInverse(&determinant, m_ViewMatrix);
+    XMVECTOR determinant = XMMatrixDeterminant(m_ViewMatrix);
+    m_Transform = XMMatrixInverse(&determinant, m_ViewMatrix);
 
     return m_ViewMatrix;
 }
@@ -129,33 +129,33 @@ const XMMATRIX& OrbitCamera::Update( _In_ float delta )
 // Find the points where ray intersects camera, given screen point near clipping plane (p1) and far clipping plane (p2)
 void OrbitCamera::RayCast(int x, int y, RenderData* pData, XMVECTOR &p1, XMVECTOR &p2)
 {
-//#define	NEAR			10.0f
-//#define FAR				4000.0f
-//#define	FOV				0.8f
-//#define	WIDTH			640.0f
-//#define	HEIGHT			480.0f
-//#define	WIDTH_DIV_2		(WIDTH*0.5f)
-//#define	HEIGHT_DIV_2	(HEIGHT*0.5f)
-//#define ASPECT			1.3333f
+//#define    NEAR            10.0f
+//#define FAR                4000.0f
+//#define    FOV                0.8f
+//#define    WIDTH            640.0f
+//#define    HEIGHT            480.0f
+//#define    WIDTH_DIV_2        (WIDTH*0.5f)
+//#define    HEIGHT_DIV_2    (HEIGHT*0.5f)
+//#define ASPECT            1.3333f
 
-	float dx,dy;
+    float dx,dy;
 
-	dx=tanf(pData->projectionData.fov * 0.5f) * (x / pData->projectionData.screenWidth / 2.0f - 1.0f) / (pData->projectionData.screenWidth / pData->projectionData.screenHeight);
-	dy=tanf(pData->projectionData.fov * 0.5f) * (1.0f-y / pData->projectionData.screenHeight / 2.0f);
+    dx=tanf(pData->projectionData.fov * 0.5f) * (x / pData->projectionData.screenWidth / 2.0f - 1.0f) / (pData->projectionData.screenWidth / pData->projectionData.screenHeight);
+    dy=tanf(pData->projectionData.fov * 0.5f) * (1.0f-y / pData->projectionData.screenHeight / 2.0f);
 
-	p1 = XMVectorSet(dx * pData->projectionData.nearClippingPlane, dy * pData->projectionData.nearClippingPlane, pData->projectionData.nearClippingPlane, 1.0f);
-	p2 = XMVectorSet(dx * pData->projectionData.farClippingPlane, dy * pData->projectionData.farClippingPlane, pData->projectionData.farClippingPlane, 1.0f);
-	
-	p1 = XMVector4Transform(p1, m_Transform);
-	p2 = XMVector4Transform(p2, m_Transform);
+    p1 = XMVectorSet(dx * pData->projectionData.nearClippingPlane, dy * pData->projectionData.nearClippingPlane, pData->projectionData.nearClippingPlane, 1.0f);
+    p2 = XMVectorSet(dx * pData->projectionData.farClippingPlane, dy * pData->projectionData.farClippingPlane, pData->projectionData.farClippingPlane, 1.0f);
+    
+    p1 = XMVector4Transform(p1, m_Transform);
+    p2 = XMVector4Transform(p2, m_Transform);
 }
 
 void OrbitCamera::FocusOnBoundingBox(
     _In_reads_(numCorners) const XMFLOAT3* pBoxCorners,
     _In_ UINT numCorners )
 {
-	m_boundingBox[0] = pBoxCorners[0];
-	m_boundingBox[1] = pBoxCorners[1];
+    m_boundingBox[0] = pBoxCorners[0];
+    m_boundingBox[1] = pBoxCorners[1];
 
     XMVECTOR mins = XMVectorReplicate(  FLT_MAX );
     XMVECTOR maxs = XMVectorReplicate( -FLT_MAX );

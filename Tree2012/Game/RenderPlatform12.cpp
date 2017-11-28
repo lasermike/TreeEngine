@@ -108,7 +108,7 @@ HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_
     newViewDesc.BufferLocation = (*buffer)->GetGPUVirtualAddress();
     newViewDesc.SizeInBytes = allocSize;
 
-    CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+    CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
     HRR((*buffer)->Map(0, &readRange, reinterpret_cast<void**>(cpuBufferBegin)));
     ZeroMemory(*cpuBufferBegin, allocSize);
 
@@ -830,10 +830,10 @@ HRESULT RenderPlatform12::InitDevice()
         //HRR(factory2->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
 
         //HRR(D3D12CreateDevice(
-        //	warpAdapter,
-        //	D3D_FEATURE_LEVEL_11_0,
-        //	IID_PPV_ARGS(&m_d3dDevice)
-        //	));
+        //    warpAdapter,
+        //    D3D_FEATURE_LEVEL_11_0,
+        //    IID_PPV_ARGS(&m_d3dDevice)
+        //    ));
     }
     else
     {
@@ -1011,7 +1011,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         D3D12_TEXTURE_LAYOUT_UNKNOWN,
         D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 
-    D3D12_CLEAR_VALUE clearValue;	// Performance tip: Tell the runtime at resource creation the desired clear value.
+    D3D12_CLEAR_VALUE clearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
     clearValue.Format = DXGI_FORMAT_D32_FLOAT;
     clearValue.DepthStencil.Depth = 1.0f;
     clearValue.DepthStencil.Stencil = 0;
@@ -1093,7 +1093,7 @@ HRESULT RenderPlatform12::UninitDevice()
 HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView)
 {
     // Get a handle to the instance buffer.  Game will fill out data before calling Render()
-    CD3DX12_RANGE readRange(0, 0);		// We do not intend to read from this resource on the CPU.
+    CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
     HR(buffer->buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
     //TODO should Map() in D3D12 only get called once at create time?
 

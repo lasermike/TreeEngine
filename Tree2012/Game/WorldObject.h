@@ -87,15 +87,15 @@ class WorldObject
 {
 protected:
 
-    bool		_drawInstanced;
+    bool        _drawInstanced;
 
     unique_ptr<WorldObjectParams> _params;
-    XMFLOAT3	_position;
+    XMFLOAT3    _position;
     XMFLOAT4    _rotation; // Quaternion
-    XMFLOAT3	_scale;
+    XMFLOAT3    _scale;
 
-    XMFLOAT3	_boundingBox[2];
-    XMFLOAT3	_extents[4];
+    XMFLOAT3    _boundingBox[2];
+    XMFLOAT3    _extents[4];
 
     float CalcTime(float time) { return time * _params->_animationSpeed; }
 public:

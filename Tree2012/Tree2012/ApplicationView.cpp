@@ -15,10 +15,10 @@ using namespace Windows::UI::Core;
 ApplicationView::ApplicationView()
 {
     m_windowClosed = false;
-	for (int i = 0; i < ARRAYSIZE(pressedButtons); i++)
-	{
-		pressedButtons[i] = false;
-	}
+    for (int i = 0; i < ARRAYSIZE(pressedButtons); i++)
+    {
+        pressedButtons[i] = false;
+    }
 }
 
 // Called by the system.  Perform application initialization here,
@@ -38,8 +38,8 @@ void ApplicationView::SetWindow(CoreWindow^ window)
 {
     window->Closed += ref new TypedEventHandler<CoreWindow^, CoreWindowEventArgs^>(this, &ApplicationView::OnWindowClosed);
 
-	m_pGame = new Game(&m_inputManager);
-	m_pGame->Initialize(window, 0);
+    m_pGame = new Game(&m_inputManager);
+    m_pGame->Initialize(window, 0);
 }
 
 // The purpose of this method is to get the application entry point.
@@ -57,28 +57,28 @@ void ApplicationView::Run()
     {
         dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
 
-		HandleInput();
+        HandleInput();
 
-		m_pGame->ComputeCPU();
-		m_pGame->ComputeGPU();
-		m_pGame->Render(false);
+        m_pGame->ComputeCPU();
+        m_pGame->ComputeGPU();
+        m_pGame->Render(false);
     }
 }
 
 void ApplicationView::HandleInput()
 {
-	m_input.Update();
-	const XSF::GamepadReading& input = m_input.GetCurrentGamepadReading();
+    m_input.Update();
+    const XSF::GamepadReading& input = m_input.GetCurrentGamepadReading();
 
-	FrameInputData& data = m_inputManager.GetFrameInput(0);
+    FrameInputData& data = m_inputManager.GetFrameInput(0);
 
-	data.key[VK_RIGHT] = input.IsDPadRightPressed();
-	data.key[VK_LEFT] = input.IsDPadLeftPressed();
-	data.key['0'] = input.IsYPressed();
-	data.key['R'] = input.IsLeftShoulderPressed();
-	data.key['Z'] = input.IsRightShoulderPressed();
-	data.key['H'] = input.IsDPadUpPressed();
-	data.key['P'] = input.IsAPressed();
+    data.key[VK_RIGHT] = input.IsDPadRightPressed();
+    data.key[VK_LEFT] = input.IsDPadLeftPressed();
+    data.key['0'] = input.IsYPressed();
+    data.key['R'] = input.IsLeftShoulderPressed();
+    data.key['Z'] = input.IsRightShoulderPressed();
+    data.key['H'] = input.IsDPadUpPressed();
+    data.key['P'] = input.IsAPressed();
 }
 
 void ApplicationView::Uninitialize()

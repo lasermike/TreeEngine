@@ -18,7 +18,7 @@ using namespace OVR;
 struct OculusTexture
 {
     ovrSwapTextureSet      * TextureSet;
-	ID3D11RenderTargetView * TexRtv[3] = {};
+    ID3D11RenderTargetView * TexRtv[3] = {};
 
     OculusTexture(ovrHmd hmd, ID3D11Device* pDevice, Sizei size)
     {
@@ -35,14 +35,14 @@ struct OculusTexture
         dsDesc.MiscFlags        = 0;
         dsDesc.BindFlags        = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
 
-		ovr_CreateSwapTextureSetD3D11(hmd, pDevice, &dsDesc, ovrSwapTextureSetD3D11_Typeless, &TextureSet);
+        ovr_CreateSwapTextureSetD3D11(hmd, pDevice, &dsDesc, ovrSwapTextureSetD3D11_Typeless, &TextureSet);
         for (int i = 0; i < TextureSet->TextureCount; ++i)
         {
             ovrD3D11Texture* tex = (ovrD3D11Texture*)&TextureSet->Textures[i];
-			D3D11_RENDER_TARGET_VIEW_DESC rtvd = {};
-			rtvd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-			rtvd.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-			pDevice->CreateRenderTargetView(tex->D3D11.pTexture, &rtvd, &TexRtv[i]);
+            D3D11_RENDER_TARGET_VIEW_DESC rtvd = {};
+            rtvd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+            rtvd.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+            pDevice->CreateRenderTargetView(tex->D3D11.pTexture, &rtvd, &TexRtv[i]);
         }
     }
 
@@ -57,9 +57,9 @@ struct OculusTexture
 };
 
 // Tree classic
-HINSTANCE hInst;								// current instance
-TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
-TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
+HINSTANCE hInst;                                // current instance
+TCHAR szTitle[MAX_LOADSTRING];                    // The title bar text
+TCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 HWND m_hWnd = nullptr;
 bool oculusMode = false;
 
@@ -84,15 +84,15 @@ ovrHmdDesc g_hmdDesc;
 //------------------------------------------------------------
 
 // Forward declarations of functions included in this code module:
-HRESULT				CreateOculusDevice(bool& detected);
-HRESULT				ConfigOculusDevice();
+HRESULT                CreateOculusDevice(bool& detected);
+HRESULT                ConfigOculusDevice();
 HRESULT             Render();
 void                OnWindowSizeChanged();
 
-ATOM				MyRegisterClass(HINSTANCE hInstance);
-BOOL				InitInstance(HINSTANCE, int);
-LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
+ATOM                MyRegisterClass(HINSTANCE hInstance);
+BOOL                InitInstance(HINSTANCE, int);
+LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
@@ -120,7 +120,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     MSG msg = {0};
     while (WM_QUIT != msg.message)
     {
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
@@ -166,7 +166,7 @@ HRESULT Render()
     if (oculusMode)
     {
         XMFLOAT4 eye; 
-		XMStoreFloat4(&eye, g_game->GetRenderManager().GetRenderData().eyePos);
+        XMStoreFloat4(&eye, g_game->GetRenderManager().GetRenderData().eyePos);
 
         //Camera mainCam(Vector3f(eye.x, eye.y, eye..z), Matrix4f::RotationY(3.141f));
         //float y = ovr_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, 0);
@@ -175,7 +175,7 @@ HRESULT Render()
         ovrPosef         EyeRenderPose[2];
         ovrVector3f      HmdToEyeViewOffset[2] = { eyeRenderDesc[0].HmdToEyeViewOffset,
                                                    eyeRenderDesc[1].HmdToEyeViewOffset };
-		double frameTime  = ovr_GetPredictedDisplayTime(HMD, 0);
+        double frameTime  = ovr_GetPredictedDisplayTime(HMD, 0);
         ovrTrackingState hmdState = ovr_GetTrackingState(HMD, frameTime, ovrTrue);
         ovr_CalcEyePoses(hmdState.HeadPose.ThePose, HmdToEyeViewOffset, EyeRenderPose);
 
@@ -186,27 +186,27 @@ HRESULT Render()
         // Render Scene to Eye Buffers
         for (int eyeIndex = 0; eyeIndex < 2; eyeIndex++)  //2
         {
-			if (g_inputManager.GetFrameInput(0).key[VK_SPACE])
+            if (g_inputManager.GetFrameInput(0).key[VK_SPACE])
             {
                 // Reset to default camera position
-				neutralPosition = EyeRenderPose[eyeIndex].Position;
+                neutralPosition = EyeRenderPose[eyeIndex].Position;
                 neutralRotation = EyeRenderPose[eyeIndex].Orientation;
             }
 
-			// COmpute position
+            // COmpute position
             Vector3f adjustedPos = Vector3f(EyeRenderPose[eyeIndex].Position) - neutralPosition;
-			XMFLOAT3 hmdPos = XMFLOAT3(adjustedPos.x, adjustedPos.y, adjustedPos.z);			 
+            XMFLOAT3 hmdPos = XMFLOAT3(adjustedPos.x, adjustedPos.y, adjustedPos.z);             
 
             // Compute rotation.  Divide sensor data by neutral data 
             XMVECTOR eyeQuat = RH2LH(EyeRenderPose[eyeIndex].Orientation);
             XMVECTOR neutralQuat = RH2LH(neutralRotation);
-			XMVECTOR finalQuat = eyeQuat;
-			XMFLOAT4 hmdRot;
-			XMStoreFloat4(&hmdRot, finalQuat);
+            XMVECTOR finalQuat = eyeQuat;
+            XMFLOAT4 hmdRot;
+            XMStoreFloat4(&hmdRot, finalQuat);
 
             g_game->GetPlayer()->GetCamera()->SetHmdState(hmdPos, hmdRot);
 
-			// Update game's project matrix
+            // Update game's project matrix
             Matrix4f proj = ovrMatrix4f_Projection(eyeRenderDesc[eyeIndex].Fov, 0.2f, 1000.0f, ovrProjection_None);
             XMFLOAT4X4 projxm = XMFLOAT4X4((float*) (proj.Transposed().M));
             g_game->UpdateProjection(&projxm);
@@ -241,10 +241,10 @@ HRESULT Render()
 
         ovrLayerHeader* layers = &ld.Header;
         ovrResult result = ovr_SubmitFrame(HMD, 0, nullptr, &layers, 1);
-		ASSERTSZ(result == ovrSuccess, "Failed to configure tracking.");
+        ASSERTSZ(result == ovrSuccess, "Failed to configure tracking.");
 
         // Render mirror
-	    ID3D11Texture2D* pBackBuffer = nullptr;
+        ID3D11Texture2D* pBackBuffer = nullptr;
         HRR(g_game->GetRenderManager().GetPlatform()->GetSwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer)));
 
         ovrD3D11Texture* tex = (ovrD3D11Texture*)g_mirrorTexture;
@@ -276,13 +276,13 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     bool oculusDetected = false;
     HR(CreateOculusDevice(oculusDetected));
 
-	oculusMode = HMD != nullptr && !debugOvr;
+    oculusMode = HMD != nullptr && !debugOvr;
 
-	// Found a regular or debug Oculus device
-	if (oculusMode)
-	{
+    // Found a regular or debug Oculus device
+    if (oculusMode)
+    {
         ovrSizei ovrWinSize = { g_hmdDesc.Resolution.w / 2, g_hmdDesc.Resolution.h / 2 };
-		Recti vp(Recti(Vector2i(0), ovrWinSize));
+        Recti vp(Recti(Vector2i(0), ovrWinSize));
 
         WNDCLASSW wc; memset(&wc, 0, sizeof(wc));
         wc.lpszClassName = L"OVRAppWindow";
@@ -304,24 +304,24 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         WinSize = vp.GetSize();
 
         neutralRotation = Quatf::Identity();
-	}
-	else
-	{
-		RECT rc = { 0, 0, 1600, 1080};
-		AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
-		m_hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
-	}
+    }
+    else
+    {
+        RECT rc = { 0, 0, 1600, 1080};
+        AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
+        m_hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
+    }
 
     if (!m_hWnd)
     {
         return FALSE;
     }
 
-	g_game = new Game(&g_inputManager);
+    g_game = new Game(&g_inputManager);
     g_game->GetRenderManager().GetPlatform()->SetWindow(m_hWnd);
 
-	if (FAILED(g_game->Initialize(false /* render to shared texture */)))
+    if (FAILED(g_game->Initialize(false /* render to shared texture */)))
     {
         g_game->Cleanup();
         return 0;
@@ -336,11 +336,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     ShowWindow(m_hWnd, nCmdShow);
     UpdateWindow(m_hWnd);
 
-	// Oculus mode
-	if (oculusMode)
-	{
-		ConfigOculusDevice();
-	}
+    // Oculus mode
+    if (oculusMode)
+    {
+        ConfigOculusDevice();
+    }
 
     return TRUE;
 }
@@ -362,23 +362,23 @@ HRESULT CreateOculusDevice(bool& detected)
         return 0; 
     }
 
-	ovrGraphicsLuid luid;
-	result = ovr_Create(&HMD, &luid);
-	if (OVR_SUCCESS(result))
-	{
-		LOG("Oculus Rift device created."); 
-	}
-	else 
+    ovrGraphicsLuid luid;
+    result = ovr_Create(&HMD, &luid);
+    if (OVR_SUCCESS(result))
     {
-		LOG("Oculus Rift device creation FAILED.");
-		return S_FALSE;
-		//result = ovr_CreateDebug(ovrHmd_DK2, &HMD);
-		//debugOvr = true;
+        LOG("Oculus Rift device created."); 
+    }
+    else 
+    {
+        LOG("Oculus Rift device creation FAILED.");
+        return S_FALSE;
+        //result = ovr_CreateDebug(ovrHmd_DK2, &HMD);
+        //debugOvr = true;
         //LOG("Debug Oculus Rift device created."); 
     }
 
 
-	g_hmdDesc = ovr_GetHmdDesc(HMD);
+    g_hmdDesc = ovr_GetHmdDesc(HMD);
 
     if (g_hmdDesc.ProductName[0] == '\0')
     {
@@ -394,7 +394,7 @@ HRESULT CreateOculusDevice(bool& detected)
 
 HRESULT ConfigOculusDevice()
 {
-	//ovr_SetEnabledCaps(HMD, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
+    //ovr_SetEnabledCaps(HMD, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
 
     // Start the sensor which informs of the Rift's pose and motion
     ovrResult result = ovr_ConfigureTracking(HMD, ovrTrackingCap_Orientation | ovrTrackingCap_MagYawCorrection |
@@ -434,21 +434,21 @@ HRESULT ConfigOculusDevice()
     eyeRenderDesc[0] = ovr_GetRenderDesc(HMD, ovrEye_Left, g_hmdDesc.DefaultEyeFov[0]);
     eyeRenderDesc[1] = ovr_GetRenderDesc(HMD, ovrEye_Right, g_hmdDesc.DefaultEyeFov[1]);
 
-	return S_OK;
+    return S_OK;
 }
 
 void OnWindowSizeChanged()
 {
     ASSERT(m_hWnd);
 
-	RECT rect = {0};
-	UINT windowWidth = 0; 
-	UINT windowHeight = 0;
-	GetClientRect(m_hWnd, &rect);
-	windowWidth = rect.right - rect.left;
-	windowHeight = rect.bottom - rect.top;
+    RECT rect = {0};
+    UINT windowWidth = 0; 
+    UINT windowHeight = 0;
+    GetClientRect(m_hWnd, &rect);
+    windowWidth = rect.right - rect.left;
+    windowHeight = rect.bottom - rect.top;
 
-	g_game->OnResize(windowWidth, windowHeight);
+    g_game->OnResize(windowWidth, windowHeight);
 }
 
 
@@ -461,28 +461,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     PAINTSTRUCT ps;
     HDC hdc;
 
-	FrameInputData& input = g_inputManager.GetFrameInput(0);
+    FrameInputData& input = g_inputManager.GetFrameInput(0);
 
     switch (message)
     {
-	case WM_SYSKEYDOWN:
-	case WM_SYSKEYUP:
-	case WM_KEYDOWN:
-	case WM_KEYUP:
-	{
-		//UINT VKCode = wParam;
-		bool WasDown = ((lParam & (1 << 30)) != 0);
-		bool IsDown = ((lParam & (1 << 31)) == 0);
-		
-		if (WasDown != IsDown)
-		{
-			if (IsDown)
-				input.key[wParam] = true;
-			else if (WasDown)
-				input.key[wParam] = false;
-		}
-	}
-	//case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP:
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+    {
+        //UINT VKCode = wParam;
+        bool WasDown = ((lParam & (1 << 30)) != 0);
+        bool IsDown = ((lParam & (1 << 31)) == 0);
+        
+        if (WasDown != IsDown)
+        {
+            if (IsDown)
+                input.key[wParam] = true;
+            else if (WasDown)
+                input.key[wParam] = false;
+        }
+    }
+    //case WM_KEYDOWN:
  //       input.key[wParam] = !(lParam & 1 << 30);
  //       break;
  //   case WM_KEYUP:

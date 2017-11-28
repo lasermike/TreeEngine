@@ -68,7 +68,7 @@ namespace XboxSampleFramework
         // MaxLOD = No Limit.
         MinMagLinearMipPointUVWWrap,
 
-		UseShadowMap,
+        UseShadowMap,
 
         // The total number of stock sampler states.
         SamplerStateCount
@@ -108,7 +108,7 @@ namespace XboxSampleFramework
         // Same as Wireframe rasterizer but with no back-face culling (implies winding order agnostic)
         WireframeNoCulling,
 
-		BuildShadowMap,
+        BuildShadowMap,
 
         // The total number of stock rasterizer states
         RasterizerStateCount

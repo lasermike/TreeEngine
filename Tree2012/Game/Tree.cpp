@@ -147,7 +147,6 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
 
     pRenderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat++;
 
-    // Update variables that change once per frame
     XMVECTOR vChildStart;
     XMMATRIX localToWorld;
     ComputeTransformationsManual(&localToWorld, &vChildStart, CalcTime(pRenderData->time), branch, &pRenderData->world, parentStart);

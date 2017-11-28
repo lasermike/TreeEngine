@@ -657,12 +657,12 @@ UINT32 ComputeCrc32Table(UINT32 InitialCrc, const void* Buffer, size_t Bytes)
 UINT32 ComputeCrc32(const void* Buffer, size_t Bytes, _In_opt_ UINT32 InitialCrc = 0xffffffff)
 {
 #ifdef _AMD64_
-	if (s_can_use_sse4)
-	{
-		return ComputeCrc32SSE4(InitialCrc, Buffer, Bytes);
-	}
+    if (s_can_use_sse4)
+    {
+        return ComputeCrc32SSE4(InitialCrc, Buffer, Bytes);
+    }
 #endif
-	return ComputeCrc32Table(InitialCrc, Buffer, Bytes);
+    return ComputeCrc32Table(InitialCrc, Buffer, Bytes);
 }
 
 
@@ -2123,7 +2123,7 @@ HRESULT MipsGenerator::GenerateMips(D3DCommandList* const pCmdList, _In_ ID3D12R
             pCmdList->OMSetRenderTargets(1, &hRTV, FALSE, nullptr);
             m_iRTV = ++ m_iRTV % c_maxRTV;
             
-			pCmdList->SetGraphicsRoot32BitConstant(1, iMipLevel - 1, 0);
+            pCmdList->SetGraphicsRoot32BitConstant(1, iMipLevel - 1, 0);
             pCmdList->SetGraphicsRoot32BitConstant(1, iArrayOrDepth, 1);
 
             pCmdList->DrawInstanced(4, 1, 0, 0);
@@ -2478,16 +2478,16 @@ HRESULT CreateBuffer(
         nullptr,
         IID_GRAPHICS_PPV_ARGS(ppBuffer)));
 
-	if (pInitialData)
-	{
-		HRESULT hr;
-		if (FAILED(hr = pUploadHeap->CopyBufferDataToDefaultBuffer(pInitialData, static_cast<SIZE_T>(desc.Width), pCmdList, *ppBuffer)))
-		{
-			XSF_SAFE_RELEASE(*ppBuffer);
-			return hr;
-		}
-		XSF::ResourceBarrier(pCmdList, *ppBuffer, initialUsage, D3D12_RESOURCE_STATE_COMMON);
-	}
+    if (pInitialData)
+    {
+        HRESULT hr;
+        if (FAILED(hr = pUploadHeap->CopyBufferDataToDefaultBuffer(pInitialData, static_cast<SIZE_T>(desc.Width), pCmdList, *ppBuffer)))
+        {
+            XSF_SAFE_RELEASE(*ppBuffer);
+            return hr;
+        }
+        XSF::ResourceBarrier(pCmdList, *ppBuffer, initialUsage, D3D12_RESOURCE_STATE_COMMON);
+    }
 
     return S_OK;
 }
@@ -2511,12 +2511,12 @@ HRESULT CreateVertexBuffer(
     XSF::ResourceBarrier(pCmdList, *ppBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
     if (pVBView)
-	{
-		ZeroMemory(pVBView, sizeof(*pVBView));
-		pVBView->BufferLocation = (*ppBuffer)->GetGPUVirtualAddress();
-		pVBView->StrideInBytes = strideInBytes;
-		pVBView->SizeInBytes = static_cast< UINT >(desc.Width);
-	}
+    {
+        ZeroMemory(pVBView, sizeof(*pVBView));
+        pVBView->BufferLocation = (*ppBuffer)->GetGPUVirtualAddress();
+        pVBView->StrideInBytes = strideInBytes;
+        pVBView->SizeInBytes = static_cast< UINT >(desc.Width);
+    }
     return S_OK;
 }
 
@@ -2543,12 +2543,12 @@ HRESULT CreateIndexBuffer(
     XSF::ResourceBarrier(pCmdList, *ppBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
     if (pIBView)
-	{
-		ZeroMemory(pIBView, sizeof(*pIBView));
-		pIBView->BufferLocation = (*ppBuffer)->GetGPUVirtualAddress();
-		pIBView->Format = format;
-		pIBView->SizeInBytes = static_cast<UINT>(desc.Width);
-	}
+    {
+        ZeroMemory(pIBView, sizeof(*pIBView));
+        pIBView->BufferLocation = (*ppBuffer)->GetGPUVirtualAddress();
+        pIBView->Format = format;
+        pIBView->SizeInBytes = static_cast<UINT>(desc.Width);
+    }
     return S_OK;
 }
 
@@ -2619,11 +2619,11 @@ HRESULT CreateResource(
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
 HRESULT UpdateConstantBuffer(
-	D3DDevice* pDevice,
-	SIZE_T cbSize,
-	XSF::CpuGpuHeap* pUploadHeap,
-	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptorHandle,
-	const void* pData)
+    D3DDevice* pDevice,
+    SIZE_T cbSize,
+    XSF::CpuGpuHeap* pUploadHeap,
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptorHandle,
+    const void* pData)
 {
     D3D12_CONSTANT_BUFFER_VIEW_DESC descCB = {};
     BYTE* pHeap;
@@ -2631,9 +2631,9 @@ HRESULT UpdateConstantBuffer(
     memcpy(pHeap, pData, cbSize);
 
     descCB.SizeInBytes = static_cast< UINT >(NextMultiple(cbSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-	pDevice->CreateConstantBufferView(&descCB, cpuDescriptorHandle);
-		
-	return S_OK;
+    pDevice->CreateConstantBufferView(&descCB, cpuDescriptorHandle);
+        
+    return S_OK;
 }
 
 //--------------------------------------------------------------------------------------
@@ -2774,23 +2774,23 @@ static HRESULT CreateD3DResources(
     {
         for (UINT i = 0 ; i < mipCount; ++i)
         {
-			pitchSrcDesc.RowPitch = static_cast<UINT>(initData[subresourceIndex].RowPitch);
-			pitchSrcDesc.Width = std::max(width >> i, minW);
+            pitchSrcDesc.RowPitch = static_cast<UINT>(initData[subresourceIndex].RowPitch);
+            pitchSrcDesc.Width = std::max(width >> i, minW);
             pitchSrcDesc.Height = std::max(height >> i, minH);
-			pitchSrcDesc.Depth = std::max(depth >> i, 1u);
+            pitchSrcDesc.Depth = std::max(depth >> i, 1u);
             if (IsCompressed(format))
             {
                 pitchSrcDesc.Width = static_cast<UINT32>(NextMultiple(pitchSrcDesc.Width, 4));
                 pitchSrcDesc.Height = static_cast<UINT32>(NextMultiple(pitchSrcDesc.Height, 4));
             }
            
-			D3D12_SUBRESOURCE_FOOTPRINT pitchDestDesc = pitchSrcDesc;
-			pitchDestDesc.RowPitch  = static_cast<UINT32>(NextMultiple(pitchDestDesc.RowPitch , XSF_TEXTURE_DATA_PITCH_ALIGNMENT));
+            D3D12_SUBRESOURCE_FOOTPRINT pitchDestDesc = pitchSrcDesc;
+            pitchDestDesc.RowPitch  = static_cast<UINT32>(NextMultiple(pitchDestDesc.RowPitch , XSF_TEXTURE_DATA_PITCH_ALIGNMENT));
 
-			XSF_ERROR_IF_FAILED(pUploadHeap->CopyTextureSubresourceToDefaultTexture(
-				reinterpret_cast<const BYTE*>(initData[subresourceIndex].pData), pitchSrcDesc, pCmdList, pTex, subresourceIndex, &pitchDestDesc));
+            XSF_ERROR_IF_FAILED(pUploadHeap->CopyTextureSubresourceToDefaultTexture(
+                reinterpret_cast<const BYTE*>(initData[subresourceIndex].pData), pitchSrcDesc, pCmdList, pTex, subresourceIndex, &pitchDestDesc));
  
-			subresourceIndex++;
+            subresourceIndex++;
         }
     }
 
@@ -2827,7 +2827,7 @@ static HRESULT CreateD3DResources(
     {
         pDevice->CreateShaderResourceView(pTex, &descSRV, descHandle);
     }
-	
+    
     if (ppTexture != nullptr)
     {
         *ppTexture = pTex;

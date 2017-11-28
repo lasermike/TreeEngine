@@ -5,10 +5,10 @@
 
 FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
 { 
-	{ FPS_STAT, L"FPS", 0 }, 
-	{ WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", 0 }, 
-	{ NUM_LEAVES_STAT, L"Num leaves", 0 },
-	{ NUM_STICKS_STAT, L"Num sticks", 0 },
+    { FPS_STAT, L"FPS", 0 }, 
+    { WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", 0 }, 
+    { NUM_LEAVES_STAT, L"Num leaves", 0 },
+    { NUM_STICKS_STAT, L"Num sticks", 0 },
     { DRIVER_12_STAT, L"DirectX 12", 0 },
 };
 
@@ -112,7 +112,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_vertexShaders.clear();
     m_pixelShaders.clear();
 
-	return S_OK;
+    return S_OK;
 }
 
 HRESULT RenderManager::BeginNewFrame()
@@ -122,9 +122,9 @@ HRESULT RenderManager::BeginNewFrame()
     InstancedData* dataView = nullptr;
     GetPlatform()->BeginNewFrame(true, buffer, &dataView);
 
-	m_renderData.instanceData = dataView;
+    m_renderData.instanceData = dataView;
 
-	return S_OK;
+    return S_OK;
 }
 
 
@@ -293,58 +293,58 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
     const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
 {
-	m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferIndices)));
-	*newMesh = &m_meshes[name];
-	return S_OK;
+    m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferIndices)));
+    *newMesh = &m_meshes[name];
+    return S_OK;
 }
 
 HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit)
 {
-	RenderUnit* unit = nullptr;
-	UINT ruIndex = 0;
+    RenderUnit* unit = nullptr;
+    UINT ruIndex = 0;
 
-	for (RenderUnit& ru : m_renderUnits)
-	{
-		if (ru.m_material == material && ru.m_mesh == mesh) 
-		{
-			unit = &ru;
-			break;
-		}
-		ruIndex++;
-	}
+    for (RenderUnit& ru : m_renderUnits)
+    {
+        if (ru.m_material == material && ru.m_mesh == mesh) 
+        {
+            unit = &ru;
+            break;
+        }
+        ruIndex++;
+    }
 
-	if (unit == nullptr)
-	{
-		m_renderUnits.emplace_back(RenderUnit(material, mesh));
-		unit = &(*m_renderUnits.rbegin());
-	}
+    if (unit == nullptr)
+    {
+        m_renderUnits.emplace_back(RenderUnit(material, mesh));
+        unit = &(*m_renderUnits.rbegin());
+    }
 
-	// Update object to instance buffer look up table if not present
-	if (m_objectToInstanceBufferOffset.find(object) == m_objectToInstanceBufferOffset.end())
-	{
-		m_objectToInstanceBufferOffset[object] = m_nextInstanceBufferOffset;
-		m_nextInstanceBufferOffset += object->GetMaxInstances();
-	}
+    // Update object to instance buffer look up table if not present
+    if (m_objectToInstanceBufferOffset.find(object) == m_objectToInstanceBufferOffset.end())
+    {
+        m_objectToInstanceBufferOffset[object] = m_nextInstanceBufferOffset;
+        m_nextInstanceBufferOffset += object->GetMaxInstances();
+    }
 
-	// Add reservation
-	unit->reservations.push_back(object);
-	unit->totalMaxInstances += object->GetMaxInstances(); // TODO needed?
+    // Add reservation
+    unit->reservations.push_back(object);
+    unit->totalMaxInstances += object->GetMaxInstances(); // TODO needed?
 
-	// Add per frame reservation
-	ASSERT(m_perFrameInstanceData[unit].find(object) == m_perFrameInstanceData[unit].end());
-	m_perFrameInstanceData[unit][object].first = 0;
-	m_perFrameInstanceData[unit][object].second = 0;
+    // Add per frame reservation
+    ASSERT(m_perFrameInstanceData[unit].find(object) == m_perFrameInstanceData[unit].end());
+    m_perFrameInstanceData[unit][object].first = 0;
+    m_perFrameInstanceData[unit][object].second = 0;
 
-	*ppRenderUnit = unit;
+    *ppRenderUnit = unit;
 
-	return S_OK;
+    return S_OK;
 }
 
 HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances)
 {
-	m_perFrameInstanceData[renderUnit][object].first = startInstance;
-	m_perFrameInstanceData[renderUnit][object].second = numInstances;
-	return S_OK;
+    m_perFrameInstanceData[renderUnit][object].first = startInstance;
+    m_perFrameInstanceData[renderUnit][object].second = numInstances;
+    return S_OK;
 }
 
 
@@ -502,39 +502,39 @@ HRESULT RenderManager::RenderShadowMap()
 
 void RenderManager::BuildShadowTransform()
 {
-	// Only the first "main" light casts a shadow.
-	XMVECTOR lightDir = XMLoadFloat3(&GetRenderData().dirLights[0].Direction);
-	XMVECTOR lightPos = -2.0f * GetRenderData().mSceneBounds.Radius * lightDir;
-	XMVECTOR targetPos = XMLoadFloat3(&GetRenderData().mSceneBounds.Center);
-	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    // Only the first "main" light casts a shadow.
+    XMVECTOR lightDir = XMLoadFloat3(&GetRenderData().dirLights[0].Direction);
+    XMVECTOR lightPos = -2.0f * GetRenderData().mSceneBounds.Radius * lightDir;
+    XMVECTOR targetPos = XMLoadFloat3(&GetRenderData().mSceneBounds.Center);
+    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
-	XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
+    XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
 
-	// Transform bounding sphere to light space.
-	XMFLOAT3 sphereCenterLS;
-	XMStoreFloat3(&sphereCenterLS, XMVector3TransformCoord(targetPos, V));
+    // Transform bounding sphere to light space.
+    XMFLOAT3 sphereCenterLS;
+    XMStoreFloat3(&sphereCenterLS, XMVector3TransformCoord(targetPos, V));
 
-	// Ortho frustum in light space encloses scene.
-	float l = sphereCenterLS.x - GetRenderData().mSceneBounds.Radius;
-	float b = sphereCenterLS.y - GetRenderData().mSceneBounds.Radius;
-	float n = sphereCenterLS.z - GetRenderData().mSceneBounds.Radius / 1.25f;
-	float r = sphereCenterLS.x + GetRenderData().mSceneBounds.Radius;
-	float t = sphereCenterLS.y + GetRenderData().mSceneBounds.Radius;
-	float f = sphereCenterLS.z + GetRenderData().mSceneBounds.Radius * 2.75f;
-	XMMATRIX P = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
+    // Ortho frustum in light space encloses scene.
+    float l = sphereCenterLS.x - GetRenderData().mSceneBounds.Radius;
+    float b = sphereCenterLS.y - GetRenderData().mSceneBounds.Radius;
+    float n = sphereCenterLS.z - GetRenderData().mSceneBounds.Radius / 1.25f;
+    float r = sphereCenterLS.x + GetRenderData().mSceneBounds.Radius;
+    float t = sphereCenterLS.y + GetRenderData().mSceneBounds.Radius;
+    float f = sphereCenterLS.z + GetRenderData().mSceneBounds.Radius * 2.75f;
+    XMMATRIX P = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
 
-	// Transform NDC space [-1,+1]^2 to texture space [0,1]^2
-	XMMATRIX T(
-		0.5f, 0.0f, 0.0f, 0.0f,
-		0.0f, -0.5f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.5f, 0.5f, 0.0f, 1.0f);
+    // Transform NDC space [-1,+1]^2 to texture space [0,1]^2
+    XMMATRIX T(
+        0.5f, 0.0f, 0.0f, 0.0f,
+        0.0f, -0.5f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.0f, 1.0f);
 
-	XMMATRIX S = V*P*T;
+    XMMATRIX S = V*P*T;
 
-	XMStoreFloat4x4(&GetRenderData().lightView, V);
-	XMStoreFloat4x4(&GetRenderData().lightProj, P);
-	XMStoreFloat4x4(&GetRenderData().shadowTransform, S);
+    XMStoreFloat4x4(&GetRenderData().lightView, V);
+    XMStoreFloat4x4(&GetRenderData().lightProj, P);
+    XMStoreFloat4x4(&GetRenderData().shadowTransform, S);
 }
 
 void RenderManager::DrawSceneToShadowMap()

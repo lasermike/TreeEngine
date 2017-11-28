@@ -30,6 +30,6 @@ public:
     void Load(int sceneNum, SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData);
     void Regenerate(SceneRoot* pScene);
 
-    int						  _currentSeed;
+    int _currentSeed;
     int GetNumScenes() { return 4; }
 };
