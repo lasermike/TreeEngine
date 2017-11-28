@@ -8,9 +8,7 @@
 
 #include "pch.h"
 
-#if defined(TREE3D12)
-
-#include "StockRenderStates.h"
+#include "StockRenderStates12.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Static Member variables
@@ -164,7 +162,7 @@ static const D3D12_BLEND_DESC s_StockBlendTypes[] =
     }
 };
 
-static_assert(ARRAYSIZE(s_StockBlendTypes) == static_cast<UINT>(XSF::StockBlendStates::BlendStateCount),
+static_assert(ARRAYSIZE(s_StockBlendTypes) == static_cast<UINT>(StockBlendStates::BlendStateCount),
               "Blend Description count doesn't match Blend State list");
 
 #undef EMPTY_BLEND_STATE
@@ -244,11 +242,25 @@ static const D3D12_SAMPLER_DESC s_StockSamplerTypes[] =
         { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
         0.0F,                                           // MinLOD
         D3D12_FLOAT32_MAX                               // MaxLOD
+    },
+    // UseShadowMap
+    {
+        D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT,// Filter mode
+        D3D12_TEXTURE_ADDRESS_MODE_BORDER,                    // U address clamping
+        D3D12_TEXTURE_ADDRESS_MODE_BORDER,                    // V address clamping
+        D3D12_TEXTURE_ADDRESS_MODE_BORDER,                    // W address clamping
+        0.0F,                                           // Mip LOD bias
+        0,                                              // Max Anisotropy - applies if using ANISOTROPIC filtering only
+        D3D12_COMPARISON_FUNC_LESS_EQUAL,
+        { 1.0F, 1.0F, 1.0F, 1.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
+        0.0F,                                           // MinLOD
+        D3D12_FLOAT32_MAX                               // MaxLOD
     }
+
 };
 
 
-static_assert(ARRAYSIZE(s_StockSamplerTypes) == static_cast<UINT>(XSF::StockSamplerStates::SamplerStateCount),
+static_assert(ARRAYSIZE(s_StockSamplerTypes) == static_cast<UINT>(StockSamplerStates::SamplerStateCount),
               "Sampler Description count doesn't match Sampler State list");
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -361,12 +373,26 @@ static const D3D12_RASTERIZER_DESC s_StockRasterizerTypes[] =
         0,                                              // ForcedSampleCount
         D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF       // ConservativeRaster
     },
+    // BuildShadowMap
+    {
+        D3D12_FILL_MODE_SOLID,                               // FillMode
+        D3D12_CULL_MODE_BACK,                                // CullMode
+        FALSE,                                          // FrontCounterClockwise
+        100000,                                         // DepthBias
+        0.0f,                                           // DepthBiasClamp
+        1.0f,                                           // SlopeScaledDepthBias
+        TRUE,                                           // DepthClipEnable
+        FALSE,                                          // MultisampleEnable
+        FALSE,                                          // AntialiasedLineEnable
+        0,                                              // ForcedSampleCount
+        D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF       // ConservativeRaster
+    }
 };
 
-static_assert( ARRAYSIZE(s_StockRasterizerTypes) == static_cast<UINT>(XSF::StockRasterizerStates::RasterizerStateCount),
+static_assert( ARRAYSIZE(s_StockRasterizerTypes) == static_cast<UINT>(StockRasterizerStates::RasterizerStateCount),
               "Rasterizer Description count doesn't match Rasterizer State list");
 
-static const D3D12_DEPTH_STENCIL_DESC s_StockDepthStencilTypes[XSF::StockDepthStencilStates::DepthStencilStateCount] =
+static const D3D12_DEPTH_STENCIL_DESC s_StockDepthStencilTypes[StockDepthStencilStates::DepthStencilStateCount] =
 {
     // AlwaysSucceed_WriteZOut_NoStencil,
     // No depth test, no stencil test, updates Z buffer
@@ -507,7 +533,7 @@ static const D3D12_DEPTH_STENCIL_DESC s_StockDepthStencilTypes[XSF::StockDepthSt
     }
 };
 
-static_assert(ARRAYSIZE(s_StockDepthStencilTypes) == static_cast<UINT>(XSF::StockDepthStencilStates::DepthStencilStateCount),
+static_assert(ARRAYSIZE(s_StockDepthStencilTypes) == static_cast<UINT>(StockDepthStencilStates::DepthStencilStateCount),
               "Depth Stencil Description count doesn't match Depth Stencil State list");
 
 
@@ -723,5 +749,3 @@ void XSF::StockRenderStates::CopyDepthStencilTemplate(D3D12_DEPTH_STENCIL_DESC& 
 {
     memcpy(&Destination, &s_StockDepthStencilTypes[static_cast<size_t>(state)], sizeof(Destination));
 }
-
-#endif

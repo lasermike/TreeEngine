@@ -21,111 +21,123 @@ interface IInputManager;
 
 struct FrameInputData
 {
-	UINT frame;
-	bool key[256];
+    UINT frame;
+    bool key[256];
 
-	FrameInputData()
-	{
-		frame = 0;
-		memset(key, 0, sizeof(bool) * _countof(key));
-	}
+    FrameInputData()
+    {
+        frame = 0;
+        memset(key, 0, sizeof(bool) * _countof(key));
+    }
 };
 
-class Game : public SwapChainCreator
+class Game
 {
 public:
 
-	Game(IInputManager* inputMgr);
-	~Game();
+    Game(IInputManager* inputMgr);
+    ~Game();
 
-	// Initialization and management
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-	HRESULT Initialize(HWND hwnd, bool renderToSharedTexture);
-#else
-	HRESULT Initialize(Windows::UI::Core::CoreWindow^ window, float logicalDpi);
-#endif
-	HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain); // TODO: move to platform specific code
+    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat) { return m_renderManager.UpdateProjection(pProjMat, false); }
+    HRESULT OnResize(UINT width, UINT height) { m_needsResize = true; m_nextScreenWidth = width; m_nextScreenHeight = height; return S_OK; }
 
-	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat) { return m_renderManager.UpdateProjection(pProjMat); }
-	HRESULT OnResize(UINT width, UINT height) { return m_renderManager.OnResize(width, height, m_renderToSharedTexture, this); }
+    HRESULT Cleanup();
 
-	HRESULT Cleanup();
+    // Basic game loop
+    void ComputeCPU();
+    void ComputeGPU();
+    void Render(bool present);
 
-	// Basic game loop
-	void ComputeCPU();
-	void ComputeGPU();
-	void Render(bool present);
+    // Rendering helpers
+    void Clear();
+    void Present();
 
-	// Rendering helpers
-	void Clear();
-	void Present();
+    void Suspend();
+    void Resume();
 
-	void Suspend();
-	void Resume();
-
-	RenderManager& GetRenderManager() { return m_renderManager; }
+    RenderManager& GetRenderManager() { return m_renderManager; }
 
     Player* GetPlayer() { return m_player; }
 
-	// Allow SSE members
-	void* operator new(size_t size) 
-	{ 
-		return _aligned_malloc(size, 16); 
-	}
-	void operator delete(void* mem) { return _aligned_free(mem); }
+    // Allow SSE members
+    void* operator new(size_t size) 
+    { 
+        return _aligned_malloc(size, 16); 
+    }
+    void operator delete(void* mem) { return _aligned_free(mem); }
+
+    HRESULT Initialize(bool renderToSharedTexture);
+
+#if defined(TREENGINE_WIN32)
+    void SetWindow(HWND hwnd)
+    {
+        m_hwnd = hwnd;
+    }
+
+    HRESULT Initialize();
+
+#else
+
+    void SetWindow(Windows::UI::Core::CoreWindow^ window, float logicalDpi)
+    {
+        m_window = window;
+        m_logicalDpi = logicalDpi;
+    }
+#endif
 
 private:
 
-	HRESULT Initialize();
+    void Update(DX::StepTimer const& timer);
+    void Regenerate();
+    void HandleInput(bool key[256]);
 
-	void Update(DX::StepTimer const& timer);
-	void Regenerate();
-	void HandleInput(bool key[256]);
+    HRESULT ReloadDevice();
+    void UpdateViewMatrix();
+
+    // Managers
+    GameLoader                            m_loader;
+    RenderManager                        m_renderManager;
+    HMODULE                             m_renderPlatformDLL;
+
+    // Owned objectes
+    ThreadPool*                            m_threadPool;
+    SceneRoot*                            m_pScene;
+    Player*                                m_player;
+
+    // Unowned objects
+    IInputManager*                        m_inputMgr;   
+
+    // Game state
+    DX::StepTimer                        m_timer;
+    double                                m_timeStart;
+    double                                m_timeCurrent;
+    int                                    m_currentScene;
+    bool                                m_advanceScene;
+    int                                    m_advanceSceneAmount;
+    bool                                m_reloadDevice;
+
+    bool                                m_needsResize;
+    int                                 m_nextScreenWidth;
+    int                                 m_nextScreenHeight;
+    bool                                m_renderToSharedTexture;
+
+    bool                                m_resetTree;
+    bool                                m_showShadowBuffer;
+    bool                                m_paused;
+    bool                                m_wireframe;
+    bool                                m_showHelp;
+    bool                                m_is12Driver;
+    bool                                m_rotateLights;
+    GameData                            m_gameData;
 
 
-	void UpdateView();
-
-	void BuildShadowTransform();
-	void DrawSceneToShadowMap();
-
-	// Managers
-	GameLoader							m_loader;
-	RenderManager						m_renderManager;
-
-	// Owned objectes
-	ThreadPool*							m_threadPool;
-	SceneRoot*							m_pScene;
-	Player*								m_player;
-
-	// Unowned objects
-	IInputManager*						m_inputMgr;   
-
-	// Game state
-	DX::StepTimer						m_timer;
-	double								m_timeStart;
-	double								m_timeCurrent;
-	int								    m_currentScene;
-	bool							    m_advanceScene;
-	int								    m_advanceSceneAmount;
-
-#if defined(WIN32) && !defined(TREENGINE_XBOX)
-	HWND								m_hwnd;
+#if defined(_TREE_CLASSIC)
+    HWND                              m_hwnd;
 #else
-	Platform::Agile<Windows::UI::Core::CoreWindow>		m_window;
-#if !defined(_XBOX_ONE)
-	float ConvertDipsToPixels(float dips, float logicalDpi);
-#endif // XBOX
-#endif //Classic
+    Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;
+    float                             m_logicalDpi;
+#endif
 
-	bool								m_renderToSharedTexture;
-
-	bool								m_resetTree;
-	bool								m_showShadowBuffer;
-	bool								m_paused;
-	bool								m_wireframe;
-	bool								m_showHelp;
-
-	GameData							m_gameData;
 };
 
 

@@ -60,8 +60,9 @@ inline ThreadPool::ThreadPool(size_t threads)
             {
                 for(;;)
                 {
-                    std::function<void()> task;
+                    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Thread pool lock");
 
+                    std::function<void()> task;
                     {
                         std::unique_lock<std::mutex> lock(this->queue_mutex);
                         this->workAvailableCondition.wait(lock,
@@ -74,16 +75,21 @@ inline ThreadPool::ThreadPool(size_t threads)
 
                     {
                         std::unique_lock<std::mutex> lock(this->workingThreads_mutex);
-						this->workingThreads++;
-					}
+                        this->workingThreads++;
+                    }
+
+                    PIXEndEvent();
+                    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Thread pool task");
 
                     task();
 
                     {
                         std::unique_lock<std::mutex> lock(this->workingThreads_mutex);
-						this->workingThreads--;
-					    workersIdleCondition.notify_one();
-					}
+                        this->workingThreads--;
+                        workersIdleCondition.notify_one();
+                    }
+
+                    PIXEndEvent();
                 }
             }
         );

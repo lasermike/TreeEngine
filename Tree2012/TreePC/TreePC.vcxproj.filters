@@ -1,20 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Common">
-      <UniqueIdentifier>9b22e637-c613-479f-bec8-59215e96eefb</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Assets">
-      <UniqueIdentifier>0231c883-4b58-4f5b-8174-8adc32b27604</UniqueIdentifier>
-    </Filter>
     <Image Include="Assets\Logo.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\SmallLogo.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\StoreLogo.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Filter Include="Old">
       <UniqueIdentifier>{271cec89-5e1f-4377-b741-7ee42db3037e}</UniqueIdentifier>
@@ -28,16 +22,22 @@
     <Filter Include="Game\Shaders">
       <UniqueIdentifier>{d764843c-3859-42b9-8c90-3883b7baac76}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Lib">
-      <UniqueIdentifier>{8f349712-6ffe-464d-8717-3fd2fdba4398}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Game\Source">
       <UniqueIdentifier>{9ef275b0-9e01-43ab-8ed4-bfceeaf6c458}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Platform Source">
+      <UniqueIdentifier>{797ad5e4-5ced-45c1-a317-1d4028112774}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UWP">
+      <UniqueIdentifier>0231c883-4b58-4f5b-8174-8adc32b27604</UniqueIdentifier>
+    </Filter>
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="TreePC.cpp" />
-    <ClCompile Include="pch.cpp" />
     <ClCompile Include="..\Game\WorldObject.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -50,9 +50,6 @@
     <ClCompile Include="..\Game\Tree.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\StockRenderStates.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\Stdafx.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -60,9 +57,6 @@
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\SceneRoot.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\RenderStates.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\Primitive.cpp">
@@ -95,7 +89,6 @@
     <ClCompile Include="..\Game\GameLoader.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -105,23 +98,35 @@
     <ClCompile Include="..\Game\BitmapFont12.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\StockRenderStates12.cpp">
+    <ClCompile Include="..\Game\D3D11Platform.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\D3D12Util.cpp">
+    <ClCompile Include="..\Game\DDSTextureLoader12.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\ScreenGrab12.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\Player.cpp">
+      <Filter>Game\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Platform Source</Filter>
+    </ClCompile>
+    <ClCompile Include="TreePC.cpp">
+      <Filter>Platform Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\RenderPlatform.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="TreePC.h" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="BasicTimer.h">
       <Filter>Old</Filter>
     </ClInclude>
     <ClInclude Include="DirectXHelper.h">
       <Filter>Old</Filter>
     </ClInclude>
-    <ClInclude Include="Lib\DirectXTex.h" />
     <ClInclude Include="..\Game\WorldObject.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
@@ -132,9 +137,6 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\Tree.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\StockRenderStates.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\StepTimer.h">
@@ -150,9 +152,6 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\Resource.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\RenderStates.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\RenderData.h">
@@ -197,25 +196,44 @@
     <ClInclude Include="..\Game\GameLoader.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\Player.h" />
     <ClInclude Include="..\Game\RenderManager.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\StockRenderStates12.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\BitmapFont12.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\D3D12Util.h">
+    <ClInclude Include="..\Game\RenderPlatform.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\D3D11Platform.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\DDSTextureLoader12.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\GpuResource.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\ScreenGrab12.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Lib\DirectXTex.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\Player.h">
+      <Filter>Game\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Platform Source</Filter>
+    </ClInclude>
+    <ClInclude Include="TreePC.h">
+      <Filter>Platform Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\UploadBuffer.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <AppxManifest Include="Package.appxmanifest" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="TreePC_TemporaryKey.pfx" />
     <None Include="..\Game\Courier_New_11.abc">
       <Filter>Game\Resources</Filter>
     </None>
@@ -234,6 +252,13 @@
     <None Include="..\Game\Arial_16.abc">
       <Filter>Game\Resources</Filter>
     </None>
+    <None Include="..\Game\CopyResources.cmd">
+      <Filter>Game\Resources</Filter>
+    </None>
+    <None Include="TreePC_TemporaryKey.pfx">
+      <Filter>UWP</Filter>
+    </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Game\bark2.dds">
@@ -247,23 +272,46 @@
       <Filter>Game\Resources</Filter>
     </Image>
     <Image Include="Assets\SplashScreen.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\Square44x44Logo.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\Square150x150Logo.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\LockScreenLogo.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
-      <Filter>Assets</Filter>
+      <Filter>UWP</Filter>
     </Image>
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
@@ -283,5 +331,10 @@
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
       <Filter>Game\Shaders</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <Filter>UWP</Filter>
+    </AppxManifest>
   </ItemGroup>
 </Project>

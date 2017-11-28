@@ -28,7 +28,7 @@ TreeModel* GraphModelGenerator::Create()
 	return _model;
 }
 
-void GraphModelGenerator::CreateGraph(std::vector<XMFLOAT2>& points) { }
+void GraphModelGenerator::CreateGraph(std::vector<XMFLOAT2>& /*points*/) { }
 
 
 FSGraphModel* FSGraphModelGenerator::Create()
@@ -71,11 +71,12 @@ HRESULT FSGraph::InitGraphics(RenderManager& renderManager)
 
 	// Create material, mesh, and reserve render unit
 	Material* newMaterial = nullptr;
-	renderManager.CreateMaterial(L"line0", L"graph", L"FSGraphVS.cso", L"FSGraphPS.cso", mat, &newMaterial);
+	renderManager.CreateMaterial(L"line0", L"graph", L"FSGraphVS.cso", L"FSGraphPS.cso", mat, 
+                  StockRenderState(StockBlendStates::AlphaBlend), &newMaterial);
 
 	Mesh* newMesh = nullptr;
 	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_FSQuad);
-	renderManager.CreateMesh(L"FSQuad", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &newMesh);
+	renderManager.CreateMesh(L"FSQuad", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &newMesh);
 
 	renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
 

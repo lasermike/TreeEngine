@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "TreeGeometry.h"
-#include "DDSTextureLoader.h"
+//#include "DDSTextureLoader.h"
 
 #include "TreeModel.h"
 #include "TreeModelGenerator.h"

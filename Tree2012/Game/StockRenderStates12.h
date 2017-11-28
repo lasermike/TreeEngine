@@ -9,13 +9,13 @@
 
 #pragma once
 
-#ifndef STOCKRENDERSTATES12_H_GUARD
-#define STOCKRENDERSTATES12_H_GUARD
+#include "StockRenderStates.h"
 
 namespace XSF = XboxSampleFramework;
 
 namespace XboxSampleFramework
 {
+    /*
     //------------------------------------------------------------------------------------------------------------------
     // Name: enum class StockBlendStates
     // Desc: A list of common Blend States used by the sample framework.
@@ -141,6 +141,7 @@ namespace XboxSampleFramework
         // The total number of stock depth-stencil states
         DepthStencilStateCount
     };
+    */
 
     //------------------------------------------------------------------------------------------------------------------
     // Name: class StockRenderStates
@@ -369,6 +370,3 @@ namespace XboxSampleFramework
     }
 
 }
-
-
-#endif //STOCKRENDERSTATES12_H_GUARD

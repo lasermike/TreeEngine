@@ -51,107 +51,107 @@ template<class INTERFACE, const IID* piid = NULL>
 class CComPtr
 {
 public:
-	CComPtr()
-	{
-		m_Ptr = NULL;
-	}
-	CComPtr(INTERFACE* lPtr)
-	{
-		m_Ptr = NULL;
+    CComPtr()
+    {
+        m_Ptr = NULL;
+    }
+    CComPtr(INTERFACE* lPtr)
+    {
+        m_Ptr = NULL;
 
-		if (lPtr != NULL)
-		{
-			m_Ptr = lPtr;
-			m_Ptr->AddRef();
-		}
-	}
-	CComPtr(const CComPtr<INTERFACE, piid>& RefComPtr)
-	{
-		m_Ptr = NULL;
-		m_Ptr = (INTERFACE*)RefComPtr;
+        if (lPtr != NULL)
+        {
+            m_Ptr = lPtr;
+            m_Ptr->AddRef();
+        }
+    }
+    CComPtr(const CComPtr<INTERFACE, piid>& RefComPtr)
+    {
+        m_Ptr = NULL;
+        m_Ptr = (INTERFACE*)RefComPtr;
 
-		if (m_Ptr)
-		{
-			m_Ptr->AddRef();
-		}
-	}
-	CComPtr(IUnknown* pIUnknown, IID iid)
-	{
-		m_Ptr = NULL;
+        if (m_Ptr)
+        {
+            m_Ptr->AddRef();
+        }
+    }
+    CComPtr(IUnknown* pIUnknown, IID iid)
+    {
+        m_Ptr = NULL;
 
-		if (pIUnknown != NULL)
-		{
-			pIUnknown->QueryInterface(iid, (void**)&m_Ptr);
-		}
-	}
-	~CComPtr()
-	{
-		if (m_Ptr)
-		{
-			m_Ptr->Release();
-			m_Ptr = NULL;
-		}
-	}
+        if (pIUnknown != NULL)
+        {
+            pIUnknown->QueryInterface(iid, (void**)&m_Ptr);
+        }
+    }
+    ~CComPtr()
+    {
+        if (m_Ptr)
+        {
+            m_Ptr->Release();
+            m_Ptr = NULL;
+        }
+    }
 
 public:
-	operator INTERFACE*() const
+    operator INTERFACE*() const
     {
-		//ASSERT(m_Ptr != NULL);
+        //ASSERT(m_Ptr != NULL);
         return m_Ptr;
     }
-	INTERFACE& operator*() const
+    INTERFACE& operator*() const
     {
         ASSERT(m_Ptr != NULL);
-		return *m_Ptr;
+        return *m_Ptr;
     }
-	INTERFACE** operator&()
+    INTERFACE** operator&()
     {
         //ASSERT(m_Ptr != NULL);
         return &m_Ptr;
     }
-	INTERFACE* operator->() const
-	{
-		ASSERT(m_Ptr != NULL);
-		return m_Ptr;
-	}
-	INTERFACE* operator=(INTERFACE* lPtr)
-	{
-		ASSERT(lPtr != NULL);
-		if (IsEqualObject(lPtr))
-		{
-			return m_Ptr;
-		}
-		m_Ptr->Release();
-		lPtr->AddRef();
-		m_Ptr = lPtr;
-		return m_Ptr;
-	}
-	INTERFACE* operator=(IUnknown* pIUnknown)
+    INTERFACE* operator->() const
     {
-		ASSERT(pIUnknown != NULL);
-		ASSERT(piid != NULL);
-        pIUnknown->QueryInterface(*piid, (void**)&m_Ptr);
-		ASSERT(m_Ptr != NULL);
-		return m_Ptr;
+        ASSERT(m_Ptr != NULL);
+        return m_Ptr;
     }
-	INTERFACE* operator=(const CComPtr<INTERFACE, piid>& RefComPtr)
-	{
-		ASSERT(&RefComPtr != NULL);
-		m_Ptr = (INTERFACE*)RefComPtr;
+    INTERFACE* operator=(INTERFACE* lPtr)
+    {
+        ASSERT(lPtr != NULL);
+        if (IsEqualObject(lPtr))
+        {
+            return m_Ptr;
+        }
+        m_Ptr->Release();
+        lPtr->AddRef();
+        m_Ptr = lPtr;
+        return m_Ptr;
+    }
+    INTERFACE* operator=(IUnknown* pIUnknown)
+    {
+        ASSERT(pIUnknown != NULL);
+        ASSERT(piid != NULL);
+        pIUnknown->QueryInterface(*piid, (void**)&m_Ptr);
+        ASSERT(m_Ptr != NULL);
+        return m_Ptr;
+    }
+    INTERFACE* operator=(const CComPtr<INTERFACE, piid>& RefComPtr)
+    {
+        ASSERT(&RefComPtr != NULL);
+        m_Ptr = (INTERFACE*)RefComPtr;
 
-		if (m_Ptr)
-		{
-			m_Ptr->AddRef();
-		}
-		return m_Ptr;
-	}
-	void Attach(INTERFACE* lPtr)
+        if (m_Ptr)
+        {
+            m_Ptr->AddRef();
+        }
+        return m_Ptr;
+    }
+    void Attach(INTERFACE* lPtr)
     {
         if (lPtr)
-		{
-			m_Ptr->Release();
-			m_Ptr = lPtr;
-		}
+        {
+            m_Ptr->Release();
+            m_Ptr = lPtr;
+        }
     }
     INTERFACE* Detach()
     {
@@ -159,26 +159,26 @@ public:
         m_Ptr = NULL;
         return lPtr;
     }
-	void Release()
-	{
-		if (m_Ptr)
-		{
-			m_Ptr->Release();
-			m_Ptr = NULL;
-		}
-	}
-	BOOL IsEqualObject(IUnknown* pOther)
-	{
-		ASSERT(pOther != NULL);
-		IUnknown* pUnknown = NULL;
-		m_Ptr->QueryInterface(IID_IUnknown, (void**)&pUnknown);
+    void Release()
+    {
+        if (m_Ptr)
+        {
+            m_Ptr->Release();
+            m_Ptr = NULL;
+        }
+    }
+    BOOL IsEqualObject(IUnknown* pOther)
+    {
+        ASSERT(pOther != NULL);
+        IUnknown* pUnknown = NULL;
+        m_Ptr->QueryInterface(IID_IUnknown, (void**)&pUnknown);
         BOOL Result = (pOther == pUnknown) ? TRUE : FALSE;
-		pUnknown->Release();
-		return Result;
-	}
+        pUnknown->Release();
+        return Result;
+    }
 
 private:
-	INTERFACE* m_Ptr;
+    INTERFACE* m_Ptr;
 };
 
 #endif // _COMPTR_H_

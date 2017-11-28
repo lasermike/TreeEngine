@@ -7,51 +7,51 @@
 
 SceneRoot::~SceneRoot()
 {
-	for (auto i = _children.begin(); i != _children.end(); i++)
-	{
-		SafeDelete(&(*i));
-	}
+    for (auto i = _children.begin(); i != _children.end(); i++)
+    {
+        SafeDelete(&(*i));
+    }
 }
 
 XMVECTOR SceneRoot::GetExtents(Extent extent)
 {
-	XSF_ASSERT(extent == TOP);
+    XSF_ASSERT(extent == TOP);
 
-	auto i = _children.begin() ;
-	XMVECTOR retval = (*i)->GetExtents(extent);
-	i++;
-	for (; i != _children.end(); i++)
-	{
-		XMVECTOR cur = (*i)->GetExtents(extent);
-		if (XMVectorGetY(cur) > XMVectorGetY(retval)) 
-		{
-			retval = cur;
-		}
-	}
+    auto i = _children.begin() ;
+    XMVECTOR retval = (*i)->GetExtents(extent);
+    i++;
+    for (; i != _children.end(); i++)
+    {
+        XMVECTOR cur = (*i)->GetExtents(extent);
+        if (XMVectorGetY(cur) > XMVectorGetY(retval)) 
+        {
+            retval = cur;
+        }
+    }
 
-	return retval; 
+    return retval; 
 }
 
 UINT32 SceneRoot::GetMaxInstances()
 {
     // Determine number of instances
-	unsigned int numInstances = 0;
-	for (auto j : _children)
-	{
-		numInstances += j->GetMaxInstances();
-	}
+    unsigned int numInstances = 0;
+    for (auto j : _children)
+    {
+        numInstances += j->GetMaxInstances();
+    }
 
     return numInstances;
 }
 
 HRESULT SceneRoot::InitGraphics(RenderManager& renderManager)
 {
-	for (auto i : _children)
-	{
-		HRR(i->InitGraphics(renderManager));
-	}
+    for (auto i : _children)
+    {
+        HRR(i->InitGraphics(renderManager));
+    }
 
-	return S_OK;
+    return S_OK;
 }
 
 HRESULT SceneRoot::CleanUpDeviceObjects()
@@ -66,64 +66,66 @@ HRESULT SceneRoot::CleanUpDeviceObjects()
 
 void SceneRoot::DeleteAllChildren()
 {
-	CleanUpDeviceObjects();
-	for (WorldObject* child : _children)
-	{
-		delete child;
-	}
-	_children.clear();
+    CleanUpDeviceObjects();
+    for (WorldObject* child : _children)
+    {
+        delete child;
+    }
+    _children.clear();
 }
 
 
 HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
 {
-	HRESULT hr = S_OK;
+    PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"SceneRoot::Update");
 
-	UINT numObjs = (UINT) _children.size();
-	UINT objsPerThread = std::max(1U, numObjs / threadPool.GetNumWorkers());
+    HRESULT hr = S_OK;
 
-	WorkData threadData = { 0, 0 /*first*/, objsPerThread /*end*/, &renderFrame }; 
+    UINT numObjs = (UINT) _children.size();
+    UINT objsPerThread = std::max(1U, numObjs / threadPool.GetNumWorkers());
 
-	std::list<WorkData> workData;
+    WorkData threadData = { 0, 0 /*first*/, objsPerThread /*end*/, &renderFrame }; 
 
-	for (UINT i = 0; i < threadPool.GetNumWorkers() && threadData.end <= numObjs; i++)
-	{
-		if (i + 1 == threadPool.GetNumWorkers()) // Make sure the last iteration has all remaining objs
-		{
-			threadData.end = numObjs;
-		}
+    std::list<WorkData> workData;
 
-		workData.push_back(threadData);
-		threadPool.enqueue([this](WorkData* data)
-						   {
-							   UINT num = 0;
-							   for (auto c : _children)
-							   {
-								   if (num >= data->start && num < data->end)
-								   {
-									   c->ComputeConstants((IRenderFrame*) data->param1);
-								   }
-								   num++;
-							   }
-						   }, &*workData.rbegin());	
-		threadData.start  += objsPerThread;
-		threadData.end  += objsPerThread;
-	}
+    for (UINT i = 0; i < threadPool.GetNumWorkers() && threadData.end <= numObjs; i++)
+    {
+        if (i + 1 == threadPool.GetNumWorkers()) // Make sure the last iteration has all remaining objs
+        {
+            threadData.end = numObjs;
+        }
 
-	threadPool.WaitTilDone();
+        workData.push_back(threadData);
+        threadPool.enqueue([this](WorkData* data)
+                           {
+                               UINT num = 0;
+                               for (auto c : _children)
+                               {
+                                   if (num >= data->start && num < data->end)
+                                   {
+                                       c->ComputeConstants((IRenderFrame*) data->param1);
+                                   }
+                                   num++;
+                               }
+                           }, &*workData.rbegin());    
+        threadData.start  += objsPerThread;
+        threadData.end  += objsPerThread;
+    }
 
-	_boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
-	XMVECTOR bbmin = XMLoadFloat3(&_boundingBox[0]);
-	XMVECTOR bbmax = XMLoadFloat3(&_boundingBox[1]);
-	
-	for (WorldObject* c : _children)
-	{
-		bbmin = XMVectorMin(bbmin, XMLoadFloat3(&c->GetBoundingBox()[0]));
-		bbmax = XMVectorMax(bbmax, XMLoadFloat3(&c->GetBoundingBox()[1]));
-	}
+    threadPool.WaitTilDone();
 
-	XMStoreFloat3(&_boundingBox[0], bbmin);
-	XMStoreFloat3(&_boundingBox[1], bbmax);
+    _boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
+    XMVECTOR bbmin = XMLoadFloat3(&_boundingBox[0]);
+    XMVECTOR bbmax = XMLoadFloat3(&_boundingBox[1]);
+    
+    for (WorldObject* c : _children)
+    {
+        bbmin = XMVectorMin(bbmin, XMLoadFloat3(&c->GetBoundingBox()[0]));
+        bbmax = XMVectorMax(bbmax, XMLoadFloat3(&c->GetBoundingBox()[1]));
+    }
 
-	return hr;
+    XMStoreFloat3(&_boundingBox[0], bbmin);
+    XMStoreFloat3(&_boundingBox[1], bbmax);
+
+    return hr;
 }

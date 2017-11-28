@@ -6,10 +6,10 @@
 
 struct Rule
 {
-	string input;
-	string output;
+    string input;
+    string output;
 
-	Rule(char* in, char* out) : input(in), output(out) { }
+    Rule(char* in, char* out) : input(in), output(out) { }
 };
 
 
@@ -38,42 +38,46 @@ struct Rule
 //    }
 //};
 
+struct LSystemParams;
+
+typedef float (*LengthFunc)(LSystemParams* params, float cmdParam);
 
 struct LSystemParams
 {
-	int _numIterations;
-	float _angle;
-	float _segmentLength;
-	string _constants;
-	float thickness;
-	string _axiom;
-	vector<Rule> _rules;
+    LSystemParams();
 
-	LSystemParams() : _numIterations(0), _angle(0), _constants(), _axiom(), _rules() { };
+    int _numIterations;
+    float _angle;
+    float _segmentLength;
+    string _constants;
+    float thickness;
+    string _axiom;
+    XMFLOAT3 _initialDirection;
+    vector<Rule> _rules;
+
+    LengthFunc SegmentLength;
 };
-
 
 struct BuildState
 {
-	XMVECTOR pos;
-	XMVECTOR dir;
-	Branch* branch;
+    XMVECTOR pos;
+    XMMATRIX matDir;
+    Branch* branch;
 
-	BuildState()
-	{
-		ZeroMemory(this, sizeof(BuildState));
-	}
+    BuildState()
+    {
+        ZeroMemory(this, sizeof(BuildState));
+    }
 };
 
 class LSystemModelGenerator : public TreeModelGenerator
 {
-	LSystemParams _params;
+    LSystemParams _params;
 
 public:
-	LSystemModelGenerator(LSystemParams& params);
-	TreeModel* Create();
+    LSystemModelGenerator(LSystemParams& params);
+    TreeModel* Create();
 
 protected:
-	void CreateSkeleton(string& cmd);
-	void CreateSkeleton2(string& cmd);
+    void CreateSkeleton(string& cmd);
 };

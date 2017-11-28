@@ -1,22 +1,45 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug12|Win32">
+      <Configuration>Debug12</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug12|x64">
+      <Configuration>Debug12</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{FF5EA045-3150-4374-83C0-17C9C97F30F2}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>TreeClassic</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
@@ -29,10 +52,24 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'" Label="Configuration">
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -42,78 +79,184 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>..\Game\.;..\Inc;$(WindowsSDK_IncludePath);$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(UniversalCRT_IncludePath)</IncludePath>
-    <LibraryPath>..\TreePC\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);$(UniversalCRT_LibraryPath_x86)</LibraryPath>
-    <OutDir>$(SolutionDir)$(Configuration)\$(ProjectName)\</OutDir>
+    <LibraryPath>..\TreeClassic\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);$(UniversalCRT_LibraryPath_x86)</LibraryPath>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>..\Game\.;..\Inc;$(WindowsSDK_IncludePath);$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(UniversalCRT_IncludePath)</IncludePath>
+    <LibraryPath>..\TreeClassic\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);$(UniversalCRT_LibraryPath_x86)</LibraryPath>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>..\Game\.;..\Inc;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);$(WindowsSDK_IncludePath);$(UniversalCRT_IncludePath)</IncludePath>
-    <LibraryPath>;..\TreePC\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);$(UniversalCRT_LibraryPath_x86)</LibraryPath>
-    <OutDir>$(SolutionDir)$(Configuration)\TreeClassic\</OutDir>
+    <LibraryPath>;..\TreeClassic\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);$(UniversalCRT_LibraryPath_x86)</LibraryPath>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>.;..\Game\.;..\Inc;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>..\TreeClassic\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
+    <IncludePath>.;..\Game\.;..\Inc;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>..\TreeClassic\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+
+  <!-- common settings -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_TREE_CLASSIC;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
+    </Link>
+    <PostBuildEvent>
+      <Command>call ..\Game\CopyResources.cmd $(OutDir) 
+</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+   
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_TREE_CLASSIC;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>libOVR.lib; libOVRKernel.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Lib\Debug</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_TREE_CLASSIC;TREE3D12;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>libOVR.lib; libOVRKernel.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Debug;Lib\Debug</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent />
-    <PostBuildEvent>
-      <Command>call ..\..\misc\copyrobo ..\$(Configuration)\TreeWin32Lib  $(OutDir) *.cso /XO ;
-call ..\Game\CopyResources.cmd $(OutDir) 
-</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
+  
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
-      <PrecompiledHeader>Use</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_TREE_CLASSIC;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>libOVR.lib; libOVRKernel.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\TreeWin32Lib\Lib\Release;Lib\Release</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>call ..\..\misc\copyrobo ..\$(Configuration)\TreeWin32Lib  $(OutDir) *.cso /XO ;</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
+  
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>_TREE_CLASSIC;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>libOVR64d.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>_TREE_CLASSIC;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>libOVR64d.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  
   <ItemGroup>
     <Text Include="..\Game\graphdata.txt" />
     <Text Include="..\Game\Shaders\ShaderFiles.txt" />
     <Text Include="ReadMe.txt" />
   </ItemGroup>
+  
   <ItemGroup>
+    <ClInclude Include="..\Game\BitmapFont.h" />
+    <ClInclude Include="..\Game\CComPtr.h" />
+    <ClInclude Include="..\Game\DDSTextureLoader.h" />
+    <ClInclude Include="..\Game\DXMath.h" />
+    <ClInclude Include="..\Game\Game.h" />
+    <ClInclude Include="..\Game\GameLoader.h" />
+    <ClInclude Include="..\Game\GeometryGenerator.h" />
+    <ClInclude Include="..\Game\Graph.h" />
+    <ClInclude Include="..\Game\LSystemModelGenerator.h" />
+    <ClInclude Include="..\Game\Materials.h" />
+    <ClInclude Include="..\Game\MathHelper.h" />
+    <ClInclude Include="..\Game\Model.h" />
+    <ClInclude Include="..\Game\OrbitCamera.h" />
+    <ClInclude Include="..\Game\Player.h" />
+    <ClInclude Include="..\Game\Primitive.h" />
+    <ClInclude Include="..\Game\RenderData.h" />
+    <ClInclude Include="..\Game\RenderManager.h" />
+    <ClInclude Include="..\Game\RenderStates.h" />
+    <ClInclude Include="..\Game\Resource.h" />
+    <ClInclude Include="..\Game\SceneRoot.h" />
+    <ClInclude Include="..\Game\ShadowMap.h" />
+    <ClInclude Include="..\Game\stdafx.h" />
+    <ClInclude Include="..\Game\StepTimer.h" />
+    <ClInclude Include="..\Game\StockRenderStates.h" />
+    <ClInclude Include="..\Game\Tree.h" />
+    <ClInclude Include="..\Game\TreeModel.h" />
+    <ClInclude Include="..\Game\TreeModelGenerator.h" />
+    <ClInclude Include="..\Game\UploadBuffer.h" />
+    <ClInclude Include="..\Game\WorldObject.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TreeClassic.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Game\BitmapFont.cpp" />
+    <ClCompile Include="..\Game\DDSTextureLoader.cpp" />
+    <ClCompile Include="..\Game\Game.cpp" />
+    <ClCompile Include="..\Game\GameLoader.cpp" />
+    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="..\Game\Graph.cpp" />
+    <ClCompile Include="..\Game\LSystemModelGenerator.cpp" />
+    <ClCompile Include="..\Game\Materials.cpp" />
+    <ClCompile Include="..\Game\MathHelper.cpp" />
+    <ClCompile Include="..\Game\OrbitCamera.cpp" />
+    <ClCompile Include="..\Game\Player.cpp" />
+    <ClCompile Include="..\Game\Primitive.cpp" />
+    <ClCompile Include="..\Game\RenderManager.cpp" />
+    <ClCompile Include="..\Game\RenderPlatform.cpp" />
+    <ClCompile Include="..\Game\RenderStates.cpp" />
+    <ClCompile Include="..\Game\SceneRoot.cpp" />
+    <ClCompile Include="..\Game\ShadowMap.cpp" />
+    <ClCompile Include="..\Game\Stdafx.cpp" />
+    <ClCompile Include="..\Game\StockRenderStates.cpp" />
+    <ClCompile Include="..\Game\Tree.cpp" />
+    <ClCompile Include="..\Game\TreeModel.cpp" />
+    <ClCompile Include="..\Game\TreeModelGenerator.cpp" />
+    <ClCompile Include="..\Game\WorldObject.cpp" />
     <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TreeClassic.cpp" />
   </ItemGroup>
@@ -121,11 +264,33 @@ call ..\Game\CopyResources.cmd $(OutDir)
     <ResourceCompile Include="TreeClassic.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Game\Arial_16.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <Image Include="..\Game\bark2.dds">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="..\Game\Bark_0005_diffuse.DDS" />
+    <Image Include="..\Game\Bark_0009_diffuse.DDS">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <None Include="..\Game\Courier_New_11.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <Image Include="..\Game\snow.dds">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
     <Image Include="small.ico" />
     <Image Include="TreeClassic.ico" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Game\Arial_16.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
     <None Include="..\Game\CopyResources.cmd" />
+    <None Include="..\Game\Courier_New_11.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
     <None Include="..\Game\Shaders\buildShaders.bat">
       <FileType>Document</FileType>
     </None>
@@ -135,26 +300,13 @@ call ..\Game\CopyResources.cmd $(OutDir)
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
     <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-      </ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\TreeWin32Lib\TreeWin32Lib.vcxproj">
-      <Project>{58431921-70b6-4938-822e-8652a4cf8f28}</Project>
-      <Private>true</Private>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

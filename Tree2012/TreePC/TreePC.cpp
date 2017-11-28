@@ -13,55 +13,56 @@ using namespace Windows::Graphics::Display;
 using namespace concurrency;
 
 TreePC::TreePC() :
-	m_windowClosed(false),
-	m_windowVisible(true)
+    m_windowClosed(false),
+    m_windowVisible(false)
 {
 }
 
 void TreePC::Initialize(CoreApplicationView^ applicationView)
 {
-	applicationView->Activated +=
+    applicationView->Activated +=
         ref new TypedEventHandler<CoreApplicationView^, IActivatedEventArgs^>(this, &TreePC::OnActivated);
 
-	CoreApplication::Suspending +=
+    CoreApplication::Suspending +=
         ref new EventHandler<SuspendingEventArgs^>(this, &TreePC::OnSuspending);
 
-	CoreApplication::Resuming +=
+    CoreApplication::Resuming +=
         ref new EventHandler<Platform::Object^>(this, &TreePC::OnResuming);
 
-	m_pGame = new Game(&m_inputManager);
+    m_pGame = new Game(&m_inputManager);
 }
 
 void TreePC::SetWindow(CoreWindow^ window)
 {
-	window->SizeChanged += 
+    window->SizeChanged += 
         ref new TypedEventHandler<CoreWindow^, WindowSizeChangedEventArgs^>(this, &TreePC::OnWindowSizeChanged);
 
-	window->VisibilityChanged +=
-		ref new TypedEventHandler<CoreWindow^, VisibilityChangedEventArgs^>(this, &TreePC::OnVisibilityChanged);
+    window->VisibilityChanged +=
+        ref new TypedEventHandler<CoreWindow^, VisibilityChangedEventArgs^>(this, &TreePC::OnVisibilityChanged);
 
-	window->Closed += 
+    window->Closed += 
         ref new TypedEventHandler<CoreWindow^, CoreWindowEventArgs^>(this, &TreePC::OnWindowClosed);
 
-	window->PointerCursor = ref new CoreCursor(CoreCursorType::Arrow, 0);
+    window->PointerCursor = ref new CoreCursor(CoreCursorType::Arrow, 0);
 
-	window->PointerPressed +=
-		ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &TreePC::OnPointerPressed);
+    window->PointerPressed +=
+        ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &TreePC::OnPointerPressed);
 
-	window->PointerMoved +=
-		ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &TreePC::OnPointerMoved);
+    window->PointerMoved +=
+        ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &TreePC::OnPointerMoved);
 
-	window->KeyDown +=
-		ref new TypedEventHandler<CoreWindow^, KeyEventArgs^>(this, &TreePC::OnKeyDown);
+    window->KeyDown +=
+        ref new TypedEventHandler<CoreWindow^, KeyEventArgs^>(this, &TreePC::OnKeyDown);
 
-	window->KeyUp +=
-		ref new TypedEventHandler<CoreWindow^, KeyEventArgs^>(this, &TreePC::OnKeyUp);
+    window->KeyUp +=
+        ref new TypedEventHandler<CoreWindow^, KeyEventArgs^>(this, &TreePC::OnKeyUp);
 
-	auto m_info = DisplayInformation::GetForCurrentView();
+    auto info = DisplayInformation::GetForCurrentView();
 
-	m_pGame->Initialize(CoreWindow::GetForCurrentThread(), m_info->LogicalDpi);
-
-
+    //m_pGame->GetRenderManager().GetPlatform()->SetWindow(CoreWindow::GetForCurrentThread(), info->LogicalDpi);
+    m_pGame->SetWindow(CoreWindow::GetForCurrentThread(), info->LogicalDpi);
+    m_pGame->Initialize(false /* render to shared texture 8*/);
+    OnResize();
 }
 
 void TreePC::Load(Platform::String^ entryPoint)
@@ -70,109 +71,119 @@ void TreePC::Load(Platform::String^ entryPoint)
 
 void TreePC::Run()
 {
-	BasicTimer^ timer = ref new BasicTimer();
+    BasicTimer^ timer = ref new BasicTimer();
 
-	while (!m_windowClosed)
-	{
-		if (m_windowVisible)
-		{
-			timer->Update();
-			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
-			m_pGame->ComputeCPU();
-			m_pGame->ComputeGPU();
-			m_pGame->Render(false);
-		}
-		else
-		{
-			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
-		}
-	}
+    CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+
+    while (!m_windowClosed)
+    {
+        if (m_windowVisible)
+        {
+            timer->Update();
+            CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+            m_pGame->ComputeCPU();
+            m_pGame->ComputeGPU();
+            m_pGame->Render(false);
+        }
+        else
+        {
+            CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
+        }
+    }
+
+    int x = 0;
+    x = x;
 }
 
 void TreePC::Uninitialize()
 {
 }
 
+void TreePC::OnResize()
+{
+    auto windowBounds = CoreWindow::GetForCurrentThread()->Bounds;
+    UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
+    UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
+
+    m_pGame->OnResize(windowWidth, windowHeight);
+}
+
 void TreePC::OnWindowSizeChanged(CoreWindow^ sender, WindowSizeChangedEventArgs^ args)
 {
-	auto windowBounds = CoreWindow::GetForCurrentThread()->Bounds;
-	UINT windowWidth = (UINT) ConvertDipsToPixels(windowBounds.Width);
-	UINT windowHeight = (UINT)  ConvertDipsToPixels(windowBounds.Height);
-
-	m_pGame->OnResize(windowWidth, windowHeight);
+    OnResize();
 }
 
 void TreePC::OnVisibilityChanged(CoreWindow^ sender, VisibilityChangedEventArgs^ args)
 {
-	m_windowVisible = args->Visible;
+    m_windowVisible = args->Visible;
 }
 
 void TreePC::OnWindowClosed(CoreWindow^ sender, CoreWindowEventArgs^ args)
 {
-	m_windowClosed = true;
+    m_windowClosed = true;
 }
 
 void TreePC::OnPointerPressed(CoreWindow^ sender, PointerEventArgs^ args)
 {
-	// Insert your code here.
+    // Insert your code here.
 }
 
 void TreePC::OnPointerMoved(CoreWindow^ sender, PointerEventArgs^ args)
 {
-	// Insert your code here.
+    // Insert your code here.
 }
 
 void TreePC::OnKeyDown(CoreWindow^ sender, KeyEventArgs^ args)
 {
-	assert( (int) args->VirtualKey < 256);
-	m_inputManager.GetFrameInput(0).key[ (int) args->VirtualKey] = true;
+    assert( (int) args->VirtualKey < 256);
+    m_inputManager.GetFrameInput(0).key[ (int) args->VirtualKey] = true;
 }
 
 void TreePC::OnKeyUp(CoreWindow^ sender, KeyEventArgs^ args)
 {
-	assert( (int) args->VirtualKey < 256);
-	m_inputManager.GetFrameInput(0).key[ (int) args->VirtualKey] = false;
+    assert( (int) args->VirtualKey < 256);
+    m_inputManager.GetFrameInput(0).key[ (int) args->VirtualKey] = false;
 }
 
 void TreePC::OnActivated(CoreApplicationView^ applicationView, IActivatedEventArgs^ args)
 {
-	CoreWindow::GetForCurrentThread()->Activate();
+    CoreWindow::GetForCurrentThread()->Activate();
 }
 
 void TreePC::OnSuspending(Platform::Object^ sender, SuspendingEventArgs^ args)
 {
-	// Save app state asynchronously after requesting a deferral. Holding a deferral
-	// indicates that the application is busy performing suspending operations. Be
-	// aware that a deferral may not be held indefinitely. After about five seconds,
-	// the app will be forced to exit.
-	SuspendingDeferral^ deferral = args->SuspendingOperation->GetDeferral();
+    // Save app state asynchronously after requesting a deferral. Holding a deferral
+    // indicates that the application is busy performing suspending operations. Be
+    // aware that a deferral may not be held indefinitely. After about five seconds,
+    // the app will be forced to exit.
+    SuspendingDeferral^ deferral = args->SuspendingOperation->GetDeferral();
 
-	create_task([this, deferral]()
-	{
-		// Insert your code here.
+    create_task([this, deferral]()
+    {
+        // Insert your code here.
 
-		deferral->Complete();
-	}); 
+        deferral->Complete();
+    }); 
 }
  
 void TreePC::OnResuming(Platform::Object^ sender, Platform::Object^ args)
 {
-	// Restore any data or state that was unloaded on suspend. By default, data
-	// and state are persisted when resuming from suspend. Note that this event
-	// does not occur if the app was previously terminated.
+    // Restore any data or state that was unloaded on suspend. By default, data
+    // and state are persisted when resuming from suspend. Note that this event
+    // does not occur if the app was previously terminated.
 }
 
 // Method to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
 float TreePC::ConvertDipsToPixels(float dips)
 {
-	static const float dipsPerInch = 96.0f;
+    static const float dipsPerInch = 96.0f;
 
-	auto m_info = DisplayInformation::GetForCurrentView();
+    auto info = DisplayInformation::GetForCurrentView();
 
 
-	return floor(dips * m_info ->LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+    return floor(dips * info ->LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 
-	//return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
+    //return floor(dips * DisplayProperties::LogicalDpi / dipsPerInch + 0.5f); // Round to nearest integer.
 }
 
 IFrameworkView^ Direct3DApplicationSource::CreateView()
@@ -183,7 +194,13 @@ IFrameworkView^ Direct3DApplicationSource::CreateView()
 [Platform::MTAThread]
 int main(Platform::Array<Platform::String^>^)
 {
-	auto direct3DApplicationSource = ref new Direct3DApplicationSource();
-	CoreApplication::Run(direct3DApplicationSource);
-	return 0;
+    auto direct3DApplicationSource = ref new Direct3DApplicationSource();
+    CoreApplication::Run(direct3DApplicationSource);
+    return 0;
+}
+
+
+void TreePC::OnClosed(Windows::UI::Core::CoreWindow ^sender, Windows::UI::Core::CoreWindowEventArgs ^args)
+{
+    throw ref new Platform::NotImplementedException();
 }

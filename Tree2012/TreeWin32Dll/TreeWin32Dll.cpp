@@ -77,9 +77,9 @@ extern "C" __declspec(dllexport) LPVOID WINAPI InitializeScene()
 	}
 
 	// Get a D3D9 handle to the back buffer
-	HRC(g_game->GetBackBuffer()->QueryInterface(__uuidof(IDXGIResource), (void**)&pResource));
+	HRC(g_game->GetRenderManager().GetBackBuffer()->QueryInterface(__uuidof(IDXGIResource), (void**)&pResource));
 	HRC(pResource->GetSharedHandle(&hSharedHandle));
-	g_game->GetBackBuffer()->GetDesc(&textureDesc);
+	g_game->GetRenderManager().GetBackBuffer()->GetDesc(&textureDesc);
 
 	// D3D9
 	HRC(Direct3DCreate9Ex(D3D_SDK_VERSION, &pD3D9));

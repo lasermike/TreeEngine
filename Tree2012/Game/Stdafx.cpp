@@ -2,9 +2,9 @@
 #include <vector>
 #include "processenv.h"
 
-//#ifdef _TREE_CLASSIC
-//#include "Shlwapi.h"
-//#endif
+#if defined(TREE3D12)
+#include <D3Dcompiler.h>
+#endif
 
 namespace XboxSampleFramework
 {
@@ -12,7 +12,7 @@ namespace XboxSampleFramework
     {
         wchar_t    g_strCommonFileRoot[ 1024 ];
         wchar_t    g_strApplicationDataPath[ 1024 ];
-	}
+    }
 }
 
 //--------------------------------------------------------------------------------------
@@ -38,23 +38,39 @@ void XSF::SetContentFileRoot()
 
     _snwprintf_s( Details::g_strApplicationDataPath, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s\\", writeableFolder.c_str() );
 
-#elif defined(WIN32)
-	GetModuleFileName( NULL, Details::g_strCommonFileRoot, MAX_PATH );
-	//PathRemoveFileSpec(Details::g_strCommonFileRoot);
-	wstring path = Details::g_strCommonFileRoot;
+#elif defined(TREENGINE_WIN32)
+    GetModuleFileName(NULL, Details::g_strCommonFileRoot, MAX_PATH);
+    //PathRemoveFileSpec(Details::g_strCommonFileRoot);
+    wstring path = Details::g_strCommonFileRoot;
     size_t found = path.find_last_of(L"/\\");
-    _snwprintf_s( Details::g_strCommonFileRoot, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s", path.substr(0, found).c_str() );
-	LOG(Details::g_strCommonFileRoot);
+    _snwprintf_s(Details::g_strCommonFileRoot, _countof(Details::g_strApplicationDataPath), _TRUNCATE, L"%s", path.substr(0, found).c_str());
+    //PathAddBackslash(Details::g_strCommonFileRoot);
+    LOG(Details::g_strCommonFileRoot);
 
 #else
-//    wchar_t temp[ 1024 ];
+    wchar_t temp[ 1024 ];
 //    GetCurrentDirectoryW( _countof( temp ), temp );
-	wcscpy_s(Details::g_strCommonFileRoot, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
+    wcscpy_s(temp, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
 
-    //swprintf_s( Details::g_strCommonFileRoot, L"%s\\", installFolder.front() );
+    swprintf_s( Details::g_strCommonFileRoot, L"%s\\", temp);
     //swprintf_s( Details::g_strApplicationDataPath, L"%s\\", temp );
 #endif
 }
+
+#if defined(TREE3D12)
+
+// Desc: Load a shader blob from file
+//--------------------------------------------------------------------------------------
+HRESULT XSF::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
+{
+    VERBOSEATGPROFILETHIS;
+
+    wchar_t tmp[1024];
+    _snwprintf_s(tmp, _TRUNCATE, L"%s%s", Details::g_strCommonFileRoot, path);
+
+    return D3DReadFileToBlob(tmp, ppShader);
+}
+#endif
 
 //--------------------------------------------------------------------------------------
 // Name: LoadBlob
@@ -104,6 +120,7 @@ HRESULT XSF::LoadBlob( const wchar_t* pFilename, std::vector< BYTE >& data )
     if ( _wcsicmp( pFilename, L"test" ) )
     {
         DebugPrint( L"LoadBlob: Failed to open file %s\n", tmp );
+        assert(false);
     }
 
     return E_FAIL;
@@ -181,47 +198,80 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
     }*/
 }
 
-#if !defined(TREE3D12)
+#if defined(TREE3D12)
+#if defined(_DEBUG)
+void SetDebugName(ID3D12DeviceChild* child, const char* name)
+{
+    child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
+}
+#endif //_DEBUG -> NDEBUG
+
+// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
+// If no such adapter can be found, *ppAdapter will be set to nullptr.
+void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
+{
+    CComPtr<IDXGIAdapter1> adapter;
+    *ppAdapter = nullptr;
+
+    for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
+    {
+        DXGI_ADAPTER_DESC1 desc;
+        adapter->GetDesc1(&desc);
+
+        if (wcsstr(desc.Description, L"Intel") != nullptr)
+        {
+            continue;
+        }
+
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+        {
+            // Don't select the Basic Render Driver adapter.
+            // If you want a software adapter, pass in "/warp" on the command line.
+            continue;
+        }
+
+        // Check to see if the adapter supports Direct3D 12, but don't create the
+        // actual device yet.
+        HRESULT hr = D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr);
+
+        HR(hr);
+        if (SUCCEEDED(hr))
+        {
+            break;
+        }
+    }
+
+    *ppAdapter = adapter.Detach();
+}
+
+#else
 //
 // Naming
 //
 #if defined(_DEBUG) && !defined(_XBOX_ONE) // NAMING
 void SetDebugName(ID3D11DeviceChild* child, const char* name)
 {
-	child->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(name), name);
+    child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
 }
 
 #else
-// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
-// If no such adapter can be found, *ppAdapter will be set to nullptr.
-void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
-{
-	ComPtr<IDXGIAdapter1> adapter;
-	*ppAdapter = nullptr;
-
-	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
-	{
-		DXGI_ADAPTER_DESC1 desc;
-		adapter->GetDesc1(&desc);
-
-		if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-		{
-			// Don't select the Basic Render Driver adapter.
-			// If you want a software adapter, pass in "/warp" on the command line.
-			continue;
-		}
-
-		// Check to see if the adapter supports Direct3D 12, but don't create the
-		// actual device yet.
-		if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-		{
-			break;
-		}
-	}
-
-	*ppAdapter = adapter.Detach();
-}
 #endif // TREE3D12
 
 #endif
 
+#if defined(PIX_INSTRUMENTATION)
+#else
+
+void PIXBeginEvent(void* /*ctx*/, DWORD /*color*/, wchar_t* /*text*/, ...) { }
+void PIXBeginEvent(DWORD /*color*/, wchar_t* /*text*/, ...) { }
+
+void PIXBeginEvent(void* /*ctx*/) { }
+void PIXBeginEvent() { }
+
+void PIXEndEvent(void*) { }
+void PIXEndEvent() { }
+
+void PIXScopedEvent(void*, DWORD, wchar_t*, ...) { }
+void PIXScopedEvent(DWORD, wchar_t*, ...) { }
+
+#endif

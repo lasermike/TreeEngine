@@ -9,63 +9,73 @@ Primitive::Primitive(WorldObjectParams* wop) : WorldObject(wop), _model(nullptr)
 
 Primitive::~Primitive()
 {
-	if (_model)
-	{
-		delete _model;
-	}
+    if (_model)
+    {
+        delete _model;
+    }
 }
 
 void Primitive::Create(PrimitiveModelGenerator* generator)
 {
-	_model = generator->Create();
+    _model = generator->Create();
 }
 
 HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 {
-	HRR(CleanUpDeviceObjects());
+    HRR(CleanUpDeviceObjects());
 
-	ShaderMaterial mat;
-	mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
-	mat.Diffuse = XMFLOAT4(0, .6f, 0, 1);
-	mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
-	mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-	mat.flags.y = 1; //1 for textured; 
+    if (_params->materials.size() < 1)
+    {
+        ShaderMaterial mat;
+        mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
+        mat.Diffuse = XMFLOAT4(0, 1.0f, 0, 1);
+        mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
+        mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+        mat.flags.y = 1; //1 for textured; 
+        _params->materials.push_back(mat);
+    }
 
-	// Create material, mesh, and reserve render unit
-	Material* newMaterial = nullptr;
-	renderManager.CreateMaterial(L"ground", L"snow.dds", nullptr, nullptr, mat, &newMaterial);
+    // Default textures
+    if (_params->textureFilename.size() < 1)
+    {
+        _params->textureFilename.push_back(L"snow.dds");
+    }
 
-	Mesh* newMesh = nullptr;
-	const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());
-	renderManager.CreateMesh(L"ground", renderManager.GetVertexBuffer(), renderManager.GetIndexBuffer(), pBufferIndices, &newMesh);
+    // Create material, mesh, and reserve render unit
+    Material* newMaterial = nullptr;
+    renderManager.CreateMaterial(L"ground", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
 
-	renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
+    Mesh* newMesh = nullptr;
+    const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());
+    renderManager.CreateMesh(L"ground", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &newMesh);
 
-	return S_OK;
+    renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
+
+    return S_OK;
 }
 
 HRESULT Primitive::ComputeConstants(IRenderFrame* pFrameConfig)
 {
-	UINT startInstance = 0;
-	HRR(pFrameConfig->GetInstanceIndex(this, startInstance));
+    UINT startInstance = 0;
+    HRR(pFrameConfig->GetInstanceIndex(this, startInstance));
 
-	pFrameConfig->SetInstances(m_renderUnit, this, startInstance, 1);
-	InstancedData* dataView = pFrameConfig->GetRenderData().instanceData;
-	InstancedData* firstDataView = dataView + startInstance;
+    pFrameConfig->SetInstances(m_renderUnit, this, startInstance, 1);
+    InstancedData* dataView = pFrameConfig->GetRenderData().instanceData;
+    InstancedData* firstDataView = dataView + startInstance;
 
-	const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0); 
-	const XMVECTOR vScaleCenter = XMVectorSet(0, 0, 0, 0);
-	XMVECTOR vScale = XMLoadFloat3(&_scale);
-	XMVECTOR vQuat = XMLoadFloat4(&this->GetParams().rotation);
-	XMVECTOR vStart = XMLoadFloat3(&_position); 
+    const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0);
+    const XMVECTOR vScaleCenter = XMVectorSet(0, 0, 0, 0);
+    XMVECTOR vScale = XMLoadFloat3(&_scale);
+    XMVECTOR vQuat = XMLoadFloat4(&this->GetParams().rotation);
+    XMVECTOR vStart = XMLoadFloat3(&_position);
 
-	XMMATRIX transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
+    XMMATRIX transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
-	// Multiply by this object's world matrix
-	transform = transform * XMLoadFloat4x4(&pFrameConfig->GetRenderData().world);
+    // Multiply by this object's world matrix
+    transform = transform * XMLoadFloat4x4(&pFrameConfig->GetRenderData().world);
 
-	XMStoreFloat4x4(&firstDataView->World, transform);
+    XMStoreFloat4x4(&firstDataView->World, transform);
 
-	return S_OK;
+    return S_OK;
 }
 

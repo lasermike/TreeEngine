@@ -30,6 +30,7 @@ protected:
 	void OnKeyDown(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::KeyEventArgs^ args);
 	void OnKeyUp(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::KeyEventArgs^ args);
 	static float ConvertDipsToPixels(float dips);
+    void OnResize();
 
 private:
 	Game* m_pGame;
@@ -37,6 +38,7 @@ private:
 	bool m_windowVisible;
 	InputManager m_inputManager;
 	//DisplayInformation^ m_info;
+    void OnClosed(Windows::UI::Core::CoreWindow ^sender, Windows::UI::Core::CoreWindowEventArgs ^args);
 };
 
 ref class Direct3DApplicationSource sealed : Windows::ApplicationModel::Core::IFrameworkViewSource

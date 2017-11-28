@@ -2,29 +2,31 @@
 echo CMD: %*
 @REM %1 -- FXC, %2 -- OUTPUT folder, %3 -- layout folder, %4 -- input file (in project dir), %5 -- platform, %6 -- config, %7 -- incrementa flag
 @SETLOCAL EnableDelayedExpansion
-@set inputFile=%4
 @set layoutFolder=%3
+@set inputFile=%4
 @set AnyErrors=0
 
-call %~p4\commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
+call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 
 @rem Setup for hot recompile
 @set incremental=0
 @if "%7"=="1" set incremental=1
 
-@if "%incremental%"=="0" (
-	@rem Output a batch file to rebuild this shader file
-	@rem echo %~dp4 > %2%\shaderSrcPath.txt
-	@copy %0 %2
-	echo buildShaders.bat %1 %2 %3 %4 %5 %6 1 > %2build%~n4.cmd
-)
+@rem 
+@rem @if "%incremental%"=="0" (
+@rem     echo Incremental shader build
+@rem 	@rem Output a batch file to rebuild this shader file
+@rem 	echo %~dp4 > %2%\shaderSrcPath.txt
+@rem 	@copy %0 %2
+@rem 	echo buildShaders.bat %1 %2 %3 %4 %5 %6 1 > %2build%~n4.cmd
+@rem )
 
 @rem Color init
 @call :ColorInit
 
 @rem Build from each entry point in shader
 @rem format:filename,vs/ps,entry_point
-@FOR /F "tokens=1,2,3 delims=," %%G IN (%~p4ShaderFiles.txt) DO (
+@FOR /F "tokens=1,2,3 delims=," %%G IN (%~dp4ShaderFiles.txt) DO (
   if %%G==%~nx4 call :BuildShader %4 %%H %%I %2
 )
 
@@ -39,21 +41,25 @@ call %~p4\commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 @rem %1 = inputfile, %2 = stage, %3 = entrypoint %4 = Output dir
 @echo BuildShader: %*
 @if %2==vs (
-set target=vs_5_0
-set suffix=VS
+  set target=vs_5_0
+  set suffix=VS
 ) ELSE (
-set target=ps_5_0
-set suffix=PS
+  set target=ps_5_0
+  set suffix=PS
 )
+
+@rem Compile!
 @set outputfile=%~4%~n3.cso
 @ECHO Building %1 for %target%  
 @set finalcmd=%cmdline% %1 /T%target% /E%3 /Fo"%outputfile%"
 @echo !finalcmd!
 call !finalcmd!
+
 @if ERRORLEVEL 1 goto ENDOFSCRIPT
-@if "%incremental%"=="0" (
-	copy "%outputfile%" %layoutFolder%
-)
+
+@rem Copy output to deployment directory (AppX)
+copy "%outputfile%" %layoutFolder%
+
 @goto :EOF
 
 @rem Subroutines

@@ -5,6 +5,7 @@ Tree.hlsl,ps,PS
 Tree.hlsl,vs,DrawScreenQuadVS
 Tree.hlsl,ps,DrawScreenQuadPS
 Tree.hlsl,vs,BuildShadowMapVS
+Tree.hlsl,ps,BuildShadowMapPS
 Tree.hlsl,vs,FSGraphVS
 Tree.hlsl,ps,FSGraphPS
 

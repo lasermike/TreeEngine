@@ -18,6 +18,11 @@ if "a%~6%" == "aDebug" (
    SET cmdline=%cmdline% /O0 /Od
 )
 
+if "a%~6%" == "aDebug12" (
+   echo Compiling shaders with optimization disabled...
+   SET cmdline=%cmdline% /O0 /Od
+)
+
 if "a%~6%" == "aDebug_MonoD3D" (
    echo Compiling shaders with optimization disabled...
    SET cmdline=%cmdline% /O0 /Od

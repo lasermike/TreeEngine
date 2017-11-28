@@ -8,10 +8,10 @@
 //--------------------------------------------------------------------------------------
 #include <pch.h>
 
-#if !defined(TREE3D12)
+#if defined(TREE3D11)
 
 #include "BitmapFont.h"
-#include "StockRenderStates.h"
+#include "StockRenderStates11.h"
 
 using namespace XboxSampleFramework;
 
@@ -1398,7 +1398,7 @@ void XSF::DynamicBuffer::Unmap(UINT numBytesUsed)
 //-------------------------------------------------------------------------------------
 ID3D11Buffer* const&   XSF::DynamicBuffer::GetBuffer() const
 {
-	return m_spBuffer.ptr;
+	return (ID3D11Buffer*) m_spBuffer.ptr;
 }
 
 //--------------------------------------------------------------------------------------

@@ -1,346 +1,165 @@
-#pragma once
+ #pragma once
 #include "pch.h"
-#include "GeometryGenerator.h"
 #include "RenderData.h"
-#include "Materials.h"
+#include "RenderPlatform.h"
+#include "StockRenderStates.h"
 
 class WorldObject;
 
-namespace XboxSampleFramework
-{
-class BitmapFont;
-};
-
 enum DisplayMode
 {
-	Monitor = 0,
-	Oculus
+    Monitor = 0,
+    Oculus
 };
 
 enum MaterialTypes
 {
-	LogMaterial,
-	TwigMaterial,
-	GroundMaterial,
+    LogMaterial,
+    TwigMaterial,
+    GroundMaterial,
 
-	MaterialTypesMax
+    MaterialTypesMax
 };
 
 enum ShaderType
 {
-	ShaderType_VertexShader,
-	ShaderType_PixelShader,
-	ShaderType_ComputeShader,
-};
-
-interface SwapChainCreator
-{
-	virtual HRESULT CreateSwapChain(DXGI_SWAP_CHAIN_DESC1* sd, IDXGIFactory2* dxgiFactory2, IDXGISwapChain1** swapChain) = 0;
-};
-
-//enum { MAT_WRAP = 1, MAT_WIRE = 2, MAT_ZALWAYS = 4, MAT_NOCULL = 8 };
-
-struct Material
-{
-	wstring					  m_name;
-
-#if defined(TREE3D12)
-
-	ID3D12Resource*			m_texture;
-	ID3DBlob*				m_vertexShader;
-	ID3DBlob*				m_pixelShader;
-	//ID3D12InputLayout*    m_inputLayout;
-
-	CComPtr<ID3D12Resource> m_constBuffer;
-#else
-	ID3D11ShaderResourceView* m_texture;
-	ID3D11VertexShader*       m_vertexShader;
-	ID3D11PixelShader*        m_pixelShader;
-    ID3D11InputLayout*        m_inputLayout;
-
-	CComPtr<ID3D11Buffer>     m_constBuffer;
-
-#endif
-	ShaderMaterial			  m_shaderMaterial;
-
-	// NYI
-#if defined(TREE3D12)
-	void* m_samplerState;
-	void* m_rasterizer;
-	void* m_depthState;
-#else
-	ID3D11SamplerState*       m_samplerState;
-    ID3D11RasterizerState*    m_rasterizer;
-    ID3D11DepthStencilState*  m_depthState;
-#endif
-
-public:
-	Material(const wchar_t* name, ID3D11ShaderResourceView* texture, ID3D11InputLayout* inputLayout,
-			 ID3D11VertexShader* vertexShader, ID3D11PixelShader* pixelShader, ID3D11SamplerState* samplerState,
-			 ID3D11RasterizerState* rasterizer, ID3D11DepthStencilState* depthState, 
-			 ShaderMaterial shaderMaterial, ID3D11Buffer* constBuffer) :
-				m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
-				m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
-				m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer) 
-	{
-		ASSERT(m_vertexShader != nullptr);
-		ASSERT(m_pixelShader != nullptr);
-		ASSERT(m_inputLayout != nullptr);
-		ASSERT(m_constBuffer != nullptr);
-		//TODO
-		//ASSERT(m_samplerState != nullptr);
-		//ASSERT(m_rasterizer != nullptr);
-		//ASSERT(m_depthState != nullptr);
-	}
-	Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
-				 m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
-				 m_depthState(nullptr), m_constBuffer() { }
-
-	// Necessary?
-    Material(Material const& rhs) :
-        m_name(rhs.m_name), m_texture(rhs.m_texture), m_inputLayout(rhs.m_inputLayout), m_vertexShader(rhs.m_vertexShader),
-		m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
-		m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer) 
-    {};        // Copy constructor
-
-	// Necessary?
-    Material& operator=(Material const& /*rhs*/)
-    {
-        return *this;
-    }  
-
-
-	~Material()
-	{
-		m_constBuffer.Release();
-	}
+    ShaderType_VertexShader,
+    ShaderType_PixelShader,
+    ShaderType_ComputeShader,
 };
 
 struct Mesh
 {
-	ID3D11Buffer* m_vertexBuffer;
-	ID3D11Buffer* m_indexBuffer;
-	const GeometryBufferData::BufferIndices* m_bufferIndices;
+    D3DBuffer m_vertexBuffer;
+    D3DBuffer m_indexBuffer;
+
+    const GeometryBufferData::BufferIndices* m_bufferIndices;
 
 public:
-	Mesh() : m_vertexBuffer(nullptr), m_indexBuffer(nullptr), m_bufferIndices(nullptr) { } 
-	Mesh(ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, const GeometryBufferData::BufferIndices* bufferIndices) :
-		m_vertexBuffer(vertexBuffer), m_indexBuffer(indexBuffer), m_bufferIndices(bufferIndices)  
-	{
-		assert(m_vertexBuffer);
-		assert(m_indexBuffer);
-		assert(m_bufferIndices);
-	}
+    Mesh() : m_vertexBuffer(), m_indexBuffer(), m_bufferIndices(nullptr) { }
+    Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferIndices* bufferIndices) :
+        m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer), m_bufferIndices(bufferIndices)
+    {
+        //assert(m_vertexBuffer);
+        //assert(m_indexBuffer);
+        //assert(m_bufferIndices);
+    }
 };
 
 struct RenderUnit
 {
-	Material*					m_material;
-	Mesh*						m_mesh;
+    Material*                   m_material;
+    Mesh*                       m_mesh;
 
-	UINT						totalMaxInstances; // TODO Needed?
-	std::list<WorldObject*>		reservations;
+    UINT                        totalMaxInstances; // TODO Needed?
+    std::list<WorldObject*>     reservations;
 
-	RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh), totalMaxInstances(0) 
-	{
-		assert(m_material);
-		assert(m_mesh);
-	}
-
-};
-
-struct DoubleBuffer	
-{
-	CComPtr<ID3D11Buffer> buffers[2];
-
-	DoubleBuffer() 
-	{
-	}
-
-	HRESULT Create(const D3D11_BUFFER_DESC& bd, XSF::D3DDevice* device)
-	{
-		buffers[0].Release();
-		buffers[1].Release();
-
-		HRR(device->CreateBuffer(&bd, 0, &buffers[0]));
-		HRR(device->CreateBuffer(&bd, 0, &buffers[1]));
-		SetDebugName(buffers[0], "DoubleBuffer::buffers[0]");
-		SetDebugName(buffers[1], "DoubleBuffer::buffers[1]");
-
-		return S_OK;
-	}
-	void Release()
-	{
-		buffers[0].Release();
-		buffers[1].Release();
-	}
-	ID3D11Buffer* Get(UINT frame) { return buffers[frame % 2]; }
+    RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh), totalMaxInstances(0)
+    {
+        assert(m_material);
+        assert(m_mesh);
+    }
 };
 
 
 interface IRenderFrame
 {
-	virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
-	virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
-	virtual RenderData& GetRenderData() = 0;
-	virtual XSF::D3DDeviceContext* GetContext() = 0;
+    virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
+    virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
+    virtual RenderData& GetRenderData() = 0;
 };
 
 class RenderManager : public IRenderFrame
 {
-	// Filled in during scene initialization
-	std::map<wstring, Material*>					m_materials;
-	std::map<wstring, Mesh>							m_meshes;
-	std::map<wstring, ID3D11ShaderResourceView*>	m_textures;
-	std::map<wstring, ID3D11VertexShader*>			m_vertexShaders;
-	std::map<wstring, ID3D11PixelShader*>			m_pixelShaders;
-	std::list<RenderUnit>							m_renderUnits;
-	std::map<WorldObject*, UINT>					m_objectToInstanceBufferOffset;  // Filled in during scene initialization
-	UINT											m_nextInstanceBufferOffset;		 // Used during initialization
+    // Filled in during scene initialization
+    std::map<wstring, Material*>                    m_materials;
+    std::map<wstring, Mesh>                         m_meshes;
+    std::map<wstring, LoadedTexture*>               m_textures;
 
-	// Filled in each frame by each world object via SetInstances()
-	std::map<RenderUnit*, std::map<WorldObject*, std::pair<UINT, UINT>>> m_perFrameInstanceData;
+    std::map<wstring, VertexShader*>                m_vertexShaders;
+    std::map<wstring, PixelShader*>                 m_pixelShaders;
 
-	RenderData							m_renderData;
+    std::list<RenderUnit>                           m_renderUnits;
+    std::map<WorldObject*, UINT>                    m_objectToInstanceBufferOffset;  // Filled in during scene initialization
+    UINT                                            m_nextInstanceBufferOffset;		 // Used during initialization
 
-	// Pipeline objects.
-	CComPtr<XSF::D3DDevice>             m_d3dDevice;
-	D3D_DRIVER_TYPE                     m_driverType;
-	D3D_FEATURE_LEVEL                   m_featureLevel;
-	static const UINT FrameCount = 2;
+    // Filled in each frame by each world object via SetInstances()
+    std::map<RenderUnit*, std::map<WorldObject*, std::pair<UINT, UINT>>> m_perFrameInstanceData;
 
-#if defined(TREE3D12)
-	CComPtr<ID3D12CommandQueue> m_commandQueue;
-	CComPtr<ID3D12CommandAllocator> m_commandAllocator;
-	CComPtr<IDXGISwapChain3> m_swapChain;
-	CComPtr<ID3D12Resource> m_renderTargets[FrameCount];
-	CComPtr<ID3D12RootSignature> m_rootSignature;
-	CComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-	CComPtr<ID3D12DescriptorHeap> m_cbvHeap;
-	CComPtr<ID3D12PipelineState> m_pipelineState;
-	CComPtr<ID3D12GraphicsCommandList> m_commandList;
-	UINT m_rtvDescriptorSize;
-	D3D12_VIEWPORT m_viewport;
-	D3D12_RECT m_scissorRect;
-#else
-	CComPtr<ID3D11Device1>              m_d3dDevice1;
-	CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
-	CComPtr<ID3D11DeviceContext1>       m_immediateContext1;
-	CComPtr<IDXGISwapChain>             m_pSwapChain;
-	CComPtr<IDXGISwapChain1>            m_pSwapChain1;
-	CComPtr<ID3D11RenderTargetView>     m_pRenderTargetView;
-	CComPtr<ID3D11Texture2D>            m_pSharedRenderToTexture;
-	CComPtr<ID3D11Texture2D>            m_pDepthStencil;
-	CComPtr<ID3D11DepthStencilView>		m_pDepthStencilView;
-	D3D11_VIEWPORT						m_viewPort;
-#endif
+    RenderData                                      m_renderData;
 
-	DisplayMode							m_displayMode;
-	bool								m_enableMsaa;
+    // 11 or 12
+    RenderPlatform*                                 m_platform;
 
-	struct CBChangeOnResize
-	{
-		XMFLOAT4X4 mProjection;
-	};
+    DisplayMode                         m_displayMode;
 
-	// App resources.
-#if defined(TREE3D12)
-	CComPtr<ID3D12Resource>               m_pCBChangeOnResize;
-	CBChangeOnResize					  m_cbChangesOnResize;
+    // App resources.
 
-#else
-	CComPtr<ID3D11Buffer>               m_pCBChangeOnResize;
-	CBChangeOnResize					m_cbChangesOnResize;
+    DoubleBuffer                        m_instancedBuffer;
 
-	CComPtr<ID3D11RasterizerState>		m_rasterState;
+    GeometryGenerator                   m_geometryGenerator;
+    GeometryBufferData                  m_geometryData;
 
-    // TODO per material
-	CComPtr<ID3D11VertexShader>         m_vertexShader;
-	CComPtr<ID3D11PixelShader>          m_pixelShader;
+    int m_lastMaxInstances;
+    bool m_lastUseShadowMaps;
 
-	CComPtr<ID3D11VertexShader>			m_shadowVertexShader;
-	CComPtr<ID3D11PixelShader>			m_shadowPixelShader;
-	CComPtr<ID3D11VertexShader>			m_drawScreenVertexShader;
-	CComPtr<ID3D11PixelShader>			m_drawScreenPixelShader;
+    DirectionalLight                    m_light;  // Doesn't belong here, will move later
 
-    // Single vertex and index buffer for all geometry in scene
-	CComPtr<ID3D11InputLayout>          m_vertexLayout;
-	CComPtr<ID3D11Buffer>               m_vertexBuffer;
-	CComPtr<ID3D11Buffer>               m_indexBuffer;
+    HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
+    HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
+    HRESULT Render(RenderUnit& renderUnit, RenderPass pass);
+    HRESULT RenderScene(RenderPass pass);
 
-	CComPtr<ID3D11Buffer>               m_CBNeverChanges;
-	CComPtr<ID3D11Buffer>               m_CBChangesEveryFrame;
-
-	// Fixed drawing features
-	CComPtr<ID3D11Buffer>				m_screenQuadVB;
-	CComPtr<ID3D11Buffer>				m_screenQuadIB;
-	CComPtr<ID3D11ShaderResourceView>   m_debugTextureRV;
-#endif
-
-	DoubleBuffer						m_instancedBuffer;
-
-	GeometryGenerator					m_geometryGenerator;
-	GeometryBufferData					m_geometryData;
-
-	DirectionalLight					m_light;  // Doesn't belong here, will move later
-
-	XSF::BitmapFont*					m_bitmapFont;
-
-#if defined(TREE3D12)
-	HRESULT LoadShader(_In_z_ const wchar_t* fileName, _COM_Outptr_ ID3DBlob** ppShader);
-#else
-	HRESULT LoadPixelShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11PixelShader** ppPS, _In_opt_ std::vector< BYTE >* pData = nullptr);
-	HRESULT LoadVertexShader(_In_ D3DDevice* pDevice, _In_z_ const wchar_t* fileName, _COM_Outptr_ ID3D11VertexShader** ppVS,
-								_In_opt_ const D3D11_INPUT_ELEMENT_DESC* pInputElementDesc = NULL, _In_opt_ UINT numElements = 0, _COM_Outptr_ ID3D11InputLayout** ppInputLayout = NULL, _In_opt_ std::vector< BYTE >* pData = nullptr);
-#endif
-
-	HRESULT LoadTexture(const wchar_t* textureFilename);
-	HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
-	HRESULT Render(RenderUnit& renderUnit);
-	HRESULT SetMaterial(Material& material);
+    void BuildShadowTransform();
+    void DrawSceneToShadowMap();
 
 public:
-	RenderManager();
-	~RenderManager();
-	HRESULT Initialize();
+    RenderManager();
+    ~RenderManager();
 
-	HRESULT InitDevice();
-	HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture, SwapChainCreator* swapChainCreator);
-	void CleanupDeviceForShutdown();
-	
-	RenderData& GetRenderData() { return m_renderData; }
-	XSF::D3DDevice* GetDevice() { return m_d3dDevice; }
-	XSF::D3DDeviceContext* GetContext() { return m_immediateContext; }
-	ID3D11Buffer* GetVertexBuffer() { return m_vertexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
-	ID3D11Buffer* GetIndexBuffer() { return m_indexBuffer; } // TODO TEMP!  Objects should be able to load their own meshes
-	GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
+    HRESULT SetPlatform(HMODULE platformDLL);
 
-	// Accessor methods for Oculus
-	ID3D11Device* GetDevice11() { return m_d3dDevice1; }
-	ID3D11RenderTargetView* GetRTV() { return m_pRenderTargetView; }
-	ID3D11DepthStencilView* GetDSV() { return m_pDepthStencilView; }
-	ID3D11Texture2D* GetBackBuffer() { return m_pSharedRenderToTexture; }
-	IDXGISwapChain* GetSwapChain() { return m_pSwapChain; }
-	D3D11_VIEWPORT* GetViewport() { return &m_viewPort; }
-	HRESULT UpdateProjection(XMFLOAT4X4* pProjMat);
+    HRESULT InitDevice();
+    HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
+    void UninitDevice();
 
-	HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
-	HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, ShaderMaterial& shaderMaterial, Material** newMaterial);
-	HRESULT CreateMesh(const wchar_t* name, ID3D11Buffer* vertexBuffer, ID3D11Buffer* indexBuffer, 
-					   const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
-	HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
-	HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
-	HRESULT GetInstanceIndex(WorldObject* object, UINT&);
+    RenderPlatform* GetPlatformBase() { return m_platform; }
 
-	HRESULT InitGraphics(UINT maxInstances);
-	virtual HRESULT CleanUpDeviceObjects();
+    RenderData& GetRenderData() { return m_renderData; }
 
-	HRESULT BeginFrame();
-	HRESULT EndFrame();
-	HRESULT Render();
+    RenderPlatform* GetPlatform() { return (RenderPlatform*)m_platform; }
 
-	HRESULT BuildScreenQuadGeometryBuffers(XSF::D3DDevice* pD3DDevice);
-	HRESULT DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11ShaderResourceView* depthTexture);
-	HRESULT DrawFrameStats();
+    GeometryBufferData& GetGeometryBufferData() { return m_geometryData; }
+
+    // Accessor methods for Oculus
+    //HRESULT GetViewport(Viewport& viewport);
+
+    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+    HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);
+
+    HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
+    HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, 
+                           const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, 
+                           ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
+    HRESULT CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
+        const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
+
+    HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
+    HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
+    HRESULT GetInstanceIndex(WorldObject* object, UINT&);
+
+    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
+    virtual HRESULT UninitGameLevelGraphics();
+
+    HRESULT BeginNewFrame();
+    HRESULT EndFrame();
+
+    void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
+                bool m_renderToSharedTexture, float* clearColor);
+
+    HRESULT DrawFrameStats();
+    HRESULT RenderShadowMap();
+
+    HRESULT ChangePlatform(int platform);
 };
 
