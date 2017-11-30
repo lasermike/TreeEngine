@@ -238,7 +238,6 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
     ASSERT(animScaleFactor >= 0.0f);
 
     XMVECTOR vStart = parentStart;
-    //XMVECTOR vStart = XMLoadFloat3((XMFLOAT3*)&(branch->start)) + XMLoadFloat3(&_position);
     XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
 
     // Scale branch
@@ -289,7 +288,8 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
     const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
     *computedTransform = MatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
-    *computedTransform = *computedTransform * XMLoadFloat4x4(world);  //TODO
+    // Apply object local to world transform
+    *computedTransform = *computedTransform * XMLoadFloat4x4(world);
 
     // Compute extents.  Keep these in local coordinates if we can.
     if (XMVectorGetY(vEnd) > _extents[TOP].y)
@@ -307,7 +307,6 @@ HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransf
     }
 
     XMVECTOR vStart = parentStart;
-    //XMVECTOR vStart = XMLoadFloat3((XMFLOAT3*)&(branch->start)) + XMLoadFloat3(&_position);
     XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
 
     // Scale branch

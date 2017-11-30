@@ -350,19 +350,18 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params3C->_animationSpeed = 100.0f;
     scene->AddChild(new Tree(params3C));
 
-
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
     params4->primitiveType = PrimitiveType_Cylinder;
-    params4->textureFilename.push_back(L"undersea.dds");
+    //params4->textureFilename.push_back(L"undersea.dds");
     ShaderMaterial mat;
-    mat.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
+    mat.Ambient = XMFLOAT4(.9f, .9f, .9f, 1.0f);
     mat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1);
     mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
     mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-    mat.flags.y = 1; //1 for textured; 
+    mat.flags.y = 0; //1 for textured; 
     params4->materials.push_back(mat);
     scene->AddChild(new Primitive(params4));
 
@@ -370,12 +369,14 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
     renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.0, -0.7f, 0.7f);
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0f)));
     renderData->time = 0;
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
+
+    gameData->clearColor = Colors::White;
 }
 
 
