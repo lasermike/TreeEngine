@@ -316,17 +316,16 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     WorldObjectParameters<LSystemParams>* params3 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params3->depthLOD = 1;
     params3->textureFilename.push_back(L"urchinskin.dds");
-    params3->position = XMFLOAT3(-2, 1.0, 0);
     params3->GetGeneratorParameters()._constants = "";
     params3->GetGeneratorParameters()._angle = XM_PI / 2.0f;
-    params3->GetGeneratorParameters()._numIterations = 3;
     params3->GetGeneratorParameters()._segmentLength = 0.1f; //  0.05f;
     params3->GetGeneratorParameters().thickness = .010f;
     params3->GetGeneratorParameters()._initialDirection = XMFLOAT3(1.0f, 0.0, 0.0);
-    params3->_animationSpeed = 55.0f;
     params3->GetGeneratorParameters()._axiom = "A";
-
     params3->GetGeneratorParameters()._rules.push_back(Rule("A", "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"));
+    params3->GetGeneratorParameters()._numIterations = 1;
+    params3->position = XMFLOAT3(0, 1.0, 0);
+    params3->_animationSpeed = 2.0f;
 
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
@@ -340,10 +339,16 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     scene->AddChild(new Tree(params3A));
 
     WorldObjectParameters<LSystemParams>* params3B = new WorldObjectParameters<LSystemParams>(*params3);
-    params3B->position = XMFLOAT3(0, 1.0, 0);
-    params3B->GetGeneratorParameters()._numIterations = 1;
-    params3B->_animationSpeed = 2.0f;
+    params3B->position = XMFLOAT3(-2, 1.0, 0);
+    params3B->GetGeneratorParameters()._numIterations = 3;
+    params3B->_animationSpeed = 30.0f;
     scene->AddChild(new Tree(params3B));
+
+    WorldObjectParameters<LSystemParams>* params3C = new WorldObjectParameters<LSystemParams>(*params3);
+    params3C->position = XMFLOAT3(-4, 1.0, 0);
+    params3C->GetGeneratorParameters()._numIterations = 4;
+    params3C->_animationSpeed = 100.0f;
+    scene->AddChild(new Tree(params3C));
 
 
     // Ground

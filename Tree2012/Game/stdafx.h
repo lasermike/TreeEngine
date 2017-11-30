@@ -118,7 +118,7 @@ struct Utility
 {
     void Output(const char * fnt, ...)
     {
-        static char string_text[1000];
+        static char string_text[256 * 256];
         va_list args; va_start(args, fnt);
         vsprintf_s(string_text, fnt, args);
         va_end(args);
