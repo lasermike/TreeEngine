@@ -368,7 +368,7 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
                 break;
             case '0':
                 m_timeStart = 0;
-                key[k] = false;
+                key[k] = false; 
                 break;
             case 'Z':
                 m_showShadowBuffer = !m_showShadowBuffer;

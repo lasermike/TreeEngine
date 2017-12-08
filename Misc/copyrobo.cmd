@@ -1,7 +1,10 @@
 @setlocal
 @echo off
+echo copyrobo from: %1
+echo copyrobo   to: %2
+echo copyrobo what: %3
 @set result=0
-@robocopy /NJH %*
+@robocopy %* /NJH /V /X /FP 
 @if %ERRORLEVEL% EQU 16 echo ***FATAL ERROR*** & goto end
     if %ERRORLEVEL% EQU 15 echo OKCOPY + FAIL + MISMATCHES + XTRA & goto end
     if %ERRORLEVEL% EQU 14 echo FAIL + MISMATCHES + XTRA & goto end

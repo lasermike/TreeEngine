@@ -365,7 +365,7 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params4->materials.push_back(mat);
     scene->AddChild(new Primitive(params4));
 
-    // Init lights
+    // Init lights 
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
     renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);

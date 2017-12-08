@@ -43,6 +43,7 @@
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
     <EnableDotNetNativeCompatibleProfile>true</EnableDotNetNativeCompatibleProfile>
     <ProjectName>TreePC</ProjectName>
+	<BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
@@ -103,9 +104,9 @@
       <DisableSpecificWarnings>4453</DisableSpecificWarnings>
     </ClCompile>
     <PostBuildEvent>
-      <Command>..\Game\CopyResources.cmd $(OutDir)\AppX\
-..\..\Misc\copyrobo ..\..\..\binaries\Debug\x64\RenderPlatform11UWP\ $(TargetDir) RenderPlatform11UWP.dll
-..\..\Misc\copyrobo ..\..\..\binaries\Debug\x64\RenderPlatform12UWP\ $(TargetDir) RenderPlatform12UWP.dll	  
+      <Command>call ..\Game\CopyResources.cmd $(OutDir)AppX\
+call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\RenderPlatform11UWP $(BinsDir)$(Configuration)\$(Platform)\TreePC\AppX RenderPlatform11UWP.dll /XO
+call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\RenderPlatform12UWP $(BinsDir)$(Configuration)\$(Platform)\TreePC\AppX RenderPlatform12UWP.dll /XO 
 	  </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
