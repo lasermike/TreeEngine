@@ -14,7 +14,6 @@
 #include "ResourceUploadBatch.h"
 
 using namespace DirectX;
-//using namespace DirectX::SimpleMath;
 
 
 enum CbvSrvHeapOffsets
@@ -27,7 +26,7 @@ enum CbvSrvHeapOffsets
     Texture0Srv_HeapOffset = 3,
     Num_CbvSrvHeapOffsets
 };
-
+ 
 const int numGlobalDescriptors = 2;
 
 const int numConstantBuffersPerMaterial = 1;
@@ -821,31 +820,14 @@ HRESULT RenderPlatform12::InitDevice()
 
 #endif
 
-    const bool useWarpDevice = false;
-    if (useWarpDevice)
-    {
-        //      CComQIPtr<IDXGIFactory4> factory4(factory2);
+    CComPtr<IDXGIAdapter1> hardwareAdapter;
+    GetHardwareAdapter(factory2, &hardwareAdapter);
 
-        //CComPtr<IDXGIAdapter> warpAdapter;
-        //HRR(factory2->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
-
-        //HRR(D3D12CreateDevice(
-        //    warpAdapter,
-        //    D3D_FEATURE_LEVEL_11_0,
-        //    IID_PPV_ARGS(&m_d3dDevice)
-        //    ));
-    }
-    else
-    {
-        CComPtr<IDXGIAdapter1> hardwareAdapter;
-        GetHardwareAdapter(factory2, &hardwareAdapter);
-
-        HRR(D3D12CreateDevice(
-            hardwareAdapter,
-            D3D_FEATURE_LEVEL_11_0,
-            IID_PPV_ARGS(&m_d3dDevice)
-        ));
-    }
+    HRR(D3D12CreateDevice(
+        hardwareAdapter,
+        D3D_FEATURE_LEVEL_11_0,
+        IID_PPV_ARGS(&m_d3dDevice)
+    ));
 
     // Allocate graphics memory
     m_graphicsMemory = new GraphicsMemory(GetDevice());
