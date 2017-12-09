@@ -125,9 +125,6 @@
     <ClInclude Include="BasicTimer.h">
       <Filter>Old</Filter>
     </ClInclude>
-    <ClInclude Include="DirectXHelper.h">
-      <Filter>Old</Filter>
-    </ClInclude>
     <ClInclude Include="..\Game\WorldObject.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
@@ -216,9 +213,6 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\ScreenGrab12.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Lib\DirectXTex.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\Player.h">

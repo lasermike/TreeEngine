@@ -235,8 +235,6 @@ call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\Rend
     <ClInclude Include="..\Game\UploadBuffer.h" />
     <ClInclude Include="..\Game\WorldObject.h" />
     <ClInclude Include="BasicTimer.h" />
-    <ClInclude Include="DirectXHelper.h" />
-    <ClInclude Include="Lib\DirectXTex.h" />
     <ClInclude Include="TreePC.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
