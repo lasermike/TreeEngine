@@ -281,7 +281,7 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
-void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
@@ -379,6 +379,52 @@ void LoadSeaScene2(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     gameData->clearColor = Colors::White;
 }
 
+void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+{
+    ShaderMaterial trunkMaterial;
+    trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
+    trunkMaterial.Diffuse = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+    trunkMaterial.Specular = XMFLOAT4(0.1f, .1f, .1f, 1.0f);
+    trunkMaterial.flags.y = 0; //useTextures  TODO
+
+    ShaderMaterial leafMaterial;
+    XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
+    leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
+    leafMaterial.flags.y = false; //useTextures  TODO
+
+    WorldObjectParameters<LSystemParams>* params3 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    params3->depthLOD = 1;
+    //params3->textureFilename.push_back(L"urchinskin.dds");
+    params3->GetGeneratorParameters()._constants = "";
+    params3->GetGeneratorParameters()._angle = XM_PI / 4.0f;
+    params3->GetGeneratorParameters()._segmentLength = 0.5f;
+    params3->GetGeneratorParameters().thickness = .010f;
+    //params3->GetGeneratorParameters()._initialDirection = XMFLOAT3(1.0f, 0.0, 0.0);
+    params3->GetGeneratorParameters()._axiom = "A";
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "[ZF]"));//[zF]
+    params3->GetGeneratorParameters()._numIterations = 1;
+    params3->position = XMFLOAT3(0, 1.0, 0);
+    params3->_animationSpeed = 5.0f;
+
+    params3->materials.push_back(trunkMaterial);
+    params3->materials.push_back(leafMaterial);
+
+    scene->AddChild(new Tree(params3));
+
+
+    // Init lights 
+    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0f)));
+    renderData->time = 0;
+
+    // Camera
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
+
+    gameData->clearColor = Colors::White;
+}
 
 void LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
@@ -573,35 +619,26 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
     switch (sceneNum)
     {
     case 0:
-    {
-        LoadSeaScene2(pScene, pRenderData, pPlayer, gameData);
+        LoadTestTree(pScene, pRenderData, pPlayer, gameData);
         break;
-    }
     case 1:
-    {
+        LoadCurvesScene(pScene, pRenderData, pPlayer, gameData);
+        break;
+    case 2:
         LoadSeaScene(pScene, pRenderData, pPlayer, gameData);
         break;
-    }
-    case 2:
-    {
+    case 3:
         LoadTrees(pScene, pRenderData, pPlayer, gameData);
         break;
-    }
-    case 3:
-    {
+    case 4:
         LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
         break;
-    }
-    case 4:
-    {
+    case 5:
         LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
         break;
-    }
-    case 5:
-    {
+    case 6:
         LoadGraph(pScene, pRenderData, pPlayer, gameData);
         break;
-    }
     default:
         ASSERT(false);
     }

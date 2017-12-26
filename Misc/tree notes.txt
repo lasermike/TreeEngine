@@ -1,0 +1,5 @@
+TREE notes
+
+second row of matrix is the view/look vector.  Multiplied by scale (?)
+
+last row is translation
