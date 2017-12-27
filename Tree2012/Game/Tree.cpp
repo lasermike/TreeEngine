@@ -225,118 +225,6 @@ HRESULT Tree::ComputeBranchInstanceData(RenderData* pRenderData, int& currentBra
     return S_OK;
 }
 
-int LookAt(float x1, float y1, float z1, float x2, float y2, float z2, XMFLOAT4X4* matrix)
-{
-    /* Build a transform as if you were at a point (x1,y1,z1), and
-    looking at a point (x2,y2,z2) */
-
-    float ViewOut[3];      // the View or "new Z" vector
-    float ViewUp[3];       // the Up or "new Y" vector
-    float ViewRight[3];    // the Right or "new X" vector
-
-    float ViewMagnitude;   // for normalizing the View vector
-    float UpMagnitude;     // for normalizing the Up vector
-    float UpProjection;    // magnitude of projection of View Vector on World UP
-
-    const float WorldUp[3] = { 0, 1, 0 };
-
-    // first, calculate and normalize the view vector
-    ViewOut[0] = x2 - x1;
-    ViewOut[1] = y2 - y1;
-    ViewOut[2] = z2 - z1;
-    ViewMagnitude = sqrt(ViewOut[0] * ViewOut[0] + ViewOut[1] * ViewOut[1] +
-        ViewOut[2] * ViewOut[2]);
-
-    // invalid points (not far enough apart)
-    if (ViewMagnitude < .000001)
-        return (-1);
-
-    // normalize. This is the unit vector in the "new Z" direction
-    ViewOut[0] = ViewOut[0] / ViewMagnitude;
-    ViewOut[1] = ViewOut[1] / ViewMagnitude;
-    ViewOut[2] = ViewOut[2] / ViewMagnitude;
-
-    // Now the hard part: The ViewUp or "new Y" vector
-
-    // dot product of ViewOut vector and World Up vector gives projection of
-    // of ViewOut on WorldUp
-    UpProjection = ViewOut[0] * WorldUp[0] + ViewOut[1] * WorldUp[1] +
-        ViewOut[2] * WorldUp[2];
-
-    // first try at making a View Up vector: use World Up
-    ViewUp[0] = WorldUp[0] - UpProjection*ViewOut[0];
-    ViewUp[1] = WorldUp[1] - UpProjection*ViewOut[1];
-    ViewUp[2] = WorldUp[2] - UpProjection*ViewOut[2];
-
-    // Check for validity:
-    UpMagnitude = ViewUp[0] * ViewUp[0] + ViewUp[1] * ViewUp[1] + ViewUp[2] * ViewUp[2];
-
-    if (UpMagnitude < .0000001)
-    {
-        //Second try at making a View Up vector: Use Y axis default  (0,1,0)
-        ViewUp[0] = -ViewOut[1] * ViewOut[0];
-        ViewUp[1] = 1 - ViewOut[1] * ViewOut[1];
-        ViewUp[2] = -ViewOut[1] * ViewOut[2];
-
-        // Check for validity:
-        UpMagnitude = ViewUp[0] * ViewUp[0] + ViewUp[1] * ViewUp[1] + ViewUp[2] * ViewUp[2];
-
-        if (UpMagnitude < .0000001)
-        {
-            //Final try at making a View Up vector: Use Z axis default  (0,0,1)
-            ViewUp[0] = -ViewOut[2] * ViewOut[0];
-            ViewUp[1] = -ViewOut[2] * ViewOut[1];
-            ViewUp[2] = 1 - ViewOut[2] * ViewOut[2];
-
-            // Check for validity:
-            UpMagnitude = ViewUp[0] * ViewUp[0] + ViewUp[1] * ViewUp[1] + ViewUp[2] * ViewUp[2];
-
-            if (UpMagnitude < .0000001)
-                return(-1);
-        }
-    }
-
-    // normalize the Up Vector
-    UpMagnitude = sqrt(UpMagnitude);
-    ViewUp[0] = ViewUp[0] / UpMagnitude;
-    ViewUp[1] = ViewUp[1] / UpMagnitude;
-    ViewUp[2] = ViewUp[2] / UpMagnitude;
-
-    // Calculate the Right Vector. Use cross product of Out and Up.
-    ViewRight[0] = ViewOut[1] * ViewUp[2] + ViewOut[2] * ViewUp[1];
-    ViewRight[1] = ViewOut[2] * ViewUp[0] + ViewOut[0] * ViewUp[2];
-    ViewRight[2] = ViewOut[0] * ViewUp[1] + ViewOut[1] * ViewUp[0];
-
-    // Plug values into rotation matrix R
-    matrix->m[0][0] = ViewRight[0];
-    matrix->m[0][1] = ViewRight[1];
-    matrix->m[0][2] = ViewRight[2];
-    matrix->m[0][3] = 0;
-
-    matrix->m[2][0] = ViewUp[0];
-    matrix->m[2][1] = ViewUp[1];
-    matrix->m[2][2] = ViewUp[2];
-    matrix->m[2][3] = 0;
-
-    matrix->m[1][0] = ViewOut[0];
-    matrix->m[1][1] = ViewOut[1];
-    matrix->m[1][2] = ViewOut[2];
-    matrix->m[1][3] = 0;
-
-    //matrix->m[3][0] = 0;// x1;
-    //matrix->m[3][1] = 0;// y1;
-    //matrix->m[3][2] = 0;// z1;
-    //matrix->m[3][3] = 1;
-
-    // Plug values into translation matrix T
-    //MoveFill(ViewMoveMatrix, -x1, -y1, -z1);
-
-    // build the World Transform
-    //MatrixMultiply(ViewRotationMatrix, ViewMoveMatrix, WorldTransform);
-
-    return(0);
-}
-
 inline XMMATRIX XM_CALLCONV TEMatrixLookToLH
 (
     FXMVECTOR EyePosition,
@@ -416,23 +304,20 @@ const XMMATRIX matNegOrigin = { { 1.0f, 0.0f, 0.0f, 0.0f },
 __inline XMMATRIX TEMatrixTransformation
 (
     FXMVECTOR Scaling,
-    CXMVECTOR RotationQuaternion,
     FXMMATRIX RotationMat,
     CXMVECTOR Translation
 )
 {
     XMMATRIX M;
     XMMATRIX MScaling;
-    XMMATRIX MRotation;
     XMVECTOR VTranslation;
 
     MScaling = XMMatrixScalingFromVector(Scaling);
-    MRotation = XMMatrixRotationQuaternion(RotationQuaternion);
     VTranslation = _mm_and_ps(Translation, g_XMMask3);
 
     M = matNegOrigin;
     M = XMMatrixMultiply(M, MScaling);
-    M = XMMatrixMultiply(M, MRotation);
+    M = XMMatrixMultiply(M, RotationMat);
     M.r[3] = XMVectorAdd(M.r[3], origin);
     M.r[3] = XMVectorAdd(M.r[3], VTranslation);
 
@@ -491,39 +376,31 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
     }
     else
     {
-        //XMFLOAT4X4 mat;
-        //XMStoreFloat4x4(&mat, XMMatrixIdentity());
-        //LookAt(branch->start.x, branch->start.y, branch->start.z,
-        //       branch->end.x, branch->end.y, branch->end.z, &mat);
-        //computedMatrix = XMLoadFloat4x4(&mat);
-        ////computedMatrix = XMMatrixTranspose(computedMatrix);
-
         XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
         computedMatrix = TEMatrixLookToLH(vStart, vDir, vUp);
         computedMatrix.r[3] = vStart;
     }
-
-//    computedMatrix = XMMatrixMultiply(XMMatrixScalingFromVector(vScale), computedMatrix);
 
     *computedTransform = computedMatrix;
 
 #else
 
     // Determine rotation
-    XMVECTOR vCross = XMVector3Cross(vUp, vDir);
+    XMVECTOR vCross = XMVector3Normalize(XMVector3Cross(vUp, vDir));
     XMVECTOR vCrossLenSq = XMVector3LengthSq(vCross);
     XMVECTOR vQuat;
     XMMATRIX matRotation;
     float crossLenSq;
     XMStoreFloat(&crossLenSq, vCrossLenSq);
-    if (crossLenSq > 0.001f) // Need better value for epsilon here
+    if (crossLenSq > 0.001f)
     {
+        vDir = XMVectorSelect(g_XMZero, vDir, g_XMSelect1110);
+
         XMVECTOR vDot = XMVector3Dot(vUp, vDir);
         float angle;
         XMStoreFloat(&angle, vDot);
         angle = acos(angle);
-        vQuat = XMQuaternionRotationAxis(vCross, angle);
-        matRotation = XMMatrixLookToLH(vStart, vDir, vUp);
+        matRotation = XMMatrixRotationNormal(vCross, angle);
     }
     else if (XMVectorGetY(vDir) < -0.99f)
     {
@@ -537,9 +414,7 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
         matRotation = XMMatrixIdentity();
     }
 
-    *computedTransform = TEMatrixTransformation(vScale, vQuat, matRotation, vStart);
-    //*computedTransform = TEMatrixTransformation(vScale, vQuat, vStart);
-
+    *computedTransform = TEMatrixTransformation(vScale, matRotation, vStart);
 
 #endif
 
@@ -553,59 +428,6 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
     return S_OK;
 }
 
-HRESULT Tree::ComputeTransformations(XMMATRIX* transform, XMMATRIX* normalTransform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart)
-{
-    float animScaleFactor = 1.0f;
-    if (time - 5 < branch->depth)
-    {
-        animScaleFactor = (time - branch->depth) / 5;
-    }
-
-    XMVECTOR vStart = parentStart;
-    XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
-
-    // Scale branch
-    XMVECTOR vMag = XMVector3Length(vEnd - vStart);
-    float magY = XMVectorGetX(vMag);
-    float magXZ = branch->thickness;
-    magY *= animScaleFactor;
-    magXZ *= animScaleFactor;
-    XMVECTOR vScale = XMVectorSet(magXZ, magY, magXZ, 0);
-
-    // Child start pos
-    XMVECTOR vMagY = XMVectorSet(animScaleFactor, animScaleFactor, animScaleFactor, 1);
-    *vChildStart = (vEnd - vStart) * vMagY + vStart;
-
-    // Determine rotation
-    XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
-    XMVECTOR vDiff = vEnd - vStart;
-    XMVECTOR vCross = XMVector3Cross(vUp, XMVector3Normalize(vDiff));
-    XMVECTOR vCrossLenSq = XMVector3LengthSq(vCross);
-    XMVECTOR vQuat;
-    float crossLenSq;
-    XMStoreFloat(&crossLenSq, vCrossLenSq);
-    if (crossLenSq > 0.01f) // Need better value for epsilon here
-    {
-        XMVECTOR vDot = XMVector3Dot(vUp, XMVector3Normalize(vDiff));
-        float angle;
-        XMStoreFloat(&angle, vDot);
-        angle = acos(angle);
-        vQuat = XMQuaternionRotationAxis(vCross, angle);
-    }
-    else
-    {
-        vQuat = XMQuaternionRotationAxis(vUp, 0);
-    }
-
-    const XMVECTOR vCenter = XMVectorSet(0, 0, 0, 0);
-    const XMVECTOR vScaleCenter = XMVectorSet(0, -0.5, 0, 0);
-    *transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
-
-    *transform = *transform * XMLoadFloat4x4(world);  //TODO
-    *normalTransform = MathHelper::InverseTranspose(XMMatrixTranspose(*transform));
-
-    return S_OK;
-}
 
 unsigned int Tree::GetMaxInstances()
 {
