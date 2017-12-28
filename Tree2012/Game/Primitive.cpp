@@ -71,9 +71,6 @@ HRESULT Primitive::ComputeConstants(IRenderFrame* pFrameConfig)
 
     XMMATRIX transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
-    // Multiply by this object's world matrix
-    transform = transform * XMLoadFloat4x4(&pFrameConfig->GetRenderData().world);
-
     XMStoreFloat4x4(&firstDataView->World, transform);
 
     return S_OK;

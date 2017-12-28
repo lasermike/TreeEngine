@@ -33,12 +33,13 @@ private:
         XMFLOAT3 startPosition;
     };
 
-    std::queue<TreeFrame> m_treeFrames;
+    int numTreeFrames;
+    static const int maxTreeFrameQueueSize = 256;
+    TreeFrame m_treeFrames[maxTreeFrameQueueSize];
 
-    HRESULT ComputeBranchInstanceData(RenderData* pRenderData, int& currentBranch, Branch const* branch, XMFLOAT3* parentStart);
-    HRESULT ComputeBranchInstanceData(TreeFrame& frame);
+    HRESULT ComputeBranchInstanceData(TreeFrame frame);
 
-    HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, XMFLOAT4X4* world, FXMVECTOR parentStart);
+    HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, FXMVECTOR parentStart);
 
 
 public:

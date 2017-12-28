@@ -56,7 +56,6 @@ struct RenderData
     // Transformations
     ProjectionData      projectionData;
 
-    XMFLOAT4X4          world;          // Needed?
     XMFLOAT4X4          projection;
     XMFLOAT4X4          view;           
     XMVECTOR            eyePos;
@@ -81,7 +80,6 @@ struct RenderData
 
     RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr)
     {
-        XMStoreFloat4x4(&world, XMMatrixIdentity());
         XMStoreFloat4x4(&view, XMMatrixIdentity());
         XMStoreFloat4x4(&projection, XMMatrixIdentity());
         XMStoreFloat4x4(&lightView, XMMatrixIdentity());

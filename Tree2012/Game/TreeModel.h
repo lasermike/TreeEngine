@@ -6,7 +6,6 @@
 using namespace DirectX;
 
 const int maxBranches = 13000; //3^6 + 1 
-const int maxChildBranches = 8;
 
 struct cbBranch
 {
@@ -15,7 +14,6 @@ struct cbBranch
     XMFLOAT4 start[maxBranches];
     XMFLOAT4 end[maxBranches];
     XMFLOAT4 children[maxBranches];
-
 };
 
 
@@ -55,20 +53,12 @@ struct Branch
     {
         children.push_back(c);
     }
-
-    void SetChild(int i, int c) 
-    { 
-        ASSERT(i < maxChildBranches);
-        ASSERT(i == (int) children.size());
-        children.at(i) = c;
-    }
 };
 
 struct BranchLevelData
 {
     int depth;
     int numBranches;
-    //std::vector<int>* pBranchesInLevel;
 
     BranchLevelData() : depth(0), numBranches(0) { }
     ~BranchLevelData() { /*SafeDelete(&pBranchesInLevel);*/ }
@@ -90,7 +80,6 @@ public:
     TreeModel(void);
     ~TreeModel(void);
 
-    //static const int maxChildBranches = 6;
     static const int maxLevels = 6;
     Branch* trunk;
 

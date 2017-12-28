@@ -31,5 +31,5 @@ public:
     void Regenerate(SceneRoot* pScene);
 
     int _currentSeed;
-    int GetNumScenes() { return 4; }
+    int GetNumScenes();
 };

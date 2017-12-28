@@ -357,10 +357,6 @@ HRESULT RenderManager::InitDevice()
 
     HRR(GetPlatform()->InitDevice());
 
-    // Initialize the world matrices
-    XMStoreFloat4x4(&GetRenderData().world, XMMatrixIdentity());
-
-
     return hr;
 }
 

@@ -401,7 +401,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->GetGeneratorParameters().thickness = .010f;
     //params3->GetGeneratorParameters()._initialDirection = XMFLOAT3(1.0f, 0.0, 0.0);
     params3->GetGeneratorParameters()._axiom = "A";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "[ZF]"));//[zF]
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F[ZF][zF]"));
     params3->GetGeneratorParameters()._numIterations = 1;
     params3->position = XMFLOAT3(0, 1.0, 0);
     params3->_animationSpeed = 5.0f;
@@ -611,6 +611,11 @@ void GameLoader::Regenerate(SceneRoot* pScene)
         }
     }
 
+}
+
+int GameLoader::GetNumScenes()
+{ 
+    return 7;
 }
 
 
