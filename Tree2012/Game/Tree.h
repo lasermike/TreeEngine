@@ -27,8 +27,6 @@ private:
 
     struct TreeFrame
     {
-        RenderData* renderData;
-        int currentBranch;
         Branch* branch;
         XMFLOAT3 startPosition;
     };
@@ -37,7 +35,7 @@ private:
     static const int maxTreeFrameQueueSize = 256;
     TreeFrame m_treeFrames[maxTreeFrameQueueSize];
 
-    HRESULT ComputeBranchInstanceData(TreeFrame frame);
+    HRESULT ComputeBranchInstanceData(TreeFrame frame, RenderData* pRenderData);
 
     HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, FXMVECTOR parentStart);
 
