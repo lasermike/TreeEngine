@@ -897,7 +897,7 @@ HRESULT RenderPlatform11::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
     D3D11_BUFFER_DESC vbd = {};
 
     vbd.Usage = D3D11_USAGE_DYNAMIC;
-    vbd.ByteWidth = sizeBytes * numInstances;
+    vbd.ByteWidth = sizeBytes; // *numInstances;
     vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     vbd.MiscFlags = 0;

@@ -32,7 +32,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_paused = false;
     m_wireframe = false;
     m_showHelp = false;
-    m_is12Driver = false;
+    m_is12Driver = true;
     m_rotateLights = false;
     m_timeStart = 0;
     m_resetTree = true;
@@ -86,7 +86,6 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     m_currentScene = 0;
     m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
-    //m_loader.Load("Basic", m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
     // Init scene bounds.
     // Estimatation.    

@@ -226,7 +226,6 @@ float SegLengthPlusRand(LSystemParams* params, float cmdParam)
 void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
-    params2->position = XMFLOAT3(0, .5f, 0);
     params2->_animationSpeed = 4.0f;
     params2->depthLOD = 1;
     params2->textureFilename.push_back(L"urchinskin.dds");
@@ -244,7 +243,7 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     leafMaterial.flags.y = false; //useTextures  TODO
     params2->materials.push_back(leafMaterial);
 
-    params2->GetGeneratorParameters()._axiom = "z y F Z F";
+    params2->GetGeneratorParameters()._axiom = "F Z F";
     params2->GetGeneratorParameters()._rules.push_back(Rule("F", "F [z F][Z F][X y F z F][x Y F]"));
     params2->GetGeneratorParameters()._constants = "";
     params2->GetGeneratorParameters()._angle = 0.453972f;
@@ -252,7 +251,18 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters()._segmentLength = .28f;
     params2->GetGeneratorParameters().thickness = .020f;
     params2->GetGeneratorParameters().SegmentLength = SegLengthPlusRand;
+
+    params2->position = XMFLOAT3(-2.2f, .5f, 1.0f);
     scene->AddChild(new Tree(params2));
+
+    params2->position = XMFLOAT3(0.5f, .5f, 0.0f);
+    XMStoreFloat4(&params2->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 1.0f));
+    scene->AddChild(new Tree(params2));
+
+    params2->position = XMFLOAT3(3.0f, .5f, 1.0f);
+    XMStoreFloat4(&params2->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 2.0f));
+    scene->AddChild(new Tree(params2));
+
 
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
@@ -278,7 +288,7 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
-    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+    //player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
 void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
@@ -623,13 +633,13 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 {
     switch (sceneNum)
     {
-    case 0:
+    case 2:
         LoadTestTree(pScene, pRenderData, pPlayer, gameData);
         break;
     case 1:
         LoadCurvesScene(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 2:
+    case 0:
         LoadSeaScene(pScene, pRenderData, pPlayer, gameData);
         break;
     case 3:
