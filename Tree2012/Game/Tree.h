@@ -17,9 +17,48 @@ class Tree : public WorldObject
 private:
 
     TreeModel* _treeModel;
-    std::vector<InstancedData>            _logInstanceData;
-    std::vector<InstancedData>            _twigInstanceData;
-    std::vector<InstancedData>            _leafInstanceData;
+
+    // STL vector who's allocation never shrinks
+    class InstanceDataArray
+    {
+    public:
+        std::vector<InstancedData> m_data;
+        int m_size;
+
+        InstanceDataArray() : m_size(0) {}
+
+        void clear()
+        {
+            m_size = 0;
+        }
+
+        int size()
+        {
+            return m_size;
+        }
+
+        void push_back(InstancedData& newData)
+        {
+            if (m_size == m_data.size())
+            {
+                m_data.push_back(newData);
+                m_size++;
+            }
+            else
+            {
+                m_data[m_size++] = newData;
+            }
+        }
+
+        InstancedData& operator[](int pos)
+        {
+            return m_data[pos];
+        }
+    };
+
+    InstanceDataArray                      m_logInstanceData;
+    InstanceDataArray                      m_twigInstanceData;
+    InstanceDataArray                      m_leafInstanceData;
 
     RenderUnit*                            m_logUnit;
     RenderUnit*                            m_twigUnit;

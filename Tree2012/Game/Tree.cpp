@@ -95,9 +95,9 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         _extents[i] = XMFLOAT3(0, 0, 0);
     }
 
-    _logInstanceData.clear();
-    _twigInstanceData.clear();
-    _leafInstanceData.clear();
+    m_logInstanceData.clear();
+    m_twigInstanceData.clear();
+    m_leafInstanceData.clear();
 
     // Queue first branch
     TreeFrame firstFrame = { _treeModel->trunk, _position };
@@ -111,31 +111,31 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     }
 
     InstancedData* logBuffer = dataView + startInstance;
-    InstancedData* twigBuffer = dataView + startInstance + _logInstanceData.size();
-    InstancedData* leafBuffer = dataView + startInstance + _logInstanceData.size() + _twigInstanceData.size();
+    InstancedData* twigBuffer = dataView + startInstance + m_logInstanceData.size();
+    InstancedData* leafBuffer = dataView + startInstance + m_logInstanceData.size() + m_twigInstanceData.size();
 
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Compute Constants memcpy");
 
     // TODO add to render unit specific data view
-    if (_logInstanceData.size())
+    if (m_logInstanceData.size())
     {
-        memcpy(logBuffer, &_logInstanceData[0], _logInstanceData.size() * sizeof(InstancedData));
+        memcpy(logBuffer, &m_logInstanceData[0], m_logInstanceData.size() * sizeof(InstancedData));
     }
 
-    if (_twigInstanceData.size() > 0)
+    if (m_twigInstanceData.size() > 0)
     {
-        memcpy(twigBuffer, &_twigInstanceData[0], _twigInstanceData.size() * sizeof(InstancedData));
+        memcpy(twigBuffer, &m_twigInstanceData[0], m_twigInstanceData.size() * sizeof(InstancedData));
     }
 
-    if (_leafInstanceData.size() > 0)
+    if (m_leafInstanceData.size() > 0)
     {
-        memcpy(leafBuffer, &_leafInstanceData[0], _leafInstanceData.size() * sizeof(InstancedData));
+        memcpy(leafBuffer, &m_leafInstanceData[0], m_leafInstanceData.size() * sizeof(InstancedData));
     }
 
-    pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT)_logInstanceData.size());
-    pFrameConfig->SetInstances(m_twigUnit, this, startInstance + (UINT)_logInstanceData.size(), (UINT)_twigInstanceData.size());
-    pFrameConfig->SetInstances(m_leafUnit, this, startInstance + (UINT)_logInstanceData.size() + (UINT)_twigInstanceData.size(), (UINT)_leafInstanceData.size());
+    pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT)m_logInstanceData.size());
+    pFrameConfig->SetInstances(m_twigUnit, this, startInstance + (UINT)m_logInstanceData.size(), (UINT)m_twigInstanceData.size());
+    pFrameConfig->SetInstances(m_leafUnit, this, startInstance + (UINT)m_logInstanceData.size() + (UINT)m_twigInstanceData.size(), (UINT)m_leafInstanceData.size());
 
     PIXEndEvent();
 
@@ -169,17 +169,17 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame frame, RenderData* pRenderData
     switch (frame.branch->geometryType)
     {
     case Leaf:
-        _leafInstanceData.push_back(data);
+        m_leafInstanceData.push_back(data);
         pRenderData->frameStats[NUM_LEAVES_STAT].stat++;
         break;
     case Stick:
         if (_params->depthLOD != -1 && (frame.branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)) < 100.0f))
         {
-            _logInstanceData.push_back(data);
+            m_logInstanceData.push_back(data);
         }
         else
         {
-            _twigInstanceData.push_back(data);
+            m_twigInstanceData.push_back(data);
         }
         pRenderData->frameStats[NUM_STICKS_STAT].stat++;
 
@@ -353,8 +353,6 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
     XMVECTOR vMagY = XMVectorSet(animScaleFactor, animScaleFactor, animScaleFactor, 1);
     *vComputedEnd = startToEnd * vMagY + vStart;
 
-    XMMATRIX computedMatrix;
-
     XMVECTOR vDir = XMVector3Normalize(vEnd - vStart);
     XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
 
@@ -432,8 +430,8 @@ unsigned int Tree::GetNumInstances()
 {
     if (_treeModel)
     {
-        assert((UINT)_treeModel->treeData.numBranches >= _logInstanceData.size() + _twigInstanceData.size() + _leafInstanceData.size());
-        return (unsigned int)(_logInstanceData.size() + _twigInstanceData.size() + _leafInstanceData.size());
+        assert((UINT)_treeModel->treeData.numBranches >= m_logInstanceData.size() + m_twigInstanceData.size() + m_leafInstanceData.size());
+        return (unsigned int)(m_logInstanceData.size() + m_twigInstanceData.size() + m_leafInstanceData.size());
     }
     else
         return 0;
