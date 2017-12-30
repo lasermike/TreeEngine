@@ -43,7 +43,7 @@
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
     <EnableDotNetNativeCompatibleProfile>true</EnableDotNetNativeCompatibleProfile>
     <ProjectName>TreePC</ProjectName>
-	<BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
+    <BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
@@ -112,7 +112,7 @@ call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\Rend
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;NOPIX_INSTRUMENTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization Condition="'$(Configuration)'=='Release'">Disabled</Optimization>
       <UndefinePreprocessorDefinitions Condition="'$(Platform)'=='Win32'">WIN32</UndefinePreprocessorDefinitions>
     </ClCompile>
@@ -123,7 +123,7 @@ call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\Rend
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;NOPIX_INSTRUMENTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions Condition="'$(Platform)'=='Win32'">WIN32</UndefinePreprocessorDefinitions>
       <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BrowseInformation>
     </ClCompile>
@@ -328,12 +328,12 @@ call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\Rend
     <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ImageContentTask.targets" />
     <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\MeshContentTask.targets" />
     <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ShaderGraphContentTask.targets" />
-    <Import Project="..\packages\WinPixEventRuntime.1.0.170918004\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.170918004\build\WinPixEventRuntime.targets')" />
+    <Import Project="..\packages\WinPixEventRuntime.1.0.170625002\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.170625002\build\WinPixEventRuntime.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.170918004\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.170918004\build\WinPixEventRuntime.targets'))" />
+    <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.170625002\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.170625002\build\WinPixEventRuntime.targets'))" />
   </Target>
 </Project>
