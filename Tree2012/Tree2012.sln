@@ -4,6 +4,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreeXBox", "Tree2012\Tree2012.vcxproj", "{492A8733-A8A0-420B-A0FA-FC72732B1001}"
+	ProjectSection(ProjectDependencies) = postProject
+		{93C08E30-B028-418F-8266-51EF1BC60255} = {93C08E30-B028-418F-8266-51EF1BC60255}
+		{C21341FB-E80A-44AC-9A31-714242204EE3} = {C21341FB-E80A-44AC-9A31-714242204EE3}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreePC", "TreePC\TreePC.vcxproj", "{9B22E637-C613-479F-BEC8-59215E96EEFB}"
 	ProjectSection(ProjectDependencies) = postProject

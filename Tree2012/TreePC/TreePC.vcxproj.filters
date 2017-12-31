@@ -36,6 +36,8 @@
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\StoreLogo.png" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Game\WorldObject.cpp">
@@ -102,9 +104,6 @@
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\DDSTextureLoader12.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\ScreenGrab12.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\Player.cpp">
@@ -212,9 +211,6 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\GpuResource.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\ScreenGrab12.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="Lib\DirectXTex.h">

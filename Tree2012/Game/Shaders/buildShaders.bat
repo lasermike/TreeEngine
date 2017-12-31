@@ -58,6 +58,7 @@ call !finalcmd!
 @if ERRORLEVEL 1 goto ENDOFSCRIPT
 
 @rem Copy output to deployment directory (AppX)
+mkdir %layoutFolder%
 copy "%outputfile%" %layoutFolder%
 
 @goto :EOF
