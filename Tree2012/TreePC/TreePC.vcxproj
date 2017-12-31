@@ -103,10 +103,7 @@
       <DisableSpecificWarnings>4453</DisableSpecificWarnings>
     </ClCompile>
     <PostBuildEvent>
-      <Command>..\Game\CopyResources.cmd $(LayoutDir)\
-..\..\Misc\copyrobo ..\..\..\binaries\$(ConfigurationName)\x64\RenderPlatform11UWP\ $(LayoutDir)\ RenderPlatform11UWP.dll
-..\..\Misc\copyrobo ..\..\..\binaries\$(ConfigurationName)\x64\RenderPlatform12UWP\ $(LayoutDir)\ RenderPlatform12UWP.dll	  
-	  </Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)\AppX</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
@@ -233,8 +230,6 @@
     <ClInclude Include="..\Game\UploadBuffer.h" />
     <ClInclude Include="..\Game\WorldObject.h" />
     <ClInclude Include="BasicTimer.h" />
-    <ClInclude Include="DirectXHelper.h" />
-    <ClInclude Include="Lib\DirectXTex.h" />
     <ClInclude Include="TreePC.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
@@ -250,7 +245,7 @@
     <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp" />
-    <ClCompile Include="..\Game\RenderPlatform.cpp"/>
+    <ClCompile Include="..\Game\RenderPlatform.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
     <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
@@ -283,7 +278,7 @@
     <None Include="..\Game\Shaders\buildShaders.bat" />
     <None Include="..\Game\Shaders\commonshader.bat" />
     <None Include="packages.config" />
-    <None Include="TreePC_TemporaryKey.pfx"/>
+    <None Include="TreePC_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
