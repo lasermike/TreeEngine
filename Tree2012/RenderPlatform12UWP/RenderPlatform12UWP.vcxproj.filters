@@ -52,6 +52,7 @@
     <ClCompile Include="..\Game\RenderPlatform12.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\ScreenGrab12.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -87,5 +88,6 @@
     <ClInclude Include="..\Game\GeometryGenerator.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\ScreenGrab12.h" />
   </ItemGroup>
 </Project>

@@ -76,12 +76,6 @@
     <ClCompile Include="..\Game\Game.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\DDSTextureLoader.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\BitmapFont.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\LSystemModelGenerator.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -95,18 +89,6 @@
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\Graph.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\BitmapFont12.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\D3D11Platform.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\DDSTextureLoader12.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\ScreenGrab12.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\Player.cpp">
@@ -213,7 +195,6 @@
     <ClInclude Include="..\Game\GpuResource.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\ScreenGrab12.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\Player.h">

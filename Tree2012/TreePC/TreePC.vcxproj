@@ -104,10 +104,7 @@
       <DisableSpecificWarnings>4453</DisableSpecificWarnings>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\CopyResources.cmd $(OutDir)AppX\
-call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\RenderPlatform11UWP $(BinsDir)$(Configuration)\$(Platform)\TreePC\AppX RenderPlatform11UWP.dll /XO
-call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\RenderPlatform12UWP $(BinsDir)$(Configuration)\$(Platform)\TreePC\AppX RenderPlatform12UWP.dll /XO 
-	  </Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)\AppX</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
@@ -225,7 +222,6 @@ call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\Rend
     <ClInclude Include="..\Game\RenderPlatform.h" />
     <ClInclude Include="..\Game\Resource.h" />
     <ClInclude Include="..\Game\SceneRoot.h" />
-    <ClInclude Include="..\Game\ScreenGrab12.h" />
     <ClInclude Include="..\Game\ShadowMap.h" />
     <ClInclude Include="..\Game\stdafx.h" />
     <ClInclude Include="..\Game\StepTimer.h" />
@@ -239,21 +235,6 @@ call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\Rend
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Game\BitmapFont.cpp" />
-    <ClCompile Include="..\Game\BitmapFont12.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\Game\D3D11Platform.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
-      </ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\Game\DDSTextureLoader.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
-      </ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\Game\DDSTextureLoader12.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\Game\Game.cpp" />
     <ClCompile Include="..\Game\GameLoader.cpp" />
     <ClCompile Include="..\Game\GeometryGenerator.cpp" />
@@ -265,14 +246,8 @@ call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\Rend
     <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp" />
-    <ClCompile Include="..\Game\RenderPlatform.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="..\Game\RenderPlatform.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
-    <ClCompile Include="..\Game\ScreenGrab12.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
     <ClCompile Include="..\Game\Tree.cpp" />
@@ -304,9 +279,7 @@ call $(SolutionDir)\..\Misc\copyrobo $(BinsDir)$(Configuration)\$(Platform)\Rend
     <None Include="..\Game\Shaders\buildShaders.bat" />
     <None Include="..\Game\Shaders\commonshader.bat" />
     <None Include="packages.config" />
-    <None Include="TreePC_TemporaryKey.pfx">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-    </None>
+    <None Include="TreePC_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
