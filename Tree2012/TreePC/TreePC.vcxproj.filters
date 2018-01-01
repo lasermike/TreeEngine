@@ -195,8 +195,6 @@
     <ClInclude Include="..\Game\GpuResource.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
-      <Filter>Game\Source</Filter>
-    </ClInclude>
     <ClInclude Include="..\Game\Player.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
