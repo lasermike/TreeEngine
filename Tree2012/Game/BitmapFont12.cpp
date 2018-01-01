@@ -9,7 +9,6 @@
 #include <pch.h>
 #include "RenderManager.h"
 
-#if defined(TREE3D12)
 #include "StockRenderStates12.h"
 #include "BitmapFont12.h"
 
@@ -1158,4 +1157,3 @@ VOID BitmapFont::EndQuads(UINT uNumQuadsUsed)
     m_pCmdList->DrawIndexedInstanced(5 * uNumQuadsUsed, 1, 0, 0, 0);
 }
 
-#endif
