@@ -12,32 +12,6 @@ struct Rule
     Rule(char* in, char* out) : input(in), output(out) { }
 };
 
-
-//class GeneratorParams
-//{
-//public:
-//	virtual ~GeneratorParams() { }
-//};
-//
-//template<typename T>
-//class GeneratorParameters : public GeneratorParams
-//{
-//private:
-//    T data;
-//public:
-//    virtual ~GeneratorParameters () { }
-//
-//    GeneratorParameters(T d)
-//    {
-//        data = d;
-//    }
-//
-//    T GetValue()
-//    {
-//        return data;
-//    }
-//};
-
 struct LSystemParams;
 
 typedef float (*LengthFunc)(LSystemParams* params, float cmdParam);

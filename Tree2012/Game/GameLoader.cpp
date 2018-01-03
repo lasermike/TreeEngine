@@ -255,14 +255,15 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->position = XMFLOAT3(-2.2f, .5f, 1.0f);
     scene->AddChild(new Tree(params2));
 
-    params2->position = XMFLOAT3(0.5f, .5f, 0.0f);
-    XMStoreFloat4(&params2->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 1.0f));
-    scene->AddChild(new Tree(params2));
+    WorldObjectParameters<LSystemParams>* params2A = new WorldObjectParameters<LSystemParams>(*params2);
+    params2A->position = XMFLOAT3(0.5f, .5f, 0.0f);
+    XMStoreFloat4(&params2A->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 1.0f));
+    scene->AddChild(new Tree(params2A));
 
-    params2->position = XMFLOAT3(3.0f, .5f, 1.0f);
-    XMStoreFloat4(&params2->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 2.0f));
-    scene->AddChild(new Tree(params2));
-
+    WorldObjectParameters<LSystemParams>* params2B = new WorldObjectParameters<LSystemParams>(*params2);
+    params2B->position = XMFLOAT3(3.0f, .5f, 1.0f);
+    XMStoreFloat4(&params2B->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 2.0f));
+    scene->AddChild(new Tree(params2B));
 
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
@@ -288,7 +289,7 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
-    //player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
 void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
@@ -633,13 +634,13 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 {
     switch (sceneNum)
     {
-    case 2:
+    case 0:
         LoadTestTree(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 1:
+    case 2:
         LoadCurvesScene(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 0:
+    case 1:
         LoadSeaScene(pScene, pRenderData, pPlayer, gameData);
         break;
     case 3:
