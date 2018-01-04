@@ -747,7 +747,7 @@ HRESULT RenderPlatform11::DrawIndexedInstanced(
 HRESULT RenderPlatform11::SetRenderPhase(RenderState state)
 {
     HRESULT hr = S_OK;
-    //const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
+    const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
 
     switch (state)
     {
@@ -755,7 +755,7 @@ HRESULT RenderPlatform11::SetRenderPhase(RenderState state)
     {
         m_renderData->pShadowMap->BindDsvAndSetNullRenderTarget(GetContext());
 
-        //stockStates.ApplyRasterizerState(GetContext(), StockRasterizerStates::BuildShadowMap);
+        stockStates.ApplyRasterizerState(GetContext(), StockRasterizerStates::BuildShadowMap);
         break;
     }
     case RP_TRANSITION_FROM_RENDER_SHADOW_MAP:
@@ -764,7 +764,7 @@ HRESULT RenderPlatform11::SetRenderPhase(RenderState state)
         GetContext()->RSSetState(0);
         GetContext()->RSSetViewports(1, &GetViewport());
 
-        //stockStates.ApplyRasterizerState(GetContext(), StockRasterizerStates::Solid);
+        stockStates.ApplyRasterizerState(GetContext(), StockRasterizerStates::Solid);
         break;
     }
     }

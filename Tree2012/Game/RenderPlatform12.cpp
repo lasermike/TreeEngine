@@ -336,6 +336,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     shadowPsoDesc.NumRenderTargets = 0;
 
     HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
+    m_pipelineStateShadowMap->SetName(L"ShadowPSO");
 
     // Execute the command list.
     HRR(GetCommandList()->Close());
@@ -527,7 +528,7 @@ HRESULT RenderPlatform12::SetMaterial(Material* material, RenderPass pass)
     CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_shaderHeap.GetIncrementSize());
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
-    GetCommandList()->SetPipelineState(material->m_pipelineState);
+    GetCommandList()->SetPipelineState(material->m_pipelineStates[pass]);
 
     return S_OK;
 }
@@ -684,9 +685,12 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
     m_gameLevelPSOs.push_back(pipelineState);
 
+    // TODO create own shadow PSO
+    ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, m_pipelineStateShadowMap };
+
     Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vs, ps,
         nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
-        shaderMaterial, uploadBuffer, gpuMaterialHandle, pipelineState);
+        shaderMaterial, uploadBuffer, gpuMaterialHandle, pipelineStates);
 
     *newMaterial = newMat;
 
@@ -1141,7 +1145,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    GetCommandList()->SetPipelineState(m_pipelineState);
+    GetCommandList()->SetPipelineState(m_pipelineState);  // Needed?  Supports rendering without material?
 
     // Make shadow map available to shaders
     if (useShadowMaps)

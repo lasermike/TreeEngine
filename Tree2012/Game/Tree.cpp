@@ -24,6 +24,13 @@ void Tree::Create(TreeModelGenerator* generator)
     {
         _params->_animationSpeed = _treeModel->treeData.numLevels / 10.0f;
     }
+
+    if (_params->meshes.size() == 0)
+    {
+        _params->meshes.push_back(PrimitiveType_Cylinder);
+        _params->meshes.push_back(PrimitiveType_Box);
+        _params->meshes.push_back(PrimitiveType_Box);
+    }
 }
 
 HRESULT Tree::InitGraphics(RenderManager& renderManager)
@@ -56,7 +63,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     Material* pTrunk = nullptr;
     renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &pTrunk);
     Mesh* pNewMesh = nullptr;
-    const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Cylinder);
+    const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_params->meshes[0]);
     renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
     renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
 

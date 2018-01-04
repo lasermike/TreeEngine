@@ -32,7 +32,8 @@ struct BoundingSphere
 enum RenderPass
 {
     RegularPass,
-    ShadowMapPass
+    ShadowMapPass,
+    NUM_RENDER_PASSES
 };
 
 struct ProjectionData

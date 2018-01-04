@@ -379,8 +379,8 @@ static const D3D12_RASTERIZER_DESC s_StockRasterizerTypes[] =
         D3D12_CULL_MODE_BACK,                                // CullMode
         FALSE,                                          // FrontCounterClockwise
         100000,                                         // DepthBias
-        0.0f,                                           // DepthBiasClamp
-        1.0f,                                           // SlopeScaledDepthBias
+        3.0f,                                           // DepthBiasClamp
+        4.0f,                                           // SlopeScaledDepthBias
         TRUE,                                           // DepthClipEnable
         FALSE,                                          // MultisampleEnable
         FALSE,                                          // AntialiasedLineEnable

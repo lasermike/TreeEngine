@@ -40,7 +40,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
     // Cylinder LD
     GeometryGenerator::MeshData cylinderLD;
-    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 1, false, false, cylinderLD);
+    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 1, true, true, cylinderLD);
 
     // Cache the index count of each object.
     data.cylinderLDIndices.VertexCount = (UINT)cylinderLD.Vertices.size();

@@ -409,8 +409,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->GetGeneratorParameters()._constants = "";
     params3->GetGeneratorParameters()._angle = XM_PI / 4.0f;
     params3->GetGeneratorParameters()._segmentLength = 0.5f;
-    params3->GetGeneratorParameters().thickness = .010f;
-    //params3->GetGeneratorParameters()._initialDirection = XMFLOAT3(1.0f, 0.0, 0.0);
+    params3->GetGeneratorParameters().thickness = .20f;
     params3->GetGeneratorParameters()._axiom = "A";
     params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F[ZF][zF]"));
     params3->GetGeneratorParameters()._numIterations = 1;
@@ -419,6 +418,8 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
+
+    params3->meshes.push_back(PrimitiveType_CylinderLD);
 
     scene->AddChild(new Tree(params3));
 

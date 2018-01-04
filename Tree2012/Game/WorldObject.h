@@ -61,6 +61,7 @@ public:
     PrimitiveType primitiveType;
     std::vector<std::wstring> textureFilename;
     std::vector<ShaderMaterial> materials;
+    std::vector<PrimitiveType> meshes;
 };
 
 template<typename T>
