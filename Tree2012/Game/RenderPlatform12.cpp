@@ -685,8 +685,25 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
     m_gameLevelPSOs.push_back(pipelineState);
 
+    // Shadow pass PSO
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
+    shadowPsoDesc.RasterizerState.DepthBias = 100000;
+    shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
+    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_shadowVertexShader);
+    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_shadowPixelShader);
+    shadowPsoDesc.DSVFormat = ShadowMap::Format();
+
+    // Shadow map pass does not have a render target.
+    shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+    shadowPsoDesc.NumRenderTargets = 0;
+
+    ID3D12PipelineState* pipelineStateShadowMap = nullptr;
+    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&pipelineStateShadowMap)));
+    m_gameLevelPSOs.push_back(pipelineStateShadowMap);
+
     // TODO create own shadow PSO
-    ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, m_pipelineStateShadowMap };
+    ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
 
     Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vs, ps,
         nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
