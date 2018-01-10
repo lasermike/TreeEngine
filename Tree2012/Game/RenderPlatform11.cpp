@@ -113,12 +113,22 @@ HRESULT RenderPlatform11::UpdateView(CBNeverChanges& cbNeverChanges, bool shadow
     return S_OK;
 }
 
-HRESULT RenderPlatform11::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
+HRESULT RenderPlatform11::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass)
 {
-    CBChangeOnResize cbChangesOnResize;
-    XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+    CBChangesPerPass cbChangesPerPass;
+    XMStoreFloat4x4(&cbChangesPerPass.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
 
-    m_immediateContext->UpdateSubresource(m_constBufferChangesOnResize->Resource(), 0, nullptr, &cbChangesOnResize, 0, 0);
+    XMStoreFloat4x4(&cbChangesPerPass.mView, XMMatrixTranspose(XMLoadFloat4x4(pViewMat)));
+
+    m_immediateContext->UpdateSubresource(m_constBufferChangesPerPass->Resource(), 0, nullptr, &cbChangesPerPass, 0, 0);
+
+
+    //ID3D11Buffer* buffer = m_constBufferNeverChanges->Resource();
+    //CBNeverChanges cbNeverChanges;
+    //cbNeverChanges.mView = *pViewMat;
+    //m_immediateContext->UpdateSubresource(buffer, 0, nullptr, &cbNeverChanges, 0, 0);
+    //m_immediateContext->VSSetConstantBuffers(0, 1, &buffer);
+
     return S_OK;
 }
 
@@ -201,9 +211,9 @@ HRESULT RenderPlatform11::InitDevice()
 
     // Create constant buffer
     // TODO: Allocate second CB for shadow pass instead of uploading CB during render
-    m_constBufferChangesOnResize = new UploadBuffer<CBChangeOnResize>(GetDevice(), 1, true);
+    m_constBufferChangesPerPass = new UploadBuffer<CBChangesPerPass>(GetDevice(), 1, true);
 
-    ID3D11Buffer* buffer = m_constBufferChangesOnResize->Resource();
+    ID3D11Buffer* buffer = m_constBufferChangesPerPass->Resource();
     m_immediateContext->VSSetConstantBuffers(1, 1, &buffer);
 
     // REnder states
@@ -218,7 +228,7 @@ HRESULT RenderPlatform11::UninitDevice()
 
     ReleaseSwapChainResources();
 
-    SafeDelete(&m_constBufferChangesOnResize);
+    SafeDelete(&m_constBufferChangesPerPass);
 
     m_rasterState.Release();
 

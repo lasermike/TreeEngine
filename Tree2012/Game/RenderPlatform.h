@@ -393,7 +393,7 @@ public:
     virtual HRESULT UninitGameLevelGraphics() = 0;
 
     virtual HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass) = 0;
-    virtual HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass) = 0;
+    virtual HRESULT UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass) = 0;
 
     virtual HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView) = 0;
     virtual HRESULT EndFrame(D3DBuffer* buffer) = 0;
@@ -481,7 +481,7 @@ private:
     };
 
     UploadBuffer<CBNeverChanges>*      m_constBufferNeverChanges;
-    UploadBuffer<CBChangeOnResize>*    m_constBufferChangeOnResize;
+    UploadBuffer<CBChangesPerPass>*    m_constBufferChangesPerPass;
     UploadBuffer<CBChangesEveryFrame>* m_constBufferChangesEveryFrame;
 
     // Vertex buffers
@@ -565,7 +565,7 @@ public:
     HRESULT UninitGameLevelGraphics();
 
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
-    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+    HRESULT UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView);
     HRESULT EndFrame(D3DBuffer* buffer);
@@ -621,7 +621,7 @@ class RenderPlatform11 : public RenderPlatform
     D3D11_VIEWPORT                    m_viewPort;
 
     UploadBuffer<CBChangesEveryFrame>* m_constBufferChangesEveryFrame;
-    UploadBuffer<CBChangeOnResize>*   m_constBufferChangesOnResize;
+    UploadBuffer<CBChangesPerPass>*    m_constBufferChangesPerPass;
 
     UploadBuffer<CBNeverChanges>*     m_constBufferNeverChanges;
 
@@ -695,7 +695,7 @@ public:
     HRESULT UninitGameLevelGraphics();
 
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
-    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+    HRESULT UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView);
     HRESULT EndFrame(D3DBuffer* buffer);
@@ -756,7 +756,7 @@ typedef HRESULT(*OnResizeFunc)(UINT windowWidth, UINT windowHeight, bool renderT
 typedef IDXGISwapChain* (*GetSwapChainFunc)();
 
 typedef HRESULT(*UpdateViewFunc)(CBNeverChanges& cbNeverChanges, bool shadowPass);
-typedef HRESULT(*UpdateProjectionFunc)(XMFLOAT4X4* pProjMat, bool shadowPass);
+typedef HRESULT(*UpdateViewProjectionFunc)(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass);
 
 typedef HRESULT(*InitGameLevelGraphicsFunc)(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
 typedef HRESULT(*UninitGameLevelGraphicsFunc)();
@@ -808,7 +808,7 @@ class RenderPlatformDLL : public RenderPlatform
     GetSwapChainFunc GetSwapChainFuncPtr;
 
     UpdateViewFunc UpdateViewFuncPtr;
-    UpdateProjectionFunc UpdateProjectionFuncPtr;
+    UpdateViewProjectionFunc UpdateViewProjectionFuncPtr;
 
     InitGameLevelGraphicsFunc InitGameLevelGraphicsFuncPtr;
     UninitGameLevelGraphicsFunc UninitGameLevelGraphicsFuncPtr;
@@ -864,7 +864,7 @@ public:
     IDXGISwapChain* GetSwapChain() { return GetSwapChainFuncPtr(); }
 
     HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass) { return UpdateViewFuncPtr(cbNeverChanges, shadowPass); }
-    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass) { return UpdateProjectionFuncPtr(pProjMat, shadowPass); }
+    HRESULT UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass) { return UpdateViewProjectionFuncPtr(pViewMat, pProjMat, shadowPass); }
 
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData) { return InitGameLevelGraphicsFuncPtr(maxInstances, useShadowMaps, geometryData); }
     HRESULT UninitGameLevelGraphics() { return UninitGameLevelGraphicsFuncPtr(); }

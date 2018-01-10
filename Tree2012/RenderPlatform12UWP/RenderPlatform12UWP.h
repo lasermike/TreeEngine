@@ -27,7 +27,7 @@ RENDERPLATFORM_API HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool re
 RENDERPLATFORM_API IDXGISwapChain* GetSwapChain();
 
 RENDERPLATFORM_API HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass);
-RENDERPLATFORM_API HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+RENDERPLATFORM_API HRESULT UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass);
 
 RENDERPLATFORM_API HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData);
 RENDERPLATFORM_API HRESULT UninitGameLevelGraphics();

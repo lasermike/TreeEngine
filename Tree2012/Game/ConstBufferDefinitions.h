@@ -10,15 +10,15 @@ struct InstancedData
 //
 // Const buffer definitions
 //
-struct CBChangeOnResize
+struct CBChangesPerPass
 {
+    XMFLOAT4X4 mView;
     XMFLOAT4X4 mProjection;
 };
 
 __declspec(align(16))
 struct CBNeverChanges
 {
-    XMFLOAT4X4 mView;
 };
 
 __declspec(align(16))

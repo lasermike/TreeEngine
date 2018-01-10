@@ -38,7 +38,11 @@ public:
     Game(IInputManager* inputMgr);
     ~Game();
 
-    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat) { return m_renderManager.UpdateProjection(pProjMat, false); }
+    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat)
+    { 
+        return m_renderManager.UpdateViewProjection(&m_renderManager.GetRenderData().view, pProjMat, false);
+    }
+
     HRESULT OnResize(UINT width, UINT height) { m_needsResize = true; m_nextScreenWidth = width; m_nextScreenHeight = height; return S_OK; }
 
     HRESULT Cleanup();

@@ -16,12 +16,11 @@ SamplerState samPoint : register(s2);
 
 cbuffer cbNeverChanges : register(b0)
 {
-    matrix View;
-    ShaderMaterial groundMaterial;
 };
 
-cbuffer cbChangeOnResize : register(b1)
+cbuffer cbChangesPerPass : register(b1)
 {
+    matrix View;
     matrix Projection;
 };
 

@@ -60,9 +60,9 @@ RENDERPLATFORM_API HRESULT UpdateView(CBNeverChanges& cbNeverChanges, bool shado
     return m_pPlatform->UpdateView(cbNeverChanges, shadowPass);
 }
 
-RENDERPLATFORM_API HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
+RENDERPLATFORM_API HRESULT UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass)
 {
-    return m_pPlatform->UpdateProjection(pProjMat, shadowPass);
+    return m_pPlatform->UpdateViewProjection(pViewMat, pProjMat, shadowPass);
 }
 
 RENDERPLATFORM_API HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData)

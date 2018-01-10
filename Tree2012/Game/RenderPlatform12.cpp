@@ -36,7 +36,7 @@ const int numDescriptorsPerMaterial = numConstantBuffersPerMaterial + numTexture
 enum constBufferRootSignatureOffsets
 {
     NeverChangesRootSignatureShaderSlot,
-    ChangeOnResizeRootSignatureShaderSlot,
+    ChangesPerPassRootSignatureShaderSlot,
     ChangesEveryFrameRootSignatureShaderSlot,
 };
 
@@ -46,7 +46,7 @@ enum RootSignatureParams
     CbvTableRootSignatureParam,
     SrvTableRootSignatureParam,
     NeverChangesRootSignatureParam,
-    ChangeOnResizeRootSignatureParam,
+    ChangesPerPassRootSignatureParam,
     ChangesEveryFrameRootSignatureParam,
 };
 
@@ -138,11 +138,11 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     //   0  CBV buffer descriptor table - MaterialCbv_HeapOffset
     //   1  SRV descriptor table - Texture0_HeapOffset
     //   2  Constant buffer descriptor -NeverChangesCbv_HeapOffset,
-    //   3  Constant buffer descriptor- ChangeOnResizeCbv_HeapOffset,
+    //   3  Constant buffer descriptor- ChangesPerPassCbv_HeapOffset,
     //   4  Constant buffer descriptor- ChangesEveryFrame_HeapOffset,
 
     //   cbuffer cbNeverChanges : register( b0 )
-    //   cbuffer cbChangeOnResize : register(b1)
+    //   cbuffer cbChangesPerPass : register(b1)
     //   cbuffer cbChangesEveryFrame : register(b2)
     //   cbuffer cbMaterial : register (b3)
 
@@ -156,7 +156,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     rootParameters[CbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[SrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[NeverChangesRootSignatureParam].InitAsConstantBufferView(NeverChangesRootSignatureShaderSlot);
-    rootParameters[ChangeOnResizeRootSignatureParam].InitAsConstantBufferView(ChangeOnResizeRootSignatureShaderSlot);
+    rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
 
     D3D12_STATIC_SAMPLER_DESC sampler[3];
@@ -879,8 +879,8 @@ HRESULT RenderPlatform12::InitDevice()
     HRR(GetDevice()->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
     HRR(GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 
-    // Create ChangeOnResize constant buffer
-    m_constBufferChangeOnResize = new UploadBuffer<CBChangeOnResize>(GetDevice(), Count_CBSI, true);
+    // Create ChangesPerPass constant buffer
+    m_constBufferChangesPerPass = new UploadBuffer<CBChangesPerPass>(GetDevice(), Count_CBSI, true);
 
     // Initialize render statesf
     XSF::StockRenderStates::Initialize(GetDevice());
@@ -913,14 +913,20 @@ HRESULT RenderPlatform12::UpdateView(CBNeverChanges& cbNeverChanges, bool shadow
     return S_OK;
 }
 
-HRESULT RenderPlatform12::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
+HRESULT RenderPlatform12::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass)
 {
-    CBChangeOnResize cbChangesOnResize = {};
-    XMStoreFloat4x4(&cbChangesOnResize.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+    CBChangesPerPass cbChangesPerPass = {};
+    XMStoreFloat4x4(&cbChangesPerPass.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+
+    XMStoreFloat4x4(&cbChangesPerPass.mView, XMMatrixTranspose(XMLoadFloat4x4(pViewMat)));
+    //cbChangesPerPass.mView = *pViewMat;
 
     int offset = shadowPass ? ShadowPass_CBSI : NormalPass_CBSI;
-    m_constBufferChangeOnResize->CopyData(offset, cbChangesOnResize);
-    GetCommandList()->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constBufferChangeOnResize->GetGPUVirtualAddress(offset));
+    m_constBufferChangesPerPass->CopyData(offset, cbChangesPerPass);
+    GetCommandList()->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(offset));
+
+    //m_constBufferNeverChanges->CopyData(offset, cbNeverChanges);
+    //GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constBufferNeverChanges->GetGPUVirtualAddress(offset));
 
     return S_OK;
 }
@@ -1071,7 +1077,7 @@ HRESULT RenderPlatform12::UninitDevice()
     m_rtvHeap.Terminate();
     m_dsvHeap.Terminate();
 
-    SafeDelete(&m_constBufferChangeOnResize);
+    SafeDelete(&m_constBufferChangesPerPass);
 
     m_commandQueue.Release();
     m_commandAllocator.Release();
@@ -1135,7 +1141,7 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
 
     // Set root signature constant buffers
     m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constBufferNeverChanges->GetGPUVirtualAddress(NormalPass_CBSI));
-    m_commandList->SetGraphicsRootConstantBufferView(ChangeOnResizeRootSignatureParam, m_constBufferChangeOnResize->GetGPUVirtualAddress(NormalPass_CBSI));
+    m_commandList->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
     m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

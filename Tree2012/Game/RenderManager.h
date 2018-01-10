@@ -134,7 +134,7 @@ public:
     // Accessor methods for Oculus
     //HRESULT GetViewport(Viewport& viewport);
 
-    HRESULT UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass);
+    HRESULT UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass);
     HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);

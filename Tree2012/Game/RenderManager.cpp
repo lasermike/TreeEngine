@@ -360,16 +360,16 @@ HRESULT RenderManager::InitDevice()
     return hr;
 }
 
-HRESULT RenderManager::UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass)
+HRESULT RenderManager::UpdateView(XMFLOAT4X4* pViewMat, bool shadowPass)
 {
     CBNeverChanges cbNeverChanges;
-    XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+    //XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(pViewMat)));
     return GetPlatform()->UpdateView(cbNeverChanges, shadowPass);
 }
 
-HRESULT RenderManager::UpdateProjection(XMFLOAT4X4* pProjMat, bool shadowPass)
+HRESULT RenderManager::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass)
 {
-    return GetPlatform()->UpdateProjection(pProjMat, shadowPass);
+    return GetPlatform()->UpdateViewProjection(pViewMat, pProjMat, shadowPass);
 }
 
 HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
@@ -426,8 +426,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 
     GetPlatform()->RenderProlog(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor);
 
-    UpdateProjection(&GetRenderData().projection, false);
-    UpdateView(&GetRenderData().view, false);
+    UpdateViewProjection(&GetRenderData().view, &GetRenderData().projection, false);
 
     // Update chandfsges every frame CB.
     // Compute world to camera matrix
@@ -534,14 +533,12 @@ void RenderManager::BuildShadowTransform()
 
 void RenderManager::DrawSceneToShadowMap()
 {
-    UpdateProjection(&GetRenderData().lightProj, true);
-    UpdateView(&GetRenderData().lightView, true);
+    UpdateViewProjection(&GetRenderData().lightView, &GetRenderData().lightProj, true);
 
     // Draw everything
     HR(RenderScene(ShadowMapPass));
 
-    UpdateProjection(&GetRenderData().projection, false);
-    UpdateView(&GetRenderData().view, false);
+    UpdateViewProjection(&GetRenderData().view, &GetRenderData().projection, false);
 }
 
 
@@ -566,7 +563,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(GetSwapChain);
 
     ASSIGN_FUNC(UpdateView);
-    ASSIGN_FUNC(UpdateProjection);
+    ASSIGN_FUNC(UpdateViewProjection);
 
     ASSIGN_FUNC(InitGameLevelGraphics);
     ASSIGN_FUNC(UninitGameLevelGraphics);
