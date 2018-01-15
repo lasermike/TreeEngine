@@ -46,6 +46,9 @@ struct D3DBuffer
 
     D3D12_VERTEX_BUFFER_VIEW view;
 
+    CD3DX12_CPU_DESCRIPTOR_HANDLE srvViewCpu;
+    CD3DX12_GPU_DESCRIPTOR_HANDLE srvViewGpu;
+
     D3DBuffer() : buffer(nullptr) { }
     D3DBuffer(ID3D12Resource* bufferParam) : buffer(bufferParam) { }
     ~D3DBuffer() { Release(); }
@@ -451,6 +454,7 @@ private:
     DescriptorHeapWrapper             m_rtvHeap;
     DescriptorHeapWrapper             m_dsvHeap;
     DescriptorHeapWrapper             m_shaderHeap;
+    int                               m_nextFreeShaderHeapDescriptor;
     DirectX::GraphicsMemory*          m_graphicsMemory;
 
     CComPtr<ID3D12Resource>           m_renderTargets[RenderPlatform12::FrameCount];
@@ -536,7 +540,7 @@ private:
 
 public:
 
-    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr) { }
+    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0) { }
 
     HRESULT CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
     void WaitForPreviousFrame();
