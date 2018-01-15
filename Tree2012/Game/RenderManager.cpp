@@ -127,7 +127,6 @@ HRESULT RenderManager::BeginNewFrame()
     return S_OK;
 }
 
-
 HRESULT RenderManager::EndFrame()
 {
     return GetPlatform()->EndFrame(m_instancedBuffer.Get(m_renderData.frame));

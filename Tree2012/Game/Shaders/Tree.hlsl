@@ -14,9 +14,17 @@ SamplerState samLinear : register(s0);
 SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 
-cbuffer cbNeverChanges : register(b0)
+struct BranchData
 {
+    float4x4 BranchWorld; //  : WORLD;
 };
+
+StructuredBuffer<BranchData> BranchBuffer : register(t2);
+//ConstantBuffer<BranchData> BranchBuffer : register(b0);
+
+//cbuffer cbNeverChanges : register(b0)
+//{
+//};
 
 cbuffer cbChangesPerPass : register(b1)
 {

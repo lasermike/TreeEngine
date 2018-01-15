@@ -105,10 +105,10 @@ HRESULT RenderPlatform11::GetViewport(Viewport& viewport)
 
 HRESULT RenderPlatform11::UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass)
 {
-    ID3D11Buffer* buffer = m_constBufferNeverChanges->Resource();
+    //ID3D11Buffer* buffer = m_constBufferNeverChanges->Resource();
 
-    m_immediateContext->UpdateSubresource(buffer, 0, nullptr, &cbNeverChanges, 0, 0);
-    m_immediateContext->VSSetConstantBuffers(0, 1, &buffer);
+    //m_immediateContext->UpdateSubresource(buffer, 0, nullptr, &cbNeverChanges, 0, 0);
+    //m_immediateContext->VSSetConstantBuffers(0, 1, &buffer);
 
     return S_OK;
 }

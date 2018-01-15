@@ -18,16 +18,20 @@ using namespace DirectX;
 
 enum CbvSrvHeapOffsets
 {
+    // Global descriptors
     ShadowSrv_HeapOffset = 0,
     NullSrv_HeapOffset = 1,
+    BranchData1Srv_HeapOffset = 2,
+    BranchData2Srv_HeapOffset = 3,
 
-    Material0_HeapOffset = 2,
+    // Global descriptors
+    Material0_HeapOffset = 4,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 3,
+    Texture0Srv_HeapOffset = 5,
     Num_CbvSrvHeapOffsets
 };
  
-const int numGlobalDescriptors = 2;
+const int numGlobalDescriptors = Material0_HeapOffset;
 
 const int numConstantBuffersPerMaterial = 1;
 const int numTexturesPerMaterial = 1;
@@ -35,9 +39,13 @@ const int numDescriptorsPerMaterial = numConstantBuffersPerMaterial + numTexture
 
 enum constBufferRootSignatureOffsets
 {
-    NeverChangesRootSignatureShaderSlot,
-    ChangesPerPassRootSignatureShaderSlot,
-    ChangesEveryFrameRootSignatureShaderSlot,
+    ChangesPerPassRootSignatureShaderSlot = 1,
+    ChangesEveryFrameRootSignatureShaderSlot = 2,
+};
+
+enum srvRootSignatureOffsets
+{
+    BranchDataRootSignatureShaderSlot = 2,
 };
 
 enum RootSignatureParams
@@ -45,7 +53,7 @@ enum RootSignatureParams
     ShadowSrvTableRootSignatureParam = 0,
     CbvTableRootSignatureParam,
     SrvTableRootSignatureParam,
-    NeverChangesRootSignatureParam,
+    BranchDataRootSignatureParam,
     ChangesPerPassRootSignatureParam,
     ChangesEveryFrameRootSignatureParam,
 };
@@ -93,7 +101,6 @@ HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_
 {
     CD3DX12_HEAP_PROPERTIES createdHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
-    // Constants that never change
     const UINT allocSize = (size + 255) & ~255;
     HR(GetDevice()->CreateCommittedResource(
         &createdHeapProperties,
@@ -135,13 +142,14 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // Create the root signature.
     // Root signature parameters are:
-    //   0  CBV buffer descriptor table - MaterialCbv_HeapOffset
-    //   1  SRV descriptor table - Texture0_HeapOffset
-    //   2  Constant buffer descriptor -NeverChangesCbv_HeapOffset,
-    //   3  Constant buffer descriptor- ChangesPerPassCbv_HeapOffset,
-    //   4  Constant buffer descriptor- ChangesEveryFrame_HeapOffset,
+    //   0  SRV shadow buffer descriptor table  ShadowSrv_HeapOffset
+    //   1  CBV buffer descriptor table -       MaterialCbv_HeapOffset
+    //   2  SRV descriptor table -              Texture0_HeapOffset
+    //   3  SRV descriptor                      BranchDataCbv_HeapOffset,
+    //   4  Constant buffer descriptor          ChangesPerPassCbv_HeapOffset,
+    //   5  Constant buffer descriptor          ChangesEveryFrame_HeapOffset,
 
-    //   cbuffer cbNeverChanges : register( b0 )
+    //   cbuffer cbBranchData : register( b0 )
     //   cbuffer cbChangesPerPass : register(b1)
     //   cbuffer cbChangesEveryFrame : register(b2)
     //   cbuffer cbMaterial : register (b3)
@@ -155,7 +163,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[CbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[SrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
-    rootParameters[NeverChangesRootSignatureParam].InitAsConstantBufferView(NeverChangesRootSignatureShaderSlot);
+    rootParameters[BranchDataRootSignatureParam].InitAsShaderResourceView(BranchDataRootSignatureShaderSlot);
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
 
@@ -403,6 +411,20 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
     SetDebugName(newBuffer->buffer, "D3DBuffer::buffer");
 
     m_gameLevelResources.push_back(newBuffer->buffer);
+
+    // Create SRV for the constant buffer to use as structured buffer
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    srvDesc.Buffer.NumElements = numInstances;
+    srvDesc.Buffer.StructureByteStride = sizeBytes / numInstances;
+
+    newBuffer->srvViewCpu = m_shaderHeap.hCPU(BranchData1Srv_HeapOffset + m_nextFreeShaderHeapDescriptor);
+    newBuffer->srvViewGpu = m_shaderHeap.hGPU(BranchData1Srv_HeapOffset + m_nextFreeShaderHeapDescriptor++);
+
+    m_d3dDevice->CreateShaderResourceView(newBuffer->buffer, &srvDesc, newBuffer->srvViewCpu);
+
 
     *d3dBuffer = newBuffer;
 
@@ -908,7 +930,7 @@ HRESULT RenderPlatform12::UpdateView(CBNeverChanges& cbNeverChanges, bool shadow
 {
     int offset = shadowPass ? ShadowPass_CBSI : NormalPass_CBSI;
     m_constBufferNeverChanges->CopyData(offset, cbNeverChanges);
-    GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constBufferNeverChanges->GetGPUVirtualAddress(offset));
+    //GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constBufferNeverChanges->GetGPUVirtualAddress(offset));
 
     return S_OK;
 }
@@ -1140,7 +1162,7 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureHandle);
 
     // Set root signature constant buffers
-    m_commandList->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constBufferNeverChanges->GetGPUVirtualAddress(NormalPass_CBSI));
+    m_commandList->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, buffer->buffer->GetGPUVirtualAddress());
     m_commandList->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
     m_commandList->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
 
