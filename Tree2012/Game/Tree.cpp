@@ -86,8 +86,11 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 
 HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 {
-    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants");
+    // 2 passes
+    // 1st pass - animate bones and determine number of model groups
+    // 2nd pass - build world matrix for each bone
 
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants");
 
     UINT startInstance = 0;
     HRR(pFrameConfig->GetInstanceIndex(this, startInstance));
@@ -108,7 +111,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     m_leafInstanceData.clear();
 
     // Queue first branch
-    TreeFrame firstFrame = { _treeModel->trunk, _position };
+    TreeFrame firstFrame = { _treeModel->trunk, _position, XMFLOAT3(), XMFLOAT3(1, 1, 1) };
     m_treeFrames[0] = firstFrame;
     numTreeFrames = 1;
 
@@ -156,7 +159,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     return S_OK;
 }
 
-HRESULT Tree::ComputeBranchInstanceData(TreeFrame frame, RenderData* pRenderData)
+HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderData)
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeTransformationsManual");
 
@@ -168,8 +171,10 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame frame, RenderData* pRenderData
     XMVECTOR vChildStart;
     XMMATRIX localToWorld;
     XMVECTOR vParentStart = XMVectorSelect(g_XMOne, XMLoadFloat3(&frame.startPosition), g_XMSelect1110.v);
-    
-    ComputeTransformationsManual(&localToWorld, &vChildStart, CalcTime(pRenderData->time), frame.branch, vParentStart);
+
+    ComputeBranchEnd(&vChildStart, CalcTime(pRenderData->time), frame);
+
+    ComputeTransformationsManual(&localToWorld, frame);
 
     localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
 
@@ -219,7 +224,7 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame frame, RenderData* pRenderData
             XMFLOAT3 childStart;
             XMStoreFloat3(&childStart, vChildStart);
 
-            TreeFrame childFrame = { child, childStart };
+            TreeFrame childFrame = { child, childStart, XMFLOAT3(), XMFLOAT3(1,1,1) };
             m_treeFrames[numTreeFrames++] = childFrame;
             assert(numTreeFrames < maxTreeFrameQueueSize);
         }
@@ -330,12 +335,12 @@ __inline XMMATRIX TEMatrixTransformation
 }
 
 
-HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR* vComputedEnd, float time, Branch const* branch, FXMVECTOR parentStart)
+HRESULT Tree::ComputeBranchEnd(XMVECTOR* vComputedEnd, float time, TreeFrame& frame)
 {
     float animScaleFactor = 1.0f;
-    if (time - 5 < branch->depth)
+    if (time - 5 < frame.branch->depth)
     {
-        animScaleFactor = (time - branch->depth) / 5;
+        animScaleFactor = (time - frame.branch->depth) / 5;
     }
     else
     {
@@ -344,20 +349,20 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
 
     ASSERT(animScaleFactor >= 0.0f);
 
-    XMVECTOR vStart = parentStart;
-    XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(branch->end)) + XMLoadFloat3(&_position);
+    XMVECTOR vStart = XMLoadFloat3(&frame.startPosition);
+    XMVECTOR vEnd = XMLoadFloat3((XMFLOAT3*)&(frame.branch->end)) + XMLoadFloat3(&_position);
 
     // Scale branch
     XMVECTOR vMag = XMVector3Length(vEnd - vStart);
     XMVECTOR vScale = g_XMOne; // *.3f;
 
-    switch (branch->geometryType)
+    switch (frame.branch->geometryType)
     {
     case Leaf:
         vScale = XMVectorSet(XMVectorGetX(vMag) * 0.5f, XMVectorGetX(vMag), 0.004f, 0) * animScaleFactor;
         break;
     case Stick:
-        vScale = XMVectorSet(branch->thickness, XMVectorGetX(vMag), branch->thickness, 0) * animScaleFactor;
+        vScale = XMVectorSet(frame.branch->thickness, XMVectorGetX(vMag), frame.branch->thickness, 0) * animScaleFactor;
         break;
     }
 
@@ -367,8 +372,20 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, XMVECTOR
     XMVECTOR vMagY = XMVectorSet(animScaleFactor, animScaleFactor, animScaleFactor, 1);
     *vComputedEnd = startToEnd * vMagY + vStart;
 
+    XMStoreFloat3(&frame.endPosition, *vComputedEnd);
+    XMStoreFloat3(&frame.scale, vScale);
+
+    return S_OK;
+}
+
+HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFrame& frame)
+{
+    XMVECTOR vStart = XMLoadFloat3(&frame.startPosition);
+    XMVECTOR vEnd = XMLoadFloat3(&frame.endPosition);
+    XMVECTOR vScale = XMLoadFloat3(&frame.scale);
     XMVECTOR vDir = XMVector3Normalize(vEnd - vStart);
     XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
+    
 
 //#define NEW_WAY
 #ifdef NEW_WAY

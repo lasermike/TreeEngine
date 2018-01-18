@@ -68,16 +68,20 @@ private:
     {
         Branch* branch;
         XMFLOAT3 startPosition;
+        XMFLOAT3 endPosition;
+        XMFLOAT3 scale;
     };
 
     int numTreeFrames;
     static const int maxTreeFrameQueueSize = 256;
     TreeFrame m_treeFrames[maxTreeFrameQueueSize];
 
-    HRESULT ComputeBranchInstanceData(TreeFrame frame, RenderData* pRenderData);
+    HRESULT ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderData);
 
-    HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, FXMVECTOR parentStart);
+    //HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, FXMVECTOR parentStart);
 
+    HRESULT ComputeBranchEnd(XMVECTOR* vComputedEnd, float time, TreeFrame& frame);
+    HRESULT ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFrame& frame);
 
 public:
     Tree(WorldObjectParams* pParams);
