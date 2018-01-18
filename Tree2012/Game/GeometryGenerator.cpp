@@ -501,6 +501,8 @@ void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, floa
             vertex.TexC.x = (float)j/sliceCount;
             vertex.TexC.y = 1.0f - (float)i/stackCount;
 
+            vertex.InstanceWeight = XMFLOAT3(1.0f,0,0);
+
             // Cylinder can be parameterized as follows, where we introduce v
             // parameter that goes in the same direction as the v tex-coord
             // so that the bitangent goes in the same direction as the v tex-coord.

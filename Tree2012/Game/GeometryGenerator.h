@@ -32,6 +32,7 @@ struct SimpleVertex
     XMFLOAT3 Normal;
     XMFLOAT2 Tex;
     XMFLOAT3 TangentU;
+    XMFLOAT3 InstanceOffset;
 };
 
 struct GeometryBufferData
@@ -110,6 +111,8 @@ public:
         XMFLOAT3 Normal;
         XMFLOAT3 TangentU;
         XMFLOAT2 TexC;
+        XMFLOAT3 InstanceWeight; // Weight of which branch matrix to use in BranchData
+
     };
 
     struct MeshData

@@ -5,6 +5,9 @@
 struct InstancedData
 {
     XMFLOAT4X4 World;
+    UINT  InstanceOffset;
+    UINT  InstanceOffsetPrev;
+    UINT  InstanceOffsetNext;
 };
 
 //

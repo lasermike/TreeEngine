@@ -17,14 +17,13 @@ SamplerState samPoint : register(s2);
 struct BranchData
 {
     float4x4 BranchWorld; //  : WORLD;
+    uint InstanceOffset;
+    uint InstanceOffsetPrev;
+    uint InstanceOffsetNext;
 };
 
 StructuredBuffer<BranchData> BranchBuffer : register(t2);
 //ConstantBuffer<BranchData> BranchBuffer : register(b0);
-
-//cbuffer cbNeverChanges : register(b0)
-//{
-//};
 
 cbuffer cbChangesPerPass : register(b1)
 {
@@ -54,7 +53,13 @@ struct VS_INPUT
     float3 NormalL : NORMAL;
     float2 Tex : TEXCOORD0;
     float3 TangentL : TANGENT;
+    float  InstanceWeight : BLENDWEIGHT0;
+    float  InstanceWeightPrev : BLENDWEIGHT1;
+    float  InstanceWeightNext : BLENDWEIGHT2;
     float4x4 World  : WORLD;
+    uint  InstanceOffset : BLENDINDICES0;
+    uint  InstanceOffsetPrev : BLENDINDICES1;
+    uint  InstanceOffsetNext : BLENDINDICES2;
 };
 
 struct PS_INPUT
@@ -77,7 +82,15 @@ static const bool TSLights = true;
 PS_INPUT VS(VS_INPUT input)
 {
     PS_INPUT output = (PS_INPUT)0;
-    output.PosW = mul(float4(input.Pos, 1.0f), input.World).xyz;
+
+    //float4x4 world = input.World;
+    float4x4 world = BranchBuffer[input.InstanceOffset].BranchWorld;
+    float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
+    float4x4 worldNext = BranchBuffer[input.InstanceOffsetNext].BranchWorld;
+
+    world = lerp(world, worldPrev, input.InstanceWeight);
+
+    output.PosW = mul(float4(input.Pos, 1.0f), world).xyz;
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
     output.Pos = mul(output.Pos, transpose(Projection));
@@ -87,14 +100,14 @@ PS_INPUT VS(VS_INPUT input)
     output.ViewDirection = normalize(eyePos.xyz - output.PosW);
 
     // TBN vectors for tangent space
-    float3 worldNormal = mul(input.NormalL, (float3x3) input.World);
+    float3 worldNormal = mul(input.NormalL, (float3x3) world);
     output.N = normalize(worldNormal);
 
-    float3 worldTangent = mul(input.TangentL, (float3x3) input.World);
+    float3 worldTangent = mul(input.TangentL, (float3x3) world);
     output.T = normalize(worldTangent);
 
     float3 worldBinormal = normalize(cross(output.N, output.T));
-    worldBinormal = mul(worldBinormal, (float3x3) input.World);
+    worldBinormal = mul(worldBinormal, (float3x3) world);
     output.B = worldBinormal;
 
     // Generate projective tex-coords to project shadow map onto scene.

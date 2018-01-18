@@ -88,6 +88,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants");
 
+
     UINT startInstance = 0;
     HRR(pFrameConfig->GetInstanceIndex(this, startInstance));
 
@@ -138,6 +139,12 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     if (m_leafInstanceData.size() > 0)
     {
         memcpy(leafBuffer, &m_leafInstanceData[0], m_leafInstanceData.size() * sizeof(InstancedData));
+    }
+
+    int numInstances = m_logInstanceData.size() + m_twigInstanceData.size() + m_leafInstanceData.size();
+    for (int i = 0; i < numInstances; i++)
+    {
+        logBuffer[i].InstanceOffset = startInstance + i;
     }
 
     pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT)m_logInstanceData.size());
