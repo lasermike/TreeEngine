@@ -117,7 +117,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 
     while (numTreeFrames)
     {
-        TreeFrame& frame = m_treeFrames[--numTreeFrames];
+        TreeFrame frame = m_treeFrames[--numTreeFrames];
         ComputeBranchInstanceData(frame, &pFrameConfig->GetRenderData());
     }
 
@@ -385,7 +385,6 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFram
     XMVECTOR vScale = XMLoadFloat3(&frame.scale);
     XMVECTOR vDir = XMVector3Normalize(vEnd - vStart);
     XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
-    
 
 //#define NEW_WAY
 #ifdef NEW_WAY

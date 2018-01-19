@@ -85,10 +85,10 @@ PS_INPUT VS(VS_INPUT input)
 
     //float4x4 world = input.World;
     float4x4 world = BranchBuffer[input.InstanceOffset].BranchWorld;
-    float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
-    float4x4 worldNext = BranchBuffer[input.InstanceOffsetNext].BranchWorld;
+    //float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
+    //float4x4 worldNext = BranchBuffer[input.InstanceOffsetNext].BranchWorld;
 
-    world = lerp(world, worldPrev, input.InstanceWeight);
+    //world = lerp(world, worldPrev, input.InstanceWeight);
 
     output.PosW = mul(float4(input.Pos, 1.0f), world).xyz;
 
