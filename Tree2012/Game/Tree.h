@@ -64,6 +64,16 @@ private:
     RenderUnit*                            m_twigUnit;
     RenderUnit*                            m_leafUnit;
 
+    enum
+    {
+        LOG_BRANCH_TYPE,
+        TWIG_BRANCH_TYPE,
+        LEAF_BRANCH_TYPE,
+        MAX_BRANCH_TYPE
+    };
+
+    int                                    m_numInstancesPerType[MAX_BRANCH_TYPE];
+
     struct TreeFrame
     {
         Branch* branch;
@@ -72,13 +82,13 @@ private:
         XMFLOAT3 scale;
     };
 
-    int numTreeFrames;
-    static const int maxTreeFrameQueueSize = 256;
-    TreeFrame m_treeFrames[maxTreeFrameQueueSize];
+    int m_numTreeFrames;
+    std::vector<TreeFrame> m_treeFrames;
 
     HRESULT ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderData);
+    HRESULT ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData);
 
-    //HRESULT ComputeTransformationsManual(XMMATRIX* transform, XMVECTOR* vChildStart, float time, Branch const* branch, FXMVECTOR parentStart);
+    bool IsTwig(TreeFrame& frame, RenderData* pRenderData);
 
     HRESULT ComputeBranchEnd(XMVECTOR* vComputedEnd, float time, TreeFrame& frame);
     HRESULT ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFrame& frame);

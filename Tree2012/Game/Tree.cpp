@@ -109,17 +109,30 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     m_logInstanceData.clear();
     m_twigInstanceData.clear();
     m_leafInstanceData.clear();
+    ZeroMemory(m_numInstancesPerType, sizeof(m_numInstancesPerType));
+
+    if (m_treeFrames.size() < _treeModel->treeData.numBranches)
+    {
+        m_treeFrames.resize(_treeModel->treeData.numBranches);
+    }
 
     // Queue first branch
-    TreeFrame firstFrame = { _treeModel->trunk, _position, XMFLOAT3(), XMFLOAT3(1, 1, 1) };
+    TreeFrame firstFrame = { _treeModel->trunk, _position, XMFLOAT3(), XMFLOAT3() };
     m_treeFrames[0] = firstFrame;
-    numTreeFrames = 1;
+    m_numTreeFrames = 1;
 
-    while (numTreeFrames)
+    for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
     {
-        TreeFrame frame = m_treeFrames[--numTreeFrames];
+        TreeFrame& frame = m_treeFrames[currentFrame];
         ComputeBranchInstanceData(frame, &pFrameConfig->GetRenderData());
     }
+
+    for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
+    {
+        TreeFrame& frame = m_treeFrames[currentFrame];
+        ComputeBranchInstanceDataPass2(frame, &pFrameConfig->GetRenderData());
+    }
+
 
     InstancedData* logBuffer = dataView + startInstance;
     InstancedData* twigBuffer = dataView + startInstance + m_logInstanceData.size();
@@ -169,11 +182,50 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderDat
     pRenderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat++;
 
     XMVECTOR vChildStart;
-    XMMATRIX localToWorld;
     XMVECTOR vParentStart = XMVectorSelect(g_XMOne, XMLoadFloat3(&frame.startPosition), g_XMSelect1110.v);
+
+    switch (frame.branch->geometryType)
+    {
+    case Leaf:
+        m_numInstancesPerType[LEAF_BRANCH_TYPE]++;
+        break;
+    case Stick:
+        m_numInstancesPerType[IsTwig(frame, pRenderData) ? TWIG_BRANCH_TYPE : LOG_BRANCH_TYPE]++;
+        break;
+    }
 
     ComputeBranchEnd(&vChildStart, CalcTime(pRenderData->time), frame);
 
+
+    // Compute child branches
+    for (unsigned int c = 0; c < frame.branch->children.size(); c++)
+    {
+        if (frame.branch->Child(c) != 0)
+        {
+            Branch* child = &_treeModel->treeData.pBranches[frame.branch->Child(c)];
+
+            XMFLOAT3 childStart;
+            XMStoreFloat3(&childStart, vChildStart);
+
+            TreeFrame childFrame = { child, childStart, XMFLOAT3(), XMFLOAT3() };
+            m_treeFrames[m_numTreeFrames++] = childFrame;
+        }
+    }
+
+    PIXEndEvent();
+
+    return S_OK;
+}
+
+bool Tree::IsTwig(TreeFrame& frame, RenderData* pRenderData)
+{
+    return _params->depthLOD != -1 &&
+            (frame.branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)) < 100.0f);
+}
+
+HRESULT Tree::ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData)
+{
+    XMMATRIX localToWorld;
     ComputeTransformationsManual(&localToWorld, frame);
 
     localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
@@ -192,7 +244,7 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderDat
         pRenderData->frameStats[NUM_LEAVES_STAT].stat++;
         break;
     case Stick:
-        if (_params->depthLOD != -1 && (frame.branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)) < 100.0f))
+        if (IsTwig(frame, pRenderData))
         {
             m_logInstanceData.push_back(data);
         }
@@ -213,24 +265,6 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderDat
         XMLoadFloat3(&_boundingBox[0])));
     XMStoreFloat3(&_boundingBox[1], XMVectorMax(XMVector3Transform(XMVectorSet(1.0f, 1.0f, 1.0f, 0), localToWorld),
         XMLoadFloat3(&_boundingBox[1])));
-
-    // Compute child branches
-    for (unsigned int c = 0; c < frame.branch->children.size(); c++)
-    {
-        if (frame.branch->Child(c) != 0)
-        {
-            Branch* child = &_treeModel->treeData.pBranches[frame.branch->Child(c)];
-
-            XMFLOAT3 childStart;
-            XMStoreFloat3(&childStart, vChildStart);
-
-            TreeFrame childFrame = { child, childStart, XMFLOAT3(), XMFLOAT3(1,1,1) };
-            m_treeFrames[numTreeFrames++] = childFrame;
-            assert(numTreeFrames < maxTreeFrameQueueSize);
-        }
-    }
-
-    PIXEndEvent();
 
     return S_OK;
 }
