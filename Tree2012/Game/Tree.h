@@ -77,16 +77,18 @@ private:
     struct TreeFrame
     {
         Branch* branch;
+        TreeFrame* parentFrame;
         XMFLOAT3 startPosition;
         XMFLOAT3 endPosition;
         XMFLOAT3 scale;
+        int instanceOffset;
     };
 
     int m_numTreeFrames;
     std::vector<TreeFrame> m_treeFrames;
 
     HRESULT ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderData);
-    HRESULT ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData);
+    HRESULT ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData, int startInstance);
 
     bool IsTwig(TreeFrame& frame, RenderData* pRenderData);
 

@@ -117,7 +117,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     }
 
     // Queue first branch
-    TreeFrame firstFrame = { _treeModel->trunk, _position, XMFLOAT3(), XMFLOAT3() };
+    TreeFrame firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), 0xFFFFFFFF };
     m_treeFrames[0] = firstFrame;
     m_numTreeFrames = 1;
 
@@ -130,7 +130,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
     {
         TreeFrame& frame = m_treeFrames[currentFrame];
-        ComputeBranchInstanceDataPass2(frame, &pFrameConfig->GetRenderData());
+        ComputeBranchInstanceDataPass2(frame, &pFrameConfig->GetRenderData(), startInstance);
     }
 
 
@@ -157,11 +157,11 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         memcpy(leafBuffer, &m_leafInstanceData[0], m_leafInstanceData.size() * sizeof(InstancedData));
     }
 
-    int numInstances = m_logInstanceData.size() + m_twigInstanceData.size() + m_leafInstanceData.size();
-    for (int i = 0; i < numInstances; i++)
-    {
-        logBuffer[i].InstanceOffset = startInstance + i;
-    }
+    //int numInstances = m_logInstanceData.size() + m_twigInstanceData.size() + m_leafInstanceData.size();
+    //for (int i = 0; i < numInstances; i++)
+    //{
+    //    logBuffer[i].InstanceOffset = startInstance + i;
+    //}
 
     pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT)m_logInstanceData.size());
     pFrameConfig->SetInstances(m_twigUnit, this, startInstance + (UINT)m_logInstanceData.size(), (UINT)m_twigInstanceData.size());
@@ -196,7 +196,6 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderDat
 
     ComputeBranchEnd(&vChildStart, CalcTime(pRenderData->time), frame);
 
-
     // Compute child branches
     for (unsigned int c = 0; c < frame.branch->children.size(); c++)
     {
@@ -207,7 +206,7 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderDat
             XMFLOAT3 childStart;
             XMStoreFloat3(&childStart, vChildStart);
 
-            TreeFrame childFrame = { child, childStart, XMFLOAT3(), XMFLOAT3() };
+            TreeFrame childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), 0xFFFFFFFF };
             m_treeFrames[m_numTreeFrames++] = childFrame;
         }
     }
@@ -219,11 +218,13 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderDat
 
 bool Tree::IsTwig(TreeFrame& frame, RenderData* pRenderData)
 {
-    return _params->depthLOD != -1 &&
+    bool isLog =  _params->depthLOD != -1 &&
             (frame.branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)) < 100.0f);
+
+    return !isLog;
 }
 
-HRESULT Tree::ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData)
+HRESULT Tree::ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData, int startInstance)
 {
     XMMATRIX localToWorld;
     ComputeTransformationsManual(&localToWorld, frame);
@@ -233,29 +234,64 @@ HRESULT Tree::ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRend
     InstancedData data;
     XMStoreFloat4x4(&data.World, localToWorld);
 
+
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants push_back");
 
+    int instanceOffset = 0;
     // Decide which geometry model to use
     switch (frame.branch->geometryType)
     {
     case Leaf:
+        instanceOffset = startInstance + m_numInstancesPerType[LOG_BRANCH_TYPE] + m_numInstancesPerType[TWIG_BRANCH_TYPE] + m_leafInstanceData.size();
+        data.InstanceOffset = instanceOffset;
+        if (frame.parentFrame && frame.parentFrame->instanceOffset != 0xFFFFFFFF)
+        {
+            data.InstanceOffsetPrev = frame.parentFrame->instanceOffset;
+        }
+        else
+        {
+            data.InstanceOffsetPrev = instanceOffset;
+        }
+
         m_leafInstanceData.push_back(data);
         pRenderData->frameStats[NUM_LEAVES_STAT].stat++;
         break;
     case Stick:
         if (IsTwig(frame, pRenderData))
         {
-            m_logInstanceData.push_back(data);
+            instanceOffset = startInstance + m_numInstancesPerType[LOG_BRANCH_TYPE] + m_twigInstanceData.size();
+            data.InstanceOffset = instanceOffset;
+            if (frame.parentFrame && frame.parentFrame->instanceOffset != 0xFFFFFFFF)
+            {
+                data.InstanceOffsetPrev = frame.parentFrame->instanceOffset;
+            }
+            else
+            {
+                data.InstanceOffsetPrev = instanceOffset;
+            }
+            m_twigInstanceData.push_back(data);
         }
         else
         {
-            m_twigInstanceData.push_back(data);
+            instanceOffset = startInstance + m_logInstanceData.size();
+            data.InstanceOffset = instanceOffset;
+            if (frame.parentFrame && frame.parentFrame->instanceOffset != 0xFFFFFFFF)
+            {
+                data.InstanceOffsetPrev = frame.parentFrame->instanceOffset;
+            }
+            else
+            {
+                data.InstanceOffsetPrev = instanceOffset;
+            }
+            m_logInstanceData.push_back(data);
         }
         pRenderData->frameStats[NUM_STICKS_STAT].stat++;
 
         break;
     }
+
+    frame.instanceOffset = instanceOffset;
 
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeBranchInstanceData");
