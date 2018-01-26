@@ -32,7 +32,7 @@ struct SimpleVertex
     XMFLOAT3 Normal;
     XMFLOAT2 Tex;
     XMFLOAT3 TangentU;
-    XMFLOAT3 InstanceOffset;
+    XMFLOAT3 InstanceWeights;
 };
 
 struct GeometryBufferData
@@ -97,22 +97,32 @@ public:
     struct Vertex
     {
         Vertex() {}
-        Vertex(const XMFLOAT3& p, const XMFLOAT3& n, const XMFLOAT3& t, const XMFLOAT2& uv)
-            : Position(p), Normal(n), TangentU(t), TexC(uv) {}
+        Vertex(const XMFLOAT3& p, const XMFLOAT3& n, const XMFLOAT3& t, const XMFLOAT2& uv, const XMFLOAT3& instanceWeights)
+            : Position(p), Normal(n), TangentU(t), TexC(uv), InstanceWeights(instanceWeights) {}
         Vertex(
             float px, float py, float pz,
             float nx, float ny, float nz,
             float tx, float ty, float tz,
             float u, float v)
             : Position(px, py, pz), Normal(nx, ny, nz),
-            TangentU(tx, ty, tz), TexC(u, v) {}
+            TangentU(tx, ty, tz), TexC(u, v),
+            InstanceWeights(1.0f, 0, 0) {}
+
+        Vertex(
+            float px, float py, float pz,
+            float nx, float ny, float nz,
+            float tx, float ty, float tz,
+            float u, float v,
+            float w1, float w2, float w3)
+            : Position(px, py, pz), Normal(nx, ny, nz),
+            TangentU(tx, ty, tz), TexC(u, v),
+            InstanceWeights(w1, w2, w3) {}
 
         XMFLOAT3 Position;
         XMFLOAT3 Normal;
         XMFLOAT3 TangentU;
         XMFLOAT2 TexC;
-        XMFLOAT3 InstanceWeight; // Weight of which branch matrix to use in BranchData
-
+        XMFLOAT3 InstanceWeights; // Weight of which branch matrix to use in BranchData
     };
 
     struct MeshData

@@ -28,7 +28,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
     // Cylinder
     GeometryGenerator::MeshData cylinder;
-    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 1, true, false, cylinder);
+    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 4, true, true, cylinder);
 
     // Cache the index count of each object.
     data.cylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();
@@ -40,7 +40,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
     // Cylinder LD
     GeometryGenerator::MeshData cylinderLD;
-    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 1, true, true, cylinderLD);
+    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 4, true, true, cylinderLD);
 
     // Cache the index count of each object.
     data.cylinderLDIndices.VertexCount = (UINT)cylinderLD.Vertices.size();
@@ -78,6 +78,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = box.Vertices[i].Normal;
         data.vertices[k].Tex = box.Vertices[i].TexC;
         data.vertices[k].TangentU = box.Vertices[i].TangentU;
+        data.vertices[k].InstanceWeights = box.Vertices[i].InstanceWeights;
     }
 
     for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
@@ -86,6 +87,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = cylinder.Vertices[i].Normal;
         data.vertices[k].Tex = cylinder.Vertices[i].TexC;
         data.vertices[k].TangentU = cylinder.Vertices[i].TangentU;
+        data.vertices[k].InstanceWeights = cylinder.Vertices[i].InstanceWeights;
     }
 
     for (size_t i = 0; i < cylinderLD.Vertices.size(); ++i, ++k)
@@ -94,6 +96,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = cylinderLD.Vertices[i].Normal;
         data.vertices[k].Tex = cylinderLD.Vertices[i].TexC;
         data.vertices[k].TangentU = cylinderLD.Vertices[i].TangentU;
+        data.vertices[k].InstanceWeights = cylinderLD.Vertices[i].InstanceWeights;
     }
 
     for (size_t i = 0; i < fsQuad.Vertices.size(); ++i, ++k)
@@ -102,6 +105,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = fsQuad.Vertices[i].Normal;
         data.vertices[k].Tex = fsQuad.Vertices[i].TexC;
         data.vertices[k].TangentU = fsQuad.Vertices[i].TangentU;
+        data.vertices[k].InstanceWeights = fsQuad.Vertices[i].InstanceWeights;
     }
 
     //
@@ -462,6 +466,8 @@ void GeometryGenerator::CreateGeosphere(float radius, UINT numSubdivisions, Mesh
     }
 }
 
+const float instanceWeightEnds = 0.5f;
+
 void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, bool buildTop, bool buildBottom, MeshData& meshData)
 {
     meshData.Vertices.clear();
@@ -501,7 +507,14 @@ void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, floa
             vertex.TexC.x = (float)j/sliceCount;
             vertex.TexC.y = 1.0f - (float)i/stackCount;
 
-            vertex.InstanceWeight = XMFLOAT3(1.0f,0,0);
+            if (i == 0 || i == ringCount - 1)
+            {
+                vertex.InstanceWeights = XMFLOAT3(instanceWeightEnds, 0, 0);
+            }
+            else
+            {
+                vertex.InstanceWeights = XMFLOAT3(0, 0, 0);
+            }
 
             // Cylinder can be parameterized as follows, where we introduce v
             // parameter that goes in the same direction as the v tex-coord
@@ -586,11 +599,11 @@ void GeometryGenerator::BuildCylinderTopCap(float /*bottomRadius*/, float topRad
         float u = x/height + 0.5f;
         float v = z/height + 0.5f;
 
-        meshData.Vertices.push_back( Vertex(x, y, z, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, u, v) );
+        meshData.Vertices.push_back( Vertex(x, y, z, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, u, v, instanceWeightEnds, 0.0f, 0.0f ) );
     }
 
     // Cap center vertex.
-    meshData.Vertices.push_back( Vertex(0.0f, y, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f) );
+    meshData.Vertices.push_back( Vertex(0.0f, y, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f, instanceWeightEnds, 0.0f, 0.0f) );
 
     // Index of center vertex.
     UINT centerIndex = (UINT)meshData.Vertices.size()-1;
@@ -625,11 +638,11 @@ void GeometryGenerator::BuildCylinderBottomCap(float bottomRadius, float /*topRa
         float u = x/height + 0.5f;
         float v = z/height + 0.5f;
 
-        meshData.Vertices.push_back( Vertex(x, y, z, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, u, v) );
+        meshData.Vertices.push_back( Vertex(x, y, z, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, u, v, instanceWeightEnds, 0, 0.) );
     }
 
     // Cap center vertex.
-    meshData.Vertices.push_back( Vertex(0.0f, y, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f) );
+    meshData.Vertices.push_back( Vertex(0.0f, y, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f, instanceWeightEnds, 0, 0) );
 
     // Cache the index of center vertex.
     UINT centerIndex = (UINT)meshData.Vertices.size()-1;

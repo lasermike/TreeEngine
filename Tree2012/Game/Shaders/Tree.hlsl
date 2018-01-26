@@ -53,9 +53,9 @@ struct VS_INPUT
     float3 NormalL : NORMAL;
     float2 Tex : TEXCOORD0;
     float3 TangentL : TANGENT;
-    float  InstanceWeight : BLENDWEIGHT0;
-    float  InstanceWeightPrev : BLENDWEIGHT1;
-    float  InstanceWeightNext : BLENDWEIGHT2;
+    float  InstanceWeight1 : BLENDWEIGHT0;
+    float  InstanceWeight2 : BLENDWEIGHT1;
+    float  InstanceWeight3 : BLENDWEIGHT2;
     float4x4 World  : WORLD;
     uint  InstanceOffset : BLENDINDICES0;
     uint  InstanceOffsetPrev : BLENDINDICES1;
@@ -88,7 +88,12 @@ PS_INPUT VS(VS_INPUT input)
     float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
     //float4x4 worldNext = BranchBuffer[input.InstanceOffsetNext].BranchWorld;
 
-    world = lerp(world, worldPrev, 0.5 /*input.InstanceWeight*/);
+    //float4 translation = world[3];
+    //world[3] = float4(0, 0, 0, 1);
+    //worldPrev[3] = float4(0, 0, 0, 1);
+    world = lerp(world, worldPrev, input.InstanceWeight1);
+
+    //world[3] = translation;
 
     output.PosW = mul(float4(input.Pos, 1.0f), world).xyz;
 
