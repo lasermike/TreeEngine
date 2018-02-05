@@ -23,7 +23,6 @@ struct BranchData
 };
 
 StructuredBuffer<BranchData> BranchBuffer : register(t2);
-//ConstantBuffer<BranchData> BranchBuffer : register(b0);
 
 cbuffer cbChangesPerPass : register(b1)
 {
@@ -91,11 +90,21 @@ PS_INPUT VS(VS_INPUT input)
     //float4 translation = world[3];
     //world[3] = float4(0, 0, 0, 1);
     //worldPrev[3] = float4(0, 0, 0, 1);
-    world = lerp(world, worldPrev, input.InstanceWeight1);
+
+    //world = lerp(world, worldPrev, input.InstanceWeight1);
 
     //world[3] = translation;
 
-    output.PosW = mul(float4(input.Pos, 1.0f), world).xyz;
+    input.Pos.y *= input.InstanceWeight3;
+
+    float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
+    float3 outPrev = mul(float4(input.Pos, 1.0f), worldPrev).xyz;
+
+    out0 = lerp(out0, outPrev, input.InstanceWeight1);
+
+
+    output.PosW = out0;
+
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
     output.Pos = mul(output.Pos, transpose(Projection));

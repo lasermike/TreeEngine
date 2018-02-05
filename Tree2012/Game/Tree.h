@@ -82,6 +82,8 @@ private:
         XMFLOAT3 endPosition;
         XMFLOAT3 scale;
         int instanceOffset;
+        int instanceOffsetNext;
+        int instanceOffsetPrev;
     };
 
     int m_numTreeFrames;

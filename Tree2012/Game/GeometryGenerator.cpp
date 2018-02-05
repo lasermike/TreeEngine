@@ -28,7 +28,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
     // Cylinder
     GeometryGenerator::MeshData cylinder;
-    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 4, true, true, cylinder);
+    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 3, false, false, cylinder);
 
     // Cache the index count of each object.
     data.cylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();
@@ -40,7 +40,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
     // Cylinder LD
     GeometryGenerator::MeshData cylinderLD;
-    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 4, true, true, cylinderLD);
+    geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 3, false, false, cylinderLD);
 
     // Cache the index count of each object.
     data.cylinderLDIndices.VertexCount = (UINT)cylinderLD.Vertices.size();
@@ -466,7 +466,7 @@ void GeometryGenerator::CreateGeosphere(float radius, UINT numSubdivisions, Mesh
     }
 }
 
-const float instanceWeightEnds = 0.5f;
+const float instanceWeightEnds = 1.0f;
 
 void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, bool buildTop, bool buildBottom, MeshData& meshData)
 {
@@ -507,13 +507,18 @@ void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, floa
             vertex.TexC.x = (float)j/sliceCount;
             vertex.TexC.y = 1.0f - (float)i/stackCount;
 
-            if (i == 0 || i == ringCount - 1)
+            if (i == 0)
             {
-                vertex.InstanceWeights = XMFLOAT3(instanceWeightEnds, 0, 0);
+                vertex.InstanceWeights = XMFLOAT3(1.0f, 0, -1.0f);
+            }
+            else if (i == ringCount - 1)
+            {
+                //vertex.InstanceWeights = XMFLOAT3(0, 0.5f, 0);
+                vertex.InstanceWeights = XMFLOAT3(0, 0, 1.0f);
             }
             else
             {
-                vertex.InstanceWeights = XMFLOAT3(0, 0, 0);
+                vertex.InstanceWeights = XMFLOAT3(0, 0, 1.0f);
             }
 
             // Cylinder can be parameterized as follows, where we introduce v

@@ -117,7 +117,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     }
 
     // Queue first branch
-    TreeFrame firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), 0xFFFFFFFF };
+    TreeFrame firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), 0xFFFFFFFF, 0, 0 /* next */ };
     m_treeFrames[0] = firstFrame;
     m_numTreeFrames = 1;
 
@@ -201,12 +201,17 @@ HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderDat
     {
         if (frame.branch->Child(c) != 0)
         {
+            if (c == 0)
+            {
+                frame.instanceOffsetNext = m_numTreeFrames;
+            }
+
             Branch* child = &_treeModel->treeData.pBranches[frame.branch->Child(c)];
 
             XMFLOAT3 childStart;
             XMStoreFloat3(&childStart, vChildStart);
 
-            TreeFrame childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), 0xFFFFFFFF };
+            TreeFrame childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), 0xFFFFFFFF, 0xFFFFFFFF, frame.instanceOffset };
             m_treeFrames[m_numTreeFrames++] = childFrame;
         }
     }
@@ -284,6 +289,9 @@ HRESULT Tree::ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRend
             {
                 data.InstanceOffsetPrev = instanceOffset;
             }
+
+            data.InstanceOffsetNext = frame.instanceOffsetNext;
+
             m_logInstanceData.push_back(data);
         }
         pRenderData->frameStats[NUM_STICKS_STAT].stat++;
