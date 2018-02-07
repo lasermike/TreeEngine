@@ -82,9 +82,9 @@ PS_INPUT VS(VS_INPUT input)
 {
     PS_INPUT output = (PS_INPUT)0;
 
-    //float4x4 world = input.World;
-    float4x4 world = BranchBuffer[input.InstanceOffset].BranchWorld;
-    float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
+    float4x4 world = input.World;
+    //float4x4 world = BranchBuffer[input.InstanceOffset].BranchWorld;
+    //float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
     //float4x4 worldNext = BranchBuffer[input.InstanceOffsetNext].BranchWorld;
 
     //float4 translation = world[3];
@@ -94,6 +94,48 @@ PS_INPUT VS(VS_INPUT input)
     //world = lerp(world, worldPrev, input.InstanceWeight1);
 
     //world[3] = translation;
+
+    //input.Pos.y *= input.InstanceWeight3;
+
+    float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
+    //float3 outPrev = mul(float4(input.Pos, 1.0f), worldPrev).xyz;
+
+    //out0 = lerp(out0, outPrev, input.InstanceWeight1);
+
+    output.PosW = out0;
+
+    output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
+    output.Pos = mul(output.Pos, transpose(Projection));
+    output.Tex = input.Tex;
+
+    // View direction.  Calcuate here and have it interpolated by to the pixel shader
+    output.ViewDirection = normalize(eyePos.xyz - output.PosW);
+
+    // TBN vectors for tangent space
+    float3 worldNormal = mul(input.NormalL, (float3x3) world);
+    output.N = normalize(worldNormal);
+
+    float3 worldTangent = mul(input.TangentL, (float3x3) world);
+    output.T = normalize(worldTangent);
+
+    float3 worldBinormal = normalize(cross(output.N, output.T));
+    worldBinormal = mul(worldBinormal, (float3x3) world);
+    output.B = worldBinormal;
+
+    // Generate projective tex-coords to project shadow map onto scene.
+    output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
+
+    return output;
+}
+
+PS_INPUT VSSkinned(VS_INPUT input)
+{
+    PS_INPUT output = (PS_INPUT)0;
+
+    //float4x4 world = input.World;
+    float4x4 world = BranchBuffer[input.InstanceOffset].BranchWorld;
+    float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
+    //float4x4 worldNext = BranchBuffer[input.InstanceOffsetNext].BranchWorld;
 
     input.Pos.y *= input.InstanceWeight3;
 

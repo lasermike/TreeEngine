@@ -23,6 +23,7 @@ enum PrimitiveType
     PrimitiveType_Box = 0,
     PrimitiveType_Cylinder,
     PrimitiveType_CylinderLD,
+    PrimitiveType_CylinderHD,
     PrimitiveType_FSQuad,
 };
 
@@ -48,6 +49,7 @@ struct GeometryBufferData
     BufferIndices boxIndices;
     BufferIndices cylinderIndices;
     BufferIndices cylinderLDIndices;
+    BufferIndices cylinderHDIndices;
     BufferIndices fsQuadIndices;
 
     std::vector<SimpleVertex> vertices;
@@ -78,6 +80,9 @@ struct GeometryBufferData
         case PrimitiveType_CylinderLD:
             pBufferIndices = &this->cylinderLDIndices;
             break;
+        case PrimitiveType_CylinderHD:
+            pBufferIndices = &this->cylinderHDIndices;
+            break;
         case PrimitiveType_FSQuad:
             pBufferIndices = &this->fsQuadIndices;
             break;
@@ -106,7 +111,7 @@ public:
             float u, float v)
             : Position(px, py, pz), Normal(nx, ny, nz),
             TangentU(tx, ty, tz), TexC(u, v),
-            InstanceWeights(0.0f, 0, 1.0f) {}
+            InstanceWeights(1.0f, 0, 1.0f) {}
 
         Vertex(
             float px, float py, float pz,

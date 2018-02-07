@@ -175,7 +175,7 @@ void LoadGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameDat
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0.0f, 0, 0);
     params4->scale = XMFLOAT3(30, .01f, 30);
-    params4->primitiveType = PrimitiveType_Cylinder;
+    params4->primitiveType = PrimitiveType_CylinderHD;
     scene->AddChild(new Primitive(params4));
 
     // Init lights
@@ -269,7 +269,7 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
-    params4->primitiveType = PrimitiveType_Cylinder;
+    params4->primitiveType = PrimitiveType_CylinderHD;
     params4->textureFilename.push_back(L"undersea.dds");
     ShaderMaterial mat;
     mat.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
@@ -365,7 +365,7 @@ void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, G
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
-    params4->primitiveType = PrimitiveType_Cylinder;
+    params4->primitiveType = PrimitiveType_CylinderHD;
     //params4->textureFilename.push_back(L"undersea.dds");
     ShaderMaterial mat;
     mat.Ambient = XMFLOAT4(.9f, .9f, .9f, 1.0f);
@@ -475,7 +475,7 @@ void LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameDat
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
-    params4->primitiveType = PrimitiveType_Cylinder;
+    params4->primitiveType = PrimitiveType_CylinderHD;
     scene->AddChild(new Primitive(params4));
 
     WorldObjectParams* params7 = new WorldObjectParams(PrimitiveGeneratorType);
@@ -516,7 +516,7 @@ void LoadTrees2(SceneRoot* scene, RenderData* renderData, Player* player, GameDa
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(30, .01f, 30);
-    params4->primitiveType = PrimitiveType_Cylinder;
+    params4->primitiveType = PrimitiveType_CylinderHD;
     scene->AddChild(new Primitive(params4));
 
     // Init lights
@@ -560,7 +560,7 @@ void LoadTrees3(SceneRoot* scene, RenderData* renderData, Player* player, GameDa
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(30, .01f, 30);
-    params4->primitiveType = PrimitiveType_Cylinder;
+    params4->primitiveType = PrimitiveType_CylinderHD;
     scene->AddChild(new Primitive(params4));
 
     // Init lights
