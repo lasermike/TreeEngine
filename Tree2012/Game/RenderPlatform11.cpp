@@ -21,20 +21,26 @@
 class InputLayoutDesc
 {
 public:
-    static const InputElementDesc InstancedBasic16[8];
+    static const InputElementDesc InstancedBasic16[14];
     static const InputElementDesc Basic32[3];
 };
 
-const InputElementDesc InputLayoutDesc::InstancedBasic16[8] =
+const InputElementDesc InputLayoutDesc::InstancedBasic16[14] =
 {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
     { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, InputClassificationVertex, 0 },
     { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, InputClassificationVertex, 0 },
     { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, InputClassificationVertex, 0 },
+    { "BLENDWEIGHT", 0, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "BLENDWEIGHT", 1, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "BLENDWEIGHT", 2, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
     { "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "BLENDINDICES", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "BLENDINDICES", 1, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "BLENDINDICES", 2, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
 };
 
 const InputElementDesc InputLayoutDesc::Basic32[3] =
