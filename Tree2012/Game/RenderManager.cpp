@@ -164,8 +164,8 @@ HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
         UINT startInstance = m_perFrameInstanceData[&ru][object].first;
         UINT numInstances = m_perFrameInstanceData[&ru][object].second;
 
-        GetPlatform()->DrawIndexedInstanced(ru.m_mesh->m_bufferIndices->IndexCount, numInstances, ru.m_mesh->m_bufferIndices->IndexOffset,
-            ru.m_mesh->m_bufferIndices->VertexOffset, startInstance);
+        GetPlatform()->DrawIndexedInstanced(ru.m_mesh->m_bufferOffsets->IndexCount, numInstances, ru.m_mesh->m_bufferOffsets->IndexOffset,
+            ru.m_mesh->m_bufferOffsets->VertexOffset, startInstance);
     }
     return S_OK;
 }
@@ -290,9 +290,9 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 }
 
 HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
-    const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh)
+    const GeometryBufferData::BufferOffsets* bufferOffsets, Mesh** newMesh)
 {
-    m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferIndices)));
+    m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferOffsets)));
     *newMesh = &m_meshes[name];
     return S_OK;
 }

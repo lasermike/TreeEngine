@@ -38,6 +38,15 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     data.cylinderIndices.IndexOffset = data.boxIndices.IndexCount;
     data.cylinderIndices.IndexCount = (UINT) cylinder.Indices.size();
 
+
+    // Skinned version
+    data.skinnedCylinderIndices.VertexCount = (UINT) cylinder.Vertices.size();
+    data.skinnedCylinderIndices.VertexOffset = 0;
+
+    data.skinnedCylinderIndices.IndexOffset = 0;
+    data.skinnedCylinderIndices.IndexCount = (UINT)cylinder.Indices.size();
+
+
     // Cylinder LD
     GeometryGenerator::MeshData cylinderLD;
     geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 6, 3, false, false, cylinderLD);
@@ -85,6 +94,11 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
     data.vertices.resize(totalVertexCount);
 
+
+    UINT skinnedVertexCount = (UINT) cylinder.Vertices.size();
+    data.skinnedVertices.resize(skinnedVertexCount);
+
+
     UINT k = 0;
     for (size_t i = 0; i < box.Vertices.size(); ++i, ++k)
     {
@@ -92,7 +106,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = box.Vertices[i].Normal;
         data.vertices[k].Tex = box.Vertices[i].TexC;
         data.vertices[k].TangentU = box.Vertices[i].TangentU;
-        data.vertices[k].InstanceWeights = box.Vertices[i].InstanceWeights;
+        //data.vertices[k].InstanceWeights = box.Vertices[i].InstanceWeights;
     }
 
     for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
@@ -101,7 +115,12 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = cylinder.Vertices[i].Normal;
         data.vertices[k].Tex = cylinder.Vertices[i].TexC;
         data.vertices[k].TangentU = cylinder.Vertices[i].TangentU;
-        data.vertices[k].InstanceWeights = cylinder.Vertices[i].InstanceWeights;
+
+        data.skinnedVertices[i].Pos = cylinder.Vertices[i].Position;
+        data.skinnedVertices[i].Normal = cylinder.Vertices[i].Normal;
+        data.skinnedVertices[i].Tex = cylinder.Vertices[i].TexC;
+        data.skinnedVertices[i].TangentU = cylinder.Vertices[i].TangentU;
+        data.skinnedVertices[i].InstanceWeights = cylinder.Vertices[i].InstanceWeights;
     }
 
     for (size_t i = 0; i < cylinderLD.Vertices.size(); ++i, ++k)
@@ -110,7 +129,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = cylinderLD.Vertices[i].Normal;
         data.vertices[k].Tex = cylinderLD.Vertices[i].TexC;
         data.vertices[k].TangentU = cylinderLD.Vertices[i].TangentU;
-        data.vertices[k].InstanceWeights = cylinderLD.Vertices[i].InstanceWeights;
+        //data.vertices[k].InstanceWeights = cylinderLD.Vertices[i].InstanceWeights;
     }
 
     for (size_t i = 0; i < cylinderHD.Vertices.size(); ++i, ++k)
@@ -119,7 +138,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = cylinderHD.Vertices[i].Normal;
         data.vertices[k].Tex = cylinderHD.Vertices[i].TexC;
         data.vertices[k].TangentU = cylinderHD.Vertices[i].TangentU;
-        data.vertices[k].InstanceWeights = cylinderHD.Vertices[i].InstanceWeights;
+        //data.vertices[k].InstanceWeights = cylinderHD.Vertices[i].InstanceWeights;
     }
 
     for (size_t i = 0; i < fsQuad.Vertices.size(); ++i, ++k)
@@ -128,7 +147,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Normal = fsQuad.Vertices[i].Normal;
         data.vertices[k].Tex = fsQuad.Vertices[i].TexC;
         data.vertices[k].TangentU = fsQuad.Vertices[i].TangentU;
-        data.vertices[k].InstanceWeights = fsQuad.Vertices[i].InstanceWeights;
+        //data.vertices[k].InstanceWeights = fsQuad.Vertices[i].InstanceWeights;
     }
 
     //
@@ -140,6 +159,8 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     data.indices.insert(data.indices.end(), cylinderLD.Indices.begin(), cylinderLD.Indices.end());
     data.indices.insert(data.indices.end(), cylinderHD.Indices.begin(), cylinderHD.Indices.end());
     data.indices.insert(data.indices.end(), fsQuad.Indices.begin(), fsQuad.Indices.end());
+
+    data.skinnedIndices.insert(data.skinnedIndices.end(), cylinder.Indices.begin(), cylinder.Indices.end());
 }
 
 void GeometryGenerator::CreateBox(float width, float height, float depth, MeshData& meshData)

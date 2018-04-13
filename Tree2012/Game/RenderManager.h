@@ -33,12 +33,12 @@ struct Mesh
     D3DBuffer m_vertexBuffer;
     D3DBuffer m_indexBuffer;
 
-    const GeometryBufferData::BufferIndices* m_bufferIndices;
+    const GeometryBufferData::BufferOffsets* m_bufferOffsets;
 
 public:
-    Mesh() : m_vertexBuffer(), m_indexBuffer(), m_bufferIndices(nullptr) { }
-    Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferIndices* bufferIndices) :
-        m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer), m_bufferIndices(bufferIndices)
+    Mesh() : m_vertexBuffer(), m_indexBuffer(), m_bufferOffsets(nullptr) { }
+    Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferOffsets* bufferOffsets) :
+        m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer), m_bufferOffsets(bufferOffsets)
     {
         //assert(m_vertexBuffer);
         //assert(m_indexBuffer);
@@ -142,7 +142,7 @@ public:
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, 
                            ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
     HRESULT CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
-        const GeometryBufferData::BufferIndices* bufferIndices, Mesh** newMesh);
+        const GeometryBufferData::BufferOffsets* bufferIndices, Mesh** newMesh);
 
     HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);

@@ -72,11 +72,24 @@ const int maxNumMaterials = 4;
 class InputLayoutDesc
 {
 public:
-    static const InputElementDesc InstancedBasic16[14];
+    static const InputElementDesc InstancedBasic16[8];
+    static const InputElementDesc InstancedSkinned[14];
     static const InputElementDesc Basic32[3];
 };
 
-const InputElementDesc InputLayoutDesc::InstancedBasic16[14] =
+const InputElementDesc InputLayoutDesc::InstancedBasic16[8] =
+{
+    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
+    { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+};
+
+const InputElementDesc InputLayoutDesc::InstancedSkinned[14] =
 {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
     { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
@@ -327,7 +340,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 
-    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; //DXGI_FORMAT_D32_FLOAT;
+    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = 1;
@@ -690,6 +703,7 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     }
 
     // create PSO
+    // TODO: Skinned VB??
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
     psoDesc.pRootSignature = m_rootSignature;

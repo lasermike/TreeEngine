@@ -63,22 +63,22 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     Material* pTrunk = nullptr;
     renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &pTrunk);
     Mesh* pNewMesh = nullptr;
-    const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_params->meshes[0]);
-    renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
+    const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_params->meshes[0]);
+    renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferOffsets, &pNewMesh);
     renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
 
     Material* pTwig = nullptr;
     renderManager.CreateMaterial(L"twig", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &pTwig);
     pNewMesh = nullptr;
-    pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
-    renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
+    pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
+    renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferOffsets, &pNewMesh);
     renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
 
     Material* pLeaf = nullptr;
     renderManager.CreateMaterial(L"leaf", L"", nullptr, nullptr, _params->materials[1], StockRenderState(), &pLeaf);
     pNewMesh = nullptr;
-    pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(PrimitiveType_Box);
-    renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &pNewMesh);
+    pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
+    renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferOffsets, &pNewMesh);
     renderManager.ReserveRenderUnit(pLeaf, pNewMesh, this, &m_leafUnit);
 
     return S_OK;

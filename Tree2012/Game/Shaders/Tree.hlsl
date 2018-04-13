@@ -52,6 +52,16 @@ struct VS_INPUT
     float3 NormalL : NORMAL;
     float2 Tex : TEXCOORD0;
     float3 TangentL : TANGENT;
+    float4x4 World  : WORLD;
+};
+
+//--------------------------------------------------------------------------------------
+struct VS_SKINNED_INPUT
+{
+    float3 Pos : POSITION;
+    float3 NormalL : NORMAL;
+    float2 Tex : TEXCOORD0;
+    float3 TangentL : TANGENT;
     float  InstanceWeight1 : BLENDWEIGHT0;
     float  InstanceWeight2 : BLENDWEIGHT1;
     float  InstanceWeight3 : BLENDWEIGHT2;
@@ -83,25 +93,8 @@ PS_INPUT VS(VS_INPUT input)
     PS_INPUT output = (PS_INPUT)0;
 
     float4x4 world = input.World;
-    //float4x4 world = BranchBuffer[input.InstanceOffset].BranchWorld;
-    //float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
-    //float4x4 worldNext = BranchBuffer[input.InstanceOffsetNext].BranchWorld;
-
-    //float4 translation = world[3];
-    //world[3] = float4(0, 0, 0, 1);
-    //worldPrev[3] = float4(0, 0, 0, 1);
-
-    //world = lerp(world, worldPrev, input.InstanceWeight1);
-
-    //world[3] = translation;
-
-    //input.Pos.y *= input.InstanceWeight3;
 
     float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
-    //float3 outPrev = mul(float4(input.Pos, 1.0f), worldPrev).xyz;
-
-    //out0 = lerp(out0, outPrev, input.InstanceWeight1);
-
     output.PosW = out0;
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
@@ -128,7 +121,7 @@ PS_INPUT VS(VS_INPUT input)
     return output;
 }
 
-PS_INPUT VSSkinned(VS_INPUT input)
+PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
 {
     PS_INPUT output = (PS_INPUT)0;
 
@@ -144,9 +137,7 @@ PS_INPUT VSSkinned(VS_INPUT input)
 
     out0 = lerp(out0, outPrev, input.InstanceWeight1);
 
-
     output.PosW = out0;
-
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
     output.Pos = mul(output.Pos, transpose(Projection));
@@ -235,6 +226,18 @@ struct ShadowMapVertexOut
 };
 
 ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
+{
+    ShadowMapVertexOut output;
+
+    float4 pos = mul(float4(input.Pos, 1.0f), input.World);
+    pos = mul(pos, transpose(View));
+    output.PosH = mul(pos, transpose(Projection));
+    output.Tex = input.Tex;
+
+    return output;
+}
+
+ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
 {
     ShadowMapVertexOut output;
 

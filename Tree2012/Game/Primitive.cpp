@@ -46,8 +46,8 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
     renderManager.CreateMaterial(L"ground", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
 
     Mesh* newMesh = nullptr;
-    const GeometryBufferData::BufferIndices* pBufferIndices = renderManager.GetGeometryBufferData().GetBufferIndices(_model->GetPrimitiveType());
-    renderManager.CreateMesh(L"ground", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferIndices, &newMesh);
+    const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_model->GetPrimitiveType());
+    renderManager.CreateMesh(L"ground", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferOffsets, &newMesh);
 
     renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
 

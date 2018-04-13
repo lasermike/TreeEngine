@@ -25,9 +25,18 @@ enum PrimitiveType
     PrimitiveType_CylinderLD,
     PrimitiveType_CylinderHD,
     PrimitiveType_FSQuad,
+    PrimitiveType_SkinnedCylinder
 };
 
 struct SimpleVertex
+{
+    XMFLOAT3 Pos;
+    XMFLOAT3 Normal;
+    XMFLOAT2 Tex;
+    XMFLOAT3 TangentU;
+};
+
+struct SkinnedVertex
 {
     XMFLOAT3 Pos;
     XMFLOAT3 Normal;
@@ -38,7 +47,7 @@ struct SimpleVertex
 
 struct GeometryBufferData
 {
-    struct BufferIndices
+    struct BufferOffsets
     {
         UINT VertexOffset;
         UINT VertexCount;
@@ -46,21 +55,26 @@ struct GeometryBufferData
         UINT IndexCount;
     };
 
-    BufferIndices boxIndices;
-    BufferIndices cylinderIndices;
-    BufferIndices cylinderLDIndices;
-    BufferIndices cylinderHDIndices;
-    BufferIndices fsQuadIndices;
+    BufferOffsets boxIndices;
+    BufferOffsets cylinderIndices;
+    BufferOffsets cylinderLDIndices;
+    BufferOffsets cylinderHDIndices;
+    BufferOffsets fsQuadIndices;
+    BufferOffsets skinnedCylinderIndices;
 
     std::vector<SimpleVertex> vertices;
     std::vector<UINT> indices;
 
+    std::vector<SkinnedVertex> skinnedVertices;
+    std::vector<UINT> skinnedIndices;
+
+
     GeometryBufferData() : vertices(), indices()
     {
-        ZeroMemory(&boxIndices, sizeof(BufferIndices));
-        ZeroMemory(&cylinderIndices, sizeof(BufferIndices));
-        ZeroMemory(&cylinderLDIndices, sizeof(BufferIndices));
-        ZeroMemory(&fsQuadIndices, sizeof(BufferIndices));
+        ZeroMemory(&boxIndices, sizeof(BufferOffsets));
+        ZeroMemory(&cylinderIndices, sizeof(BufferOffsets));
+        ZeroMemory(&cylinderLDIndices, sizeof(BufferOffsets));
+        ZeroMemory(&fsQuadIndices, sizeof(BufferOffsets));
     }
 
     void Release()
@@ -69,30 +83,33 @@ struct GeometryBufferData
         indices.clear();
     }
 
-    const BufferIndices* const GetBufferIndices(PrimitiveType primType)
+    const BufferOffsets* const GetBufferOffsets(PrimitiveType primType)
     {
-        BufferIndices* pBufferIndices = nullptr;
+        BufferOffsets* pBufferOffsets = nullptr;
         switch (primType)
         {
         case PrimitiveType_Cylinder:
-            pBufferIndices = &this->cylinderIndices;
+            pBufferOffsets = &this->cylinderIndices;
             break;
         case PrimitiveType_CylinderLD:
-            pBufferIndices = &this->cylinderLDIndices;
+            pBufferOffsets = &this->cylinderLDIndices;
             break;
         case PrimitiveType_CylinderHD:
-            pBufferIndices = &this->cylinderHDIndices;
+            pBufferOffsets = &this->cylinderHDIndices;
             break;
         case PrimitiveType_FSQuad:
-            pBufferIndices = &this->fsQuadIndices;
+            pBufferOffsets = &this->fsQuadIndices;
+            break;
+        case PrimitiveType_SkinnedCylinder:
+            pBufferOffsets = &this->skinnedCylinderIndices;
             break;
         case PrimitiveType_Box:
         default:
-            pBufferIndices = &this->boxIndices;
+            pBufferOffsets = &this->boxIndices;
             break;
         }
 
-        return pBufferIndices;
+        return pBufferOffsets;
     }
 };
 
@@ -127,7 +144,7 @@ public:
         XMFLOAT3 Normal;
         XMFLOAT3 TangentU;
         XMFLOAT2 TexC;
-        XMFLOAT3 InstanceWeights; // Weight of which branch matrix to use in BranchData
+        XMFLOAT3 InstanceWeights; // For skinned, weight of which branch matrix to use in BranchData
     };
 
     struct MeshData
