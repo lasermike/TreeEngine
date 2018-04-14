@@ -314,7 +314,7 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(BuildScreenQuadGeometryBuffers());
 
     //////
-    // Create vertex buffer
+    // Create primitive vertex buffer
     D3D11_BUFFER_DESC vbd;
     ZeroMemory(&vbd, sizeof(vbd));
     vbd.Usage = D3D11_USAGE_IMMUTABLE;
@@ -341,6 +341,34 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(GetDevice()->CreateBuffer(&ibd, &iinitData, &m_indexBuffer.buffer));
     SetDebugName(m_indexBuffer, "RenderManager::m_indexBuffer");
 
+    //////
+    // Create skinned primitive vertex buffer
+    ZeroMemory(&vbd, sizeof(vbd));
+    vbd.Usage = D3D11_USAGE_IMMUTABLE;
+    vbd.ByteWidth = (UINT)(sizeof(SkinnedVertex) * geometryData.skinnedVertices.size());
+    vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vbd.CPUAccessFlags = 0;
+    vbd.MiscFlags = 0;
+    //D3D11_SUBRESOURCE_DATA vinitData;
+    ZeroMemory(&vinitData, sizeof(vinitData));
+    vinitData.pSysMem = &geometryData.skinnedVertices[0];
+    HRR(GetDevice()->CreateBuffer(&vbd, &vinitData, &m_skinnedVertexBuffer.buffer));
+    SetDebugName(m_skinnedVertexBuffer, "RenderManager::m_skinnedVertexBuffer");
+
+    //D3D11_BUFFER_DESC ibd;
+    ZeroMemory(&ibd, sizeof(ibd));
+    ibd.Usage = D3D11_USAGE_IMMUTABLE;
+    ibd.ByteWidth = (UINT)(sizeof(UINT) * geometryData.skinnedIndices.size());
+    ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    ibd.CPUAccessFlags = 0;
+    ibd.MiscFlags = 0;
+    //D3D11_SUBRESOURCE_DATA iinitData;
+    ZeroMemory(&iinitData, sizeof(iinitData));
+    iinitData.pSysMem = &geometryData.skinnedIndices[0];
+    HRR(GetDevice()->CreateBuffer(&ibd, &iinitData, &m_skinnedIndexBuffer.buffer));
+    SetDebugName(m_skinnedIndexBuffer, "RenderManager::m_skinnedIndexBuffer");
+
+
     // Set index buffer
     m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
 
@@ -363,6 +391,8 @@ HRESULT RenderPlatform11::UninitGameLevelGraphics()
 
     m_vertexBuffer.Release();
     m_indexBuffer.Release();
+    m_skinnedVertexBuffer.Release();
+    m_skinnedIndexBuffer.Release();
     m_screenQuadVB.Release();
     m_screenQuadIB.Release();
     SafeRelease(&m_vertexLayout);
@@ -654,6 +684,7 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
     m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Set vertex buffer
+    // TODO: Move to per-object?
     UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
     UINT offset[2] = { 0, 0 };
     ID3D11Buffer* vbs[2] = { m_vertexBuffer.buffer, *instancedBuffer->Get(m_renderData->frame) };

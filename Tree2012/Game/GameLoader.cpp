@@ -419,7 +419,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
 
-    params3->meshes.push_back(PrimitiveType_CylinderLD);
+    params3->meshes.push_back(PrimitiveType_SkinnedCylinder);
 
     scene->AddChild(new Tree(params3));
 

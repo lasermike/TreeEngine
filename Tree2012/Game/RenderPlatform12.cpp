@@ -279,7 +279,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(LoadPixelShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
 
     //
-    // Vertex and index buffer
+    // Simple vertex and index buffer
     // 
     const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
     const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * geometryData.vertices.size());
@@ -323,6 +323,56 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_IBView.BufferLocation = m_indexBuffer.buffer->GetGPUVirtualAddress();
     m_IBView.SizeInBytes = UINT(sizeof(UINT) * geometryData.indices.size());
     m_IBView.Format = DXGI_FORMAT_R32_UINT;
+
+    //
+    // Skinned vertex and index buffer
+    // 
+    //const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    const D3D12_RESOURCE_DESC skinnedVertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SkinnedVertex) * geometryData.skinnedVertices.size());
+    HRR(GetDevice()->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &skinnedVertexBufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_skinnedVertexBuffer.buffer)));
+    HRR(m_skinnedVertexBuffer.buffer->SetName(L"Skinned vertex Buffer"));
+
+    // copy the triangle data to the vertex buffer
+    dataBegin = nullptr;
+    m_skinnedVertexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+    memcpy(dataBegin, &geometryData.skinnedVertices[0], sizeof(SkinnedVertex) * geometryData.skinnedVertices.size());
+    m_skinnedVertexBuffer.buffer->Unmap(0, nullptr);
+
+    //HERE!
+
+    // initialize vertex buffer view
+    m_skinnedVBView.BufferLocation = m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress();
+    m_skinnedVBView.StrideInBytes = sizeof(SkinnedVertex);
+    m_skinnedVBView.SizeInBytes = UINT(sizeof(SkinnedVertex) * geometryData.skinnedVertices.size());
+
+    // Index buffer
+    const D3D12_RESOURCE_DESC skinnedIndexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * geometryData.skinnedIndices.size());
+    HRR(GetDevice()->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &skinnedIndexBufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_skinnedIndexBuffer.buffer)));
+    HRR(m_skinnedIndexBuffer.buffer->SetName(L"Skinned Index Buffer"));
+
+    // copy the index data to the index buffer
+    dataBegin = nullptr;
+    m_skinnedIndexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
+    memcpy(dataBegin, &geometryData.skinnedIndices[0], sizeof(UINT) * geometryData.skinnedIndices.size());
+    m_skinnedIndexBuffer.buffer->Unmap(0, nullptr);
+
+    // Initialize the index buffer view.
+    m_skinnedIBView.BufferLocation = m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress();
+    m_skinnedIBView.SizeInBytes = UINT(sizeof(UINT) * geometryData.skinnedIndices.size());
+    m_skinnedIBView.Format = DXGI_FORMAT_R32_UINT;
+
 
     // Debug overlay to show depth map
     HRR(BuildScreenQuadGeometryBuffers());
@@ -487,6 +537,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     m_vertexBuffer.Release();
     m_indexBuffer.Release();
+    m_skinnedVertexBuffer.Release();
+    m_skinnedIndexBuffer.Release();
     m_screenQuadVB.Release();
     m_screenQuadIB.Release();
 

@@ -76,7 +76,10 @@ HRESULT FSGraph::InitGraphics(RenderManager& renderManager)
 
 	Mesh* newMesh = nullptr;
 	const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_FSQuad);
-	renderManager.CreateMesh(L"FSQuad", renderManager.GetPlatform()->GetVertexBuffer(), renderManager.GetPlatform()->GetIndexBuffer(), pBufferOffsets, &newMesh);
+	renderManager.CreateMesh(L"FSQuad", 
+                             renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), 
+                             renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
+                             pBufferOffsets, &newMesh);
 
 	renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
 

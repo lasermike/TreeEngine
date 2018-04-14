@@ -60,8 +60,8 @@ RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelS
 
 RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb);
 
-RENDERPLATFORM_API D3DBuffer* GetVertexBuffer();
-RENDERPLATFORM_API D3DBuffer* GetIndexBuffer();
+RENDERPLATFORM_API D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer);
+RENDERPLATFORM_API D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer);
 
 RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport);
 

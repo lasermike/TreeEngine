@@ -168,14 +168,14 @@ RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb)
     return m_pPlatform->SetFrameSceneData(cb);
 }
 
-RENDERPLATFORM_API D3DBuffer* GetVertexBuffer()
+RENDERPLATFORM_API D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer)
 {
-    return m_pPlatform->GetVertexBuffer();
+    return m_pPlatform->GetVertexBuffer(geometryBuffer);
 }
 
-RENDERPLATFORM_API D3DBuffer* GetIndexBuffer()
+RENDERPLATFORM_API D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer)
 {
-    return m_pPlatform->GetIndexBuffer();
+    return m_pPlatform->GetIndexBuffer(geometryBuffer);
 }
 
 RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport)

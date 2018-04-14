@@ -340,6 +340,12 @@ enum RenderPlatforms
     D3D11_RENDER_PLATFORM = 2,
 };
 
+enum GeometryBuffer
+{
+    PRIMITIVE_GEOMETRY_BUFFER = 0,
+    SKINNED_PRIMITIVE_GEOMETRY_BUFFER,
+    CUSTOM0_GEOMETRY_BUFFER
+};
 
 class RenderPlatform
 {
@@ -425,8 +431,8 @@ public:
 
     virtual void SetFrameSceneData(CBChangesEveryFrame* cb) = 0;
 
-    virtual D3DBuffer* GetVertexBuffer() = 0;  // TODO TEMP!  Objects should be able to load their own meshes
-    virtual D3DBuffer* GetIndexBuffer() = 0;
+    virtual D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) = 0;  // TODO!  Objects should be able to load their own meshes
+    virtual D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) = 0;
 
     virtual IUnknown* GetDevice() = 0;
 
@@ -491,11 +497,16 @@ private:
     // Vertex buffers
     //
 
-    // Single vertex and index buffer for all geometry in scene
+    // Single vertex and index buffer for all geometry of same vertex format in scene
     D3DBuffer                         m_vertexBuffer;
     D3DBuffer                         m_indexBuffer;
     D3D12_VERTEX_BUFFER_VIEW          m_VBView;
     D3D12_INDEX_BUFFER_VIEW           m_IBView;
+
+    D3DBuffer                         m_skinnedVertexBuffer;
+    D3DBuffer                         m_skinnedIndexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW          m_skinnedVBView;
+    D3D12_INDEX_BUFFER_VIEW           m_skinnedIBView;
 
     // Fixed drawing features
     CComPtr<ID3D12Resource>           m_screenQuadVB;
@@ -602,8 +613,16 @@ public:
 
     HRESULT GetViewport(Viewport& viewport);
 
-    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
-    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; }
+    D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer)
+    {
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedVertexBuffer : &m_vertexBuffer;
+    }
+
+    D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer)
+    { 
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
+    }
+
 };
 
 #elif defined(TREE3D11)
@@ -631,11 +650,17 @@ class RenderPlatform11 : public RenderPlatform
 
     XSF::BitmapFont*                  m_bitmapFont;
 
+    // Single vertex and index buffer for all geometry with same vertex format in scene
+    CComPtr<ID3D11InputLayout>        m_vertexLayout;
+
     D3DBuffer                         m_vertexBuffer;
     D3DBuffer                         m_indexBuffer;
 
-    // Single vertex and index buffer for all geometry in scene
-    CComPtr<ID3D11InputLayout>        m_vertexLayout;
+    CComPtr<ID3D11InputLayout>        m_skinnedVertexLayout;
+
+    D3DBuffer                         m_skinnedVertexBuffer;
+    D3DBuffer                         m_skinnedIndexBuffer;
+
 
     // Fixed drawing features
     CComPtr<ID3D11Buffer>             m_screenQuadVB;
@@ -730,8 +755,15 @@ public:
 
     void SetFrameSceneData(CBChangesEveryFrame* cb);
 
-    D3DBuffer* GetVertexBuffer() { return &m_vertexBuffer; }  // TODO TEMP!  Objects should be able to load their own meshes
-    D3DBuffer* GetIndexBuffer() { return &m_indexBuffer; }
+    D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer)
+    { 
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedVertexBuffer : &m_vertexBuffer;
+    }
+
+    D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer)
+    {
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
+    }
 
     HRESULT GetViewport(Viewport& viewport);
 
@@ -793,8 +825,8 @@ typedef HRESULT (*LoadPixelShaderFunc)(const wchar_t* shaderFilename, PixelShade
 
 typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 
-typedef D3DBuffer* (*GetVertexBufferFunc)();
-typedef D3DBuffer* (*GetIndexBufferFunc)();
+typedef D3DBuffer* (*GetVertexBufferFunc)(GeometryBuffer geometryBuffer);
+typedef D3DBuffer* (*GetIndexBufferFunc)(GeometryBuffer geometryBuffer);
 
 typedef HRESULT (*GetViewportFunc)(Viewport& viewport);
 
@@ -926,8 +958,8 @@ public:
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { SetFrameSceneDataFuncPtr(cb); }
 
-    D3DBuffer* GetVertexBuffer() { return GetVertexBufferFuncPtr(); }
-    D3DBuffer* GetIndexBuffer() { return GetIndexBufferFuncPtr(); }
+    D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) { return GetVertexBufferFuncPtr(geometryBuffer); }
+    D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) { return GetIndexBufferFuncPtr(geometryBuffer); }
 
     HRESULT GetViewport(Viewport& viewport) { return GetViewportFuncPtr(viewport); }
 
