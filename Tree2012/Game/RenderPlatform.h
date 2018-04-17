@@ -102,6 +102,74 @@ struct DoubleBuffer
     }
 };
 
+#if defined(TREE3D12)
+#define InputElementDesc D3D12_INPUT_ELEMENT_DESC
+#define InputClassificationVertex D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA
+#define InputClassificationInstance D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA
+#define AppendAlignedElement D3D12_APPEND_ALIGNED_ELEMENT
+#else
+#define InputElementDesc D3D11_INPUT_ELEMENT_DESC
+#define InputClassificationVertex D3D11_INPUT_PER_VERTEX_DATA
+#define InputClassificationInstance D3D11_INPUT_PER_INSTANCE_DATA
+#define AppendAlignedElement D3D11_APPEND_ALIGNED_ELEMENT
+#endif
+
+enum InputLayouts_FIX
+{
+    BASIC_INPUT_LAYOUT = 0,
+    SKINNED_INPUT_LAYOUT,
+    SIMPLE_INPUT_LAYOUT,
+    CUSTOM0_INPUT_LAYOUT
+};
+
+class InputLayoutDesc
+{
+public:
+    static const InputElementDesc InstancedBasic16[8];
+    static const InputElementDesc InstancedSkinned[14];
+    static const InputElementDesc Basic32[3];
+
+    //GetLayout()
+};
+
+__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[8] =
+{
+    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
+    { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+};
+
+__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[14] =
+{
+    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
+    { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "BLENDWEIGHT", 0, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "BLENDWEIGHT", 1, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "BLENDWEIGHT", 2, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+    { "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "BLENDINDICES", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "BLENDINDICES", 1, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "BLENDINDICES", 2, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+};
+
+__declspec(selectany) const InputElementDesc InputLayoutDesc::Basic32[3] =
+{
+    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
+    { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, InputClassificationVertex, 0 },
+    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, InputClassificationVertex, 0 }
+};
+
+
 struct LoadedTexture
 {
 #if defined(TREE3D12)
