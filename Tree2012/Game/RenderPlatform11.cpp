@@ -10,8 +10,7 @@
 
 #include "DirectXTex.h"
 
-#define ID3DInputLayout ID3D11InputLayout
-class InputLayouts
+class InputLayoutsManager
 {
 public:
     static void InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen);
@@ -21,10 +20,10 @@ public:
     static ID3DInputLayout* Basic32;
 };
 
-ID3DInputLayout* InputLayouts::InstancedBasic16 = 0;
-ID3DInputLayout* InputLayouts::Basic32 = 0;
+ID3DInputLayout* InputLayoutsManager::InstancedBasic16 = 0;
+ID3DInputLayout* InputLayoutsManager::Basic32 = 0;
 
-void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
+void InputLayoutsManager::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
 {
     HR(device->CreateInputLayout(InputLayoutDesc::InstancedBasic16,
         ARRAYSIZE(InputLayoutDesc::InstancedBasic16),
@@ -33,7 +32,7 @@ void InputLayouts::InitAll(ID3D11Device* device, const void* pShaderBytecodeWith
     SetDebugName(InstancedBasic16, "RenderManager InstancedBasic16");
 }
 
-void InputLayouts::DestroyAll()
+void InputLayoutsManager::DestroyAll()
 {
     SafeRelease(&InstancedBasic16);
     SafeRelease(&Basic32);
@@ -233,8 +232,8 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     std::vector< BYTE > dataVS;
     HRR(XSF::LoadBlob(L"VS.cso", dataVS));
 
-    InputLayouts::InitAll(GetDevice(), &(dataVS)[0], dataVS.size());
-    m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
+    InputLayoutsManager::InitAll(GetDevice(), &(dataVS)[0], dataVS.size());
+    m_immediateContext->IASetInputLayout(InputLayoutsManager::InstancedBasic16);
 
     // Create input layout 2
     dataVS.clear();
@@ -244,8 +243,8 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
         ARRAYSIZE(InputLayoutDesc::Basic32),
         &(dataVS)[0] /*passDesc.pIAInputSignature*/,
         dataVS.size() /*passDesc.IAInputSignatureSize*/,
-        &InputLayouts::Basic32));
-    SetDebugName(InputLayouts::Basic32, "InputLayouts::Basic32");
+        &InputLayoutsManager::Basic32));
+    SetDebugName(InputLayoutsManager::Basic32, "InputLayoutsManager::Basic32");
 
     //
     // Shaders
@@ -377,7 +376,7 @@ HRESULT RenderPlatform11::UninitGameLevelGraphics()
     }
     m_gameLevelBuffers.clear();
 
-    InputLayouts::DestroyAll();
+    InputLayoutsManager::DestroyAll();
 
     return S_OK;
 }
@@ -639,7 +638,7 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
     }
 
     // Set up input assembler
-    m_immediateContext->IASetInputLayout(InputLayouts::InstancedBasic16);
+    m_immediateContext->IASetInputLayout(InputLayoutsManager::InstancedBasic16);
     m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
     m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -807,7 +806,7 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         ps = m_pixelShader;
     }
 
-    Material* newMat = new Material(name, texture, InputLayouts::InstancedBasic16, vs, ps,
+    Material* newMat = new Material(name, texture, InputLayoutsManager::InstancedBasic16, vs, ps,
         nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
         shaderMaterial, constBuffer);
 
@@ -1021,7 +1020,7 @@ HRESULT RenderPlatform11::DrawScreenQuad(XSF::D3DDeviceContext* pContext, ID3D11
     UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
 
-    pContext->IASetInputLayout(InputLayouts::Basic32);
+    pContext->IASetInputLayout(InputLayoutsManager::Basic32);
     pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     pContext->IASetVertexBuffers(0, 1, &m_screenQuadVB, &stride, &offset);
     pContext->IASetIndexBuffer(m_screenQuadIB, DXGI_FORMAT_R32_UINT, 0);

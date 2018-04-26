@@ -300,7 +300,6 @@ HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, 
 HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit)
 {
     RenderUnit* unit = nullptr;
-    UINT ruIndex = 0;
 
     for (RenderUnit& ru : m_renderUnits)
     {
@@ -309,7 +308,6 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
             unit = &ru;
             break;
         }
-        ruIndex++;
     }
 
     if (unit == nullptr)

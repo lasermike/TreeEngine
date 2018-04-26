@@ -28,20 +28,32 @@ enum ShaderType
     ShaderType_ComputeShader,
 };
 
-struct Mesh
+struct MeshBuffers
 {
     D3DBuffer m_vertexBuffer;
     D3DBuffer m_indexBuffer;
 
-    const GeometryBufferData::BufferOffsets* m_bufferOffsets;
+    MeshBuffers() : m_vertexBuffer(), m_indexBuffer() { }
 
-public:
-    Mesh() : m_vertexBuffer(), m_indexBuffer(), m_bufferOffsets(nullptr) { }
-    Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferOffsets* bufferOffsets) :
-        m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer), m_bufferOffsets(bufferOffsets)
+    MeshBuffers(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer) :
+        m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer)
     {
         //assert(m_vertexBuffer);
         //assert(m_indexBuffer);
+    }
+};
+
+struct Mesh : public MeshBuffers
+{
+
+    const GeometryBufferData::BufferOffsets* m_bufferOffsets;
+
+public:
+    Mesh() : MeshBuffers(), m_bufferOffsets(nullptr) { }
+    Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferOffsets* bufferOffsets) :
+        MeshBuffers(vertexBuffer, indexBuffer),
+        m_bufferOffsets(bufferOffsets)
+    {
         //assert(m_bufferIndices);
     }
 };

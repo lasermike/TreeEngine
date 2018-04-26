@@ -683,6 +683,8 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         ps = m_pixelShader;
     }
 
+    //
+    // Allocate constant buffer for material
     UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
 
     m_gameLevelResources.push_back(uploadBuffer->Resource());
@@ -690,10 +692,10 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = m_shaderHeap.hGPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
     D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
 
-    // Create descriptor
+    // Create descriptor for material constant buffer
     GetDevice()->CreateConstantBufferView(&uploadBuffer->View(), cpuMaterialHandle); //???
 
-                                                                                     // Copy texture descriptor from offline heap to shader visible heap
+    // Copy texture descriptor from offline heap to shader visible heap
     if (texture)
     {
         D3D12_CPU_DESCRIPTOR_HANDLE dest = m_shaderHeap.hCPU(materialNum * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
@@ -703,7 +705,15 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     // create PSO
     // TODO: Skinned VB??
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
+    if (false)
+    {
+        psoDesc.InputLayout = { InputLayoutDesc::InstancedSkinned, _countof(InputLayoutDesc::InstancedSkinned) };
+    }
+    else
+    {
+        psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
+    }
+
     psoDesc.pRootSignature = m_rootSignature;
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(vs->shader);
     psoDesc.PS = CD3DX12_SHADER_BYTECODE(ps->shader);

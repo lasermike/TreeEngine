@@ -107,14 +107,16 @@ struct DoubleBuffer
 #define InputClassificationVertex D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA
 #define InputClassificationInstance D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA
 #define AppendAlignedElement D3D12_APPEND_ALIGNED_ELEMENT
+#define ID3DInputLayout ID3D12InputLayout
 #else
 #define InputElementDesc D3D11_INPUT_ELEMENT_DESC
 #define InputClassificationVertex D3D11_INPUT_PER_VERTEX_DATA
 #define InputClassificationInstance D3D11_INPUT_PER_INSTANCE_DATA
 #define AppendAlignedElement D3D11_APPEND_ALIGNED_ELEMENT
+#define ID3DInputLayout ID3D11InputLayout
 #endif
 
-enum InputLayouts_FIX
+enum InputLayouts
 {
     BASIC_INPUT_LAYOUT = 0,
     SKINNED_INPUT_LAYOUT,
@@ -496,6 +498,7 @@ public:
     virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer) = 0;
     virtual HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader) = 0;
     virtual HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader) = 0;
+    //virtual HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit) = 0;
 
     virtual void SetFrameSceneData(CBChangesEveryFrame* cb) = 0;
 
