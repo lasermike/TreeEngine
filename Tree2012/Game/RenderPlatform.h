@@ -373,6 +373,33 @@ public:
     }
 };
 
+struct Mesh;
+class WorldObject;
+
+struct RenderUnit
+{
+    Material*                   m_material;
+    Mesh*                       m_mesh;
+
+    UINT                        totalMaxInstances; // TODO Needed?
+    std::list<WorldObject*>     reservations;
+
+#if defined(TREE3D12)
+
+    ID3D12PipelineState*            m_pipelineStates[NUM_RENDER_PASSES];
+    //const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
+
+#elif defined(TREE3D11)
+#endif
+
+    RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh), totalMaxInstances(0)
+    {
+        assert(m_material);
+        assert(m_mesh);
+    }
+};
+
+
 
 #if defined(TREE3D12)
 // Trim upload heaps when they're no longer in use
@@ -498,7 +525,7 @@ public:
     virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer) = 0;
     virtual HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader) = 0;
     virtual HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader) = 0;
-    //virtual HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit) = 0;
+    virtual HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit) = 0;
 
     virtual void SetFrameSceneData(CBChangesEveryFrame* cb) = 0;
 
@@ -589,6 +616,7 @@ private:
     std::vector<VertexShader*>        m_gameLevelVertexShaders;
     std::vector<PixelShader*>         m_gameLevelPixelShaders;
     std::vector<ID3D12PipelineState*> m_gameLevelPSOs;
+    std::list<RenderUnit*>            m_gameLevelRenderUnits;
 
     CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading textures
     CComPtr<ID3D12DescriptorHeap>     m_samplerHeap;
@@ -679,6 +707,7 @@ public:
 
     HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader);
     HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader);
+    HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit);
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
 
@@ -742,6 +771,7 @@ class RenderPlatform11 : public RenderPlatform
     std::vector<ID3D11Buffer*>        m_gameLevelBuffers;
     std::vector<VertexShader*>        m_gameLevelVertexShaders;
     std::vector<PixelShader*>         m_gameLevelPixelShaders;
+    std::list<RenderUnit*>            m_gameLevelRenderUnits;
 
 // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
@@ -751,7 +781,6 @@ public:
     static const UINT msaaCount = 4;
 
     RenderPlatform11(RenderData* renderData) : m_renderData(renderData), m_msaaQuality(0)
-
     {
 #ifdef ENABLE_MSAA
         m_enableMsaa = true; // TODO
@@ -818,6 +847,7 @@ public:
     HRESULT SetMaterial(Material* material, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
+    HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit);
 
     HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
 
@@ -893,6 +923,7 @@ typedef HRESULT (*CreateD3DBufferFunc)(const UINT sizeBytes, const UINT numInsta
 
 typedef HRESULT (*LoadVertexShaderFunc)(const wchar_t* shaderFilename, VertexShader** shader);
 typedef HRESULT (*LoadPixelShaderFunc)(const wchar_t* shaderFilename, PixelShader** shader);
+typedef HRESULT (*CreateRenderUnitFunc)(Material* material, Mesh* mesh, RenderUnit** renderUnit);
 
 typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 
@@ -940,6 +971,7 @@ class RenderPlatformDLL : public RenderPlatform
     LoadTextureFunc LoadTextureFuncPtr;
     CreateTexture2DFunc CreateTexture2DFuncPtr;
     CreateD3DBufferFunc CreateD3DBufferFuncPtr;
+    CreateRenderUnitFunc CreateRenderUnitFuncPtr;
 
     LoadVertexShaderFunc LoadVertexShaderFuncPtr;
     LoadPixelShaderFunc LoadPixelShaderFuncPtr;
@@ -1025,6 +1057,11 @@ public:
     HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader)
     {
         return LoadPixelShaderFuncPtr(shaderFilename, shader);
+    }
+
+    HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit)
+    {
+        return CreateRenderUnitFuncPtr(material, mesh, renderUnit);
     }
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { SetFrameSceneDataFuncPtr(cb); }

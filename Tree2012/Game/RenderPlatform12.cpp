@@ -513,6 +513,12 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     }
     m_gameLevelPSOs.clear();
 
+    for (RenderUnit* ru : m_gameLevelRenderUnits)
+    {
+        delete ru;
+    }
+    m_gameLevelRenderUnits.clear();
+
     m_commandList.Release();
     SafeDelete(&m_bitmapFont);
 
@@ -761,6 +767,13 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 
     *newMaterial = newMat;
 
+    return S_OK;
+}
+
+HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit)
+{
+    *renderUnit = new RenderUnit(material, mesh);
+    m_gameLevelRenderUnits.push_back(*renderUnit);
     return S_OK;
 }
 

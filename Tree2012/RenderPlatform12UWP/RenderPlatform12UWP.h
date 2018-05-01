@@ -58,6 +58,8 @@ RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numI
 RENDERPLATFORM_API HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader);
 RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader);
 
+RENDERPLATFORM_API HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit);
+
 RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb);
 
 RENDERPLATFORM_API D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer);

@@ -144,7 +144,7 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     HRR(GetPlatform()->RenderSceneSetup(pass, &m_instancedBuffer));
 
     // Render each unit
-    for (auto& ru : m_renderUnits)
+    for (RenderUnit* ru : m_renderUnits)
     {
         Render(ru, pass);
     }
@@ -152,20 +152,20 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     return S_OK;
 }
 
-HRESULT RenderManager::Render(RenderUnit& ru, RenderPass pass)
+HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 {
-    GetPlatform()->SetMaterial(ru.m_material, pass);
+    GetPlatform()->SetMaterial(ru->m_material, pass);
 
-    for (auto object : ru.reservations)
+    for (auto object : ru->reservations)
     {
         if (pass == ShadowMapPass && object->GetObjectType() == PrimitiveObjectType)
             continue;
 
-        UINT startInstance = m_perFrameInstanceData[&ru][object].first;
-        UINT numInstances = m_perFrameInstanceData[&ru][object].second;
+        UINT startInstance = m_perFrameInstanceData[ru][object].first;
+        UINT numInstances = m_perFrameInstanceData[ru][object].second;
 
-        GetPlatform()->DrawIndexedInstanced(ru.m_mesh->m_bufferOffsets->IndexCount, numInstances, ru.m_mesh->m_bufferOffsets->IndexOffset,
-            ru.m_mesh->m_bufferOffsets->VertexOffset, startInstance);
+        GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets->IndexCount, numInstances, ru->m_mesh->m_bufferOffsets->IndexOffset,
+            ru->m_mesh->m_bufferOffsets->VertexOffset, startInstance);
     }
     return S_OK;
 }
@@ -301,19 +301,21 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
 {
     RenderUnit* unit = nullptr;
 
-    for (RenderUnit& ru : m_renderUnits)
+    for (RenderUnit* ru : m_renderUnits)
     {
-        if (ru.m_material == material && ru.m_mesh == mesh) 
+        if (ru->m_material == material && ru->m_mesh == mesh) 
         {
-            unit = &ru;
+            unit = ru;
             break;
         }
     }
 
     if (unit == nullptr)
     {
-        m_renderUnits.emplace_back(RenderUnit(material, mesh));
-        unit = &(*m_renderUnits.rbegin());
+        HRR(GetPlatform()->CreateRenderUnit(material, mesh, &unit));
+        m_renderUnits.push_back(unit);
+        //m_renderUnits.emplace_back(RenderUnit(material, mesh));
+        //unit = &(*m_renderUnits.rbegin());
     }
 
     // Update object to instance buffer look up table if not present
@@ -585,6 +587,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(LoadTexture);
     ASSIGN_FUNC(CreateTexture2D);
     ASSIGN_FUNC(CreateD3DBuffer);
+    ASSIGN_FUNC(CreateRenderUnit);
 
     ASSIGN_FUNC(SetFrameSceneData);
 

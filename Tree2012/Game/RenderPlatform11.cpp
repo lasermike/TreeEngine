@@ -376,6 +376,12 @@ HRESULT RenderPlatform11::UninitGameLevelGraphics()
     }
     m_gameLevelBuffers.clear();
 
+    for (RenderUnit* ru : m_gameLevelRenderUnits)
+    {
+        delete ru;
+    }
+    m_gameLevelRenderUnits.clear();
+
     InputLayoutsManager::DestroyAll();
 
     return S_OK;
@@ -963,6 +969,13 @@ HRESULT RenderPlatform11::LoadPixelShader(const wchar_t* shaderFilename, PixelSh
 
     *shader = pixelShader;
 
+    return S_OK;
+}
+
+HRESULT RenderPlatform11::CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit)
+{
+    *renderUnit = new RenderUnit(material, mesh);
+    m_gameLevelRenderUnits.push_back(*renderUnit);
     return S_OK;
 }
 

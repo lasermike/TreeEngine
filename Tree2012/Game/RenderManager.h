@@ -58,22 +58,6 @@ public:
     }
 };
 
-struct RenderUnit
-{
-    Material*                   m_material;
-    Mesh*                       m_mesh;
-
-    UINT                        totalMaxInstances; // TODO Needed?
-    std::list<WorldObject*>     reservations;
-
-    RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh), totalMaxInstances(0)
-    {
-        assert(m_material);
-        assert(m_mesh);
-    }
-};
-
-
 interface IRenderFrame
 {
     virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
@@ -91,7 +75,7 @@ class RenderManager : public IRenderFrame
     std::map<wstring, VertexShader*>                m_vertexShaders;
     std::map<wstring, PixelShader*>                 m_pixelShaders;
 
-    std::list<RenderUnit>                           m_renderUnits;
+    std::list<RenderUnit*>                          m_renderUnits;
     std::map<WorldObject*, UINT>                    m_objectToInstanceBufferOffset;  // Filled in during scene initialization
     UINT                                            m_nextInstanceBufferOffset;		 // Used during initialization
 
@@ -119,7 +103,7 @@ class RenderManager : public IRenderFrame
 
     HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
     HRESULT LoadShader(const wchar_t* shaderFilename, ShaderType shaderType);
-    HRESULT Render(RenderUnit& renderUnit, RenderPass pass);
+    HRESULT Render(RenderUnit* renderUnit, RenderPass pass);
     HRESULT RenderScene(RenderPass pass);
 
     void BuildShadowTransform();

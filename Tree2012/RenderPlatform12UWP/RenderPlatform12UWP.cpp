@@ -161,6 +161,11 @@ RENDERPLATFORM_API HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelS
     return m_pPlatform->LoadPixelShader(shaderFilename, shader);
 }
 
+RENDERPLATFORM_API HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit)
+{
+    return m_pPlatform->CreateRenderUnit(material, mesh, renderUnit);
+}
+
 RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb)
 {
     return m_pPlatform->SetFrameSceneData(cb);
