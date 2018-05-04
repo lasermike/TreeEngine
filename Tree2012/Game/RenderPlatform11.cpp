@@ -812,9 +812,9 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         ps = m_pixelShader;
     }
 
-    Material* newMat = new Material(name, texture, InputLayoutsManager::InstancedBasic16, vs, ps,
+    Material* newMat = new Material(name, texture, vs, ps,
         nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
-        shaderMaterial, constBuffer);
+        shaderMaterial, constBuffer, renderState);
 
     m_gameLevelBuffers.push_back(constBuffer->Resource());
 
@@ -823,12 +823,12 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     return S_OK;
 }
 
-HRESULT RenderPlatform11::SetMaterial(Material* material, RenderPass pass)
+HRESULT RenderPlatform11::SetRenderUnit(RenderUnit* ru, RenderPass pass)
 {
     CBMaterial cb;
-    cb.material = material->m_shaderMaterial;
+    cb.material = ru->m_material->m_shaderMaterial;
 
-    ID3D11Buffer* constBuffer = material->m_constBuffer->Resource();
+    ID3D11Buffer* constBuffer = ru->m_material->m_constBuffer->Resource();
 
     m_immediateContext->VSSetConstantBuffers(3, 1, &constBuffer);
     m_immediateContext->PSSetConstantBuffers(3, 1, &constBuffer);
@@ -836,20 +836,20 @@ HRESULT RenderPlatform11::SetMaterial(Material* material, RenderPass pass)
     // TODO: support arbitary vertex shaders with shadow mapping
     if (pass != ShadowMapPass)
     {
-        ID3D11VertexShader* vertexShader = material->m_vertexShader->shader ? material->m_vertexShader->shader : m_vertexShader->shader;
+        ID3D11VertexShader* vertexShader = ru->m_material->m_vertexShader->shader ? ru->m_material->m_vertexShader->shader : m_vertexShader->shader;
         m_immediateContext->VSSetShader(vertexShader, nullptr, 0);
 
-        ID3D11PixelShader* pixelShader = material->m_pixelShader->shader ? material->m_pixelShader->shader : m_pixelShader->shader;
+        ID3D11PixelShader* pixelShader = ru->m_material->m_pixelShader->shader ? ru->m_material->m_pixelShader->shader : m_pixelShader->shader;
         m_immediateContext->PSSetShader(pixelShader, nullptr, 0);
     }
 
-    m_immediateContext->UpdateSubresource(material->m_constBuffer->Resource(), 0, nullptr, &cb, 0, 0);
+    m_immediateContext->UpdateSubresource(ru->m_material->m_constBuffer->Resource(), 0, nullptr, &cb, 0, 0);
 
     ID3D11ShaderResourceView* texture = nullptr;
 
-    if (material->m_texture)
+    if (ru->m_material->m_texture)
     {
-        texture = material->m_texture->texture;
+        texture = ru->m_material->m_texture->texture;
     }
 
     m_immediateContext->PSSetShaderResources(0, 1, &texture);

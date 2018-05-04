@@ -154,7 +154,7 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
 
 HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 {
-    GetPlatform()->SetMaterial(ru->m_material, pass);
+    GetPlatform()->SetRenderUnit(ru, pass);
 
     for (auto object : ru->reservations)
     {
@@ -314,8 +314,6 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
     {
         HRR(GetPlatform()->CreateRenderUnit(material, mesh, &unit));
         m_renderUnits.push_back(unit);
-        //m_renderUnits.emplace_back(RenderUnit(material, mesh));
-        //unit = &(*m_renderUnits.rbegin());
     }
 
     // Update object to instance buffer look up table if not present
@@ -583,7 +581,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(EndDrawText);
 
     ASSIGN_FUNC(CreateMaterial);
-    ASSIGN_FUNC(SetMaterial);
+    ASSIGN_FUNC(SetRenderUnit);
     ASSIGN_FUNC(LoadTexture);
     ASSIGN_FUNC(CreateTexture2D);
     ASSIGN_FUNC(CreateD3DBuffer);

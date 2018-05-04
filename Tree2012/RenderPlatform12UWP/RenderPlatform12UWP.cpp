@@ -131,9 +131,9 @@ RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* te
     return m_pPlatform->CreateMaterial(name, texture, vs, ps, shaderMaterial, renderState, materialNum, newMaterial);
 }
 
-RENDERPLATFORM_API HRESULT SetMaterial(Material* material, RenderPass pass)
+RENDERPLATFORM_API HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass)
 {
-    return m_pPlatform->SetMaterial(material, pass);
+    return m_pPlatform->SetRenderUnit(ru, pass);
 }
 
 RENDERPLATFORM_API HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture)

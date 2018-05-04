@@ -50,7 +50,7 @@ RENDERPLATFORM_API HRESULT EndDrawText();
 // Materials
 RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
     ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
-RENDERPLATFORM_API HRESULT SetMaterial(Material* material, RenderPass pass);
+RENDERPLATFORM_API HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass);
 RENDERPLATFORM_API HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
 RENDERPLATFORM_API HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 RENDERPLATFORM_API HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);

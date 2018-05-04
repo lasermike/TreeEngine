@@ -252,14 +252,14 @@ struct Material
     VertexShader*                   m_vertexShader;
     PixelShader*                    m_pixelShader;
 
+    StockRenderState                m_renderState;
+
 #if defined(TREE3D12)
 
     UploadBuffer<CBMaterial>*       m_constBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE     m_cbvSrvHeapTable;
-    ID3D12PipelineState*            m_pipelineStates[NUM_RENDER_PASSES];
 
     // NYI
-    const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
     void* m_samplerState;
     void* m_rasterizer;
     void* m_depthState;
@@ -269,7 +269,6 @@ struct Material
     UploadBuffer<CBMaterial>*       m_constBuffer;
 
     // NYI
-    ID3D11InputLayout*        m_inputLayout;
     ID3D11SamplerState*       m_samplerState;
     ID3D11RasterizerState*    m_rasterizer;
     ID3D11DepthStencilState*  m_depthState;
@@ -277,26 +276,19 @@ struct Material
 
 public:
 #if defined(TREE3D12)
-    Material(const wchar_t* name,
-        LoadedTexture* texture, const D3D12_INPUT_ELEMENT_DESC* inputLayout,
+    Material(const wchar_t* name, LoadedTexture* texture,
         VertexShader* vertexShader, PixelShader* pixelShader, D3D12_STATIC_SAMPLER_DESC* samplerState,
         D3D12_RASTERIZER_DESC* rasterizer, D3D12_DEPTH_STENCIL_DESC* depthState,
         ShaderMaterial shaderMaterial, UploadBuffer<CBMaterial>* constBuffer,
-        D3D12_GPU_DESCRIPTOR_HANDLE srvHeapTable, ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES]) :
-        m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
+        D3D12_GPU_DESCRIPTOR_HANDLE srvHeapTable, StockRenderState renderState) :
+        m_name(name), m_texture(texture), m_vertexShader(vertexShader),
         m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
         m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer),
-        m_cbvSrvHeapTable(srvHeapTable)
+        m_cbvSrvHeapTable(srvHeapTable), m_renderState(renderState)
     {
         ASSERT(m_vertexShader != nullptr);
         ASSERT(m_pixelShader != nullptr);
-        ASSERT(m_inputLayout != nullptr);
         ASSERT(m_constBuffer != nullptr);
-
-        for (int i = 0; i < NUM_RENDER_PASSES; i++)
-        {
-            m_pipelineStates[i] = pipelineStates[i];
-        }
 
         // TODO: create a pipeline state object for these
         //ASSERT(m_samplerState != nullptr);
@@ -304,25 +296,18 @@ public:
         //ASSERT(m_depthState != nullptr);
     }
 
-    Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
+    Material() : m_name(), m_texture(nullptr), m_vertexShader(nullptr),
         m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
         m_depthState(nullptr), m_constBuffer(), m_cbvSrvHeapTable()
-    {
-        ZeroMemory(m_pipelineStates, sizeof(m_pipelineStates));
-    }
+    { }
 
     // Copy constructor
     Material(Material const& rhs) :
-        m_name(rhs.m_name), m_texture(rhs.m_texture), m_inputLayout(rhs.m_inputLayout), m_vertexShader(rhs.m_vertexShader),
+        m_name(rhs.m_name), m_texture(rhs.m_texture), m_vertexShader(rhs.m_vertexShader),
         m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
         m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer),
-        m_cbvSrvHeapTable(rhs.m_cbvSrvHeapTable)
-    {
-        for (int i = 0; i < NUM_RENDER_PASSES; i++)
-        {
-            m_pipelineStates[i] = rhs.m_pipelineStates[i];
-        }
-    };
+        m_cbvSrvHeapTable(rhs.m_cbvSrvHeapTable), m_renderState(rhs.m_renderState)
+    { }
 
     ~Material()
     {
@@ -330,33 +315,31 @@ public:
     }
 
 #elif defined(TREE3D11)
-    Material(const wchar_t* name,
-        LoadedTexture* texture, ID3D11InputLayout* inputLayout,
+    Material(const wchar_t* name, LoadedTexture* texture,
         VertexShader* vertexShader, PixelShader* pixelShader, ID3D11SamplerState* samplerState,
         ID3D11RasterizerState* rasterizer, ID3D11DepthStencilState* depthState,
-        ShaderMaterial shaderMaterial, UploadBuffer<CBMaterial>* constBuffer) :
-        m_name(name), m_texture(texture), m_inputLayout(inputLayout), m_vertexShader(vertexShader),
+        ShaderMaterial shaderMaterial, UploadBuffer<CBMaterial>* constBuffer, StockRenderState renderState) :
+        m_name(name), m_texture(texture), m_vertexShader(vertexShader),
         m_pixelShader(pixelShader), m_samplerState(samplerState), m_rasterizer(rasterizer),
-        m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer)
+        m_depthState(depthState), m_shaderMaterial(shaderMaterial), m_constBuffer(constBuffer), m_renderState(renderState)
     {
         ASSERT(m_vertexShader != nullptr);
         ASSERT(m_pixelShader != nullptr);
-        ASSERT(m_inputLayout != nullptr);
         ASSERT(m_constBuffer != nullptr);
         //TODO
         //ASSERT(m_samplerState != nullptr);
         //ASSERT(m_rasterizer != nullptr);
         //ASSERT(m_depthState != nullptr);
     }
-    Material() : m_name(), m_texture(nullptr), m_inputLayout(nullptr), m_vertexShader(nullptr),
+    Material() : m_name(), m_texture(nullptr), m_vertexShader(nullptr),
         m_pixelShader(nullptr), m_samplerState(nullptr), m_rasterizer(nullptr),
         m_depthState(nullptr), m_constBuffer() { }
 
     // Necessary?
     Material(Material const& rhs) :
-        m_name(rhs.m_name), m_texture(rhs.m_texture), m_inputLayout(rhs.m_inputLayout), m_vertexShader(rhs.m_vertexShader),
+        m_name(rhs.m_name), m_texture(rhs.m_texture), m_vertexShader(rhs.m_vertexShader),
         m_pixelShader(rhs.m_pixelShader), m_samplerState(rhs.m_samplerState), m_rasterizer(rhs.m_rasterizer),
-        m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer)
+        m_depthState(rhs.m_depthState), m_shaderMaterial(rhs.m_shaderMaterial), m_constBuffer(rhs.m_constBuffer), m_renderState(rhs.m_renderState)
     {};        // Copy constructor
 
     ~Material()
@@ -389,14 +372,30 @@ struct RenderUnit
     ID3D12PipelineState*            m_pipelineStates[NUM_RENDER_PASSES];
     //const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
 
-#elif defined(TREE3D11)
-#endif
 
-    RenderUnit(Material* material, Mesh* mesh) : m_material(material), m_mesh(mesh), totalMaxInstances(0)
+    RenderUnit(Material* material, Mesh* mesh, ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES]) : 
+        m_material(material), m_mesh(mesh), totalMaxInstances(0)
+    {
+        assert(m_material);
+        assert(m_mesh);
+        assert(pipelineStates);
+
+        for (int i = 0; i < NUM_RENDER_PASSES; i++)
+        {
+            m_pipelineStates[i] = pipelineStates[i];
+        }
+    }
+
+#elif defined(TREE3D11)
+
+    RenderUnit(Material* material, Mesh* mesh) :
+        m_material(material), m_mesh(mesh), totalMaxInstances(0)
     {
         assert(m_material);
         assert(m_mesh);
     }
+
+#endif
 };
 
 
@@ -519,7 +518,7 @@ public:
     // Materials
     virtual HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
                                    ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial) = 0;
-    virtual HRESULT SetMaterial(Material* material, RenderPass pass) = 0;
+    virtual HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass) = 0;
     virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
     virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
     virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer) = 0;
@@ -699,7 +698,7 @@ public:
     // Materials
     HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
         ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
-    HRESULT SetMaterial(Material* material, RenderPass pass);
+    HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
@@ -844,7 +843,7 @@ public:
     // Materials
     HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
         ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
-    HRESULT SetMaterial(Material* material, RenderPass pass);
+    HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
     HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit);
@@ -915,7 +914,7 @@ typedef HRESULT (*EndDrawTextFunc)();
 
 typedef HRESULT (*CreateMaterialFunc)(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
                                       ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
-typedef HRESULT (*SetMaterialFunc)(Material* material, RenderPass pass);
+typedef HRESULT (*SetRenderUnitFunc)(RenderUnit* ru, RenderPass pass);
 typedef HRESULT (*LoadTextureFunc)(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
 typedef HRESULT (*CreateTexture2DFunc)(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
@@ -967,7 +966,7 @@ class RenderPlatformDLL : public RenderPlatform
     EndDrawTextFunc EndDrawTextFuncPtr;
 
     CreateMaterialFunc CreateMaterialFuncPtr;
-    SetMaterialFunc SetMaterialFuncPtr;
+    SetRenderUnitFunc SetRenderUnitFuncPtr;
     LoadTextureFunc LoadTextureFuncPtr;
     CreateTexture2DFunc CreateTexture2DFuncPtr;
     CreateD3DBufferFunc CreateD3DBufferFuncPtr;
@@ -1033,7 +1032,7 @@ public:
         return CreateMaterialFuncPtr(name, texture, vs, ps, shaderMaterial, renderState, materialNum, newMaterial);
     }
 
-    HRESULT SetMaterial(Material* material, RenderPass pass) { return SetMaterialFuncPtr(material, pass); }
+    HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass) { return SetRenderUnitFuncPtr(ru, pass); }
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture)
     {
         return LoadTextureFuncPtr(textureFilename, textureIndex, loadedTexture);

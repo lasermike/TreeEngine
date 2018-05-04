@@ -558,22 +558,22 @@ HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
     return S_OK;
 }
 
-HRESULT RenderPlatform12::SetMaterial(Material* material, RenderPass pass)
+HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
 {
     // TODO: Set material PSO
 
-    CBMaterial mat = { material->m_shaderMaterial };
+    CBMaterial mat = { ru->m_material->m_shaderMaterial };
 
-    material->m_constBuffer->CopyData(0, mat);
+    ru->m_material->m_constBuffer->CopyData(0, mat);
 
     // Set constant buffer view
-    GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, material->m_cbvSrvHeapTable);
+    GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, ru->m_material->m_cbvSrvHeapTable);
 
     // Set texture buffer view
-    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_shaderHeap.GetIncrementSize());
+    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(ru->m_material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_shaderHeap.GetIncrementSize());
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
-    GetCommandList()->SetPipelineState(material->m_pipelineStates[pass]);
+    GetCommandList()->SetPipelineState(ru->m_pipelineStates[pass]);
 
     return S_OK;
 }
@@ -708,7 +708,7 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
-    // create PSO
+/*    // create PSO
     // TODO: Skinned VB??
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     if (false)
@@ -760,10 +760,10 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 
     // TODO create own shadow PSO
     ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
-
-    Material* newMat = new Material(name, texture, InputLayoutDesc::InstancedBasic16, vs, ps,
+*/
+    Material* newMat = new Material(name, texture, vs, ps,
         nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
-        shaderMaterial, uploadBuffer, gpuMaterialHandle, pipelineStates);
+        shaderMaterial, uploadBuffer, gpuMaterialHandle, renderState);
 
     *newMaterial = newMat;
 
@@ -772,7 +772,60 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 
 HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit)
 {
-    *renderUnit = new RenderUnit(material, mesh);
+    // create PSO
+    // TODO: Skinned VB??
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    if (false)
+    {
+        psoDesc.InputLayout = { InputLayoutDesc::InstancedSkinned, _countof(InputLayoutDesc::InstancedSkinned) };
+    }
+    else
+    {
+        psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
+    }
+
+    psoDesc.pRootSignature = m_rootSignature;
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(material->m_vertexShader->shader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(material->m_pixelShader->shader);
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+
+    StockRenderStates::GetInstance().CopyBlendTemplate(psoDesc.BlendState, material->m_renderState.blendState);
+
+    // TODO: fill out other render states in PSO
+
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = GetSwapChainFormat();
+    psoDesc.SampleDesc.Count = 1;
+
+    ID3D12PipelineState* pipelineState = nullptr;
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
+    m_gameLevelPSOs.push_back(pipelineState);
+
+    // Shadow pass PSO
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
+    shadowPsoDesc.RasterizerState.DepthBias = 100000;
+    shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
+    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_shadowVertexShader);
+    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_shadowPixelShader);
+    shadowPsoDesc.DSVFormat = ShadowMap::Format();
+
+    // Shadow map pass does not have a render target.
+    shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+    shadowPsoDesc.NumRenderTargets = 0;
+
+    ID3D12PipelineState* pipelineStateShadowMap = nullptr;
+    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&pipelineStateShadowMap)));
+    m_gameLevelPSOs.push_back(pipelineStateShadowMap);
+
+    // TODO create own shadow PSO
+    ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
+
+    *renderUnit = new RenderUnit(material, mesh, pipelineStates);
     m_gameLevelRenderUnits.push_back(*renderUnit);
     return S_OK;
 }
@@ -1195,7 +1248,7 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     m_commandList->IASetIndexBuffer(&m_IBView);
     m_commandList->OMSetStencilRef(0);
 
-    // Set default material (first material).  Will be changed by calls to SetMaterial()
+    // Set default material (first material).  Will be changed by calls to SetRenderUnit()
     D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_shaderHeap.hGPU(Material0_HeapOffset);;
     m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, materialHandle);
 
