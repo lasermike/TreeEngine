@@ -81,6 +81,8 @@ struct GeometryBufferData
     {
         vertices.clear();
         indices.clear();
+        skinnedVertices.clear();
+        skinnedIndices.clear();
     }
 
     const BufferOffsets* const GetBufferOffsets(PrimitiveType primType)

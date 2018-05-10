@@ -290,9 +290,9 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 }
 
 HRESULT RenderManager::CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
-    const GeometryBufferData::BufferOffsets* bufferOffsets, Mesh** newMesh)
+    const GeometryBufferData::BufferOffsets* bufferOffsets, InputLayouts inputLayout, Mesh** newMesh)
 {
-    m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferOffsets)));
+    m_meshes.emplace(std::make_pair(name, Mesh(vertexBuffer, indexBuffer, bufferOffsets, inputLayout)));
     *newMesh = &m_meshes[name];
     return S_OK;
 }

@@ -236,7 +236,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&m_vertexBuffer.buffer)));
-    HRR(m_vertexBuffer.buffer->SetName(L"Vertex Buffer"));
+    HRR(m_vertexBuffer.buffer->SetName(L"Simple vertex buffer"));
 
     // copy the triangle data to the vertex buffer
     UINT8* dataBegin;
@@ -258,7 +258,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&m_indexBuffer.buffer)));
-    HRR(m_indexBuffer.buffer->SetName(L"Index Buffer"));
+    HRR(m_indexBuffer.buffer->SetName(L"Simple index buffer"));
 
     // copy the index data to the index buffer
     m_indexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
@@ -282,7 +282,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&m_skinnedVertexBuffer.buffer)));
-    HRR(m_skinnedVertexBuffer.buffer->SetName(L"Skinned vertex Buffer"));
+    HRR(m_skinnedVertexBuffer.buffer->SetName(L"Skinned vertex buffer"));
 
     // copy the triangle data to the vertex buffer
     dataBegin = nullptr;
@@ -548,20 +548,13 @@ HRESULT RenderPlatform12::EndFrame(D3DBuffer* buffer)
 
 HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
 {
-    D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
-    buffers[0] = m_VBView;
-    buffers[1] = instancedBuffer->Get(m_renderData->frame)->view;   
-
-    GetCommandList()->IASetVertexBuffers(0, 2, buffers);
-    GetCommandList()->IASetIndexBuffer(&m_IBView);
+    m_currentInstanceBuffer = instancedBuffer->Get(m_renderData->frame);
 
     return S_OK;
 }
 
 HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
 {
-    // TODO: Set material PSO
-
     CBMaterial mat = { ru->m_material->m_shaderMaterial };
 
     ru->m_material->m_constBuffer->CopyData(0, mat);
@@ -574,6 +567,14 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
     GetCommandList()->SetPipelineState(ru->m_pipelineStates[pass]);
+
+    // Set vertex/index buffers
+    D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
+    buffers[0] = ru->m_mesh->m_inputLayout == SKINNED_INPUT_LAYOUT ? m_skinnedVBView : m_VBView;
+    buffers[1] = m_currentInstanceBuffer->view;
+
+    GetCommandList()->IASetVertexBuffers(0, 2, buffers);
+    GetCommandList()->IASetIndexBuffer(ru->m_mesh->m_inputLayout == SKINNED_INPUT_LAYOUT ? &m_skinnedIBView : &m_IBView);
 
     return S_OK;
 }
@@ -773,9 +774,8 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit)
 {
     // create PSO
-    // TODO: Skinned VB??
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    if (false)
+    if (mesh->m_inputLayout == SKINNED_INPUT_LAYOUT)
     {
         psoDesc.InputLayout = { InputLayoutDesc::InstancedSkinned, _countof(InputLayoutDesc::InstancedSkinned) };
     }

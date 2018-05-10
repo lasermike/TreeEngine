@@ -50,7 +50,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
     renderManager.CreateMesh(L"ground", 
                              renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
                              renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
-                             pBufferOffsets, &newMesh);
+                             pBufferOffsets, BASIC_INPUT_LAYOUT, &newMesh);
 
     renderManager.ReserveRenderUnit(newMaterial, newMesh, this, &m_renderUnit);
 

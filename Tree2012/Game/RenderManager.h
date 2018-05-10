@@ -28,36 +28,6 @@ enum ShaderType
     ShaderType_ComputeShader,
 };
 
-struct MeshBuffers
-{
-    D3DBuffer m_vertexBuffer;
-    D3DBuffer m_indexBuffer;
-
-    MeshBuffers() : m_vertexBuffer(), m_indexBuffer() { }
-
-    MeshBuffers(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer) :
-        m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer)
-    {
-        //assert(m_vertexBuffer);
-        //assert(m_indexBuffer);
-    }
-};
-
-struct Mesh : public MeshBuffers
-{
-
-    const GeometryBufferData::BufferOffsets* m_bufferOffsets;
-
-public:
-    Mesh() : MeshBuffers(), m_bufferOffsets(nullptr) { }
-    Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferOffsets* bufferOffsets) :
-        MeshBuffers(vertexBuffer, indexBuffer),
-        m_bufferOffsets(bufferOffsets)
-    {
-        //assert(m_bufferIndices);
-    }
-};
-
 interface IRenderFrame
 {
     virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
@@ -138,7 +108,7 @@ public:
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, 
                            ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
     HRESULT CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
-        const GeometryBufferData::BufferOffsets* bufferIndices, Mesh** newMesh);
+        const GeometryBufferData::BufferOffsets* bufferIndices, InputLayouts inputLayout, Mesh** newMesh);
 
     HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);

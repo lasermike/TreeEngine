@@ -356,7 +356,43 @@ public:
     }
 };
 
-struct Mesh;
+/*
+struct MeshBuffers
+{
+    InputLayouts m_inputLayout;
+
+    D3DBuffer m_vertexBuffer;
+    D3DBuffer m_indexBuffer;
+
+    MeshBuffers() : m_vertexBuffer(), m_indexBuffer(), m_inputLayout(BASIC_INPUT_LAYOUT) { }
+
+    MeshBuffers(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, InputLayouts inputLayout) :
+        m_vertexBuffer(*vertexBuffer), m_indexBuffer(*indexBuffer), m_inputLayout(inputLayout)
+    {
+        //assert(m_vertexBuffer);
+        //assert(m_indexBuffer);
+    }
+};*/
+
+struct Mesh //: public MeshBuffers
+{
+    InputLayouts m_inputLayout;
+
+    D3DBuffer* m_vertexBuffer;
+    D3DBuffer* m_indexBuffer;
+
+    const GeometryBufferData::BufferOffsets* m_bufferOffsets;
+
+public:
+    Mesh() : m_bufferOffsets(nullptr), m_vertexBuffer(nullptr), m_indexBuffer(nullptr), m_inputLayout(BASIC_INPUT_LAYOUT) { }
+    Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferOffsets* bufferOffsets, InputLayouts inputLayout) :
+        m_vertexBuffer(vertexBuffer), m_indexBuffer(indexBuffer), m_inputLayout(inputLayout),
+        m_bufferOffsets(bufferOffsets)
+    {
+        //assert(m_bufferOffsets);
+    }
+};
+
 class WorldObject;
 
 struct RenderUnit
@@ -455,6 +491,7 @@ protected:
 
     DXGI_FORMAT                       m_swapChainFormat;
 
+    D3DBuffer*                        m_currentInstanceBuffer;
 public:
 
     RenderPlatform() :

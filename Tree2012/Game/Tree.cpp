@@ -59,28 +59,37 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
         _params->textureFilename.push_back(L"Bark_0005_diffuse.dds");
     }
 
-    GeometryBuffer geometryBuffer = _params->meshes[0] == PrimitiveType_SkinnedCylinder ? SKINNED_PRIMITIVE_GEOMETRY_BUFFER : PRIMITIVE_GEOMETRY_BUFFER;
+    GeometryBuffer geometryBuffer = PRIMITIVE_GEOMETRY_BUFFER;
+    std::wstring vsFilename;
+    std::wstring psFilename;
+    InputLayouts inputLayout = BASIC_INPUT_LAYOUT;
+    if (_params->meshes[0] == PrimitiveType_SkinnedCylinder)
+    {
+        geometryBuffer = SKINNED_PRIMITIVE_GEOMETRY_BUFFER;
+        vsFilename = L"VSSkinned.cso";
+        inputLayout = SKINNED_INPUT_LAYOUT;
+    }
 
     // Create material, mesh, and reserve render unit
     Material* pTrunk = nullptr;
-    renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &pTrunk);
+    renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), vsFilename.c_str(), nullptr, _params->materials[0], StockRenderState(), &pTrunk);
     Mesh* pNewMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_params->meshes[0]);
-    renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, &pNewMesh);
+    renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, inputLayout, &pNewMesh);
     renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
 
     Material* pTwig = nullptr;
     renderManager.CreateMaterial(L"twig", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &pTwig);
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
-    renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, &pNewMesh);
+    renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
     renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
 
     Material* pLeaf = nullptr;
     renderManager.CreateMaterial(L"leaf", L"", nullptr, nullptr, _params->materials[1], StockRenderState(), &pLeaf);
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
-    renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, &pNewMesh);
+    renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
     renderManager.ReserveRenderUnit(pLeaf, pNewMesh, this, &m_leafUnit);
 
     return S_OK;

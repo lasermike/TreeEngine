@@ -443,6 +443,8 @@ void LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameDat
     WorldObjectParams* params3 = new WorldObjectParams(FixedTreeGeneratorType);
     params3->depthLOD = 2;
     params3->position = XMFLOAT3(-1.3f, 0.5f, 1.3f);
+    params3->meshes.push_back(PrimitiveType_SkinnedCylinder);
+
     scene->AddChild(new Tree(params3));
 
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
