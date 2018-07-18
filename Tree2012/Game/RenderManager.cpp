@@ -245,6 +245,7 @@ HRESULT RenderManager::CreateTexture2D(const wchar_t* name, const float* points,
 
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textureFilename,
     const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
+    const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,
     ShaderMaterial& shaderMaterial, StockRenderState renderState, Material** newMaterial)
 {
     auto existing = m_materials.find(name);
@@ -279,9 +280,28 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
         assert(pixelShader);
     }
 
+    // Shadow shaders
+    VertexShader* shadowVertexShader = nullptr;
+    PixelShader* shadowPixelShader = nullptr;
+
+    if (shadowVertexShaderFilename && *shadowVertexShaderFilename)
+    {
+        LoadShader(shadowVertexShaderFilename, ShaderType_VertexShader);
+        shadowVertexShader = m_vertexShaders[shadowVertexShaderFilename];
+        assert(shadowVertexShader);
+    }
+
+    if (shadowPixelShaderFilename && *shadowPixelShaderFilename)
+    {
+        LoadShader(shadowPixelShaderFilename, ShaderType_PixelShader);
+        shadowPixelShader = m_pixelShaders[shadowPixelShaderFilename];
+        assert(shadowPixelShader);
+    }
+
+
     Material* newMat = nullptr;
-    GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shaderMaterial,
-        renderState, (int) m_materials.size(), &newMat);
+    GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shadowVertexShader, shadowPixelShader, shaderMaterial,
+                                  renderState, (int) m_materials.size(), &newMat);
 
     m_materials[name] = newMat;
     *newMaterial = newMat;

@@ -104,8 +104,9 @@ public:
     HRESULT UpdateView(XMFLOAT4X4* pProjMat, bool shadowPass);
 
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height);
-    HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename, 
+    HRESULT CreateMaterial(const wchar_t* name, const wchar_t* textureFilename,
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, 
+                           const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename, 
                            ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
     HRESULT CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
         const GeometryBufferData::BufferOffsets* bufferIndices, InputLayouts inputLayout, Mesh** newMesh);

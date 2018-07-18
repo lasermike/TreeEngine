@@ -48,8 +48,8 @@ RENDERPLATFORM_API HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ c
 RENDERPLATFORM_API HRESULT EndDrawText();
 
 // Materials
-RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-    ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
+RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps, VertexShader* shadowVs, PixelShader* shadowPs,
+                                          ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
 RENDERPLATFORM_API HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass);
 RENDERPLATFORM_API HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
 RENDERPLATFORM_API HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);

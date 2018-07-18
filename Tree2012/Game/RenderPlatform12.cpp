@@ -677,8 +677,8 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
     return S_OK;
 }
 
-HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-    ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial)
+HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps, VertexShader* shadowVs, PixelShader* shadowPs,
+                                         ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial)
 {
     if (!vs)
     {
@@ -688,6 +688,16 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     if (!ps)
     {
         ps = m_pixelShader;
+    }
+
+    if (!shadowVs)
+    {
+        shadowVs = m_shadowVertexShader;
+    }
+
+    if (!shadowPs)
+    {
+        shadowPs = m_shadowPixelShader;
     }
 
     //
@@ -762,7 +772,7 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     // TODO create own shadow PSO
     ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
 */
-    Material* newMat = new Material(name, texture, vs, ps,
+    Material* newMat = new Material(name, texture, vs, ps, shadowVs, shadowPs,
         nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
         shaderMaterial, uploadBuffer, gpuMaterialHandle, renderState);
 

@@ -43,7 +43,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 
     // Create material, mesh, and reserve render unit
     Material* newMaterial = nullptr;
-    renderManager.CreateMaterial(L"ground", _params->textureFilename[0].c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
+    renderManager.CreateMaterial(L"ground", _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
 
     Mesh* newMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_model->GetPrimitiveType());

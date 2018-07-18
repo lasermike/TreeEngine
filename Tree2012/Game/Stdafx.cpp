@@ -218,7 +218,8 @@ void GetHardwareAdapter(IDXGIFactory2* pFactory, IDXGIAdapter1** ppAdapter)
         DXGI_ADAPTER_DESC1 desc;
         adapter->GetDesc1(&desc);
 
-        if (wcsstr(desc.Description, L"Intel") != nullptr)
+        if (wcsstr(desc.Description, L"NVIDIA") != nullptr)
+        //if (wcsstr(desc.Description, L"Intel") != nullptr) //NVIDIA
         {
             continue;
         }

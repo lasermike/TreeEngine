@@ -125,10 +125,10 @@ RENDERPLATFORM_API HRESULT EndDrawText()
     return m_pPlatform->EndDrawText();
 }
 
-RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
+RENDERPLATFORM_API HRESULT CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps, VertexShader* shadowVs, PixelShader* shadowPs,
                                           ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial)
 {
-    return m_pPlatform->CreateMaterial(name, texture, vs, ps, shaderMaterial, renderState, materialNum, newMaterial);
+    return m_pPlatform->CreateMaterial(name, texture, vs, ps, shadowVs, shadowPs, shaderMaterial, renderState, materialNum, newMaterial);
 }
 
 RENDERPLATFORM_API HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass)

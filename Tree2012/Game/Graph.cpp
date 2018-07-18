@@ -71,7 +71,7 @@ HRESULT FSGraph::InitGraphics(RenderManager& renderManager)
 
 	// Create material, mesh, and reserve render unit
 	Material* newMaterial = nullptr;
-	renderManager.CreateMaterial(L"line0", L"graph", L"FSGraphVS.cso", L"FSGraphPS.cso", mat, 
+	renderManager.CreateMaterial(L"line0", L"graph", L"FSGraphVS.cso", L"FSGraphPS.cso", L"FSGraphVS.cso", L"FSGraphPS.cso", mat,
                   StockRenderState(StockBlendStates::AlphaBlend), &newMaterial);
 
 	Mesh* newMesh = nullptr;

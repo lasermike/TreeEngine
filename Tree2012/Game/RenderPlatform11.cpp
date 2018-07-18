@@ -17,24 +17,19 @@ public:
     static void DestroyAll();
 
     static ID3DInputLayout* InstancedBasic16;
+    static ID3DInputLayout* InstancedSkinned;
     static ID3DInputLayout* Basic32;
 };
 
 ID3DInputLayout* InputLayoutsManager::InstancedBasic16 = 0;
+ID3DInputLayout* InputLayoutsManager::InstancedSkinned = 0;
 ID3DInputLayout* InputLayoutsManager::Basic32 = 0;
 
-void InputLayoutsManager::InitAll(ID3D11Device* device, const void* pShaderBytecodeWithInputSignature, SIZE_T byteCodeLen)
-{
-    HR(device->CreateInputLayout(InputLayoutDesc::InstancedBasic16,
-        ARRAYSIZE(InputLayoutDesc::InstancedBasic16),
-        pShaderBytecodeWithInputSignature /*passDesc.pIAInputSignature*/,
-        byteCodeLen /*passDesc.IAInputSignatureSize*/, &InstancedBasic16));
-    SetDebugName(InstancedBasic16, "RenderManager InstancedBasic16");
-}
 
 void InputLayoutsManager::DestroyAll()
 {
     SafeRelease(&InstancedBasic16);
+    SafeRelease(&InstancedSkinned);
     SafeRelease(&Basic32);
 }
 
@@ -228,12 +223,28 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_constBufferChangesEveryFrame = new UploadBuffer<CBChangesEveryFrame>(GetDevice(), 1, true);
     SetDebugName(m_constBufferChangesEveryFrame->Resource(), "RenderManager::m_constBufferChangesEveryFrame");
 
-    // Create input layout 1
+    // Create input layout Basic16
     std::vector< BYTE > dataVS;
     HRR(XSF::LoadBlob(L"VS.cso", dataVS));
 
-    InputLayoutsManager::InitAll(GetDevice(), &(dataVS)[0], dataVS.size());
+    HR(GetDevice()->CreateInputLayout(InputLayoutDesc::InstancedBasic16,
+        ARRAYSIZE(InputLayoutDesc::InstancedBasic16),
+        &(dataVS)[0] /*passDesc.pIAInputSignature*/,
+        dataVS.size() /*passDesc.IAInputSignatureSize*/,
+        &InputLayoutsManager::InstancedBasic16));
+    SetDebugName(InputLayoutsManager::InstancedBasic16, "RenderManager InstancedBasic16");
+
+    // Set default. Probably not needed
     m_immediateContext->IASetInputLayout(InputLayoutsManager::InstancedBasic16);
+
+    dataVS.clear();
+    HRR(XSF::LoadBlob(L"VSSkinned.cso", dataVS));
+    HR(GetDevice()->CreateInputLayout(InputLayoutDesc::InstancedSkinned,
+        ARRAYSIZE(InputLayoutDesc::InstancedSkinned),
+        &(dataVS)[0] /*passDesc.pIAInputSignature*/,
+        dataVS.size() /*passDesc.IAInputSignatureSize*/,
+        &InputLayoutsManager::InstancedSkinned));
+    SetDebugName(InputLayoutsManager::InstancedSkinned, "RenderManager InstancedSkinned");
 
     // Create input layout 2
     dataVS.clear();
@@ -261,6 +272,7 @@ HRESULT RenderPlatform11::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_shadowPixelShader = nullptr;
 
     HRR(LoadVertexShader(L"BuildShadowMapVS.cso", &m_shadowVertexShader));
+    HRR(LoadPixelShader(L"BuildShadowMapPS.cso", &m_shadowPixelShader));
     // TODO: load a shadow pixel shader to support transparent textures not casting shadows
 
     ////////  Debug window
@@ -623,6 +635,8 @@ void RenderPlatform11::SetFrameSceneData(CBChangesEveryFrame* cb)
 
 HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
 {
+    m_currentInstanceBuffer = instancedBuffer->Get(m_renderData->frame);
+
     // Set samplers
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
     ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap),
@@ -643,17 +657,19 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
         m_immediateContext->PSSetShader(*m_pixelShader, nullptr, 0);
     }
 
-    // Set up input assembler
-    m_immediateContext->IASetInputLayout(InputLayoutsManager::InstancedBasic16);
-    m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
-    m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_currentInstanceBuffer = instancedBuffer->Get(m_renderData->frame);
 
-    // Set vertex buffer
-    // TODO: Move to per-object?
-    UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
-    UINT offset[2] = { 0, 0 };
-    ID3D11Buffer* vbs[2] = { m_vertexBuffer.buffer, *instancedBuffer->Get(m_renderData->frame) };
-    m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+    //// Set up input assembler
+    //m_immediateContext->IASetInputLayout(InputLayoutsManager::InstancedBasic16);
+    //m_immediateContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+    //m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    //// Set vertex buffer
+    //// TODO: Move to per-object?
+    //UINT stride[2] = { sizeof(SimpleVertex), sizeof(InstancedData) };
+    //UINT offset[2] = { 0, 0 };
+    //ID3D11Buffer* vbs[2] = { m_vertexBuffer.buffer, *instancedBuffer->Get(m_renderData->frame) };
+    //m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
 
     return S_OK;
 }
@@ -796,8 +812,8 @@ HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int /*text
     return S_OK;
 }
 
-HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps,
-    ShaderMaterial& shaderMaterial, StockRenderState renderState, int /*materialNum*/, Material** newMaterial)
+HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps, VertexShader* shadowVs, PixelShader* shadowPs,
+                                         ShaderMaterial& shaderMaterial, StockRenderState renderState, int /*materialNum*/, Material** newMaterial)
 {
     UploadBuffer<CBMaterial>* constBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
     SetDebugName(constBuffer->Resource(), "RenderManager::CreateMaterial::pConstBuffer");
@@ -812,7 +828,17 @@ HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         ps = m_pixelShader;
     }
 
-    Material* newMat = new Material(name, texture, vs, ps,
+    if (!shadowVs)
+    {
+        shadowVs = m_shadowVertexShader;
+    }
+
+    if (!shadowPs)
+    {
+        shadowPs = m_shadowPixelShader;
+    }
+
+    Material* newMat = new Material(name, texture, vs, ps, shadowVs, shadowPs,
         nullptr /*ID3D11SamplerState* samplerState*/, nullptr /*ID3D11RasterizerState* rasterizer*/, nullptr /*ID3D11DepthStencilState* depthState*/,
         shaderMaterial, constBuffer, renderState);
 
@@ -842,6 +868,14 @@ HRESULT RenderPlatform11::SetRenderUnit(RenderUnit* ru, RenderPass pass)
         ID3D11PixelShader* pixelShader = ru->m_material->m_pixelShader->shader ? ru->m_material->m_pixelShader->shader : m_pixelShader->shader;
         m_immediateContext->PSSetShader(pixelShader, nullptr, 0);
     }
+    else
+    {
+        ID3D11VertexShader* vertexShader = ru->m_material->m_shadowVertexShader ? ru->m_material->m_shadowVertexShader->shader : m_shadowVertexShader->shader;
+        m_immediateContext->VSSetShader(vertexShader, nullptr, 0);
+
+        ID3D11PixelShader* pixelShader = ru->m_material->m_shadowPixelShader ? ru->m_material->m_shadowPixelShader->shader : m_shadowPixelShader ? m_shadowPixelShader->shader : nullptr;
+        m_immediateContext->PSSetShader(pixelShader, nullptr, 0);
+    }
 
     m_immediateContext->UpdateSubresource(ru->m_material->m_constBuffer->Resource(), 0, nullptr, &cb, 0, 0);
 
@@ -853,6 +887,28 @@ HRESULT RenderPlatform11::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     }
 
     m_immediateContext->PSSetShaderResources(0, 1, &texture);
+
+
+    // Set up input assembler
+    m_immediateContext->IASetInputLayout(ru->m_mesh->m_inputLayout == SKINNED_INPUT_LAYOUT ? InputLayoutsManager::InstancedSkinned : InputLayoutsManager::InstancedBasic16);
+    m_immediateContext->IASetIndexBuffer(ru->m_mesh->m_inputLayout == SKINNED_INPUT_LAYOUT ? m_skinnedIndexBuffer : m_indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+    m_immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Set vertex buffer
+    UINT stride[2] =
+    {
+        ru->m_mesh->m_inputLayout == SKINNED_INPUT_LAYOUT ? sizeof(SkinnedVertex) : sizeof(SimpleVertex),
+        sizeof(InstancedData)};
+
+    UINT offset[2] = { 0, 0 };
+    ID3D11Buffer* vbs[2] = 
+    { 
+        ru->m_mesh->m_inputLayout == SKINNED_INPUT_LAYOUT ? m_skinnedVertexBuffer.buffer : m_vertexBuffer.buffer,
+        *m_currentInstanceBuffer
+    };
+
+    m_immediateContext->IASetVertexBuffers(0, 2, vbs, stride, offset);
+
     return S_OK;
 }
 
