@@ -390,6 +390,56 @@ void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, G
     gameData->clearColor = Colors::White;
 }
 
+void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+{
+    ShaderMaterial trunkMaterial;
+    trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
+    trunkMaterial.Diffuse = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+    trunkMaterial.Specular = XMFLOAT4(0.1f, .1f, .1f, 1.0f);
+    trunkMaterial.flags.y = 0; //useTextures  TODO
+
+    ShaderMaterial leafMaterial;
+    XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
+    leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
+    leafMaterial.flags.y = false; //useTextures  TODO
+
+    WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    params2->position = XMFLOAT3(1.3f, .5f, -1.3f);
+    params2->_animationSpeed = 0.0f;
+    params2->depthLOD = 1;
+    params2->GetGeneratorParameters()._axiom = "G(1)";
+    params2->GetGeneratorParameters()._constants = "";
+    //params2->GetGeneratorParameters()._rules.push_back(Rule("q", "q F [z F][ Z F ] q F [ x F ][X F ] F"));
+    params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F [z F(a)][ Z F(a) ] Y G(a*0.33) F(a)"));
+    params2->GetGeneratorParameters()._angle = XMConvertToRadians(90); // 0.383972f;
+    params2->GetGeneratorParameters()._numIterations = 3;
+    params2->GetGeneratorParameters()._segmentLength = .28f;
+    params2->GetGeneratorParameters().thickness = .020f;
+    params2->_animationSpeed = 5.0f;
+    scene->AddChild(new Tree(params2));
+
+    params2->materials.push_back(trunkMaterial);
+    params2->materials.push_back(leafMaterial);
+
+    params2->meshes.push_back(PrimitiveType_SkinnedCylinder);
+
+    scene->AddChild(new Tree(params2));
+
+    // Init lights 
+    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0f)));
+    renderData->time = 0;
+
+    // Camera
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
+
+    gameData->clearColor = Colors::White;
+}
+
+
 void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
     ShaderMaterial trunkMaterial;
@@ -638,6 +688,9 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
     switch (sceneNum)
     {
     case 0:
+        LoadXmasTree(pScene, pRenderData, pPlayer, gameData);
+        break;
+    case 7:
         LoadTestTree(pScene, pRenderData, pPlayer, gameData);
         break;
     case 2:
