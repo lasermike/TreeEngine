@@ -312,7 +312,7 @@ void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, G
     params2->_animationSpeed = 150.0f;
     params2->position = XMFLOAT3(-1, 1, 2);
     XMStoreFloat4(&params2->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), XM_PIDIV2));
-    params2->GetGeneratorParameters()._axiom = "F(1) x F(1) x F(1) x F(1) x F(1) x F(1) x";
+    params2->GetGeneratorParameters()._axiom = "F(0.1) x F(0.1) x F(0.1) x F(0.1) x F(0.1) x F(0.1) x";
     params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.33) X F(a*0.33) x x F(a*0.33) X F(a*0.33)"));
     params2->GetGeneratorParameters()._constants = "";
     params2->GetGeneratorParameters()._angle = 1.047198f;
@@ -390,6 +390,13 @@ void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, G
     gameData->clearColor = Colors::White;
 }
 
+float SegLengthParam(LSystemParams* params, float cmdParam)
+{
+    float len = cmdParam;
+    return len;
+}
+
+
 void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
     ShaderMaterial trunkMaterial;
@@ -410,13 +417,13 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters()._axiom = "G(1)";
     params2->GetGeneratorParameters()._constants = "";
     //params2->GetGeneratorParameters()._rules.push_back(Rule("q", "q F [z F][ Z F ] q F [ x F ][X F ] F"));
-    params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F [z F(a)][ Z F(a) ] Y G(a*0.33) F(a)"));
-    params2->GetGeneratorParameters()._angle = XMConvertToRadians(90); // 0.383972f;
-    params2->GetGeneratorParameters()._numIterations = 3;
+    params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a*0.1) [z z F(a*0.2)][z z x x F(a*0.2)][ Z Z F(a*0.2) ][ Z Z X X F(a*0.2) ] F(a*0.1) G(a*0.33)"));
+    //params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.5)"));
+    params2->GetGeneratorParameters()._angle = XMConvertToRadians(45); // 0.383972f;
+    params2->GetGeneratorParameters()._numIterations = 2;
     params2->GetGeneratorParameters()._segmentLength = .28f;
     params2->GetGeneratorParameters().thickness = .020f;
     params2->_animationSpeed = 5.0f;
-    scene->AddChild(new Tree(params2));
 
     params2->materials.push_back(trunkMaterial);
     params2->materials.push_back(leafMaterial);
@@ -458,10 +465,10 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     //params3->textureFilename.push_back(L"urchinskin.dds");
     params3->GetGeneratorParameters()._constants = "";
     params3->GetGeneratorParameters()._angle = XM_PI / 4.0f;
-    params3->GetGeneratorParameters()._segmentLength = 0.5f;
+    params3->GetGeneratorParameters()._segmentLength = 1.0f; // 0.5f;
     params3->GetGeneratorParameters().thickness = .20f;
-    params3->GetGeneratorParameters()._axiom = "A";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F[ZF]")); //[zF]
+    params3->GetGeneratorParameters()._axiom = "G(1.0)";
+    params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F[Z F(a * 0.25)]")); //[zF]
     params3->GetGeneratorParameters()._numIterations = 1;
     params3->position = XMFLOAT3(0, 1.0, 0);
     params3->_animationSpeed = 5.0f;
@@ -687,10 +694,10 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 {
     switch (sceneNum)
     {
-    case 0:
+    case 7:
         LoadXmasTree(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 7:
+    case 0:
         LoadTestTree(pScene, pRenderData, pPlayer, gameData);
         break;
     case 2:

@@ -26,7 +26,7 @@ enum EquationType
 
 enum ParamType
 {
-    PT_UNKNOWN,
+    PT_NONE,
     PT_FLOAT,
     PT_EQUATION
 };
@@ -63,7 +63,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
 
     result->symbol = *cmdIt;
 
-    ParamType outputParamType = PT_UNKNOWN;
+    ParamType outputParamType = PT_NONE;
     float param = 0.0f;
     int decimalPosition = 0;
     bool parsingFloat = false;
@@ -91,6 +91,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
             char ch = *paramIt;
             if (paramType == PT_EQUATION)
             {
+                assert(ch < 'A' || ch > 'Z');
                 if (ch >= 'a' && ch <= 'z')
                 {
                     result->param.symbol = ch;
@@ -112,7 +113,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
             {
                 if (ch >= '0' && ch <= '9')
                 {
-                    byte digit = ch - '0';
+                    int digit = ch - '0';
                     if (decimalPosition)
                     {
                         result->param.floatVal += digit / (10.0f * decimalPosition);
@@ -124,7 +125,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
                         result->param.floatVal += digit;
                     }
 
-                    outputParamType = outputParamType == PT_UNKNOWN ? PT_FLOAT : outputParamType;
+                    outputParamType = outputParamType == PT_NONE ? PT_FLOAT : outputParamType;
 
                 }
                 else if (ch == '.')
@@ -140,7 +141,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
 
 void replaceAll(string& inout, const string &search, const string &replace)
 {
-    // First tokenize all strings
+    // Tokenize search string
     Command searchCmd = {};
 
     for (auto searchIt = search.begin(); searchIt != search.end(); searchIt++)
@@ -148,6 +149,7 @@ void replaceAll(string& inout, const string &search, const string &replace)
         GetCommand(searchIt, search.end(), PT_EQUATION, &searchCmd);
     }
 
+    // Tokenize replace string
     std::vector<Command> replaceCmds;
     for (auto& replaceIt = replace.begin(); replaceIt != replace.end(); replaceIt++)
     {
@@ -158,6 +160,7 @@ void replaceAll(string& inout, const string &search, const string &replace)
         }
     }
 
+    // Tokenize input string
     size_t pos = 0;
     std::vector<Command> inputCmds;
     for (auto inoutIt = inout.begin(); inoutIt != inout.end(); inoutIt++)
@@ -169,7 +172,7 @@ void replaceAll(string& inout, const string &search, const string &replace)
         }
     }
 
-    // Second do search/replace
+    // Do search/replace on input
     std::vector<Command> outputCmds;
     for (auto& inputCmd : inputCmds)
     {
@@ -187,6 +190,10 @@ void replaceAll(string& inout, const string &search, const string &replace)
                     else if (replaceCmd.param.equationType == ET_ADD)
                     {
                         replaceCmd.param.floatVal = inputCmd.param.floatVal + replaceCmd.param.floatVal;
+                    }
+                    else
+                    {
+                        replaceCmd.param.floatVal = inputCmd.param.floatVal;
                     }
 
                     replaceCmd.param.paramType = PT_FLOAT;
@@ -206,7 +213,7 @@ void replaceAll(string& inout, const string &search, const string &replace)
     for(auto& outputCmd : outputCmds)
     {
         ss << outputCmd.symbol;
-        if (outputCmd.param.paramType != PT_UNKNOWN)
+        if (outputCmd.param.paramType != PT_NONE)
         {
             assert(outputCmd.param.paramType == PT_FLOAT);
             ss << '(';
@@ -322,13 +329,21 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         case 'F':
         case 'L':
             {
-                float cmdParam = command.param.paramType == PT_FLOAT ? command.param.floatVal : 0.0f;
-                float len = _params.SegmentLength(&_params, cmdParam);
+                float len = 0.0f;
+                if (command.param.paramType == PT_FLOAT)
+                {
+                    len = command.param.floatVal;
+                }
+                else
+                {
+                    len = _params.SegmentLength(&_params, len);
+                }
+                //len = _params.SegmentLength(&_params, len);
 
                 XMVECTOR axis = XMVector3Transform(initialDirection, currentState.matDir);
 
                 XMVECTOR prevPos = currentState.pos;
-                currentState.pos = currentState.pos + axis * len * (command .symbol == 'L' ? 0.5f : 1.0f);
+                currentState.pos = currentState.pos + axis * len * (command .symbol == 'L' ? 0.5f : 1.0f);  // TODO: hack, get rid of this
 
                 XMFLOAT4 tmpPrev, tmpNext;
                 XMStoreFloat4(&tmpPrev, prevPos);
