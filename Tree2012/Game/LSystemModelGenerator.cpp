@@ -116,7 +116,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
                     int digit = ch - '0';
                     if (decimalPosition)
                     {
-                        result->param.floatVal += digit / (10.0f * decimalPosition);
+                        result->param.floatVal += float( digit / (pow(10.0, (double) decimalPosition) ) );
                         decimalPosition++;
                     }
                     else

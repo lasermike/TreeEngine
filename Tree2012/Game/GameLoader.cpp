@@ -468,7 +468,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->GetGeneratorParameters()._segmentLength = 1.0f; // 0.5f;
     params3->GetGeneratorParameters().thickness = .20f;
     params3->GetGeneratorParameters()._axiom = "G(1.0)";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F[Z F(a * 0.25)]")); //[zF]
+    params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F[Z F(a * 0.5)]")); //[zF]
     params3->GetGeneratorParameters()._numIterations = 1;
     params3->position = XMFLOAT3(0, 1.0, 0);
     params3->_animationSpeed = 5.0f;
