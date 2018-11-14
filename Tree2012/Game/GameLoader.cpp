@@ -311,13 +311,15 @@ void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, G
     params2->textureFilename.push_back(L"urchinskin.dds");
     params2->_animationSpeed = 150.0f;
     params2->position = XMFLOAT3(-1, 1, 2);
+    params2->scale = XMFLOAT3(3, 3, 3);
+
     XMStoreFloat4(&params2->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), XM_PIDIV2));
     params2->GetGeneratorParameters()._axiom = "F(0.1) x F(0.1) x F(0.1) x F(0.1) x F(0.1) x F(0.1) x";
     params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.33) X F(a*0.33) x x F(a*0.33) X F(a*0.33)"));
     params2->GetGeneratorParameters()._constants = "";
     params2->GetGeneratorParameters()._angle = 1.047198f;
     params2->GetGeneratorParameters()._numIterations = 3;
-    params2->GetGeneratorParameters()._segmentLength = 0.03f;
+    params2->GetGeneratorParameters()._segmentLength = 6.0f;
     params2->GetGeneratorParameters().thickness = .010f;
     params2->materials.push_back(trunkMaterial);
     params2->materials.push_back(leafMaterial);

@@ -27,7 +27,7 @@ enum EquationType
 enum ParamType
 {
     PT_NONE,
-    PT_FLOAT,
+    PT_DOUBLE,
     PT_EQUATION
 };
 
@@ -35,7 +35,7 @@ struct Param
 {
     char raw[64];
     ParamType paramType;
-    float floatVal;
+    double doubleVal;
     char symbol;
     EquationType equationType;
 };
@@ -109,23 +109,23 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
                 }
             }
 
-            if (paramType == PT_FLOAT || paramType == PT_EQUATION)
+            if (paramType == PT_DOUBLE || paramType == PT_EQUATION)
             {
                 if (ch >= '0' && ch <= '9')
                 {
                     int digit = ch - '0';
                     if (decimalPosition)
                     {
-                        result->param.floatVal += float( digit / (pow(10.0, (double) decimalPosition) ) );
+                        result->param.doubleVal += digit / (pow(10.0, (double) decimalPosition) );
                         decimalPosition++;
                     }
                     else
                     {
-                        result->param.floatVal *= 10.0f;
-                        result->param.floatVal += digit;
+                        result->param.doubleVal *= 10.0;
+                        result->param.doubleVal += digit;
                     }
 
-                    outputParamType = outputParamType == PT_NONE ? PT_FLOAT : outputParamType;
+                    outputParamType = outputParamType == PT_NONE ? PT_DOUBLE : outputParamType;
 
                 }
                 else if (ch == '.')
@@ -182,21 +182,21 @@ void replaceAll(string& inout, const string &search, const string &replace)
             {
                 if (replaceCmd.param.paramType == PT_EQUATION)
                 {
-                    assert(inputCmd.param.paramType == PT_FLOAT);
+                    assert(inputCmd.param.paramType == PT_DOUBLE);
                     if (replaceCmd.param.equationType == ET_MULTIPLY)
                     {
-                        replaceCmd.param.floatVal = inputCmd.param.floatVal * replaceCmd.param.floatVal;
+                        replaceCmd.param.doubleVal = inputCmd.param.doubleVal * replaceCmd.param.doubleVal;
                     }
                     else if (replaceCmd.param.equationType == ET_ADD)
                     {
-                        replaceCmd.param.floatVal = inputCmd.param.floatVal + replaceCmd.param.floatVal;
+                        replaceCmd.param.doubleVal = inputCmd.param.doubleVal + replaceCmd.param.doubleVal;
                     }
                     else
                     {
-                        replaceCmd.param.floatVal = inputCmd.param.floatVal;
+                        replaceCmd.param.doubleVal = inputCmd.param.doubleVal;
                     }
 
-                    replaceCmd.param.paramType = PT_FLOAT;
+                    replaceCmd.param.paramType = PT_DOUBLE;
                 }
 
                 outputCmds.push_back(replaceCmd);
@@ -215,9 +215,9 @@ void replaceAll(string& inout, const string &search, const string &replace)
         ss << outputCmd.symbol;
         if (outputCmd.param.paramType != PT_NONE)
         {
-            assert(outputCmd.param.paramType == PT_FLOAT);
+            assert(outputCmd.param.paramType == PT_DOUBLE);
             ss << '(';
-            ss << outputCmd.param.floatVal;
+            ss << outputCmd.param.doubleVal;
             ss << ')';
         }
     }
@@ -290,7 +290,7 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     for (auto cmdIt = axiom.begin(); cmdIt != axiom.end(); cmdIt++)
     {
         Command command = {};
-        if (!GetCommand(cmdIt, axiom.end(), PT_FLOAT, &command))
+        if (!GetCommand(cmdIt, axiom.end(), PT_DOUBLE, &command))
         {
             assert(false);
         }
@@ -329,16 +329,16 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         case 'F':
         case 'L':
             {
-                float len = 0.0f;
-                if (command.param.paramType == PT_FLOAT)
+                double len = 0.0f;
+                if (command.param.paramType == PT_DOUBLE)
                 {
-                    len = command.param.floatVal;
+                    len = command.param.doubleVal;
+                    len *= _params.SegmentLength(&_params, len);
                 }
                 else
                 {
                     len = _params.SegmentLength(&_params, len);
                 }
-                //len = _params.SegmentLength(&_params, len);
 
                 XMVECTOR axis = XMVector3Transform(initialDirection, currentState.matDir);
 
