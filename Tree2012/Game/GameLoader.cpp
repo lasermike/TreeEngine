@@ -467,12 +467,16 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->depthLOD = 1;
     //params3->textureFilename.push_back(L"urchinskin.dds");
     params3->GetGeneratorParameters()._constants = "";
-    params3->GetGeneratorParameters()._angle = XM_PI / 4.0f;
-    params3->GetGeneratorParameters()._segmentLength = 1.0f; // 0.5f;
-    params3->GetGeneratorParameters().thickness = .20f;
-    params3->GetGeneratorParameters()._axiom = "G(1.0)";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a) [ Z(a * 0.5) F(a * 0.5) G(a * 0.5)]")); //[zF]
-    params3->GetGeneratorParameters()._numIterations = 2;
+    params3->GetGeneratorParameters()._angle = 1; // XM_PI / 4.0f;
+    params3->GetGeneratorParameters()._segmentLength = .005f; // 0.5f;
+    params3->GetGeneratorParameters().thickness = .01f;
+    //params3->GetGeneratorParameters()._axiom = "G(1.0)";
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a) [ Z(a * 0.5) F(a * 0.5) G(a * 0.5)]")); //[zF]
+    params3->GetGeneratorParameters()._axiom = "F(200) /(0.785398) A";
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(50)[&(0.33074)F(50)A]/(1.653525) [&(0.33074)F(50)A]/(2.31483)[&(0.33074)F(50)A]") );
+    params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.109)"));
+//    params3->GetGeneratorParameters()._rules.push_back(Rule("!(w)", "!(w*1.732)"));
+    params3->GetGeneratorParameters()._numIterations = 4;
     params3->position = XMFLOAT3(0, 1.0, 0);
     params3->_animationSpeed = 5.0f;
 

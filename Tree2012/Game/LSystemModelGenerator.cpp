@@ -261,12 +261,12 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
     XMVECTOR initialDirection = XMLoadFloat3(&_params._initialDirection);
 
-    XMMATRIX rotateXPosMat = XMMatrixRotationNormal(xVec, _params._angle);
-    XMMATRIX rotateXNegMat = XMMatrixRotationNormal(xVec, -_params._angle );
-    XMMATRIX rotateYPosMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), _params._angle);
-    XMMATRIX rotateYNegMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), -_params._angle);
-    XMMATRIX rotateZPosMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), _params._angle);
-    XMMATRIX rotateZNegMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), -_params._angle);
+    //XMMATRIX rotateXPosMat = XMMatrixRotationNormal(xVec, _params._angle);
+    //XMMATRIX rotateXNegMat = XMMatrixRotationNormal(xVec, -_params._angle );
+    //XMMATRIX rotateYPosMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), _params._angle);
+    //XMMATRIX rotateYNegMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), -_params._angle);
+    //XMMATRIX rotateZPosMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), _params._angle);
+    //XMMATRIX rotateZNegMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), -_params._angle);
     XMMATRIX rotate180Mat = XMMatrixRotationNormal(yVec, XM_PI);
 
     // Create trunk
