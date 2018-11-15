@@ -14,7 +14,7 @@ struct Rule
 
 struct LSystemParams;
 
-typedef float (*LengthFunc)(LSystemParams* params, float cmdParam);
+typedef double (*LengthFunc)(LSystemParams* params, double cmdParam);
 
 struct LSystemParams
 {

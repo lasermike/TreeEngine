@@ -2,7 +2,7 @@
 #include "LSystemModelGenerator.h"
 #include <stack>
 
-float DefaultLength(LSystemParams* params, float cmdParam)
+double DefaultLength(LSystemParams* params, double cmdParam)
 {
     return params->_segmentLength;
 }
@@ -92,7 +92,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
             if (paramType == PT_EQUATION)
             {
                 assert(ch < 'A' || ch > 'Z');
-                if (ch >= 'a' && ch <= 'z')
+                if (ch >= 'a' && ch <= 'z')  // Find variable
                 {
                     result->param.symbol = ch;
                     outputParamType = PT_EQUATION;
@@ -295,33 +295,47 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             assert(false);
         }
 
+        double magnitude = 1.0f;
+        if (command.param.paramType == PT_DOUBLE)
+        {
+            magnitude = command.param.doubleVal;
+        }
+
+        XMMATRIX rotateMat;
+
         switch (command.symbol)
         {
         case '&':
         case 'Y':
-            currentState.matDir = XMMatrixMultiply(rotateYPosMat, currentState.matDir);
+            rotateMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), float(_params._angle * magnitude));
+            currentState.matDir = XMMatrixMultiply(rotateMat, currentState.matDir);
             break;
         case '^':
         case 'y':
-            currentState.matDir = XMMatrixMultiply(rotateYNegMat, currentState.matDir);
+            rotateMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), float(-_params._angle * magnitude));
+            currentState.matDir = XMMatrixMultiply(rotateMat, currentState.matDir);
             break;
         case '<':
         case '\\':
         case 'X':
-            currentState.matDir = XMMatrixMultiply(rotateXPosMat, currentState.matDir);
+            rotateMat = XMMatrixRotationNormal(XMLoadFloat3(&xAxis), float(_params._angle * magnitude));
+            currentState.matDir = XMMatrixMultiply(rotateMat, currentState.matDir);
             break;
         case '>':
         case '/':
         case 'x':
-            currentState.matDir = XMMatrixMultiply(rotateXNegMat, currentState.matDir);
+            rotateMat = XMMatrixRotationNormal(XMLoadFloat3(&xAxis), float(-_params._angle * magnitude));
+            currentState.matDir = XMMatrixMultiply(rotateMat, currentState.matDir);
             break;
         case '+':
         case 'Z':
-            currentState.matDir = XMMatrixMultiply(rotateZPosMat, currentState.matDir);
+            rotateMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), float(_params._angle * magnitude));
+            currentState.matDir = XMMatrixMultiply(rotateMat, currentState.matDir);
             break;
         case '-':
         case 'z':
-            currentState.matDir = XMMatrixMultiply(rotateZNegMat, currentState.matDir);
+            rotateMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), float(-_params._angle * magnitude));
+            currentState.matDir = XMMatrixMultiply(rotateMat, currentState.matDir);
             break;
         case '|':
             currentState.matDir = XMMatrixMultiply(rotate180Mat, currentState.matDir);
@@ -329,21 +343,12 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         case 'F':
         case 'L':
             {
-                double len = 0.0f;
-                if (command.param.paramType == PT_DOUBLE)
-                {
-                    len = command.param.doubleVal;
-                    len *= _params.SegmentLength(&_params, len);
-                }
-                else
-                {
-                    len = _params.SegmentLength(&_params, len);
-                }
+                magnitude *= _params.SegmentLength(&_params, magnitude);
 
                 XMVECTOR axis = XMVector3Transform(initialDirection, currentState.matDir);
 
                 XMVECTOR prevPos = currentState.pos;
-                currentState.pos = currentState.pos + axis * len * (command .symbol == 'L' ? 0.5f : 1.0f);  // TODO: hack, get rid of this
+                currentState.pos = currentState.pos + axis * float(magnitude) * (command .symbol == 'L' ? 0.5f : 1.0f);  // TODO: hack, get rid of this
 
                 XMFLOAT4 tmpPrev, tmpNext;
                 XMStoreFloat4(&tmpPrev, prevPos);

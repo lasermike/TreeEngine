@@ -217,9 +217,9 @@ void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, Gam
 }
 
 
-float SegLengthPlusRand(LSystemParams* params, float cmdParam)
+double SegLengthPlusRand(LSystemParams* params, double cmdParam)
 {
-    float len = rand() / (float)RAND_MAX * 0.2f + params->_segmentLength;
+    double len = rand() / (float)RAND_MAX * 0.2 + params->_segmentLength;
     return len;
 }
 
@@ -418,12 +418,13 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->depthLOD = 1;
     params2->GetGeneratorParameters()._axiom = "G(1)";
     params2->GetGeneratorParameters()._constants = "";
+    //Old
     //params2->GetGeneratorParameters()._rules.push_back(Rule("q", "q F [z F][ Z F ] q F [ x F ][X F ] F"));
     params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a*0.1) [z z F(a*0.2)][z z x x F(a*0.2)][ Z Z F(a*0.2) ][ Z Z X X F(a*0.2) ] F(a*0.1) G(a*0.33)"));
-    //params2->GetGeneratorParameters()._rules.push_back(Rule("F(a)", "F(a*0.5)"));
+    //params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a*0.1) [z z F(a*0.2)][z z x x F(a*0.2)][ Z Z F(a*0.2) ][ Z Z X X F(a*0.2) ] F(a*0.1) G(a*0.33)"));
     params2->GetGeneratorParameters()._angle = XMConvertToRadians(45); // 0.383972f;
     params2->GetGeneratorParameters()._numIterations = 2;
-    params2->GetGeneratorParameters()._segmentLength = .28f;
+    params2->GetGeneratorParameters()._segmentLength = 4.0f;
     params2->GetGeneratorParameters().thickness = .020f;
     params2->_animationSpeed = 5.0f;
 
@@ -470,8 +471,8 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->GetGeneratorParameters()._segmentLength = 1.0f; // 0.5f;
     params3->GetGeneratorParameters().thickness = .20f;
     params3->GetGeneratorParameters()._axiom = "G(1.0)";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F[Z F(a * 0.5)]")); //[zF]
-    params3->GetGeneratorParameters()._numIterations = 1;
+    params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a) [ Z(a * 0.5) F(a * 0.5) G(a * 0.5)]")); //[zF]
+    params3->GetGeneratorParameters()._numIterations = 2;
     params3->position = XMFLOAT3(0, 1.0, 0);
     params3->_animationSpeed = 5.0f;
 
