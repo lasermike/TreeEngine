@@ -414,19 +414,23 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params2->position = XMFLOAT3(1.3f, .5f, -1.3f);
-    params2->_animationSpeed = 0.0f;
-    params2->depthLOD = 1;
-    params2->GetGeneratorParameters()._axiom = "G(1)";
-    params2->GetGeneratorParameters()._constants = "";
-    //Old
-    //params2->GetGeneratorParameters()._rules.push_back(Rule("q", "q F [z F][ Z F ] q F [ x F ][X F ] F"));
-    params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a*0.1) [z z F(a*0.2)][z z x x F(a*0.2)][ Z Z F(a*0.2) ][ Z Z X X F(a*0.2) ] F(a*0.1) G(a*0.33)"));
-    //params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a*0.1) [z z F(a*0.2)][z z x x F(a*0.2)][ Z Z F(a*0.2) ][ Z Z X X F(a*0.2) ] F(a*0.1) G(a*0.33)"));
     params2->GetGeneratorParameters()._angle = XMConvertToRadians(45); // 0.383972f;
     params2->GetGeneratorParameters()._numIterations = 2;
-    params2->GetGeneratorParameters()._segmentLength = 4.0f;
-    params2->GetGeneratorParameters().thickness = .020f;
     params2->_animationSpeed = 5.0f;
+    params2->depthLOD = 1;
+    params2->GetGeneratorParameters()._segmentLength = .01; // 0.5f;
+    params2->GetGeneratorParameters().thickness = .01f;
+    params2->GetGeneratorParameters()._constants = "";
+
+    params2->GetGeneratorParameters()._axiom = "F(50) T(100)";
+    params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[z(2) F(t * .5)] F(t * 0.5) T(t * 0.9)"));
+
+    // Old2
+    //params2->GetGeneratorParameters()._axiom = "G(1)";
+    //Old
+    //params2->GetGeneratorParameters()._rules.push_back(Rule("q", "q F [z F][ Z F ] q F [ x F ][X F ] F"));
+    //params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a*0.1) [z z F(a*0.2)][z z x x F(a*0.2)][ Z Z F(a*0.2) ][ Z Z X X F(a*0.2) ] F(a*0.1) G(a*0.33)"));
+    //params2->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a*0.1) [z z F(a*0.2)][z z x x F(a*0.2)][ Z Z F(a*0.2) ][ Z Z X X F(a*0.2) ] F(a*0.1) G(a*0.33)"));
 
     params2->materials.push_back(trunkMaterial);
     params2->materials.push_back(leafMaterial);
@@ -467,18 +471,25 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->depthLOD = 1;
     //params3->textureFilename.push_back(L"urchinskin.dds");
     params3->GetGeneratorParameters()._constants = "";
-    params3->GetGeneratorParameters()._angle = 1; // XM_PI / 4.0f;
-    params3->GetGeneratorParameters()._segmentLength = .005f; // 0.5f;
+    params3->GetGeneratorParameters()._angle = 1.0; // XM_PI / 4.0f;
+    params3->GetGeneratorParameters()._segmentLength = .001; // 0.5f;
     params3->GetGeneratorParameters().thickness = .01f;
-    //params3->GetGeneratorParameters()._axiom = "G(1.0)";
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a) [ Z(a * 0.5) F(a * 0.5) G(a * 0.5)]")); //[zF]
-    params3->GetGeneratorParameters()._axiom = "F(200) /(0.785398) A";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(50)[&(0.33074)F(50)A]/(1.653525) [&(0.33074)F(50)A]/(2.31483)[&(0.33074)F(50)A]") );
-    params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.109)"));
-//    params3->GetGeneratorParameters()._rules.push_back(Rule("!(w)", "!(w*1.732)"));
-    params3->GetGeneratorParameters()._numIterations = 4;
+    params3->GetGeneratorParameters()._numIterations = 6;
     params3->position = XMFLOAT3(0, 1.0, 0);
     params3->_animationSpeed = 5.0f;
+    params3->GetGeneratorParameters()._axiom = "F(200) /(0.785398) A";
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(50)[&(0.33074)F(50)A]/(1.653525) [&(0.33074)F(50)A]/(2.31483)[&(0.33074)F(50)A]"));
+    params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.309)"));
+
+    //    params3->GetGeneratorParameters()._rules.push_back(Rule("!(w)", "!(w*1.732)"));
+
+    //params3->GetGeneratorParameters()._axiom = "G(1.0)";
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a) [ Z(a * 0.5) F(a * 0.5) G(a * 0.5)]")); //[zF]
+
+    //params3->GetGeneratorParameters()._axiom = "F(200) z(0.785398) A";
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(50)[&(0.33074)F(50)A]Z(1.653525) [&(0.33074)F(50)A]/(2.31483)[&(0.33074)F(50)A]"));
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.109)"));
+
 
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
@@ -701,28 +712,28 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 {
     switch (sceneNum)
     {
-    case 7:
+    case 0:
         LoadXmasTree(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 0:
+    case 1:
         LoadTestTree(pScene, pRenderData, pPlayer, gameData);
         break;
     case 2:
-        LoadCurvesScene(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 1:
         LoadSeaScene(pScene, pRenderData, pPlayer, gameData);
         break;
     case 3:
-        LoadTrees(pScene, pRenderData, pPlayer, gameData);
+        LoadCurvesScene(pScene, pRenderData, pPlayer, gameData);
         break;
     case 4:
-        LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
+        LoadTrees(pScene, pRenderData, pPlayer, gameData);
         break;
     case 5:
-        LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
+        LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
         break;
     case 6:
+        LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
+        break;
+    case 7:
         LoadGraph(pScene, pRenderData, pPlayer, gameData);
         break;
     default:
