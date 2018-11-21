@@ -413,17 +413,17 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     leafMaterial.flags.y = false; //useTextures  TODO
 
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
-    params2->position = XMFLOAT3(1.3f, .5f, -1.3f);
-    params2->GetGeneratorParameters()._angle = XMConvertToRadians(45); // 0.383972f;
-    params2->GetGeneratorParameters()._numIterations = 2;
-    params2->_animationSpeed = 5.0f;
+    params2->position = XMFLOAT3(0, .5f, -2.0f);
+    params2->GetGeneratorParameters()._angle = XM_2PI; //XMConvertToRadians(45);
+    params2->GetGeneratorParameters()._numIterations = 40;
+    params2->_animationSpeed = 15.0f;
     params2->depthLOD = 1;
     params2->GetGeneratorParameters()._segmentLength = .01; // 0.5f;
     params2->GetGeneratorParameters().thickness = .01f;
     params2->GetGeneratorParameters()._constants = "";
 
     params2->GetGeneratorParameters()._axiom = "F(50) T(100)";
-    params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[z(2) F(t * .5)] F(t * 0.5) T(t * 0.9)"));
+    params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[Y(t * ?) z(0.25) F(t * .5)] F(t * 0.04) T(t * 0.95)"));
 
     // Old2
     //params2->GetGeneratorParameters()._axiom = "G(1)";

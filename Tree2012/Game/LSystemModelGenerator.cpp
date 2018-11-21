@@ -46,6 +46,7 @@ struct Command
     Param param;
 };
 
+
 bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, ParamType paramType, Command* result)
 {
     ZeroMemory(result, sizeof(Command));
@@ -89,10 +90,18 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
             }
 
             char ch = *paramIt;
+
+            if (ch == '?') // rand
+            {
+                result->param.doubleVal = rand() / (double)RAND_MAX;
+            }
+
+            // Equation parsing
             if (paramType == PT_EQUATION)
             {
-                assert(ch < 'A' || ch > 'Z');
-                if (ch >= 'a' && ch <= 'z')  // Find variable
+                assert(ch < 'A' || ch > 'Z'); // Nest expressions NYI
+                bool isValid = (ch >= 'a' && ch <= 'z');
+                if (isValid)
                 {
                     result->param.symbol = ch;
                     outputParamType = PT_EQUATION;
