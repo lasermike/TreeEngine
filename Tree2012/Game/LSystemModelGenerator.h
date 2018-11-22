@@ -37,10 +37,12 @@ struct BuildState
     XMVECTOR pos;
     XMMATRIX matDir;
     Branch* branch;
+    float thickness;
 
     BuildState()
     {
         ZeroMemory(this, sizeof(BuildState));
+        thickness = 1.0f;
     }
 };
 

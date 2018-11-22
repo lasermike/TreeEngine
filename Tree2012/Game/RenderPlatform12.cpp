@@ -533,6 +533,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
         resource->Release();
     }
     m_gameLevelResources.clear();
+    m_nextFreeShaderHeapDescriptor = 0;
 
     SafeDelete(&m_renderData->pShadowMap);
 
@@ -957,8 +958,11 @@ HRESULT RenderPlatform12::InitDevice()
     }
     //}
 
-    CComPtr<IDXGIFactory2> factory2;
-    HRR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory2)));
+	CComPtr<IDXGIFactory4> factory4;
+	HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory4)));
+
+//    CComPtr<IDXGIFactory2> factory2;
+//    HRR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory2)));
 
 #else
 
@@ -968,11 +972,11 @@ HRESULT RenderPlatform12::InitDevice()
 #endif
 
     CComPtr<IDXGIAdapter1> hardwareAdapter;
-    GetHardwareAdapter(factory2, &hardwareAdapter);
+    GetHardwareAdapter(factory4, &hardwareAdapter);
 
     HRR(D3D12CreateDevice(
         hardwareAdapter,
-        D3D_FEATURE_LEVEL_11_0,
+		D3D_FEATURE_LEVEL_11_0,
         IID_PPV_ARGS(&m_d3dDevice)
     ));
 

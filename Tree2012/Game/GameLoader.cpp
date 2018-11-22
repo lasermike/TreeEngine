@@ -423,7 +423,8 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters()._constants = "";
 
     params2->GetGeneratorParameters()._axiom = "F(50) T(100)";
-    params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[Y(t * ?) z(0.25) F(t * .5)] F(t * 0.04) T(t * 0.95)"));
+    params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[Y(t * ?) z(0.25) B(t * .5)] F(t * 0.04) T(t * 0.95)"));
+    params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "F(1) [Y(b * ?) z(0.25) !(0.2) F(2)] B(b * 0.95) "));
 
     // Old2
     //params2->GetGeneratorParameters()._axiom = "G(1)";

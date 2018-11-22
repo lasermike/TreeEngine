@@ -158,15 +158,18 @@ void replaceAll(string& inout, const string &search, const string &replace)
         GetCommand(searchIt, search.end(), PT_EQUATION, &searchCmd);
     }
 
+
     // Tokenize replace string
     std::vector<Command> replaceCmds;
     for (auto& replaceIt = replace.begin(); replaceIt != replace.end(); replaceIt++)
     {
         Command repCmd = {};
-        if (GetCommand(replaceIt, replace.end(), PT_EQUATION, &repCmd))
+        if (!GetCommand(replaceIt, replace.end(), PT_EQUATION, &repCmd))
         {
-            replaceCmds.push_back(repCmd);
+            break;
         }
+
+        replaceCmds.push_back(repCmd);
     }
 
     // Tokenize input string
@@ -290,9 +293,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     _model->trunk->thickness = _params.thickness;
     _model->trunk->depth = 0;
     initialState.branch = _model->trunk;
+    initialState.thickness = 1.0f;
 
     BuildState currentState = initialState;
-
     stack<BuildState> stateStack;
     int pos = 0;
     string done, unknown;
@@ -363,7 +366,8 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
                 XMStoreFloat4(&tmpPrev, prevPos);
                 XMStoreFloat4(&tmpNext, currentState.pos);
 
-                currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (command.symbol == 'L' ? Leaf : Stick), _params.thickness);
+                currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (command.symbol == 'L' ? Leaf : Stick), 
+                                                currentState.thickness * _params.thickness);
             }
 
             break;
@@ -377,6 +381,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         case 'C':
             // TODO color
             //cmdIt++;
+            break;
+        case '!': // set line width
+            currentState.thickness = magnitude;
             break;
         case ' ':
             break; // noop
