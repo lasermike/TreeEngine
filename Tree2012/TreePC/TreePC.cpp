@@ -71,28 +71,38 @@ void TreePC::Load(Platform::String^ entryPoint)
 
 void TreePC::Run()
 {
-    BasicTimer^ timer = ref new BasicTimer();
-
     CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+
+    std::thread renderThread(
+        [this]
+        {
+            BasicTimer^ timer = ref new BasicTimer();
+
+            for (;;)
+            {
+                if (m_windowVisible)
+                {
+                    timer->Update();
+                    m_pGame->ComputeCPU();
+                    m_pGame->ComputeGPU();
+                    m_pGame->Render(false);
+                }
+            }
+    });
 
     while (!m_windowClosed)
     {
         if (m_windowVisible)
         {
-            timer->Update();
             CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
-            m_pGame->ComputeCPU();
-            m_pGame->ComputeGPU();
-            m_pGame->Render(false);
         }
         else
         {
             CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
         }
-    }
 
-    int x = 0;
-    x = x;
+        Sleep(50);
+    }
 }
 
 void TreePC::Uninitialize()
