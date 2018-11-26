@@ -101,7 +101,7 @@ void TreePC::Run()
             CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
         }
 
-        Sleep(50);
+        Sleep(100);
     }
 }
 

@@ -21,7 +21,8 @@ enum EquationType
 {
     ET_UNKNOWN,
     ET_ADD,
-    ET_MULTIPLY
+    ET_MULTIPLY,
+    ET_SUBTRACT
 };
 
 enum ParamType
@@ -112,6 +113,9 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
                 case '+':
                     result->param.equationType = ET_ADD;
                     break;
+                case '-':
+                    result->param.equationType = ET_SUBTRACT;
+                    break;
                 case '*':
                     result->param.equationType = ET_MULTIPLY;
                     break;
@@ -148,6 +152,18 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
     return true;
 }
 
+bool Rule::SatisfiesCondition(int interations)
+{
+    if (numIterations == 0) // infinite
+    {
+        return true;
+    }
+
+    //assert(interations < numIterations);
+
+    return (interations < numIterations);
+}
+
 void replaceAll(string& inout, const string &search, const string &replace)
 {
     // Tokenize search string
@@ -167,6 +183,11 @@ void replaceAll(string& inout, const string &search, const string &replace)
         if (!GetCommand(replaceIt, replace.end(), PT_EQUATION, &repCmd))
         {
             break;
+        }
+
+        if (repCmd.symbol == ';' /*&& repCmd.param.paramType == PT_DOUBLE && repCmd.param.doubleVal <= 0*/)
+        {
+            return; // rule is inactive when semicolon is zero or less
         }
 
         replaceCmds.push_back(repCmd);
@@ -202,6 +223,10 @@ void replaceAll(string& inout, const string &search, const string &replace)
                     else if (replaceCmd.param.equationType == ET_ADD)
                     {
                         replaceCmd.param.doubleVal = inputCmd.param.doubleVal + replaceCmd.param.doubleVal;
+                    }
+                    else if (replaceCmd.param.equationType == ET_SUBTRACT)
+                    {
+                        replaceCmd.param.doubleVal = inputCmd.param.doubleVal - replaceCmd.param.doubleVal;
                     }
                     else
                     {
@@ -246,7 +271,10 @@ TreeModel* LSystemModelGenerator::Create()
     {
         for (auto r = _params._rules.begin(); r != _params._rules.end(); r++)
         {
-            replaceAll(axiom, (*r).input, (*r).output);
+            if (r->SatisfiesCondition(i))
+            {
+                replaceAll(axiom, (*r).input, (*r).output);
+            }
         }
     }
 
@@ -383,7 +411,7 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             //cmdIt++;
             break;
         case '!': // set line width
-            currentState.thickness = magnitude;
+            currentState.thickness = (float) magnitude;
             break;
         case ' ':
             break; // noop

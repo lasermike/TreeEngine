@@ -8,8 +8,13 @@ struct Rule
 {
     string input;
     string output;
+    int numIterations;
 
-    Rule(char* in, char* out) : input(in), output(out) { }
+    Rule(char* in, char* out) : input(in), output(out), numIterations(0) { }
+    Rule(char* in, int numIterations, char* out) : input(in), numIterations(numIterations), output(out) { }
+
+    bool SatisfiesCondition(int numInterations);
+
 };
 
 struct LSystemParams;
