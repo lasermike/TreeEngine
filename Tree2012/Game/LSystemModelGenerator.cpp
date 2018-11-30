@@ -22,7 +22,6 @@ enum EquationType
     ET_UNKNOWN,
     ET_ADD,
     ET_MULTIPLY,
-    ET_SUBTRACT
 };
 
 enum ParamType
@@ -70,6 +69,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
     int decimalPosition = 0;
     bool parsingFloat = false;
     auto paramIt = cmdIt;
+    int sign = 1;
     while (paramIt + 1 != end)
     {
         paramIt++;
@@ -87,6 +87,7 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
             {
                 cmdIt = paramIt; // Move iterator to end of param
                 result->param.paramType = outputParamType;
+                result->param.doubleVal *= sign;
                 return true;
             }
 
@@ -113,9 +114,6 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
                 case '+':
                     result->param.equationType = ET_ADD;
                     break;
-                case '-':
-                    result->param.equationType = ET_SUBTRACT;
-                    break;
                 case '*':
                     result->param.equationType = ET_MULTIPLY;
                     break;
@@ -139,11 +137,14 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
                     }
 
                     outputParamType = outputParamType == PT_NONE ? PT_DOUBLE : outputParamType;
-
                 }
                 else if (ch == '.')
                 {
                     decimalPosition = 1;
+                }
+                else if (ch == '-')
+                {
+                    sign = -sign;
                 }
             }
         } 
@@ -177,6 +178,7 @@ void replaceAll(string& inout, const string &search, const string &replace)
 
     // Tokenize replace string
     std::vector<Command> replaceCmds;
+    //bool ruleHasTerminator = false;
     for (auto& replaceIt = replace.begin(); replaceIt != replace.end(); replaceIt++)
     {
         Command repCmd = {};
@@ -185,10 +187,10 @@ void replaceAll(string& inout, const string &search, const string &replace)
             break;
         }
 
-        if (repCmd.symbol == ';' /*&& repCmd.param.paramType == PT_DOUBLE && repCmd.param.doubleVal <= 0*/)
-        {
-            return; // rule is inactive when semicolon is zero or less
-        }
+        //if (repCmd.symbol == ';')
+        //{
+        //    ruleHasTerminator = true;
+        //}
 
         replaceCmds.push_back(repCmd);
     }
@@ -201,6 +203,12 @@ void replaceAll(string& inout, const string &search, const string &replace)
         Command inoutCmd = {};
         if (GetCommand(inoutIt, inout.end(), PT_EQUATION, &inoutCmd))
         {
+            //// Look for termination counter
+            //if (ruleHasTerminator && inoutCmd.symbol == ';' && inoutCmd.param.doubleVal <= 0)
+            //{
+            //    return; // rule is inactive when semicolon is zero or less
+            //}
+
             inputCmds.push_back(inoutCmd);
         }
     }
@@ -223,10 +231,6 @@ void replaceAll(string& inout, const string &search, const string &replace)
                     else if (replaceCmd.param.equationType == ET_ADD)
                     {
                         replaceCmd.param.doubleVal = inputCmd.param.doubleVal + replaceCmd.param.doubleVal;
-                    }
-                    else if (replaceCmd.param.equationType == ET_SUBTRACT)
-                    {
-                        replaceCmd.param.doubleVal = inputCmd.param.doubleVal - replaceCmd.param.doubleVal;
                     }
                     else
                     {

@@ -415,7 +415,7 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params2->position = XMFLOAT3(0, .5f, -2.0f);
     params2->GetGeneratorParameters()._angle = XM_2PI; //XMConvertToRadians(45);
-    params2->GetGeneratorParameters()._numIterations = 40;
+    params2->GetGeneratorParameters()._numIterations = 10;
     params2->_animationSpeed = 15.0f;
     params2->depthLOD = 1;
     params2->GetGeneratorParameters()._segmentLength = .01; // 0.5f;
@@ -423,9 +423,14 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters()._constants = "";
 
     params2->GetGeneratorParameters()._axiom = "F(50) T(100)";
-    params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[Y(t * ?) z(0.25) B(t * .5)] F(t * 0.04) T(t * 0.95)"));
-    params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", ";(2) F(1) [Y(b * ?) z(0.25) !(0.2) F(2)] B(b * 0.95) "));
-    params2->GetGeneratorParameters()._rules.push_back(Rule(";(i)", ";(i - 1)"));
+
+    params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[Y(t * ?) z(0.25) B(t * .5)] F(t * 0.04) "
+                                                                    "[Y(t * ?) z(0.25) B(t * .5)] F(t * 0.04) "
+                                                                    "[Y(t * ?) z(0.25) B(t * .5)] F(t * 0.04) T(t * 0.95) "));
+    params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "F(b * .2) [x(0.1) F(2)] [x(-0.1) F(2)] B(b * 0.95) "));
+
+    //params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "F(b * .2) [Y(b * ?) z(0.25) !(0.2) F(2)] B(b * 0.95) "));
+    //params2->GetGeneratorParameters()._rules.push_back(Rule(";(i)", ";(i - 1)"));
     //needles
     //params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "F(1) [Y(b * ?) z(0.25) !(0.2) F(2)] B(b * 0.95) "));
 
