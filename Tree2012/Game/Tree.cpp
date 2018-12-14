@@ -88,7 +88,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     Material* pLeaf = nullptr;
     renderManager.CreateMaterial(L"leaf", L"", nullptr, nullptr, nullptr, nullptr, _params->materials[1], StockRenderState(), &pLeaf);
     pNewMesh = nullptr;
-    pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
+    pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_FSQuad);
     renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
     renderManager.ReserveRenderUnit(pLeaf, pNewMesh, this, &m_leafUnit);
 

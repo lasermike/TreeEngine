@@ -392,7 +392,8 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
                 XMVECTOR axis = XMVector3Transform(initialDirection, currentState.matDir);
 
                 XMVECTOR prevPos = currentState.pos;
-                currentState.pos = currentState.pos + axis * float(magnitude) * (command .symbol == 'L' ? 0.5f : 1.0f);  // TODO: hack, get rid of this
+                currentState.pos = currentState.pos + axis * float(magnitude);
+                //currentState.pos = currentState.pos + axis * float(magnitude) * (command .symbol == 'L' ? 0.5f : 1.0f);  // TODO: hack, get rid of this
 
                 XMFLOAT4 tmpPrev, tmpNext;
                 XMStoreFloat4(&tmpPrev, prevPos);

@@ -85,9 +85,21 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     data.fsQuadIndices.IndexOffset = data.cylinderHDIndices.IndexOffset + data.cylinderHDIndices.IndexCount;
     data.fsQuadIndices.IndexCount = (UINT)fsQuad.Indices.size();
 
+    // Sprite
+    GeometryGenerator::MeshData sprite;
+    geoGen.CreateSprite(sprite);
+
+    // Cache the index count of each object.
+    data.spriteIndices.VertexCount = (UINT)sprite.Vertices.size();
+    data.spriteIndices.VertexOffset = (UINT)(data.fsQuadIndices.VertexOffset + fsQuad.Vertices.size());
+
+    // Cache the index count of each object.
+    data.spriteIndices.IndexOffset = data.fsQuadIndices.IndexOffset + data.fsQuadIndices.IndexCount;
+    data.spriteIndices.IndexCount = (UINT)sprite.Indices.size();
+
     // Finalize everything
     UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size() + cylinderLD.Vertices.size() + 
-                                    cylinderHD.Vertices.size() + fsQuad.Vertices.size());
+                                    cylinderHD.Vertices.size() + fsQuad.Vertices.size() + sprite.Vertices.size());
 
     // Extract the vertex elements we are interested in and pack the
     // vertices of all the meshes into one vertex buffer.
@@ -803,3 +815,44 @@ void GeometryGenerator::CreateFullscreenQuad(MeshData& meshData)
     meshData.Indices[4] = 2;
     meshData.Indices[5] = 3;
 }
+
+void GeometryGenerator::CreateSprite(MeshData& meshData)
+{
+    meshData.Vertices.resize(4);
+    meshData.Indices.resize(6);
+
+    // Position coordinates specified in NDC space.
+    meshData.Vertices[0] = Vertex(
+        -1.0f, -1.0f, 0.0f,
+        0.0f, 0.0f, -1.0f,
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f);
+
+    meshData.Vertices[1] = Vertex(
+        -1.0f, +1.0f, 0.0f,
+        0.0f, 0.0f, -1.0f,
+        1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f);
+
+    meshData.Vertices[2] = Vertex(
+        +1.0f, +1.0f, 0.0f,
+        0.0f, 0.0f, -1.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 0.0f);
+
+    meshData.Vertices[3] = Vertex(
+        +1.0f, -1.0f, 0.0f,
+        0.0f, 0.0f, -1.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 1.0f);
+
+    meshData.Indices[0] = 0;
+    meshData.Indices[1] = 1;
+    meshData.Indices[2] = 2;
+
+    meshData.Indices[3] = 0;
+    meshData.Indices[4] = 2;
+    meshData.Indices[5] = 3;
+}
+
+

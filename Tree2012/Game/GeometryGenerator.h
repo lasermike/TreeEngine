@@ -25,7 +25,8 @@ enum PrimitiveType
     PrimitiveType_CylinderLD,
     PrimitiveType_CylinderHD,
     PrimitiveType_FSQuad,
-    PrimitiveType_SkinnedCylinder
+    PrimitiveType_SkinnedCylinder,
+    PrimitiveType_Sprite,
 };
 
 struct SimpleVertex
@@ -61,6 +62,7 @@ struct GeometryBufferData
     BufferOffsets cylinderHDIndices;
     BufferOffsets fsQuadIndices;
     BufferOffsets skinnedCylinderIndices;
+    BufferOffsets spriteIndices;
 
     std::vector<SimpleVertex> vertices;
     std::vector<UINT> indices;
@@ -101,6 +103,9 @@ struct GeometryBufferData
             break;
         case PrimitiveType_FSQuad:
             pBufferOffsets = &this->fsQuadIndices;
+            break;
+        case PrimitiveType_Sprite:
+            pBufferOffsets = &this->spriteIndices;
             break;
         case PrimitiveType_SkinnedCylinder:
             pBufferOffsets = &this->skinnedCylinderIndices;
@@ -195,6 +200,12 @@ public:
     /// postprocessing effects.
     ///</summary>
     void CreateFullscreenQuad(MeshData& meshData);
+
+    ///<summary>
+    /// Create billboard sprite on XZ plane
+    /// 
+    ///</summary>
+    void CreateSprite(MeshData& meshData);
 
 private:
     void Subdivide(MeshData& meshData);
