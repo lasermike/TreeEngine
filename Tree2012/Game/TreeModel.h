@@ -20,7 +20,8 @@ struct cbBranch
 enum GeometryType
 {
     Stick,
-    Leaf
+    Leaf,
+    SkinnedStick
 };
 
 struct Branch

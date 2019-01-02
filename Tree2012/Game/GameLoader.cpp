@@ -427,7 +427,7 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
                                                                     "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
                                                                     "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.8) "));
-    params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "!(.002 * b) F(b * .2) [!(.02) x(0.1) L(b * 0.5)] [!(.02) x(-0.1) L(b * 0.5)] B(b * 0.95) "));
+    params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "!(.002 * b) F(b * .2) [!(.02) x(0.1) F(b * 0.5)] [!(.02) x(-0.1) F(b * 0.5)] B(b * 0.95) "));
 
     params2->materials.push_back(trunkMaterial);
     params2->materials.push_back(leafMaterial);
