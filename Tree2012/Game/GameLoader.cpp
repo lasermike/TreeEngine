@@ -408,13 +408,16 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     trunkMaterial.flags.y = 0; //useTextures  TODO
 
     ShaderMaterial leafMaterial;
-    XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
+    XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
     leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
-    leafMaterial.flags.y = false; //useTextures  TODO
+    leafMaterial.flags.y = true; //useTextures  TODO
 
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");
+    params2->textureFilename.push_back(L"FirBranchWithNeedles.dds");
+
     params2->position = XMFLOAT3(0, .5f, -2.0f);
-    params2->GetGeneratorParameters()._angle = XM_2PI; //XMConvertToRadians(45);
+    params2->GetGeneratorParameters()._angle = XM_2PI;
     params2->GetGeneratorParameters()._numIterations = 10;
     params2->_animationSpeed = 15.0f;
     params2->depthLOD = 1;
@@ -427,7 +430,7 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
                                                                     "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
                                                                     "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.8) "));
-    params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "!(.002 * b) F(b * .2) [!(.02) x(0.1) F(b * 0.5)] [!(.02) x(-0.1) F(b * 0.5)] B(b * 0.95) "));
+    params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.5)] [!(.02) $(1) x(-0.1) F(b * 0.5)] B(b * 0.95) "));
 
     params2->materials.push_back(trunkMaterial);
     params2->materials.push_back(leafMaterial);

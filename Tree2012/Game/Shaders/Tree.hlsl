@@ -211,7 +211,7 @@ float4 PS(PS_INPUT input) : SV_Target
     float4 litColor = ambient + diffuse + spec;
 
     // Common to take alpha from diffuse material.
-    litColor.a = mat.Diffuse.a;
+//    litColor.a = mat.Diffuse.a;
 
     return litColor;
 }

@@ -399,7 +399,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
                 XMStoreFloat4(&tmpPrev, prevPos);
                 XMStoreFloat4(&tmpNext, currentState.pos);
 
-                currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, (command.symbol == 'L' ? Leaf : Stick), 
+                GeometryType geomtryType = (currentState.modelId == 1 || command.symbol == 'L') ? Leaf : Stick;
+
+                currentState.branch = AddBranch(currentState.branch, tmpPrev, tmpNext, geomtryType, 
                                                 currentState.thickness * _params.thickness);
             }
 
@@ -417,6 +419,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             break;
         case '!': // set line width
             currentState.thickness = (float) magnitude;
+            break;
+        case '$':
+            currentState.modelId = (int) magnitude;
             break;
         case ' ':
             break; // noop

@@ -43,11 +43,13 @@ struct BuildState
     XMMATRIX matDir;
     Branch* branch;
     float thickness;
+    int modelId;
 
     BuildState()
     {
         ZeroMemory(this, sizeof(BuildState));
         thickness = 1.0f;
+        modelId = 0;
     }
 };
 
