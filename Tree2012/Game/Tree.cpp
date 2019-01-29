@@ -47,10 +47,9 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
         _params->materials.push_back(trunkMaterial);
 
         ShaderMaterial leafMaterial;
-        leafMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-        XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
+        XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
         leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
-        leafMaterial.flags.y = 1; //useTextures  TODO
+        leafMaterial.flags.y = false; //useTextures  TODO
         _params->materials.push_back(leafMaterial);
     }
 

@@ -408,9 +408,11 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     trunkMaterial.flags.y = 0; //useTextures  TODO
 
     ShaderMaterial leafMaterial;
+    leafMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
     XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
     leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
     leafMaterial.flags.y = true; //useTextures  TODO
+    leafMaterial.flags.z = true; //clip alpha
 
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");

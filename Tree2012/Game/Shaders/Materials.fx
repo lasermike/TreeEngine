@@ -48,7 +48,7 @@ struct ShaderMaterial
     float4 Diffuse;
     float4 Specular; // w = SpecPower
     float4 Reflect;
-    float4 flags; // x = n/a, y = useTexture
+    float4 flags; // x = n/a, y = useTexture, z = clip alpha
 };
 
 //---------------------------------------------------------------------------------------

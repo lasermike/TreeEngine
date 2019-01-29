@@ -184,7 +184,14 @@ float4 PS(PS_INPUT input) : SV_Target
 
     float4 textureColor;
     if (mat.flags.y > 0)  //use texture
+    {
         textureColor = txDiffuse.Sample(samLinear, input.Tex);
+
+        if (mat.flags.z > 0)
+        {
+            clip(textureColor.a < 0.01 ? -1 : 1);
+        }
+    }
     else
         textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
 
