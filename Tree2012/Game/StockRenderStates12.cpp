@@ -64,10 +64,10 @@ static const D3D12_BLEND_DESC s_StockBlendTypes[] =
         {{                                              // Blend Target 0
             TRUE,                                       // Blend Enable
             FALSE,                                      // LogicOp Enable
-            D3D12_BLEND_SRC_ALPHA,                      // SrcBlend
+            D3D12_BLEND_ONE,                            // SrcBlend
             D3D12_BLEND_INV_SRC_ALPHA,                  // DestBlend
             D3D12_BLEND_OP_ADD,                         // BlendOp
-            D3D12_BLEND_SRC_ALPHA,                      // SrcBlendAlpha
+            D3D12_BLEND_ONE,                            // SrcBlendAlpha
             D3D12_BLEND_INV_SRC_ALPHA,                  // DestBlendAlpha
             D3D12_BLEND_OP_ADD,                         // BlendOpAlpha
             D3D12_LOGIC_OP_NOOP,                        // LogicOp

@@ -79,7 +79,9 @@ struct RenderData
     XMFLOAT4X4            lightProj;
     XMFLOAT4X4            shadowTransform;
 
-    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr)
+    bool                 wireframe;
+
+    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr), wireframe(false)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());
         XMStoreFloat4x4(&projection, XMMatrixIdentity());

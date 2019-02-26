@@ -58,7 +58,7 @@ enum RootSignatureParams
     ChangesEveryFrameRootSignatureParam,
 };
 
-const int maxTotalTexturesInScene = 2;
+const int maxTotalTexturesInScene = 3;
 const int maxNumMaterials = 4;
 
 
@@ -593,6 +593,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 
 HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** texture)
 {
+    assert(textureIndex < maxTotalTexturesInScene);
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_shaderHeap.GetIncrementSize());
 
     ID3D12Resource* resource = nullptr;
@@ -795,10 +796,13 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
         psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
     }
 
+    CD3DX12_RASTERIZER_DESC rasterizerState(D3D12_DEFAULT);
+    rasterizerState.FillMode = m_renderData->wireframe ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
+
     psoDesc.pRootSignature = m_rootSignature;
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(material->m_vertexShader->shader);
     psoDesc.PS = CD3DX12_SHADER_BYTECODE(material->m_pixelShader->shader);
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.RasterizerState = rasterizerState;
 
     StockRenderStates::GetInstance().CopyBlendTemplate(psoDesc.BlendState, material->m_renderState.blendState);
 

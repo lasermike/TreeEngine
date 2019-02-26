@@ -408,9 +408,9 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     trunkMaterial.flags.y = 0; //useTextures  TODO
 
     ShaderMaterial leafMaterial;
-    leafMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
+    leafMaterial.Ambient = XMFLOAT4(.4f, .4f, .4f, 1.0f);
     XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
-    leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
+    leafMaterial.Specular = XMFLOAT4(0, .5f, .1f, 1.0);
     leafMaterial.flags.y = true; //useTextures  TODO
     leafMaterial.flags.z = true; //clip alpha
 
@@ -441,6 +441,13 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
     scene->AddChild(new Tree(params2));
 
+    // Ground
+    WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+    params4->position = XMFLOAT3(0, 0, 0);
+    params4->scale = XMFLOAT3(25, .01f, 25);
+    params4->primitiveType = PrimitiveType_CylinderHD;
+    scene->AddChild(new Primitive(params4));
+
     // Init lights 
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
     renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -465,22 +472,26 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     trunkMaterial.flags.y = 0; //useTextures  TODO
 
     ShaderMaterial leafMaterial;
-    XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
-    leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
-    leafMaterial.flags.y = false; //useTextures  TODO
+    leafMaterial.Ambient = XMFLOAT4(.4f, .4f, .4f, 1.0f);
+    XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
+    leafMaterial.Specular = XMFLOAT4(0, .5f, .1f, 1.0);
+    leafMaterial.flags.y = true; //useTextures  TODO
+    leafMaterial.flags.z = true; //clip alpha
 
     WorldObjectParameters<LSystemParams>* params3 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    params3->textureFilename.push_back(L"Bark_0005_diffuse.dds");
+    params3->textureFilename.push_back(L"FirBranchWithNeedles.dds");
     params3->depthLOD = 1;
-    //params3->textureFilename.push_back(L"urchinskin.dds");
     params3->GetGeneratorParameters()._constants = "";
-    params3->GetGeneratorParameters()._angle = 1.0; // XM_PI / 4.0f;
-    params3->GetGeneratorParameters()._segmentLength = .001; // 0.5f;
-    params3->GetGeneratorParameters().thickness = .01f;
-    params3->GetGeneratorParameters()._numIterations = 6;
+    params3->GetGeneratorParameters()._angle = XM_PI / 4.0f;
+    params3->GetGeneratorParameters()._segmentLength = .01; // 0.5f;
+    params3->GetGeneratorParameters().thickness = .04f;
+    params3->GetGeneratorParameters()._numIterations = 1;
     params3->position = XMFLOAT3(0, 1.0, 0);
     params3->_animationSpeed = 5.0f;
-    params3->GetGeneratorParameters()._axiom = "F(200) /(0.785398) A";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(50)[&(0.33074)F(50)A]/(1.653525) [&(0.33074)F(50)A]/(2.31483)[&(0.33074)F(50)A]"));
+
+    params3->GetGeneratorParameters()._axiom = "F(20) A";
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) [z(1) $(1) F(10)] F(25) A] [Z(0.33074)F(50)A] "));
     params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.309)"));
 
     //    params3->GetGeneratorParameters()._rules.push_back(Rule("!(w)", "!(w*1.732)"));
@@ -489,7 +500,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     //params3->GetGeneratorParameters()._rules.push_back(Rule("G(a)", "F(a) [ Z(a * 0.5) F(a * 0.5) G(a * 0.5)]")); //[zF]
 
     //params3->GetGeneratorParameters()._axiom = "F(200) z(0.785398) A";
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(50)[&(0.33074)F(50)A]Z(1.653525) [&(0.33074)F(50)A]/(2.31483)[&(0.33074)F(50)A]"));
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(50) [&(0.33074)F(50)A] Z(1.653525) [&(0.33074)F(50)A] /(2.31483) [&(0.33074)F(50)A]"));
     //params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.109)"));
 
 
@@ -512,7 +523,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
 
-    gameData->clearColor = Colors::White;
+    gameData->clearColor = Colors::LimeGreen; // White;
 }
 
 void LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
@@ -714,10 +725,10 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 {
     switch (sceneNum)
     {
-    case 0:
+    case 1:
         LoadXmasTree(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 1:
+    case 0:
         LoadTestTree(pScene, pRenderData, pPlayer, gameData);
         break;
     case 2:

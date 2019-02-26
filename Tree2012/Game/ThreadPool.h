@@ -25,8 +25,8 @@ class ThreadPool {
 public:
     ThreadPool(size_t);
     template<class F>
-    auto enqueue(F&& f, WorkData* pWork) 
-        -> std::future<typename std::result_of<F(WorkData*)>::type>;
+    auto enqueue(F&& f, WorkData pWork) 
+        -> std::future<typename std::result_of<F(WorkData)>::type>;
 	void WaitTilDone();
 
     //template<class F, class... Args>
@@ -100,16 +100,16 @@ inline ThreadPool::ThreadPool(size_t threads)
 //auto ThreadPool::enqueue(F&& f, Args&&... args) 
 //    -> std::future<typename std::result_of<F(Args...)>::type>
 template<class F>
-auto ThreadPool::enqueue(F&& f, WorkData* pWorkData) 
-    -> std::future<typename std::result_of<F(WorkData*)>::type>
+auto ThreadPool::enqueue(F&& f, WorkData workData) 
+    -> std::future<typename std::result_of<F(WorkData)>::type>
 {
-    //using return_type = typename std::result_of<F(WorkData*)>::type;
+    //using return_type = typename std::result_of<F(WorkData)>::type;
 
-    auto task = std::make_shared< std::packaged_task<std::result_of<F(WorkData*)>::type()> >(
-            std::bind(std::forward<F>(f), std::forward<WorkData*>(pWorkData))
+    auto task = std::make_shared< std::packaged_task<std::result_of<F(WorkData)>::type()> >(
+            std::bind(std::forward<F>(f), std::forward<WorkData>(workData))
         );
         
-    std::future<std::result_of<F(WorkData*)>::type> res = task->get_future();
+    std::future<std::result_of<F(WorkData)>::type> res = task->get_future();
     {
         std::unique_lock<std::mutex> lock(queue_mutex);
 

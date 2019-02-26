@@ -139,10 +139,10 @@ HRESULT Game::ReloadDevice()
 
     }
 
-    if (!firstTimeLoad)
-    {
-        m_is12Driver = !m_is12Driver;
-    }
+    //if (!firstTimeLoad)
+    //{
+    //    m_is12Driver = !m_is12Driver;
+    //}
 
     const wchar_t* dllFilename = m_is12Driver ? L"RenderPlatform12UWP.dll" : L"RenderPlatform11UWP.dll";
     m_renderPlatformDLL = ::LoadPackagedLibrary(dllFilename, 0);
@@ -345,7 +345,7 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
 {
     m_player->HandleInput(key);
 
-    const char availableKeys[] = { '0', 'Z', 'P', '#' , 'H', 'N', 'B', 'R', '1', '2', '3' };
+    const char availableKeys[] = { '0', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3' };
     for (char k : availableKeys)
     {
         if (key[k])
@@ -377,9 +377,11 @@ void Game::HandleInput(bool key[256])  // WM_KEYDOWN
                 m_paused = !m_paused;
                 key[k] = false;
                 break;
-            case '#':
+            case 'M':
                 m_wireframe = !m_wireframe;
+                m_renderManager.GetRenderData().wireframe = m_wireframe;
                 key[k] = false;
+                m_reloadDevice = true;
                 break;
             case 'H':
                 m_showHelp = !m_showHelp;

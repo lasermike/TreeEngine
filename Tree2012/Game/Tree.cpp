@@ -86,11 +86,12 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
 
     StockRenderState leafState;
-    leafState.blendState = StockBlendStates::AlphaBlend;
+    leafState.blendState = StockBlendStates::PremultipliedAlphaBlend;
     Material* pLeaf = nullptr;
-    renderManager.CreateMaterial(L"leaf", _params->textureFilename[1].c_str(), nullptr, nullptr, nullptr, nullptr, _params->materials[1], leafState, &pLeaf);
+    const wchar_t* leafTexture = _params->textureFilename.size() > 1 ? _params->textureFilename[1].c_str() : nullptr;
+    renderManager.CreateMaterial(L"leaf", leafTexture, nullptr, nullptr, nullptr, nullptr, _params->materials[1], leafState, &pLeaf);
     pNewMesh = nullptr;
-    pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_FSQuad);
+    pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
     renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
     renderManager.ReserveRenderUnit(pLeaf, pNewMesh, this, &m_leafUnit);
 

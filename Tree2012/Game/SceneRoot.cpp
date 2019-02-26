@@ -86,7 +86,7 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
 
     WorkData threadData = { 0, 0 /*first*/, objsPerThread /*end*/, &renderFrame }; 
 
-    std::list<WorkData> workData;
+	//std::list<WorkData> workData;
 
     for (UINT i = 0; i < threadPool.GetNumWorkers() && threadData.end <= numObjs; i++)
     {
@@ -95,19 +95,19 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
             threadData.end = numObjs;
         }
 
-        workData.push_back(threadData);
-        threadPool.enqueue([this](WorkData* data)
+        //workData.push_back(threadData);
+        threadPool.enqueue([this](WorkData data)
                            {
                                UINT num = 0;
                                for (auto c : _children)
                                {
-                                   if (num >= data->start && num < data->end)
+                                   if (num >= data.start && num < data.end)
                                    {
-                                       c->ComputeConstants((IRenderFrame*) data->param1);
+                                       c->ComputeConstants((IRenderFrame*) data.param1);
                                    }
                                    num++;
                                }
-                           }, &*workData.rbegin());    
+                           }, threadData);    
         threadData.start  += objsPerThread;
         threadData.end  += objsPerThread;
     }
