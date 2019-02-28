@@ -163,7 +163,7 @@ public:
     };
 
 
-    void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data);
+    static void BuildGeometryBuffers(GeometryBufferData& data);
 
     ///<summary>
     /// Creates a box centered at the origin with the given dimensions.
@@ -205,7 +205,7 @@ public:
     /// Create billboard sprite on XZ plane
     /// 
     ///</summary>
-    void CreateSprite(MeshData& meshData);
+    void CreateSprite(MeshData& meshData, int numSides);
 
 private:
     void Subdivide(MeshData& meshData);

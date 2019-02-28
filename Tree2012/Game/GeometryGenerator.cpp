@@ -87,7 +87,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
     // Sprite
     GeometryGenerator::MeshData sprite;
-    geoGen.CreateSprite(sprite);
+    geoGen.CreateSprite(sprite, 2);
 
     // Cache the index count of each object.
     data.spriteIndices.VertexCount = (UINT)sprite.Vertices.size();
@@ -162,6 +162,14 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         //data.vertices[k].InstanceWeights = fsQuad.Vertices[i].InstanceWeights;
     }
 
+    for (size_t i = 0; i < sprite.Vertices.size(); ++i, ++k)
+    {
+        data.vertices[k].Pos = sprite.Vertices[i].Position;
+        data.vertices[k].Normal = sprite.Vertices[i].Normal;
+        data.vertices[k].Tex = sprite.Vertices[i].TexC;
+        data.vertices[k].TangentU = sprite.Vertices[i].TangentU;
+    }
+
     //
     // Pack the indices of all the meshes into one index buffer.
     //
@@ -171,6 +179,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     data.indices.insert(data.indices.end(), cylinderLD.Indices.begin(), cylinderLD.Indices.end());
     data.indices.insert(data.indices.end(), cylinderHD.Indices.begin(), cylinderHD.Indices.end());
     data.indices.insert(data.indices.end(), fsQuad.Indices.begin(), fsQuad.Indices.end());
+    data.indices.insert(data.indices.end(), sprite.Indices.begin(), sprite.Indices.end());
 
     data.skinnedIndices.insert(data.skinnedIndices.end(), cylinder.Indices.begin(), cylinder.Indices.end());
 }
@@ -816,13 +825,54 @@ void GeometryGenerator::CreateFullscreenQuad(MeshData& meshData)
     meshData.Indices[5] = 3;
 }
 
-void GeometryGenerator::CreateSprite(MeshData& meshData)
+void GeometryGenerator::CreateSprite(MeshData& meshData, int numSides)
 {
-    meshData.Vertices.resize(4);
-    meshData.Indices.resize(6);
+    ASSERT(numSides == 1 || numSides == 2);
+
+    Vertex v[8];
+
+    const float width = 0.5f;
+    const float height = 0.5f;
+
+    float w2 = 0.5f * width;
+    float h2 = 0.5f * height;
+    float d2 = 0.0f;
+
+    meshData.BoundingBoxMin = XMFLOAT3(-w2, -h2, -d2);
+    meshData.BoundingBoxMax = XMFLOAT3(w2, h2, d2);
+
+    // Fill in the front face vertex data.
+    v[0] = Vertex(-w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    v[1] = Vertex(-w2, +h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    v[2] = Vertex(+w2, +h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+    v[3] = Vertex(+w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+    // Fill in the back face vertex data.
+    v[4] = Vertex(-w2, -h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+    v[5] = Vertex(+w2, -h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    v[6] = Vertex(+w2, +h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    v[7] = Vertex(-w2, +h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+
+    meshData.Vertices.resize(numSides == 1 ? 4 : 8);
+    meshData.Indices.resize(numSides == 1 ? 6 : 12);
+
+    meshData.Vertices.assign(&v[0], &v[meshData.Vertices.size()]);
+
+    UINT i[36];
+
+    // Fill in the front face index data
+    i[0] = 0; i[1] = 1; i[2] = 2;
+    i[3] = 0; i[4] = 2; i[5] = 3;
+
+    // Fill in the back face index data
+    i[6] = 4; i[7] = 5; i[8] = 6;
+    i[9] = 4; i[10] = 6; i[11] = 7;
+
+    meshData.Indices.assign(&i[0], &i[meshData.Indices.size()]);
+
 
     // Position coordinates specified in NDC space.
-    meshData.Vertices[0] = Vertex(
+/*    meshData.Vertices[0] = Vertex(
         -1.0f, -1.0f, 0.0f,
         0.0f, 0.0f, -1.0f,
         1.0f, 0.0f, 0.0f,
@@ -853,6 +903,7 @@ void GeometryGenerator::CreateSprite(MeshData& meshData)
     meshData.Indices[3] = 0;
     meshData.Indices[4] = 2;
     meshData.Indices[5] = 3;
+    */
 }
 
 

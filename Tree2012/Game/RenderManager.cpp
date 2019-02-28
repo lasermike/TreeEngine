@@ -59,7 +59,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     m_lastUseShadowMaps = useShadowMaps;
  
     // Create vertices and indice for geometry
-    m_geometryGenerator.BuildGeometryBuffers(m_geometryData);
+    GeometryGenerator::BuildGeometryBuffers(m_geometryData);
 
     GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps, m_geometryData);
 
