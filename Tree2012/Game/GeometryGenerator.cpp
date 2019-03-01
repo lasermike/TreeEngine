@@ -831,8 +831,8 @@ void GeometryGenerator::CreateSprite(MeshData& meshData, int numSides)
 
     Vertex v[8];
 
-    const float width = 0.5f;
-    const float height = 0.5f;
+    const float width = 1.0f;
+    const float height = 1.0f;
 
     float w2 = 0.5f * width;
     float h2 = 0.5f * height;
