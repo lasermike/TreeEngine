@@ -187,9 +187,9 @@ float4 PS(PS_INPUT input) : SV_Target
     {
         textureColor = txDiffuse.Sample(samLinear, input.Tex);
 
-        if (mat.flags.z > 0)
+        if (mat.flags.z > 0)  // clip alpha threshold
         {
-            clip(textureColor.a < 0.01 ? -1 : 1);
+            clip(textureColor.a - mat.flags.z);
         }
     }
     else
@@ -261,11 +261,13 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
 // texture can use a NULL pixel shader for depth pass.
 void BuildShadowMapPS(ShadowMapVertexOut input)
 {
-    // TODO support alpha map
-    //float4 diffuse = gDiffuseMap.Sample(samLinear, input.Tex);
+    if (mat.flags.z > 0)  // clip alpha threshold
+    {
+        float4 textureColor = txDiffuse.Sample(samLinear, input.Tex);
 
-    // Don't write transparent pixels to the shadow map.
-    //clip(diffuse.a - 0.15f);
+        // Don't write transparent pixels to the shadow map.
+        clip(textureColor.a - mat.flags.z);
+    }
 }
 
 /////////////////////////////////////////////////////////

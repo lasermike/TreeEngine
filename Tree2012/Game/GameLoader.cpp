@@ -476,7 +476,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
     leafMaterial.Specular = XMFLOAT4(0, .5f, .1f, 1.0);
     leafMaterial.flags.y = true; //useTextures  TODO
-    leafMaterial.flags.z = true; //clip alpha
+    leafMaterial.flags.z = 0.6; //clip alpha threshold
 
     WorldObjectParameters<LSystemParams>* params3 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params3->textureFilename.push_back(L"Bark_0005_diffuse.dds");
@@ -491,8 +491,8 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->_animationSpeed = 5.0f;
 
     params3->GetGeneratorParameters()._axiom = "F(20) A";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) [z(1) $(1) F(10)] F(25) A] [Z(0.33074)F(50)A] "));
-    params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.309)"));
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) [z(1) $(1) F(5)] F(10) [z(1) F(30)] F(10) [z(1) $(1) F(30)] F(25) A] [Z(0.33074)F(50)A] "));
+//    params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.309)"));
 
     //    params3->GetGeneratorParameters()._rules.push_back(Rule("!(w)", "!(w*1.732)"));
 
@@ -511,6 +511,13 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
     scene->AddChild(new Tree(params3));
 
+    // Ground
+    WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+    params4->position = XMFLOAT3(0, 0, 0);
+    params4->scale = XMFLOAT3(25, .01f, 25);
+    params4->primitiveType = PrimitiveType_CylinderHD;
+    scene->AddChild(new Primitive(params4));
+
 
     // Init lights 
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
@@ -523,7 +530,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
 
-    gameData->clearColor = Colors::LimeGreen; // White;
+    gameData->clearColor = Colors::IndianRed; //LimeGreen; // 
 }
 
 void LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)

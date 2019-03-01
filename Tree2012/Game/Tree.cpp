@@ -86,7 +86,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
 
     StockRenderState leafState;
-    leafState.blendState = StockBlendStates::PremultipliedAlphaBlend;
+    leafState.blendState = StockBlendStates::Overwrite;
     Material* pLeaf = nullptr;
     const wchar_t* leafTexture = _params->textureFilename.size() > 1 ? _params->textureFilename[1].c_str() : nullptr;
     renderManager.CreateMaterial(L"leaf", leafTexture, nullptr, nullptr, nullptr, nullptr, _params->materials[1], leafState, &pLeaf);
