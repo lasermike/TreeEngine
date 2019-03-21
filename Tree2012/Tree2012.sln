@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.27703.2047
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreeXBox", "Tree2012\Tree2012.vcxproj", "{492A8733-A8A0-420B-A0FA-FC72732B1001}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -31,6 +31,9 @@ Global
 		Debug|Durango = Debug|Durango
 		Debug|Win32 = Debug|Win32
 		Debug|x64 = Debug|x64
+		Debug12|Durango = Debug12|Durango
+		Debug12|Win32 = Debug12|Win32
+		Debug12|x64 = Debug12|x64
 		Profile|Durango = Profile|Durango
 		Profile|Win32 = Profile|Win32
 		Profile|x64 = Profile|x64
@@ -44,6 +47,15 @@ Global
 		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug|Durango.Deploy.0 = Debug|Durango
 		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug|Win32.ActiveCfg = Debug|Durango
 		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug|x64.ActiveCfg = Debug|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|Durango.ActiveCfg = Debug|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|Durango.Build.0 = Debug|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|Durango.Deploy.0 = Debug|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|Win32.ActiveCfg = Release|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|Win32.Build.0 = Release|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|Win32.Deploy.0 = Release|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|x64.ActiveCfg = Release|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|x64.Build.0 = Release|Durango
+		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Debug12|x64.Deploy.0 = Release|Durango
 		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Profile|Durango.ActiveCfg = Profile|Durango
 		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Profile|Durango.Build.0 = Profile|Durango
 		{492A8733-A8A0-420B-A0FA-FC72732B1001}.Profile|Durango.Deploy.0 = Profile|Durango
@@ -59,6 +71,15 @@ Global
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug|x64.ActiveCfg = Debug|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug|x64.Build.0 = Debug|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug|x64.Deploy.0 = Debug|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|Durango.ActiveCfg = Release|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|Durango.Build.0 = Release|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|Durango.Deploy.0 = Release|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|Win32.ActiveCfg = Release|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|Win32.Build.0 = Release|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|Win32.Deploy.0 = Release|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|x64.ActiveCfg = Debug|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|x64.Build.0 = Debug|x64
+		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug12|x64.Deploy.0 = Debug|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Profile|Durango.ActiveCfg = Release|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Profile|Durango.Build.0 = Release|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Profile|Durango.Deploy.0 = Release|x64
@@ -76,6 +97,11 @@ Global
 		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|Durango.ActiveCfg = Debug|Win32
 		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|Win32.ActiveCfg = Debug|Win32
 		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug|x64.ActiveCfg = Debug|x64
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug12|Durango.ActiveCfg = Debug12|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug12|Win32.ActiveCfg = Debug12|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug12|Win32.Build.0 = Debug12|Win32
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug12|x64.ActiveCfg = Debug12|x64
+		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Debug12|x64.Build.0 = Debug12|x64
 		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|Durango.ActiveCfg = Release|x64
 		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|Win32.ActiveCfg = Release|Win32
 		{FF5EA045-3150-4374-83C0-17C9C97F30F2}.Profile|Win32.Build.0 = Release|Win32
@@ -88,6 +114,12 @@ Global
 		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug|Win32.ActiveCfg = Debug|x64
 		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug|x64.ActiveCfg = Debug|x64
 		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug|x64.Build.0 = Debug|x64
+		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug12|Durango.ActiveCfg = Release|x64
+		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug12|Durango.Build.0 = Release|x64
+		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug12|Win32.ActiveCfg = Release|x64
+		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug12|Win32.Build.0 = Release|x64
+		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug12|x64.ActiveCfg = Debug|x64
+		{C21341FB-E80A-44AC-9A31-714242204EE3}.Debug12|x64.Build.0 = Debug|x64
 		{C21341FB-E80A-44AC-9A31-714242204EE3}.Profile|Durango.ActiveCfg = Release|x64
 		{C21341FB-E80A-44AC-9A31-714242204EE3}.Profile|Durango.Build.0 = Release|x64
 		{C21341FB-E80A-44AC-9A31-714242204EE3}.Profile|Win32.ActiveCfg = Release|x64
@@ -102,6 +134,12 @@ Global
 		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug|Win32.ActiveCfg = Debug|x64
 		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug|x64.ActiveCfg = Debug|x64
 		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug|x64.Build.0 = Debug|x64
+		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug12|Durango.ActiveCfg = Release|x64
+		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug12|Durango.Build.0 = Release|x64
+		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug12|Win32.ActiveCfg = Release|x64
+		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug12|Win32.Build.0 = Release|x64
+		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug12|x64.ActiveCfg = Debug|x64
+		{93C08E30-B028-418F-8266-51EF1BC60255}.Debug12|x64.Build.0 = Debug|x64
 		{93C08E30-B028-418F-8266-51EF1BC60255}.Profile|Durango.ActiveCfg = Release|x64
 		{93C08E30-B028-418F-8266-51EF1BC60255}.Profile|Durango.Build.0 = Release|x64
 		{93C08E30-B028-418F-8266-51EF1BC60255}.Profile|Win32.ActiveCfg = Release|x64
@@ -115,5 +153,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B5B38E73-B617-4AF5-9CB2-4397BF0FB9DE}
 	EndGlobalSection
 EndGlobal

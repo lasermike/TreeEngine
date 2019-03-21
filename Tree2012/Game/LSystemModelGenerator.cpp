@@ -43,7 +43,8 @@ struct Param
 struct Command
 {
     char symbol;
-    Param param;
+    Param params[2];
+    int numParams;
 };
 
 
@@ -74,95 +75,81 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
     {
         paramIt++;
 
-        if (paramIt == cmdIt + 1)  // First position
+        if (paramIt == cmdIt + 1 && *paramIt != '(')  // First position after symbol must be paren open or we are done parsing this command
         {
-            if (*paramIt != '(') // No param found
+            return true;
+        }
+
+        char ch = *paramIt;
+
+        if (ch == ')') // Param end
+        {
+            cmdIt = paramIt; // Move iterator to end of param
+            result->params[result->numParams - 1].paramType = outputParamType;
+            result->params[result->numParams - 1].doubleVal *= sign;
+            return true;
+        }
+        else if (ch == '(')
+        {
+            result->numParams = 1; // First param
+        }
+        else if (ch == '?') // rand
+        {
+            result->params[result->numParams - 1].doubleVal = rand() / (double)RAND_MAX;
+        }
+
+        // Equation parsing
+        if (paramType == PT_EQUATION)
+        {
+            assert(ch < 'A' || ch > 'Z'); // Nest expressions NYI
+            bool isValid = (ch >= 'a' && ch <= 'z');
+            if (isValid)
             {
-                return true;
+                result->params[result->numParams - 1].symbol = ch;
+                outputParamType = PT_EQUATION;
+            }
+
+            switch (ch)
+            {
+            case '+':
+                result->params[result->numParams - 1].equationType = ET_ADD;
+                break;
+            case '*':
+                result->params[result->numParams - 1].equationType = ET_MULTIPLY;
+                break;
             }
         }
-        else
+
+        if (paramType == PT_DOUBLE || paramType == PT_EQUATION)
         {
-            if (*paramIt == ')') // Param end
+            if (ch >= '0' && ch <= '9')
             {
-                cmdIt = paramIt; // Move iterator to end of param
-                result->param.paramType = outputParamType;
-                result->param.doubleVal *= sign;
-                return true;
+                int digit = ch - '0';
+                if (decimalPosition)
+                {
+                    result->params[result->numParams - 1].doubleVal += digit / (pow(10.0, (double) decimalPosition) );
+                    decimalPosition++;
+                }
+                else
+                {
+                    result->params[result->numParams - 1].doubleVal *= 10.0;
+                    result->params[result->numParams - 1].doubleVal += digit;
+                }
+
+                outputParamType = outputParamType == PT_NONE ? PT_DOUBLE : outputParamType;
             }
-
-            char ch = *paramIt;
-
-            if (ch == '?') // rand
+            else if (ch == '.')
             {
-                result->param.doubleVal = rand() / (double)RAND_MAX;
+                decimalPosition = 1;
             }
-
-            // Equation parsing
-            if (paramType == PT_EQUATION)
+            else if (ch == '-')
             {
-                assert(ch < 'A' || ch > 'Z'); // Nest expressions NYI
-                bool isValid = (ch >= 'a' && ch <= 'z');
-                if (isValid)
-                {
-                    result->param.symbol = ch;
-                    outputParamType = PT_EQUATION;
-                }
-
-                switch (ch)
-                {
-                case '+':
-                    result->param.equationType = ET_ADD;
-                    break;
-                case '*':
-                    result->param.equationType = ET_MULTIPLY;
-                    break;
-                }
+                sign = -sign;
             }
-
-            if (paramType == PT_DOUBLE || paramType == PT_EQUATION)
-            {
-                if (ch >= '0' && ch <= '9')
-                {
-                    int digit = ch - '0';
-                    if (decimalPosition)
-                    {
-                        result->param.doubleVal += digit / (pow(10.0, (double) decimalPosition) );
-                        decimalPosition++;
-                    }
-                    else
-                    {
-                        result->param.doubleVal *= 10.0;
-                        result->param.doubleVal += digit;
-                    }
-
-                    outputParamType = outputParamType == PT_NONE ? PT_DOUBLE : outputParamType;
-                }
-                else if (ch == '.')
-                {
-                    decimalPosition = 1;
-                }
-                else if (ch == '-')
-                {
-                    sign = -sign;
-                }
-            }
-        } 
+        }
     }
 
     return true;
-}
-
-bool Rule::SatisfiesCondition(int interations)
-{
-    if (numIterations == 0) // infinite
-    {
-        return true;
-    }
-
-    //assert(interations < numIterations);
-
-    return (interations < numIterations);
 }
 
 void replaceAll(string& inout, const string &search, const string &replace)
@@ -178,7 +165,6 @@ void replaceAll(string& inout, const string &search, const string &replace)
 
     // Tokenize replace string
     std::vector<Command> replaceCmds;
-    //bool ruleHasTerminator = false;
     for (auto& replaceIt = replace.begin(); replaceIt != replace.end(); replaceIt++)
     {
         Command repCmd = {};
@@ -186,11 +172,6 @@ void replaceAll(string& inout, const string &search, const string &replace)
         {
             break;
         }
-
-        //if (repCmd.symbol == ';')
-        //{
-        //    ruleHasTerminator = true;
-        //}
 
         replaceCmds.push_back(repCmd);
     }
@@ -203,12 +184,6 @@ void replaceAll(string& inout, const string &search, const string &replace)
         Command inoutCmd = {};
         if (GetCommand(inoutIt, inout.end(), PT_EQUATION, &inoutCmd))
         {
-            //// Look for termination counter
-            //if (ruleHasTerminator && inoutCmd.symbol == ';' && inoutCmd.param.doubleVal <= 0)
-            //{
-            //    return; // rule is inactive when semicolon is zero or less
-            //}
-
             inputCmds.push_back(inoutCmd);
         }
     }
@@ -221,23 +196,23 @@ void replaceAll(string& inout, const string &search, const string &replace)
         {
             for(auto replaceCmd : replaceCmds)
             {
-                if (replaceCmd.param.paramType == PT_EQUATION)
+                if (replaceCmd.params[0].paramType == PT_EQUATION)
                 {
-                    assert(inputCmd.param.paramType == PT_DOUBLE);
-                    if (replaceCmd.param.equationType == ET_MULTIPLY)
+                    assert(inputCmd.params[0].paramType == PT_DOUBLE);
+                    if (replaceCmd.params[0].equationType == ET_MULTIPLY)
                     {
-                        replaceCmd.param.doubleVal = inputCmd.param.doubleVal * replaceCmd.param.doubleVal;
+                        replaceCmd.params[0].doubleVal = inputCmd.params[0].doubleVal * replaceCmd.params[0].doubleVal;
                     }
-                    else if (replaceCmd.param.equationType == ET_ADD)
+                    else if (replaceCmd.params[0].equationType == ET_ADD)
                     {
-                        replaceCmd.param.doubleVal = inputCmd.param.doubleVal + replaceCmd.param.doubleVal;
+                        replaceCmd.params[0].doubleVal = inputCmd.params[0].doubleVal + replaceCmd.params[0].doubleVal;
                     }
                     else
                     {
-                        replaceCmd.param.doubleVal = inputCmd.param.doubleVal;
+                        replaceCmd.params[0].doubleVal = inputCmd.params[0].doubleVal;
                     }
 
-                    replaceCmd.param.paramType = PT_DOUBLE;
+                    replaceCmd.params[0].paramType = PT_DOUBLE;
                 }
 
                 outputCmds.push_back(replaceCmd);
@@ -254,11 +229,11 @@ void replaceAll(string& inout, const string &search, const string &replace)
     for(auto& outputCmd : outputCmds)
     {
         ss << outputCmd.symbol;
-        if (outputCmd.param.paramType != PT_NONE)
+        if (outputCmd.params[0].paramType != PT_NONE)
         {
-            assert(outputCmd.param.paramType == PT_DOUBLE);
+            assert(outputCmd.params[0].paramType == PT_DOUBLE);
             ss << '(';
-            ss << outputCmd.param.doubleVal;
+            ss << outputCmd.params[0].doubleVal;
             ss << ')';
         }
     }
@@ -275,10 +250,7 @@ TreeModel* LSystemModelGenerator::Create()
     {
         for (auto r = _params._rules.begin(); r != _params._rules.end(); r++)
         {
-            if (r->SatisfiesCondition(i))
-            {
-                replaceAll(axiom, (*r).input, (*r).output);
-            }
+            replaceAll(axiom, (*r).input, (*r).output);
         }
     }
 
@@ -305,12 +277,6 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
     XMVECTOR initialDirection = XMLoadFloat3(&_params._initialDirection);
 
-    //XMMATRIX rotateXPosMat = XMMatrixRotationNormal(xVec, _params._angle);
-    //XMMATRIX rotateXNegMat = XMMatrixRotationNormal(xVec, -_params._angle );
-    //XMMATRIX rotateYPosMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), _params._angle);
-    //XMMATRIX rotateYNegMat = XMMatrixRotationNormal(XMLoadFloat3(&yAxis), -_params._angle);
-    //XMMATRIX rotateZPosMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), _params._angle);
-    //XMMATRIX rotateZNegMat = XMMatrixRotationNormal(XMLoadFloat3(&zAxis), -_params._angle);
     XMMATRIX rotate180Mat = XMMatrixRotationNormal(yVec, XM_PI);
 
     // Create trunk
@@ -340,9 +306,9 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         }
 
         double magnitude = 1.0f;
-        if (command.param.paramType == PT_DOUBLE)
+        if (command.params[0].paramType == PT_DOUBLE)
         {
-            magnitude = command.param.doubleVal;
+            magnitude = command.params[0].doubleVal;
         }
 
         XMMATRIX rotateMat;
