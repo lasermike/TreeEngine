@@ -47,7 +47,7 @@ struct Command
     int numParams;
 };
 
-
+// Find the next command eg. F(x * 2, 1) in the string and return it as result
 bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, ParamType paramType, Command* result)
 {
     ZeroMemory(result, sizeof(Command));
@@ -154,16 +154,16 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
 
 void replaceAll(string& inout, const string &search, const string &replace)
 {
-    // Tokenize search string
+    // Tokenize command to search for
     Command searchCmd = {};
-
-    for (auto searchIt = search.begin(); searchIt != search.end(); searchIt++)
+    int i = 0;
+    for (auto searchIt = search.begin(); searchIt != search.end(); searchIt++, i++)
     {
         GetCommand(searchIt, search.end(), PT_EQUATION, &searchCmd);
+        assert(i == 0); // Should never search for more than one command at a time 
     }
 
-
-    // Tokenize replace string
+    // Tokenize replace string into commands
     std::vector<Command> replaceCmds;
     for (auto& replaceIt = replace.begin(); replaceIt != replace.end(); replaceIt++)
     {
