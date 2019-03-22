@@ -48,7 +48,7 @@ struct Command
 };
 
 // Find the next command eg. F(x * 2, 1) in the string and return it as result
-bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, ParamType paramType, Command* result)
+bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, ParamType parsingType, Command* result)
 {
     ZeroMemory(result, sizeof(Command));
 
@@ -95,11 +95,20 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
         }
         else if (ch == '?') // rand
         {
-            result->params[result->numParams - 1].doubleVal = rand() / (double)RAND_MAX;
+            result->params[result->numParams].doubleVal = rand() / (double)RAND_MAX;
+        }
+        else if (ch == ',') // rand
+        {
+            result->params[result->numParams - 1].paramType = outputParamType;
+            result->params[result->numParams - 1].doubleVal *= sign;
+            result->numParams++;
+            sign = 1;
+            outputParamType = PT_NONE;
+            decimalPosition = 0;
         }
 
         // Equation parsing
-        if (paramType == PT_EQUATION)
+        if (parsingType == PT_EQUATION)
         {
             assert(ch < 'A' || ch > 'Z'); // Nest expressions NYI
             bool isValid = (ch >= 'a' && ch <= 'z');
@@ -120,32 +129,29 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
             }
         }
 
-        if (paramType == PT_DOUBLE || paramType == PT_EQUATION)
+        if (ch >= '0' && ch <= '9')
         {
-            if (ch >= '0' && ch <= '9')
+            int digit = ch - '0';
+            if (decimalPosition)
             {
-                int digit = ch - '0';
-                if (decimalPosition)
-                {
-                    result->params[result->numParams - 1].doubleVal += digit / (pow(10.0, (double) decimalPosition) );
-                    decimalPosition++;
-                }
-                else
-                {
-                    result->params[result->numParams - 1].doubleVal *= 10.0;
-                    result->params[result->numParams - 1].doubleVal += digit;
-                }
+                result->params[result->numParams - 1].doubleVal += digit / (pow(10.0, (double) decimalPosition) );
+                decimalPosition++;
+            }
+            else
+            {
+                result->params[result->numParams - 1].doubleVal *= 10.0;
+                result->params[result->numParams - 1].doubleVal += digit;
+            }
 
-                outputParamType = outputParamType == PT_NONE ? PT_DOUBLE : outputParamType;
-            }
-            else if (ch == '.')
-            {
-                decimalPosition = 1;
-            }
-            else if (ch == '-')
-            {
-                sign = -sign;
-            }
+            outputParamType = outputParamType == PT_NONE ? PT_DOUBLE : outputParamType;
+        }
+        else if (ch == '.')
+        {
+            decimalPosition = 1;
+        }
+        else if (ch == '-')
+        {
+            sign = -sign;
         }
     }
 
@@ -163,7 +169,7 @@ void replaceAll(string& inout, const string &search, const string &replace)
         assert(i == 0); // Should never search for more than one command at a time 
     }
 
-    // Tokenize replace string into commands
+    // Tokenize replace string into command array
     std::vector<Command> replaceCmds;
     for (auto& replaceIt = replace.begin(); replaceIt != replace.end(); replaceIt++)
     {
@@ -194,25 +200,35 @@ void replaceAll(string& inout, const string &search, const string &replace)
     {
         if (inputCmd.symbol == searchCmd.symbol)
         {
+            assert(inputCmd.numParams == searchCmd.numParams);
+
             for(auto replaceCmd : replaceCmds)
             {
-                if (replaceCmd.params[0].paramType == PT_EQUATION)
+                for (int r = 0; r < replaceCmd.numParams; r++)
                 {
-                    assert(inputCmd.params[0].paramType == PT_DOUBLE);
-                    if (replaceCmd.params[0].equationType == ET_MULTIPLY)
+                    if (replaceCmd.params[r].paramType == PT_EQUATION)
                     {
-                        replaceCmd.params[0].doubleVal = inputCmd.params[0].doubleVal * replaceCmd.params[0].doubleVal;
-                    }
-                    else if (replaceCmd.params[0].equationType == ET_ADD)
-                    {
-                        replaceCmd.params[0].doubleVal = inputCmd.params[0].doubleVal + replaceCmd.params[0].doubleVal;
-                    }
-                    else
-                    {
-                        replaceCmd.params[0].doubleVal = inputCmd.params[0].doubleVal;
-                    }
+                        for (int i = 0; i < inputCmd.numParams; i++)
+                        {
+                            if (replaceCmd.params[r].symbol == searchCmd.params[i].symbol)
+                            {
+                                double newValue = replaceCmd.params[r].doubleVal;
 
-                    replaceCmd.params[0].paramType = PT_DOUBLE;
+                                assert(inputCmd.params[i].paramType == PT_DOUBLE);
+                                if (replaceCmd.params[r].equationType == ET_MULTIPLY)
+                                {
+                                    newValue = inputCmd.params[i].doubleVal * replaceCmd.params[r].doubleVal;
+                                }
+                                else if (replaceCmd.params[r].equationType == ET_ADD)
+                                {
+                                    newValue = inputCmd.params[i].doubleVal + replaceCmd.params[r].doubleVal;
+                                }
+
+                                replaceCmd.params[r].paramType = PT_DOUBLE;
+                                replaceCmd.params[r].doubleVal = newValue;
+                            }
+                        }
+                    }
                 }
 
                 outputCmds.push_back(replaceCmd);
@@ -229,12 +245,21 @@ void replaceAll(string& inout, const string &search, const string &replace)
     for(auto& outputCmd : outputCmds)
     {
         ss << outputCmd.symbol;
-        if (outputCmd.params[0].paramType != PT_NONE)
+        for (int p = 0; p < outputCmd.numParams; p++)
         {
-            assert(outputCmd.params[0].paramType == PT_DOUBLE);
-            ss << '(';
-            ss << outputCmd.params[0].doubleVal;
-            ss << ')';
+            if (outputCmd.params[p].paramType != PT_NONE)
+            {
+                assert(outputCmd.params[p].paramType == PT_DOUBLE);
+                if (p == 0)
+                    ss << '(';
+                else
+                    ss << ',';
+
+                ss << outputCmd.params[p].doubleVal;
+
+                if (p == outputCmd.numParams - 1)
+                    ss << ')';
+            }
         }
     }
 

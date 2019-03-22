@@ -427,12 +427,16 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters().thickness = .08f;
     params2->GetGeneratorParameters()._constants = "";
 
-    params2->GetGeneratorParameters()._axiom = "F(50) T(100)";
+    params2->GetGeneratorParameters()._axiom = "F(50) T(100,2)";
 
-    params2->GetGeneratorParameters()._rules.push_back(Rule("T(t)", "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
-                                                                    "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
-                                                                    "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.8) "));
-    params2->GetGeneratorParameters()._rules.push_back(Rule("B(b)", "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.75)] [!(.02) $(1) x(-0.1) F(b * 0.75)] B(b * 0.95) "));
+    params2->GetGeneratorParameters()._rules.push_back(Rule(
+        "T(t,r)", 
+            "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
+            "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
+            "[Y(t * ?) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.8,r) "));
+    params2->GetGeneratorParameters()._rules.push_back(Rule(
+        "B(b)", 
+            "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.75)] [!(.02) $(1) x(-0.1) F(b * 0.75)] B(b * 0.95) "));
 
     params2->materials.push_back(trunkMaterial);
     params2->materials.push_back(leafMaterial);
