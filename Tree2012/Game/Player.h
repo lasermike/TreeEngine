@@ -1,13 +1,6 @@
 #pragma once
 #include "worldobject.h"
-#include "OrbitCamera.h"
 #include "StepTimer.h"
-
-enum CameraType
-{
-    OrbitCameraType = 0,
-    WalkCameraType
-};
 
 //-----------------------------------------------------------
 class Camera
@@ -36,12 +29,7 @@ class Player :
 {
 
     // Camera
-    CameraType                            m_cameraType;
-    Camera*                                m_camera;
-    OrbitCamera*                        m_orbitCamera;
-    WorldObject*                        _selection;
-    float                                _rotateSpeed;
-    float                                _dollySpeed;
+    Camera*                              m_camera;
 
 
 public:
@@ -51,21 +39,13 @@ public:
     void HandleInput(bool key[256]);
 
     Camera* GetCamera() { return m_camera; }
-    OrbitCamera* GetOrbitCamera() { return m_orbitCamera; }
     
     XMMATRIX GetViewMatrix();
     XMVECTOR GetEyePosition();
     void UpdateOrbitCamera(DX::StepTimer const& timer, RenderData* pRenderData);
-    void Select(WorldObject* pSelected);
-    void Select(int index);
-
 
     inline void Update(DX::StepTimer const& timer, RenderData* pRenderData)
     {
-        if (m_cameraType == OrbitCameraType)
-        {
-            UpdateOrbitCamera(timer, pRenderData);
-        }
     }
 };
 

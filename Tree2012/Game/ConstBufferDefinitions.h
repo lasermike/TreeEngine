@@ -29,9 +29,10 @@ struct CBChangesEveryFrame
 {
     DirectionalLight light;
     XMFLOAT4 eyePos;
-    XMFLOAT4X4 worldToCamera;
     XMFLOAT4X4 shadowMatrix;
     UINT globalFlags;
+    int numDirectionalLights;
+    int numPointLights;
 };
 
 

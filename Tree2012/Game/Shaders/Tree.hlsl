@@ -34,9 +34,10 @@ cbuffer cbChangesEveryFrame : register(b2)
 {
     DirectionalLight light;
     float4 eyePos;
-    matrix worldToCamera;
     matrix shadowMatrix;
     uint globalFlags;  // bit 0 = use shadow maps
+    int numDirectionalLights;
+    int numPointLights;
 };
 
 cbuffer cbMaterial : register (b3)
@@ -205,15 +206,15 @@ float4 PS(PS_INPUT input) : SV_Target
 
     // Sum the light contribution from each light source.  
     //[unroll]
-    //for (int i = 0; i < gLightCount; ++i)
-    //{
+    for (int i = 0; i < numDirectionalLights; ++i)
+    {
         float4 A, D, S;
         ComputeDirectionalLight(mat, textureColor, light /*gDirLights[i]*/, normal, toEye, A, D, S);
 
         ambient += A;
         diffuse += shadow[0] * D; // diffuse += D
         spec += shadow[0] * S; // spec += S;
-    //}
+    }
 
     float4 litColor = ambient + diffuse + spec;
 

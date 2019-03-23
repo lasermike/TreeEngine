@@ -420,20 +420,20 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
     params2->position = XMFLOAT3(0, .5f, -2.0f);
     params2->GetGeneratorParameters()._angle = XM_2PI;
-    params2->GetGeneratorParameters()._numIterations = 10;
+    params2->GetGeneratorParameters()._numIterations = 14;
     params2->_animationSpeed = 15.0f;
     params2->depthLOD = 1;
-    params2->GetGeneratorParameters()._segmentLength = .01; // 0.5f;
+    params2->GetGeneratorParameters()._segmentLength = .01f; // 0.5f;
     params2->GetGeneratorParameters().thickness = .08f;
     params2->GetGeneratorParameters()._constants = "";
 
-    params2->GetGeneratorParameters()._axiom = "F(50) T(100,2)";
+    params2->GetGeneratorParameters()._axiom = "F(50) T(100,.1)";
 
     params2->GetGeneratorParameters()._rules.push_back(Rule(
         "T(t,r)", 
             "[Y(r ) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
-            "[Y(r + .3) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
-            "[Y(r + .6) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.9,r + .1) "));
+            "[Y(r + .33) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
+            "[Y(r + .66) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.9,r + .24) "));
     params2->GetGeneratorParameters()._rules.push_back(Rule(
         "B(b)", 
             "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.75)] [!(.02) $(1) x(-0.1) F(b * 0.75)] B(b * 0.95) "));
@@ -450,20 +450,30 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
     params4->primitiveType = PrimitiveType_CylinderHD;
+
+    ShaderMaterial mat;
+    mat.Ambient = XMFLOAT4(.3f, .3f, .3f, 1);
+    mat.Diffuse = XMFLOAT4(.8f, .8f, .8f, 1);
+    mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
+    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+    mat.flags.y = 1; //1 for textured; 
+    params4->materials.push_back(mat);
+
     scene->AddChild(new Primitive(params4));
 
     // Init lights 
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
     renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.9f, -0.7f, 0.7f, 0.0f)));
-    renderData->time = 0;
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
+    
+    renderData->numPointLights = 1;
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
 
-    gameData->clearColor = Colors::White;
+    gameData->clearColor = Colors::Navy;
 }
 
 
@@ -480,7 +490,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
     leafMaterial.Specular = XMFLOAT4(0, .5f, .1f, 1.0);
     leafMaterial.flags.y = true; //useTextures  TODO
-    leafMaterial.flags.z = 0.6; //clip alpha threshold
+    leafMaterial.flags.z = 0.6f; //clip alpha threshold
 
     WorldObjectParameters<LSystemParams>* params3 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params3->textureFilename.push_back(L"Bark_0005_diffuse.dds");
@@ -488,7 +498,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->depthLOD = 1;
     params3->GetGeneratorParameters()._constants = "";
     params3->GetGeneratorParameters()._angle = XM_PI / 4.0f;
-    params3->GetGeneratorParameters()._segmentLength = .01; // 0.5f;
+    params3->GetGeneratorParameters()._segmentLength = .01f; // 0.5f;
     params3->GetGeneratorParameters().thickness = .04f;
     params3->GetGeneratorParameters()._numIterations = 1;
     params3->position = XMFLOAT3(0, 1.0, 0);
@@ -736,10 +746,10 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
 {
     switch (sceneNum)
     {
-    case 1:
+    case 0:
         LoadXmasTree(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 0:
+    case 1:
         LoadTestTree(pScene, pRenderData, pPlayer, gameData);
         break;
     case 2:

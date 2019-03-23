@@ -68,7 +68,10 @@ struct RenderData
     FrameStatistic*     frameStats;
 
     // Lighting
+    int numDirectionalLights;
+    int numPointLights;
     DirectionalLight    dirLights[1];
+    PointLight pointLights[1];
 
     // Shadows
     static const int    SMapWidth = 2048;
@@ -89,5 +92,9 @@ struct RenderData
         XMStoreFloat4x4(&lightProj, XMMatrixIdentity());
         XMStoreFloat4x4(&shadowTransform, XMMatrixIdentity());
         memset(&dirLights, 0, sizeof(DirectionalLight) * _countof(dirLights));
+        memset(&pointLights, 0, sizeof(PointLight) * _countof(pointLights));
+        
+        numDirectionalLights = 1;
+        numPointLights = 0;
     }
 };

@@ -446,13 +446,15 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
     UpdateViewProjection(&GetRenderData().view, &GetRenderData().projection, false);
 
     // Update chandfsges every frame CB.
-    // Compute world to camera matrix
     CBChangesEveryFrame cb;
     cb.globalFlags = m_renderData.pShadowMap ? 0x1 : 0x0;
     cb.light = m_renderData.dirLights[0];
+    cb.numDirectionalLights = m_renderData.numDirectionalLights;
+    cb.numPointLights = 0;
+    assert(m_renderData.numDirectionalLights < 2);
+
     XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
     cb.shadowMatrix = m_renderData.shadowTransform;
-    XMStoreFloat4x4(&cb.worldToCamera, XMMatrixRotationY(m_renderData.time));
 
     GetPlatform()->SetFrameSceneData(&cb);
 
