@@ -198,10 +198,18 @@ void LoadGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameDat
 void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
-    params4->position = XMFLOAT3(0, 0, 0);
+    params4->position = XMFLOAT3(0, 0, 2);
     params4->scale = XMFLOAT3(1, 1.5, 2);
     XMStoreFloat4(&params4->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
     params4->primitiveType = PrimitiveType_Box;
+
+    WorldObjectParams* params1 = new WorldObjectParams(PrimitiveGeneratorType);
+    params1->position = XMFLOAT3(2, 0, 0);
+    params1->scale = XMFLOAT3(2, .01f, 2);
+    params1->primitiveType = PrimitiveType_CylinderHD;
+    params1->textureFilename.push_back(L"undersea.dds");
+    scene->AddChild(new Primitive(params1));
+
     scene->AddChild(new Primitive(params4));
 
     // Init lights
@@ -460,6 +468,20 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params4->materials.push_back(mat);
 
     scene->AddChild(new Primitive(params4));
+
+    // Skybox
+    WorldObjectParams* params5 = new WorldObjectParams(PrimitiveGeneratorType);
+    params5->position = XMFLOAT3(0, 0, 0);
+    params5->scale = XMFLOAT3(-40.0f, -40.0f, -50.0f);
+    params5->primitiveType = PrimitiveType_Box;
+    mat.Ambient = XMFLOAT4(1, 1, 1, 1);
+    mat.Diffuse = XMFLOAT4(0, 0, 9, 1);
+    mat.Specular = XMFLOAT4(0, 0, 0, 0);
+    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+    mat.flags.y = 0; //1 for textured; 
+    params5->materials.push_back(mat);
+    scene->AddChild(new Primitive(params5));
+
 
     // Init lights 
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);

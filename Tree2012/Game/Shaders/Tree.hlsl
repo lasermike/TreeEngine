@@ -87,6 +87,36 @@ struct PS_INPUT
 static const bool TSLights = true;
 
 //--------------------------------------------------------------------------------------
+// Skybox
+//--------------------------------------------------------------------------------------
+/*
+VertexOut SkyBoxVS(VS_INPUT vin)
+{
+    PS_INPUT output;
+
+    // Use local vertex position as cubemap lookup vector.
+    output.Pos = vin.Pos;
+
+    // Transform to world space.
+    //float4 posW = mul(float4(input.Pos, 1.0f), gWorld);
+
+    output.PosW = mul(float4(input.Pos, 1.0f), world).xyz;
+
+    // Always center sky about camera.
+    posW.xyz += eyePos;
+
+    // Set z = w so that z/w = 1 (i.e., skydome always on far plane).
+    output.PosH = mul(posW, gViewProj).xyww;
+
+    return output;
+}
+
+float4 SkyBoxPS(VertexOut pin) : SV_Target
+{
+    return gCubeMap.Sample(gsamLinearWrap, pin.PosL);
+}
+*/
+//--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
 PS_INPUT VS(VS_INPUT input)

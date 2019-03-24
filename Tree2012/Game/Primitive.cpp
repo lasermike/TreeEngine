@@ -41,13 +41,16 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
         _params->textureFilename.push_back(L"snow.dds");
     }
 
+    wchar_t resourceName[64];
+    swprintf(resourceName, 64, L"primitive%d", _id);
+
     // Create material, mesh, and reserve render unit
     Material* newMaterial = nullptr;
-    renderManager.CreateMaterial(L"ground", _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
+    renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
 
     Mesh* newMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_model->GetPrimitiveType());
-    renderManager.CreateMesh(L"ground", 
+    renderManager.CreateMesh(resourceName,
                              renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
                              renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
                              pBufferOffsets, BASIC_INPUT_LAYOUT, &newMesh);

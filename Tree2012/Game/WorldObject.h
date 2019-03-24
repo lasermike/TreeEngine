@@ -98,6 +98,8 @@ protected:
     XMFLOAT3    _boundingBox[2];
     XMFLOAT3    _extents[4];
 
+    int         _id;
+
     float CalcTime(float time) { return time * _params->_animationSpeed; }
 public:
 

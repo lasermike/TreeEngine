@@ -1,9 +1,12 @@
 #include "pch.h"
 #include "WorldObject.h"
 
+static int WorldObject_nextId = 0;
+
 
 WorldObject::WorldObject(WorldObjectParams* pParams) : _params(pParams), _drawInstanced(true)
 {
+    _id = WorldObject_nextId++;
     _position = XMFLOAT3(0,0,0);
     XMStoreFloat4(&_rotation, XMQuaternionIdentity());
     _scale = XMFLOAT3(1,1,1);

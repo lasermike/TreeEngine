@@ -59,7 +59,7 @@ enum RootSignatureParams
 };
 
 const int maxTotalTexturesInScene = 3;
-const int maxNumMaterials = 4;
+const int maxNumMaterials = 6;
 
 
 HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
@@ -707,6 +707,8 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
 
     m_gameLevelResources.push_back(uploadBuffer->Resource());
+
+    assert(materialNum < maxNumMaterials);
 
     D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = m_shaderHeap.hGPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
     D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
