@@ -411,9 +411,9 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
 {
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
-    trunkMaterial.Diffuse = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+    trunkMaterial.Diffuse = XMFLOAT4(Colors::BurlyWood); //XMFLOAT4(0.6f, 0.6f, 0.6f, 1.0f);
     trunkMaterial.Specular = XMFLOAT4(0.1f, .1f, .1f, 1.0f);
-    trunkMaterial.flags.y = 0; //useTextures  TODO
+    trunkMaterial.flags.y = 1; //useTextures  TODO
 
     ShaderMaterial leafMaterial;
     leafMaterial.Ambient = XMFLOAT4(.4f, .4f, .4f, 1.0f);
