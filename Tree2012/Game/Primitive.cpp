@@ -41,12 +41,22 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
         _params->textureFilename.push_back(L"snow.dds");
     }
 
+    std::wstring vsFilename;
+    std::wstring psFilename;
+
+    if (_params->cubeMap)
+    {
+        vsFilename = L"SkyBoxVS.cso";
+        psFilename = L"SkyBoxPS.cso";
+    }
+
+
     wchar_t resourceName[64];
     swprintf(resourceName, 64, L"primitive%d", _id);
 
     // Create material, mesh, and reserve render unit
     Material* newMaterial = nullptr;
-    renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
+    renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
 
     Mesh* newMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_model->GetPrimitiveType());

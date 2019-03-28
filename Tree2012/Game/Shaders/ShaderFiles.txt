@@ -9,3 +9,5 @@ Tree.hlsl,vs,BuildShadowMapVS
 Tree.hlsl,ps,BuildShadowMapPS
 Tree.hlsl,vs,FSGraphVS
 Tree.hlsl,ps,FSGraphPS
+Tree.hlsl,vs,SkyBoxVS
+Tree.hlsl,ps,SkyBoxPS

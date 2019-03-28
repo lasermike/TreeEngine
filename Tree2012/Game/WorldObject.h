@@ -45,7 +45,8 @@ public:
         depthLOD(4),
         generatorType(genType),
         _animationSpeed(1.0f),
-        primitiveType(PrimitiveType_Box)
+        primitiveType(PrimitiveType_Box),
+        cubeMap(false)
     {
         XMStoreFloat4(&rotation, XMQuaternionIdentity());
     }
@@ -59,6 +60,7 @@ public:
     float _animationSpeed;
     int depthLOD;
     PrimitiveType primitiveType;
+    bool cubeMap;
     std::vector<std::wstring> textureFilename;
     std::vector<ShaderMaterial> materials;
     std::vector<PrimitiveType> meshes;

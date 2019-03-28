@@ -472,14 +472,16 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     // Skybox
     WorldObjectParams* params5 = new WorldObjectParams(PrimitiveGeneratorType);
     params5->position = XMFLOAT3(0, 0, 0);
-    params5->scale = XMFLOAT3(-40.0f, -40.0f, -50.0f);
+    params5->scale = XMFLOAT3(-30.0f, -30.0f, -30.0f);
     params5->primitiveType = PrimitiveType_Box;
     mat.Ambient = XMFLOAT4(1, 1, 1, 1);
     mat.Diffuse = XMFLOAT4(0, 0, 9, 1);
     mat.Specular = XMFLOAT4(0, 0, 0, 0);
     mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-    mat.flags.y = 0; //1 for textured; 
+    mat.flags.y = 1; //1 for textured;
     params5->materials.push_back(mat);
+    params5->cubeMap = true;
+    params5->textureFilename.push_back(L"cube.dds");
     scene->AddChild(new Primitive(params5));
 
 

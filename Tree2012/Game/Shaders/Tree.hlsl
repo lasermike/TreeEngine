@@ -1,3 +1,4 @@
+
 //--------------------------------------------------------------------------------------
 // File: Tree.hlsl
 //
@@ -9,10 +10,12 @@
 // Constant Buffer Variables
 //--------------------------------------------------------------------------------------
 Texture2D txDiffuse : register(t0);
+TextureCube txCubeMap : register(t0);
 Texture2D txShadowMap : register(t1);
 SamplerState samLinear : register(s0);
 SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
+SamplerState samLinearWrap : register(s3);
 
 struct BranchData
 {
@@ -89,33 +92,35 @@ static const bool TSLights = true;
 //--------------------------------------------------------------------------------------
 // Skybox
 //--------------------------------------------------------------------------------------
-/*
-VertexOut SkyBoxVS(VS_INPUT vin)
+
+PS_INPUT SkyBoxVS(VS_INPUT vin)
 {
     PS_INPUT output;
 
-    // Use local vertex position as cubemap lookup vector.
-    output.Pos = vin.Pos;
+    // Use local vertex position as cubemap lookup vector.  Store in Position World variable.
+    output.PosW = vin.Pos;
 
     // Transform to world space.
-    //float4 posW = mul(float4(input.Pos, 1.0f), gWorld);
-
-    output.PosW = mul(float4(input.Pos, 1.0f), world).xyz;
+    float3 pos = mul(float4(vin.Pos, 1.0f), vin.World).xyz;
 
     // Always center sky about camera.
-    posW.xyz += eyePos;
+    pos.xyz += eyePos.xyz;
 
     // Set z = w so that z/w = 1 (i.e., skydome always on far plane).
-    output.PosH = mul(posW, gViewProj).xyww;
+    //output.Pos = mul(posW, gViewProj).xyww;
+
+    output.Pos = mul(float4(pos, 1.0f), transpose(View));
+    output.Pos = mul(output.Pos, transpose(Projection));
+    output.Tex = vin.Tex;
 
     return output;
 }
 
-float4 SkyBoxPS(VertexOut pin) : SV_Target
+float4 SkyBoxPS(PS_INPUT pin) : SV_Target
 {
-    return gCubeMap.Sample(gsamLinearWrap, pin.PosL);
+    return txCubeMap.Sample(samLinearWrap, pin.PosW);
 }
-*/
+
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------

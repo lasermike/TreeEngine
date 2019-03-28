@@ -58,7 +58,7 @@ enum RootSignatureParams
     ChangesEveryFrameRootSignatureParam,
 };
 
-const int maxTotalTexturesInScene = 3;
+const int maxTotalTexturesInScene = 4;
 const int maxNumMaterials = 6;
 
 
@@ -132,10 +132,11 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
 
-    D3D12_STATIC_SAMPLER_DESC sampler[3];
+    D3D12_STATIC_SAMPLER_DESC sampler[4];
     sampler[0] = D3D12_STATIC_SAMPLER_DESC();
     sampler[1] = D3D12_STATIC_SAMPLER_DESC();
     sampler[2] = D3D12_STATIC_SAMPLER_DESC();
+    sampler[3] = D3D12_STATIC_SAMPLER_DESC();
 
     sampler[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
     sampler[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
@@ -175,6 +176,20 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     sampler[2].ShaderRegister = 2;
     sampler[2].RegisterSpace = 0;
     sampler[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    sampler[3].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    sampler[3].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler[3].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler[3].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler[3].MipLODBias = 0;
+    sampler[3].MaxAnisotropy = 0;
+    sampler[3].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    sampler[3].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    sampler[3].MinLOD = 0.0f;
+    sampler[3].MaxLOD = D3D12_FLOAT32_MAX;
+    sampler[3].ShaderRegister = 3;
+    sampler[3].RegisterSpace = 0;
+    sampler[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
     rootSignatureDesc.Init(_countof(rootParameters), rootParameters, _countof(sampler), sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -290,8 +305,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     memcpy(dataBegin, &geometryData.skinnedVertices[0], sizeof(SkinnedVertex) * geometryData.skinnedVertices.size());
     m_skinnedVertexBuffer.buffer->Unmap(0, nullptr);
 
-    //HERE!
-
     // initialize vertex buffer view
     m_skinnedVBView.BufferLocation = m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress();
     m_skinnedVBView.StrideInBytes = sizeof(SkinnedVertex);
@@ -318,7 +331,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_skinnedIBView.BufferLocation = m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress();
     m_skinnedIBView.SizeInBytes = UINT(sizeof(UINT) * geometryData.skinnedIndices.size());
     m_skinnedIBView.Format = DXGI_FORMAT_R32_UINT;
-
 
     // Debug overlay to show depth map
     HRR(BuildScreenQuadGeometryBuffers());
