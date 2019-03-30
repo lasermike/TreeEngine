@@ -118,7 +118,7 @@ PS_INPUT SkyBoxVS(VS_INPUT vin)
 
 float4 SkyBoxPS(PS_INPUT pin) : SV_Target
 {
-    return txCubeMap.Sample(samLinearWrap, pin.PosW);
+    return txCubeMap.Sample(samLinearWrap, pin.PosW.xyz);
 }
 
 //--------------------------------------------------------------------------------------
