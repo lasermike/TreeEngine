@@ -515,18 +515,21 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     paramsZ->materials.push_back(mat);
     scene->AddChild(new Primitive(paramsZ));
 
-
     // Init lights 
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
     renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
-    
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
+    //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
+
     renderData->numPointLights = 1;
 
     // Camera
-    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
-    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(1.11395788, 0.711319208, 2.05959034)));
+    player->SetRotation(XMVectorSet(0.00989040267, 0.978999615, 0.0489907376, 0));
+
+//    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
+//    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
 
     gameData->clearColor = Colors::Navy;
 }
