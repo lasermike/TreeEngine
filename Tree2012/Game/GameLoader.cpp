@@ -484,6 +484,37 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params5->textureFilename.push_back(L"cube.dds");
     scene->AddChild(new Primitive(params5));
 
+    //axis X
+    mat = ShaderMaterial();
+    XMStoreFloat4(&mat.Ambient, Colors::Red);
+    WorldObjectParams* paramsX = new WorldObjectParams(PrimitiveGeneratorType);
+    paramsX->position = XMFLOAT3(-3.5f, 0, 0);
+    paramsX->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
+    XMStoreFloat4(&paramsX->rotation, XMQuaternionRotationRollPitchYaw(0.0f,0.0f,XM_PIDIV2));
+    paramsX->primitiveType = PrimitiveType_CylinderHD;
+    paramsX->materials.push_back(mat);
+    scene->AddChild(new Primitive(paramsX));
+
+    // axis Y
+    XMStoreFloat4(&mat.Ambient, Colors::Green);
+    WorldObjectParams* paramsY = new WorldObjectParams(PrimitiveGeneratorType);
+    paramsY->position = XMFLOAT3(-4, 0.5f, 0);
+    paramsY->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
+    XMStoreFloat4(&paramsY->rotation, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, 0.0f));
+    paramsY->primitiveType = PrimitiveType_CylinderHD;
+    paramsY->materials.push_back(mat);
+    scene->AddChild(new Primitive(paramsY));
+
+    // axis Z
+    XMStoreFloat4(&mat.Ambient, Colors::Blue);
+    WorldObjectParams* paramsZ = new WorldObjectParams(PrimitiveGeneratorType);
+    paramsZ->position = XMFLOAT3(-4, 0.0f, 0.5f);
+    paramsZ->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
+    XMStoreFloat4(&paramsZ->rotation, XMQuaternionRotationRollPitchYaw(XM_PIDIV2, 0.0f, 0.0f));
+    paramsZ->primitiveType = PrimitiveType_CylinderHD;
+    paramsZ->materials.push_back(mat);
+    scene->AddChild(new Primitive(paramsZ));
+
 
     // Init lights 
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);

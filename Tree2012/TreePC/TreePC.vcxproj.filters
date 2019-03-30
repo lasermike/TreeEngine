@@ -41,6 +41,9 @@
     <Image Include="..\Game\Resources\FirBranchWithNeedles.dds">
       <Filter>Game\Resources</Filter>
     </Image>
+    <Image Include="..\Game\Resources\cube.dds">
+      <Filter>Game\Resources</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Game\WorldObject.cpp">
@@ -230,9 +233,6 @@
     <None Include="..\Game\Arial_16.abc">
       <Filter>Game\Resources</Filter>
     </None>
-    <None Include="..\Game\CopyResources.cmd">
-      <Filter>Game\Resources</Filter>
-    </None>
     <None Include="TreePC_TemporaryKey.pfx">
       <Filter>UWP</Filter>
     </None>
@@ -308,6 +308,9 @@
     </CustomBuild>
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
       <Filter>Game\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\CopyResources.cmd">
+      <Filter>Game\Resources</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>

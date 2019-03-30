@@ -98,7 +98,7 @@ PS_INPUT SkyBoxVS(VS_INPUT vin)
     PS_INPUT output;
 
     // Use local vertex position as cubemap lookup vector.  Store in Position World variable.
-    output.PosW = vin.Pos;
+    output.PosW = float3(-vin.Pos.x, -vin.Pos.y, -vin.Pos.z);
 
     // Transform to world space.
     float3 pos = mul(float4(vin.Pos, 1.0f), vin.World).xyz;

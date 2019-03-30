@@ -59,7 +59,7 @@ enum RootSignatureParams
 };
 
 const int maxTotalTexturesInScene = 4;
-const int maxNumMaterials = 6;
+const int maxNumMaterials = 9;
 
 
 HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)

@@ -113,6 +113,7 @@
   <ItemGroup>
     <Image Include="..\Game\bark2.dds" />
     <Image Include="..\Game\Bark_0005_diffuse.DDS" />
+    <Image Include="..\Game\Resources\cube.dds" />
     <Image Include="..\Game\Resources\FirBranchWithNeedles.dds" />
     <Image Include="..\Game\snow.dds" />
     <Image Include="Assets\LockScreenLogo.scale-200.png">
@@ -200,7 +201,11 @@
     <None Include="..\Game\Arial_16.tga">
       <DeploymentContent>true</DeploymentContent>
     </None>
-    <None Include="..\Game\CopyResources.cmd" />
+    <CustomBuild Include="..\Game\CopyResources.cmd">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</DeploymentContent>
+      <FileType>Document</FileType>
+    </CustomBuild>
     <None Include="..\Game\Courier_New_11.abc">
       <DeploymentContent>true</DeploymentContent>
     </None>

@@ -6,9 +6,8 @@ set files=graphdata.txt Courier_New_11.tga Arial_16.abc Arial_16.tga bark2.dds B
 set dirs=Resources
 
 mkdir %dest%
-
+ 
 call ..\..\misc\copyrobo %gamedir% %dest% %files% %options%
 
 call ..\..\misc\copyrobo %gamedir%\Resources %dest% %options%
 
- 
