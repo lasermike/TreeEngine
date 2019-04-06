@@ -110,7 +110,7 @@ PS_INPUT SkyBoxVS(VS_INPUT vin)
     //output.Pos = mul(posW, gViewProj).xyww;
 
     output.Pos = mul(float4(pos, 1.0f), transpose(View));
-    output.Pos = mul(output.Pos, transpose(Projection));
+    output.Pos = float4(mul(output.Pos, transpose(Projection)).xyz, 1);
     output.Tex = vin.Tex;
 
     return output;

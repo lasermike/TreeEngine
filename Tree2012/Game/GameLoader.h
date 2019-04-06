@@ -1,5 +1,4 @@
 #pragma once
-#include "OrbitCamera.h"
 
 class SceneRoot;
 struct RenderData;

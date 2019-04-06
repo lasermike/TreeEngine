@@ -85,9 +85,6 @@
     <ClCompile Include="..\Game\LSystemModelGenerator.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\OrbitCamera.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\GameLoader.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -175,9 +172,6 @@
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\LSystemModelGenerator.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\OrbitCamera.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\Game\GameLoader.h">

@@ -4,7 +4,6 @@
 #include "Primitive.h"
 #include "SceneRoot.h"
 #include "LSystemModelGenerator.h"
-#include "orbitcamera.h"
 #include <time.h>
 #include "Player.h"
 #include "Graph.h"

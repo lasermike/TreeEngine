@@ -1056,7 +1056,6 @@ HRESULT RenderPlatform12::UpdateView(CBNeverChanges& cbNeverChanges, bool shadow
 {
     int offset = shadowPass ? ShadowPass_CBSI : NormalPass_CBSI;
     m_constBufferNeverChanges->CopyData(offset, cbNeverChanges);
-    //GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constBufferNeverChanges->GetGPUVirtualAddress(offset));
 
     return S_OK;
 }
@@ -1067,14 +1066,10 @@ HRESULT RenderPlatform12::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4*
     XMStoreFloat4x4(&cbChangesPerPass.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
 
     XMStoreFloat4x4(&cbChangesPerPass.mView, XMMatrixTranspose(XMLoadFloat4x4(pViewMat)));
-    //cbChangesPerPass.mView = *pViewMat;
 
     int offset = shadowPass ? ShadowPass_CBSI : NormalPass_CBSI;
     m_constBufferChangesPerPass->CopyData(offset, cbChangesPerPass);
     GetCommandList()->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(offset));
-
-    //m_constBufferNeverChanges->CopyData(offset, cbNeverChanges);
-    //GetCommandList()->SetGraphicsRootConstantBufferView(NeverChangesRootSignatureParam, m_constBufferNeverChanges->GetGPUVirtualAddress(offset));
 
     return S_OK;
 }

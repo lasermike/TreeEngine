@@ -42,7 +42,6 @@ public:
     
     XMMATRIX GetViewMatrix();
     XMVECTOR GetEyePosition();
-    void UpdateOrbitCamera(DX::StepTimer const& timer, RenderData* pRenderData);
 
     inline void Update(DX::StepTimer const& timer, RenderData* pRenderData)
     {
