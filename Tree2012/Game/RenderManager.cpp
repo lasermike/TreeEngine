@@ -379,6 +379,7 @@ HRESULT RenderManager::InitDevice()
 
 HRESULT RenderManager::UpdateView(XMFLOAT4X4* pViewMat, bool shadowPass)
 {
+    ASSERT(0);
     CBNeverChanges cbNeverChanges;
     //XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(pViewMat)));
     return GetPlatform()->UpdateView(cbNeverChanges, shadowPass);

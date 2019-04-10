@@ -106,11 +106,11 @@ PS_INPUT SkyBoxVS(VS_INPUT vin)
     // Always center sky about camera.
     pos.xyz += eyePos.xyz;
 
-    // Set z = w so that z/w = 1 (i.e., skydome always on far plane).
+    // TODO:Set z = w so that z/w = 1 (i.e., skydome always on far plane).
     //output.Pos = mul(posW, gViewProj).xyww;
 
     output.Pos = mul(float4(pos, 1.0f), transpose(View));
-    output.Pos = float4(mul(output.Pos, transpose(Projection)).xyz, 1);
+    output.Pos = mul(output.Pos, transpose(Projection));
     output.Tex = vin.Tex;
 
     return output;

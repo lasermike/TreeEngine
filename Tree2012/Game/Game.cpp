@@ -81,7 +81,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_renderManager.GetRenderData().frame = 0;
     m_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
     m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
-    m_renderManager.GetRenderData().projectionData.farClippingPlane = 25.0f;
+    m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
     m_currentScene = 0;
     m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
