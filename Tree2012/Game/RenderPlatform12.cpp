@@ -23,11 +23,15 @@ enum CbvSrvHeapOffsets
     NullSrv_HeapOffset = 1,
     BranchData1Srv_HeapOffset = 2,
     BranchData2Srv_HeapOffset = 3,
+    Offscreen1_SrvHeapOffset = 4,
+    Offscreen2_SrvHeapOffset = 5,
+    Offscreen1_UavHeapOffset = 6,
+    Offscreen2_UavHeapOffset = 7,
 
-    // Global descriptors
-    Material0_HeapOffset = 4,
+    // Per-material descriptors
+    Material0_HeapOffset = 8,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 5,
+    Texture0Srv_HeapOffset = 9,
     Num_CbvSrvHeapOffsets
 };
  
@@ -102,8 +106,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 {
     // Create the command list.
     HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, GetCommandAllocator(), nullptr, IID_PPV_ARGS(&m_commandList)));
-
-    //HRR(RenderStates::InitAll(m_d3dDevice));
 
     // Create the root signature.
     // Root signature parameters are:
@@ -199,13 +201,13 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
     HRR(GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
-    // Initialize null descriptor
+    // Initialize null descriptor view
     D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc = {};
     nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     nullSrvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     nullSrvDesc.Texture2D.MipLevels = 1;
-    GetDevice()->CreateShaderResourceView(nullptr, &nullSrvDesc, m_shaderHeap.hCPU(NullSrv_HeapOffset));
+    GetDevice()->CreateShaderResourceView(nullptr, &nullSrvDesc, m_descriptorHeap.hCPU(NullSrv_HeapOffset));
 
     // Init text font
     m_bitmapFont = new XSF::BitmapFont();
@@ -384,8 +386,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     {
         D3D12_CPU_DESCRIPTOR_HANDLE shadowDsv = m_dsvHeap.hCPU(ShadowDsv_HeapOffset);
         m_renderData->pShadowMap = new ShadowMap(GetDevice(),
-            m_shaderHeap.hCPU(ShadowSrv_HeapOffset),
-            m_shaderHeap.hGPU(ShadowSrv_HeapOffset),
+            m_descriptorHeap.hCPU(ShadowSrv_HeapOffset),
+            m_descriptorHeap.hGPU(ShadowSrv_HeapOffset),
             shadowDsv,
             m_renderData->SMapWidth,
             m_renderData->SMapHeight);
@@ -446,8 +448,8 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
     srvDesc.Buffer.NumElements = numInstances;
     srvDesc.Buffer.StructureByteStride = sizeBytes / numInstances;
 
-    newBuffer->srvViewCpu = m_shaderHeap.hCPU(BranchData1Srv_HeapOffset + m_nextFreeShaderHeapDescriptor);
-    newBuffer->srvViewGpu = m_shaderHeap.hGPU(BranchData1Srv_HeapOffset + m_nextFreeShaderHeapDescriptor++);
+    newBuffer->srvViewCpu = m_descriptorHeap.hCPU(BranchData1Srv_HeapOffset + m_nextFreeShaderHeapDescriptor);
+    newBuffer->srvViewGpu = m_descriptorHeap.hGPU(BranchData1Srv_HeapOffset + m_nextFreeShaderHeapDescriptor++);
 
     m_d3dDevice->CreateShaderResourceView(newBuffer->buffer, &srvDesc, newBuffer->srvViewCpu);
 
@@ -575,7 +577,7 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, ru->m_material->m_cbvSrvHeapTable);
 
     // Set texture buffer view
-    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(ru->m_material->m_cbvSrvHeapTable, Texture0Srv_HeapOffset - Material0_HeapOffset, m_shaderHeap.GetIncrementSize());
+    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(ru->m_material->m_cbvSrvHeapTable, numTexturesPerMaterial, m_descriptorHeap.GetIncrementSize());
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
 
     GetCommandList()->SetPipelineState(ru->m_pipelineStates[pass]);
@@ -605,7 +607,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** texture)
 {
     assert(textureIndex < maxTotalTexturesInScene);
-    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_shaderHeap.GetIncrementSize());
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_descriptorHeap.GetIncrementSize());
 
     ID3D12Resource* resource = nullptr;
     HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
@@ -619,7 +621,7 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
 
 HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture)
 {
-    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_shaderHeap.GetIncrementSize());
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_descriptorHeap.GetIncrementSize());
 
     ResourceUploadBatch resourceUpload(GetDevice());
     resourceUpload.Begin();
@@ -721,8 +723,8 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 
     assert(materialNum < maxNumMaterials);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = m_shaderHeap.hGPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_shaderHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = m_descriptorHeap.hGPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_descriptorHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
 
     // Create descriptor for material constant buffer
     GetDevice()->CreateConstantBufferView(&uploadBuffer->View(), cpuMaterialHandle); //???
@@ -730,7 +732,7 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     // Copy texture descriptor from offline heap to shader visible heap
     if (texture)
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE dest = m_shaderHeap.hCPU(materialNum * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
+        D3D12_CPU_DESCRIPTOR_HANDLE dest = m_descriptorHeap.hCPU(materialNum * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
         GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
@@ -897,12 +899,12 @@ HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList,
     GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
     GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE shadowMapHandle = m_shaderHeap.hGPU(ShadowSrv_HeapOffset);
+    D3D12_GPU_DESCRIPTOR_HANDLE shadowMapHandle = m_descriptorHeap.hGPU(ShadowSrv_HeapOffset);
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, shadowMapHandle);
 
     commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_shaderHeap.hGPU(NullSrv_HeapOffset);
+    D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_descriptorHeap.hGPU(NullSrv_HeapOffset);
     GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
 
     return S_OK;
@@ -963,7 +965,7 @@ HRESULT RenderPlatform12::InitDevice()
     HRR(GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
 
     // Shader visible heap
-    HRR(m_shaderHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, true));
+    HRR(m_descriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, true));
 
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -1037,6 +1039,9 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
     m_pRenderTargetView = D3D12_RESOURCE_DESC();
     m_pSharedRenderToTexture.Release();
 
+    m_offscreenBuffer1.Release();
+    m_offscreenBuffer2.Release();
+
     return hr;
 }
 
@@ -1083,7 +1088,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     // Create render target views (RTVs).
     for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
     {
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(i)); /*->GetCPUDescriptorHandleForHeapStart());*/
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(i));
 
         HRR(m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
         GetDevice()->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
@@ -1127,6 +1132,65 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     // Create the depth stencil view.
     GetDevice()->CreateDepthStencilView(m_pDepthStencil, nullptr, m_dsvHeap.hCPU(0));
 
+    // Create offscreen rendering surfaces
+    D3D12_RESOURCE_DESC offscreenDesc;
+    ZeroMemory(&offscreenDesc, sizeof(D3D12_RESOURCE_DESC));
+    offscreenDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    offscreenDesc.Alignment = 0;
+    offscreenDesc.Width = windowWidth;
+    offscreenDesc.Height = windowHeight;
+    offscreenDesc.DepthOrArraySize = 1;
+    offscreenDesc.MipLevels = 1;
+    offscreenDesc.Format = m_swapChainFormat;
+    offscreenDesc.SampleDesc.Count = 1;
+    offscreenDesc.SampleDesc.Quality = 0;
+    offscreenDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    offscreenDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    HRR(GetDevice()->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &offscreenDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_offscreenBuffer1)));
+
+    HRR(GetDevice()->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &offscreenDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_offscreenBuffer2)));
+
+    // Create offscreen rendering views
+    // SRV
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = m_swapChainFormat;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE offscreenCpuHandle = m_descriptorHeap.hCPU(Offscreen1_SrvHeapOffset);
+    GetDevice()->CreateShaderResourceView(m_offscreenBuffer1, &srvDesc, offscreenCpuHandle);
+
+    offscreenCpuHandle = m_descriptorHeap.hCPU(Offscreen2_SrvHeapOffset);
+    GetDevice()->CreateShaderResourceView(m_offscreenBuffer2, &srvDesc, offscreenCpuHandle);
+
+    // UAV
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = m_swapChainFormat;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    uavDesc.Texture2D.MipSlice = 0;
+
+    offscreenCpuHandle = m_descriptorHeap.hCPU(Offscreen1_UavHeapOffset);
+    GetDevice()->CreateUnorderedAccessView(m_offscreenBuffer1, nullptr, &uavDesc, offscreenCpuHandle);
+
+    offscreenCpuHandle = m_descriptorHeap.hCPU(Offscreen2_UavHeapOffset);
+    GetDevice()->CreateUnorderedAccessView(m_offscreenBuffer2, nullptr, &uavDesc, offscreenCpuHandle);
+
+    ////
     // Validation
     ASSERT(m_pSwapChain);
     ASSERT(m_pSwapChain || m_pSharedRenderToTexture);
@@ -1134,7 +1198,6 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     ASSERT(m_renderTargets[1]);
     ASSERT(m_viewPort.Width != 0);
     ASSERT(m_viewPort.Height != 0);
-
 
     return S_OK;
 }
@@ -1176,7 +1239,7 @@ HRESULT RenderPlatform12::UninitDevice()
     CloseHandle(m_fenceEvent);
     m_fenceEvent = nullptr;
 
-    m_shaderHeap.Terminate();
+    m_descriptorHeap.Terminate();
 
     // InitDevice objects
     m_d3dDevice.Release();
@@ -1211,7 +1274,7 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature);
 
-    ID3D12DescriptorHeap* ppHeaps[] = { m_shaderHeap };
+    ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
     m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     m_commandList->RSSetViewports(1, &m_viewPort);
@@ -1222,10 +1285,10 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     m_commandList->OMSetStencilRef(0);
 
     // Set default material (first material).  Will be changed by calls to SetRenderUnit()
-    D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_shaderHeap.hGPU(Material0_HeapOffset);;
+    D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_descriptorHeap.hGPU(Material0_HeapOffset);
     m_commandList->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, materialHandle);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_shaderHeap.hGPU(Texture0Srv_HeapOffset);;
+    D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
     m_commandList->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureHandle);
 
     // Set root signature constant buffers
@@ -1309,7 +1372,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     //// Unbind shadow texture so we can render to it next frame
     //if (useShadowMaps)
     //{
-    //    D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_shaderHeap.hGPU(NullSrv_HeapOffset);
+    //    D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_descriptorHeap.hGPU(NullSrv_HeapOffset);
     //    GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
     //}
 

@@ -601,7 +601,7 @@ private:
 
     DescriptorHeapWrapper             m_rtvHeap;
     DescriptorHeapWrapper             m_dsvHeap;
-    DescriptorHeapWrapper             m_shaderHeap;
+    DescriptorHeapWrapper             m_descriptorHeap;
     int                               m_nextFreeShaderHeapDescriptor;
     DirectX::GraphicsMemory*          m_graphicsMemory;
 
@@ -662,16 +662,26 @@ private:
     std::vector<ID3D12PipelineState*> m_gameLevelPSOs;
     std::list<RenderUnit*>            m_gameLevelRenderUnits;
 
+    // Texture loading
     CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading textures
     CComPtr<ID3D12DescriptorHeap>     m_samplerHeap;
+
+    // PSO
     CComPtr<ID3D12PipelineState>      m_pipelineState;
     CComPtr<ID3D12PipelineState>      m_pipelineStateFullScreenQuad;
     CComPtr<ID3D12PipelineState>      m_pipelineStateShadowMap;
 
+    // Fences
     CComPtr<ID3D12Fence>              m_fence;
     HANDLE                            m_fenceEvent;
     UINT64                            m_fenceValue;
     std::list<FencedHeap>             m_managedUploadHeaps;
+
+    // Offscreen rendering
+    CComPtr<ID3D12Resource>           m_offscreenBuffer1;
+    CComPtr<ID3D12Resource>           m_offscreenBuffer2;
+    D3D12_RESOURCE_DESC               m_offscreenView1;
+    D3D12_RESOURCE_DESC               m_offscreenView2;
 
     enum DsvHeapOffset
     {
