@@ -166,12 +166,14 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     float4x4 worldPrev = InstanceBuffer[input.InstanceOffsetPrev].World;
     //float4x4 worldNext = InstanceBuffer[input.InstanceOffsetNext].World;
 
-    input.Pos.y *= input.InstanceWeight3;
+    //input.Pos.y *= input.InstanceWeight3;
 
     float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
-    float3 outPrev = mul(float4(input.Pos, 1.0f), worldPrev).xyz;
 
-    out0 = lerp(out0, outPrev, input.InstanceWeight1);
+    float3 inputPosPrev = float3(input.Pos.x, 0.5f, input.Pos.z); // assume(!) skinned cylinder always 1 unit tall, centered on origin
+    float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
+
+    out0 = lerp(outPrev, out0, input.InstanceWeight1);
 
     output.PosW = out0;
 

@@ -28,6 +28,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 
     // Cylinder
     GeometryGenerator::MeshData cylinder;
+    // Note: skinned VS shader assumes geometry is always 1 unit tall
     geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 3, false, false, cylinder);
 
     // Cache the index count of each object.
@@ -573,26 +574,8 @@ void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, floa
             vertex.TexC.x = (float)j/sliceCount;
             vertex.TexC.y = 1.0f - (float)i/stackCount;
 
-            if (i == 0)
-            {
-                vertex.InstanceWeights = XMFLOAT3(1.0f, 0, -1.0f);
-            }
-            else if (i == ringCount - 1)
-            {
-                vertex.InstanceWeights = XMFLOAT3(0, 0, 1.0f);
-            }
-            else
-            {
-                vertex.InstanceWeights = XMFLOAT3(0, 0, 1.0f);
-            }
-
-
-            //else
-            //{
-            //    //float lerp = 1.0f - i / (float)(ringCount - 1);
-            //    float lerp = i / (float)(ringCount - 1);
-            //    vertex.InstanceWeights = XMFLOAT3(lerp, 0, 1.0f);
-            //}
+            float lerp = i / (float)stackCount;
+            vertex.InstanceWeights = XMFLOAT3(lerp, 0, 1.0f);
 
             // Cylinder can be parameterized as follows, where we introduce v
             // parameter that goes in the same direction as the v tex-coord
