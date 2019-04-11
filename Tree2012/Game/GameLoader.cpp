@@ -412,7 +412,7 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
     trunkMaterial.Diffuse = XMFLOAT4(Colors::BurlyWood); //XMFLOAT4(0.6f, 0.6f, 0.6f, 1.0f);
     trunkMaterial.Specular = XMFLOAT4(0.1f, .1f, .1f, 1.0f);
-    trunkMaterial.flags.y = 1; //useTextures  TODO
+    trunkMaterial.flags.y = 1; //useTextures
 
     ShaderMaterial leafMaterial;
     leafMaterial.Ambient = XMFLOAT4(.4f, .4f, .4f, 1.0f);
@@ -524,12 +524,13 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     renderData->numPointLights = 1;
 
     // Camera
+#if ALT_POSITION
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -5.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
+#else
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(1.11395788, 0.711319208, 2.05959034)));
     player->SetRotation(XMVectorSet(0.00989040267, 0.978999615, 0.0489907376, 0));
-
-//    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
-//    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
-
+#endif
     gameData->clearColor = Colors::Navy;
 }
 
@@ -562,8 +563,11 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->_animationSpeed = 5.0f;
 
     params3->GetGeneratorParameters()._axiom = "F(20) A";
-    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) [z(1) $(1) F(5)] F(10) [z(1) F(30)] F(10) [z(1) $(1) F(30)] F(25) A] [Z(0.33074)F(50)A] "));
-//    params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.309)"));
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) A] [Z(0.33074)F(50)A] "));
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) [z(1) $(1) F(5)] F(10) [z(1) F(30)] F(10) [z(1) $(1) F(30)] F(25) A] [Z(0.33074)F(50)A] "));
+
+    //    params3->GetGeneratorParameters()._rules.push_back(Rule("F(l)", "F(l*1.309)"));
 
     //    params3->GetGeneratorParameters()._rules.push_back(Rule("!(w)", "!(w*1.732)"));
 

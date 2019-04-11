@@ -17,15 +17,15 @@ SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 SamplerState samLinearWrap : register(s3);
 
-struct BranchData
+struct InstancedData
 {
-    float4x4 BranchWorld; //  : WORLD;
+    float4x4 World; //  : WORLD;
     uint InstanceOffset;
     uint InstanceOffsetPrev;
     uint InstanceOffsetNext;
 };
 
-StructuredBuffer<BranchData> BranchBuffer : register(t2);
+StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
 
 cbuffer cbChangesPerPass : register(b1)
 {
@@ -161,10 +161,10 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
 {
     PS_INPUT output = (PS_INPUT)0;
 
-    //float4x4 world = input.World;
-    float4x4 world = BranchBuffer[input.InstanceOffset].BranchWorld;
-    float4x4 worldPrev = BranchBuffer[input.InstanceOffsetPrev].BranchWorld;
-    //float4x4 worldNext = BranchBuffer[input.InstanceOffsetNext].BranchWorld;
+    float4x4 world = input.World;
+    //float4x4 world = InstanceBuffer[input.InstanceOffset].World;
+    float4x4 worldPrev = InstanceBuffer[input.InstanceOffsetPrev].World;
+    //float4x4 worldNext = InstanceBuffer[input.InstanceOffsetNext].World;
 
     input.Pos.y *= input.InstanceWeight3;
 
@@ -281,10 +281,12 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 }
 
 ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
-{
+{ 
     ShadowMapVertexOut output;
 
-    float4 pos = mul(float4(input.Pos, 1.0f), input.World);
+    float4x4 world = input.World;
+    //float4x4 world = InstanceBuffer[input.InstanceOffset].World;
+    float4 pos = mul(float4(input.Pos, 1.0f), world);
     pos = mul(pos, transpose(View));
     output.PosH = mul(pos, transpose(Projection));
     output.Tex = input.Tex;

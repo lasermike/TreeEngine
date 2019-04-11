@@ -586,6 +586,14 @@ void GeometryGenerator::CreateCylinder(float bottomRadius, float topRadius, floa
                 vertex.InstanceWeights = XMFLOAT3(0, 0, 1.0f);
             }
 
+
+            //else
+            //{
+            //    //float lerp = 1.0f - i / (float)(ringCount - 1);
+            //    float lerp = i / (float)(ringCount - 1);
+            //    vertex.InstanceWeights = XMFLOAT3(lerp, 0, 1.0f);
+            //}
+
             // Cylinder can be parameterized as follows, where we introduce v
             // parameter that goes in the same direction as the v tex-coord
             // so that the bitangent goes in the same direction as the v tex-coord.

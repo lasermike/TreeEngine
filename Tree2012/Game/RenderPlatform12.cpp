@@ -361,7 +361,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     shadowPsoDesc.RasterizerState.DepthBias = 100000;
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
-    //shadowPsoDesc.pRootSignature = mRootSignature.Get();
     shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_shadowVertexShader);
     shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_shadowPixelShader);
     shadowPsoDesc.DSVFormat = ShadowMap::Format();
@@ -735,59 +734,6 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
-/*    // create PSO
-    // TODO: Skinned VB??
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    if (false)
-    {
-        psoDesc.InputLayout = { InputLayoutDesc::InstancedSkinned, _countof(InputLayoutDesc::InstancedSkinned) };
-    }
-    else
-    {
-        psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
-    }
-
-    psoDesc.pRootSignature = m_rootSignature;
-    psoDesc.VS = CD3DX12_SHADER_BYTECODE(vs->shader);
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(ps->shader);
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-
-    StockRenderStates::GetInstance().CopyBlendTemplate(psoDesc.BlendState, renderState.blendState);
-
-    // TODO: fill out other render states in PSO
-
-    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-    psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = GetSwapChainFormat();
-    psoDesc.SampleDesc.Count = 1;
-
-    ID3D12PipelineState* pipelineState = nullptr;
-    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
-    m_gameLevelPSOs.push_back(pipelineState);
-
-    // Shadow pass PSO
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
-    shadowPsoDesc.RasterizerState.DepthBias = 100000;
-    shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
-    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
-    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_shadowVertexShader);
-    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_shadowPixelShader);
-    shadowPsoDesc.DSVFormat = ShadowMap::Format();
-
-    // Shadow map pass does not have a render target.
-    shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
-    shadowPsoDesc.NumRenderTargets = 0;
-
-    ID3D12PipelineState* pipelineStateShadowMap = nullptr;
-    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&pipelineStateShadowMap)));
-    m_gameLevelPSOs.push_back(pipelineStateShadowMap);
-
-    // TODO create own shadow PSO
-    ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
-*/
     Material* newMat = new Material(name, texture, vs, ps, shadowVs, shadowPs,
         nullptr /*D3D12_STATIC_SAMPLER_DESC* samplerState*/, nullptr /*D3D12_RASTERIZER_DESC* rasterizer*/, nullptr /*D3D12_DEPTH_STENCIL_DESC* depthState*/,
         shaderMaterial, uploadBuffer, gpuMaterialHandle, renderState);
@@ -839,8 +785,8 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     shadowPsoDesc.RasterizerState.DepthBias = 100000;
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
-    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_shadowVertexShader);
-    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_shadowPixelShader);
+    shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(material->m_shadowVertexShader->shader);
+    shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(material->m_shadowPixelShader->shader);
     shadowPsoDesc.DSVFormat = ShadowMap::Format();
 
     // Shadow map pass does not have a render target.

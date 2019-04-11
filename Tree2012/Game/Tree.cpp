@@ -60,19 +60,20 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     }
 
     GeometryBuffer geometryBuffer = PRIMITIVE_GEOMETRY_BUFFER;
-    std::wstring vsFilename;
+    std::wstring vsFilename, shadowVsFilename;
     std::wstring psFilename;
     InputLayouts inputLayout = BASIC_INPUT_LAYOUT;
     if (_params->meshes[0] == PrimitiveType_SkinnedCylinder)
     {
         geometryBuffer = SKINNED_PRIMITIVE_GEOMETRY_BUFFER;
         vsFilename = L"VSSkinned.cso";
+        shadowVsFilename = L"BuildShadowMapVSSkinned.cso";
         inputLayout = SKINNED_INPUT_LAYOUT;
     }
 
     // Create material, mesh, and reserve render unit
     Material* pTrunk = nullptr;
-    renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), vsFilename.c_str(), nullptr, vsFilename.c_str(), nullptr, _params->materials[0], StockRenderState(), &pTrunk);
+    renderManager.CreateMaterial(L"trunk", _params->textureFilename[0].c_str(), vsFilename.c_str(), nullptr, shadowVsFilename.c_str(), nullptr, _params->materials[0], StockRenderState(), &pTrunk);
     Mesh* pNewMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_params->meshes[0]);
     renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, inputLayout, &pNewMesh);

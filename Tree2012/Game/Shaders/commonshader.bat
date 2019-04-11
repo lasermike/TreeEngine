@@ -15,17 +15,17 @@ SET cmdline=%~1 /Zi /Zpr
 
 if "a%~6%" == "aDebug" (
    echo Compiling shaders with optimization disabled...
-   SET cmdline=%cmdline% /O0 /Od
+   SET cmdline=%cmdline% /Od /O0
 )
 
 if "a%~6%" == "aDebug12" (
    echo Compiling shaders with optimization disabled...
-   SET cmdline=%cmdline% /O0 /Od
+   SET cmdline=%cmdline% /Od /O0
 )
 
 if "a%~6%" == "aDebug_MonoD3D" (
    echo Compiling shaders with optimization disabled...
-   SET cmdline=%cmdline% /O0 /Od
+   SET cmdline=%cmdline% /Od /O0
 )
 
 if "a%~6%" == "aRelease" (
