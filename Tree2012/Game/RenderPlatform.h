@@ -593,6 +593,7 @@ class RenderPlatform12 : public RenderPlatform
 {
 public:
     static const UINT                 FrameCount = 2;
+    static const UINT                 OffscreenBufferCount = 2;
 
 private:
     CComPtr<ID3D12Device>             m_d3dDevice;
