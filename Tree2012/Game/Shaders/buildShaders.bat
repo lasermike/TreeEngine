@@ -43,11 +43,13 @@ call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 @if %2==vs (
   set target=vs_5_0
   set suffix=VS
-) ELSE (
+) ELSE if %2==ps (
   set target=ps_5_0
   set suffix=PS
+) ELSE (
+  set target=cs_5_0
+  set suffix=CS
 )
-
 @rem Compile!
 @set outputfile=%~4%~n3.cso
 @ECHO Building %1 for %target%  
@@ -59,7 +61,7 @@ call !finalcmd!
 
 @rem Copy output to deployment directory (AppX)
 mkdir %layoutFolder%
-copy "%outputfile%" %layoutFolder%
+xcopy "%outputfile%" %layoutFolder% /y
 
 @goto :EOF
 

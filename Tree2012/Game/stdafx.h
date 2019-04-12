@@ -58,7 +58,7 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
         HRESULT hr2 = (x);                                      \
         if (FAILED(hr2))                                         \
         {                                                      \
-        std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr2 << ", " << L#x << "\n"; \
+            Util.Output("ERROR: %s(%d), HR:%x - " #x "\n", __FILE__, (DWORD)__LINE__, hr2);  \
         assert(SUCCEEDED(hr2)); \
         }                                                      \
     }
@@ -70,9 +70,9 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
         HRESULT hr2 = (x);                                      \
         if (FAILED(hr2))                                         \
         {                                                      \
-        std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr2 << ", " << L#x << "\n"; \
-        assert(SUCCEEDED(hr2)); \
-        return hr2; \
+            Util.Output("ERROR: %s(%d), HR:%x - " #x "\n", __FILE__, (DWORD)__LINE__, hr2);  \
+            assert(SUCCEEDED(hr2)); \
+            return hr2; \
         }                                                      \
     }
 #endif
@@ -82,7 +82,7 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
         hr = (x);                                      \
         if (FAILED(hr))                                         \
         {                                                      \
-            std::cerr << "ERROR: " << __FILE__ << ": " << (DWORD)__LINE__ << ", HR:" << hr << ", " << L#x << "\n"; \
+            Util.Output("ERROR: %s(%d), HR:%x - " #x "\n", __FILE__, (DWORD)__LINE__, hr);  \
             assert(SUCCEEDED(hr)); \
             goto Cleanup; \
         }                                                      

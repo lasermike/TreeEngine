@@ -243,6 +243,28 @@ struct PixelShader
 #endif
 };
 
+struct ComputeShader
+{
+#if defined(TREE3D12)
+    ID3DBlob*                 shader;
+
+    ~ComputeShader() { Release(); }
+    ComputeShader() : shader(nullptr) { }
+
+    operator ID3DBlob* () { return shader; }
+    void Release();
+
+#elif defined(TREE3D11)
+    ID3D11ComputeShader*        shader;
+
+    ComputeShader() : shader(nullptr) { }
+    ~ComputeShader() { Release(); }
+
+    operator ID3D11ComputeShader* () { return shader; }
+    void Release();
+#endif
+};
+
 struct Material
 {
     wstring                         m_name;
@@ -413,8 +435,9 @@ struct RenderUnit
 
 #if defined(TREE3D12)
 
-    ID3D12PipelineState*            m_pipelineStates[NUM_RENDER_PASSES];
-    //const D3D12_INPUT_ELEMENT_DESC* m_inputLayout;
+    ID3D12PipelineState*        m_pipelineStates[NUM_RENDER_PASSES];
+    int                         id;
+    static int                  s_nextId;
 
 
     RenderUnit(Material* material, Mesh* mesh, ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES]) : 
@@ -428,6 +451,8 @@ struct RenderUnit
         {
             m_pipelineStates[i] = pipelineStates[i];
         }
+
+        id = s_nextId++;
     }
 
 #elif defined(TREE3D11)
@@ -438,6 +463,8 @@ struct RenderUnit
         assert(m_material);
         assert(m_mesh);
     }
+
+
 
 #endif
 };
@@ -612,6 +639,7 @@ private:
     D3D12_RESOURCE_DESC               m_pDepthStencilView;
 
     CComPtr<ID3D12RootSignature>       m_rootSignature;
+    CComPtr<ID3D12RootSignature>       m_computeRootSignature;
     CComPtr<ID3D12GraphicsCommandList> m_commandList;
     CComPtr<ID3D12CommandQueue>        m_commandQueue;
     CComPtr<ID3D12CommandAllocator>    m_commandAllocator;
@@ -660,14 +688,16 @@ private:
     std::vector<ID3D12Resource*>      m_gameLevelResources;
     std::vector<VertexShader*>        m_gameLevelVertexShaders;
     std::vector<PixelShader*>         m_gameLevelPixelShaders;
-    std::vector<ID3D12PipelineState*> m_gameLevelPSOs;
+    std::unordered_map <std::string, ID3D12PipelineState*> m_gameLevelPSOs;
     std::list<RenderUnit*>            m_gameLevelRenderUnits;
+    std::unordered_map <std::wstring, ComputeShader*> m_gameLevelComputeShaders;
+
 
     // Texture loading
     CComPtr<ID3D12DescriptorHeap>     m_loadTextureHeap;    // offline heap for loading textures
     CComPtr<ID3D12DescriptorHeap>     m_samplerHeap;
 
-    // PSO
+    // PSO -TODO: consolidate in game level pso's
     CComPtr<ID3D12PipelineState>      m_pipelineState;
     CComPtr<ID3D12PipelineState>      m_pipelineStateFullScreenQuad;
     CComPtr<ID3D12PipelineState>      m_pipelineStateShadowMap;
@@ -778,6 +808,8 @@ public:
         return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
     }
 
+    // TODO: move into interface
+    HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
 };
 
 #elif defined(TREE3D11)

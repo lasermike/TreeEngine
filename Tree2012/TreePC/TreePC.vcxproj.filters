@@ -306,6 +306,9 @@
     <CustomBuild Include="..\Game\CopyResources.cmd">
       <Filter>Game\Resources</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">

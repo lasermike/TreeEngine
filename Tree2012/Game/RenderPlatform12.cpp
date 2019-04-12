@@ -41,6 +41,14 @@ const int numConstantBuffersPerMaterial = 1;
 const int numTexturesPerMaterial = 1;
 const int numDescriptorsPerMaterial = numConstantBuffersPerMaterial + numTexturesPerMaterial;
 
+enum RtvHeapOffsets
+{
+    Framed1_RtvHeapOffset = 0,
+    Frame2_RtvHeapOffset = 1,
+    Offscreen1_RtvHeapOffset = 3,
+    Offscreen2_RtvHeapOffset = 4
+};
+
 enum constBufferRootSignatureOffsets
 {
     ChangesPerPassRootSignatureShaderSlot = 1,
@@ -65,6 +73,7 @@ enum RootSignatureParams
 const int maxTotalTexturesInScene = 4;
 const int maxNumMaterials = 9;
 
+int RenderUnit::s_nextId = 0;
 
 HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
 {
@@ -208,6 +217,44 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     nullSrvDesc.Texture2D.MipLevels = 1;
     GetDevice()->CreateShaderResourceView(nullptr, &nullSrvDesc, m_descriptorHeap.hCPU(NullSrv_HeapOffset));
+
+    // Create compute root signature
+    {
+        CD3DX12_DESCRIPTOR_RANGE srvTable;
+        srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+
+        CD3DX12_DESCRIPTOR_RANGE uavTable;
+        uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+
+        // Root parameter can be a table, root descriptor or root constants.
+        CD3DX12_ROOT_PARAMETER slotRootParameter[3];
+
+        // Perfomance TIP: Order from most frequent to least frequent.
+        slotRootParameter[0].InitAsConstants(12, 0);
+        slotRootParameter[1].InitAsDescriptorTable(1, &srvTable);
+        slotRootParameter[2].InitAsDescriptorTable(1, &uavTable);
+
+        // A root signature is an array of root parameters.
+        CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter, 0, nullptr,
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        // create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
+        CComPtr<ID3DBlob> serializedRootSig;
+        CComPtr<ID3DBlob> errorBlob;
+        HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, &serializedRootSig, &errorBlob);
+
+        if (errorBlob != nullptr)
+        {
+            ::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+
+        HRR(hr);
+
+        HRR(GetDevice()->CreateRootSignature(0,
+            serializedRootSig->GetBufferPointer(),
+            serializedRootSig->GetBufferSize(),
+            IID_PPV_ARGS(&m_computeRootSignature)));
+    }
 
     // Init text font
     m_bitmapFont = new XSF::BitmapFont();
@@ -374,6 +421,38 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
     m_pipelineStateShadowMap->SetName(L"ShadowPSO");
 
+    // Create compute pipeline state objects
+    {
+        // PSO for horizontal blur
+        //
+        ComputeShader* horzShader = nullptr;
+        LoadComputeShader(L"HorzBlurCS.cso", &horzShader);
+        D3D12_COMPUTE_PIPELINE_STATE_DESC horzBlurPSO = {};
+        horzBlurPSO.pRootSignature = m_computeRootSignature;
+        horzBlurPSO.CS =
+        {
+            reinterpret_cast<BYTE*>(horzShader->shader->GetBufferPointer()),
+            horzShader->shader->GetBufferSize()
+        };
+        horzBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+        HRR(GetDevice()->CreateComputePipelineState(&horzBlurPSO, IID_PPV_ARGS(&m_gameLevelPSOs["horzBlur"])));
+
+        //
+        // PSO for vertical blur
+        //
+        ComputeShader* vertShader = nullptr;
+        LoadComputeShader(L"VertBlurCS.cso", &vertShader);
+        D3D12_COMPUTE_PIPELINE_STATE_DESC vertBlurPSO = {};
+        vertBlurPSO.pRootSignature = m_computeRootSignature;
+        vertBlurPSO.CS =
+        {
+            reinterpret_cast<BYTE*>(vertShader->shader->GetBufferPointer()),
+            vertShader->shader->GetBufferSize()
+        };
+        vertBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+        HRR(GetDevice()->CreateComputePipelineState(&vertBlurPSO, IID_PPV_ARGS(&m_gameLevelPSOs["horzBlur"])));
+    }
+
     // Execute the command list.
     HRR(GetCommandList()->Close());
     ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
@@ -416,6 +495,18 @@ HRESULT RenderPlatform12::LoadPixelShader(const wchar_t* shaderFilename, PixelSh
     m_gameLevelPixelShaders.push_back(pixelShader);
 
     *shader = pixelShader;
+
+    return S_OK;
+}
+
+HRESULT RenderPlatform12::LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader)
+{
+    ComputeShader* newShader = new ComputeShader();
+    HRR(XSF::LoadShader(shaderFilename, &newShader->shader));
+
+    m_gameLevelComputeShaders[shaderFilename] = newShader;
+
+    *shader = newShader;
 
     return S_OK;
 }
@@ -520,9 +611,9 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     }
     m_gameLevelPixelShaders.clear();
 
-    for (ID3D12PipelineState* pso : m_gameLevelPSOs)
+    for (auto pso : m_gameLevelPSOs)
     {
-        pso->Release();
+        pso.second->Release();
     }
     m_gameLevelPSOs.clear();
 
@@ -536,10 +627,17 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeDelete(&m_bitmapFont);
 
     m_rootSignature.Release();
+    m_computeRootSignature.Release();
 
     m_pipelineState.Release();
     m_pipelineStateFullScreenQuad.Release();
     m_pipelineStateShadowMap.Release();
+
+    //for (auto pso : m_PSOs)
+    //{
+    //    pso.second->Release();
+    //}
+    //m_PSOs.clear();
 
     for (ID3D12Resource* resource : m_gameLevelResources)
     {
@@ -780,7 +878,6 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
 
     ID3D12PipelineState* pipelineState = nullptr;
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
-    m_gameLevelPSOs.push_back(pipelineState);
 
     // Shadow pass PSO
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
@@ -797,13 +894,17 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
 
     ID3D12PipelineState* pipelineStateShadowMap = nullptr;
     HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&pipelineStateShadowMap)));
-    m_gameLevelPSOs.push_back(pipelineStateShadowMap);
 
-    // TODO create own shadow PSO
     ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
-
     *renderUnit = new RenderUnit(material, mesh, pipelineStates);
     m_gameLevelRenderUnits.push_back(*renderUnit);
+
+    CHAR name[32];
+    sprintf_s(name, "%d", (*renderUnit)->id);
+    m_gameLevelPSOs[name] = pipelineState;
+    sprintf_s(name, "%dS", (*renderUnit)->id);
+    m_gameLevelPSOs[name] = pipelineStateShadowMap;
+
     return S_OK;
 }
 
@@ -1147,12 +1248,16 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     offscreenDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     offscreenDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
+    clearValue.Format = m_swapChainFormat;
+    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    memcpy(&clearValue.Color[0], clearColor, sizeof(float) * _countof(clearColor));
+
     HRR(GetDevice()->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &offscreenDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
+        &clearValue,
         IID_PPV_ARGS(&m_offscreenBuffer1)));
 
     HRR(GetDevice()->CreateCommittedResource(
@@ -1160,7 +1265,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         D3D12_HEAP_FLAG_NONE,
         &offscreenDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
+        &clearValue,
         IID_PPV_ARGS(&m_offscreenBuffer2)));
 
     // Create offscreen rendering views
@@ -1308,12 +1413,6 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, &m_VBView);
 
-    if (resetCommandList)
-    {
-        // Indicate that the back buffer will be used as a render target.
-        //m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-    }
-
     return hr;
 }
 
@@ -1321,7 +1420,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 {
     PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render");
 
-    //TODO NEXT: render to offscreen buffer and copy to swap chain
+    //TODO NEXT: use compute to copy offscreen1 to rtv
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
