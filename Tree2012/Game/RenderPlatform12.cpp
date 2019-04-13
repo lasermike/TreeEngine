@@ -450,7 +450,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             vertShader->shader->GetBufferSize()
         };
         vertBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-        HRR(GetDevice()->CreateComputePipelineState(&vertBlurPSO, IID_PPV_ARGS(&m_gameLevelPSOs["horzBlur"])));
+        HRR(GetDevice()->CreateComputePipelineState(&vertBlurPSO, IID_PPV_ARGS(&m_gameLevelPSOs["vertBlur"])));
     }
 
     // Execute the command list.
