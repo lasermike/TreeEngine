@@ -1256,7 +1256,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &offscreenDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
+        D3D12_RESOURCE_STATE_COMMON,
         &clearValue,
         IID_PPV_ARGS(&m_offscreenBuffer1)));
 
@@ -1264,7 +1264,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &offscreenDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
+        D3D12_RESOURCE_STATE_COMMON,
         &clearValue,
         IID_PPV_ARGS(&m_offscreenBuffer2)));
 
@@ -1428,7 +1428,6 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
     GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-    // Record commands.
     GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
@@ -1472,6 +1471,41 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     return S_OK;
 }
 
+// TODO: make a post processing system
+std::vector<float> CalcGaussWeights(float sigma)
+{
+    float twoSigma2 = 2.0f*sigma*sigma;
+
+    // Estimate the blur radius based on sigma since sigma controls the "width" of the bell curve.
+    // For example, for sigma = 3, the width of the bell curve is 
+    int blurRadius = (int)ceil(2.0f * sigma);
+
+    const int MaxBlurRadius = 5;
+    assert(blurRadius <= MaxBlurRadius);
+
+    std::vector<float> weights;
+    weights.resize(2 * blurRadius + 1);
+
+    float weightSum = 0.0f;
+
+    for (int i = -blurRadius; i <= blurRadius; ++i)
+    {
+        float x = (float)i;
+
+        weights[i + blurRadius] = expf(-x * x / twoSigma2);
+
+        weightSum += weights[i + blurRadius];
+    }
+
+    // Divide by the sum so all the weights add up to 1.0.
+    for (int i = 0; i < weights.size(); ++i)
+    {
+        weights[i] /= weightSum;
+    }
+
+    return weights;
+}
+
 HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
 {
     HRESULT hr = S_OK;
@@ -1481,23 +1515,64 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         HRR(DrawScreenQuad(GetCommandList(), m_renderData->pShadowMap ? m_renderData->pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
     }
 
-    //// Unbind shadow texture so we can render to it next frame
-    //if (useShadowMaps)
-    //{
-    //    D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_descriptorHeap.hGPU(NullSrv_HeapOffset);
-    //    GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, nullSrvHandleGpu);
-    //}
-
+#if 0
     // Copy offscreen1 to render target
-
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(FrameCount));  //m_frameIndex
-    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE));
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST));
 
     m_commandList->CopyResource(m_renderTargets[m_frameIndex], m_offscreenBuffer1);
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT));
-    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
+#endif
+
+    // use compute to copy to
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(FrameCount));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+    // blur stuff
+    auto weights = CalcGaussWeights(2.5f);
+    int blurRadius = (int)weights.size() / 2;
+
+    m_commandList->SetComputeRootSignature(m_computeRootSignature);
+
+    m_commandList->SetComputeRoot32BitConstants(0, 1, &blurRadius, 0);
+    m_commandList->SetComputeRoot32BitConstants(0, (UINT)weights.size(), weights.data(), 1);
+
+    ///. for each blur pass
+    //
+    // Horizontal Blur pass.
+    //
+
+    m_commandList->SetPipelineState(m_gameLevelPSOs["horzBlur"]);
+
+    m_commandList->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen1_SrvHeapOffset));
+    m_commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen2_UavHeapOffset));
+
+    // How many groups do we need to dispatch to cover a row of pixels, where each
+    // group covers 256 pixels (the 256 is defined in the ComputeShader).
+    UINT numGroupsX = (UINT)ceilf(m_scissorRect.right / 256.0f);
+    m_commandList->Dispatch(numGroupsX, m_scissorRect.bottom, 1);
+
+
+    //TEMPTEMP
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COMMON));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST));
+    m_commandList->CopyResource(m_renderTargets[m_frameIndex], m_offscreenBuffer2);
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
+
+    //cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBlurMap0.Get(),
+    //    D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+    //cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBlurMap1.Get(),
+    //    D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+
+
 
     PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Render
 
