@@ -1049,7 +1049,7 @@ HRESULT RenderPlatform12::InitDevice()
 
     HRR(D3D12CreateDevice(
         hardwareAdapter,
-		D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_11_0,
         IID_PPV_ARGS(&m_d3dDevice)
     ));
 
@@ -1061,7 +1061,7 @@ HRESULT RenderPlatform12::InitDevice()
     //
     // Each frame has its own depth stencils and then there is one for shadows.
     HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount + OffscreenBufferCount));
-    HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount * 1));
+    HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount)); // 1 for shadow
 
     // Heap for loading textures
     // TODO: Move from device owned to scene owned
@@ -1530,6 +1530,11 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(FrameCount));
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+    // TODO: drawing text overwrites the heap
+    // Restore heaps
+    //ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
+    //m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     // blur stuff
     auto weights = CalcGaussWeights(2.5f);
