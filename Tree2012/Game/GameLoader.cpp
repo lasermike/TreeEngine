@@ -471,6 +471,7 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     // Skybox
     WorldObjectParams* params5 = new WorldObjectParams(PrimitiveGeneratorType);
     params5->position = XMFLOAT3(0, 0, 0);
+    XMStoreFloat4(&params5->rotation, XMQuaternionRotationRollPitchYaw(0.0f, -XM_PIDIV4, 0.0f));
     params5->scale = XMFLOAT3(-30.0f, -30.0f, -30.0f);
     params5->primitiveType = PrimitiveType_Box;
     mat.Ambient = XMFLOAT4(1, 1, 1, 1);
@@ -518,8 +519,9 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
     renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
     //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
+    //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7, -0.7, 0.7, 0.0)));
 
     renderData->numPointLights = 1;
 
