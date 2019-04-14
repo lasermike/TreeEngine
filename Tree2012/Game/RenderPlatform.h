@@ -733,13 +733,16 @@ private:
         return (XboxSampleFramework::D3DDevice*) (ID3D12Device*) m_d3dDevice;
     }
 
+    void IncrementFenceOnGPU();
+    void WaitOnFence();
+
 public:
 
     RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0) { }
 
     HRESULT CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
-    void WaitForPreviousFrame();
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
+    void WaitForPreviousFrame();
     ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
     ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator; }
     ID3D12Fence* GetFence() { return m_fence; }

@@ -544,7 +544,6 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
 
     m_d3dDevice->CreateShaderResourceView(newBuffer->buffer, &srvDesc, newBuffer->srvViewCpu);
 
-
     *d3dBuffer = newBuffer;
 
     return S_OK;
@@ -552,17 +551,24 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
 
 void RenderPlatform12::WaitForPreviousFrame()
 {
-    // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-    // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-    // sample illustrates how to use fences for efficient resource usage and to
-    // maximize GPU utilization.
+    IncrementFenceOnGPU();
+    WaitOnFence();
+}
 
+void RenderPlatform12::IncrementFenceOnGPU()
+{
     // Signal and increment the fence value.
     const UINT64 fence = m_fenceValue;
     HR(GetCommandQueue()->Signal(m_fence, fence));
     m_fenceValue++;
+}
+
+void RenderPlatform12::WaitOnFence()
+{
+    assert(m_fenceValue > 0);
 
     // Wait until the previous frame is finished.
+    const UINT64 fence = m_fenceValue - 1;
     if (m_fence->GetCompletedValue() < fence)
     {
         HR(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
@@ -1367,6 +1373,9 @@ HRESULT RenderPlatform12::UninitDevice()
 //--------------------------------------------------------------------------------------
 HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView)
 {
+    // Ensure last frame is completed
+    WaitOnFence();
+
     // Get a handle to the instance buffer.  Game will fill out data before calling Render()
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
     HR(buffer->buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
@@ -1583,7 +1592,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     
     m_graphicsMemory->Commit(m_commandQueue);
 
-    WaitForPreviousFrame();
+    IncrementFenceOnGPU();
 
     return hr;
 }

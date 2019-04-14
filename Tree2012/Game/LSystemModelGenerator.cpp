@@ -158,45 +158,11 @@ bool GetCommand(string::const_iterator& cmdIt, string::const_iterator end, Param
     return true;
 }
 
-void replaceAll(string& inout, const string &search, const string &replace)
+void replaceAll(std::vector<Command>& inputOutputCmds, const Command& searchCmd, const std::vector<Command>& replaceCmds)
 {
-    // Tokenize command to search for
-    Command searchCmd = {};
-    int i = 0;
-    for (auto searchIt = search.begin(); searchIt != search.end(); searchIt++, i++)
-    {
-        GetCommand(searchIt, search.end(), PT_EQUATION, &searchCmd);
-        assert(i == 0); // Should never search for more than one command at a time 
-    }
-
-    // Tokenize replace string into command array
-    std::vector<Command> replaceCmds;
-    for (auto& replaceIt = replace.begin(); replaceIt != replace.end(); replaceIt++)
-    {
-        Command repCmd = {};
-        if (!GetCommand(replaceIt, replace.end(), PT_EQUATION, &repCmd))
-        {
-            break;
-        }
-
-        replaceCmds.push_back(repCmd);
-    }
-
-    // Tokenize input string
-    size_t pos = 0;
-    std::vector<Command> inputCmds;
-    for (auto inoutIt = inout.begin(); inoutIt != inout.end(); inoutIt++)
-    {
-        Command inoutCmd = {};
-        if (GetCommand(inoutIt, inout.end(), PT_EQUATION, &inoutCmd))
-        {
-            inputCmds.push_back(inoutCmd);
-        }
-    }
-
     // Do search/replace on input
     std::vector<Command> outputCmds;
-    for (auto& inputCmd : inputCmds)
+    for (auto& inputCmd : inputOutputCmds)
     {
         if (inputCmd.symbol == searchCmd.symbol)
         {
@@ -240,9 +206,60 @@ void replaceAll(string& inout, const string &search, const string &replace)
         }
     }
 
+    inputOutputCmds.swap(outputCmds);
+}
+
+TreeModel* LSystemModelGenerator::Create()
+{
+    _model = new TreeModel();
+
+    string axiom = _params._axiom;
+
+    // Tokenize axiom string
+    size_t pos = 0;
+    std::vector<Command> inputOutputCmds;
+    for (auto inoutIt = axiom.begin(); inoutIt != axiom.end(); inoutIt++)
+    {
+        Command inoutCmd = {};
+        if (GetCommand(inoutIt, axiom.end(), PT_EQUATION, &inoutCmd))
+        {
+            inputOutputCmds.push_back(inoutCmd);
+        }
+    }
+
+    for (int i = 0; i < _params._numIterations; i++)
+    {
+        for (auto r = _params._rules.begin(); r != _params._rules.end(); r++)
+        {
+            // Tokenize command to search for
+            Command searchCmd = {};
+            int s = 0;
+            for (auto searchIt = r->input.begin(); searchIt != r->input.end(); searchIt++, s++)
+            {
+                GetCommand(searchIt, r->input.end(), PT_EQUATION, &searchCmd);
+                assert(s == 0); // Should never search for more than one command at a time 
+            }
+
+            // Tokenize replace string into command array
+            std::vector<Command> replaceCmds;
+            for (auto& replaceIt = r->output.begin(); replaceIt != r->output.end(); replaceIt++)
+            {
+                Command repCmd = {};
+                if (!GetCommand(replaceIt, r->output.end(), PT_EQUATION, &repCmd))
+                {
+                    break;
+                }
+
+                replaceCmds.push_back(repCmd);
+            }
+
+            replaceAll(inputOutputCmds, searchCmd, replaceCmds);
+        }
+    }
+
     std::stringstream ss;
 
-    for(auto& outputCmd : outputCmds)
+    for (auto& outputCmd : inputOutputCmds)
     {
         ss << outputCmd.symbol;
         for (int p = 0; p < outputCmd.numParams; p++)
@@ -263,25 +280,12 @@ void replaceAll(string& inout, const string &search, const string &replace)
         }
     }
 
-    inout = ss.str();
-}
+    string finalResult = ss.str();
 
-TreeModel* LSystemModelGenerator::Create()
-{
-    _model = new TreeModel();
-
-    string axiom = _params._axiom;
-    for (int i = 0; i < _params._numIterations; i++)
-    {
-        for (auto r = _params._rules.begin(); r != _params._rules.end(); r++)
-        {
-            replaceAll(axiom, (*r).input, (*r).output);
-        }
-    }
-
-    OutputDebugStringA(axiom.c_str());
+    OutputDebugStringA(finalResult.c_str());
     OutputDebugStringA("\n");
-    CreateSkeleton(axiom);
+
+    CreateSkeleton(finalResult);
 
     return _model;
 }
