@@ -640,7 +640,7 @@ private:
 
     CComPtr<ID3D12RootSignature>       m_rootSignature;
     CComPtr<ID3D12RootSignature>       m_computeRootSignature;
-    CComPtr<ID3D12GraphicsCommandList> m_commandList;
+    CComPtr<ID3D12GraphicsCommandList> m_commandList[RenderPlatform12::FrameCount];
     CComPtr<ID3D12CommandQueue>        m_commandQueue;
     CComPtr<ID3D12CommandAllocator>    m_commandAllocator;
 
@@ -748,7 +748,7 @@ public:
     ID3D12Fence* GetFence() { return m_fence; }
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
-    D3DCommandList* GetCommandList() const { return m_commandList; }
+    D3DCommandList* GetCommandList() const { return m_commandList[m_frameIndex]; }
 
     //
     // Base RenderPlatform methods
