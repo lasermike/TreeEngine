@@ -4,6 +4,7 @@
 
 class ShadowMap;
 struct InstancedData;
+struct D3DBuffer;
 
 enum FrameStat
 {
@@ -58,11 +59,12 @@ struct RenderData
     ProjectionData      projectionData;
 
     XMFLOAT4X4          projection;
-    XMFLOAT4X4          view;           
+    XMFLOAT4X4          view;
     XMVECTOR            eyePos;
 
     // Instance rendering
     InstancedData*      instanceData;
+    D3DBuffer*          instanceBuffer;
 
     // Per frame statistics
     FrameStatistic*     frameStats;
@@ -96,5 +98,6 @@ struct RenderData
         
         numDirectionalLights = 1;
         numPointLights = 0;
+        instanceBuffer = nullptr;
     }
 };

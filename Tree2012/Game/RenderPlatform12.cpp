@@ -116,11 +116,14 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Create command lists.
     for (int i = 0; i < RenderPlatform12::FrameCount; i++)
     {
-        HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, GetCommandAllocator(), nullptr, IID_PPV_ARGS(&m_commandList[i])));
+        HRR(GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator[i])));
+
+        HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator[i], nullptr, IID_PPV_ARGS(&m_commandList[i])));
         HRR(m_commandList[i]->Close());
     }
 
-    HRR(m_commandList[m_frameIndex]->Reset(GetCommandAllocator(), nullptr));
+    m_commandListIndex = 0;
+    HRR(m_commandList[m_commandListIndex]->Reset(GetCommandAllocator(), nullptr));
 
     // Create the root signature.
     // Root signature parameters are:
@@ -640,6 +643,11 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
         cmdList.Release();
     }
 
+    for (auto& cmdAlloc : m_commandAllocator)
+    {
+        cmdAlloc.Release();
+    }
+
     SafeDelete(&m_bitmapFont);
 
     m_rootSignature.Release();
@@ -1090,7 +1098,6 @@ HRESULT RenderPlatform12::InitDevice()
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
     HRR(GetDevice()->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
-    HRR(GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 
     // Create ChangesPerPass constant buffer
     m_constBufferChangesPerPass = new UploadBuffer<CBChangesPerPass>(GetDevice(), Count_CBSI, true);
@@ -1362,7 +1369,6 @@ HRESULT RenderPlatform12::UninitDevice()
     SafeDelete(&m_constBufferChangesPerPass);
 
     m_commandQueue.Release();
-    m_commandAllocator.Release();
 
     m_loadTextureHeap.Release();
 
@@ -1383,16 +1389,14 @@ HRESULT RenderPlatform12::UninitDevice()
 //--------------------------------------------------------------------------------------
 HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView)
 {
-    // Ensure last frame is completed
-    WaitOnFence();
-
     // Get a handle to the instance buffer.  Game will fill out data before calling Render()
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
     HR(buffer->buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
     //TODO should Map() in D3D12 only get called once at create time?
 
-    HRESULT hr = S_OK;
-    if (resetCommandList)
+    m_commandListIndex = (m_commandListIndex + 1) % 2;
+
+    //if (resetCommandList)
     {
         // Command list allocators can only be reset when the associated command lists have finished execution on the GPU;
         // apps should use fences to determine GPU execution progress.
@@ -1401,47 +1405,52 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
         // However, when ExecuteCommandList() is called on a particular command 
         // list, that command list can then be reset at any time and must be before 
         // re-recording.
-        HR(m_commandList[m_frameIndex]->Reset(GetCommandAllocator(), m_pipelineState));
+        HR(m_commandList[m_commandListIndex]->Reset(GetCommandAllocator(), m_pipelineState));
     }
 
+    HRESULT hr = S_OK;
+
     // Set necessary state.
-    m_commandList[m_frameIndex]->SetGraphicsRootSignature(m_rootSignature);
+    m_commandList[m_commandListIndex]->SetGraphicsRootSignature(m_rootSignature);
 
     ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
-    m_commandList[m_frameIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    m_commandList[m_commandListIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-    m_commandList[m_frameIndex]->RSSetViewports(1, &m_viewPort);
-    m_commandList[m_frameIndex]->RSSetScissorRects(1, &m_scissorRect);
-    m_commandList[m_frameIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList[m_frameIndex]->IASetVertexBuffers(0, 1, &m_VBView);
-    m_commandList[m_frameIndex]->IASetIndexBuffer(&m_IBView);
-    m_commandList[m_frameIndex]->OMSetStencilRef(0);
+    m_commandList[m_commandListIndex]->RSSetViewports(1, &m_viewPort);
+    m_commandList[m_commandListIndex]->RSSetScissorRects(1, &m_scissorRect);
+    m_commandList[m_commandListIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList[m_commandListIndex]->IASetVertexBuffers(0, 1, &m_VBView);
+    m_commandList[m_commandListIndex]->IASetIndexBuffer(&m_IBView);
+    m_commandList[m_commandListIndex]->OMSetStencilRef(0);
 
-    // Set default material (first material).  Will be changed by calls to SetRenderUnit()
-    D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_descriptorHeap.hGPU(Material0_HeapOffset);
-    m_commandList[m_frameIndex]->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, materialHandle);
-
-    D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
-    m_commandList[m_frameIndex]->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureHandle);
-
-    // Set root signature constant buffers
-    m_commandList[m_frameIndex]->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, buffer->buffer->GetGPUVirtualAddress());
-    m_commandList[m_frameIndex]->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
-    m_commandList[m_frameIndex]->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
-
-    m_commandList[m_frameIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList[m_frameIndex]->IASetVertexBuffers(0, 1, &m_VBView);
-
-    return hr;
+    return S_OK;
 }
 
 HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
 {
-    PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList[m_frameIndex], TREE_COLOR_DRAW_TEXT, L"Render");
+    // Ensure last frame is completed
+    WaitOnFence();
+
+    PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList[m_commandListIndex], TREE_COLOR_DRAW_TEXT, L"Render");
+
+    // Set default material (first material).  Will be changed by calls to SetRenderUnit()
+    D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_descriptorHeap.hGPU(Material0_HeapOffset);
+    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, materialHandle);
+
+    D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
+    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureHandle);
+
+    // Set root signature constant buffers
+    m_commandList[m_commandListIndex]->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
+    m_commandList[m_commandListIndex]->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
+    m_commandList[m_commandListIndex]->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
+
+    m_commandList[m_commandListIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList[m_commandListIndex]->IASetVertexBuffers(0, 1, &m_VBView);
 
     //TODO NEXT: use compute to copy offscreen1 to rtv
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(FrameCount));  //m_frameIndex
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
@@ -1538,60 +1547,59 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
     // use compute to copy to
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(FrameCount));
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-    // TODO: drawing text overwrites the heap
     // Restore heaps
-    //ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
-    //m_commandList[m_frameIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
+    m_commandList[m_commandListIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     // blur stuff
     auto weights = CalcGaussWeights(2.5f);
     int blurRadius = (int)weights.size() / 2;
 
-    m_commandList[m_frameIndex]->SetComputeRootSignature(m_computeRootSignature);
+    m_commandList[m_commandListIndex]->SetComputeRootSignature(m_computeRootSignature);
 
-    m_commandList[m_frameIndex]->SetComputeRoot32BitConstants(0, 1, &blurRadius, 0);
-    m_commandList[m_frameIndex]->SetComputeRoot32BitConstants(0, (UINT)weights.size(), weights.data(), 1);
+    m_commandList[m_commandListIndex]->SetComputeRoot32BitConstants(0, 1, &blurRadius, 0);
+    m_commandList[m_commandListIndex]->SetComputeRoot32BitConstants(0, (UINT)weights.size(), weights.data(), 1);
 
     ///. for each blur pass
     //
     // Horizontal Blur pass.
-    m_commandList[m_frameIndex]->SetPipelineState(m_gameLevelPSOs["horzBlur"]);
+    m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs["horzBlur"]);
 
-    m_commandList[m_frameIndex]->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen1_SrvHeapOffset));
-    m_commandList[m_frameIndex]->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen2_UavHeapOffset));
+    m_commandList[m_commandListIndex]->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen1_SrvHeapOffset));
+    m_commandList[m_commandListIndex]->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen2_UavHeapOffset));
 
     // How many groups do we need to dispatch to cover a row of pixels, where each
     // group covers 256 pixels (the 256 is defined in the ComputeShader).
     UINT numGroupsX = (UINT)ceilf(m_scissorRect.right / 256.0f);
-    m_commandList[m_frameIndex]->Dispatch(numGroupsX, m_scissorRect.bottom, 1);
+    m_commandList[m_commandListIndex]->Dispatch(numGroupsX, m_scissorRect.bottom, 1);
 
     // swap source and destination
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 
     // Vertical Blur pass.
     //
-    m_commandList[m_frameIndex]->SetPipelineState(m_gameLevelPSOs["vertBlur"]);
+    m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs["vertBlur"]);
 
-    m_commandList[m_frameIndex]->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen2_SrvHeapOffset));
-    m_commandList[m_frameIndex]->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen1_UavHeapOffset));
+    m_commandList[m_commandListIndex]->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen2_SrvHeapOffset));
+    m_commandList[m_commandListIndex]->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen1_UavHeapOffset));
 
     // How many groups do we need to dispatch to cover a column of pixels, where each
     // group covers 256 pixels  (the 256 is defined in the ComputeShader).
     UINT numGroupsY = (UINT)ceilf(m_scissorRect.bottom / 256.0f);
-    m_commandList[m_frameIndex]->Dispatch(m_scissorRect.right, numGroupsY, 1);
+    m_commandList[m_commandListIndex]->Dispatch(m_scissorRect.right, numGroupsY, 1);
 
     // Copy back to render target
     // TODO: eliminate this copy by using uav view of render target buffer
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COMMON));
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST));
-    m_commandList[m_frameIndex]->CopyResource(m_renderTargets[m_frameIndex], m_offscreenBuffer1);
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT));
-    m_commandList[m_frameIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COMMON));
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST));
+    m_commandList[m_commandListIndex]->CopyResource(m_renderTargets[m_frameIndex], m_offscreenBuffer1);
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT));
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
 
     PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Post processing
 
