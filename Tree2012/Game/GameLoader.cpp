@@ -13,9 +13,8 @@ void GameData::ResetToDefaults()
 {
     useShadowMaps = true;
     useAlphaBlendedRenderTarget = true;
-    clearColor = Colors::SkyBlue;
+    XMStoreFloat4(&clearColor, Colors::SkyBlue);
 }
-
 
 GameLoader::GameLoader()
 {
@@ -150,7 +149,7 @@ void LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameD
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), 0));
 
     gameData->useShadowMaps = false;
-    gameData->clearColor = Colors::White;
+    XMStoreFloat4(&gameData->clearColor, Colors::White);
     //gameData->useAlphaBlendedRenderTarget = true;
 }
 
@@ -396,7 +395,7 @@ void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, G
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
 
-    gameData->clearColor = Colors::White;
+    XMStoreFloat4(&gameData->clearColor, Colors::White);
 }
 
 float SegLengthParam(LSystemParams* params, float cmdParam)
@@ -533,7 +532,7 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(1.11395788, 0.711319208, 2.05959034)));
     player->SetRotation(XMVectorSet(0.00989040267, 0.978999615, 0.0489907376, 0));
 #endif
-    gameData->clearColor = Colors::Navy;
+    XMStoreFloat4(&gameData->clearColor, Colors::Navy);
 }
 
 
@@ -607,7 +606,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
 
-    gameData->clearColor = Colors::IndianRed; //LimeGreen; // 
+    XMStoreFloat4(&gameData->clearColor, Colors::IndianRed);
 }
 
 void LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
@@ -836,4 +835,6 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
     default:
         ASSERT(false);
     }
+
+    pRenderData->clearColor = gameData->clearColor;
 }

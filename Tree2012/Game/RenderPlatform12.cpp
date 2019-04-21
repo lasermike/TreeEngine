@@ -1272,8 +1272,10 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     offscreenDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
     clearValue.Format = m_swapChainFormat;
-    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-    memcpy(&clearValue.Color[0], clearColor, sizeof(float) * _countof(clearColor));
+    memcpy(clearValue.Color, &m_renderData->clearColor, sizeof(float) * _countof(clearValue.Color));
+    //float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    //memcpy(&clearValue.Color[0], clearColor, sizeof(float) * _countof(clearColor));
+
 
     HRR(GetDevice()->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -1456,7 +1458,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
     GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-    GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    GetCommandList()->ClearRenderTargetView(rtvHandle, &m_renderData->clearColor.x, 0, nullptr);
     GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     GetCommandList()->SetPipelineState(m_pipelineState);  // Needed?  Supports rendering without material?
@@ -1545,7 +1547,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
     PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing");
 
-    // use compute to copy to
+    // use compute to post process
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(FrameCount));
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
@@ -1555,7 +1557,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     m_commandList[m_commandListIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     // blur stuff
-    auto weights = CalcGaussWeights(2.5f);
+    auto weights = CalcGaussWeights(2.0f);
     int blurRadius = (int)weights.size() / 2;
 
     m_commandList[m_commandListIndex]->SetComputeRootSignature(m_computeRootSignature);

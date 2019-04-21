@@ -8,7 +8,7 @@ struct GameData
 {
     bool useShadowMaps;
     bool useAlphaBlendedRenderTarget;
-    XMVECTORF32 clearColor;
+    XMFLOAT4 clearColor;
 
     GameData()
     {

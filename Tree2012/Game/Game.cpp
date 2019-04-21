@@ -247,6 +247,9 @@ void Game::Update(DX::StepTimer const& timer)
 
         // Create models and device objects
         m_resetTree = true;
+
+        // Recreate backbuffer with level specific clear color
+        m_needsResize = true;
     }
 
     // Rebuild tree if necessary
@@ -334,7 +337,7 @@ void Game::Render(bool oculus)
     m_renderManager.GetRenderData().eyePos = m_player->GetEyePosition();
 
     m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
-        m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.f[0]);
+        m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.x);
 
     PIXEndEvent();  // Render
     PIXEndEvent();  // Frame begin

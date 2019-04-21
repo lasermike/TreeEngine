@@ -70,10 +70,11 @@ struct RenderData
     FrameStatistic*     frameStats;
 
     // Lighting
-    int numDirectionalLights;
-    int numPointLights;
+    XMFLOAT4            clearColor;
+    int                 numDirectionalLights;
+    int                 numPointLights;
     DirectionalLight    dirLights[1];
-    PointLight pointLights[1];
+    PointLight          pointLights[1];
 
     // Shadows
     static const int    SMapWidth = 2048;
