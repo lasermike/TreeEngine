@@ -2,9 +2,15 @@
 
 #include "GeometryGenerator.h"
 #include "Materials.h"
+
+#if defined(TREE3D12) || defined (TREE3D11)
+
 #include "UploadBuffer.h"
+#endif
+
 #include "RenderData.h"
 #include "StockRenderStates.h"
+
 
 class RenderPlatform;
 class RenderManager;
@@ -108,12 +114,20 @@ struct DoubleBuffer
 #define InputClassificationInstance D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA
 #define AppendAlignedElement D3D12_APPEND_ALIGNED_ELEMENT
 #define ID3DInputLayout ID3D12InputLayout
-#else
+#elif defined(TREE3D11)
 #define InputElementDesc D3D11_INPUT_ELEMENT_DESC
 #define InputClassificationVertex D3D11_INPUT_PER_VERTEX_DATA
 #define InputClassificationInstance D3D11_INPUT_PER_INSTANCE_DATA
 #define AppendAlignedElement D3D11_APPEND_ALIGNED_ELEMENT
 #define ID3DInputLayout ID3D11InputLayout
+#else
+#define IDXGISwapChain void*
+
+//#define InputElementDesc int            // TODO!
+//#define InputClassificationVertex 0
+//#define InputClassificationInstance 0
+//#define AppendAlignedElement 0
+//#define ID3DInputLayout void*
 #endif
 
 enum InputLayouts
@@ -124,6 +138,7 @@ enum InputLayouts
     CUSTOM0_INPUT_LAYOUT
 };
 
+#if defined(TREE3D12) || defined(TREE3D11)
 class InputLayoutDesc
 {
 public:
@@ -171,6 +186,7 @@ __declspec(selectany) const InputElementDesc InputLayoutDesc::Basic32[3] =
     { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, InputClassificationVertex, 0 }
 };
 
+#endif
 
 struct LoadedTexture
 {
@@ -181,12 +197,16 @@ struct LoadedTexture
     LoadedTexture() : texture(nullptr), textureView(CD3DX12_CPU_DESCRIPTOR_HANDLE()) { }
     LoadedTexture(ID3D12Resource* textureParam, D3D12_CPU_DESCRIPTOR_HANDLE textureViewParam, UINT textureSlotParam) :
         texture(textureParam), textureView(textureViewParam) { }
-#else
+#elif defined(TREE3D11)
     ID3D11ShaderResourceView* texture;
 
     LoadedTexture() : texture(nullptr) { }
     LoadedTexture(ID3D11ShaderResourceView* textureParam) : texture(textureParam) { }
     LoadedTexture(LoadedTexture const& rhs) : texture(rhs.texture) { }
+#else
+    LoadedTexture() : texture(nullptr) { }
+
+    IUnknown* texture;
 #endif 
 };
 
@@ -524,7 +544,9 @@ protected:
     float                             m_logicalDpi;
 #endif
 
+#if defined(TREE3D12) || defined(TREE3D11)
     DXGI_FORMAT                       m_swapChainFormat;
+#endif
 
     D3DBuffer*                        m_currentInstanceBuffer;
 public:
@@ -534,7 +556,9 @@ public:
         m_drawScreenVertexShader(nullptr), m_drawScreenPixelShader(nullptr)
     { }
 
+#if defined(TREE3D12) || defined(TREE3D11)
     DXGI_FORMAT GetSwapChainFormat() { return m_swapChainFormat; }
+#endif
 
 #if defined(TREENGINE_WIN32)
     virtual void SetWindow(HWND hwnd)

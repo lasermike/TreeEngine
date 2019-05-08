@@ -61,9 +61,6 @@
     <ClCompile Include="..\Game\Stdafx.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\ShadowMap.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\SceneRoot.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>

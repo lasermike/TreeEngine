@@ -1150,6 +1150,11 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 {
     HRESULT hr = S_OK;
 
+    if (m_commandQueue)
+    {
+        WaitForPreviousFrame();
+    }
+
     m_pSwapChain.Release();
 
     for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)

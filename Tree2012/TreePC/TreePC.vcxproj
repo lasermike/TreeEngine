@@ -178,7 +178,6 @@
     <ClCompile Include="..\Game\RenderManager.cpp" />
     <ClCompile Include="..\Game\RenderPlatform.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
-    <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
     <ClCompile Include="..\Game\Tree.cpp" />
     <ClCompile Include="..\Game\TreeModel.cpp" />

@@ -185,7 +185,7 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #if defined(TREE3D12)
     void SetDebugName(ID3D12DeviceChild* child, const char* name);
     void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter);
-#else
+#elif defined(TREE3D11)
     void SetDebugName(ID3D11DeviceChild* child, const char* name);
 #endif
 
@@ -411,7 +411,8 @@ namespace XboxSampleFramework
     typedef CComPtr<ID3D12PipelineState>        D3DPipelineStatePtr;
     typedef CComPtr<ID3DBlob>                    D3DBlobPtr;
     
-#else
+#elif defined(TREE3D11)
+
     typedef D3DTypePtr< ID3D11Buffer >              D3DBufferPtr;
 #endif
 
@@ -431,20 +432,20 @@ namespace XboxSampleFramework
     typedef ID3D12CommandAllocator  D3DCommandAllocator;
     typedef ID3D12GraphicsCommandList D3DCommandList;
     typedef IDXGISwapChain          DXGISwapChain;
-#elif defined( XSF_USE_DX_11_1 )
+#elif defined( TREE3D11 )
     typedef ID3D11Device1           D3DDevice;
     typedef ID3D11DeviceContext1    D3DDeviceContext;
     typedef ID3D11DeviceContext1    D3DComputeContext;
     typedef ID3D11RasterizerState1  D3DRasterizerState;
     typedef D3D11_RASTERIZER_DESC1  D3DRasterizerDesc;
     typedef IDXGISwapChain1         DXGISwapChain;
-#else
-    typedef ID3D11Device            D3DDevice;
-    typedef ID3D11DeviceContext     D3DDeviceContext;
-    typedef ID3D11DeviceContext     D3DComputeContext;
-    typedef ID3D11RasterizerState   D3DRasterizerState;
-    typedef D3D11_RASTERIZER_DESC   D3DRasterizerDesc;
-    typedef IDXGISwapChain          DXGISwapChain;
+//#else
+//    typedef ID3D11Device            D3DDevice;
+//    typedef ID3D11DeviceContext     D3DDeviceContext;
+//    typedef ID3D11DeviceContext     D3DComputeContext;
+//    typedef ID3D11RasterizerState   D3DRasterizerState;
+//    typedef D3D11_RASTERIZER_DESC   D3DRasterizerDesc;
+//    typedef IDXGISwapChain          DXGISwapChain;
 #endif
 
     void DebugPrint( _In_z_ const char* msg, ... );

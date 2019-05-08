@@ -18,18 +18,14 @@
 #include <memory.h>
 #include <tchar.h>
 
-#if defined(TREE3D12)
-#include <d3d12.h>
-#include <d3dx12.h>
-#include <dxgi1_4.h>
-#else
-#include <d3d11_1.h>
-#endif
+//#include <d3d12.h>
+//#include <d3dx12.h>
+//#include <dxgi1_4.h>
 
 #include <DirectXMath.h>
-#include <d3dcompiler.h>
+//#include <d3dcompiler.h>
 
-#include "Win32_DirectXAppUtil.h"
+//#include "Win32_DirectXAppUtil.h"
 
 // Above this line include platform specific stuff
 #define TREENGINE_WIN32
