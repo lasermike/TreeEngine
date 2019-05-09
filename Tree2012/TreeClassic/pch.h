@@ -29,5 +29,5 @@
 
 // Above this line include platform specific stuff
 #define TREENGINE_WIN32
-
+#include <unknwn.h>
 #include <stdafx.h>

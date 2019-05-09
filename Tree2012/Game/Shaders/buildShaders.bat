@@ -60,8 +60,10 @@ call !finalcmd!
 @if ERRORLEVEL 1 goto ENDOFSCRIPT
 
 @rem Copy output to deployment directory (AppX)
+if not [%layoutFolder%]==[""] ( 
 mkdir %layoutFolder%
 xcopy "%outputfile%" %layoutFolder% /y
+)
 
 @goto :EOF
 

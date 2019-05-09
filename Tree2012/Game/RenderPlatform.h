@@ -541,8 +541,9 @@ protected:
     HWND                              m_hwnd;
 #else
     Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;
-    float                             m_logicalDpi;
 #endif
+
+    float                             m_logicalDpi;
 
 #if defined(TREE3D12) || defined(TREE3D11)
     DXGI_FORMAT                       m_swapChainFormat;

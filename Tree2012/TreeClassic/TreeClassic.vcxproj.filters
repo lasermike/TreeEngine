@@ -68,9 +68,6 @@
     <ClInclude Include="..\Game\Model.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\Game\OrbitCamera.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
     <ClInclude Include="..\Game\Player.h">
       <Filter>Game\Source</Filter>
     </ClInclude>
@@ -139,12 +136,6 @@
     <ClCompile Include="pch.cpp">
       <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\BitmapFont.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\DDSTextureLoader.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\Game.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -166,9 +157,6 @@
     <ClCompile Include="..\Game\MathHelper.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\OrbitCamera.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\Player.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
@@ -178,19 +166,10 @@
     <ClCompile Include="..\Game\RenderManager.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\RenderStates.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\SceneRoot.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\ShadowMap.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\Game\Stdafx.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\StockRenderStates.cpp">
       <Filter>Game\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\Tree.cpp">
@@ -262,6 +241,9 @@
       <Filter>Game\Shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
       <Filter>Game\Shaders</Filter>
     </CustomBuild>
   </ItemGroup>

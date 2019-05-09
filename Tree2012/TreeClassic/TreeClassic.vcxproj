@@ -167,9 +167,11 @@
     <ClCompile>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PreprocessorDefinitions>_TREE_CLASSIC;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>libOVR64d.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -182,6 +184,17 @@
       <AdditionalDependencies>libOVR64d.lib; d2d1.lib; d3d11.lib; dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
     </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <ShowIncludes>true</ShowIncludes>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="..\Game\graphdata.txt" />
@@ -201,7 +214,6 @@
     <ClInclude Include="..\Game\Materials.h" />
     <ClInclude Include="..\Game\MathHelper.h" />
     <ClInclude Include="..\Game\Model.h" />
-    <ClInclude Include="..\Game\OrbitCamera.h" />
     <ClInclude Include="..\Game\Player.h" />
     <ClInclude Include="..\Game\Primitive.h" />
     <ClInclude Include="..\Game\RenderData.h" />
@@ -224,8 +236,6 @@
     <ClInclude Include="TreeClassic.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Game\BitmapFont.cpp" />
-    <ClCompile Include="..\Game\DDSTextureLoader.cpp" />
     <ClCompile Include="..\Game\Game.cpp" />
     <ClCompile Include="..\Game\GameLoader.cpp" />
     <ClCompile Include="..\Game\GeometryGenerator.cpp" />
@@ -233,16 +243,12 @@
     <ClCompile Include="..\Game\LSystemModelGenerator.cpp" />
     <ClCompile Include="..\Game\Materials.cpp" />
     <ClCompile Include="..\Game\MathHelper.cpp" />
-    <ClCompile Include="..\Game\OrbitCamera.cpp" />
     <ClCompile Include="..\Game\Player.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp" />
     <ClCompile Include="..\Game\RenderPlatform.cpp" />
-    <ClCompile Include="..\Game\RenderStates.cpp" />
     <ClCompile Include="..\Game\SceneRoot.cpp" />
-    <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />
-    <ClCompile Include="..\Game\StockRenderStates.cpp" />
     <ClCompile Include="..\Game\Tree.cpp" />
     <ClCompile Include="..\Game\TreeModel.cpp" />
     <ClCompile Include="..\Game\TreeModelGenerator.cpp" />
@@ -298,6 +304,29 @@
     <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
       <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

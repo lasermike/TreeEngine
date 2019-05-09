@@ -95,7 +95,7 @@ static const bool TSLights = true;
 
 PS_INPUT SkyBoxVS(VS_INPUT vin)
 {
-    PS_INPUT output;
+    PS_INPUT output = (PS_INPUT) 0;
 
     // Use local vertex position as cubemap lookup vector.  Store in Position World variable.
     output.PosW = float3(-vin.Pos.x, -vin.Pos.y, -vin.Pos.z);

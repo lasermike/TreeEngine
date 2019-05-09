@@ -5,13 +5,15 @@
 #include "TreeClassic.h"
 #include "Game.h"
 #include "InputManager.h"
+
+#define MAX_LOADSTRING 100
+
+#ifdef OCULUS_LEGACY
 #include <OVR_CAPI_D3D.h>
 #include <Kernel/OVR_System.h>
 #include <Extras/OVR_Math.h>
 
-using namespace OVR;
-
-#define MAX_LOADSTRING 100
+//using namespace OVR;
 //------------------------------------------------------------
 // ovrSwapTextureSet wrapper class that also maintains the render target views
 // needed for D3D11 rendering.
@@ -55,6 +57,7 @@ struct OculusTexture
         ovr_DestroySwapTextureSet(hmd, TextureSet);
     }
 };
+#endif
 
 // Tree classic
 HINSTANCE hInst;                                // current instance
@@ -67,6 +70,7 @@ bool oculusMode = false;
 Game* g_game = nullptr;
 InputManager g_inputManager;
 
+#ifdef OCULUS_LEGACY
 // Oculus specific
 ovrHmd HMD = nullptr;
 bool debugOvr = false;
@@ -86,6 +90,8 @@ ovrHmdDesc g_hmdDesc;
 // Forward declarations of functions included in this code module:
 HRESULT                CreateOculusDevice(bool& detected);
 HRESULT                ConfigOculusDevice();
+#endif
+
 HRESULT             Render();
 void                OnWindowSizeChanged();
 
@@ -131,12 +137,13 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
         }
     }
 
-
+#ifdef OCULUS_LEGACY
     if (HMD)
     {
         ovr_Destroy(HMD);
         HMD = nullptr;
     }
+#endif
 
     g_game->Cleanup();
     
@@ -145,6 +152,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
+#ifdef OCULUS_LEGACY
 XMVECTOR RH2LH(const Vector3f& rvec)
 {
     return XMVectorSet(-rvec.x, -rvec.y, rvec.z, 1);
@@ -159,10 +167,11 @@ XMVECTOR RH2LH(const ovrQuatf& rvec)
 {
     return XMVectorSet(-rvec.x, -rvec.y, rvec.z, rvec.w);
 }
-
+#endif
 
 HRESULT Render()
 {
+#ifdef OCULUS_LEGACY
     if (oculusMode)
     {
         XMFLOAT4 eye; 
@@ -255,12 +264,16 @@ HRESULT Render()
     }
     else
     {
+#endif
         // Run game 
         g_game->ComputeCPU();
         g_game->ComputeGPU();
 
         g_game->Render(false);
+
+#ifdef OCULUS_LEGACY
     }
+#endif
 
     return S_OK;
 }
@@ -273,6 +286,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hInst = hInstance; // Store instance handle in our global variable
 
+#ifdef OCULUS_LEGACY
     bool oculusDetected = false;
     HR(CreateOculusDevice(oculusDetected));
 
@@ -307,11 +321,15 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
     else
     {
+#endif
         RECT rc = { 0, 0, 1600, 1080};
         AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
         m_hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
+
+#ifdef OCULUS_LEGACY
     }
+#endif
 
     if (!m_hWnd)
     {
@@ -319,7 +337,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
     g_game = new Game(&g_inputManager);
-    g_game->GetRenderManager().GetPlatform()->SetWindow(m_hWnd);
+    //g_game->GetRenderManager().GetPlatform()->SetWindow(m_hWnd);
 
     if (FAILED(g_game->Initialize(false /* render to shared texture */)))
     {
@@ -330,21 +348,26 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     OnWindowSizeChanged();
 
     // Set up the oculus helper library
+#ifdef OCULUS_LEGACY
     DIRECTX.Context = g_game->GetRenderManager().GetPlatform()->GetContext();
     DIRECTX.SwapChain = g_game->GetRenderManager().GetPlatform()->GetSwapChain();
+#endif
 
     ShowWindow(m_hWnd, nCmdShow);
     UpdateWindow(m_hWnd);
 
+#ifdef OCULUS_LEGACY
     // Oculus mode
     if (oculusMode)
     {
         ConfigOculusDevice();
     }
+#endif 
 
     return TRUE;
 }
 
+#ifdef OCULUS_LEGACY
 //--------------------------------------------------------------------------------------
 // Create Oculus interface if possible
 //--------------------------------------------------------------------------------------
@@ -436,6 +459,8 @@ HRESULT ConfigOculusDevice()
 
     return S_OK;
 }
+#endif // OCULUS_LEGACY
+
 
 void OnWindowSizeChanged()
 {

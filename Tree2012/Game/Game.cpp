@@ -131,7 +131,11 @@ HRESULT Game::ReloadDevice()
 
         m_renderManager.UninitDevice();
 
+#if defined(TREENGINE_WIN32)
+        m_renderManager.GetPlatform()->SetWindow(nullptr);
+#else
         m_renderManager.GetPlatform()->SetWindow(nullptr, m_logicalDpi);
+#endif
 
         FreeLibrary(m_renderPlatformDLL);
         m_renderPlatformDLL = nullptr;
@@ -146,9 +150,15 @@ HRESULT Game::ReloadDevice()
     const wchar_t* dllFilename = m_is12Driver ? L"RenderPlatform12UWP.dll" : L"RenderPlatform11UWP.dll";
     m_renderPlatformDLL = ::LoadPackagedLibrary(dllFilename, 0);
 
+    assert(m_renderPlatformDLL != null);
+
     m_renderManager.SetPlatform(m_renderPlatformDLL);
 
+#if defined(TREENGINE_WIN32)
+    m_renderManager.GetPlatform()->SetWindow(m_hwnd);
+#else
     m_renderManager.GetPlatform()->SetWindow(m_window.Get(), m_logicalDpi);
+#endif
 
 
     m_renderManager.InitDevice();
