@@ -220,9 +220,6 @@
     <None Include="..\Game\Shaders\commonshader.bat">
       <Filter>Game\Shaders</Filter>
     </None>
-    <None Include="..\Game\CopyResources.cmd">
-      <Filter>Game\Resources</Filter>
-    </None>
     <None Include="..\Game\Arial_16.abc">
       <Filter>Game\Resources</Filter>
     </None>
@@ -245,6 +242,9 @@
     </CustomBuild>
     <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
       <Filter>Game\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\CopyResources.cmd">
+      <Filter>Game\Resources</Filter>
     </CustomBuild>
   </ItemGroup>
 </Project>

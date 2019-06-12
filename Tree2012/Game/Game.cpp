@@ -64,18 +64,6 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 {
     m_renderToSharedTexture = renderToSharedTexture;
 
-    HRR(ReloadDevice());
-
-    XSF::SetContentFileRoot();
-
-    // Init vertex/index buffer
-    m_pScene = new SceneRoot();
-
-    // Create player
-    WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
-    playerParams->position = XMFLOAT3(-4.0f, 1.5f, -4.0f);
-    XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
-    m_player = new Player(playerParams);
 
     // Rendering defaults
     m_renderManager.GetRenderData().frame = 0;
@@ -83,14 +71,29 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
     m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
 
-    m_currentScene = 0;
-    m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
+    XSF::SetContentFileRoot();
+
+    // Init vertex/index buffer
+    m_pScene = new SceneRoot();
 
     // Init scene bounds.
     // Estimatation.    
     // Ideally would loop through all world space vertices
     m_renderManager.GetRenderData().mSceneBounds.Center = XMFLOAT3(0.0f, 3.0f, 0.0f);
     m_renderManager.GetRenderData().mSceneBounds.Radius = 5; //sqrtf(5.0f*5.0f + 5.0f*5.0f);
+
+    // Create player
+    WorldObjectParams* playerParams = new WorldObjectParams(NullGeneratorType);
+    playerParams->position = XMFLOAT3(-4.0f, 1.5f, -4.0f);
+    XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+    m_player = new Player(playerParams);
+
+    HRR(ReloadDevice());
+
+    m_currentScene = 0;
+    m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
+
+
 
     // Create thread pool
     //may return 0 when not able to detect
@@ -147,10 +150,16 @@ HRESULT Game::ReloadDevice()
     //    m_is12Driver = !m_is12Driver;
     //}
 
-    const wchar_t* dllFilename = m_is12Driver ? L"RenderPlatform12UWP.dll" : L"RenderPlatform11UWP.dll";
+    const wchar_t* dllFilename =
+#ifdef TREE3D_CLASSIC
+        L"RenderPlatform12.dll";
+    m_renderPlatformDLL = ::LoadLibrary(dllFilename);
+#else
+        m_is12Driver ? L"RenderPlatform12UWP.dll" : L"RenderPlatform11UWP.dll";
     m_renderPlatformDLL = ::LoadPackagedLibrary(dllFilename, 0);
+#endif
 
-    assert(m_renderPlatformDLL != null);
+    assert(m_renderPlatformDLL != nullptr);
 
     m_renderManager.SetPlatform(m_renderPlatformDLL);
 

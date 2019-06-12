@@ -95,6 +95,12 @@ struct DoubleBuffer
 {
     D3DBuffer* buffers[2];
 
+    DoubleBuffer()
+    {
+        buffers[0] = nullptr;
+        buffers[1] = nullptr;
+    }
+
     HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
 
     D3DBuffer* Get(UINT frame) { return buffers[frame % 2]; }
@@ -537,7 +543,7 @@ enum GeometryBuffer
 class RenderPlatform
 {
 protected:
-#if defined(_TREE_CLASSIC)
+#if defined(TREENGINE_WIN32)
     HWND                              m_hwnd;
 #else
     Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;

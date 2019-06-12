@@ -414,7 +414,7 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     trunkMaterial.flags.y = 1; //useTextures
 
     ShaderMaterial leafMaterial;
-    leafMaterial.Ambient = XMFLOAT4(.4f, .4f, .4f, 1.0f);
+    leafMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
     XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
     leafMaterial.Specular = XMFLOAT4(0, .5f, .1f, 1.0);
     leafMaterial.flags.y = true; //useTextures  TODO
@@ -515,7 +515,7 @@ void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     scene->AddChild(new Primitive(paramsZ));
 
     // Init lights 
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderData->dirLights[0].Ambient = XMFLOAT4(.6f, .6f, .6f, 1.0f);
     renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
     //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));

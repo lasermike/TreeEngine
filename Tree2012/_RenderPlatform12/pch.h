@@ -4,7 +4,6 @@
 //
 
 #pragma once
-#define NOMINMAX 
 
 #include "targetver.h"
 
@@ -12,23 +11,12 @@
 // Windows Header Files:
 #include <windows.h>
 
-// C RunTime Header Files
-#include <stdlib.h>
-#include <malloc.h>
-#include <memory.h>
-#include <tchar.h>
-
-//#include <d3d12.h>
-//#include <d3dx12.h>
-//#include <dxgi1_4.h>
+#include <d3d12.h>
+#include <d3dx12.h>
+#include <dxgi1_4.h>
 
 #include <DirectXMath.h>
-//#include <d3dcompiler.h>
+#include <d3dcompiler.h>
 
-//#include "Win32_DirectXAppUtil.h"
-
-// Above this line include platform specific stuff
-#define TREENGINE_WIN32
-#define TREE3D_CLASSIC
-#include <unknwn.h>
 #include <stdafx.h>
+

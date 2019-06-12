@@ -1201,13 +1201,17 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     swapChainDesc.Height = windowHeight;
     swapChainDesc.Format = m_swapChainFormat;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.SampleDesc.Count = 1;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
     CComPtr<IDXGISwapChain1> swapChain1;
 
+#if defined(TREENGINE_WIN32)
+    HRR(factory->CreateSwapChainForHwnd(m_commandQueue, m_hwnd, &swapChainDesc, nullptr, nullptr, &swapChain1));
+#else
     HRR(factory->CreateSwapChainForCoreWindow(GetCommandQueue(),
         reinterpret_cast<IUnknown*>(m_window.Get()), &swapChainDesc, nullptr, &swapChain1));
+#endif
 
     HRR(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
 

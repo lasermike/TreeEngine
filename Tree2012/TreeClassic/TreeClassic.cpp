@@ -337,6 +337,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
     g_game = new Game(&g_inputManager);
+    g_game->SetWindow(m_hWnd);
+    OnWindowSizeChanged();
     //g_game->GetRenderManager().GetPlatform()->SetWindow(m_hWnd);
 
     if (FAILED(g_game->Initialize(false /* render to shared texture */)))
@@ -345,7 +347,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         return 0;
     }
 
-    OnWindowSizeChanged();
+    //OnWindowSizeChanged();
 
     // Set up the oculus helper library
 #ifdef OCULUS_LEGACY

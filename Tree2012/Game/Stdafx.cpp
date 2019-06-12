@@ -39,7 +39,7 @@ void XSF::SetContentFileRoot()
     _snwprintf_s( Details::g_strApplicationDataPath, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s\\", writeableFolder.c_str() );
 
 #elif defined(TREENGINE_WIN32)
-    GetModuleFileName(NULL, Details::g_strCommonFileRoot, MAX_PATH);
+    GetModuleFileNameW(NULL, Details::g_strCommonFileRoot, MAX_PATH);
     //PathRemoveFileSpec(Details::g_strCommonFileRoot);
     wstring path = Details::g_strCommonFileRoot;
     size_t found = path.find_last_of(L"/\\");
@@ -81,7 +81,14 @@ HRESULT XSF::LoadBlob( const wchar_t* pFilename, std::vector< BYTE >& data )
     data.clear();
 
     wchar_t tmp[ 1024 ];
-    _snwprintf_s( tmp, _countof( tmp ), _TRUNCATE, L"%s\\%s", Details::g_strCommonFileRoot, pFilename );
+    if (Details::g_strCommonFileRoot && wcslen(Details::g_strCommonFileRoot))
+    {
+        _snwprintf_s(tmp, _countof(tmp), _TRUNCATE, L"%s\\%s", Details::g_strCommonFileRoot, pFilename);
+    }
+    else
+    {
+        wcscpy_s(tmp, _countof(tmp), pFilename);
+    }
 
     FILE* fp = nullptr;
 

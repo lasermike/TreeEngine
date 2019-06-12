@@ -174,6 +174,9 @@
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">
     <ClCompile>
@@ -195,6 +198,9 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <ShowIncludes>true</ShowIncludes>
     </ClCompile>
+    <PostBuildEvent>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="..\Game\graphdata.txt" />
@@ -285,7 +291,9 @@
     <None Include="..\Game\Arial_16.abc">
       <DeploymentContent>true</DeploymentContent>
     </None>
-    <None Include="..\Game\CopyResources.cmd" />
+    <CustomBuild Include="..\Game\CopyResources.cmd">
+      <FileType>Document</FileType>
+    </CustomBuild>
     <None Include="..\Game\Courier_New_11.abc">
       <DeploymentContent>true</DeploymentContent>
     </None>
