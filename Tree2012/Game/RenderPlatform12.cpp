@@ -560,8 +560,11 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
 
 void RenderPlatform12::WaitForPreviousFrame()
 {
-    IncrementFenceOnGPU();
-    WaitOnFence();
+    if (m_commandQueue)
+    {
+        IncrementFenceOnGPU();
+        WaitOnFence();
+    }
 }
 
 void RenderPlatform12::IncrementFenceOnGPU()
