@@ -130,6 +130,15 @@
     <ClCompile Include="..\Game\Stdafx.cpp" />
     <ClCompile Include="..\Game\StockRenderStates12.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="Inc\imgui.cpp" />
+    <ClCompile Include="Inc\imgui_demo.cpp" />
+    <ClCompile Include="Inc\imgui_draw.cpp" />
+    <ClCompile Include="Inc\imgui_impl_dx12.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Inc\imgui_impl_win32.cpp" />
+    <ClCompile Include="Inc\imgui_widgets.cpp" />
     <ClCompile Include="RenderPlatform12Dll.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

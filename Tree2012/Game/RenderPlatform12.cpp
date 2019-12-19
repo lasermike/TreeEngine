@@ -13,6 +13,12 @@
 
 #include "ResourceUploadBatch.h"
 
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+#include "imgui_impl_dx12.h"
+
+static int const                    NUM_FRAMES_IN_FLIGHT = 3;
+
 using namespace DirectX;
 
 
@@ -27,11 +33,12 @@ enum CbvSrvHeapOffsets
     Offscreen2_SrvHeapOffset = 5,
     Offscreen1_UavHeapOffset = 6,
     Offscreen2_UavHeapOffset = 7,
+    ImGui_SrvHeapOffset = 8,
 
     // Per-material descriptors
-    Material0_HeapOffset = 8,
+    Material0_HeapOffset = 9,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 9,
+    Texture0Srv_HeapOffset = 10,
     Num_CbvSrvHeapOffsets
 };
  
@@ -462,12 +469,46 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         HRR(GetDevice()->CreateComputePipelineState(&vertBlurPSO, IID_PPV_ARGS(&m_gameLevelPSOs["vertBlur"])));
     }
 
+
     // Execute the command list.
     HRR(GetCommandList()->Close());
     ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
     GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     WaitForPreviousFrame();
+
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplWin32_Init(m_hwnd);
+    ImGui_ImplDX12_Init(GetDevice(), NUM_FRAMES_IN_FLIGHT,
+        DXGI_FORMAT_R8G8B8A8_UNORM, m_descriptorHeap,
+        m_descriptorHeap.hCPU(ImGui_SrvHeapOffset),
+        m_descriptorHeap.hGPU(ImGui_SrvHeapOffset));
+
+    // Load Fonts
+    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
+    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
+    // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
+    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+    // - Read 'docs/FONTS.txt' for more instructions and details.
+    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
+    //io.Fonts->AddFontDefault();
+    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
+    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
+    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
+    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
+    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
+    //IM_ASSERT(font != NULL);
 
     // Init shadow map
     if (useShadowMaps)
@@ -598,6 +639,13 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
     WaitForPreviousFrame();
+
+    if (m_vertexBuffer.buffer) // Inited?
+    {
+        ImGui_ImplDX12_Shutdown();
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
+    }
 
     // Never changes CB
     SafeDelete(&m_constBufferNeverChanges);
@@ -1341,6 +1389,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     SetDebugName(m_offscreenBuffer1, "offscreenBuffer1");
     SetDebugName(m_offscreenBuffer2, "offscreenBuffer2");
 
+
     ////
     // Validation
     ASSERT(m_pSwapChain);
@@ -1474,6 +1523,16 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     GetCommandList()->SetPipelineState(m_pipelineState);  // Needed?  Supports rendering without material?
+
+
+        // Start the Dear ImGui frame
+    ImGui_ImplDX12_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+    bool show_demo_window = true;
+    ImGui::ShowDemoWindow(&show_demo_window);
 
     // Make shadow map available to shaders
     if (useShadowMaps)
@@ -1616,6 +1675,10 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
 
     PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Post processing
+
+    ImGui::Render();
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList[m_commandListIndex]);
+
 
     PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Render
 
