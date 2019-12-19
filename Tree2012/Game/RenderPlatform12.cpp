@@ -1569,7 +1569,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     m_commandList[m_commandListIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     // blur stuff
-    auto weights = CalcGaussWeights(2.0f);
+    auto weights = CalcGaussWeights(1.5f);
     int blurRadius = (int)weights.size() / 2;
 
     m_commandList[m_commandListIndex]->SetComputeRootSignature(m_computeRootSignature);

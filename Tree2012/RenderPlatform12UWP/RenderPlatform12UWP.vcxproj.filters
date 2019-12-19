@@ -88,4 +88,7 @@
     <ClInclude Include="..\Game\ScreenGrab12.h" />
     <ClInclude Include="Inc\d3dx12.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
 </Project>
