@@ -1282,6 +1282,16 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     // Initial frame index
     m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
 
+    D3D12_CLEAR_VALUE clearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
+    clearValue.Format = m_swapChainFormat;
+    memcpy(clearValue.Color, &m_renderData->clearColor, sizeof(float) * _countof(clearValue.Color));
+    DXGI_RGBA dxgiClearColor;
+    memcpy(&dxgiClearColor, &m_renderData->clearColor, sizeof(dxgiClearColor));
+    //float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    //memcpy(&clearValue.Color[0], clearColor, sizeof(float) * _countof(clearColor));
+
+    HRR(swapChain1->SetBackgroundColor(&dxgiClearColor));
+
     // Create render target views (RTVs).
     for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
     {
@@ -1311,17 +1321,17 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         D3D12_TEXTURE_LAYOUT_UNKNOWN,
         D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 
-    D3D12_CLEAR_VALUE clearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
-    clearValue.Format = DXGI_FORMAT_D32_FLOAT;
-    clearValue.DepthStencil.Depth = 1.0f;
-    clearValue.DepthStencil.Stencil = 0;
+    D3D12_CLEAR_VALUE depthClearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
+    depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+    depthClearValue.DepthStencil.Depth = 1.0f;
+    depthClearValue.DepthStencil.Stencil = 0;
 
     HRR(GetDevice()->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &depthBufferDesc,
         D3D12_RESOURCE_STATE_DEPTH_WRITE,
-        &clearValue,
+        &depthClearValue,
         IID_PPV_ARGS(&m_pDepthStencil)));
 
     SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
@@ -1343,12 +1353,6 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     offscreenDesc.SampleDesc.Quality = 0;
     offscreenDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     offscreenDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-    clearValue.Format = m_swapChainFormat;
-    memcpy(clearValue.Color, &m_renderData->clearColor, sizeof(float) * _countof(clearValue.Color));
-    //float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-    //memcpy(&clearValue.Color[0], clearColor, sizeof(float) * _countof(clearColor));
-
 
     HRR(GetDevice()->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -1467,12 +1471,14 @@ HRESULT RenderPlatform12::UninitDevice()
     assert(m_managedUploadHeaps.size() == 0);
 
 #if defined(_DEBUG)
+#if 0
     CComPtr<ID3D12DebugDevice> debugDevice;
     if (m_d3dDevice && SUCCEEDED(m_d3dDevice->QueryInterface(IID_PPV_ARGS(&debugDevice))))
     {
         debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
         debugDevice.Release();
     }
+#endif
 #endif
 
     m_d3dDevice.Release();

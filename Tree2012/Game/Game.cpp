@@ -70,6 +70,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_renderManager.GetRenderData().projectionData.fov = XM_PIDIV4;
     m_renderManager.GetRenderData().projectionData.nearClippingPlane = .2f;
     m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
+    m_renderManager.GetRenderData().clearColor = XMFLOAT4(0, 0, 0, 0);
 
     XSF::SetContentFileRoot();
 
@@ -93,7 +94,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_currentScene = 0;
     m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
-
+    m_needsResize = true;
 
     // Create thread pool
     //may return 0 when not able to detect
