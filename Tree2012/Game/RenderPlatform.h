@@ -551,6 +551,8 @@ protected:
 
     float                             m_logicalDpi;
 
+    bool imGuiInitialized;
+
 #if defined(TREE3D12) || defined(TREE3D11)
     DXGI_FORMAT                       m_swapChainFormat;
 #endif
@@ -560,7 +562,7 @@ public:
 
     RenderPlatform() :
         m_vertexShader(nullptr), m_pixelShader(nullptr), m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
-        m_drawScreenVertexShader(nullptr), m_drawScreenPixelShader(nullptr)
+        m_drawScreenVertexShader(nullptr), m_drawScreenPixelShader(nullptr), imGuiInitialized(false)
     { }
 
 #if defined(TREE3D12) || defined(TREE3D11)

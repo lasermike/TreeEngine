@@ -17,7 +17,7 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 
-static int const                    NUM_FRAMES_IN_FLIGHT = 3;
+bool useImGui = true;
 
 using namespace DirectX;
 
@@ -478,22 +478,27 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     WaitForPreviousFrame();
 
     // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    if (useImGui)
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsClassic();
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+        //ImGui::StyleColorsClassic();
 
-    // Setup Platform/Renderer bindings
-    ImGui_ImplWin32_Init(m_hwnd);
-    ImGui_ImplDX12_Init(GetDevice(), NUM_FRAMES_IN_FLIGHT,
-        DXGI_FORMAT_R8G8B8A8_UNORM, m_descriptorHeap,
-        m_descriptorHeap.hCPU(ImGui_SrvHeapOffset),
-        m_descriptorHeap.hGPU(ImGui_SrvHeapOffset));
+        // Setup Platform/Renderer bindings
+        ImGui_ImplWin32_Init(m_hwnd);
+        ImGui_ImplDX12_Init(GetDevice(), FrameCount,
+            DXGI_FORMAT_R8G8B8A8_UNORM, m_descriptorHeap,
+            m_descriptorHeap.hCPU(ImGui_SrvHeapOffset),
+            m_descriptorHeap.hGPU(ImGui_SrvHeapOffset));
+
+        imGuiInitialized = true;
+    }
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -640,11 +645,12 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     // cleaned up by the destructor.
     WaitForPreviousFrame();
 
-    if (m_vertexBuffer.buffer) // Inited?
+    if (imGuiInitialized)
     {
         ImGui_ImplDX12_Shutdown();
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
+        imGuiInitialized = false;
     }
 
     // Never changes CB
@@ -1092,13 +1098,11 @@ HRESULT RenderPlatform12::InitDevice()
 
 #if defined(_DEBUG)
     // Enable the D3D12 debug layer.
-    //{
     CComPtr<ID3D12Debug> debugController;
     if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
     {
         debugController->EnableDebugLayer();
     }
-    //}
 
 	CComPtr<IDXGIFactory4> factory4;
 	HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory4)));
@@ -1227,6 +1231,11 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 
 HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
 {
+    if (imGuiInitialized)
+    {
+        ImGui_ImplDX12_InvalidateDeviceObjects();
+    }
+
     m_scissorRect.right = static_cast<LONG>(windowWidth);
     m_scissorRect.bottom = static_cast<LONG>(windowHeight);
 
@@ -1389,6 +1398,11 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     SetDebugName(m_offscreenBuffer1, "offscreenBuffer1");
     SetDebugName(m_offscreenBuffer2, "offscreenBuffer2");
 
+    // UI
+    if (imGuiInitialized)
+    {
+        ImGui_ImplDX12_CreateDeviceObjects();
+    }
 
     ////
     // Validation
@@ -1438,13 +1452,25 @@ HRESULT RenderPlatform12::UninitDevice()
     CloseHandle(m_fenceEvent);
     m_fenceEvent = nullptr;
 
+    m_fence.Release();
+
     m_descriptorHeap.Terminate();
 
     // InitDevice objects
-    m_d3dDevice.Release();
     m_pSwapChain.Release();
     ReleaseSwapChainResources();
-    return S_OK;
+
+#if defined(_DEBUG)
+    CComPtr<ID3D12DebugDevice> debugDevice;
+    if (m_d3dDevice && SUCCEEDED(m_d3dDevice->QueryInterface(IID_PPV_ARGS(&debugDevice))))
+    {
+        debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
+    }
+#endif
+
+    m_d3dDevice.Release();
+     
+     return S_OK;
 }
 
 //--------------------------------------------------------------------------------------
@@ -1514,25 +1540,27 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     //TODO NEXT: use compute to copy offscreen1 to rtv
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
+    // Set initial render target to rtv for ImGui
+    //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
+    //GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(FrameCount));  //m_frameIndex
+    // Start the Dear ImGui frame
+    if (imGuiInitialized)
+    {
+        ImGui_ImplDX12_NewFrame();
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
+    }
+
+    // Set initial render target to offscreenbuffer1
+    CD3DX12_CPU_DESCRIPTOR_HANDLE offscreen1Handle(m_rtvHeap.hCPU(FrameCount));
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
-    GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    GetCommandList()->OMSetRenderTargets(1, &offscreen1Handle, FALSE, &dsvHandle);
 
-    GetCommandList()->ClearRenderTargetView(rtvHandle, &m_renderData->clearColor.x, 0, nullptr);
+    GetCommandList()->ClearRenderTargetView(offscreen1Handle, &m_renderData->clearColor.x, 0, nullptr);
     GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     GetCommandList()->SetPipelineState(m_pipelineState);  // Needed?  Supports rendering without material?
-
-
-        // Start the Dear ImGui frame
-    ImGui_ImplDX12_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    ImGui::NewFrame();
-
-    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-    bool show_demo_window = true;
-    ImGui::ShowDemoWindow(&show_demo_window);
 
     // Make shadow map available to shaders
     if (useShadowMaps)
@@ -1619,7 +1647,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing");
 
     // use compute to post process
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(FrameCount));
+    CD3DX12_CPU_DESCRIPTOR_HANDLE offscreen1Handle(m_rtvHeap.hCPU(FrameCount));
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
@@ -1671,14 +1699,30 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COMMON));
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST));
     m_commandList[m_commandListIndex]->CopyResource(m_renderTargets[m_frameIndex], m_offscreenBuffer1);
-    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT));
+
+    // Transition to render target to draw UI
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
+    GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Post processing
 
-    ImGui::Render();
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList[m_commandListIndex]);
+    if (imGuiInitialized)
+    {
+        // Draw UI
+        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+        bool show_demo_window = true;
+        ImGui::ShowDemoWindow(&show_demo_window);
 
+
+        ImGui::Render();
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList[m_commandListIndex]);
+    }
+
+    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
     PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Render
 
@@ -1762,6 +1806,11 @@ HRESULT RenderPlatform12::SetRenderPhase(RenderState state)
 //--------------------------------------------------------------------------------------
 void RenderPlatform12::TrimUploadHeaps(bool removeTerminatedHeaps)
 {
+    if (!m_fence)
+    {
+        return;
+    }
+
     const UINT64 fenceValue = m_fence->GetCompletedValue();
     for (std::list<FencedHeap>::const_iterator iterManagedHeap = m_managedUploadHeaps.begin(); iterManagedHeap != m_managedUploadHeaps.end(); ++iterManagedHeap)
     {
