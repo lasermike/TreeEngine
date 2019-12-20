@@ -1107,19 +1107,12 @@ HRESULT RenderPlatform12::InitDevice()
     {
         debugController->EnableDebugLayer();
     }
-
-	CComPtr<IDXGIFactory4> factory4;
-	HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory4)));
-
-//    CComPtr<IDXGIFactory2> factory2;
-//    HRR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory2)));
-
-#else
-
-    CComPtr<IDXGIFactory2> factory2;
-    HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory2)));
-
 #endif
+
+    CComPtr<IDXGIFactory4> factory4;
+    HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory4)));
+    //    CComPtr<IDXGIFactory2> factory2;
+    //    HRR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory2)));
 
     CComPtr<IDXGIAdapter1> hardwareAdapter;
     GetHardwareAdapter(factory4, &hardwareAdapter);

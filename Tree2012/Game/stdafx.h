@@ -163,7 +163,7 @@ void SafeDelete(T* obj)
 #if defined(TREE3D12)
 __inline void SetDebugName(ID3D12DeviceChild* /*child*/, const char* /*name*/) { }
 void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter);
-#else
+#elif defined(TREE3D11)
 __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
 #endif // DX12
 
