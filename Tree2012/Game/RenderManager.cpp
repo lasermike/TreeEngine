@@ -25,13 +25,6 @@ RenderManager::RenderManager() : m_platform(nullptr)
     m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
 
     m_nextInstanceBufferOffset = 0;
-
-    // TODO: where should this go?
-#if defined(TREE3D12)
-    m_platform = new RenderPlatform12(&this->GetRenderData());
-#elif defined(TREE3D11)
-    m_platform = new RenderPlatform11(&this->GetRenderData());
-#endif
 }
 
 RenderManager::~RenderManager()
