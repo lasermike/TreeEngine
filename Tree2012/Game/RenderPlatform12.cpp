@@ -225,6 +225,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     CComPtr<ID3DBlob> error;
     HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
     HRR(GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+    m_rootSignature->SetName(L"GameLevel PSO");
 
     // Initialize null descriptor view
     D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc = {};
@@ -270,6 +271,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             serializedRootSig->GetBufferPointer(),
             serializedRootSig->GetBufferSize(),
             IID_PPV_ARGS(&m_computeRootSignature)));
+
+        m_computeRootSignature->SetName(L"Compute Game Level PSO");
     }
 
     // Init text font
@@ -959,6 +962,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
 
     ID3D12PipelineState* pipelineState = nullptr;
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
+    pipelineState->SetName(L"Render Unit pso");
 
     // Shadow pass PSO
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
@@ -1460,11 +1464,14 @@ HRESULT RenderPlatform12::UninitDevice()
     m_pSwapChain.Release();
     ReleaseSwapChainResources();
 
+    assert(m_managedUploadHeaps.size() == 0);
+
 #if defined(_DEBUG)
     CComPtr<ID3D12DebugDevice> debugDevice;
     if (m_d3dDevice && SUCCEEDED(m_d3dDevice->QueryInterface(IID_PPV_ARGS(&debugDevice))))
     {
         debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
+        debugDevice.Release();
     }
 #endif
 
@@ -1808,6 +1815,7 @@ void RenderPlatform12::TrimUploadHeaps(bool removeTerminatedHeaps)
 {
     if (!m_fence)
     {
+        assert(m_managedUploadHeaps.size() == 0);
         return;
     }
 
