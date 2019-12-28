@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Game">
+      <UniqueIdentifier>{9d11889d-8abf-48e9-a9c4-c9cd40733444}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Shaders">
+      <UniqueIdentifier>{8a2a9914-a12a-4667-acc4-41673dacb4f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Resources">
+      <UniqueIdentifier>{045588dd-39d2-46a7-a296-183c1205d3c3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
+    <Text Include="..\Game\Shaders\ShaderFiles.txt">
+      <Filter>Game\Shaders</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="targetver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="TreeWin32Dll.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
+      <Filter>Game\Shaders</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Game\Shaders\buildShaders.bat">
+      <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\Shaders\commonshader.bat">
+      <Filter>Game\Shaders</Filter>
+    </None>
+    <None Include="..\Game\CopyResources.cmd">
+      <Filter>Game\Resources</Filter>
+    </None>
+  </ItemGroup>
+</Project>

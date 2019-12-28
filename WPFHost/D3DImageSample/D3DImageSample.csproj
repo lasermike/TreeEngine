@@ -108,7 +108,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>robocopy E:\Source\Private\Tree2012\Debug\TreeWin32Dll $(TargetDir). /XO</PostBuildEvent>
+    <PostBuildEvent>robocopy E:\Source\TreeEngine\Src\Tree2020\Debug\TreeWin32Dll $(TargetDir). /XO</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

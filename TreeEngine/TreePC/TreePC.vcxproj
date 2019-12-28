@@ -1,0 +1,258 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{9b22e637-c613-479f-bec8-59215e96eefb}</ProjectGuid>
+    <Keyword>DirectXApp</Keyword>
+    <RootNamespace>TreePC</RootNamespace>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.15063.0</WindowsTargetPlatformMinVersion>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <EnableDotNetNativeCompatibleProfile>true</EnableDotNetNativeCompatibleProfile>
+    <ProjectName>TreePC</ProjectName>
+    <BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug12'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ImageContentTask.props" />
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\MeshContentTask.props" />
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ShaderGraphContentTask.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <!--
+  <PropertyGroup>
+    <PackageCertificateKeyFile>TreePC_TemporaryKey.pfx</PackageCertificateKeyFile>
+  </PropertyGroup>
+  -->
+  <PropertyGroup Condition="'$(Platform)'=='Win32'">
+    <IncludePath>..\Game\.;..\Inc;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);$(UniversalCRT_IncludePath)</IncludePath>
+    <LibraryPath>;..\TreePC\Lib;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);$(UniversalCRT_LibraryPath_x86)</LibraryPath>
+    <TargetName>$(ProjectName)</TargetName>
+    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Game\.;..\Inc;</IncludePath>
+    <LibraryPath>..\TreePC\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies>d2d1.lib; d3d12.lib; dxgi.lib;ole32.lib; windowscodecs.lib; dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/stack:1048576</AdditionalOptions>
+    </Link>
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4453</DisableSpecificWarnings>
+    </ClCompile>
+    <PostBuildEvent>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)AppX</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <PreprocessorDefinitions>NDEBUG;NOPIX_INSTRUMENTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization Condition="'$(Configuration)'=='Release'">Disabled</Optimization>
+      <UndefinePreprocessorDefinitions Condition="'$(Platform)'=='Win32'">WIN32</UndefinePreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories Condition="'$(Platform)'=='Win32'">Lib\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories Condition="'$(Platform)'=='x64'">Lib\x64\Debug</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <PreprocessorDefinitions>_DEBUG;NOPIX_INSTRUMENTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions Condition="'$(Platform)'=='Win32'">WIN32</UndefinePreprocessorDefinitions>
+      <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BrowseInformation>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories Condition="'$(Platform)'=='Win32'">Lib\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories Condition="'$(Platform)'=='x64'">Lib\x64\Debug</AdditionalLibraryDirectories>
+      <StackReserveSize Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">3145728</StackReserveSize>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Image Include="..\Game\bark2.dds" />
+    <Image Include="..\Game\Bark_0005_diffuse.DDS" />
+    <Image Include="..\Game\Resources\cube.dds" />
+    <Image Include="..\Game\Resources\FirBranchWithNeedles.dds" />
+    <Image Include="..\Game\snow.dds" />
+    <Image Include="Assets\LockScreenLogo.scale-200.png">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="Assets\SplashScreen.scale-200.png">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="Assets\Square150x150Logo.scale-200.png" />
+    <Image Include="Assets\Square44x44Logo.scale-200.png" />
+    <Image Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\Wide310x150Logo.scale-200.png" />
+    <Image Include="Assets\Logo.png" />
+    <Image Include="Assets\SmallLogo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Game\BitmapFont.h" />
+    <ClInclude Include="..\Game\BitmapFont12.h" />
+    <ClInclude Include="..\Game\CComPtr.h" />
+    <ClInclude Include="..\Game\D3D11Platform.h" />
+    <ClInclude Include="..\Game\DDSTextureLoader.h" />
+    <ClInclude Include="..\Game\DDSTextureLoader12.h" />
+    <ClInclude Include="..\Game\DXMath.h" />
+    <ClInclude Include="..\Game\Game.h" />
+    <ClInclude Include="..\Game\GameLoader.h" />
+    <ClInclude Include="..\Game\GeometryGenerator.h" />
+    <ClInclude Include="..\Game\GpuResource.h" />
+    <ClInclude Include="..\Game\LSystemModelGenerator.h" />
+    <ClInclude Include="..\Game\Materials.h" />
+    <ClInclude Include="..\Game\MathHelper.h" />
+    <ClInclude Include="..\Game\Model.h" />
+    <ClInclude Include="..\Game\Player.h" />
+    <ClInclude Include="..\Game\Primitive.h" />
+    <ClInclude Include="..\Game\RenderData.h" />
+    <ClInclude Include="..\Game\RenderManager.h" />
+    <ClInclude Include="..\Game\RenderPlatform.h" />
+    <ClInclude Include="..\Game\Resource.h" />
+    <ClInclude Include="..\Game\SceneRoot.h" />
+    <ClInclude Include="..\Game\ShadowMap.h" />
+    <ClInclude Include="..\Game\stdafx.h" />
+    <ClInclude Include="..\Game\StepTimer.h" />
+    <ClInclude Include="..\Game\Tree.h" />
+    <ClInclude Include="..\Game\TreeModel.h" />
+    <ClInclude Include="..\Game\TreeModelGenerator.h" />
+    <ClInclude Include="..\Game\UploadBuffer.h" />
+    <ClInclude Include="..\Game\WorldObject.h" />
+    <ClInclude Include="BasicTimer.h" />
+    <ClInclude Include="TreePC.h" />
+    <ClInclude Include="pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Game\Game.cpp" />
+    <ClCompile Include="..\Game\GameLoader.cpp" />
+    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="..\Game\Graph.cpp" />
+    <ClCompile Include="..\Game\LSystemModelGenerator.cpp" />
+    <ClCompile Include="..\Game\Materials.cpp" />
+    <ClCompile Include="..\Game\MathHelper.cpp" />
+    <ClCompile Include="..\Game\Player.cpp" />
+    <ClCompile Include="..\Game\Primitive.cpp" />
+    <ClCompile Include="..\Game\RenderManager.cpp" />
+    <ClCompile Include="..\Game\RenderPlatform.cpp" />
+    <ClCompile Include="..\Game\SceneRoot.cpp" />
+    <ClCompile Include="..\Game\Stdafx.cpp" />
+    <ClCompile Include="..\Game\Tree.cpp" />
+    <ClCompile Include="..\Game\TreeModel.cpp" />
+    <ClCompile Include="..\Game\TreeModelGenerator.cpp" />
+    <ClCompile Include="..\Game\WorldObject.cpp" />
+    <ClCompile Include="TreePC.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+    <None Include="..\Game\Arial_16.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <None Include="..\Game\Arial_16.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <CustomBuild Include="..\Game\CopyResources.cmd">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</DeploymentContent>
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <None Include="..\Game\Courier_New_11.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <None Include="..\Game\Courier_New_11.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <None Include="..\Game\Shaders\buildShaders.bat" />
+    <None Include="..\Game\Shaders\commonshader.bat" />
+    <None Include="packages.config" />
+    <None Include="TreePC_TemporaryKey.pfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
+      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <ExcludedFromBuild> false</ExcludedFromBuild>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
+      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <ExcludedFromBuild> false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\Game\Shaders\ShaderFiles.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ImageContentTask.targets" />
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\MeshContentTask.targets" />
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ShaderGraphContentTask.targets" />
+    <Import Project="..\packages\WinPixEventRuntime.1.0.170625002\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.170625002\build\WinPixEventRuntime.targets')" />
+  </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.170625002\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.170625002\build\WinPixEventRuntime.targets'))" />
+  </Target>
+</Project>
