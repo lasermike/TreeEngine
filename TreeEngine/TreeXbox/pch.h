@@ -83,3 +83,7 @@ namespace DX
         }
     }
 }
+
+// Needed?
+#include <unknwn.h>
+#include <stdafx.h>

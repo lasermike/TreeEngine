@@ -152,9 +152,12 @@ HRESULT Game::ReloadDevice()
     //}
 
     const wchar_t* dllFilename =
-#ifdef TREE3D_CLASSIC
+#if defined(TREE3D_CLASSIC)
         L"RenderPlatform12.dll";
-    m_renderPlatformDLL = ::LoadLibrary(dllFilename);
+        m_renderPlatformDLL = ::LoadLibrary(dllFilename);
+#elif defined(TREE_XBOX)
+        L"RenderPlatform12Xbox.dll";
+        m_renderPlatformDLL = ::LoadLibrary(dllFilename);
 #else
         m_is12Driver ? L"RenderPlatform12UWP.dll" : L"RenderPlatform11UWP.dll";
     m_renderPlatformDLL = ::LoadPackagedLibrary(dllFilename, 0);

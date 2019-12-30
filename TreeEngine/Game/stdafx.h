@@ -25,18 +25,18 @@ using namespace std;
 // Error reporting and logging
 //
 #ifdef _DEBUG
-__inline void Report(char* msg, char* file, long line, char* exp) 
+__inline void Report(const char* msg, const char* file, long line, const char* exp)
 {
     std::cerr << msg << " " << file << " " << line << " " << exp << "\n"; 
 }
 
-__inline void ReportError(char* msg, char* file, long line, char* exp) 
+__inline void ReportError(const char* msg, const char* file, long line, const char* exp)
 {
     Report(msg, file, line, exp);
     assert(false); 
 }
 
-__inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) 
+__inline void ReportFailure(const char* msg, const char* file, long line, HRESULT hr)
 {
     std::cerr << msg << " " << file << " " << line << " " << hr << "\n"; 
     assert(SUCCEEDED(hr)); 
@@ -45,8 +45,8 @@ __inline void ReportFailure(char* msg, char* file, long line, HRESULT hr)
 
 #else
 
-__inline void ReportError(char* msg, char* file, long line, char* exp) { }
-__inline void ReportFailure(char* msg, char* file, long line, HRESULT hr) { }
+__inline void ReportError(const char* msg, const char* file, long line, const char* exp) { }
+__inline void ReportFailure(const char* msg, const char* file, long line, HRESULT hr) { }
 
 #endif 
 
@@ -306,8 +306,10 @@ void PIXBeginEvent();
 void PIXEndEvent(void*);
 void PIXEndEvent();
 
-void PIXScopedEvent(void*, DWORD, wchar_t*, ...);
+#if !defined(TREE_XBOX)
 void PIXScopedEvent(DWORD, wchar_t*, ...);
+void PIXScopedEvent(void*, DWORD, wchar_t*, ...);
+#endif
 
 #endif
 
@@ -400,8 +402,8 @@ namespace XboxSampleFramework
         //    }
         //};
 
-        template< typename t_Other > 
-        operator D3DTypePtr< t_Other >& () { return Typecast< t_Other, std::is_convertible< t_Resource, t_Other >::value >::allowed_cast( *this ); }
+        //template< typename t_Other > 
+        //operator D3DTypePtr< t_Other >& () { return Typecast< t_Other, std::is_convertible< t_Resource, t_Other >::value >::allowed_cast( *this ); }
     };
 
 #if defined(TREE3D12)

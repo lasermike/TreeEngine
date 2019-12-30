@@ -43,13 +43,13 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lp
         wcex.style = CS_HREDRAW | CS_VREDRAW;
         wcex.lpfnWndProc = WndProc;
         wcex.hInstance = hInstance;
-        wcex.lpszClassName = u8"TreeXBGCWindowClass";
+        wcex.lpszClassName = u8"TreeXboxWindowClass";
         wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
         if (!RegisterClassExA(&wcex))
             return 1;
 
         // Create window
-        HWND hwnd = CreateWindowExA(0, u8"TreeXBGCWindowClass", u8"TreeXBGC", WS_OVERLAPPEDWINDOW,
+        HWND hwnd = CreateWindowExA(0, u8"TreeXboxWindowClass", u8"TreeXbox", WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1080, nullptr, nullptr, hInstance,
             nullptr);
         if (!hwnd)
