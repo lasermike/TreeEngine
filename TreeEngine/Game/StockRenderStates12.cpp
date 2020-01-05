@@ -392,7 +392,7 @@ static const D3D12_RASTERIZER_DESC s_StockRasterizerTypes[] =
 static_assert( ARRAYSIZE(s_StockRasterizerTypes) == static_cast<UINT>(StockRasterizerStates::RasterizerStateCount),
               "Rasterizer Description count doesn't match Rasterizer State list");
 
-static const D3D12_DEPTH_STENCIL_DESC s_StockDepthStencilTypes[StockDepthStencilStates::DepthStencilStateCount] =
+static const D3D12_DEPTH_STENCIL_DESC s_StockDepthStencilTypes[(int) StockDepthStencilStates::DepthStencilStateCount] =
 {
     // AlwaysSucceed_WriteZOut_NoStencil,
     // No depth test, no stencil test, updates Z buffer

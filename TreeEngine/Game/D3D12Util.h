@@ -420,7 +420,7 @@ namespace XboxSampleFramework
 
         bool IsTerminated() const { return m_pDevice == nullptr; }
 
-        HRESULT Initialize(_In_ D3DDevice* const pDevice, _In_ ID3D12Fence* const pFence, SIZE_T HeapSizeBytesPerSlab, bool Readback = false, UINT32 MaxSlabCount = 2, _In_opt_z_ wchar_t* heapName = nullptr);
+        HRESULT Initialize(_In_ D3DDevice* const pDevice, _In_ ID3D12Fence* const pFence, SIZE_T HeapSizeBytesPerSlab, bool Readback = false, UINT32 MaxSlabCount = 2, const wchar_t* heapName = nullptr);
         void Terminate();
 
         void SetCurrentFence(UINT64 currentFence) { m_currentFence = currentFence; }

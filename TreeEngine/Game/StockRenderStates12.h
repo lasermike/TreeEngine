@@ -154,11 +154,11 @@ namespace XboxSampleFramework
 
         // Cached state object instances:
         DescriptorHeapWrapper m_SamplerHeap;
-        D3D12_STATIC_SAMPLER_DESC m_StaticSampler[StockSamplerStates::SamplerStateCount];
-        D3D12_SAMPLER_DESC m_SamplerDesc[StockSamplerStates::SamplerStateCount];
-        D3D12_BLEND_DESC m_BlendDesc[StockBlendStates::BlendStateCount];
-        D3D12_RASTERIZER_DESC m_RasterizerDesc[StockRasterizerStates::RasterizerStateCount];
-        D3D12_DEPTH_STENCIL_DESC m_DepthStencilDesc[StockDepthStencilStates::DepthStencilStateCount];
+        D3D12_STATIC_SAMPLER_DESC m_StaticSampler[(int) StockSamplerStates::SamplerStateCount];
+        D3D12_SAMPLER_DESC m_SamplerDesc[(int) StockSamplerStates::SamplerStateCount];
+        D3D12_BLEND_DESC m_BlendDesc[(int) StockBlendStates::BlendStateCount];
+        D3D12_RASTERIZER_DESC m_RasterizerDesc[(int) StockRasterizerStates::RasterizerStateCount];
+        D3D12_DEPTH_STENCIL_DESC m_DepthStencilDesc[(int) StockDepthStencilStates::DepthStencilStateCount];
 
         // State creation/destruction functionality:
         HRESULT GenerateStockSamplerHeap(_In_ XSF::D3DDevice* const pDev);
@@ -198,7 +198,7 @@ namespace XboxSampleFramework
         // manages their lifetime. (Addref on an ownership boundary transition only applies to COM interfaces; we're
         // not transferring ownership here).
         //--------------------------------------------------------------------------------------------------------------
-        FORCEINLINE ID3D12DescriptorHeap* StockRenderStates::GetSamplerHeap() const;
+        FORCEINLINE ID3D12DescriptorHeap* GetSamplerHeap() const;
         FORCEINLINE D3D12_GPU_DESCRIPTOR_HANDLE GetSamplerGPUHandle(StockSamplerStates state) const;
         FORCEINLINE D3D12_CPU_DESCRIPTOR_HANDLE GetSamplerCPUHandle(StockSamplerStates state) const;
         FORCEINLINE void GetStaticSampler(_Out_ D3D12_STATIC_SAMPLER_DESC* staticSampler, StockSamplerStates state, UINT shaderRegister, UINT registerSpace = 0, D3D12_SHADER_VISIBILITY shaderVisibility = D3D12_SHADER_VISIBILITY_ALL) const;

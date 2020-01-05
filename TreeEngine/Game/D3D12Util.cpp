@@ -1451,7 +1451,7 @@ void InitialDataBarrier(_In_ D3DDevice* const pDevice, _In_ ID3D12CommandQueue* 
 // Initialized the CpuGpu heap
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT CpuGpuHeap::Initialize(D3DDevice* pDevice, ID3D12Fence* const pFence, SIZE_T HeapSizeBytesPerSlab, bool Readback, UINT32 MaxSlabCount, wchar_t* heapName)
+HRESULT CpuGpuHeap::Initialize(D3DDevice* pDevice, ID3D12Fence* const pFence, SIZE_T HeapSizeBytesPerSlab, bool Readback, UINT32 MaxSlabCount, const wchar_t* heapName)
 {
     if (Readback)
     {
