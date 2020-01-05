@@ -32,7 +32,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreeXbox", "TreeXbox\TreeXb
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderPlatform12Xbox", "RenderPlatform12Xbox\RenderPlatform12Xbox.vcxproj", "{50032863-DFBE-46C4-AD53-8D47248F84F6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SharedGameFiles", "SharedGameFiles\SharedGameFiles.vcxitems", "{42DCDA45-526D-45B0-ABA5-CD9FE1716FEE}"
+EndProject
 Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		SharedGameFiles\SharedGameFiles.vcxitems*{1c5d34c2-bba2-4ee0-abc8-d298a515a51c}*SharedItemsImports = 4
+		SharedGameFiles\SharedGameFiles.vcxitems*{42dcda45-526d-45b0-aba5-cd9fe1716fee}*SharedItemsImports = 9
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Durango = Debug|Durango
 		Debug|Gaming.Xbox.Scarlett.x64 = Debug|Gaming.Xbox.Scarlett.x64

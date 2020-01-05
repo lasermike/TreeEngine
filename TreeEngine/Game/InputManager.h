@@ -1,5 +1,18 @@
 #pragma once
 
+struct FrameInputData
+{
+    UINT frame;
+    bool key[256];
+
+    FrameInputData()
+    {
+        frame = 0;
+        memset(key, 0, sizeof(bool) * _countof(key));
+    }
+};
+
+
 interface IInputManager
 {
 	virtual FrameInputData& GetFrameInput(UINT frame) = 0;

@@ -29,7 +29,7 @@ void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData
     //	LoadTestBlock(pScene, pRenderData, pCamera, gameData);
 }
 
-HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, char* filename)
+HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, const char* filename)
 {
     // Find max values
     std::vector<XMFLOAT2> values;
@@ -62,7 +62,7 @@ HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, char* filename)
     return S_OK;
 }
 
-HRESULT CreateBufferOfGraphPoints(std::vector<float>& buffer, UINT& width, char* filename)
+HRESULT CreateBufferOfGraphPoints(std::vector<float>& buffer, UINT& width, const char* filename)
 {
     // Find max values
     float maxTime = 0;

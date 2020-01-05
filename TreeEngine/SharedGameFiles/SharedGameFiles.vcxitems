@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{42dcda45-526d-45b0-aba5-cd9fe1716fee}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+    <ClCompile Include="..\Game\Game.cpp" />
+    <ClCompile Include="..\Game\GameLoader.cpp" />
+    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="..\Game\Graph.cpp" />
+    <ClCompile Include="..\Game\LSystemModelGenerator.cpp" />
+    <ClCompile Include="..\Game\Materials.cpp" />
+    <ClCompile Include="..\Game\MathHelper.cpp" />
+    <ClCompile Include="..\Game\Player.cpp" />
+    <ClCompile Include="..\Game\Primitive.cpp" />
+    <ClCompile Include="..\Game\RenderManager.cpp" />
+    <ClCompile Include="..\Game\RenderPlatform.cpp" />
+    <ClCompile Include="..\Game\SceneRoot.cpp" />
+    <ClCompile Include="..\Game\Stdafx.cpp" />
+    <ClCompile Include="..\Game\Tree.cpp" />
+    <ClCompile Include="..\Game\TreeModel.cpp" />
+    <ClCompile Include="..\Game\TreeModelGenerator.cpp" />
+    <ClCompile Include="..\Game\WorldObject.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Game\Arial_16.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <Image Include="..\Game\bark2.dds">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="..\Game\Bark_0005_diffuse.DDS" />
+    <Image Include="..\Game\Bark_0009_diffuse.DDS">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <None Include="..\Game\Courier_New_11.tga">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <Image Include="..\Game\snow.dds">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Game\Arial_16.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <CustomBuild Include="..\Game\CopyResources.cmd">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <None Include="..\Game\Courier_New_11.abc">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <None Include="..\Game\Shaders\buildShaders.bat">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="..\Game\Shaders\commonshader.bat">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
+      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
+      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
+      <FileType>Document</FileType>
+      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Outputs >$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

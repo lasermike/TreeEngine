@@ -10,26 +10,14 @@
 #include "Player.h"
 #include "RenderManager.h"
 
-#if !defined(WIN32) || defined(TREENGINE_XBOX)
-#include "agile.h"
-using namespace Microsoft::WRL;
-#endif
+//#if !defined(WIN32) || defined(TREENGINE_XBOX)
+//#include "agile.h"
+//using namespace Microsoft::WRL;
+//#endif
 
 class ThreadPool;
 class BitmapFont;
 interface IInputManager;
-
-struct FrameInputData
-{
-    UINT frame;
-    bool key[256];
-
-    FrameInputData()
-    {
-        frame = 0;
-        memset(key, 0, sizeof(bool) * _countof(key));
-    }
-};
 
 class Game
 {
@@ -135,7 +123,7 @@ private:
     GameData                            m_gameData;
 
 
-#if defined(_TREE_CLASSIC)
+#if defined(TREENGINE_WIN32)
     HWND                              m_hwnd;
 #else
     Platform::Agile<Windows::UI::Core::CoreWindow>    m_window;

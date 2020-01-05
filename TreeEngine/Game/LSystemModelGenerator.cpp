@@ -242,7 +242,7 @@ TreeModel* LSystemModelGenerator::Create()
 
             // Tokenize replace string into command array
             std::vector<Command> replaceCmds;
-            for (auto& replaceIt = r->output.begin(); replaceIt != r->output.end(); replaceIt++)
+            for (auto&& replaceIt = r->output.cbegin(); replaceIt != r->output.cend(); replaceIt++)
             {
                 Command repCmd = {};
                 if (!GetCommand(replaceIt, r->output.end(), PT_EQUATION, &repCmd))
