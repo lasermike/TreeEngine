@@ -209,7 +209,10 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
 #if defined(_DEBUG)
 void SetDebugName(ID3D12DeviceChild* child, const char* name)
 {
+#if defined(TREE_XBOX)
+#else
     child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
+#endif
 }
 #endif //_DEBUG -> NDEBUG
 
@@ -259,7 +262,7 @@ void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter)
 #if defined(_DEBUG) && !defined(_XBOX_ONE) && defined(TREE3D11) // NAMING
 void SetDebugName(ID3D11DeviceChild* child, const char* name)
 {
-    child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
+    //child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
 }
 
 #else

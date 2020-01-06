@@ -133,16 +133,6 @@ inline HANDLE safe_handle( HANDLE h ) { return (h == INVALID_HANDLE_VALUE) ? 0 :
 template<UINT TNameLength>
 inline void SetDebugObjectName(_In_ ID3D11DeviceChild* resource, _In_ const char (&name)[TNameLength])
 {
-#if defined(_XBOX_ONE) 
-    UNREFERENCED_PARAMETER(resource);
-    UNREFERENCED_PARAMETER(name);
-
-#elif (defined(_DEBUG) || defined(PROFILE))
-    resource->SetPrivateData(WKPDID_D3DDebugObjectName, TNameLength - 1, name);
-#else
-    UNREFERENCED_PARAMETER(resource);
-    UNREFERENCED_PARAMETER(name);
-#endif
 }
 
 };

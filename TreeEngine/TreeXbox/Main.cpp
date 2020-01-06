@@ -4,6 +4,7 @@
 
 #include "pch.h"
 #include "Game.h"
+#include "InputManager.h"
 
 #include <appnotify.h>
 
@@ -16,7 +17,20 @@ namespace
     HANDLE g_plmSignalResume = nullptr;
 };
 
+// Tree engine
+//Game* g_game = nullptr;
+InputManager g_inputManager;
+
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+
+void UpdateFrameAndRender()
+{
+    // Run game 
+    g_game->ComputeCPU();
+    g_game->ComputeGPU();
+
+    g_game->Render(false);
+}
 
 // Entry point
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
@@ -32,8 +46,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lp
     // Microsoft Game Core on Xbox supports UTF-8 everywhere
     assert(GetACP() == CP_UTF8);
 
-    g_game = std::make_unique<Game>();
-
     // Register class and create window
     PAPPSTATE_REGISTRATION hPLM = {};
     {
@@ -48,18 +60,31 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lp
         if (!RegisterClassExA(&wcex))
             return 1;
 
+        const int windowWidth = 1920;
+        const int windowHeight = 1080;
+
         // Create window
         HWND hwnd = CreateWindowExA(0, u8"TreeXboxWindowClass", u8"TreeXbox", WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1080, nullptr, nullptr, hInstance,
+            CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight, nullptr, nullptr, hInstance,
             nullptr);
         if (!hwnd)
             return 1;
 
+        g_game = std::make_unique<Game>(&g_inputManager);
+        //g_game = new Game(&g_inputManager);
+        g_game->SetWindow(hwnd);
+
+        g_game->OnResize(windowWidth, windowHeight);
+
+        if (FAILED(g_game->Initialize(false /* render to shared texture */)))
+        {
+            g_game->Cleanup();
+            return 0;
+        }
+
         ShowWindow(hwnd, nCmdShow);
 
         SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(g_game.get()));
-
-        g_game->Initialize(hwnd);
 
         g_plmSuspendComplete = CreateEventEx(nullptr, nullptr, 0, EVENT_MODIFY_STATE | SYNCHRONIZE);
         g_plmSignalResume = CreateEventEx(nullptr, nullptr, 0, EVENT_MODIFY_STATE | SYNCHRONIZE);
@@ -98,11 +123,14 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lp
         }
         else
         {
-            g_game->Tick();
+            UpdateFrameAndRender();
         }
     }
 
+    g_game->Cleanup();
+
     g_game.reset();
+    //delete g_game;
 
     UnregisterAppStateChangeNotification(hPLM);
 
@@ -127,17 +155,38 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_ACTIVATEAPP:
         break;
 
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP:
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+    {
+        FrameInputData& input = g_inputManager.GetFrameInput(0);
+
+        bool WasDown = ((lParam & (1 << 30)) != 0);
+        bool IsDown = ((lParam & (1 << 31)) == 0);
+
+        if (WasDown != IsDown)
+        {
+            if (IsDown)
+                input.key[wParam] = true;
+            else if (WasDown)
+                input.key[wParam] = false;
+        }
+
+        break;
+    }
+
     case WM_USER:
         if (game)
         {
-            game->OnSuspending();
+            //game->OnSuspending();
 
             // Complete deferral
             SetEvent(g_plmSuspendComplete);
 
             (void)WaitForSingleObject(g_plmSignalResume, INFINITE);
 
-            game->OnResuming();
+            //game->OnResuming();
         }
         break;
     }

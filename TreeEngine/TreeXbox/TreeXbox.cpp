@@ -2,7 +2,7 @@
 //
 
 #include "pch.h"
-#include "TreeXbox.h"
+//#include "TreeXbox.h"
 #include "Game.h"
 #include "InputManager.h"
 
@@ -13,7 +13,6 @@ HINSTANCE hInst;                                // current instance
 TCHAR szTitle[MAX_LOADSTRING];                    // The title bar text
 //TCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 HWND m_hWnd = nullptr;
-bool oculusMode = false;
 
 // Tree engine
 Game* g_game = nullptr;

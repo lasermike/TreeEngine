@@ -4,7 +4,7 @@
     <ClCompile Include="pch.cpp">
       <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="TreeXbox.cpp">
+    <ClCompile Include="Main.cpp">
       <Filter>Platform Source</Filter>
     </ClCompile>
   </ItemGroup>
