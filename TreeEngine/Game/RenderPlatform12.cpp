@@ -1100,6 +1100,32 @@ HRESULT RenderPlatform12::InitDevice()
 {
     HRESULT hr = S_OK;
 
+#if defined(TREE_XBOX)
+    // Create the DX12 API device object.
+    D3D12XBOX_CREATE_DEVICE_PARAMETERS params = {};
+    params.Version = D3D12_SDK_VERSION;
+
+#if defined(_DEBUG)
+    // Enable the debug layer.
+    params.ProcessDebugFlags = D3D12_PROCESS_DEBUG_FLAG_DEBUG_LAYER_ENABLED;
+#elif defined(PROFILE)
+    // Enable the instrumented driver.
+    params.ProcessDebugFlags = D3D12XBOX_PROCESS_DEBUG_FLAG_INSTRUMENTED;
+#endif
+
+    params.GraphicsCommandQueueRingSizeBytes = static_cast<UINT>(D3D12XBOX_DEFAULT_SIZE_BYTES);
+    params.GraphicsScratchMemorySizeBytes = static_cast<UINT>(D3D12XBOX_DEFAULT_SIZE_BYTES);
+    params.ComputeScratchMemorySizeBytes = static_cast<UINT>(D3D12XBOX_DEFAULT_SIZE_BYTES);
+
+    ThrowIfFailed(D3D12XboxCreateDevice(
+        nullptr,
+        &params,
+        IID_GRAPHICS_PPV_ARGS(m_d3dDevice.ReleaseAndGetAddressOf())
+    ));
+
+    m_d3dDevice->SetName(L"DeviceResources");
+#else
+
 #if defined(_DEBUG)
     // Enable the D3D12 debug layer.
     CComPtr<ID3D12Debug> debugController;
@@ -1111,8 +1137,6 @@ HRESULT RenderPlatform12::InitDevice()
 
     CComPtr<IDXGIFactory4> factory4;
     HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory4)));
-    //    CComPtr<IDXGIFactory2> factory2;
-    //    HRR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory2)));
 
     CComPtr<IDXGIAdapter1> hardwareAdapter;
     GetHardwareAdapter(factory4, &hardwareAdapter);
@@ -1123,6 +1147,7 @@ HRESULT RenderPlatform12::InitDevice()
         IID_PPV_ARGS(&m_d3dDevice)
     ));
 
+#endif 
     // Allocate graphics memory
     m_graphicsMemory = new GraphicsMemory(GetDevice());
 
