@@ -186,8 +186,8 @@ RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport)
     return m_pPlatform->GetViewport(viewport);
 }
 
-RENDERPLATFORM_API IUnknown* GetDevice()
-{
-    return m_pPlatform->GetDevice();
-}
+//RENDERPLATFORM_API IUnknown* GetDevice()
+//{
+//    return m_pPlatform->GetDevice();
+//}
 

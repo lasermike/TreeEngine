@@ -184,7 +184,11 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 
 #if defined(TREE3D12)
     void SetDebugName(ID3D12DeviceChild* child, const char* name);
+
+#if !defined(TREE_XBOX)
     void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter);
+#endif 
+
 #elif defined(TREE3D11)
     void SetDebugName(ID3D11DeviceChild* child, const char* name);
 #endif
@@ -336,7 +340,7 @@ const UINT64 TREE_COLOR_DRAW_TEXT = 0x0000FFFF;
 // Utilities
 //
 
-#if defined( _XBOX_ONE ) && defined( _TITLE )
+#if defined( _XBOX_ONE ) || defined( TREE_XBOX )
 #define XSF_TEXTURE_DATA_PITCH_ALIGNMENT D3D12XBOX_TEXTURE_DATA_PITCH_ALIGNMENT
 #else
 #define XSF_TEXTURE_DATA_PITCH_ALIGNMENT D3D12_TEXTURE_DATA_PITCH_ALIGNMENT

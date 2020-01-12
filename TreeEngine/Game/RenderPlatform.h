@@ -636,7 +636,7 @@ public:
     virtual D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) = 0;  // TODO!  Objects should be able to load their own meshes
     virtual D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) = 0;
 
-    virtual IUnknown* GetDevice() = 0;
+    //virtual IUnknown* GetDevice() = 0;
 
     // TODO: This is inconsistent with out other platform specific resources are managed
     // Default shader
@@ -657,7 +657,9 @@ public:
 
 private:
     CComPtr<ID3D12Device>             m_d3dDevice;
+#if !defined(TREE_XBOX)
     CComPtr<IDXGISwapChain3>          m_pSwapChain;
+#endif
     CComPtr<ID3D12Resource>           m_pSharedRenderToTexture;
 
     DescriptorHeapWrapper             m_rtvHeap;
@@ -684,6 +686,10 @@ private:
     D3D12_RECT                        m_scissorRect;
 
     XSF::BitmapFont*                  m_bitmapFont;
+
+#if defined(TREE_XBOX)
+    D3D12XBOX_FRAME_PIPELINE_TOKEN    m_framePipelineToken;
+#endif
 
     //
     // Const buffers
@@ -772,7 +778,11 @@ private:
 
 public:
 
-    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0) { }
+    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0)
+#if defined(TREE_XBOX)
+        , m_framePipelineToken(D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL)
+#endif
+    { }
 
     HRESULT CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);

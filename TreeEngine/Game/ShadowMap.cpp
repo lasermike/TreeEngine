@@ -63,7 +63,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
         &texDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         &optClear,
-        IID_PPV_ARGS(&mDepthMap)));
+        __uuidof(ID3D12Resource*), (void**)&mDepthMap));
 #else
     HR(device->CreateTexture2D(&texDesc, 0, &mDepthMap));
 #endif

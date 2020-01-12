@@ -13,8 +13,10 @@
 
 #pragma once
 
+#if !defined(TREE_XBOX)
 #define D3D12_GPU_VIRTUAL_ADDRESS_NULL 0ull
 #define D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN ~0ull
+#endif
 
 class GpuResource
 {

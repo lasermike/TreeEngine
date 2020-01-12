@@ -3,7 +3,7 @@
 #include "processenv.h"
 
 #if defined(TREE3D12)
-#include <D3Dcompiler.h>
+//#include <D3Dcompiler.h>
 #endif
 
 namespace XboxSampleFramework
@@ -68,7 +68,13 @@ HRESULT XSF::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
     wchar_t tmp[1024];
     _snwprintf_s(tmp, _TRUNCATE, L"%s%s", Details::g_strCommonFileRoot, path);
 
+#if defined(TREE_XBOX)
+    // TODO load shaders
+    ASSERT(false);
+    return E_FAIL;
+#else
     return D3DReadFileToBlob(tmp, ppShader);
+#endif
 }
 #endif
 
@@ -209,13 +215,13 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
 #if defined(_DEBUG)
 void SetDebugName(ID3D12DeviceChild* child, const char* name)
 {
-#if defined(TREE_XBOX)
-#else
+#if !defined(TREE_XBOX)
     child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
 #endif
 }
 #endif //_DEBUG -> NDEBUG
 
+#if !defined(TREE_XBOX)
 // Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 // If no such adapter can be found, *ppAdapter will be set to nullptr.
 void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter)
@@ -254,6 +260,7 @@ void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter)
 
     *ppAdapter = adapter.Detach();
 }
+#endif
 
 #else
 //

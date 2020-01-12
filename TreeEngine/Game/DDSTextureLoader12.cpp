@@ -838,7 +838,7 @@ static HRESULT CreateD3DResources(_In_ ID3D12Device* d3dDevice,
 
         ID3D12Resource* tex = nullptr;
         hr = d3dDevice->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE, &ResourceDesc,
-            D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&tex));
+            D3D12_RESOURCE_STATE_COMMON, nullptr, __uuidof(ID3D12Resource), (void**) &tex);
 
         if (SUCCEEDED(hr) && tex != nullptr)
         {
@@ -879,7 +879,7 @@ static HRESULT CreateD3DResources(_In_ ID3D12Device* d3dDevice,
 
         ID3D12Resource* tex = nullptr;
         hr = d3dDevice->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE, &ResourceDesc,
-            D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&tex));
+            D3D12_RESOURCE_STATE_COMMON, nullptr, __uuidof(ID3D12Resource), (void**)&tex);
 
         if (SUCCEEDED(hr) && tex != 0)
         {
@@ -938,7 +938,7 @@ static HRESULT CreateD3DResources(_In_ ID3D12Device* d3dDevice,
 
         ID3D12Resource* tex = nullptr;
         hr = d3dDevice->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE, &ResourceDesc,
-            D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&tex));
+            D3D12_RESOURCE_STATE_COMMON, nullptr, __uuidof(ID3D12Resource), (void**)&tex);
 
         if (SUCCEEDED(hr) && tex != nullptr)
         {
@@ -1001,7 +1001,7 @@ void InitializeTexture(GpuResource& Dest, RenderPlatform12* renderPlatform,
 
     HR(renderPlatform->GetDevice()->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE,
         &BufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr, IID_PPV_ARGS(&UploadBuffer)));
+        nullptr, __uuidof(ID3D12Resource), (void**) &UploadBuffer));
 
     // copy data to the intermediate upload heap and then schedule a copy from the upload heap to the default texture
     //InitContext.TransitionResource(Dest, D3D12_RESOURCE_STATE_COPY_DEST, true);
@@ -1284,7 +1284,7 @@ HRESULT CreateTextureFromBits(RenderPlatform12* renderPlatform,UINT NumSubresour
         &textureDesc,
         D3D12_RESOURCE_STATE_COMMON,
         nullptr,
-        IID_PPV_ARGS(&createdTexture)));
+        __uuidof(ID3D12Resource), (void**)&createdTexture));
 
     createdTexture->SetName(L"raw data texture");
 

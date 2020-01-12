@@ -36,7 +36,7 @@
 
 #include <wrl\client.h>
 
-#include <d3dx12.h>
+//#include <d3dx12.h>
 
 using Microsoft::WRL::ComPtr;
 
@@ -654,19 +654,19 @@ namespace
 
         // Create a command allocator
         ComPtr<ID3D12CommandAllocator> commandAlloc;
-        hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(commandAlloc.GetAddressOf()));
+        hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator), (void**)&commandAlloc);
         if (FAILED(hr))
             return hr;
 
         // Spin up a new command list
         ComPtr<ID3D12GraphicsCommandList> commandList;
-        hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAlloc.Get(), nullptr, IID_PPV_ARGS(commandList.GetAddressOf()));
+        hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAlloc.Get(), nullptr, __uuidof(ID3D12GraphicsCommandList), (void**)&commandList);
         if (FAILED(hr))
             return hr;
 
         // Create a fence
         ComPtr<ID3D12Fence> fence;
-        hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence.GetAddressOf()));
+        hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), (void**) &fence);
         if (FAILED(hr))
             return hr;
 
@@ -704,7 +704,7 @@ namespace
                 &descCopy,
                 D3D12_RESOURCE_STATE_COPY_DEST,
                 nullptr,
-                IID_PPV_ARGS(pTemp.GetAddressOf()));
+                __uuidof(ID3D12Resource), &pTemp);
             if (FAILED(hr))
                 return hr;
 
@@ -739,7 +739,7 @@ namespace
             &bufferDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr,
-            IID_PPV_ARGS(pStaging.ReleaseAndGetAddressOf()));
+            __uuidof(ID3D12Resource), (void**)&pStaging);
         if (FAILED(hr))
             return hr;
 
@@ -817,7 +817,7 @@ HRESULT DirectX::SaveDDSTextureToFile( ID3D12CommandQueue* pCommandQ,
         return E_INVALIDARG;
 
     ComPtr<ID3D12Device> device;
-    pCommandQ->GetDevice(IID_PPV_ARGS(device.GetAddressOf()));
+    pCommandQ->GetDevice(__uuidof(ID3D12Device), (void**) &device);
 
     // Get the size of the image
     D3D12_RESOURCE_DESC desc = pSource->GetDesc();
@@ -1005,7 +1005,7 @@ HRESULT DirectX::SaveWICTextureToFile( ID3D12CommandQueue* pCommandQ,
         return E_INVALIDARG;
 
     ComPtr<ID3D12Device> device;
-    pCommandQ->GetDevice(IID_PPV_ARGS(device.GetAddressOf()));
+    pCommandQ->GetDevice(__uuidof(ID3D12Device), (void**)&device);
 
     // Get the size of the image
     D3D12_RESOURCE_DESC desc = pSource->GetDesc();

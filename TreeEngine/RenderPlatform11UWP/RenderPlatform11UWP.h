@@ -67,4 +67,4 @@ RENDERPLATFORM_API D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer);
 
 RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport);
 
-RENDERPLATFORM_API IUnknown* GetDevice();
+//RENDERPLATFORM_API IUnknown* GetDevice();

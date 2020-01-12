@@ -28,7 +28,7 @@ public:
             &CD3DX12_RESOURCE_DESC::Buffer(mElementByteSize*elementCount),
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
-            IID_PPV_ARGS(&mUploadBuffer)));
+            __uuidof(ID3D12Resource), (void**)&mUploadBuffer));
 
         HR(mUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mMappedData)));
 

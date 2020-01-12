@@ -1,14 +1,11 @@
 //--------------------------------------------------------------------------------------
 // File: Keyboard.h
 //
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
 // Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 //
 // http://go.microsoft.com/fwlink/?LinkId=248929
+// http://go.microsoft.com/fwlink/?LinkID=615561
 //--------------------------------------------------------------------------------------
 
 #pragma once
@@ -16,8 +13,13 @@
 #include <memory>
 #include <stdint.h>
 
-#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+#if (defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)) || (defined(_XBOX_ONE) && defined(_TITLE))
 namespace ABI { namespace Windows { namespace UI { namespace Core { struct ICoreWindow; } } } }
+#endif
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
 #endif
 
 
@@ -26,9 +28,9 @@ namespace DirectX
     class Keyboard
     {
     public:
-        Keyboard();
-        Keyboard(Keyboard&& moveFrom);
-        Keyboard& operator= (Keyboard&& moveFrom);
+        Keyboard() noexcept(false);
+        Keyboard(Keyboard&& moveFrom) noexcept;
+        Keyboard& operator= (Keyboard&& moveFrom) noexcept;
 
         Keyboard(Keyboard const&) = delete;
         Keyboard& operator=(Keyboard const&) = delete;
@@ -371,10 +373,38 @@ namespace DirectX
             bool OemPeriod : 1;         // VK_OEM_PERIOD, 0xBE
             bool OemQuestion : 1;       // VK_OEM_2, 0xBF
             bool OemTilde : 1;          // VK_OEM_3, 0xC0
+        #if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_GAMES)
+            bool Reserved15 : 2;
+            bool GamepadA : 1;          // VK_GAMEPAD_A, 0xC3
+            bool GamepadB : 1;          // VK_GAMEPAD_B, 0xC4
+            bool GamepadX : 1;          // VK_GAMEPAD_X, 0xC5
+            bool GamepadY : 1;          // VK_GAMEPAD_Y, 0xC6
+            bool GamepadRSB : 1;        // VK_GAMEPAD_RIGHT_SHOULDER, 0xC7
+            bool GamepadLSB : 1;        // VK_GAMEPAD_LEFT_SHOULDER, 0xC8
+            bool GamepadLT : 1;         // VK_GAMEPAD_LEFT_TRIGGER, 0xC9
+            bool GamepadRT : 1;         // VK_GAMEPAD_RIGHT_TRIGGER, 0xCA
+            bool GamepadDPadUp : 1;     // VK_GAMEPAD_DPAD_UP, 0xCB
+            bool GamepadDPadDown : 1;   // VK_GAMEPAD_DPAD_DOWN, 0xCC
+            bool GamepadDPadLeft : 1;   // VK_GAMEPAD_DPAD_LEFT, 0xCD
+            bool GamepadDPadRight : 1;  // VK_GAMEPAD_DPAD_RIGHT, 0xCE
+            bool GamepadMenu : 1;       // VK_GAMEPAD_MENU, 0xCF
+            bool GamepadView : 1;       // VK_GAMEPAD_VIEW, 0xD0
+            bool GamepadLTSB : 1;       // VK_GAMEPAD_LEFT_THUMBSTICK_BUTTON, 0xD1
+            bool GamepadRTSB : 1;       // VK_GAMEPAD_RIGHT_THUMBSTICK_BUTTON, 0xD2
+            bool GamepadLSUp : 1;       // VK_GAMEPAD_LEFT_THUMBSTICK_UP, 0xD3
+            bool GamepadLSDown : 1;     // VK_GAMEPAD_LEFT_THUMBSTICK_DOWN, 0xD4
+            bool GamepadLSRight : 1;    // VK_GAMEPAD_LEFT_THUMBSTICK_RIGHT, 0xD5
+            bool GamepadLSLeft : 1;     // VK_GAMEPAD_LEFT_THUMBSTICK_LEFT, 0xD6
+            bool GamepadRSUp : 1;       // VK_GAMEPAD_RIGHT_THUMBSTICK_UP, 0xD7
+            bool GamepadRSDown : 1;     // VK_GAMEPAD_RIGHT_THUMBSTICK_DOWN, 0xD8
+            bool GamepadRSRight : 1;    // VK_GAMEPAD_RIGHT_THUMBSTICK_RIGHT, 0xD9
+            bool GamepadRSLeft : 1;     // VK_GAMEPAD_RIGHT_THUMBSTICK_LEFT, 0xDA
+        #else
             bool Reserved15 : 7;
             bool Reserved16 : 8;
             bool Reserved17 : 8;
             bool Reserved18 : 3;
+        #endif
             bool OemOpenBrackets : 1;   // VK_OEM_4, 0xDB
             bool OemPipe : 1;           // VK_OEM_5, 0xDC
             bool OemCloseBrackets : 1;  // VK_OEM_6, 0xDD
@@ -402,9 +432,9 @@ namespace DirectX
             bool OemClear : 1;          // VK_OEM_CLEAR, 0xFE
             bool Reserved26: 1;
 
-            bool __cdecl IsKeyDown(Keys key) const
+            bool __cdecl IsKeyDown(Keys key) const noexcept
             {
-                if (key >= 0 && key <= 0xfe)
+                if (key <= 0xfe)
                 {
                     auto ptr = reinterpret_cast<const uint32_t*>(this);
                     unsigned int bf = 1u << (key & 0x1f);
@@ -413,9 +443,9 @@ namespace DirectX
                 return false;
             }
 
-            bool __cdecl IsKeyUp(Keys key) const
+            bool __cdecl IsKeyUp(Keys key) const noexcept
             {
-                if (key >= 0 && key <= 0xfe)
+                if (key <= 0xfe)
                 {
                     auto ptr = reinterpret_cast<const uint32_t*>(this);
                     unsigned int bf = 1u << (key & 0x1f);
@@ -431,16 +461,17 @@ namespace DirectX
             State released;
             State pressed;
 
-            KeyboardStateTracker() { Reset(); }
+            #pragma prefast(suppress: 26495, "Reset() performs the initialization")
+            KeyboardStateTracker() noexcept { Reset(); }
 
-            void __cdecl Update(const State& state);
+            void __cdecl Update(const State& state) noexcept;
 
-            void __cdecl Reset();
+            void __cdecl Reset() noexcept;
 
-            bool __cdecl IsKeyPressed(Keys key) const { return pressed.IsKeyDown(key); }
-            bool __cdecl IsKeyReleased(Keys key) const { return released.IsKeyDown(key); }
+            bool __cdecl IsKeyPressed(Keys key) const noexcept { return pressed.IsKeyDown(key); }
+            bool __cdecl IsKeyReleased(Keys key) const noexcept { return released.IsKeyDown(key); }
 
-            State __cdecl GetLastState() const { return lastState; }
+            State __cdecl GetLastState() const noexcept { return lastState; }
 
         public:
             State lastState;
@@ -450,25 +481,32 @@ namespace DirectX
         State __cdecl GetState() const;
 
         // Reset the keyboard state
-        void __cdecl Reset();
+        void __cdecl Reset() noexcept;
 
         // Feature detection
         bool __cdecl IsConnected() const;
 
-#if !defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP) && defined(WM_USER)
+    #if (!defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP) || (WINAPI_FAMILY == WINAPI_FAMILY_GAMES)) && defined(WM_USER)
         static void __cdecl ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam);
-#endif
+    #endif
 
-#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+    #if (defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)) || (defined(_XBOX_ONE) && defined(_TITLE))
         void __cdecl SetWindow(ABI::Windows::UI::Core::ICoreWindow* window);
-#ifdef __cplusplus_winrt
+    #ifdef __cplusplus_winrt
         void __cdecl SetWindow(Windows::UI::Core::CoreWindow^ window)
         {
             // See https://msdn.microsoft.com/en-us/library/hh755802.aspx
             SetWindow(reinterpret_cast<ABI::Windows::UI::Core::ICoreWindow*>(window));
         }
-#endif
-#endif
+    #endif
+    #ifdef CPPWINRT_VERSION
+        void __cdecl SetWindow(winrt::Windows::UI::Core::CoreWindow window)
+        {
+            // See https://docs.microsoft.com/en-us/windows/uwp/cpp-and-winrt-apis/interop-winrt-abi
+            SetWindow(reinterpret_cast<ABI::Windows::UI::Core::ICoreWindow*>(winrt::get_abi(window)));
+        }
+    #endif
+    #endif // WINAPI_FAMILY == WINAPI_FAMILY_APP
 
         // Singleton
         static Keyboard& __cdecl Get();
@@ -480,3 +518,7 @@ namespace DirectX
         std::unique_ptr<Impl> pImpl;
     };
 }
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif

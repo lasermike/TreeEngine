@@ -1,26 +1,27 @@
 //--------------------------------------------------------------------------------------
 // File: ResourceUploadBatch.h
 //
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
 // Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 //
 // http://go.microsoft.com/fwlink/?LinkID=615561
 //--------------------------------------------------------------------------------------
 
 #pragma once
 
-#if defined(_XBOX_ONE) && defined(_TITLE)
+#ifdef _GAMING_XBOX_SCARLETT
+#include <d3d12_xs.h>
+#elif (defined(_XBOX_ONE) && defined(_TITLE)) || defined(_GAMING_XBOX)
 #include <d3d12_x.h>
 #else
 #include <d3d12.h>
+#include <dxgiformat.h>
 #endif
 
 #include <future>
 #include <memory>
+
+#include "GraphicsMemory.h"
 
 
 namespace DirectX
@@ -29,9 +30,9 @@ namespace DirectX
     class ResourceUploadBatch
     {
     public:
-        explicit ResourceUploadBatch(_In_ ID3D12Device* device);
-        ResourceUploadBatch(ResourceUploadBatch&& moveFrom);
-        ResourceUploadBatch& operator= (ResourceUploadBatch&& moveFrom);
+        explicit ResourceUploadBatch(_In_ ID3D12Device* device) noexcept(false);
+        ResourceUploadBatch(ResourceUploadBatch&& moveFrom) noexcept;
+        ResourceUploadBatch& operator= (ResourceUploadBatch&& moveFrom) noexcept;
 
         ResourceUploadBatch(ResourceUploadBatch const&) = delete;
         ResourceUploadBatch& operator= (ResourceUploadBatch const&) = delete;
@@ -45,9 +46,14 @@ namespace DirectX
         // The resource must be in the COPY_DEST state.
         void __cdecl Upload(
             _In_ ID3D12Resource* resource,
-            _In_ uint32_t subresourceIndexStart,
-            _In_reads_( numSubresources ) D3D12_SUBRESOURCE_DATA* subRes,
-            _In_ uint32_t numSubresources);
+            uint32_t subresourceIndexStart,
+            _In_reads_(numSubresources) D3D12_SUBRESOURCE_DATA* subRes,
+            uint32_t numSubresources);
+
+        void __cdecl Upload(
+            _In_ ID3D12Resource* resource,
+            const SharedGraphicsResource& buffer
+            );
 
         // Asynchronously generate mips from a resource.
         // Resource must be in the PIXEL_SHADER_RESOURCE state
@@ -56,14 +62,17 @@ namespace DirectX
         // Transition a resource once you're done with it
         void __cdecl Transition(
             _In_ ID3D12Resource* resource,
-            _In_ D3D12_RESOURCE_STATES stateBefore,
-            _In_ D3D12_RESOURCE_STATES stateAfter);
+            D3D12_RESOURCE_STATES stateBefore,
+            D3D12_RESOURCE_STATES stateAfter);
 
         // Submits all the uploads to the driver.
         // No more uploads can happen after this call until Begin is called again.
         // This returns a handle to an event that can be waited on.
         std::future<void> __cdecl End(
-            _In_ ID3D12CommandQueue* commandQueue );
+            _In_ ID3D12CommandQueue* commandQueue);
+
+        // Validates if the given DXGI format is supported for autogen mipmaps
+        bool __cdecl IsSupportedForGenerateMips(DXGI_FORMAT format) noexcept;
 
     private:
         // Private implementation.
@@ -72,4 +81,3 @@ namespace DirectX
         std::unique_ptr<Impl> pImpl;
     };
 }
-

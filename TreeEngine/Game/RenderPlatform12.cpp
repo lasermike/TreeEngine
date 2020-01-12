@@ -8,7 +8,10 @@
 #include "StockRenderStates12.h"
 #include "ShadowMap.h"
 
+#if !defined(TREE_XBOX)
 #include "d3d12sdklayers.h"
+#endif
+
 #include "ScreenGrab12.h"
 
 #include "ResourceUploadBatch.h"
@@ -87,13 +90,13 @@ HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_
     CD3DX12_HEAP_PROPERTIES createdHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
     const UINT allocSize = (size + 255) & ~255;
-    HR(GetDevice()->CreateCommittedResource(
+    HRR(GetDevice()->CreateCommittedResource(
         &createdHeapProperties,
         D3D12_HEAP_FLAG_NONE,
         &CD3DX12_RESOURCE_DESC::Buffer(allocSize),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(buffer)));
+        __uuidof(ID3D12Resource), (void**) &buffer));
 
     // Describe a constant buffer view.
     newViewDesc.BufferLocation = (*buffer)->GetGPUVirtualAddress();
@@ -123,9 +126,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Create command lists.
     for (int i = 0; i < RenderPlatform12::FrameCount; i++)
     {
-        HRR(GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator[i])));
+        HRR(GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator), (void**)&m_commandAllocator[i]));
 
-        HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator[i], nullptr, IID_PPV_ARGS(&m_commandList[i])));
+        HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator[i], nullptr, __uuidof(ID3D12CommandList), (void**)&m_commandList[i]));
         HRR(m_commandList[i]->Close());
     }
 
@@ -224,7 +227,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     CComPtr<ID3DBlob> signature;
     CComPtr<ID3DBlob> error;
     HRR(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-    HRR(GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+    HRR(GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), __uuidof(ID3D12RootSignature), (void**)&m_rootSignature));
     m_rootSignature->SetName(L"GameLevel PSO");
 
     // Initialize null descriptor view
@@ -270,7 +273,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         HRR(GetDevice()->CreateRootSignature(0,
             serializedRootSig->GetBufferPointer(),
             serializedRootSig->GetBufferSize(),
-            IID_PPV_ARGS(&m_computeRootSignature)));
+            __uuidof(ID3D12RootSignature), (void**)&m_computeRootSignature));
 
         m_computeRootSignature->SetName(L"Compute Game Level PSO");
     }
@@ -318,7 +321,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &vertexBufferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&m_vertexBuffer.buffer)));
+        __uuidof(ID3D12Resource),
+        (void**) &m_vertexBuffer.buffer));
     HRR(m_vertexBuffer.buffer->SetName(L"Simple vertex buffer"));
 
     // copy the triangle data to the vertex buffer
@@ -340,7 +344,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &indexBufferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&m_indexBuffer.buffer)));
+        __uuidof(ID3D12Resource), 
+        (void**) &m_indexBuffer.buffer));
     HRR(m_indexBuffer.buffer->SetName(L"Simple index buffer"));
 
     // copy the index data to the index buffer
@@ -364,7 +369,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &skinnedVertexBufferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&m_skinnedVertexBuffer.buffer)));
+        __uuidof(ID3D12Resource), (void**)&m_skinnedVertexBuffer.buffer));
     HRR(m_skinnedVertexBuffer.buffer->SetName(L"Skinned vertex buffer"));
 
     // copy the triangle data to the vertex buffer
@@ -386,7 +391,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &skinnedIndexBufferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&m_skinnedIndexBuffer.buffer)));
+        __uuidof(ID3D12Resource), (void**) &m_skinnedIndexBuffer.buffer));
     HRR(m_skinnedIndexBuffer.buffer->SetName(L"Skinned Index Buffer"));
 
     // copy the index data to the index buffer
@@ -422,7 +427,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     psoDesc.NumRenderTargets = 1;
     psoDesc.RTVFormats[0] = GetSwapChainFormat();
     psoDesc.SampleDesc.Count = 1;
-    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineState));
 
     // PSO for shadow map pass.
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
@@ -437,7 +442,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
     shadowPsoDesc.NumRenderTargets = 0;
 
-    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&m_pipelineStateShadowMap)));
+    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, __uuidof(ID3D12PipelineState), (void**) &m_pipelineStateShadowMap));
     m_pipelineStateShadowMap->SetName(L"ShadowPSO");
 
     // Create compute pipeline state objects
@@ -454,7 +459,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             horzShader->shader->GetBufferSize()
         };
         horzBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-        HRR(GetDevice()->CreateComputePipelineState(&horzBlurPSO, IID_PPV_ARGS(&m_gameLevelPSOs["horzBlur"])));
+        HRR(GetDevice()->CreateComputePipelineState(&horzBlurPSO, __uuidof(ID3D12PipelineState), (void**) &m_gameLevelPSOs["horzBlur"]));
 
         //
         // PSO for vertical blur
@@ -469,7 +474,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             vertShader->shader->GetBufferSize()
         };
         vertBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-        HRR(GetDevice()->CreateComputePipelineState(&vertBlurPSO, IID_PPV_ARGS(&m_gameLevelPSOs["vertBlur"])));
+        HRR(GetDevice()->CreateComputePipelineState(&vertBlurPSO, __uuidof(ID3D12PipelineState), (void**)&m_gameLevelPSOs["vertBlur"]));
     }
 
 
@@ -579,7 +584,7 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
         &CD3DX12_RESOURCE_DESC::Buffer(sizeBytes),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&newBuffer->buffer)));
+        __uuidof(ID3D12Resource), (void**)&newBuffer->buffer));
 
     newBuffer->view.BufferLocation = newBuffer->buffer->GetGPUVirtualAddress();
     newBuffer->view.SizeInBytes = sizeBytes;
@@ -636,10 +641,14 @@ void RenderPlatform12::WaitOnFence()
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 
+#if defined(TREE_XBOX)
+    m_frameIndex = (m_frameIndex + 1) % FrameCount;
+#else
     if (m_pSwapChain)
     {
         m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
     }
+#endif
 }
 
 HRESULT RenderPlatform12::UninitGameLevelGraphics()
@@ -828,7 +837,7 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
         &textureDesc,
         D3D12_RESOURCE_STATE_COMMON,
         nullptr,
-        IID_PPV_ARGS(&createdTexture)));
+        __uuidof(ID3D12Resource), (void**)&createdTexture));
 
     createdTexture->SetName(L"raw data texture");
 
@@ -961,7 +970,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     psoDesc.SampleDesc.Count = 1;
 
     ID3D12PipelineState* pipelineState = nullptr;
-    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&pipelineState));
     pipelineState->SetName(L"Render Unit pso");
 
     // Shadow pass PSO
@@ -978,7 +987,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     shadowPsoDesc.NumRenderTargets = 0;
 
     ID3D12PipelineState* pipelineStateShadowMap = nullptr;
-    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&pipelineStateShadowMap)));
+    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, __uuidof(ID3D12PipelineState), (void**)&pipelineStateShadowMap));
 
     ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
     *renderUnit = new RenderUnit(material, mesh, pipelineStates);
@@ -1020,7 +1029,7 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
         &vertexBufferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&m_screenQuadVB)));
+        __uuidof(ID3D12Resource), (void**)&m_screenQuadVB));
     HRR(m_screenQuadVB->SetName(L"Vertex Buffer"));
 
     // copy the quad data to the vertex buffer
@@ -1042,7 +1051,7 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
         &indexBufferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&m_screenQuadIB)));
+        __uuidof(ID3D12Resource), (void**)&m_screenQuadIB));
     HRR(m_indexBuffer.buffer->SetName(L"Index Buffer"));
 
     // copy the index data to the index buffer
@@ -1071,7 +1080,7 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     psoDesc.SampleDesc.Count = 1;
 
-    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateFullScreenQuad)));
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineStateFullScreenQuad));
 
     return S_OK;
 }
@@ -1101,6 +1110,8 @@ HRESULT RenderPlatform12::InitDevice()
     HRESULT hr = S_OK;
 
 #if defined(TREE_XBOX)
+    m_d3dDevice.Release();
+
     // Create the DX12 API device object.
     D3D12XBOX_CREATE_DEVICE_PARAMETERS params = {};
     params.Version = D3D12_SDK_VERSION;
@@ -1117,11 +1128,10 @@ HRESULT RenderPlatform12::InitDevice()
     params.GraphicsScratchMemorySizeBytes = static_cast<UINT>(D3D12XBOX_DEFAULT_SIZE_BYTES);
     params.ComputeScratchMemorySizeBytes = static_cast<UINT>(D3D12XBOX_DEFAULT_SIZE_BYTES);
 
-    ThrowIfFailed(D3D12XboxCreateDevice(
+    HRR(D3D12XboxCreateDevice(
         nullptr,
         &params,
-        IID_GRAPHICS_PPV_ARGS(m_d3dDevice.ReleaseAndGetAddressOf())
-    ));
+        __uuidof(ID3D12Device), (void**) &m_d3dDevice));
 
     m_d3dDevice->SetName(L"DeviceResources");
 #else
@@ -1164,7 +1174,7 @@ HRESULT RenderPlatform12::InitDevice()
     loadedTextureHeapDesc.NumDescriptors = maxTotalTexturesInScene;
     loadedTextureHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;;
     loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    HRR(GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, IID_PPV_ARGS(&m_loadTextureHeap)));
+    HRR(GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, __uuidof(ID3D12DescriptorHeap), (void**)&m_loadTextureHeap));
 
     // Shader visible heap
     HRR(m_descriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, true));
@@ -1174,7 +1184,7 @@ HRESULT RenderPlatform12::InitDevice()
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-    HRR(GetDevice()->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+    HRR(GetDevice()->CreateCommandQueue(&queueDesc, __uuidof(ID3D12CommandQueue), (void**) &m_commandQueue));
 
     // Create ChangesPerPass constant buffer
     m_constBufferChangesPerPass = new UploadBuffer<CBChangesPerPass>(GetDevice(), Count_CBSI, true);
@@ -1183,7 +1193,7 @@ HRESULT RenderPlatform12::InitDevice()
     XSF::StockRenderStates::Initialize(GetDevice());
 
     // Create synchronization objects and wait until assets have been uploaded to the GPU.
-    HRR(GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+    HRR(GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), (void**)&m_fence));
     m_fenceValue = 1;
 
     // Create an event handle to use for frame synchronization.
@@ -1232,7 +1242,9 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
         WaitForPreviousFrame();
     }
 
+#if !defined(TREE_XBOX)
     m_pSwapChain.Release();
+#endif
 
     for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
     {
@@ -1253,6 +1265,14 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 
 HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
 {
+#if defined(TREE_XBOX)
+    // Wait until all previous GPU work is complete.
+    WaitForPreviousFrame();
+
+    // Ensure we present a blank screen before cleaning up resources.
+    HRR(m_commandQueue->PresentX(0, nullptr, nullptr));
+#endif
+
     if (imGuiInitialized)
     {
         ImGui_ImplDX12_InvalidateDeviceObjects();
@@ -1269,12 +1289,57 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     m_viewPort.TopLeftX = 0;
     m_viewPort.TopLeftY = 0;
 
-    // Swap chain
-    CComPtr<IDXGIFactory4> factory;
-    HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
-
     m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
+    D3D12_CLEAR_VALUE clearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
+    clearValue.Format = m_swapChainFormat;
+    memcpy(clearValue.Color, &m_renderData->clearColor, sizeof(float) * _countof(clearValue.Color));
+    DXGI_RGBA dxgiClearColor;
+    memcpy(&dxgiClearColor, &m_renderData->clearColor, sizeof(dxgiClearColor));
+
+#if defined(TREE_XBOX)
+    // Obtain the back buffers for this window which will be the final render targets
+    // and create render target views for each of them.
+    CD3DX12_HEAP_PROPERTIES swapChainHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
+
+    D3D12_RESOURCE_DESC swapChainBufferDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+        m_swapChainFormat,
+        windowWidth,
+        windowHeight,
+        1, // This resource has only one texture.
+        1  // Use a single mipmap level.
+    );
+    swapChainBufferDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+    D3D12_CLEAR_VALUE swapChainOptimizedClearValue = {};
+    swapChainOptimizedClearValue.Format = m_swapChainFormat;
+
+    for (UINT n = 0; n < FrameCount; n++)
+    {
+        HRR(m_d3dDevice->CreateCommittedResource(
+            &swapChainHeapProperties,
+            D3D12_HEAP_FLAG_ALLOW_DISPLAY,
+            &swapChainBufferDesc,
+            D3D12_RESOURCE_STATE_PRESENT,
+            &swapChainOptimizedClearValue,
+            IID_GRAPHICS_PPV_ARGS(&m_renderTargets[n])));
+
+        wchar_t name[25] = {};
+        swprintf_s(name, L"Render target %u", n);
+        m_renderTargets[n]->SetName(name);
+
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+        rtvDesc.Format = m_swapChainFormat;
+        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(m_rtvHeap.hCPU(n));
+        m_d3dDevice->CreateRenderTargetView(m_renderTargets[n], &rtvDesc, rtvDescriptor);
+    }
+
+    // Reset the index to the current back buffer.
+    m_frameIndex = 0;
+
+#else
     // Create swap chain
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -1285,6 +1350,11 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SampleDesc.Count = 1;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+
+    // Swap chain
+    CComPtr<IDXGIFactory4> factory;
+    HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
+
 
     CComPtr<IDXGISwapChain1> swapChain1;
 
@@ -1299,14 +1369,6 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 
     // Initial frame index
     m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
-
-    D3D12_CLEAR_VALUE clearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
-    clearValue.Format = m_swapChainFormat;
-    memcpy(clearValue.Color, &m_renderData->clearColor, sizeof(float) * _countof(clearValue.Color));
-    DXGI_RGBA dxgiClearColor;
-    memcpy(&dxgiClearColor, &m_renderData->clearColor, sizeof(dxgiClearColor));
-    //float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-    //memcpy(&clearValue.Color[0], clearColor, sizeof(float) * _countof(clearColor));
 
     HRR(swapChain1->SetBackgroundColor(&dxgiClearColor));
 
@@ -1324,6 +1386,8 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
             SetDebugName(m_renderTargets[i], name);
         }
     }
+
+#endif
 
     // Create depth stencil texture
     CD3DX12_RESOURCE_DESC depthBufferDesc(
@@ -1350,7 +1414,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         &depthBufferDesc,
         D3D12_RESOURCE_STATE_DEPTH_WRITE,
         &depthClearValue,
-        IID_PPV_ARGS(&m_pDepthStencil)));
+        __uuidof(ID3D12Resource), (void**)&m_pDepthStencil));
 
     SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
 
@@ -1378,7 +1442,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         &offscreenDesc,
         D3D12_RESOURCE_STATE_COMMON,
         &clearValue,
-        IID_PPV_ARGS(&m_offscreenBuffer1)));
+        __uuidof(ID3D12Resource), (void**)&m_offscreenBuffer1));
 
     HRR(GetDevice()->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -1386,7 +1450,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         &offscreenDesc,
         D3D12_RESOURCE_STATE_COMMON,
         &clearValue,
-        IID_PPV_ARGS(&m_offscreenBuffer2)));
+        __uuidof(ID3D12Resource), (void**)&m_offscreenBuffer2));
 
     // Create offscreen rendering views
     // SRV
@@ -1432,8 +1496,10 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 
     ////
     // Validation
+#if !defined(TREE_XBOX)
     ASSERT(m_pSwapChain);
     ASSERT(m_pSwapChain || m_pSharedRenderToTexture);
+#endif
     ASSERT(m_renderTargets[0]);
     ASSERT(m_renderTargets[1]);
     ASSERT(m_viewPort.Width != 0);
@@ -1444,6 +1510,10 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 
 IDXGISwapChain* RenderPlatform12::GetSwapChain()
 {
+#if defined(TREE_XBOX)
+    ASSERT(false);
+    return nullptr;
+#else
     IDXGISwapChain* swapChain = nullptr;
 
     if (m_pSwapChain)
@@ -1452,6 +1522,7 @@ IDXGISwapChain* RenderPlatform12::GetSwapChain()
     }
 
     return swapChain;
+#endif
 }
 
 //--------------------------------------------------------------------------------------
@@ -1483,7 +1554,9 @@ HRESULT RenderPlatform12::UninitDevice()
     m_descriptorHeap.Terminate();
 
     // InitDevice objects
+#if !defined(TREE_XBOX)
     m_pSwapChain.Release();
+#endif
     ReleaseSwapChainResources();
 
     assert(m_managedUploadHeaps.size() == 0);
@@ -1552,6 +1625,11 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     WaitOnFence();
 
     PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList[m_commandListIndex], TREE_COLOR_DRAW_TEXT, L"Render");
+
+#if defined(TREE_XBOX)
+    m_framePipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
+    HRR(m_d3dDevice->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &m_framePipelineToken));
+#endif
 
     // Set default material (first material).  Will be changed by calls to SetRenderUnit()
     D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_descriptorHeap.hGPU(Material0_HeapOffset);
@@ -1763,8 +1841,19 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // Present the frame.
+#if defined(TREE_XBOX)
+    // Present the backbuffer using the PresentX API.
+    D3D12XBOX_PRESENT_PLANE_PARAMETERS planeParameters = {};
+    planeParameters.Token = m_framePipelineToken;
+    planeParameters.ResourceCount = 1;
+    planeParameters.ppResources = &m_renderTargets[m_frameIndex];
+
+    HRR(m_commandQueue->PresentX(1, &planeParameters, nullptr));
+
+#else
     HR(m_pSwapChain->Present(0, 0));
-    
+#endif
+
     m_graphicsMemory->Commit(m_commandQueue);
 
     IncrementFenceOnGPU();
