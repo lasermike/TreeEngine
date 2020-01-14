@@ -617,7 +617,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
 
     ASSIGN_FUNC(GetViewport);
 
-    ASSIGN_FUNC(GetDevice);
+//    ASSIGN_FUNC(GetDevice);
 }
 
 RenderPlatformDLL::~RenderPlatformDLL()

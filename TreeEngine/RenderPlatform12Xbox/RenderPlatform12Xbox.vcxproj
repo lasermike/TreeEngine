@@ -267,7 +267,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Xbox.XboxOne.x64'">
     <Link>
-      <AdditionalDependencies>d3dcompiler.lib; DirectXTK12.lib; d3d12.lib;$(Console_Libs);%(XboxExtensionsDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>DirectXTK12.lib; d3d12_x.lib;$(Console_Libs);%(XboxExtensionsDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>

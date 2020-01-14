@@ -1270,7 +1270,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     WaitForPreviousFrame();
 
     // Ensure we present a blank screen before cleaning up resources.
-    HRR(m_commandQueue->PresentX(0, nullptr, nullptr));
+//    HRR(m_commandQueue->PresentX(0, nullptr, nullptr));
 #endif
 
     if (imGuiInitialized)
