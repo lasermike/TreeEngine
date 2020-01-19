@@ -6,20 +6,22 @@
 //#include <D3Dcompiler.h>
 #endif
 
-namespace XboxSampleFramework
+namespace GameCommon
 {
-    namespace Details
-    {
-        wchar_t    g_strCommonFileRoot[ 1024 ];
-        wchar_t    g_strApplicationDataPath[ 1024 ];
-    }
+    wchar_t    g_strCommonFileRoot[ 1024 ];
+    wchar_t    g_strApplicationDataPath[ 1024 ];
+}
+
+const wchar_t* GameCommon::GetContentFileRoot()
+{
+    return GameCommon::g_strCommonFileRoot;
 }
 
 //--------------------------------------------------------------------------------------
 // Name: SetContentFileRoot
 // Desc: Retrieves a game package read-only data path and stores it for future use
 //--------------------------------------------------------------------------------------
-void XSF::SetContentFileRoot()
+void GameCommon::SetContentFileRoot()
 {
 #ifdef _XBOX_ONE
 
@@ -28,7 +30,7 @@ void XSF::SetContentFileRoot()
     // Remove any trailing "\\" from the end of installFolder path
     installFolder.erase( installFolder.find_last_not_of( L"\\" ) + 1 );
 
-    _snwprintf_s( Details::g_strCommonFileRoot, _countof( Details::g_strCommonFileRoot ), _TRUNCATE, L"%s\\", installFolder.c_str() );
+    _snwprintf_s( GameCommon::g_strCommonFileRoot, _countof( GameCommon::g_strCommonFileRoot ), _TRUNCATE, L"%s\\", installFolder.c_str() );
 
     // The d: drive designator is "developer scratch space"
     std::wstring  writeableFolder = L"d:\\";
@@ -36,28 +38,29 @@ void XSF::SetContentFileRoot()
     // Remove any trailing "\\" from the end of writeableFolder path
     writeableFolder.erase( writeableFolder.find_last_not_of( L"\\" ) + 1 );
 
-    _snwprintf_s( Details::g_strApplicationDataPath, _countof( Details::g_strApplicationDataPath ), _TRUNCATE, L"%s\\", writeableFolder.c_str() );
+    _snwprintf_s( GameCommon::g_strApplicationDataPath, _countof( GameCommon::g_strApplicationDataPath ), _TRUNCATE, L"%s\\", writeableFolder.c_str() );
 
 #elif defined(TREENGINE_WIN32)
-    GetModuleFileNameW(NULL, Details::g_strCommonFileRoot, MAX_PATH);
-    //PathRemoveFileSpec(Details::g_strCommonFileRoot);
-    wstring path = Details::g_strCommonFileRoot;
+    GetModuleFileNameW(NULL, GameCommon::g_strCommonFileRoot, MAX_PATH);
+    //PathRemoveFileSpec(GameCommon::g_strCommonFileRoot);
+    wstring path = GameCommon::g_strCommonFileRoot;
     size_t found = path.find_last_of(L"/\\");
-    _snwprintf_s(Details::g_strCommonFileRoot, _countof(Details::g_strApplicationDataPath), _TRUNCATE, L"%s", path.substr(0, found).c_str());
-    //PathAddBackslash(Details::g_strCommonFileRoot);
-    LOG(Details::g_strCommonFileRoot);
+    _snwprintf_s(GameCommon::g_strCommonFileRoot, _countof(GameCommon::g_strApplicationDataPath), _TRUNCATE, L"%s", path.substr(0, found).c_str());
+    //PathAddBackslash(GameCommon::g_strCommonFileRoot);
+    LOG(GameCommon::g_strCommonFileRoot);
 
 #else
     wchar_t temp[ 1024 ];
 //    GetCurrentDirectoryW( _countof( temp ), temp );
     wcscpy_s(temp, Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Begin());
 
-    swprintf_s( Details::g_strCommonFileRoot, L"%s\\", temp);
-    //swprintf_s( Details::g_strApplicationDataPath, L"%s\\", temp );
+    swprintf_s( GameCommon::g_strCommonFileRoot, L"%s\\", temp);
+    //swprintf_s( GameCommon::g_strApplicationDataPath, L"%s\\", temp );
 #endif
 }
 
 #if defined(TREE3D12)
+#if !defined(TREE_XBOX)
 
 // Desc: Load a shader blob from file
 //--------------------------------------------------------------------------------------
@@ -66,16 +69,11 @@ HRESULT XSF::LoadShader(const wchar_t* path, ID3DBlob** ppShader)
     VERBOSEATGPROFILETHIS;
 
     wchar_t tmp[1024];
-    _snwprintf_s(tmp, _TRUNCATE, L"%s%s", Details::g_strCommonFileRoot, path);
+    _snwprintf_s(tmp, _TRUNCATE, L"%s%s", GameCommon::g_strCommonFileRoot, path);
 
-#if defined(TREE_XBOX)
-    // TODO load shaders
-    ASSERT(false);
-    return E_FAIL;
-#else
     return D3DReadFileToBlob(tmp, ppShader);
-#endif
 }
+#endif
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -87,9 +85,9 @@ HRESULT XSF::LoadBlob( const wchar_t* pFilename, std::vector< BYTE >& data )
     data.clear();
 
     wchar_t tmp[ 1024 ];
-    if (Details::g_strCommonFileRoot && wcslen(Details::g_strCommonFileRoot))
+    if (GameCommon::g_strCommonFileRoot && wcslen(GameCommon::g_strCommonFileRoot))
     {
-        _snwprintf_s(tmp, _countof(tmp), _TRUNCATE, L"%s\\%s", Details::g_strCommonFileRoot, pFilename);
+        _snwprintf_s(tmp, _countof(tmp), _TRUNCATE, L"%s\\%s", GameCommon::g_strCommonFileRoot, pFilename);
     }
     else
     {
@@ -162,9 +160,9 @@ void XSF::DebugPrint( const char* msg, ... )
 #endif
 
     // Pass to the intercept if given
-    /*if( Details::g_pLoggingFunctionIntercept )
+    /*if( GameCommon::g_pLoggingFunctionIntercept )
     {
-        Details::g_pLoggingFunctionIntercept( buf );
+        GameCommon::g_pLoggingFunctionIntercept( buf );
     }*/
 }
 
@@ -201,13 +199,13 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
     OutputDebugStringW( msg );
 
     // Pass to the intercept if given
-    /*if( Details::g_pLoggingFunctionIntercept )
+    /*if( GameCommon::g_pLoggingFunctionIntercept )
     {
         char buf[ 4096 ];
         size_t converted;
         wcstombs_s( &converted, buf, msg, _countof( buf ) - 1 );
         buf[ converted ] = 0;
-        Details::g_pLoggingFunctionIntercept( buf );
+        GameCommon::g_pLoggingFunctionIntercept( buf );
     }*/
 }
 

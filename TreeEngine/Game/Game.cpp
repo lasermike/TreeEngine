@@ -72,7 +72,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_renderManager.GetRenderData().projectionData.farClippingPlane = 30.0f;
     m_renderManager.GetRenderData().clearColor = XMFLOAT4(0, 0, 0, 0);
 
-    XSF::SetContentFileRoot();
+    GameCommon::SetContentFileRoot();
 
     // Init vertex/index buffer
     m_pScene = new SceneRoot();

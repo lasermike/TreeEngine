@@ -65,8 +65,8 @@ namespace XboxSampleFramework
         struct FontFileHeaderImage;
 
         // some render state and assets are shared between all instances
-        static ID3DBlob*            s_pVS;    // Created vertex shader
-        static ID3DBlob*            s_pPS;    // Created pixel shader
+        static std::vector<uint8_t> s_pVS;
+        static std::vector<uint8_t> s_pPS;
         static ID3D12Resource*      s_pIB;   // ib
         static D3D12_INPUT_ELEMENT_DESC s_pIL[];
         static D3D12_INDEX_BUFFER_VIEW s_IBView;

@@ -219,26 +219,20 @@ struct LoadedTexture
 
 struct VertexShader
 {
-    union
-    {
 #if defined(TREE3D12)
-        ID3DBlob*           shader;
-#elif defined(TREE3D11)
-        ID3D11VertexShader* shader;
-#endif
-    };
-
-
-#if defined(TREE3D12)
-
+#if defined(TREE_XBOX)
+    std::vector<uint8_t> shader;
+    VertexShader() { }
+#else
+    ID3DBlob* shader;
     VertexShader() : shader(nullptr) { }
-    ~VertexShader() { Release(); }
-
     operator ID3DBlob* () { return shader; }
+#endif
+    ~VertexShader() { Release(); }
     void Release();
 
 #elif defined(TREE3D11)
-
+    ID3D11VertexShader* shader;
     ~VertexShader() { Release(); }
     VertexShader() : shader(nullptr) { }
 
@@ -250,12 +244,16 @@ struct VertexShader
 struct PixelShader
 {
 #if defined(TREE3D12)
+#if defined(TREE_XBOX)
+    std::vector<uint8_t> shader;
+    PixelShader() : shader() { }
+#else
     ID3DBlob*                 shader;
+    PixelShader() : shader(nullptr) { }
+    operator ID3DBlob* () { return shader; }
+#endif
 
     ~PixelShader() { Release(); }
-    PixelShader() : shader(nullptr) { }
-
-    operator ID3DBlob* () { return shader; }
     void Release();
 
 #elif defined(TREE3D11)
@@ -272,12 +270,16 @@ struct PixelShader
 struct ComputeShader
 {
 #if defined(TREE3D12)
+#if defined(TREE_XBOX)
+    std::vector<uint8_t> shader;
+    ComputeShader() : shader() { }
+#else
+    ComputeShader() : shader(nullptr) { }
     ID3DBlob*                 shader;
+    operator ID3DBlob* () { return shader; }
+#endif
 
     ~ComputeShader() { Release(); }
-    ComputeShader() : shader(nullptr) { }
-
-    operator ID3DBlob* () { return shader; }
     void Release();
 
 #elif defined(TREE3D11)

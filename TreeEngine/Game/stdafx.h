@@ -445,25 +445,23 @@ namespace XboxSampleFramework
     typedef ID3D11RasterizerState1  D3DRasterizerState;
     typedef D3D11_RASTERIZER_DESC1  D3DRasterizerDesc;
     typedef IDXGISwapChain1         DXGISwapChain;
-//#else
-//    typedef ID3D11Device            D3DDevice;
-//    typedef ID3D11DeviceContext     D3DDeviceContext;
-//    typedef ID3D11DeviceContext     D3DComputeContext;
-//    typedef ID3D11RasterizerState   D3DRasterizerState;
-//    typedef D3D11_RASTERIZER_DESC   D3DRasterizerDesc;
-//    typedef IDXGISwapChain          DXGISwapChain;
 #endif
 
     void DebugPrint( _In_z_ const char* msg, ... );
     void DebugPrint( _In_z_ const wchar_t* msg, ... );
     void PrintNoVarargs( _In_z_ const wchar_t* msg );
 
-    void SetContentFileRoot();
     HRESULT LoadBlob(_In_z_ const wchar_t* pFilename, std::vector< BYTE >& data);
 
 #if defined(TREE3D12)
     HRESULT LoadShader(const wchar_t* path, ID3DBlob** ppShader);
 #endif
+}
+
+namespace GameCommon
+{
+    void SetContentFileRoot();
+    const wchar_t* GetContentFileRoot();
 }
 
 namespace XSF = XboxSampleFramework;

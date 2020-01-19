@@ -1008,6 +1008,7 @@ void InitializeTexture(GpuResource& Dest, RenderPlatform12* renderPlatform,
     D3D12_RESOURCE_BARRIER barrier = {};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = Dest.GetResource();
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;  // Does this work on PC?
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
     renderPlatform->GetCommandList()->ResourceBarrier(1, &barrier);
@@ -1017,6 +1018,7 @@ void InitializeTexture(GpuResource& Dest, RenderPlatform12* renderPlatform,
     //InitContext.TransitionResource(Dest, D3D12_RESOURCE_STATE_GENERIC_READ, true);
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = Dest.GetResource();
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;  // Does this work on PC?
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
     renderPlatform->GetCommandList()->ResourceBarrier(1, &barrier);

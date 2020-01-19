@@ -23,7 +23,7 @@ RENDERPLATFORM_API SetWindow(HWND hwnd)
 
 RENDERPLATFORM_API void SetWindow(Windows::UI::Core::CoreWindow^ window, float logicalDpi)
 {
-    XSF::SetContentFileRoot();
+    GameCommon::SetContentFileRoot();
 
     m_pPlatform->SetWindow(window, logicalDpi);
 }

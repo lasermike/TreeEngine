@@ -31,8 +31,13 @@ using namespace XboxSampleFramework;
         DebugPrint("BitmapFont::CreateFontShaders: error %x\n", hr); \
         return hr;
 
+#if defined(TREE_XBOX)
+std::vector<uint8_t> BitmapFont::s_pVS;
+std::vector<uint8_t> BitmapFont::s_pPS;
+#else
 ID3DBlob*                   BitmapFont::s_pVS;    // Created vertex shader
 ID3DBlob*                   BitmapFont::s_pPS;    // Created pixel shader
+#endif
 ID3D12Resource*             BitmapFont::s_pIB;
 D3D12_INPUT_ELEMENT_DESC    BitmapFont::s_pIL[] = 
     {
@@ -150,24 +155,29 @@ HRESULT BitmapFont::CreateFontShaders(D3DDevice* const pDevice, D3DCommandList* 
     // started up and a vertex array created.
     ///
     
-    if (s_pVS)
+    if (s_pVS.size())
     {
         // Already initialized, so just add to the ref counts
-        s_pVS->AddRef();
-        s_pPS->AddRef();
+        //s_pVS->AddRef();
+        //s_pPS->AddRef();
         s_pIB->AddRef();
     }
     else
     {
-        XSF_ASSERT(nullptr == s_pVS);
-        XSF_ASSERT(nullptr == s_pPS);
+        //XSF_ASSERT(nullptr == s_pVS);
+        //XSF_ASSERT(nullptr == s_pPS);
         XSF_ASSERT(nullptr == s_pIB);
 
         // load shaders first
         std::vector<BYTE> dataVS, dataPS;
 
+#if defined(TREE_XBOX)
+        BitmapFont::s_pVS = RenderCommon::LoadData(VS_FILE_NAME);
+        BitmapFont::s_pPS = RenderCommon::LoadData(PS_FILE_NAME);
+#else
         HRR(XSF::LoadShader(VS_FILE_NAME, &BitmapFont::s_pVS));
         HRR(XSF::LoadShader(PS_FILE_NAME, &BitmapFont::s_pPS));
+#endif
 
         // IB
         {
@@ -208,10 +218,15 @@ HRESULT BitmapFont::CreateFontShaders(D3DDevice* const pDevice, D3DCommandList* 
     m_descPSO.InputLayout.pInputElementDescs = s_pIL;
     m_descPSO.InputLayout.NumElements = sizeof(s_pIL) / sizeof(s_pIL[0]);
     m_descPSO.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+#if defined(TREE_XBOX)
+    m_descPSO.VS = { s_pVS.data(), s_pVS.size() };
+    m_descPSO.PS = { s_pPS.data(), s_pPS.size() };
+#else
     m_descPSO.VS.pShaderBytecode = s_pVS->GetBufferPointer();
     m_descPSO.VS.BytecodeLength = s_pVS->GetBufferSize();
     m_descPSO.PS.pShaderBytecode = s_pPS->GetBufferPointer();
     m_descPSO.PS.BytecodeLength = s_pPS->GetBufferSize();
+#endif
     m_descPSO.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFF;
     m_descPSO.SampleDesc.Count = 1;
     m_descPSO.SampleMask = UINT_MAX;
@@ -236,8 +251,13 @@ VOID BitmapFont::ReleaseFontShaders()
     // to make sure any interdependencies are dealt with
     m_PSOCache.Terminate();
     ZeroMemory(&m_descPSO, sizeof(m_descPSO));
+#if defined(TREE_XBOX)
+    s_pVS.clear();
+    s_pPS.clear();
+#else
     XSF_SAFE_RELEASE_C(s_pVS);
     XSF_SAFE_RELEASE_C(s_pPS);
+#endif
     XSF_SAFE_RELEASE_C(s_pIB);
 }
 

@@ -67,16 +67,16 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
     <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
     <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
       <FileType>Document</FileType>
-      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
       <Outputs >$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>

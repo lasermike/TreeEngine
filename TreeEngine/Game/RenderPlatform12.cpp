@@ -415,8 +415,13 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { InputLayoutDesc::InstancedBasic16, _countof(InputLayoutDesc::InstancedBasic16) };
     psoDesc.pRootSignature = m_rootSignature;
+#if defined(TREE_XBOX)
+    psoDesc.VS = { m_vertexShader->shader.data(), m_vertexShader->shader.size() };
+    psoDesc.PS = { m_pixelShader->shader.data(),  m_pixelShader->shader.size() };
+#else
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader->shader);
     psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader->shader);
+#endif
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -434,8 +439,13 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     shadowPsoDesc.RasterizerState.DepthBias = 100000;
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+#if defined(TREE_XBOX)
+    psoDesc.VS = { m_shadowVertexShader->shader.data(), m_shadowVertexShader->shader.size() };
+    psoDesc.PS = { m_shadowPixelShader->shader.data(),  m_shadowPixelShader->shader.size() };
+#else
     shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_shadowVertexShader);
     shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_shadowPixelShader);
+#endif
     shadowPsoDesc.DSVFormat = ShadowMap::Format();
 
     // Shadow map pass does not have a render target.
@@ -455,8 +465,13 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         horzBlurPSO.pRootSignature = m_computeRootSignature;
         horzBlurPSO.CS =
         {
+#if defined(TREE_XBOX)
+            reinterpret_cast<BYTE*>(horzShader->shader.data()),
+            horzShader->shader.size()
+#else
             reinterpret_cast<BYTE*>(horzShader->shader->GetBufferPointer()),
             horzShader->shader->GetBufferSize()
+#endif
         };
         horzBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
         HRR(GetDevice()->CreateComputePipelineState(&horzBlurPSO, __uuidof(ID3D12PipelineState), (void**) &m_gameLevelPSOs["horzBlur"]));
@@ -470,8 +485,13 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         vertBlurPSO.pRootSignature = m_computeRootSignature;
         vertBlurPSO.CS =
         {
+#if defined(TREE_XBOX)
+            reinterpret_cast<BYTE*>(vertShader->shader.data()),
+            vertShader->shader.size()
+#else
             reinterpret_cast<BYTE*>(vertShader->shader->GetBufferPointer()),
             vertShader->shader->GetBufferSize()
+#endif
         };
         vertBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
         HRR(GetDevice()->CreateComputePipelineState(&vertBlurPSO, __uuidof(ID3D12PipelineState), (void**)&m_gameLevelPSOs["vertBlur"]));
@@ -541,7 +561,12 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 HRESULT RenderPlatform12::LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader)
 {
     VertexShader* vertexShader = new VertexShader();
+
+#if defined(TREE_XBOX)
+    vertexShader->shader = RenderCommon::LoadData(shaderFilename);
+#else
     HRR(XSF::LoadShader(shaderFilename, &vertexShader->shader));
+#endif
 
     m_gameLevelVertexShaders.push_back(vertexShader);
 
@@ -553,7 +578,11 @@ HRESULT RenderPlatform12::LoadVertexShader(const wchar_t* shaderFilename, Vertex
 HRESULT RenderPlatform12::LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader)
 {
     PixelShader* pixelShader = new PixelShader();
+#if defined(TREE_XBOX)
+    pixelShader->shader = RenderCommon::LoadData(shaderFilename);
+#else
     HRR(XSF::LoadShader(shaderFilename, &pixelShader->shader));
+#endif
 
     m_gameLevelPixelShaders.push_back(pixelShader);
 
@@ -565,8 +594,11 @@ HRESULT RenderPlatform12::LoadPixelShader(const wchar_t* shaderFilename, PixelSh
 HRESULT RenderPlatform12::LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader)
 {
     ComputeShader* newShader = new ComputeShader();
+#if defined(TREE_XBOX)
+    newShader->shader = RenderCommon::LoadData(shaderFilename);
+#else
     HRR(XSF::LoadShader(shaderFilename, &newShader->shader));
-
+#endif
     m_gameLevelComputeShaders[shaderFilename] = newShader;
 
     *shader = newShader;
@@ -953,8 +985,13 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     rasterizerState.FillMode = m_renderData->wireframe ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
 
     psoDesc.pRootSignature = m_rootSignature;
+#if defined(TREE_XBOX)
+    psoDesc.VS = { material->m_vertexShader->shader.data(), material->m_vertexShader->shader.size() };
+    psoDesc.PS = { material->m_pixelShader->shader.data(), material->m_pixelShader->shader.size() };
+#else
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(material->m_vertexShader->shader);
     psoDesc.PS = CD3DX12_SHADER_BYTECODE(material->m_pixelShader->shader);
+#endif
     psoDesc.RasterizerState = rasterizerState;
 
     StockRenderStates::GetInstance().CopyBlendTemplate(psoDesc.BlendState, material->m_renderState.blendState);
@@ -978,8 +1015,13 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     shadowPsoDesc.RasterizerState.DepthBias = 100000;
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+#if defined(TREE_XBOX)
+    shadowPsoDesc.VS = { material->m_shadowVertexShader->shader.data(), material->m_shadowVertexShader->shader.size() };
+    shadowPsoDesc.PS = { material->m_shadowPixelShader->shader.data(), material->m_shadowPixelShader->shader.size() };
+#else
     shadowPsoDesc.VS = CD3DX12_SHADER_BYTECODE(material->m_shadowVertexShader->shader);
     shadowPsoDesc.PS = CD3DX12_SHADER_BYTECODE(material->m_shadowPixelShader->shader);
+#endif
     shadowPsoDesc.DSVFormat = ShadowMap::Format();
 
     // Shadow map pass does not have a render target.
@@ -1068,8 +1110,13 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { InputLayoutDesc::Basic32, _countof(InputLayoutDesc::Basic32) };
     psoDesc.pRootSignature = m_rootSignature;
+#if defined(TREE_XBOX)
+    psoDesc.VS = { m_drawScreenVertexShader->shader.data(), m_drawScreenVertexShader->shader.size() };
+    psoDesc.PS = { m_drawScreenPixelShader->shader.data(), m_drawScreenPixelShader->shader.size() };
+#else
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_drawScreenVertexShader);
     psoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_drawScreenPixelShader);
+#endif
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState.DepthEnable = FALSE;
@@ -1207,6 +1254,33 @@ HRESULT RenderPlatform12::InitDevice()
     // list in our main loop but for now, we just want to wait for setup to 
     // complete before continuing.
     WaitForPreviousFrame();
+
+#if defined(TREE_XBOX)
+    // First, retrieve the underlying DXGI device from the D3D device.
+    CComPtr<IDXGIDevice1> dxgiDevice;
+    HRR(m_d3dDevice->QueryInterface(IID_IDXGIDevice1 , (void**) &dxgiDevice));
+
+    // Identify the physical adapter (GPU or card) this device is running on.
+    CComPtr<IDXGIAdapter> dxgiAdapter;
+    HRR(dxgiDevice->GetAdapter(&dxgiAdapter));
+
+    // Retrieve the outputs for the adapter.
+    CComPtr<IDXGIOutput> dxgiOutput;
+    HRR(dxgiAdapter->EnumOutputs(0, &dxgiOutput));
+
+    // Set frame interval and register for frame events
+    HRR(m_d3dDevice->SetFrameIntervalX(
+        dxgiOutput,
+        D3D12XBOX_FRAME_INTERVAL_60_HZ,
+        2 /* Allow 2 frames of latency */,
+        D3D12XBOX_FRAME_INTERVAL_FLAG_NONE));
+
+    HRR(GetDevice()->ScheduleFrameEventX(
+        D3D12XBOX_FRAME_EVENT_ORIGIN,
+        0U,
+        nullptr,
+        D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE));
+#endif
 
     return hr;
 }
@@ -1959,19 +2033,27 @@ void RenderPlatform12::ManageUploadHeap(XSF::CpuGpuHeap* pUploadHeap)
 
 void VertexShader::Release()
 {
+#if defined(TREE_XBOX)
+    shader.clear();
+#else
     if (shader)
     {
         shader->Release();
         shader = nullptr;
     }
+#endif
 }
 
 void PixelShader::Release()
 {
+#if defined(TREE_XBOX)
+    shader.clear();
+#else
     if (shader)
     {
         shader->Release();
         shader = nullptr;
     }
+#endif
 }
 
