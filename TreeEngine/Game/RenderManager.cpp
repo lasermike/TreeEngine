@@ -90,7 +90,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
         }
     }
     m_textures.clear();
-
+     
     for (auto m : m_materials)
     {
         if (m.second)

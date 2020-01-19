@@ -778,7 +778,9 @@ private:
 
 public:
 
-    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0)
+    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
+        m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr),
+        m_bitmapFont(nullptr)
 #if defined(TREE_XBOX)
         , m_framePipelineToken(D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL)
 #endif

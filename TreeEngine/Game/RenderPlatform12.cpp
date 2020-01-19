@@ -128,7 +128,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     {
         HRR(GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator), (void**)&m_commandAllocator[i]));
 
-        HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator[i], nullptr, __uuidof(ID3D12CommandList), (void**)&m_commandList[i]));
+        HRR(GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator[i], nullptr, __uuidof(ID3D12GraphicsCommandList), (void**)&m_commandList[i]));
         HRR(m_commandList[i]->Close());
     }
 

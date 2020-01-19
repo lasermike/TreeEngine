@@ -284,7 +284,7 @@
       <PreprocessorDefinitions>TREE_XBOX;TREE3D12;RENDERPLATFORM_EXPORTS;PIX_INSTRUMENTATION;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <ShowIncludes>true</ShowIncludes>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Xbox.Scarlett.x64'">
@@ -318,12 +318,14 @@
     <ClInclude Include="..\Game\D3D12Util.h" />
     <ClInclude Include="..\Game\DDSTextureLoader12.h" />
     <ClInclude Include="..\Game\GeometryGenerator.h" />
+    <ClInclude Include="..\Game\RenderCommon.h" />
     <ClInclude Include="..\Game\RenderPlatform.h" />
     <ClCompile Include="..\Game\BitmapFont12.cpp" />
     <ClCompile Include="..\Game\D3D12Util.cpp" />
     <ClCompile Include="..\Game\DDSTextureLoader12.cpp" />
     <ClCompile Include="..\Game\GeometryGenerator.cpp" />
     <ClCompile Include="..\Game\MathHelper.cpp" />
+    <ClCompile Include="..\Game\RenderCommon.cpp" />
     <ClCompile Include="..\Game\RenderPlatform.cpp" />
     <ClInclude Include="..\Game\ScreenGrab12.h" />
     <ClInclude Include="..\Game\ShadowMap.h" />
