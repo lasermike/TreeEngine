@@ -521,7 +521,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         // Setup Platform/Renderer bindings
         ImGui_ImplWin32_Init(m_hwnd);
         ImGui_ImplDX12_Init(GetDevice(), FrameCount,
-            DXGI_FORMAT_R8G8B8A8_UNORM, m_descriptorHeap,
+            m_swapChainFormat, m_descriptorHeap,
             m_descriptorHeap.hCPU(ImGui_SrvHeapOffset),
             m_descriptorHeap.hGPU(ImGui_SrvHeapOffset));
 
@@ -1124,7 +1124,7 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    psoDesc.RTVFormats[0] = m_swapChainFormat;
     psoDesc.SampleDesc.Count = 1;
 
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineStateFullScreenQuad));
@@ -1352,6 +1352,8 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         ImGui_ImplDX12_InvalidateDeviceObjects();
     }
 
+    m_scissorRect.left = 0;
+    m_scissorRect.top = 0;
     m_scissorRect.right = static_cast<LONG>(windowWidth);
     m_scissorRect.bottom = static_cast<LONG>(windowHeight);
 
@@ -1363,7 +1365,12 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     m_viewPort.TopLeftX = 0;
     m_viewPort.TopLeftY = 0;
 
+#if defined(TREE_XBOX)
     m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+//    m_swapChainFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+#else
+    m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+#endif
 
     D3D12_CLEAR_VALUE clearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
     clearValue.Format = m_swapChainFormat;
