@@ -1196,7 +1196,26 @@ HRESULT RenderPlatform12::InitDevice()
     HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory4)));
 
     CComPtr<IDXGIAdapter1> hardwareAdapter;
-    GetHardwareAdapter(factory4, &hardwareAdapter);
+
+    for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != factory4->EnumAdapters1(adapterIndex, &hardwareAdapter); ++adapterIndex)
+    {
+        DXGI_ADAPTER_DESC1 desc;
+        hardwareAdapter->GetDesc1(&desc);
+
+        if (wcsstr(desc.Description, L"NVIDIA") != nullptr)
+            //if (wcsstr(desc.Description, L"Intel") != nullptr) //NVIDIA
+        {
+            hardwareAdapter.Release();
+            continue;
+        }
+
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+        {
+            continue;  // No software device
+        }
+
+        break;
+    }
 
     HRR(D3D12CreateDevice(
         hardwareAdapter,

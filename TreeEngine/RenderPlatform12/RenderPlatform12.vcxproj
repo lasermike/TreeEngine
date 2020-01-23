@@ -109,6 +109,7 @@
     <ClInclude Include="..\Game\DDSTextureLoader12.h" />
     <ClInclude Include="..\Game\GeometryGenerator.h" />
     <ClInclude Include="..\Game\RenderPlatform.h" />
+    <ClInclude Include="..\Game\RenderCommon.h" />
     <ClCompile Include="..\Game\BitmapFont12.cpp" />
     <ClCompile Include="..\Game\D3D12Util.cpp" />
     <ClCompile Include="..\Game\DDSTextureLoader12.cpp" />
@@ -125,6 +126,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Game\RenderPlatform12.cpp" />
+    <ClCompile Include="..\Game\RenderCommon.cpp" />
     <ClCompile Include="..\Game\ScreenGrab12.cpp" />
     <ClCompile Include="..\Game\ShadowMap.cpp" />
     <ClCompile Include="..\Game\Stdafx.cpp" />

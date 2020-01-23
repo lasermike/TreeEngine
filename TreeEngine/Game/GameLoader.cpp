@@ -405,7 +405,7 @@ float SegLengthParam(LSystemParams* params, float cmdParam)
 }
 
 
-void LoadXmasTree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
@@ -809,7 +809,7 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
     switch (sceneNum)
     {
     case 0:
-        LoadXmasTree(pScene, pRenderData, pPlayer, gameData);
+        LoadTreeScene(pScene, pRenderData, pPlayer, gameData);
         break;
     case 1:
         LoadTestTree(pScene, pRenderData, pPlayer, gameData);

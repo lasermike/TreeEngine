@@ -38,6 +38,7 @@ Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		SharedGameFiles\SharedGameFiles.vcxitems*{1c5d34c2-bba2-4ee0-abc8-d298a515a51c}*SharedItemsImports = 4
 		SharedGameFiles\SharedGameFiles.vcxitems*{42dcda45-526d-45b0-aba5-cd9fe1716fee}*SharedItemsImports = 9
+		SharedGameFiles\SharedGameFiles.vcxitems*{ff5ea045-3150-4374-83c0-17c9c97f30f2}*SharedItemsImports = 4
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Durango = Debug|Durango

@@ -31,6 +31,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>TreeClassic</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+	<ShaderCompiler>fxc.exe</ShaderCompiler>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -219,137 +220,21 @@
     <Text Include="..\Game\Shaders\ShaderFiles.txt" />
     <Text Include="ReadMe.txt" />
   </ItemGroup>
+   <ImportGroup Label="Shared">
+    <Import Project="..\SharedGameFiles\SharedGameFiles.vcxitems" Label="Shared" />
+  </ImportGroup> 
   <ItemGroup>
-    <ClInclude Include="..\Game\BitmapFont.h" />
-    <ClInclude Include="..\Game\CComPtr.h" />
-    <ClInclude Include="..\Game\DDSTextureLoader.h" />
-    <ClInclude Include="..\Game\DXMath.h" />
-    <ClInclude Include="..\Game\Game.h" />
-    <ClInclude Include="..\Game\GameLoader.h" />
-    <ClInclude Include="..\Game\GeometryGenerator.h" />
-    <ClInclude Include="..\Game\Graph.h" />
-    <ClInclude Include="..\Game\LSystemModelGenerator.h" />
-    <ClInclude Include="..\Game\Materials.h" />
-    <ClInclude Include="..\Game\MathHelper.h" />
-    <ClInclude Include="..\Game\Model.h" />
-    <ClInclude Include="..\Game\Player.h" />
-    <ClInclude Include="..\Game\Primitive.h" />
-    <ClInclude Include="..\Game\RenderData.h" />
-    <ClInclude Include="..\Game\RenderManager.h" />
-    <ClInclude Include="..\Game\RenderStates.h" />
-    <ClInclude Include="..\Game\Resource.h" />
-    <ClInclude Include="..\Game\SceneRoot.h" />
-    <ClInclude Include="..\Game\ShadowMap.h" />
-    <ClInclude Include="..\Game\stdafx.h" />
-    <ClInclude Include="..\Game\StepTimer.h" />
-    <ClInclude Include="..\Game\StockRenderStates.h" />
-    <ClInclude Include="..\Game\Tree.h" />
-    <ClInclude Include="..\Game\TreeModel.h" />
-    <ClInclude Include="..\Game\TreeModelGenerator.h" />
-    <ClInclude Include="..\Game\UploadBuffer.h" />
-    <ClInclude Include="..\Game\WorldObject.h" />
-    <ClInclude Include="Resource.h" />
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="targetver.h" />
-    <ClInclude Include="TreeClassic.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\Game\Game.cpp" />
-    <ClCompile Include="..\Game\GameLoader.cpp" />
-    <ClCompile Include="..\Game\GeometryGenerator.cpp" />
-    <ClCompile Include="..\Game\Graph.cpp" />
-    <ClCompile Include="..\Game\LSystemModelGenerator.cpp" />
-    <ClCompile Include="..\Game\Materials.cpp" />
-    <ClCompile Include="..\Game\MathHelper.cpp" />
-    <ClCompile Include="..\Game\Player.cpp" />
-    <ClCompile Include="..\Game\Primitive.cpp" />
-    <ClCompile Include="..\Game\RenderManager.cpp" />
-    <ClCompile Include="..\Game\RenderPlatform.cpp" />
-    <ClCompile Include="..\Game\SceneRoot.cpp" />
-    <ClCompile Include="..\Game\Stdafx.cpp" />
-    <ClCompile Include="..\Game\Tree.cpp" />
-    <ClCompile Include="..\Game\TreeModel.cpp" />
-    <ClCompile Include="..\Game\TreeModelGenerator.cpp" />
-    <ClCompile Include="..\Game\WorldObject.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader>Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="TreeClassic.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader >Create</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="TreeClassic.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\Game\Arial_16.tga">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
-    <Image Include="..\Game\bark2.dds">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
-    <Image Include="..\Game\Bark_0005_diffuse.DDS" />
-    <Image Include="..\Game\Bark_0009_diffuse.DDS">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
-    <None Include="..\Game\Courier_New_11.tga">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
-    <Image Include="..\Game\snow.dds">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
     <Image Include="small.ico" />
     <Image Include="TreeClassic.ico" />
-    <None Include="packages.config" />
+    <ResourceCompile Include="TreeClassic.rc" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="..\Game\Arial_16.abc">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
-    <CustomBuild Include="..\Game\CopyResources.cmd">
-      <FileType>Document</FileType>
-    </CustomBuild>
-    <None Include="..\Game\Courier_New_11.abc">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
-    <None Include="..\Game\Shaders\buildShaders.bat">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="..\Game\Shaders\commonshader.bat">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call ..\Game\Shaders\buildShaders.bat "fxc.exe" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-    </CustomBuild>
-  </ItemGroup>
+  
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets')" />
