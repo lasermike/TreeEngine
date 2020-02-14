@@ -1202,8 +1202,8 @@ HRESULT RenderPlatform12::InitDevice()
         DXGI_ADAPTER_DESC1 desc;
         hardwareAdapter->GetDesc1(&desc);
 
-        if (wcsstr(desc.Description, L"NVIDIA") != nullptr)
-            //if (wcsstr(desc.Description, L"Intel") != nullptr) //NVIDIA
+        //if (wcsstr(desc.Description, L"NVIDIA") != nullptr)
+        if (wcsstr(desc.Description, L"Intel") != nullptr) //NVIDIA
         {
             hardwareAdapter.Release();
             continue;

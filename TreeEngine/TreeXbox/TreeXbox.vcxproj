@@ -197,7 +197,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.Scarlett.x64'">
@@ -222,7 +222,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|Gaming.Xbox.XboxOne.x64'">
@@ -247,7 +247,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|Gaming.Xbox.Scarlett.x64'">
@@ -272,7 +272,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Xbox.XboxOne.x64'">
@@ -292,7 +292,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Xbox.Scarlett.x64'">
@@ -312,7 +312,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

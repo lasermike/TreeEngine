@@ -84,7 +84,7 @@
       <DisableSpecificWarnings>4453</DisableSpecificWarnings>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)AppX</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir)AppX RenderPlatform12UWP RenderPlatform11UWP</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">

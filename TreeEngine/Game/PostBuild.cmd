@@ -2,8 +2,10 @@
 @echo on
 set binaryDir=%1
 set layoutDir=%2
+set dllProjectList=%3
 
 call ..\Game\CopyResources.cmd %layoutDir%\
-call ..\..\Misc\copyrobo %binaryDir%\RenderPlatform11UWP\ %layoutDir%\ RenderPlatform11UWP.dll RenderPlatform11UWP.pdb
-call ..\..\Misc\copyrobo %binaryDir%\RenderPlatform12UWP\ %layoutDir%\ RenderPlatform12UWP.dll RenderPlatform12UWP.pdb
+for /f %%G in ("%3") DO (
+	call ..\..\Misc\copyrobo %binaryDir%\%%G\ %layoutDir%\ %%G.dll %%G.pdb
+)
  
