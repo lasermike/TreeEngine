@@ -56,7 +56,7 @@ void HorzBlurCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : S
     if (groupThreadID.x >= N - gBlurRadius)
     {
         // Clamp out of bound samples that occur at image borders.
-        int x = min(dispatchThreadID.x + gBlurRadius, gInput.Length.x - 1);
+        int x = min(dispatchThreadID.x + gBlurRadius, gInput.Width - 1);
         gCache[groupThreadID.x + 2 * gBlurRadius] = gInput[int2(x, dispatchThreadID.y)];
     }
 

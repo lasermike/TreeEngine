@@ -1,6 +1,6 @@
 @rem echo off
 echo CMD: %*
-@REM %1 -- FXC, %2 -- OUTPUT folder, %3 -- layout folder, %4 -- input file (in project dir), %5 -- platform, %6 -- config, %7 -- incrementa flag
+@REM %1 -- FXC/DXC, %2 -- OUTPUT folder, %3 -- layout folder, %4 -- input file (in project dir), %5 -- platform, %6 -- config, %7 -- incrementa flag
 @SETLOCAL EnableDelayedExpansion
 @set layoutFolder=%3
 @set inputFile=%4
@@ -12,16 +12,6 @@ call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 @set incremental=0
 @if "%7"=="1" set incremental=1
 
-@rem 
-@rem @if "%incremental%"=="0" (
-@rem     echo Incremental shader build
-@rem 	@rem Output a batch file to rebuild this shader file
-@rem 	echo %~dp4 > %2%\shaderSrcPath.txt
-@rem 	@copy %0 %2
-@rem 	echo buildShaders.bat %1 %2 %3 %4 %5 %6 1 > %2build%~n4.cmd
-@rem )
-
-@rem Color init
 @call :ColorInit
 
 @rem Build from each entry point in shader
@@ -41,13 +31,13 @@ call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 @rem %1 = inputfile, %2 = stage, %3 = entrypoint %4 = Output dir
 @echo BuildShader: %*
 @if %2==vs (
-  set target=vs_5_0
+  set target=vs_6_0
   set suffix=VS
 ) ELSE if %2==ps (
-  set target=ps_5_0
+  set target=ps_6_0
   set suffix=PS
 ) ELSE (
-  set target=cs_5_0
+  set target=cs_6_0
   set suffix=CS
 )
 @rem Compile!
