@@ -1,9 +1,11 @@
 #pragma once
 
+
+
 struct FrameInputData
 {
     UINT frame;
-    bool key[256];
+    bool key[512];
 
     FrameInputData()
     {

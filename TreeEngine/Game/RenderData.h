@@ -5,6 +5,7 @@
 class ShadowMap;
 struct InstancedData;
 struct D3DBuffer;
+interface IInputManager;
 
 enum FrameStat
 {
@@ -87,7 +88,9 @@ struct RenderData
 
     bool                 wireframe;
 
-    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr), wireframe(false)
+    IInputManager*       inputManager;
+
+    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr), wireframe(false), inputManager(nullptr)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());
         XMStoreFloat4x4(&projection, XMMatrixIdentity());

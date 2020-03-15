@@ -145,13 +145,13 @@ void TreePC::OnPointerMoved(CoreWindow^ sender, PointerEventArgs^ args)
 
 void TreePC::OnKeyDown(CoreWindow^ sender, KeyEventArgs^ args)
 {
-    assert( (int) args->VirtualKey < 256);
+    assert( (int) args->VirtualKey < 512);
     m_inputManager.GetFrameInput(0).key[ (int) args->VirtualKey] = true;
 }
 
 void TreePC::OnKeyUp(CoreWindow^ sender, KeyEventArgs^ args)
 {
-    assert( (int) args->VirtualKey < 256);
+    assert( (int) args->VirtualKey < 512);
     m_inputManager.GetFrameInput(0).key[ (int) args->VirtualKey] = false;
 }
 

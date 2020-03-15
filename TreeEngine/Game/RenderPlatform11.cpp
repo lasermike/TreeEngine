@@ -633,6 +633,12 @@ void RenderPlatform11::SetFrameSceneData(CBChangesEveryFrame* cb)
     m_immediateContext->UpdateSubresource(buffer, 0, nullptr, cb, 0, 0);
 }
 
+void RenderPlatform11::Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    return m_pPlatform->Gui_WndProcHandler(hwnd, msg, wParam, lParam);
+}
+
+
 HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
 {
     m_currentInstanceBuffer = instancedBuffer->Get(m_renderData->frame);

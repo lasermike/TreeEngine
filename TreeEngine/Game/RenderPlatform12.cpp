@@ -16,11 +16,12 @@
 
 #include "ResourceUploadBatch.h"
 
+#include "inputManager.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 
-bool useImGui = false;
+bool useImGui = true;
 
 using namespace DirectX;
 
@@ -511,7 +512,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO(); (void)io;
-        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
         // Setup Dear ImGui style
@@ -556,6 +557,13 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     }
 
     return S_OK;
+}
+
+IMGUI_IMPL_API LRESULT  ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+LRESULT RenderPlatform12::Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    return ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 }
 
 HRESULT RenderPlatform12::LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader)
@@ -1422,7 +1430,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
             &swapChainBufferDesc,
             D3D12_RESOURCE_STATE_PRESENT,
             &swapChainOptimizedClearValue,
-            IID_GRAPHICS_PPV_ARGS(&m_renderTargets[n])));
+            IID_GRAPHICs_PPV_ARGS(&m_renderTargets[n])));
 
         wchar_t name[25] = {};
         swprintf_s(name, L"Render target %u", n);
@@ -1756,6 +1764,10 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     // Start the Dear ImGui frame
     if (imGuiInitialized)
     {
+        FrameInputData& input = m_renderData->inputManager->GetFrameInput(0);
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+        //memcpy(io.KeysDown, input.key, sizeof(input.key));
         ImGui_ImplDX12_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();

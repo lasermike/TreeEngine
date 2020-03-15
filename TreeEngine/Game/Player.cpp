@@ -40,7 +40,7 @@ XMVECTOR Player::GetEyePosition()
 }
 
 
-void Player::HandleInput(bool key[256])  // WM_KEYDOWN
+void Player::HandleInput(bool key[512])  // WM_KEYDOWN
 {
     XMMATRIX rot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
 

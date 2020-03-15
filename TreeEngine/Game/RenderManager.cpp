@@ -615,6 +615,8 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(GetVertexBuffer);
     ASSIGN_FUNC(GetIndexBuffer);
 
+    ASSIGN_FUNC(Gui_WndProcHandler);
+
     ASSIGN_FUNC(GetViewport);
 
 //    ASSIGN_FUNC(GetDevice);

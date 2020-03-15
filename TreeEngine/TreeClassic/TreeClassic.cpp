@@ -339,6 +339,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     g_game = new Game(&g_inputManager);
     g_game->SetWindow(m_hWnd);
     OnWindowSizeChanged();
+    g_game->GetRenderManager().GetRenderData().inputManager = &g_inputManager;
+
     //g_game->GetRenderManager().GetPlatform()->SetWindow(m_hWnd);
 
     if (FAILED(g_game->Initialize(false /* render to shared texture */)))
@@ -484,6 +486,11 @@ void OnWindowSizeChanged()
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if (g_game && g_game->GetRenderManager().GetPlatform())
+    {
+        g_game->GetRenderManager().GetPlatform()->Gui_WndProcHandler(hWnd, message, wParam, lParam);
+    }
+
     int wmId, wmEvent;
     PAINTSTRUCT ps;
     HDC hdc;

@@ -146,11 +146,6 @@ HRESULT Game::ReloadDevice()
 
     }
 
-    //if (!firstTimeLoad)
-    //{
-    //    m_is12Driver = !m_is12Driver;
-    //}
-
     const wchar_t* dllFilename =
 #if defined(TREE3D_CLASSIC)
         L"RenderPlatform12.dll";
@@ -242,8 +237,6 @@ void Game::Update(DX::StepTimer const& timer)
         m_renderManager.OnResize(m_nextScreenWidth, m_nextScreenHeight, m_renderToSharedTexture/*, this*/);
         m_needsResize = false;
     }
-
-
 
     if (m_advanceScene)
     {
@@ -366,7 +359,7 @@ void Game::Render(bool oculus)
     PIXEndEvent();  // Frame begin
 }
 
-void Game::HandleInput(bool key[256])  // WM_KEYDOWN
+void Game::HandleInput(bool key[512])  // WM_KEYDOWN
 {
     m_player->HandleInput(key);
 

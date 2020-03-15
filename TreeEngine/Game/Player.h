@@ -36,7 +36,7 @@ public:
     Player(WorldObjectParams* params);
     ~Player(void);
 
-    void HandleInput(bool key[256]);
+    void HandleInput(bool key[512]);
 
     Camera* GetCamera() { return m_camera; }
     

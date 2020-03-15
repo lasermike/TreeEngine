@@ -638,6 +638,10 @@ public:
     virtual D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) = 0;  // TODO!  Objects should be able to load their own meshes
     virtual D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) = 0;
 
+    // TODO: Do we like this platform specific call?
+    virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) = 0;
+
+
     //virtual IUnknown* GetDevice() = 0;
 
     // TODO: This is inconsistent with out other platform specific resources are managed
@@ -859,6 +863,9 @@ public:
         return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
     }
 
+    // TODO: Do we like this platform specific call?
+    virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
     // TODO: move into interface
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
 };
@@ -1004,6 +1011,9 @@ public:
         return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
     }
 
+    // TODO: Do we like this platform specific call?
+    virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
     HRESULT GetViewport(Viewport& viewport);
 
 };
@@ -1068,6 +1078,8 @@ typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 typedef D3DBuffer* (*GetVertexBufferFunc)(GeometryBuffer geometryBuffer);
 typedef D3DBuffer* (*GetIndexBufferFunc)(GeometryBuffer geometryBuffer);
 
+typedef LRESULT (*Gui_WndProcHandlerFunc)(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 typedef HRESULT (*GetViewportFunc)(Viewport& viewport);
 
 typedef IUnknown* (*GetDeviceFunc)();
@@ -1118,6 +1130,9 @@ class RenderPlatformDLL : public RenderPlatform
 
     GetVertexBufferFunc GetVertexBufferFuncPtr;
     GetIndexBufferFunc GetIndexBufferFuncPtr;
+
+    Gui_WndProcHandlerFunc Gui_WndProcHandlerFuncPtr;
+
 
     GetViewportFunc GetViewportFuncPtr;
 
@@ -1206,6 +1221,11 @@ public:
 
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) { return GetVertexBufferFuncPtr(geometryBuffer); }
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) { return GetIndexBufferFuncPtr(geometryBuffer); }
+
+    LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+    {
+        return Gui_WndProcHandlerFuncPtr(hwnd, msg, wParam, lParam);
+    }
 
     HRESULT GetViewport(Viewport& viewport) { return GetViewportFuncPtr(viewport); }
 

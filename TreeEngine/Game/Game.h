@@ -81,7 +81,7 @@ private:
 
     void Update(DX::StepTimer const& timer);
     void Regenerate();
-    void HandleInput(bool key[256]);
+    void HandleInput(bool key[512]);
 
     HRESULT ReloadDevice();
     void UpdateViewMatrix();
