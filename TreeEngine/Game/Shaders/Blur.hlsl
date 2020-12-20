@@ -39,6 +39,10 @@ void HorzBlurCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : S
     // Put in an array for each indexing.
     float weights[11] = { w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10 };
 
+    uint texWidth;
+    uint texHeight;
+    gInput.GetDimensions(texWidth, texHeight);
+
     //
     // Fill local thread storage to reduce bandwidth.  To blur 
     // N pixels, we will need to load N + 2*BlurRadius pixels
@@ -56,12 +60,12 @@ void HorzBlurCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : S
     if (groupThreadID.x >= N - gBlurRadius)
     {
         // Clamp out of bound samples that occur at image borders.
-        int x = min(dispatchThreadID.x + gBlurRadius, gInput.Width - 1);
+        int x = min(dispatchThreadID.x + gBlurRadius, texWidth - 1);
         gCache[groupThreadID.x + 2 * gBlurRadius] = gInput[int2(x, dispatchThreadID.y)];
     }
 
     // Clamp out of bound samples that occur at image borders.
-    gCache[groupThreadID.x + gBlurRadius] = gInput[min(dispatchThreadID.xy, gInput.Length.xy - 1)];
+    gCache[groupThreadID.x + gBlurRadius] = gInput[min(dispatchThreadID.xy, int2(texWidth, texHeight) - 1)];
 
     // Wait for all threads to finish.
     GroupMemoryBarrierWithGroupSync();
@@ -89,6 +93,10 @@ void VertBlurCS(int3 groupThreadID : SV_GroupThreadID,
     // Put in an array for each indexing.
     float weights[11] = { w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10 };
 
+    uint texWidth;
+    uint texHeight;
+    gInput.GetDimensions(texWidth, texHeight);
+
     //
     // Fill local thread storage to reduce bandwidth.  To blur 
     // N pixels, we will need to load N + 2*BlurRadius pixels
@@ -106,12 +114,12 @@ void VertBlurCS(int3 groupThreadID : SV_GroupThreadID,
     if (groupThreadID.y >= N - gBlurRadius)
     {
         // Clamp out of bound samples that occur at image borders.
-        int y = min(dispatchThreadID.y + gBlurRadius, gInput.Length.y - 1);
+        int y = min(dispatchThreadID.y + gBlurRadius, texHeight - 1);
         gCache[groupThreadID.y + 2 * gBlurRadius] = gInput[int2(dispatchThreadID.x, y)];
     }
 
     // Clamp out of bound samples that occur at image borders.
-    gCache[groupThreadID.y + gBlurRadius] = gInput[min(dispatchThreadID.xy, gInput.Length.xy - 1)];
+    gCache[groupThreadID.y + gBlurRadius] = gInput[min(dispatchThreadID.xy, int2(texWidth, texHeight) - 1)];
 
 
     // Wait for all threads to finish.

@@ -1211,15 +1211,25 @@ HRESULT RenderPlatform12::InitDevice()
         hardwareAdapter->GetDesc1(&desc);
 
         //if (wcsstr(desc.Description, L"NVIDIA") != nullptr)
-        if (wcsstr(desc.Description, L"Intel") != nullptr) //NVIDIA
-        {
-            hardwareAdapter.Release();
-            continue;
-        }
+
+        //if (wcsstr(desc.Description, L"Intel") != nullptr) //NVIDIA
+        //{
+        //    hardwareAdapter.Release();
+        //    continue;
+        //}
 
         if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
         {
             continue;  // No software device
+        }
+
+        // Check to see if the adapter supports Direct3D 12,
+        // but don't create the actual device yet.
+        if (SUCCEEDED(
+            D3D12CreateDevice(hardwareAdapter, D3D_FEATURE_LEVEL_11_0,
+                _uuidof(ID3D12Device), nullptr)))
+        {
+            break;
         }
 
         break;
@@ -1935,9 +1945,11 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     {
         // Draw UI
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        bool show_demo_window = true;
-        ImGui::ShowDemoWindow(&show_demo_window);
+        //bool show_demo_window = true;
+        //ImGui::ShowDemoWindow(&show_demo_window);
 
+        bool show_metrics_window = true;
+        ImGui::ShowMetricsWindow(&show_metrics_window);
 
         ImGui::Render();
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList[m_commandListIndex]);
