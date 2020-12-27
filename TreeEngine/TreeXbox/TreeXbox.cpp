@@ -98,6 +98,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
     g_game = new Game(&g_inputManager);
+    g_game->GetRenderManager().GetRenderData().inputManager = &g_inputManager;
     g_game->SetWindow(m_hWnd);
     OnWindowSizeChanged();
     //g_game->GetRenderManager().GetPlatform()->SetWindow(m_hWnd);

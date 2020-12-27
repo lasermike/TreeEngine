@@ -195,12 +195,12 @@ static void ShowDemoWindowPopups();
 static void ShowDemoWindowColumns();
 static void ShowDemoWindowMisc();
 
-void ImGui::ShowLSystemEditor(bool* p_open)
-{
-    IM_ASSERT(ImGui::GetCurrentContext() != NULL && "Missing dear imgui context. Refer to examples app!"); // Exceptionally add an extra assert here for people confused with initial dear imgui setup
-
-
-}
+//void ImGui::ShowLSystemEditor(bool* p_open)
+//{
+//    IM_ASSERT(ImGui::GetCurrentContext() != NULL && "Missing dear imgui context. Refer to examples app!"); // Exceptionally add an extra assert here for people confused with initial dear imgui setup
+//
+//
+//}
 
 // Demonstrate most Dear ImGui features (this is big function!)
 // You may execute this function to experiment with the UI and understand what it does. You may then search for keywords in the code when you are interested by a specific feature.

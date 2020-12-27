@@ -701,7 +701,7 @@ VOID BitmapFont::Begin(const D3D12_VIEWPORT* pViewport)
         XSF_ASSERT(m_pCmdList == nullptr);
         m_pCmdList = m_renderPlatform->GetCommandList();
 
-        XSFBeginNamedEvent(m_pCmdList, 0, L"Text rendering");
+        PIXBeginEvent(m_pCmdList, 0, L"Text rendering");
 
         const StockRenderStates& stockStates = StockRenderStates::GetInstance();
 
@@ -823,7 +823,7 @@ VOID BitmapFont::DrawText(FLOAT fOriginX, FLOAT fOriginY, DWORD dwColor, const W
     // Create a PIX user-defined event that encapsulates all of the text draw calls.
     // This makes DrawText calls easier to recognize in PIX captures, and it makes
     // them take up fewer entries in the event list.
-    XSFScopedNamedEvent(m_pCmdList, XTF_COLOR_DRAW_TEXT, L"BitmapFont::DrawText (%d chars)", uNumChars);
+    PIXScopedEvent(m_pCmdList, XTF_COLOR_DRAW_TEXT, L"BitmapFont::DrawText (%d chars)", uNumChars);
 
     // load vertex shader constants
     {
@@ -1092,7 +1092,7 @@ VOID BitmapFont::End()
 
     if (--m_dwNestedBeginCount == 0)
     {
-        XSFEndNamedEvent(m_pCmdList);
+        PIXEndEvent(m_pCmdList);
 
         m_pCmdList = nullptr;
     }

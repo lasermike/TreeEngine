@@ -155,7 +155,7 @@ HRESULT Game::ReloadDevice()
         m_renderPlatformDLL = ::LoadLibrary(dllFilename);
 #else
         m_is12Driver ? L"RenderPlatform12UWP.dll" : L"RenderPlatform11UWP.dll";
-    m_renderPlatformDLL = ::LoadPackagedLibrary(dllFilename, 0);
+        m_renderPlatformDLL = ::LoadPackagedLibrary(dllFilename, 0);
 #endif
 
     assert(m_renderPlatformDLL != nullptr);

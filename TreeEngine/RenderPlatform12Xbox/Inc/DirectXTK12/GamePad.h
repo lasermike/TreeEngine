@@ -26,10 +26,11 @@
 interface IGameInputDevice;
 #endif
 
+#include <cstdint>
 #include <memory>
-#include <stdint.h>
 
 #if (_WIN32_WINNT >= 0x0A00 /*_WIN32_WINNT_WIN10*/) && !defined(_GAMING_DESKTOP)
+#pragma comment(lib,"runtimeobject.lib")
 #include <string>
 #endif
 
@@ -54,9 +55,15 @@ namespace DirectX
         virtual ~GamePad();
 
     #if ((_WIN32_WINNT >= 0x0A00 /*_WIN32_WINNT_WIN10*/) && !defined(_GAMING_DESKTOP)) || defined(_XBOX_ONE)
-        static const int MAX_PLAYER_COUNT = 8;
+        static constexpr int MAX_PLAYER_COUNT = 8;
     #else
-        static const int MAX_PLAYER_COUNT = 4;
+        static constexpr int MAX_PLAYER_COUNT = 4;
+    #endif
+
+        static constexpr int c_MostRecent = -1;
+
+    #if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_GAMES)
+        static constexpr int c_MergedInput = -2;
     #endif
 
         enum DeadZone
@@ -277,7 +284,8 @@ namespace DirectX
 
     #if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_GAMES)
         // Underlying device access
-        void __cdecl GetDevice(int player, _Outptr_ IGameInputDevice** device) noexcept;
+        _Success_(return != false)
+        bool __cdecl GetDevice(int player, _Outptr_ IGameInputDevice** device) noexcept;
     #endif
 
         // Singleton

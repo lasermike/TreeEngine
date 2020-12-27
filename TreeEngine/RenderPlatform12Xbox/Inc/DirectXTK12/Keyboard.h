@@ -10,8 +10,8 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
-#include <stdint.h>
 
 #if (defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)) || (defined(_XBOX_ONE) && defined(_TITLE))
 namespace ABI { namespace Windows { namespace UI { namespace Core { struct ICoreWindow; } } } }
@@ -37,7 +37,7 @@ namespace DirectX
 
         virtual ~Keyboard();
 
-        enum Keys
+        enum Keys : unsigned char
         {
             None                = 0,
 
@@ -373,38 +373,10 @@ namespace DirectX
             bool OemPeriod : 1;         // VK_OEM_PERIOD, 0xBE
             bool OemQuestion : 1;       // VK_OEM_2, 0xBF
             bool OemTilde : 1;          // VK_OEM_3, 0xC0
-        #if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_GAMES)
-            bool Reserved15 : 2;
-            bool GamepadA : 1;          // VK_GAMEPAD_A, 0xC3
-            bool GamepadB : 1;          // VK_GAMEPAD_B, 0xC4
-            bool GamepadX : 1;          // VK_GAMEPAD_X, 0xC5
-            bool GamepadY : 1;          // VK_GAMEPAD_Y, 0xC6
-            bool GamepadRSB : 1;        // VK_GAMEPAD_RIGHT_SHOULDER, 0xC7
-            bool GamepadLSB : 1;        // VK_GAMEPAD_LEFT_SHOULDER, 0xC8
-            bool GamepadLT : 1;         // VK_GAMEPAD_LEFT_TRIGGER, 0xC9
-            bool GamepadRT : 1;         // VK_GAMEPAD_RIGHT_TRIGGER, 0xCA
-            bool GamepadDPadUp : 1;     // VK_GAMEPAD_DPAD_UP, 0xCB
-            bool GamepadDPadDown : 1;   // VK_GAMEPAD_DPAD_DOWN, 0xCC
-            bool GamepadDPadLeft : 1;   // VK_GAMEPAD_DPAD_LEFT, 0xCD
-            bool GamepadDPadRight : 1;  // VK_GAMEPAD_DPAD_RIGHT, 0xCE
-            bool GamepadMenu : 1;       // VK_GAMEPAD_MENU, 0xCF
-            bool GamepadView : 1;       // VK_GAMEPAD_VIEW, 0xD0
-            bool GamepadLTSB : 1;       // VK_GAMEPAD_LEFT_THUMBSTICK_BUTTON, 0xD1
-            bool GamepadRTSB : 1;       // VK_GAMEPAD_RIGHT_THUMBSTICK_BUTTON, 0xD2
-            bool GamepadLSUp : 1;       // VK_GAMEPAD_LEFT_THUMBSTICK_UP, 0xD3
-            bool GamepadLSDown : 1;     // VK_GAMEPAD_LEFT_THUMBSTICK_DOWN, 0xD4
-            bool GamepadLSRight : 1;    // VK_GAMEPAD_LEFT_THUMBSTICK_RIGHT, 0xD5
-            bool GamepadLSLeft : 1;     // VK_GAMEPAD_LEFT_THUMBSTICK_LEFT, 0xD6
-            bool GamepadRSUp : 1;       // VK_GAMEPAD_RIGHT_THUMBSTICK_UP, 0xD7
-            bool GamepadRSDown : 1;     // VK_GAMEPAD_RIGHT_THUMBSTICK_DOWN, 0xD8
-            bool GamepadRSRight : 1;    // VK_GAMEPAD_RIGHT_THUMBSTICK_RIGHT, 0xD9
-            bool GamepadRSLeft : 1;     // VK_GAMEPAD_RIGHT_THUMBSTICK_LEFT, 0xDA
-        #else
             bool Reserved15 : 7;
             bool Reserved16 : 8;
             bool Reserved17 : 8;
             bool Reserved18 : 3;
-        #endif
             bool OemOpenBrackets : 1;   // VK_OEM_4, 0xDB
             bool OemPipe : 1;           // VK_OEM_5, 0xDC
             bool OemCloseBrackets : 1;  // VK_OEM_6, 0xDD
@@ -486,7 +458,7 @@ namespace DirectX
         // Feature detection
         bool __cdecl IsConnected() const;
 
-    #if (!defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP) || (WINAPI_FAMILY == WINAPI_FAMILY_GAMES)) && defined(WM_USER)
+    #if (!defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP)) && defined(WM_USER)
         static void __cdecl ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam);
     #endif
 

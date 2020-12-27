@@ -157,13 +157,18 @@ PS_INPUT VS(VS_INPUT input)
     return output;
 }
 
-PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
+PS_INPUT VSSkinned(VS_SKINNED_INPUT input)  
 {
     PS_INPUT output = (PS_INPUT)0;
 
-    float4x4 world = input.World;
+    float4x3 world = input.World;
+    float4x3 worldPrev = InstanceBuffer[input.InstanceOffsetPrev].World;
+
+    //float4x4 world = float4x4(world2, float4(0,0,0,1));
+    //float4x4 worldPrev = float4x4(worldPrev2, float4(0, 0, 0, 1));
+
+
     //float4x4 world = InstanceBuffer[input.InstanceOffset].World;
-    float4x4 worldPrev = InstanceBuffer[input.InstanceOffsetPrev].World;
     //float4x4 worldNext = InstanceBuffer[input.InstanceOffsetNext].World;
 
     float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;

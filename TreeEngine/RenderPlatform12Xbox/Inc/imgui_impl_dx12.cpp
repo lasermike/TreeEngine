@@ -28,7 +28,7 @@
 #include "imgui_impl_dx12.h"
 
 // DirectX
-#include <d3d12_x.h>
+#include <d3d12_xs.h>
 //#include <dxgi1_4.h>
 //#include <d3dcompiler.h>
 #ifdef _MSC_VER

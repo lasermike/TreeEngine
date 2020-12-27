@@ -18,7 +18,7 @@
 #include <dxgi.h>
 #endif
 
-#include <stdint.h>
+#include <cstdint>
 
 
 namespace DirectX

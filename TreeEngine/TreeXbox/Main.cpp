@@ -71,7 +71,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lp
             return 1;
 
         g_game = std::make_unique<Game>(&g_inputManager);
-        //g_game = new Game(&g_inputManager);
+        g_game->GetRenderManager().GetRenderData().inputManager = &g_inputManager;
         g_game->SetWindow(hwnd);
 
         g_game->OnResize(windowWidth, windowHeight);

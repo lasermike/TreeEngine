@@ -21,7 +21,11 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 
+#if defined(TREE_CLASSIC)
 bool useImGui = true;
+#else
+bool useImGui = true;
+#endif
 
 using namespace DirectX;
 
@@ -91,10 +95,12 @@ HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_
     CD3DX12_HEAP_PROPERTIES createdHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
     const UINT allocSize = (size + 255) & ~255;
+    CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(allocSize);
+
     HRR(GetDevice()->CreateCommittedResource(
         &createdHeapProperties,
         D3D12_HEAP_FLAG_NONE,
-        &CD3DX12_RESOURCE_DESC::Buffer(allocSize),
+        &bufferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         __uuidof(ID3D12Resource), (void**) &buffer));
@@ -1440,7 +1446,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
             &swapChainBufferDesc,
             D3D12_RESOURCE_STATE_PRESENT,
             &swapChainOptimizedClearValue,
-            IID_GRAPHICs_PPV_ARGS(&m_renderTargets[n])));
+            IID_GRAPHICS_PPV_ARGS(&m_renderTargets[n])));
 
         wchar_t name[25] = {};
         swprintf_s(name, L"Render target %u", n);

@@ -209,7 +209,7 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 //
 #if defined(PIX_INSTRUMENTATION)
 
-#ifdef _XBOX_ONE
+#if defined(TREE_XBOX)
 #include <pix.h>
 #pragma comment(lib, "pixEvt")
 

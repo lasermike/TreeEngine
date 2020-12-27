@@ -17,9 +17,10 @@
 #include <d3d12.h>
 #endif
 
+#include <cstdint>
 #include <stdexcept>
+
 #include <assert.h>
-#include <stdint.h>
 
 #include <wrl/client.h>
 
@@ -40,6 +41,12 @@ namespace DirectX
             D3D12_DESCRIPTOR_HEAP_TYPE type,
             D3D12_DESCRIPTOR_HEAP_FLAGS flags,
             size_t count) noexcept(false);
+        DescriptorHeap(
+            _In_ ID3D12Device* device,
+            size_t count) noexcept(false) :
+            DescriptorHeap(device,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, count) {}
 
         DescriptorHeap(DescriptorHeap&&) = default;
         DescriptorHeap& operator=(DescriptorHeap&&) = default;
@@ -176,6 +183,14 @@ namespace DirectX
                 throw std::out_of_range("Reserve descriptor range is too large");
             }
         }
+
+        DescriptorPile(
+            _In_ ID3D12Device* device,
+            size_t count,
+            size_t reserve = 0) noexcept(false) :
+            DescriptorPile(device,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, count, reserve) {}
 
         DescriptorPile(const DescriptorPile&) = delete;
         DescriptorPile& operator=(const DescriptorPile&) = delete;

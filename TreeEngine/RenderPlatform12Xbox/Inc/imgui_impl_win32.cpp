@@ -15,7 +15,7 @@
 #endif
 #include <windows.h>
 #include <XInput.h>
-#include <tchar.h>
+//#include <tchar.h>
 
 // Xbox
 BOOL WINAPI ClientToScreen(
