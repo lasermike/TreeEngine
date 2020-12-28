@@ -162,7 +162,7 @@ void SafeDelete(T* obj)
 
 #if defined(TREE3D12)
 __inline void SetDebugName(ID3D12DeviceChild* /*child*/, const char* /*name*/) { }
-void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter);
+//void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter);
 #elif defined(TREE3D11)
 __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
 #endif // DX12
@@ -184,10 +184,6 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 
 #if defined(TREE3D12)
     void SetDebugName(ID3D12DeviceChild* child, const char* name);
-
-#if !defined(TREE_XBOX)
-    void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter);
-#endif 
 
 #elif defined(TREE3D11)
     void SetDebugName(ID3D11DeviceChild* child, const char* name);
@@ -212,36 +208,6 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 #if defined(TREE_XBOX)
 #include <pix.h>
 #pragma comment(lib, "pixEvt")
-
-// Pass the d3d device context as a first parameter, and NULL if there is no relevant context (say, it's a CPU function)
-// The "No-op" versions of those are to enforce calling convention in release
-// Begin and EndNamedEvents should always come in pairs. SetMarker needs a single call.
-// The xxxF versions allow to pass printf style formatted string to the macro. The non-F versions will pass the string
-// directly to the device. This is to ensure as little overhead as possible and to enable outputting strings like 0%
-// These macros all pre-append L to strings so that calling code can exclude, e.g. XSFBeginNamedEvent( ctx, color, "stuff")
-#if defined(ATG_PROFILE) || defined(ATG_PROFILE_VERBOSE)
-
-#define XSFBeginNamedEventF( ctx, color, text, ... )   PIXBeginEvent(color, text, __VA_ARGS__ ); ::XboxSampleFramework::XSFBeginNamedEventFImpl( ctx, text, __VA_ARGS__ )
-#define XSFBeginNamedEvent( ctx, color, text )         PIXBeginEvent(color, text); ::XboxSampleFramework::XSFBeginNamedEventImpl( ctx, text )
-#define XSFEndNamedEvent( ctx )                        PIXEndEvent(); ::XboxSampleFramework::XSFEndNamedEventImpl( ctx );
-
-// Scoped versions. XSFScopedNamedEvent will open an event in constructor and close it in destructor, so it will wrap a C++ scope
-// XSFScopedNamedEventFunc is commonly used to wrap the entire function body in Begin/End named event
-
-#define XSFScopedNamedEvent( ctx, color, text, ... )   ATGPROFILELABEL( text ); ::XboxSampleFramework::XsfScopedNamedEvent   XSF_PASTE( pixEvent, __LINE__ ) ( ctx, color, text, __VA_ARGS__ );
-#define XSFScopedNamedEventFunc( ctx, color )          ATGPROFILETHIS; ::XboxSampleFramework::XsfScopedNamedEvent   XSF_PASTE( pixEvent, __LINE__ ) ( ctx, color, XSF_PASTE( L, __FUNCTION__ ) );
-
-#else
-
-#define XSFBeginNamedEventF( ctx, color, text, ... )   PIXBeginEvent(color, text, __VA_ARGS__ ); ::XboxSampleFramework::XSFBeginNamedEventFImpl( ctx, text, __VA_ARGS__ )
-#define XSFBeginNamedEvent( ctx, color, text )         PIXBeginEvent(color, text); ::XboxSampleFramework::XSFBeginNamedEventImpl( ctx, text )
-#define XSFEndNamedEvent( ctx )                        PIXEndEvent(); ::XboxSampleFramework::XSFEndNamedEventImpl( ctx )
-
-// Scoped versions. XSFScopedNamedEvent will open an event in constructor and close it in destructor, so it will wrap a C++ scope
-// XSFScopedNamedEventFunc is commonly used to wrap the entire function body in Begin/End named event
-#define XSFScopedNamedEvent( ctx, color, text, ... )   ::XboxSampleFramework::XsfScopedNamedEvent   XSF_PASTE( pixEvent, __LINE__ ) ( ctx, color, text, __VA_ARGS__ );
-#define XSFScopedNamedEventFunc( ctx, color )          ::XboxSampleFramework::XsfScopedNamedEvent   XSF_PASTE( pixEvent, __LINE__ ) ( ctx, color,  XSF_PASTE( L, __FUNCTION__ ) );
-#endif
 
 #if defined(ATG_PROFILE_VERBOSE)
 
@@ -279,27 +245,9 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 // PC build
 #include "pix3.h"
 
-#define XSFBeginNamedEventF( ctx, color, text, ... )   PIXBeginEvent(ctx, color, text, __VA_ARGS__)
-#define XSFBeginNamedEvent( ctx, color, text )         PIXBeginEvent(ctx, color, text)
-#define XSFEndNamedEvent( ctx )                        PIXEndEvent(ctx)
-
-#define XSFScopedNamedEvent( ctx, color, text, ... )   PIXScopedEvent(ctx, color, text, __VA_ARGS__)
-#define XSFScopedNamedEventFunc( ctx, color )          PIXScopedEvent(ctx, color, text)
-
-
-
 #endif
 
 #else // No PIX_INSTRUMENTATION
-
-#define XSFBeginNamedEventF( ctx, color, text, ... )
-#define XSFBeginNamedEvent( ctx, color, text )
-#define XSFEndNamedEvent( ctx )                        
-
-#define XSFSetMarkerF( ctx, color, text, ... )
-#define XSFSetMarker( ctx, color, text )               
-#define XSFScopedNamedEvent( ctx, color, text, ... )   
-#define XSFScopedNamedEventFunc( ctx, color )          
 
 void PIXBeginEvent(void* /*ctx*/, DWORD /*color*/, wchar_t* /*text*/, ...);
 void PIXBeginEvent(DWORD /*color*/, wchar_t* /*text*/, ...);

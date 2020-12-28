@@ -190,14 +190,14 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;PIX_INSTRUMENTATION;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.Scarlett.x64'">
@@ -215,14 +215,14 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;PIX_INSTRUMENTATION;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|Gaming.Xbox.XboxOne.x64'">
@@ -240,14 +240,14 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;NDEBUG;PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;PIX_INSTRUMENTATION;NDEBUG;PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|Gaming.Xbox.Scarlett.x64'">
@@ -265,14 +265,14 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;NDEBUG;PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;PIX_INSTRUMENTATION;NDEBUG;PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Xbox.XboxOne.x64'">
@@ -289,10 +289,10 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;PIX_INSTRUMENTATION;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\Gaming.Xbox.Scarlett.x64 $(OutDir) RenderPlatform12Xbox</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Xbox.Scarlett.x64'">
@@ -312,7 +312,7 @@
       <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\Gaming.Xbox.Scarlett.x64 $(OutDir) RenderPlatform12Xbox</Command>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -1940,7 +1940,7 @@ _Use_decl_annotations_
 HRESULT MipsGenerator::GenerateMips(D3DCommandList* const pCmdList, _In_ ID3D12Resource* const pResource, const D3D12_SHADER_RESOURCE_VIEW_DESC* pDescSRV, 
                                     D3D12_CPU_DESCRIPTOR_HANDLE* phSRV, D3D12_RESOURCE_STATES resourceState)
 {
-    XSFScopedNamedEvent(pCmdList, XTF_COLOR_DRAW_TEXT, L"GenerateMips");
+    PIXScopedEvent(pCmdList, XTF_COLOR_DRAW_TEXT, L"GenerateMips");
 
     D3D12_RESOURCE_DESC descResource = pResource->GetDesc();
 
@@ -2078,7 +2078,7 @@ HRESULT MipsGenerator::GenerateMips(D3DCommandList* const pCmdList, _In_ ID3D12R
 
         for (UINT iMipLevel = iMinMipLevel; iMipLevel < descResource.MipLevels; ++iMipLevel)
         {
-            XSFScopedNamedEvent(pCmdList, XTF_COLOR_DRAW_TEXT, L"GenerateMips (Array: %d, Mip: %d)", iArrayOrDepth, iMipLevel);
+            PIXScopedEvent(pCmdList, XTF_COLOR_DRAW_TEXT, L"GenerateMips (Array: %d, Mip: %d)", iArrayOrDepth, iMipLevel);
 
             // transition the lower mip level to RT
             descBarrier.Transition.Subresource = iMipLevel + iArrayOrDepth * descResource.MipLevels;
