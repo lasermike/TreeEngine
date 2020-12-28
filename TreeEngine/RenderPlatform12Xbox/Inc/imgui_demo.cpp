@@ -211,8 +211,8 @@ void ImGui::ShowDemoWindow(bool* p_open)
     // Examples Apps (accessible from the "Examples" menu)
     static bool show_app_documents = false;
     static bool show_app_main_menu_bar = false;
-    static bool show_app_console = false;
-    static bool show_app_log = false;
+    static bool show_app_console = true;
+    static bool show_app_log = true;
     static bool show_app_layout = false;
     static bool show_app_property_editor = false;
     static bool show_app_long_text = false;
@@ -236,9 +236,9 @@ void ImGui::ShowDemoWindow(bool* p_open)
     if (show_app_custom_rendering)    ShowExampleAppCustomRendering(&show_app_custom_rendering);
 
     // Dear ImGui Apps (accessible from the "Tools" menu)
-    static bool show_app_metrics = false;
+    static bool show_app_metrics = true;
     static bool show_app_style_editor = false;
-    static bool show_app_about = false;
+    static bool show_app_about = true;
 
     if (show_app_metrics)             { ImGui::ShowMetricsWindow(&show_app_metrics); }
     if (show_app_style_editor)        { ImGui::Begin("Style Editor", &show_app_style_editor); ImGui::ShowStyleEditor(); ImGui::End(); }

@@ -30,13 +30,14 @@
 // DirectX
 #include <d3d12_xs.h>
 //#include <dxgi1_4.h>
-//#include <d3dcompiler.h>
+#include <d3dcompiler.h>
 #ifdef _MSC_VER
-//#pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
+#pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
 #endif
 
 // DirectX data
 static ID3D12Device*                g_pd3dDevice = NULL;
+static ID3D12CommandQueue*          g_pd3dCmdQueue = NULL;
 static ID3D10Blob*                  g_pVertexShaderBlob = NULL;
 static ID3D10Blob*                  g_pPixelShaderBlob = NULL;
 static ID3D12RootSignature*         g_pRootSignature = NULL;
@@ -332,7 +333,7 @@ static void ImGui_ImplDX12_CreateFontsTexture()
         barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
         ID3D12Fence* fence = NULL;
-        hr = g_pd3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), (void**) &fence);
+        hr = g_pd3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), (void**)&fence);
         IM_ASSERT(SUCCEEDED(hr));
 
         HANDLE event = CreateEvent(0, 0, 0, 0);
@@ -341,18 +342,21 @@ static void ImGui_ImplDX12_CreateFontsTexture()
         D3D12_COMMAND_QUEUE_DESC queueDesc = {};
         queueDesc.Type     = D3D12_COMMAND_LIST_TYPE_DIRECT;
         queueDesc.Flags    = D3D12_COMMAND_QUEUE_FLAG_NONE;
-        queueDesc.NodeMask = 1;
 
-        ID3D12CommandQueue* cmdQueue = NULL;
-        hr = g_pd3dDevice->CreateCommandQueue(&queueDesc, __uuidof(ID3D12CommandQueue), (void**)&cmdQueue);
-        IM_ASSERT(SUCCEEDED(hr));
+#if !defined(TREE_XBOX)
+        queueDesc.NodeMask = 1;
+#endif
+        //ID3D12CommandQueue* cmdQueue = NULL;
+        //hr = g_pd3dDevice->CreateCommandQueue(&queueDesc, __uuidof(ID3D12CommandQueue), (void**)&cmdQueue);
+        //IM_ASSERT(SUCCEEDED(hr));
+        IM_ASSERT(g_pd3dCmdQueue);
 
         ID3D12CommandAllocator* cmdAlloc = NULL;
-        hr = g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandList), (void**)&cmdAlloc);
+        hr = g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator), (void**)&cmdAlloc);
         IM_ASSERT(SUCCEEDED(hr));
 
         ID3D12GraphicsCommandList* cmdList = NULL;
-        hr = g_pd3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, cmdAlloc, NULL, __uuidof(ID3D12CommandList), (void**)&cmdList);
+        hr = g_pd3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, cmdAlloc, NULL, __uuidof(ID3D12GraphicsCommandList), (void**)&cmdList);
         IM_ASSERT(SUCCEEDED(hr));
 
         cmdList->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, NULL);
@@ -361,8 +365,8 @@ static void ImGui_ImplDX12_CreateFontsTexture()
         hr = cmdList->Close();
         IM_ASSERT(SUCCEEDED(hr));
 
-        cmdQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*) &cmdList);
-        hr = cmdQueue->Signal(fence, 1);
+        g_pd3dCmdQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*) &cmdList);
+        hr = g_pd3dCmdQueue->Signal(fence, 1);
         IM_ASSERT(SUCCEEDED(hr));
 
         fence->SetEventOnCompletion(1, event);
@@ -370,7 +374,6 @@ static void ImGui_ImplDX12_CreateFontsTexture()
 
         cmdList->Release();
         cmdAlloc->Release();
-        cmdQueue->Release();
         CloseHandle(event);
         fence->Release();
         uploadBuffer->Release();
@@ -503,8 +506,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
               return output;\
             }";
 
-        assert(false);
-        //D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_5_0", 0, 0, &g_pVertexShaderBlob, NULL);
+        D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_5_0", 0, 0, &g_pVertexShaderBlob, NULL);
         if (g_pVertexShaderBlob == NULL) // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
             return false;
         psoDesc.VS = { g_pVertexShaderBlob->GetBufferPointer(), g_pVertexShaderBlob->GetBufferSize() };
@@ -536,9 +538,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
               return out_col; \
             }";
 
-        assert(false);
-
-        //D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_5_0", 0, 0, &g_pPixelShaderBlob, NULL);
+        D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_5_0", 0, 0, &g_pPixelShaderBlob, NULL);
         if (g_pPixelShaderBlob == NULL)  // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
             return false;
         psoDesc.PS = { g_pPixelShaderBlob->GetBufferPointer(), g_pPixelShaderBlob->GetBufferSize() };
@@ -586,7 +586,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         desc.BackFace = desc.FrontFace;
     }
 
-    if (g_pd3dDevice->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**) &g_pPipelineState) != S_OK)
+    if (g_pd3dDevice->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&g_pPipelineState) != S_OK)
         return false;
 
     ImGui_ImplDX12_CreateFontsTexture();
@@ -616,7 +616,7 @@ void    ImGui_ImplDX12_InvalidateDeviceObjects()
     }
 }
 
-bool ImGui_ImplDX12_Init(ID3D12Device* device, int num_frames_in_flight, DXGI_FORMAT rtv_format, ID3D12DescriptorHeap* cbv_srv_heap,
+bool ImGui_ImplDX12_Init(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, int num_frames_in_flight, DXGI_FORMAT rtv_format, ID3D12DescriptorHeap* cbv_srv_heap,
                          D3D12_CPU_DESCRIPTOR_HANDLE font_srv_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE font_srv_gpu_desc_handle)
 {
     // Setup back-end capabilities flags
@@ -625,6 +625,8 @@ bool ImGui_ImplDX12_Init(ID3D12Device* device, int num_frames_in_flight, DXGI_FO
     io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
 
     g_pd3dDevice = device;
+    g_pd3dCmdQueue = cmdQueue;
+
     g_RTVFormat = rtv_format;
     g_hFontSrvCpuDescHandle = font_srv_cpu_desc_handle;
     g_hFontSrvGpuDescHandle = font_srv_gpu_desc_handle;
@@ -652,6 +654,7 @@ void ImGui_ImplDX12_Shutdown()
     delete[] g_pFrameResources;
     g_pFrameResources = NULL;
     g_pd3dDevice = NULL;
+    g_pd3dCmdQueue = NULL;
     g_hFontSrvCpuDescHandle.ptr = 0;
     g_hFontSrvGpuDescHandle.ptr = 0;
     g_numFramesInFlight = 0;

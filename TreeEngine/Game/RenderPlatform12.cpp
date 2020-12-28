@@ -527,11 +527,14 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         // Setup Platform/Renderer bindings
         ImGui_ImplWin32_Init(m_hwnd);
-        ImGui_ImplDX12_Init(GetDevice(), FrameCount,
+        ImGui_ImplDX12_Init(GetDevice(),
+#if defined(TREE_XBOX)
+        m_commandQueue,
+#endif 
+            FrameCount,
             m_swapChainFormat, m_descriptorHeap,
             m_descriptorHeap.hCPU(ImGui_SrvHeapOffset),
             m_descriptorHeap.hGPU(ImGui_SrvHeapOffset));
-
         imGuiInitialized = true;
     }
 

@@ -29,9 +29,9 @@ void UpdateFrameAndRender()
     g_game->ComputeCPU();
     g_game->ComputeGPU();
 
-    g_game->Render(false);
+    g_game->Render(false);   
 }
-
+ 
 // Entry point
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {

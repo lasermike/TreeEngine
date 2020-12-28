@@ -15,150 +15,7 @@
 #endif
 #include <windows.h>
 #include <XInput.h>
-//#include <tchar.h>
-
-// Xbox
-BOOL WINAPI ClientToScreen(
-    _In_ HWND hWnd,
-    _Inout_ LPPOINT lpPoint) 
-{
-    return false;
-}
-
-BOOL WINAPI ScreenToClient(
-    _In_ HWND hWnd,
-    _Inout_ LPPOINT lpPoint)
-{
-    return false;
-}
-
-BOOL WINAPI SetCursorPos(
-    _In_ int X,
-    _In_ int Y)
-{
-    return false;
-}
-
-HWND
-WINAPI
-GetForegroundWindow(
-    VOID)
-{
-    return 0;
-}
-
-BOOL WINAPI IsChild(
-    _In_ HWND hWndParent,
-    _In_ HWND hWnd)
-{
-    return false;
-}
-
-SHORT
-WINAPI
-GetKeyState(
-    _In_ int nVirtKey)
-{
-    return 0;
-}
-
-HWND
-WINAPI
-GetCapture(
-    VOID)
-{
-    return 0;
-}
-
-HWND
-WINAPI
-SetCapture(
-    _In_ HWND hWnd)
-{
-    return 0;
-}
-
-BOOL
-WINAPI
-ReleaseCapture(
-    VOID)
-{
-    return false;
-}
-
-typedef struct _XINPUT_GAMEPAD
-{
-    WORD                                wButtons;
-    BYTE                                bLeftTrigger;
-    BYTE                                bRightTrigger;
-    SHORT                               sThumbLX;
-    SHORT                               sThumbLY;
-    SHORT                               sThumbRX;
-    SHORT                               sThumbRY;
-} XINPUT_GAMEPAD, * PXINPUT_GAMEPAD;
-
-typedef struct _XINPUT_VIBRATION
-{
-    WORD                                wLeftMotorSpeed;
-    WORD                                wRightMotorSpeed;
-} XINPUT_VIBRATION, * PXINPUT_VIBRATION;
-
-typedef struct _XINPUT_CAPABILITIES
-{
-    BYTE                                Type;
-    BYTE                                SubType;
-    WORD                                Flags;
-    XINPUT_GAMEPAD                      Gamepad;
-    XINPUT_VIBRATION                    Vibration;
-} XINPUT_CAPABILITIES, * PXINPUT_CAPABILITIES;
-
-DWORD WINAPI XInputGetCapabilities
-(
-    _In_  DWORD                dwUserIndex,   // Index of the gamer associated with the device
-    _In_  DWORD                dwFlags,       // Input flags that identify the device type
-    _Out_ XINPUT_CAPABILITIES* pCapabilities  // Receives the capabilities
-)
-{
-    return 0;
-}
-
-#define XINPUT_FLAG_GAMEPAD             0x00000001
-
-typedef struct _XINPUT_STATE
-{
-    DWORD                               dwPacketNumber;
-    XINPUT_GAMEPAD                      Gamepad;
-} XINPUT_STATE, * PXINPUT_STATE;
-
-DWORD WINAPI XInputGetState
-(
-    _In_  DWORD         dwUserIndex,  // Index of the gamer associated with the device
-    _Out_ XINPUT_STATE* pState        // Receives the current state
-)
-{
-    return 0;
-}
-
-#define XINPUT_GAMEPAD_DPAD_UP          0x0001
-#define XINPUT_GAMEPAD_DPAD_DOWN        0x0002
-#define XINPUT_GAMEPAD_DPAD_LEFT        0x0004
-#define XINPUT_GAMEPAD_DPAD_RIGHT       0x0008
-#define XINPUT_GAMEPAD_START            0x0010
-#define XINPUT_GAMEPAD_BACK             0x0020
-#define XINPUT_GAMEPAD_LEFT_THUMB       0x0040
-#define XINPUT_GAMEPAD_RIGHT_THUMB      0x0080
-#define XINPUT_GAMEPAD_LEFT_SHOULDER    0x0100
-#define XINPUT_GAMEPAD_RIGHT_SHOULDER   0x0200
-#define XINPUT_GAMEPAD_A                0x1000
-#define XINPUT_GAMEPAD_B                0x2000
-#define XINPUT_GAMEPAD_X                0x4000
-#define XINPUT_GAMEPAD_Y                0x8000
-
-#define XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE  7849
-#define XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE 8689
-#define XINPUT_GAMEPAD_TRIGGER_THRESHOLD    30
-
-// Xbox
+#include <tchar.h>
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
@@ -276,6 +133,7 @@ static void ImGui_ImplWin32_UpdateMousePos()
 {
     ImGuiIO& io = ImGui::GetIO();
 
+#if 0
     // Set OS mouse position if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
     if (io.WantSetMousePos)
     {
@@ -291,6 +149,7 @@ static void ImGui_ImplWin32_UpdateMousePos()
         if (active_window == g_hWnd || ::IsChild(active_window, g_hWnd))
             if (::GetCursorPos(&pos) && ::ScreenToClient(g_hWnd, &pos))
                 io.MousePos = ImVec2((float)pos.x, (float)pos.y);
+#endif
 }
 
 #ifdef _MSC_VER
@@ -304,6 +163,8 @@ static void ImGui_ImplWin32_UpdateGamepads()
     memset(io.NavInputs, 0, sizeof(io.NavInputs));
     if ((io.ConfigFlags & ImGuiConfigFlags_NavEnableGamepad) == 0)
         return;
+
+#if 0
 
     // Calling XInputGetState() every frame on disconnected gamepads is unfortunately too slow.
     // Instead we refresh gamepad availability by calling XInputGetCapabilities() _only_ after receiving WM_DEVICECHANGE.
@@ -342,6 +203,9 @@ static void ImGui_ImplWin32_UpdateGamepads()
         #undef MAP_BUTTON
         #undef MAP_ANALOG
     }
+
+#endif
+
 }
 
 void    ImGui_ImplWin32_NewFrame()
@@ -360,12 +224,15 @@ void    ImGui_ImplWin32_NewFrame()
     io.DeltaTime = (float)(current_time - g_Time) / g_TicksPerSecond;
     g_Time = current_time;
 
+#if 0
+
     // Read keyboard modifiers inputs
     io.KeyCtrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
     io.KeyShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
     io.KeyAlt = (::GetKeyState(VK_MENU) & 0x8000) != 0;
     io.KeySuper = false;
     // io.KeysDown[], io.MousePos, io.MouseDown[], io.MouseWheel: filled by the WndProc handler below.
+#endif 
 
     // Update OS mouse position
     ImGui_ImplWin32_UpdateMousePos();
@@ -415,8 +282,12 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
         if (msg == WM_RBUTTONDOWN || msg == WM_RBUTTONDBLCLK) { button = 1; }
         if (msg == WM_MBUTTONDOWN || msg == WM_MBUTTONDBLCLK) { button = 2; }
         if (msg == WM_XBUTTONDOWN || msg == WM_XBUTTONDBLCLK) { button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? 3 : 4; }
+
+#if 0
         if (!ImGui::IsAnyMouseDown() && ::GetCapture() == NULL)
             ::SetCapture(hwnd);
+#endif
+
         io.MouseDown[button] = true;
         return 0;
     }
@@ -431,8 +302,10 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
         if (msg == WM_MBUTTONUP) { button = 2; }
         if (msg == WM_XBUTTONUP) { button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? 3 : 4; }
         io.MouseDown[button] = false;
+#if 0
         if (!ImGui::IsAnyMouseDown() && ::GetCapture() == hwnd)
             ::ReleaseCapture();
+#endif
         return 0;
     }
     case WM_MOUSEWHEEL:

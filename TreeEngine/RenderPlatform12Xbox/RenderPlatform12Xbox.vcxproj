@@ -303,7 +303,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;TREE3D12;RENDERPLATFORM_EXPORTS;PIX_INSTRUMENTATION;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREE3D12;RENDERPLATFORM_EXPORTS;PIX_INSTRUMENTATION;IMGUI_DISABLE_WIN32_FUNCTIONS;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
