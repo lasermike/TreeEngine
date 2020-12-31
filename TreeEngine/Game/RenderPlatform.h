@@ -14,6 +14,7 @@
 
 class RenderPlatform;
 class RenderManager;
+enum CbvSrvHeapOffsets;
 
 namespace XboxSampleFramework
 {
@@ -611,7 +612,7 @@ public:
     virtual HRESULT EndFrame(D3DBuffer* buffer) = 0;
 
     virtual HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) = 0;
-    virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) = 0;
+    virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) = 0;
 
     virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
     virtual HRESULT SetRenderPhase(RenderState state) = 0;
@@ -770,7 +771,7 @@ private:
 
     // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
-    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
+    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, CbvSrvHeapOffsets srvOffset);
 
     void TrimUploadHeaps(bool removeTerminatedHeaps);
 
@@ -825,7 +826,7 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer);
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
-    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
@@ -975,7 +976,7 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer);
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
-    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
@@ -1050,7 +1051,7 @@ typedef HRESULT (*BeginNewFrameFunc)(bool resetCommandList, D3DBuffer* buffer, I
 typedef HRESULT (*EndFrameFunc)(D3DBuffer* buffer);
 
 typedef HRESULT (*RenderPrologFunc)(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
-typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
 typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
 typedef HRESULT (*SetRenderPhaseFunc)(RenderState state);
@@ -1165,7 +1166,7 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer) { return EndFrameFuncPtr(buffer); }
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) { return RenderPrologFuncPtr(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor); }
-    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture); }
+    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, renderToSharedTexture); }
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
     HRESULT SetRenderPhase(RenderState state) { return SetRenderPhaseFuncPtr(state); }

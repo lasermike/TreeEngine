@@ -90,9 +90,9 @@ RENDERPLATFORM_API HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlp
     return m_pPlatform->RenderProlog(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor);
 }
 
-RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
+RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture)
 {
-    return m_pPlatform->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture);
+    return m_pPlatform->RenderEpilog(oculus, useShadowMaps, renderToSharedTexture);
 }
 
 RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)

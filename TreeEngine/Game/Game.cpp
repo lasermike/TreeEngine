@@ -5,7 +5,6 @@
 #include "Tree.h"
 #include "TreeModelGenerator.h"
 #include "Primitive.h"
-#include "ShadowMap.h"
 #include "GameLoader.h"
 #include "RenderManager.h"
 #include "InputManager.h"
@@ -36,6 +35,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_timeStart = 0;
     m_resetTree = true;
     m_showShadowBuffer = false;
+    m_showDxrUav = false;
     m_advanceScene = 0;
     m_advanceSceneAmount = 0;
     m_currentScene = 0;
@@ -353,7 +353,7 @@ void Game::Render(bool oculus)
     m_renderManager.GetRenderData().eyePos = m_player->GetEyePosition();
 
     m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
-        m_showShadowBuffer, m_renderToSharedTexture, &m_gameData.clearColor.x);
+                           m_renderToSharedTexture, &m_gameData.clearColor.x);
 
     PIXEndEvent();  // Render
     PIXEndEvent();  // Frame begin
@@ -389,6 +389,7 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
                 break;
             case 'Z':
                 m_showShadowBuffer = !m_showShadowBuffer;
+                m_renderManager.GetRenderData().showShadowBuffer = m_showShadowBuffer;
                 key[k] = false;
                 break;
             case 'P':

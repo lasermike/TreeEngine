@@ -121,7 +121,7 @@ public:
     HRESULT BeginNewFrame();
     HRESULT EndFrame();
 
-    void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
+    void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp,
                 bool m_renderToSharedTexture, float* clearColor);
 
     HRESULT DrawFrameStats();

@@ -3,6 +3,7 @@
 #include "ConstBufferDefinitions.h"
 
 class ShadowMap;
+class UavBuffer;
 struct InstancedData;
 struct D3DBuffer;
 interface IInputManager;
@@ -80,17 +81,21 @@ struct RenderData
     // Shadows
     static const int    SMapWidth = 2048;
     static const int    SMapHeight = 2048;
-    BoundingSphere        mSceneBounds;
-    ShadowMap*            pShadowMap;        // Owned by Game
-    XMFLOAT4X4            lightView;
-    XMFLOAT4X4            lightProj;
-    XMFLOAT4X4            shadowTransform;
+    BoundingSphere      mSceneBounds;
+    ShadowMap*          pShadowMap;        // Owned by Game
+    UavBuffer*          pDxrBuffer;        // Owned by Game
+    XMFLOAT4X4          lightView;
+    XMFLOAT4X4          lightProj;
+    XMFLOAT4X4          shadowTransform;
 
-    bool                 wireframe;
+    bool                wireframe;
+    bool                showShadowBuffer;
+    bool                showDxrUav;
+
 
     IInputManager*       inputManager;
 
-    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), instanceData(nullptr), wireframe(false), inputManager(nullptr)
+    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrBuffer(nullptr), instanceData(nullptr), wireframe(false), showShadowBuffer(false), showDxrUav(true), inputManager(nullptr)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());
         XMStoreFloat4x4(&projection, XMMatrixIdentity());

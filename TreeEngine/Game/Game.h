@@ -115,6 +115,7 @@ private:
 
     bool                                m_resetTree;
     bool                                m_showShadowBuffer;
+    bool                                m_showDxrUav;
     bool                                m_paused;
     bool                                m_wireframe;
     bool                                m_showHelp;

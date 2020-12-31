@@ -7,6 +7,36 @@
 
 #if defined(TREE3D12)
 
+UavBuffer::UavBuffer(XSF::D3DDevice* device,
+                     DXGI_FORMAT dxgiFormat,
+                     D3D12_CPU_DESCRIPTOR_HANDLE bufferSrvCpu,
+                     D3D12_GPU_DESCRIPTOR_HANDLE bufferSrvGpu,
+                     UINT width, UINT height)
+{
+    srvCpu = bufferSrvCpu;
+    srvGpu = bufferSrvGpu;
+
+    D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+    D3D12_RESOURCE_DESC uavOutputDesc = CD3DX12_RESOURCE_DESC::Tex2D(dxgiFormat, (UINT64)width, (UINT)height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    HR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &uavOutputDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        nullptr, __uuidof(ID3D12Resource*), (void**) &uavOutput));
+
+    device->CreateUnorderedAccessView(uavOutput, nullptr, nullptr, bufferSrvCpu);
+
+    // Describe and create a SRV for the texture.
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = dxgiFormat;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+    device->CreateShaderResourceView(uavOutput, &srvDesc, bufferSrvCpu);
+
+    //m_hudBatch->SetViewport(m_deviceResources->GetScreenViewport());
+
+}
+
+
 ShadowMap::ShadowMap(XSF::D3DDevice* device, D3D12_CPU_DESCRIPTOR_HANDLE shadowMapSrvCpu, D3D12_GPU_DESCRIPTOR_HANDLE shadowMapSrvGpu,
                      D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvCpu, UINT width, UINT height)
     : mWidth(width), mHeight(height), mDepthMapSRVCpu(shadowMapSrvCpu), mDepthMapSRVGpu(shadowMapSrvGpu), mDepthMapDSV(shadowMapDsvCpu), mDepthMap(0)
@@ -68,7 +98,7 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     HR(device->CreateTexture2D(&texDesc, 0, &mDepthMap));
 #endif
 
-    SetDebugName(mDepthMap, "ShadowMap::mDepthMap");
+    SetDebugName(mDepthMap, L"ShadowMap::mDepthMap");
 
 #if defined(TREE3D12)
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
@@ -76,7 +106,6 @@ ShadowMap::ShadowMap(XSF::D3DDevice* device, UINT width, UINT height)
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Texture2D.MipSlice = 0;
     device->CreateDepthStencilView(mDepthMap, &dsvDesc, mDepthMapDSV);
-    //SetDebugName(mDepthMapDSV, "ShadowMap::mDepthMapDSV");
 
     // Describe and create a SRV for the texture.
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};

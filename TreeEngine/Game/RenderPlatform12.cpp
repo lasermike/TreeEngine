@@ -42,6 +42,7 @@ enum CbvSrvHeapOffsets
     Offscreen1_UavHeapOffset = 6,
     Offscreen2_UavHeapOffset = 7,
     ImGui_SrvHeapOffset = 8,
+    Dxr_SrvHeapOffset = 9,
 
     // Per-material descriptors
     Material0_HeapOffset = 9,
@@ -291,7 +292,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // Constant buffers
     m_constBufferNeverChanges = new UploadBuffer<CBNeverChanges>(GetDevice(), Count_CBSI /* normal + shadown pass */, true);
-    SetDebugName(m_constBufferNeverChanges->Resource(), "RenderManager::m_constBufferNeverChanges");
+    SetDebugName(m_constBufferNeverChanges->Resource(), L"RenderManager::m_constBufferNeverChanges");
 
     // Constants per frame
     m_constBufferChangesEveryFrame = new UploadBuffer<CBChangesEveryFrame>(GetDevice(), 1, true);
@@ -565,6 +566,16 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             m_renderData->SMapHeight);
     }
 
+    if (true /*useDxr*/)
+    {
+        m_renderData->pDxrBuffer = new UavBuffer(GetDevice(),
+            m_swapChainFormat,
+            m_descriptorHeap.hCPU(Dxr_SrvHeapOffset),
+            m_descriptorHeap.hGPU(Dxr_SrvHeapOffset),
+            m_renderData->projectionData.screenWidth,
+            m_renderData->projectionData.screenHeight);
+    }
+
     return S_OK;
 }
 
@@ -639,7 +650,7 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
     newBuffer->view.SizeInBytes = sizeBytes;
     newBuffer->view.StrideInBytes = sizeBytes / numInstances;
 
-    SetDebugName(newBuffer->buffer, "D3DBuffer::buffer");
+    SetDebugName(newBuffer->buffer, L"D3DBuffer::buffer");
 
     m_gameLevelResources.push_back(newBuffer->buffer);
 
@@ -788,6 +799,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_gameLevelResources.clear();
     m_nextFreeShaderHeapDescriptor = 0;
 
+    SafeDelete(&m_renderData->pDxrBuffer);
     SafeDelete(&m_renderData->pShadowMap);
 
     return S_OK;
@@ -1149,7 +1161,7 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     return S_OK;
 }
 
-HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture)
+HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, CbvSrvHeapOffsets srvOffset)
 {
     UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
@@ -1158,8 +1170,8 @@ HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList,
     GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
     GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE shadowMapHandle = m_descriptorHeap.hGPU(ShadowSrv_HeapOffset);
-    GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, shadowMapHandle);
+    D3D12_GPU_DESCRIPTOR_HANDLE srvHandle = m_descriptorHeap.hGPU(srvOffset);
+    GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, srvHandle);
 
     commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
@@ -1413,7 +1425,6 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 
 #if defined(TREE_XBOX)
     m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-//    m_swapChainFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 #else
     m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 #endif
@@ -1507,8 +1518,8 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         HRR(m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
         GetDevice()->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
 
-        CHAR name[25];
-        if (sprintf_s(name, "m_renderTargets[%u]", i) > 0)
+        wchar_t name[25];
+        if (wcsprintf_s(name, "m_renderTargets[%u]", i) > 0)
         {
             SetDebugName(m_renderTargets[i], name);
         }
@@ -1543,7 +1554,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         &depthClearValue,
         __uuidof(ID3D12Resource), (void**)&m_pDepthStencil));
 
-    SetDebugName(m_pDepthStencil, "Game::m_pDepthStencil");
+    SetDebugName(m_pDepthStencil, L"Game::m_pDepthStencil");
 
     // Create the depth stencil view.
     GetDevice()->CreateDepthStencilView(m_pDepthStencil, nullptr, m_dsvHeap.hCPU(0));
@@ -1612,8 +1623,8 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     rtvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_rtvHeap.hCPU(FrameCount + 1));
     GetDevice()->CreateRenderTargetView(m_offscreenBuffer2, nullptr, rtvHandle);
 
-    SetDebugName(m_offscreenBuffer1, "offscreenBuffer1");
-    SetDebugName(m_offscreenBuffer2, "offscreenBuffer2");
+    SetDebugName(m_offscreenBuffer1, L"offscreenBuffer1");
+    SetDebugName(m_offscreenBuffer2, L"offscreenBuffer2");
 
     // UI
     if (imGuiInitialized)
@@ -1875,13 +1886,31 @@ std::vector<float> CalcGaussWeights(float sigma)
     return weights;
 }
 
-HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
+HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool renderToSharedTexture)
 {
     HRESULT hr = S_OK;
 
-    if (showShadowBuffer)
+    if (m_renderData->showShadowBuffer)
     {
-        HRR(DrawScreenQuad(GetCommandList(), m_renderData->pShadowMap ? m_renderData->pShadowMap->DepthMapSRV() : D3D12_CPU_DESCRIPTOR_HANDLE()));
+        HRR(DrawScreenQuad(GetCommandList(), ShadowSrv_HeapOffset));
+    }
+
+    if (m_renderData->showDxrUav)
+    {
+        PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");
+
+        // Change to DEPTH_WRITE.
+        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrBuffer->uavOutput,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        GetCommandList()->ResourceBarrier(1, &toReadBarrier);
+
+        HRR(DrawScreenQuad(GetCommandList(), Dxr_SrvHeapOffset));
+
+        D3D12_RESOURCE_BARRIER barriers[1];
+        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        GetCommandList()->ResourceBarrier(ARRAYSIZE(barriers), barriers);
+
+        PIXEndEvent(GetCommandList());
     }
 
     PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing");

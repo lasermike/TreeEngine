@@ -211,10 +211,17 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
 
 #if defined(TREE3D12)
 #if defined(_DEBUG)
-void SetDebugName(ID3D12DeviceChild* child, const char* name)
+void SetDebugName(ID3D12DeviceChild* child, const wchar_t* name)
 {
-#if !defined(TREE_XBOX)
-    child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
+#if defined(TREE_XBOX)
+    child->SetName(name);
+#else
+    char buf[4096];
+    size_t converted;
+    wcstombs_s(&converted, buf, name, _countof(buf) - 1);
+    buf[converted] = 0;
+
+    child->SetPrivateData(WKPDID_D3DDebugObjectName, converted, buf);
 #endif
 }
 #endif //_DEBUG -> NDEBUG
@@ -224,10 +231,7 @@ void SetDebugName(ID3D12DeviceChild* child, const char* name)
 // Naming
 //
 #if defined(_DEBUG) && !defined(_XBOX_ONE) && defined(TREE3D11) // NAMING
-void SetDebugName(ID3D11DeviceChild* child, const char* name)
-{
-    //child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
-}
+void SetDebugName(ID3D11DeviceChild* child, const char* name) { }
 
 #else
 #endif // TREE3D12

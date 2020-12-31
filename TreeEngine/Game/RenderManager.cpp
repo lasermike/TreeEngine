@@ -434,7 +434,7 @@ void RenderManager::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
+void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp,
     bool renderToSharedTexture, float* clearColor)
 {
     HRESULT hr = S_OK;
@@ -465,7 +465,7 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
         DrawFrameStats();
     }
 
-    HRC(GetPlatform()->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture));
+    HRC(GetPlatform()->RenderEpilog(oculus, useShadowMaps, renderToSharedTexture));
 
 Cleanup:
     return;

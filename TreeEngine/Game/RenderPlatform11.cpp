@@ -723,7 +723,7 @@ HRESULT RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlph
     return S_OK;
 }
 
-HRESULT RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
+HRESULT RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture)
 {
     HRESULT hr = S_OK;
 
@@ -734,7 +734,7 @@ HRESULT RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool sho
         m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
     }
 
-    if (showShadowBuffer)
+    if (m_renderData->showShadowBuffer)
     {
         HRC(DrawScreenQuad(m_immediateContext, m_renderData->pShadowMap->DepthMapSRV()));
     }

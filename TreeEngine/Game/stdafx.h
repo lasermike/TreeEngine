@@ -161,7 +161,7 @@ void SafeDelete(T* obj)
 #define XSF_ERROR_IF_FAILED( exp ) exp  
 
 #if defined(TREE3D12)
-__inline void SetDebugName(ID3D12DeviceChild* /*child*/, const char* /*name*/) { }
+__inline void SetDebugName(ID3D12DeviceChild* /*child*/, const wchar_t* /*name*/) { }
 //void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter);
 #elif defined(TREE3D11)
 __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
@@ -178,18 +178,12 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 //
 // Naming of objects
 //
-#if defined(_XBOX_ONE) // NAMING
-    __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
-#else
-
 #if defined(TREE3D12)
-    void SetDebugName(ID3D12DeviceChild* child, const char* name);
+    void SetDebugName(ID3D12DeviceChild* child, const wchar_t* name);
 
 #elif defined(TREE3D11)
     void SetDebugName(ID3D11DeviceChild* child, const char* name);
 #endif
-
-#endif // NAMING
 
 #endif  // NDEBUG
 
