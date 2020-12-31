@@ -565,7 +565,7 @@ public:
 
     RenderPlatform() :
         m_vertexShader(nullptr), m_pixelShader(nullptr), m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
-        m_drawScreenVertexShader(nullptr), m_drawScreenPixelShader(nullptr), imGuiInitialized(false)
+        m_drawScreenVertexShader(nullptr), m_drawR8ScreenPixelShader(nullptr), m_drawRGBScreenPixelShader(nullptr), imGuiInitialized(false)
     { }
 
 #if defined(TREE3D12) || defined(TREE3D11)
@@ -652,7 +652,8 @@ public:
     VertexShader*                      m_shadowVertexShader;
     PixelShader*                       m_shadowPixelShader;
     VertexShader*                      m_drawScreenVertexShader;
-    PixelShader*                       m_drawScreenPixelShader;
+    PixelShader*                       m_drawR8ScreenPixelShader;
+    PixelShader*                       m_drawRGBScreenPixelShader;
 };
 
 #if defined(TREE3D12)
@@ -746,8 +747,9 @@ private:
 
     // PSO -TODO: consolidate in game level pso's
     CComPtr<ID3D12PipelineState>      m_pipelineState;
-    CComPtr<ID3D12PipelineState>      m_pipelineStateFullScreenQuad;
+    CComPtr<ID3D12PipelineState>      m_pipelineStateR8FullScreenQuad;
     CComPtr<ID3D12PipelineState>      m_pipelineStateShadowMap;
+    CComPtr<ID3D12PipelineState>      m_pipelineStateRGBFullScreenQuad;
 
     // Fences
     CComPtr<ID3D12Fence>              m_fence;
@@ -771,7 +773,7 @@ private:
 
     // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
-    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, CbvSrvHeapOffsets srvOffset);
+    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, CbvSrvHeapOffsets srvOffset, ID3D12PipelineState* pso);
 
     void TrimUploadHeaps(bool removeTerminatedHeaps);
 

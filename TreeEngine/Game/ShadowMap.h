@@ -17,6 +17,7 @@ public:
               DXGI_FORMAT dxgiFormat,
               D3D12_CPU_DESCRIPTOR_HANDLE bufferSrvCpu,
               D3D12_GPU_DESCRIPTOR_HANDLE bufferSrvGpu,
+              D3D12_CPU_DESCRIPTOR_HANDLE bufferUavCpu,
               UINT width, UINT height);
 
     ID3D12Resource* uavOutput;

@@ -347,7 +347,7 @@ DSVertexOut DrawScreenQuadVS(DSVertexIn vin)
     return vout;
 }
 
-float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
+float4 DrawR8ScreenQuadPS(DSVertexOut input) : SV_Target
 {
     float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
 
@@ -357,6 +357,13 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
     // draw test circle 
     //float len = length(input.Tex - 0.5);
     //return float4(len, len, len,1);
+}
+
+float4 DrawRGBScreenQuadPS(DSVertexOut input) : SV_Target
+{
+    float4 c = txDiffuse.Sample(samLinear, input.Tex);
+
+    return float4(c.rgb, 1);
 }
 
 /////////////////////////////////////////////////////////

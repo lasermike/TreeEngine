@@ -30,9 +30,9 @@ void UpdateFrameAndRender()
     g_game->ComputeGPU();
 
     g_game->Render(false); 
-}
-
-// Entry point
+}   
+  
+// Entry point 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
     UNREFERENCED_PARAMETER(lpCmdLine);

@@ -11,6 +11,7 @@ UavBuffer::UavBuffer(XSF::D3DDevice* device,
                      DXGI_FORMAT dxgiFormat,
                      D3D12_CPU_DESCRIPTOR_HANDLE bufferSrvCpu,
                      D3D12_GPU_DESCRIPTOR_HANDLE bufferSrvGpu,
+                     D3D12_CPU_DESCRIPTOR_HANDLE bufferUavCpu,
                      UINT width, UINT height)
 {
     srvCpu = bufferSrvCpu;
@@ -22,9 +23,13 @@ UavBuffer::UavBuffer(XSF::D3DDevice* device,
     HR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &uavOutputDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
         nullptr, __uuidof(ID3D12Resource*), (void**) &uavOutput));
 
-    device->CreateUnorderedAccessView(uavOutput, nullptr, nullptr, bufferSrvCpu);
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = dxgiFormat;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-    // Describe and create a SRV for the texture.
+    device->CreateUnorderedAccessView(uavOutput, nullptr, &uavDesc, bufferUavCpu);
+
+    //Describe and create a SRV for the texture.
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Format = dxgiFormat;
@@ -32,8 +37,7 @@ UavBuffer::UavBuffer(XSF::D3DDevice* device,
     srvDesc.Texture2D.MipLevels = 1;
     device->CreateShaderResourceView(uavOutput, &srvDesc, bufferSrvCpu);
 
-    //m_hudBatch->SetViewport(m_deviceResources->GetScreenViewport());
-
+    SetDebugName(uavOutput, L"UavBuffer");
 }
 
 

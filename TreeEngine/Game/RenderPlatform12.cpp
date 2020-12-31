@@ -21,6 +21,8 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 
+#include "pix.h"
+
 #if defined(TREE_CLASSIC)
 bool useImGui = true;
 #else
@@ -43,11 +45,12 @@ enum CbvSrvHeapOffsets
     Offscreen2_UavHeapOffset = 7,
     ImGui_SrvHeapOffset = 8,
     Dxr_SrvHeapOffset = 9,
+    Dxr_UavHeapOffset = 10,
 
     // Per-material descriptors
-    Material0_HeapOffset = 9,
+    Material0_HeapOffset = 11,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 10,
+    Texture0Srv_HeapOffset = 12,
     Num_CbvSrvHeapOffsets
 };
  
@@ -314,9 +317,11 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     ////////  Debug window texture /////
     m_drawScreenVertexShader = nullptr;
-    m_drawScreenPixelShader = nullptr;
+    m_drawR8ScreenPixelShader = nullptr;
+    m_drawRGBScreenPixelShader = nullptr;
     HRR(LoadVertexShader(L"DrawScreenQuadVS.cso", &m_drawScreenVertexShader));
-    HRR(LoadPixelShader(L"DrawScreenQuadPS.cso", &m_drawScreenPixelShader));
+    HRR(LoadPixelShader(L"DrawR8ScreenQuadPS.cso", &m_drawR8ScreenPixelShader));
+    HRR(LoadPixelShader(L"DrawRGBScreenQuadPS.cso", &m_drawRGBScreenPixelShader));
 
     //
     // Simple vertex and index buffer
@@ -572,6 +577,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             m_swapChainFormat,
             m_descriptorHeap.hCPU(Dxr_SrvHeapOffset),
             m_descriptorHeap.hGPU(Dxr_SrvHeapOffset),
+            m_descriptorHeap.hCPU(Dxr_UavHeapOffset),
             m_renderData->projectionData.screenWidth,
             m_renderData->projectionData.screenHeight);
     }
@@ -741,7 +747,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_shadowVertexShader = nullptr;
     m_shadowPixelShader = nullptr;
     m_drawScreenVertexShader = nullptr;
-    m_drawScreenPixelShader = nullptr;
+    m_drawR8ScreenPixelShader = nullptr;
+    m_drawRGBScreenPixelShader = nullptr;
 
     for (VertexShader* vs : m_gameLevelVertexShaders)
     {
@@ -783,7 +790,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_computeRootSignature.Release();
 
     m_pipelineState.Release();
-    m_pipelineStateFullScreenQuad.Release();
+    m_pipelineStateR8FullScreenQuad.Release();
+    m_pipelineStateRGBFullScreenQuad.Release();
     m_pipelineStateShadowMap.Release();
 
     //for (auto pso : m_PSOs)
@@ -1141,10 +1149,10 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     psoDesc.pRootSignature = m_rootSignature;
 #if defined(TREE_XBOX)
     psoDesc.VS = { m_drawScreenVertexShader->shader.data(), m_drawScreenVertexShader->shader.size() };
-    psoDesc.PS = { m_drawScreenPixelShader->shader.data(), m_drawScreenPixelShader->shader.size() };
+    psoDesc.PS = { m_drawR8ScreenPixelShader->shader.data(), m_drawR8ScreenPixelShader->shader.size() };
 #else
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(*m_drawScreenVertexShader);
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_drawScreenPixelShader);
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_drawR8ScreenPixelShader);
 #endif
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
@@ -1156,17 +1164,27 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     psoDesc.RTVFormats[0] = m_swapChainFormat;
     psoDesc.SampleDesc.Count = 1;
 
-    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineStateFullScreenQuad));
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineStateR8FullScreenQuad));
 
+    // Create RGB version
+#if defined(TREE_XBOX)
+    psoDesc.PS = { m_drawRGBScreenPixelShader->shader.data(), m_drawRGBScreenPixelShader->shader.size() };
+#else
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_drawRGBScreenPixelShader);
+#endif
+
+    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineStateRGBFullScreenQuad));
+
+    
     return S_OK;
 }
 
-HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, CbvSrvHeapOffsets srvOffset)
+HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, CbvSrvHeapOffsets srvOffset, ID3D12PipelineState* pso)
 {
     UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
 
-    commandList->SetPipelineState(m_pipelineStateFullScreenQuad);
+    commandList->SetPipelineState(pso);
     GetCommandList()->IASetVertexBuffers(0, 1, &m_screenQuadVBView);
     GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
 
@@ -1519,7 +1537,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         GetDevice()->CreateRenderTargetView(m_renderTargets[i], nullptr, rtvHandle);
 
         wchar_t name[25];
-        if (wcsprintf_s(name, "m_renderTargets[%u]", i) > 0)
+        if (swprintf_s(name, L"m_renderTargets[%u]", i) > 0)
         {
             SetDebugName(m_renderTargets[i], name);
         }
@@ -1892,19 +1910,26 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
     if (m_renderData->showShadowBuffer)
     {
-        HRR(DrawScreenQuad(GetCommandList(), ShadowSrv_HeapOffset));
+        HRR(DrawScreenQuad(GetCommandList(), ShadowSrv_HeapOffset, m_pipelineStateR8FullScreenQuad));
     }
 
     if (m_renderData->showDxrUav)
     {
         PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");
 
+        //GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, m_descriptorHeap.hGPU(Dxr_UavHeapOffset));
+
+        //UINT clearColor[4] = { 200, 0, 0, 1 };
+        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(Dxr_UavHeapOffset), m_descriptorHeap.hCPU(Dxr_UavHeapOffset),
+        //    m_renderData->pDxrBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
+
+
         // Change to DEPTH_WRITE.
         CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrBuffer->uavOutput,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         GetCommandList()->ResourceBarrier(1, &toReadBarrier);
 
-        HRR(DrawScreenQuad(GetCommandList(), Dxr_SrvHeapOffset));
+        HRR(DrawScreenQuad(GetCommandList(), Dxr_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
 
         D3D12_RESOURCE_BARRIER barriers[1];
         barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
