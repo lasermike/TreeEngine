@@ -16,6 +16,23 @@ class RenderPlatform;
 class RenderManager;
 enum CbvSrvHeapOffsets;
 
+#if defined(TREE_XBOX) && defined(TREE3D12)
+#include "DxrHelper.h"
+
+struct SimpleTriangleRecord : public ShaderRecord
+{
+    SimpleTriangleRecord() : ShaderRecord()
+    {
+
+    }
+
+    SimpleTriangleRecord(ID3D12StateObjectProperties* props, LPCWSTR exportName)
+    {
+        Initialize(props, exportName);
+    }
+};
+#endif
+
 namespace XboxSampleFramework
 {
     class BitmapFont;
@@ -874,7 +891,26 @@ public:
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
 
 #if defined(TREE_XBOX)
-    void CreateRaytracingPipeline();
+    HRESULT CreateRaytracingPipeline();
+
+    // DXR Objects
+    CComPtr<ID3D12StateObject>            m_raytracingStateObject;
+    CComPtr<ID3D12StateObjectProperties>  m_raytracingStateObjectProps;
+    CComPtr<ID3D12RootSignature>          m_globalRootSignature;
+    CComPtr<ID3D12RootSignature>          m_localRootSignature;
+
+    CComPtr<ID3D12Resource>		m_TLAS, m_TLASScratch;
+    CComPtr<ID3D12Resource>		m_triangleBLAS;
+    CComPtr<ID3D12Resource>		m_VB, m_IB, m_scratch;
+
+    ShaderBindingTable<SimpleTriangleRecord, 1, 2, 1> m_shaderBindingTable;
+
+    static const uint32_t MAX_INSTANCES_IN_TLAS = 10;
+    uint32_t m_numInstancesInTLAS;
+
+    DirectX::GraphicsResource m_instanceDescBuffer;
+    D3D12_RAY_FLAGS m_rayFlags;
+
 #endif
 };
 

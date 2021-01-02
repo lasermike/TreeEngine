@@ -1,21 +1,23 @@
 SETLOCAL ENABLEDELAYEDEXPANSION
 
-echo CMD: %*
 @REM %1 -- FXC/DXC, %2 -- OUTPUT folder, %3 -- layout folder, %4 -- input file (in project dir), %5 -- platform, %6 -- config, %7 -- manifest filename -- incrementa flag
 @SETLOCAL EnableDelayedExpansion
 @set layoutFolder=%3
 @set inputFile=%4
 @set AnyErrors=0
 
+set compiler=%1
+set outputFolder=%2
 set manifestFilename=%7
+set platform=%5
 
-call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
+echo Compiler: !compiler!
+echo Output folder: !outputFolder!
+echo Layout folder: %3
+echo Platform: !platform!
 
 @rem Setup for hot recompile
 @set incremental=0
-
-
-@call :ColorInit
 
 @rem Build from each entry point in shader
 @rem format:filename,vs/ps,entry_point
@@ -43,19 +45,42 @@ call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 ) ELSE if %2==lib (
   set target=lib_6_3
   set suffix=lib
+) ELSE if %2==rootsig (
+  set target=rootsig_1_1
+  set suffix=inc
 ) ELSE (
   set target=cs_6_0
   set suffix=CS
 )
 
 @rem Compile!
-set outputfile=%~4%~n3.cso
-ECHO Building %1 for %target%  
-set finalcmd=%cmdline% %1 /T%target% /Fo"%outputfile%"
-if not [!suffix!] == [lib] (
-	set finalcmd=!finalcmd! /E%3
+set cmdline=!compiler! /Zi /T %target% /E %3 
+
+if !platform! == "Gaming.Xbox.Scarlett.x64" (
+   echo Compiling shaders for Scarlett...
+) else (
+	rem set cmdline=!cmdline!
 )
 
+ECHO Building %1 for %target%  
+
+if [%2] == [rootsig] (
+	set cmdline=!cmdline! /Fh !outputFolder!%3.inc 
+) else if [%2] == [lib] (
+	set cmdline=!cmdline! /Fh !outputFolder!%3.inc /Fd !outputFolder!%3.pdb /Vn g_%3 
+	) else (
+	set outputfile=%~4%~n3.cso
+	set cmdline=!cmdline! /Fo "%outputfile%" /Zpr
+)
+
+set finalcmd=!cmdline! !inputFile!
+
+SET count=1
+FOR /F "tokens=* USEBACKQ" %%F IN (`where dxc`) DO (
+  SET var!count!=%%F
+  SET /a count=!count!+1
+)
+ECHO %var1%
 echo !finalcmd!
 call !finalcmd!
 

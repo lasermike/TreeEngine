@@ -34,10 +34,10 @@
     <!-- - - - -->
     <BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
     <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
-	<LayoutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\TreeXbox\Layout\</LayoutDir>
+    <LayoutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\TreeXbox\Layout\</LayoutDir>
     <MinimumVisualStudioVersion>16.0</MinimumVisualStudioVersion>
     <TargetRuntime>Native</TargetRuntime>
-	<ShaderCompiler>dxc.exe</ShaderCompiler>
+    <ShaderCompiler>dxc.exe</ShaderCompiler>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.XboxOne.x64'" Label="Configuration">
@@ -330,10 +330,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Xbox.Scarlett.x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Main.cpp" />
-    <CustomBuild Include="..\Game\Shaders\RaytracingLibrary.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" ShaderFilesXbox.txt</Command>
-      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <MGCCompile Include="MicrosoftGame.Config" />

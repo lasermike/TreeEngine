@@ -123,4 +123,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\RaytracingLibrary.hlsl" />
+    <CustomBuild Include="..\Game\Shaders\GlobalRootSignature.hlsl" />
+    <CustomBuild Include="..\Game\Shaders\LocalRootSignature.hlsl" />
+  </ItemGroup>
 </Project>

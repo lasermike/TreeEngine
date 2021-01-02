@@ -33,7 +33,8 @@
     <Keyword>Win32Proj</Keyword>
     <BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
     <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
-	<LayoutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\TreeXbox\Layout\</LayoutDir>
+    <LayoutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\TreeXbox\Layout\</LayoutDir>
+    <ShaderCompiler>dxc.exe</ShaderCompiler>
     <WindowsTargetPlatformVersion>$([Microsoft.Build.Utilities.ToolLocationHelper]::GetLatestSDKTargetPlatformVersion('Windows', '10.0'))</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -160,7 +161,7 @@
     <LibraryPath>Lib\Scarlett\$(Configuration);$(Console_SdkLibPath)</LibraryPath>
     <LibraryWPath>Lib\Scarlett\$(Configuration);$(Console_SdkLibPath);$(Console_SdkWindowsMetadataPath)</LibraryWPath>
     <IncludePath>Inc;..\Game\.;Inc\DirectXTK12;..\Inc;$(Console_SdkIncludeRoot)</IncludePath>
-    <ExecutablePath>$(Console_SdkRoot)bin;$(Console_SdkToolPath);$(ExecutablePath);$(PATH);</ExecutablePath>
+    <ExecutablePath>$(Console_SdkRoot)bin;$(Console_SdkToolPath);$(ExecutablePath)</ExecutablePath>
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.XboxOne.x64'">
@@ -176,7 +177,7 @@
     </Link>
     <PostBuildEvent>
       <Command>call $(SolutionDir)\..\Misc\copyrobo $(OutDir) $(BinsDir)$(Configuration)\$(Platform)\TreeXbox\Layout\Image\Loose $(RootNamespace).dll $(RootNamespace).pdb /XO</Command>
-    </PostBuildEvent> 
+    </PostBuildEvent>
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -307,7 +308,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;PIX_INSTRUMENTATION;IMGUI_DISABLE_WIN32_FUNCTIONS;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);$(OutDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -380,6 +381,20 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|Gaming.Xbox.Scarlett.x64'">
       </PrecompiledHeader>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\RaytracingLibrary.hlsl">
+      <Command>call ..\Game\Shaders\buildShaders.bat "$(Console_SdkToolPath)$(ShaderCompiler)" $(OutDir) $(LayoutDir)Image\Loose "%(FullPath)" "$(Platform)" "$(Configuration)" ShaderFilesXbox.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\GlobalRootSignature.hlsl">
+      <Command>call ..\Game\Shaders\buildShaders.bat "$(Console_SdkToolPath)$(ShaderCompiler)" $(OutDir) $(LayoutDir)Image\Loose "%(FullPath)" "$(Platform)" "$(Configuration)" ShaderFilesXbox.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\Game\Shaders\LocalRootSignature.hlsl">
+      <Command>call ..\Game\Shaders\buildShaders.bat "$(Console_SdkToolPath)$(ShaderCompiler)" $(OutDir) $(LayoutDir)Image\Loose "%(FullPath)" "$(Platform)" "$(Configuration)" ShaderFilesXbox.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,3 +1,4 @@
+SETLOCAL ENABLEDELAYEDEXPANSION
 @rem echo off
 
 REM %1% -- FXC
@@ -48,9 +49,8 @@ if "a%~6%" == "aProfile_MonoD3D" (
    SET cmdline=%cmdline% /O3
 )
 
-if "a%~5%" == "aDurango" (
-   echo Compiling shaders for Durango...
-   SET cmdline=%cmdline% /D_DURANGO=1 /WX
+if "%~5%" == "Gaming.Xbox.Scarlett.x64" (
+   echo Compiling shaders for Scarlett...
    rem SET cmdline=%cmdline% /D_DURANGO=1 /D__XBOX_FULL_PRECOMPILE_PROMISE
 ) else (
    echo Compiling shaders for x64...

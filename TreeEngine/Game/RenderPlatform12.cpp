@@ -29,6 +29,12 @@ bool useImGui = true;
 bool useImGui = true;
 #endif
 
+#if defined(TREE_XBOX)
+#include "RaytracingLibrary.inc"
+#include "GlobalRootSignature.inc"
+#include "LocalRootSignature.inc"
+#endif
+
 using namespace DirectX;
 
 
@@ -1360,17 +1366,15 @@ HRESULT RenderPlatform12::InitDevice()
         nullptr,
         D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE));
 
-    //CreateRaytracingPipeline();
+    CreateRaytracingPipeline();
 #endif
 
     return hr;
 }
 
-#if defined(TREE_XBOXX)
-void RenderPlatform12::CreateRaytracingPipeline()
+#if defined(TREE_XBOX)
+HRESULT RenderPlatform12::CreateRaytracingPipeline()
 {
-    auto device = m_deviceResources->GetD3DDevice();
-
     CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
 
     auto raytracingLibrary = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
@@ -1403,8 +1407,9 @@ void RenderPlatform12::CreateRaytracingPipeline()
     {
         // It is not currently possible to specify the D3D12XBOX_ROOT_SIGNATURE_FLAG_RAYTRACING flag in HLSL, so this must be created in C++ with that flag set.
         // To make that process simpler, we'll just deserialize the one we have, add the flag and create it again.
-        Microsoft::WRL::ComPtr<ID3D12VersionedRootSignatureDeserializer> rootSigDeserializer;
-        DX::ThrowIfFailed(D3D12CreateVersionedRootSignatureDeserializer(g_GlobalRootSignature, sizeof(g_GlobalRootSignature), IID_GRAPHICS_PPV_ARGS(rootSigDeserializer.GetAddressOf())));
+        CComPtr<ID3D12VersionedRootSignatureDeserializer> rootSigDeserializer;
+        HRR(D3D12CreateVersionedRootSignatureDeserializer(g_GlobalRootSignature, sizeof(g_GlobalRootSignature), __uuidof(ID3D12VersionedRootSignatureDeserializer),
+                                                            (void**) &rootSigDeserializer));
 
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rsDesc = *(rootSigDeserializer->GetUnconvertedRootSignatureDesc());
 
@@ -1412,40 +1417,45 @@ void RenderPlatform12::CreateRaytracingPipeline()
         rsDesc.Desc_1_1.Flags |= D3D12XBOX_ROOT_SIGNATURE_FLAG_RAYTRACING;
 #endif
 
-        Microsoft::WRL::ComPtr<ID3DBlob> mainBlob, errorBlob;
-        DX::ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rsDesc, mainBlob.GetAddressOf(), errorBlob.GetAddressOf()));
-        DX::ThrowIfFailed(device->CreateRootSignature(0, mainBlob->GetBufferPointer(), mainBlob->GetBufferSize(), IID_GRAPHICS_PPV_ARGS(m_globalRootSignature.GetAddressOf())));
+        CComPtr<ID3DBlob> mainBlob, errorBlob;
+        HRR(D3D12SerializeVersionedRootSignature(&rsDesc, &mainBlob, &errorBlob));
+        HRR(m_d3dDevice->CreateRootSignature(0, mainBlob->GetBufferPointer(), mainBlob->GetBufferSize(), __uuidof(ID3D12RootSignature), (void**)&m_globalRootSignature));
         m_globalRootSignature->SetName(L"GlobalRootSignature");
 
         auto globalRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-        globalRootSignature->SetRootSignature(m_globalRootSignature.Get());
+        globalRootSignature->SetRootSignature(m_globalRootSignature);
     }
 
     // Create Local Root Signature
     {
-        DX::ThrowIfFailed(device->CreateRootSignature(0, g_LocalRootSignature, sizeof(g_LocalRootSignature), IID_GRAPHICS_PPV_ARGS(m_localRootSignature.GetAddressOf())));
+        HRR(m_d3dDevice->CreateRootSignature(0, g_LocalRootSignature, sizeof(g_LocalRootSignature), __uuidof(ID3D12RootSignature), (void**)&m_localRootSignature));
         m_localRootSignature->SetName(L"LocalRootSignature");
 
         auto localRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
-        localRootSignature->SetRootSignature(m_localRootSignature.Get());
+        localRootSignature->SetRootSignature(m_localRootSignature);
 
         auto rootSignatureAssociation = raytracingPipeline.CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
         rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
         rootSignatureAssociation->AddExport(hitGroupExportName);
     }
 
-    DX::ThrowIfFailed(device->CreateStateObject(raytracingPipeline, IID_GRAPHICS_PPV_ARGS(m_raytracingStateObject.GetAddressOf())));
-    DX::ThrowIfFailed(m_raytracingStateObject->QueryInterface(IID_GRAPHICS_PPV_ARGS(m_raytracingStateObjectProps.GetAddressOf())));
+    CComPtr<ID3D12Device5> d3dDevice5;
+    HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**) &d3dDevice5));
 
-    SimpleTriangleRecord rayGenRecord(m_raytracingStateObjectProps.Get(), rayGenExportName);
+    HRR(d3dDevice5->CreateStateObject(raytracingPipeline, __uuidof(ID3D12StateObject), (void**)&m_raytracingStateObject));
+    HRR(m_raytracingStateObject->QueryInterface(__uuidof(ID3D12StateObjectProperties), (void**)&m_raytracingStateObjectProps));
+
+    SimpleTriangleRecord rayGenRecord(m_raytracingStateObjectProps, rayGenExportName);
     SimpleTriangleRecord emptyMissShader;
-    SimpleTriangleRecord validMissShader(m_raytracingStateObjectProps.Get(), missShaderExportName);
-    SimpleTriangleRecord hitGroupRecord(m_raytracingStateObjectProps.Get(), hitGroupExportName);
+    SimpleTriangleRecord validMissShader(m_raytracingStateObjectProps, missShaderExportName);
+    SimpleTriangleRecord hitGroupRecord(m_raytracingStateObjectProps, hitGroupExportName);
 
     m_shaderBindingTable.SetRayGenRecord(0, rayGenRecord);
     m_shaderBindingTable.SetMissShaderRecord(0, emptyMissShader);
     m_shaderBindingTable.SetMissShaderRecord(1, validMissShader);
     m_shaderBindingTable.SetHitGroupRecord(0, hitGroupRecord);
+
+    return S_OK;
 }
 #endif
 
@@ -1775,6 +1785,13 @@ IDXGISwapChain* RenderPlatform12::GetSwapChain()
 
 HRESULT RenderPlatform12::UninitDevice()
 {
+#if defined (TREE_XBOX)
+    m_raytracingStateObject.Release();
+    m_raytracingStateObjectProps.Release();
+    m_globalRootSignature.Release();
+    m_localRootSignature.Release();
+
+#endif
     SafeDelete(&m_graphicsMemory);
 
     XSF::StockRenderStates::Shutdown();
