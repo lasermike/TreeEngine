@@ -892,6 +892,8 @@ public:
 
 #if defined(TREE_XBOX)
     HRESULT CreateRaytracingPipeline();
+    HRESULT BuildTopLevelAccelerationStructure(bool buildEveryFrame);
+    HRESULT BuildBottomLevelAccelerationStructure(bool buildEveryFrame);
 
     // DXR Objects
     CComPtr<ID3D12StateObject>            m_raytracingStateObject;

@@ -237,6 +237,7 @@ namespace XboxSampleFramework
 
         operator ID3D12DescriptorHeap*() { return m_pDH; }
         operator ID3D12DescriptorHeap*() const { return m_pDH; }
+        operator ID3D12DescriptorHeap* const* () const { return &m_pDH; }
 
         D3D12_CPU_DESCRIPTOR_HANDLE hCPU(UINT index) const
         {

@@ -70,5 +70,5 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 [shader("miss")]
 void MissShader(inout RayPayload payload)
 {
-	renderOutput[DispatchRaysIndex().xy] = float4(0, 0, 0, 1);
+	renderOutput[DispatchRaysIndex().xy] = float4(0, 1, 0, 1);
 }
