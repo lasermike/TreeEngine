@@ -18,11 +18,13 @@ public:
               D3D12_CPU_DESCRIPTOR_HANDLE bufferSrvCpu,
               D3D12_GPU_DESCRIPTOR_HANDLE bufferSrvGpu,
               D3D12_CPU_DESCRIPTOR_HANDLE bufferUavCpu,
+              D3D12_CPU_DESCRIPTOR_HANDLE bufferNonVisibleUavCpu,
               UINT width, UINT height);
 
     ID3D12Resource* uavOutput;
     D3D12_CPU_DESCRIPTOR_HANDLE srvCpu;
     D3D12_GPU_DESCRIPTOR_HANDLE srvGpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE srvCpuNonVisible;
 };
 
 class ShadowMap

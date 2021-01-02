@@ -578,6 +578,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             m_descriptorHeap.hCPU(Dxr_SrvHeapOffset),
             m_descriptorHeap.hGPU(Dxr_SrvHeapOffset),
             m_descriptorHeap.hCPU(Dxr_UavHeapOffset),
+            m_nonVisibleDescriptorHeap.hCPU(Dxr_UavHeapOffset),
             m_renderData->projectionData.screenWidth,
             m_renderData->projectionData.screenHeight);
     }
@@ -1302,6 +1303,8 @@ HRESULT RenderPlatform12::InitDevice()
     // Shader visible heap
     HRR(m_descriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, true));
 
+    HRR(m_nonVisibleDescriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, numGlobalDescriptors, false));
+
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -1356,10 +1359,95 @@ HRESULT RenderPlatform12::InitDevice()
         0U,
         nullptr,
         D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE));
+
+    //CreateRaytracingPipeline();
 #endif
 
     return hr;
 }
+
+#if defined(TREE_XBOXX)
+void RenderPlatform12::CreateRaytracingPipeline()
+{
+    auto device = m_deviceResources->GetD3DDevice();
+
+    CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+
+    auto raytracingLibrary = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+    D3D12_SHADER_BYTECODE libraryDXIL = CD3DX12_SHADER_BYTECODE((void*)g_RaytracingLibrary, sizeof(g_RaytracingLibrary));
+    raytracingLibrary->SetDXILLibrary(&libraryDXIL);
+
+    const wchar_t* rayGenExportName = L"RayGenerationShader";
+    const wchar_t* missShaderExportName = L"MissShader";
+    const wchar_t* hitGroupExportName = L"HitGroup";
+
+    // Setup our one and only Hit Group
+    {
+        auto hitGroup = raytracingPipeline.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+        hitGroup->SetHitGroupExport(hitGroupExportName);
+        hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+        hitGroup->SetClosestHitShaderImport(L"ClosestHitShader");
+        hitGroup->SetAnyHitShaderImport(L"AnyHitShader");
+    }
+
+    // Configure the shaders and pipeline
+    {
+        auto shaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+        shaderConfig->Config(4, 8);
+
+        auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+        pipelineConfig->Config(1);
+    }
+
+    // Create Global Root Signature
+    {
+        // It is not currently possible to specify the D3D12XBOX_ROOT_SIGNATURE_FLAG_RAYTRACING flag in HLSL, so this must be created in C++ with that flag set.
+        // To make that process simpler, we'll just deserialize the one we have, add the flag and create it again.
+        Microsoft::WRL::ComPtr<ID3D12VersionedRootSignatureDeserializer> rootSigDeserializer;
+        DX::ThrowIfFailed(D3D12CreateVersionedRootSignatureDeserializer(g_GlobalRootSignature, sizeof(g_GlobalRootSignature), IID_GRAPHICS_PPV_ARGS(rootSigDeserializer.GetAddressOf())));
+
+        D3D12_VERSIONED_ROOT_SIGNATURE_DESC rsDesc = *(rootSigDeserializer->GetUnconvertedRootSignatureDesc());
+
+#ifdef _GAMING_XBOX_SCARLETT
+        rsDesc.Desc_1_1.Flags |= D3D12XBOX_ROOT_SIGNATURE_FLAG_RAYTRACING;
+#endif
+
+        Microsoft::WRL::ComPtr<ID3DBlob> mainBlob, errorBlob;
+        DX::ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rsDesc, mainBlob.GetAddressOf(), errorBlob.GetAddressOf()));
+        DX::ThrowIfFailed(device->CreateRootSignature(0, mainBlob->GetBufferPointer(), mainBlob->GetBufferSize(), IID_GRAPHICS_PPV_ARGS(m_globalRootSignature.GetAddressOf())));
+        m_globalRootSignature->SetName(L"GlobalRootSignature");
+
+        auto globalRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+        globalRootSignature->SetRootSignature(m_globalRootSignature.Get());
+    }
+
+    // Create Local Root Signature
+    {
+        DX::ThrowIfFailed(device->CreateRootSignature(0, g_LocalRootSignature, sizeof(g_LocalRootSignature), IID_GRAPHICS_PPV_ARGS(m_localRootSignature.GetAddressOf())));
+        m_localRootSignature->SetName(L"LocalRootSignature");
+
+        auto localRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
+        localRootSignature->SetRootSignature(m_localRootSignature.Get());
+
+        auto rootSignatureAssociation = raytracingPipeline.CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+        rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
+        rootSignatureAssociation->AddExport(hitGroupExportName);
+    }
+
+    DX::ThrowIfFailed(device->CreateStateObject(raytracingPipeline, IID_GRAPHICS_PPV_ARGS(m_raytracingStateObject.GetAddressOf())));
+    DX::ThrowIfFailed(m_raytracingStateObject->QueryInterface(IID_GRAPHICS_PPV_ARGS(m_raytracingStateObjectProps.GetAddressOf())));
+
+    SimpleTriangleRecord rayGenRecord(m_raytracingStateObjectProps.Get(), rayGenExportName);
+    SimpleTriangleRecord emptyMissShader;
+    SimpleTriangleRecord validMissShader(m_raytracingStateObjectProps.Get(), missShaderExportName);
+    SimpleTriangleRecord hitGroupRecord(m_raytracingStateObjectProps.Get(), hitGroupExportName);
+
+    m_shaderBindingTable.SetRayGenRecord(0, rayGenRecord);
+    m_shaderBindingTable.SetMissShaderRecord(0, emptyMissShader);
+    m_shaderBindingTable.SetMissShaderRecord(1, validMissShader);
+    m_shaderBindingTable.SetHitGroupRecord(0, hitGroupRecord);
+}
+#endif
 
 HRESULT RenderPlatform12::UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass)
 {
@@ -1709,6 +1797,8 @@ HRESULT RenderPlatform12::UninitDevice()
 
     m_descriptorHeap.Terminate();
 
+    m_nonVisibleDescriptorHeap.Terminate();
+
     // InitDevice objects
 #if !defined(TREE_XBOX)
     m_pSwapChain.Release();
@@ -1917,11 +2007,9 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     {
         PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");
 
-        //GetCommandList()->SetGraphicsRootDescriptorTable(ShadowSrvTableRootSignatureParam, m_descriptorHeap.hGPU(Dxr_UavHeapOffset));
-
-        //UINT clearColor[4] = { 200, 0, 0, 1 };
-        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(Dxr_UavHeapOffset), m_descriptorHeap.hCPU(Dxr_UavHeapOffset),
-        //    m_renderData->pDxrBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
+        UINT clearColor[4] = { 200, 0, 0, 1 };
+        GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(Dxr_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(Dxr_UavHeapOffset),
+            m_renderData->pDxrBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
 
 
         // Change to DEPTH_WRITE.

@@ -6,6 +6,6 @@ set dllProjectList=%3
 
 call ..\Game\CopyResources.cmd %layoutDir%\
 for /f %%G in ("%3") DO (
-	call ..\..\Misc\copyrobo %binaryDir%\%%G\ %layoutDir%\ %%G.dll %%G.pdb
+	call ..\..\Misc\copyrobo %binaryDir%\%%G %layoutDir% %%G.dll %%G.pdb
 )
  

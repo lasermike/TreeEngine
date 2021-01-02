@@ -1,22 +1,25 @@
-@rem echo off
+SETLOCAL ENABLEDELAYEDEXPANSION
+
 echo CMD: %*
-@REM %1 -- FXC/DXC, %2 -- OUTPUT folder, %3 -- layout folder, %4 -- input file (in project dir), %5 -- platform, %6 -- config, %7 -- incrementa flag
+@REM %1 -- FXC/DXC, %2 -- OUTPUT folder, %3 -- layout folder, %4 -- input file (in project dir), %5 -- platform, %6 -- config, %7 -- manifest filename -- incrementa flag
 @SETLOCAL EnableDelayedExpansion
 @set layoutFolder=%3
 @set inputFile=%4
 @set AnyErrors=0
 
+set manifestFilename=%7
+
 call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 
 @rem Setup for hot recompile
 @set incremental=0
-@if "%7"=="1" set incremental=1
+
 
 @call :ColorInit
 
 @rem Build from each entry point in shader
 @rem format:filename,vs/ps,entry_point
-@FOR /F "tokens=1,2,3 delims=," %%G IN (%~dp4ShaderFiles.txt) DO (
+@FOR /F "tokens=1,2,3 delims=," %%G IN (%~dp4!manifestFilename!) DO (
   if %%G==%~nx4 call :BuildShader %4 %%H %%I %2
 )
 
@@ -29,6 +32,7 @@ call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 
 :BuildShader 
 @rem %1 = inputfile, %2 = stage, %3 = entrypoint %4 = Output dir
+
 @echo BuildShader: %*
 @if %2==vs (
   set target=vs_6_0
@@ -36,21 +40,29 @@ call %~dp4commonshader.bat %1 %2 %3 %4 %5 %6 %7 %8
 ) ELSE if %2==ps (
   set target=ps_6_0
   set suffix=PS
+) ELSE if %2==lib (
+  set target=lib_6_3
+  set suffix=lib
 ) ELSE (
   set target=cs_6_0
   set suffix=CS
 )
+
 @rem Compile!
-@set outputfile=%~4%~n3.cso
-@ECHO Building %1 for %target%  
-@set finalcmd=%cmdline% %1 /T%target% /E%3 /Fo"%outputfile%"
-@echo !finalcmd!
+set outputfile=%~4%~n3.cso
+ECHO Building %1 for %target%  
+set finalcmd=%cmdline% %1 /T%target% /Fo"%outputfile%"
+if not [!suffix!] == [lib] (
+	set finalcmd=!finalcmd! /E%3
+)
+
+echo !finalcmd!
 call !finalcmd!
 
 @if ERRORLEVEL 1 goto ENDOFSCRIPT
 
 @rem Copy output to deployment directory (AppX)
-if not [%layoutFolder%]==[""] ( 
+if not exist %layoutFolder% ( 
 mkdir %layoutFolder%
 xcopy "%outputfile%" %layoutFolder% /y
 )

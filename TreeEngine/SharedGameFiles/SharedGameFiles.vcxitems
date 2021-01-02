@@ -64,19 +64,19 @@
     <None Include="..\Game\Shaders\commonshader.bat">
       <FileType>Document</FileType>
     </None>
-  </ItemGroup>
+  </ItemGroup> 
   <ItemGroup>
-    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\ATGFont.hlsl">
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
-    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tree.hlsl">
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
-    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl">
       <FileType>Document</FileType>
-      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs >$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>

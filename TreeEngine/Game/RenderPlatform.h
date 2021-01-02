@@ -673,6 +673,7 @@ private:
     DescriptorHeapWrapper             m_rtvHeap;
     DescriptorHeapWrapper             m_dsvHeap;
     DescriptorHeapWrapper             m_descriptorHeap;
+    DescriptorHeapWrapper             m_nonVisibleDescriptorHeap;
     int                               m_nextFreeShaderHeapDescriptor;
     DirectX::GraphicsMemory*          m_graphicsMemory;
 
@@ -871,6 +872,10 @@ public:
 
     // TODO: move into interface
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
+
+#if defined(TREE_XBOX)
+    void CreateRaytracingPipeline();
+#endif
 };
 
 #elif defined(TREE3D11)

@@ -12,10 +12,12 @@ UavBuffer::UavBuffer(XSF::D3DDevice* device,
                      D3D12_CPU_DESCRIPTOR_HANDLE bufferSrvCpu,
                      D3D12_GPU_DESCRIPTOR_HANDLE bufferSrvGpu,
                      D3D12_CPU_DESCRIPTOR_HANDLE bufferUavCpu,
+                     D3D12_CPU_DESCRIPTOR_HANDLE bufferNonVisibleUavCpu,
                      UINT width, UINT height)
 {
     srvCpu = bufferSrvCpu;
     srvGpu = bufferSrvGpu;
+    srvCpuNonVisible = bufferNonVisibleUavCpu;
 
     D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
@@ -27,7 +29,9 @@ UavBuffer::UavBuffer(XSF::D3DDevice* device,
     uavDesc.Format = dxgiFormat;
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-    device->CreateUnorderedAccessView(uavOutput, nullptr, &uavDesc, bufferUavCpu);
+    device->CreateUnorderedAccessView(uavOutput, nullptr, &uavDesc, bufferNonVisibleUavCpu);
+
+    device->CopyDescriptorsSimple(1, bufferUavCpu, bufferNonVisibleUavCpu, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     //Describe and create a SRV for the texture.
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
