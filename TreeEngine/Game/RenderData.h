@@ -95,7 +95,7 @@ struct RenderData
 
     IInputManager*       inputManager;
 
-    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrBuffer(nullptr), instanceData(nullptr), wireframe(false), showShadowBuffer(false), showDxrUav(true), inputManager(nullptr)
+    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrBuffer(nullptr), instanceData(nullptr), wireframe(false), showShadowBuffer(false), showDxrUav(false), inputManager(nullptr)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());
         XMStoreFloat4x4(&projection, XMMatrixIdentity());
@@ -108,5 +108,8 @@ struct RenderData
         numDirectionalLights = 1;
         numPointLights = 0;
         instanceBuffer = nullptr;
+#if defined(TREE_XBOX)
+        showDxrUav = true;
+#endif
     }
 };

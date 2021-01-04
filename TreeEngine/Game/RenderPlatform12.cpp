@@ -50,13 +50,18 @@ enum CbvSrvHeapOffsets
     Offscreen1_UavHeapOffset = 6,
     Offscreen2_UavHeapOffset = 7,
     ImGui_SrvHeapOffset = 8,
-    Dxr_SrvHeapOffset = 9,
-    Dxr_UavHeapOffset = 10,
+    DxrOut_SrvHeapOffset = 9,
+    DxrOut_UavHeapOffset = 10,
+    DxrVB_SrvHeapOffset = 11,
+    DxrVB_UavHeapOffset = 12,
+    DxrVBCounter_UavHeapOffset = 13,
+    DxrIB_SrvHeapOffset = 14,
+    DxrIB_UavHeapOffset = 15,
 
     // Per-material descriptors
-    Material0_HeapOffset = 11,
+    Material0_HeapOffset = 16,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 12,
+    Texture0Srv_HeapOffset = 17,
     Num_CbvSrvHeapOffsets
 };
  
@@ -93,6 +98,7 @@ enum RootSignatureParams
     BranchDataRootSignatureParam,
     ChangesPerPassRootSignatureParam,
     ChangesEveryFrameRootSignatureParam,
+    UavTableRootSignatureParam,
 };
 
 const int maxTotalTexturesInScene = 4;
@@ -166,18 +172,20 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     //   cbuffer cbChangesEveryFrame : register(b2)
     //   cbuffer cbMaterial : register (b3)
 
-    CD3DX12_DESCRIPTOR_RANGE ranges[3];
+    CD3DX12_DESCRIPTOR_RANGE ranges[4];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numTexturesPerMaterial, 0 /* t0 */);
+    ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0 /* u0 */);
 
-    CD3DX12_ROOT_PARAMETER rootParameters[6];
+    CD3DX12_ROOT_PARAMETER rootParameters[7];
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[CbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[SrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[BranchDataRootSignatureParam].InitAsShaderResourceView(BranchDataRootSignatureShaderSlot);
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
+    rootParameters[UavTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_VERTEX);
 
     D3D12_STATIC_SAMPLER_DESC sampler[4];
     sampler[0] = D3D12_STATIC_SAMPLER_DESC();
@@ -577,18 +585,99 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             m_renderData->SMapHeight);
     }
 
+#if defined(TREE_XBOX)
     if (true /*useDxr*/)
     {
         m_numInstancesInTLAS = 1;
+
+        // Create screen sized output buffer
         m_renderData->pDxrBuffer = new UavBuffer(GetDevice(),
             m_swapChainFormat,
-            m_descriptorHeap.hCPU(Dxr_SrvHeapOffset),
-            m_descriptorHeap.hGPU(Dxr_SrvHeapOffset),
-            m_descriptorHeap.hCPU(Dxr_UavHeapOffset),
-            m_nonVisibleDescriptorHeap.hCPU(Dxr_UavHeapOffset),
+            m_descriptorHeap.hCPU(DxrOut_SrvHeapOffset),
+            m_descriptorHeap.hGPU(DxrOut_SrvHeapOffset),
+            m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
+            m_nonVisibleDescriptorHeap.hCPU(DxrOut_UavHeapOffset),
             m_renderData->projectionData.screenWidth,
             m_renderData->projectionData.screenHeight);
+
+        const UINT maxWorldVertices = 50000;
+        auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+        // Create index world buffer
+        auto descIBBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * maxWorldVertices, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        HRR(GetDevice()->CreateCommittedResource(
+            &defaultHeapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &descIBBuffer,
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, //D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            __uuidof(ID3D12Resource), (void**)&m_IBWorld));
+
+        HRR(m_IBWorld->SetName(L"IB World Instance"));
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC descIBSRV = {};
+        descIBSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;  // 0?
+        descIBSRV.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        descIBSRV.Buffer.NumElements = maxWorldVertices;
+        descIBSRV.Buffer.StructureByteStride = sizeof(UINT);
+
+        GetDevice()->CreateShaderResourceView(m_IBWorld, &descIBSRV, m_descriptorHeap.hCPU(DxrIB_SrvHeapOffset));
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC descIBUAV = {};
+        descIBUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        descIBUAV.Buffer.NumElements = maxWorldVertices;
+        descIBUAV.Buffer.StructureByteStride = sizeof(UINT);
+
+        GetDevice()->CreateUnorderedAccessView(m_IBWorld, nullptr, &descIBUAV, m_descriptorHeap.hCPU(DxrIB_UavHeapOffset));
+
+        // Create vertex world buffer
+        auto descBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(XMFLOAT3) * maxWorldVertices, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        HRR(GetDevice()->CreateCommittedResource(
+            &defaultHeapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &descBuffer,
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, //D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            __uuidof(ID3D12Resource), (void**) &m_VBWorld));
+
+        HRR(m_VBWorld->SetName(L"VB World Instance"));
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+        descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        descSRV.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        descSRV.Buffer.NumElements = maxWorldVertices;
+        descSRV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
+
+        GetDevice()->CreateShaderResourceView(m_VBWorld, &descSRV, m_descriptorHeap.hCPU(DxrVB_SrvHeapOffset));
+
+        // Create counter for vertex output
+        auto descCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        HRR(GetDevice()->CreateCommittedResource(
+            &defaultHeapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &descCounterBuffer,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            __uuidof(ID3D12Resource), (void**) &m_VBWorldCounter));
+
+        HRR(m_VBWorldCounter->SetName(L"Particle Counter"));
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
+        descUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        descUAV.Buffer.NumElements = maxWorldVertices;
+        descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
+
+        GetDevice()->CreateUnorderedAccessView(m_VBWorld, m_VBWorldCounter, &descUAV, m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset));
+
+        // The second UAV is needed for the Clear operation to reset the counter
+        D3D12_UNORDERED_ACCESS_VIEW_DESC descCounterUAV = {};
+        descCounterUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        descCounterUAV.Buffer.NumElements = 1;
+        descCounterUAV.Buffer.StructureByteStride = sizeof(UINT);
+
+        GetDevice()->CreateUnorderedAccessView(m_VBWorldCounter, nullptr, &descCounterUAV, m_nonVisibleDescriptorHeap.hCPU(DxrVBCounter_UavHeapOffset));
     }
+#endif
 
     return S_OK;
 }
@@ -1487,31 +1576,31 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     rtInputs.pGeometryDescs = &geometryDesc;
 
-    if (m_VB == nullptr)
-    {
-        // Create all the resources only once, even if we're going to rebuild the BLAS every frame.		
-        D3D12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexCount * vertexSize);
-        D3D12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(indexCount * indexSize);
+    //if (m_VB == nullptr)
+    //{
+    //    // Create all the resources only once, even if we're going to rebuild the BLAS every frame.		
+    //    D3D12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexCount * vertexSize);
+    //    D3D12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(indexCount * indexSize);
 
-        D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    //    D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
-        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &vbDesc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, __uuidof(ID3D12Resource), (void**)&m_VB));
-        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &ibDesc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, __uuidof(ID3D12Resource), (void**)&m_IB));
+    //    HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &vbDesc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, __uuidof(ID3D12Resource), (void**)&m_VB));
+    //    HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &ibDesc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, __uuidof(ID3D12Resource), (void**)&m_IB));
 
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO preBuildInfo;
-        device->GetRaytracingAccelerationStructurePrebuildInfo(&rtInputs, &preBuildInfo);
+    //    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO preBuildInfo;
+    //    device->GetRaytracingAccelerationStructurePrebuildInfo(&rtInputs, &preBuildInfo);
 
-        D3D12_RESOURCE_DESC blasDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    //    D3D12_RESOURCE_DESC blasDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    //    D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
-        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_triangleBLAS));
-        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_scratch));
-    }
+    //    HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+    //        nullptr, __uuidof(ID3D12Resource), (void**)&m_triangleBLAS));
+    //    HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+    //        nullptr, __uuidof(ID3D12Resource), (void**)&m_scratch));
+    //}
 
-    geometryDesc.Triangles.VertexBuffer.StartAddress = m_VB->GetGPUVirtualAddress();
-    geometryDesc.Triangles.IndexBuffer = m_IB->GetGPUVirtualAddress();
+    geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress();
+    geometryDesc.Triangles.IndexBuffer = m_IBWorld->GetGPUVirtualAddress();
 
     // Upload one triangle's worth of vertices and indices...
     XMFLOAT3 vertexPositions[3] = { { -0.5f, -0.5f, 0 }, { 0, 0.5f, 0 }, { 0.5f, -0.5f, 0 } };
@@ -1523,12 +1612,12 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     DirectX::ResourceUploadBatch uploadBatch(device);
 
     uploadBatch.Begin();
-    uploadBatch.Transition(m_VB, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
-    uploadBatch.Transition(m_IB, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
-    uploadBatch.Upload(m_VB, 0, &vbData, 1);
-    uploadBatch.Upload(m_IB, 0, &ibData, 1);
-    uploadBatch.Transition(m_VB, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    uploadBatch.Transition(m_IB, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    uploadBatch.Transition(m_VBWorld, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+    uploadBatch.Transition(m_IBWorld, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+    uploadBatch.Upload(m_VBWorld, 0, &vbData, 1);
+    uploadBatch.Upload(m_IBWorld, 0, &ibData, 1);
+    uploadBatch.Transition(m_VBWorld, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    uploadBatch.Transition(m_IBWorld, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     uploadBatch.End(GetCommandQueue());
 
     CComPtr<ID3D12GraphicsCommandList6> commandList;
@@ -2166,7 +2255,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         commandList->SetPipelineState1(m_raytracingStateObject);
         commandList->SetComputeRootShaderResourceView(0, m_TLAS->GetGPUVirtualAddress());
         commandList->SetComputeRoot32BitConstants(1, ARRAYSIZE(rootConstants), rootConstants, 0);
-        commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Dxr_UavHeapOffset));
+        commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
         commandList->DispatchRays(&dispatchRaysDesc);
 
         PIXEndEvent(GetCommandList());
@@ -2226,7 +2315,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");
 
         //UINT clearColor[4] = { 200, 0, 0, 1 };
-        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(Dxr_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(Dxr_UavHeapOffset),
+        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(DxrOut_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(DxrOut_UavHeapOffset),
         //    m_renderData->pDxrBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
 
 
@@ -2235,7 +2324,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         GetCommandList()->ResourceBarrier(1, &toReadBarrier);
 
-        HRR(DrawScreenQuad(GetCommandList(), Dxr_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
+        HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
 
         D3D12_RESOURCE_BARRIER barriers[1];
         barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);

@@ -17,6 +17,10 @@ SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 SamplerState samLinearWrap : register(s3);
 
+//RWTexture2D<float4> gOutput : register(u0);
+AppendStructuredBuffer<float3> outputVertices   : register(u0);    // UAV: Processed indirect commands
+AppendStructuredBuffer<uint> outputIndices    : register(u1);    // UAV: Processed indirect commands
+
 struct InstancedData
 {
     float4x4 World; //  : WORLD;
@@ -73,6 +77,7 @@ struct VS_SKINNED_INPUT
     uint  InstanceOffset : BLENDINDICES0;
     uint  InstanceOffsetPrev : BLENDINDICES1;
     uint  InstanceOffsetNext : BLENDINDICES2;
+    uint  VertexID : SV_VertexID;
 };
 
 struct PS_INPUT
@@ -161,8 +166,8 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
 {
     PS_INPUT output = (PS_INPUT)0;
 
-    float4x3 world = input.World;
-    float4x3 worldPrev = InstanceBuffer[input.InstanceOffsetPrev].World;
+    float4x3 world = (float4x3) input.World;
+    float4x3 worldPrev = (float4x3) InstanceBuffer[input.InstanceOffsetPrev].World;
 
     //float4x4 world = float4x4(world2, float4(0,0,0,1));
     //float4x4 worldPrev = float4x4(worldPrev2, float4(0, 0, 0, 1));
@@ -179,6 +184,10 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     out0 = lerp(outPrev, out0, input.InstanceWeight1);
 
     output.PosW = out0;
+
+    // Write transformed vertex for DXR
+    outputVertices.Append(out0);
+    outputIndices.Append(input.VertexID);
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
     output.Pos = mul(output.Pos, transpose(Projection));

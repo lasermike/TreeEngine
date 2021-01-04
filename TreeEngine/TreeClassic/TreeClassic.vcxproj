@@ -140,7 +140,22 @@
     <Image Include="TreeClassic.ico" />
     <ResourceCompile Include="TreeClassic.rc" />
   </ItemGroup>
-  
+  <ItemGroup>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\ATGFont.hlsl">
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tree.hlsl">
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs >$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets')" />

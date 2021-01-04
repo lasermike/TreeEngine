@@ -383,6 +383,21 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\ATGFont.hlsl">
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tree.hlsl">
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs >$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\RaytracingLibrary.hlsl">
       <Command>call ..\Game\Shaders\buildShaders.bat "$(Console_SdkToolPath)$(ShaderCompiler)" $(OutDir) $(LayoutDir)Image\Loose "%(FullPath)" "$(Platform)" "$(Configuration)" ShaderFilesXbox.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>

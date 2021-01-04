@@ -334,6 +334,7 @@
   <ItemGroup>
     <MGCCompile Include="MicrosoftGame.Config" />
   </ItemGroup>
+  
   <ItemGroup>
     <CopyFileToFolders Include="GraphicsLogo.png">
       <DeploymentContent>true</DeploymentContent>

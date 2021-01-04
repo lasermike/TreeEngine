@@ -903,7 +903,9 @@ public:
 
     CComPtr<ID3D12Resource>		m_TLAS, m_TLASScratch;
     CComPtr<ID3D12Resource>		m_triangleBLAS;
-    CComPtr<ID3D12Resource>		m_VB, m_IB, m_scratch;
+    CComPtr<ID3D12Resource>		m_VBWorld, m_IBWorld, m_scratch;
+
+    CComPtr<ID3D12Resource>     m_VBWorldCounter;
 
     ShaderBindingTable<SimpleTriangleRecord, 1, 2, 1> m_shaderBindingTable;
 
