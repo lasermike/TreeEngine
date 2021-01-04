@@ -17,9 +17,9 @@ SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 SamplerState samLinearWrap : register(s3);
 
-//RWTexture2D<float4> gOutput : register(u0);
 AppendStructuredBuffer<float3> outputVertices   : register(u0);    // UAV: Processed indirect commands
 AppendStructuredBuffer<uint> outputIndices    : register(u1);    // UAV: Processed indirect commands
+ConsumeStructuredBuffer<uint> outputVertexCounter    : register(u2);    // UAV: Processed indirect commands
 
 struct InstancedData
 {

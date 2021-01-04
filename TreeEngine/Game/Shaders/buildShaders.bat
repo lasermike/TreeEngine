@@ -74,18 +74,18 @@ set cmdline=!compiler! /Zi /T %target% /E %3
 
 if !platform! == "Gaming.Xbox.Scarlett.x64" (
    echo  Compiling shaders for Scarlett...
-   set cmdline=!cmdline! /Fc !outputfile!%3.cso.txt 
+   set cmdline=!cmdline! /Fc !outputFolder!%3.cso.txt 
 ) else (
 	rem set cmdline=!cmdline!
 )
 
 if [%2] == [rootsig] (
-	set cmdline=!cmdline! /Fh !outputfile!%3.inc 
+	set cmdline=!cmdline! /Fh !outputFolder!%3.inc 
 ) else if [%2] == [lib] (
-	set cmdline=!cmdline! /Fh !outputfile!%3.inc /Fd !outputfile!%3.pdb /Vn g_%3 
+	set cmdline=!cmdline! /Fh !outputFolder!%3.inc /Fd !outputFolder!%3.pdb /Vn g_%3 
 ) else (
 	set outputfile=%~4%~n3.cso
-	set cmdline=!cmdline! /Zpr /Od /Fo "!outputfile!" /Fd !outputfile!%3.pdb
+	set cmdline=!cmdline! /Zpr /Od /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
 )
 
 set finalcmd=!cmdline! !inputFile!
@@ -106,11 +106,11 @@ echo Succeeded
 
 @rem Copy output to deployment directory (AppX)
 if [!copyToLayout!]==[1] (
-	echo Copying "%outputfile%" to layout folder %layoutFolder%
+	echo Copying !outputfile! to layout folder %layoutFolder%
 	if not exist %layoutFolder% ( 
 		mkdir %layoutFolder%
 	)
-	xcopy "%outputfile%" %layoutFolder% /y
+	xcopy "!outputfile!" %layoutFolder% /y
 )
 
 @goto :EOF

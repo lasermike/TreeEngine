@@ -313,9 +313,9 @@
       <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;PIX_INSTRUMENTATION;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
     </ClCompile>
-    <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command>
-    </PostBuildEvent>
+    <!-- <PostBuildEvent> -->
+      <!-- <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command> -->
+    <!-- </PostBuildEvent> -->
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

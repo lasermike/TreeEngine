@@ -702,8 +702,10 @@ private:
     CComPtr<ID3D12RootSignature>       m_rootSignature;
     CComPtr<ID3D12RootSignature>       m_computeRootSignature;
     CComPtr<ID3D12CommandQueue>        m_commandQueue;
-    CComPtr<ID3D12GraphicsCommandList> m_commandList[RenderPlatform12::FrameCount];
-    CComPtr<ID3D12CommandAllocator>    m_commandAllocator[RenderPlatform12::FrameCount];
+
+    static const int                   kNumCommandLists = 12; // RenderPlatform12::FrameCount
+    CComPtr<ID3D12GraphicsCommandList> m_commandList[kNumCommandLists];
+    CComPtr<ID3D12CommandAllocator>    m_commandAllocator[kNumCommandLists];
 
     UINT                              m_frameIndex;
     UINT                              m_commandListIndex;
@@ -803,6 +805,8 @@ private:
     void IncrementFenceOnGPU();
     void WaitOnFence();
 
+    void WaitOnGpu();
+
 public:
 
     RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
@@ -822,6 +826,7 @@ public:
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
     D3DCommandList* GetCommandList() const { return m_commandList[m_commandListIndex]; }
+    HRESULT AdvanceToNextCommandList();
 
     //
     // Base RenderPlatform methods
@@ -906,6 +911,7 @@ public:
     CComPtr<ID3D12Resource>		m_VBWorld, m_IBWorld, m_scratch;
 
     CComPtr<ID3D12Resource>     m_VBWorldCounter;
+    CComPtr<ID3D12Resource>     m_VBWorldCounterReadback;
 
     ShaderBindingTable<SimpleTriangleRecord, 1, 2, 1> m_shaderBindingTable;
 
