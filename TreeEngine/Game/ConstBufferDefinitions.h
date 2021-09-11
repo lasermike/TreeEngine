@@ -4,7 +4,7 @@
 // For rendering indirectly
 struct InstancedData
 {
-    XMFLOAT4X4 World;
+    XMFLOAT4X3 World;
     UINT  InstanceOffset;
     UINT  InstanceOffsetPrev;
     UINT  InstanceOffsetNext;

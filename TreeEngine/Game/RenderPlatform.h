@@ -194,6 +194,7 @@ __declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[1
     { "BLENDWEIGHT", 0, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
     { "BLENDWEIGHT", 1, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
     { "BLENDWEIGHT", 2, DXGI_FORMAT_R32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
+//    { "VERTEXINDEX", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationVertex, 0 },
     { "WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
@@ -917,6 +918,8 @@ public:
 
     static const uint32_t MAX_INSTANCES_IN_TLAS = 10;
     uint32_t m_numInstancesInTLAS;
+    uint32_t m_maxInstances;
+    GraphicsResource m_BLASinstanceDescBuffer;
 
     DirectX::GraphicsResource m_instanceDescBuffer;
     D3D12_RAY_FLAGS m_rayFlags;

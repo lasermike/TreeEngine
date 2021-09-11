@@ -252,7 +252,7 @@ HRESULT Tree::ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRend
     localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
 
     InstancedData data;
-    XMStoreFloat4x4(&data.World, localToWorld);
+    XMStoreFloat4x3(&data.World, localToWorld);
 
 
     PIXEndEvent();

@@ -103,7 +103,7 @@ HRESULT FSGraph::ComputeConstants(IRenderFrame* pFrameConfig)
 
 	XMMATRIX transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
-	XMStoreFloat4x4(&firstDataView->World, transform);
+	XMStoreFloat4x3(&firstDataView->World, transform);
 
 	return S_OK;
 }

@@ -19,11 +19,11 @@ SamplerState samLinearWrap : register(s3);
 
 AppendStructuredBuffer<float3> outputVertices   : register(u0);    // UAV: Processed indirect commands
 AppendStructuredBuffer<uint> outputIndices    : register(u1);    // UAV: Processed indirect commands
-ConsumeStructuredBuffer<uint> outputVertexCounter    : register(u2);    // UAV: Processed indirect commands
+RWStructuredBuffer<uint> outputVertexCounter    : register(u2);    // UAV: Processed indirect commands
 
 struct InstancedData
 {
-    float4x4 World; //  : WORLD;
+    float4x3 World; //  : WORLD;
     uint InstanceOffset;
     uint InstanceOffsetPrev;
     uint InstanceOffsetNext;
@@ -73,11 +73,11 @@ struct VS_SKINNED_INPUT
     float  InstanceWeight1 : BLENDWEIGHT0;
     float  InstanceWeight2 : BLENDWEIGHT1;
     float  InstanceWeight3 : BLENDWEIGHT2;
+    //uint  VertexInstance;
     float4x4 World  : WORLD;
     uint  InstanceOffset : BLENDINDICES0;
     uint  InstanceOffsetPrev : BLENDINDICES1;
     uint  InstanceOffsetNext : BLENDINDICES2;
-    uint  VertexID : SV_VertexID;
 };
 
 struct PS_INPUT
@@ -187,7 +187,7 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
 
     // Write transformed vertex for DXR
     outputVertices.Append(out0);
-    outputIndices.Append(input.VertexID);
+    //outputIndices.Append(input.VertexID);
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
     output.Pos = mul(output.Pos, transpose(Projection));

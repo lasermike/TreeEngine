@@ -721,6 +721,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     }
 #endif
 
+    m_maxInstances = maxInstances;
+
     return S_OK;
 }
 
@@ -1609,18 +1611,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     CComPtr<ID3D12Device5> device;
     HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
 
-    //// Create new commandlist
-    //CComPtr<ID3D12CommandQueue> copyQueue;
-    //CComPtr <ID3D12CommandAllocator> copyAllocator;
-    //CComPtr <ID3D12GraphicsCommandList> copyList;
-
-    //D3D12_COMMAND_QUEUE_DESC descCopyQueue = {};
-    //descCopyQueue.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    //descCopyQueue.Type = D3D12_COMMAND_LIST_TYPE_COPY;
-    //device->CreateCommandQueue(&descCopyQueue, __uuidof(ID3D12CommandQueue), (void**)&copyQueue);
-    //device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, __uuidof(ID3D12CommandAllocator), (void**)&copyAllocator);
-    //device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, copyAllocator, nullptr, __uuidof(ID3D12GraphicsCommandList), (void**)&copyList);
-
     D3D12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
     GetCommandList()->ResourceBarrier(1, &uavBarrier);
 
@@ -1650,7 +1640,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     geometryDesc.Triangles.VertexCount = vertexCount;
     geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
     geometryDesc.Triangles.VertexBuffer.StrideInBytes = vertexSize;
-    geometryDesc.Triangles.IndexCount = indexCount;
+    geometryDesc.Triangles.IndexCount = indexCount - (indexCount > 0 ? indexCount % 3 : 0);
     geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 
     geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress();
@@ -1663,17 +1653,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     rtInputs.NumDescs = 1;
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     rtInputs.pGeometryDescs = &geometryDesc;
-
-    //if (m_VB == nullptr)
-    //{
-    //    // Create all the resources only once, even if we're going to rebuild the BLAS every frame.		
-    //    D3D12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexCount * vertexSize);
-    //    D3D12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(indexCount * indexSize);
-
-
-    //    HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &vbDesc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, __uuidof(ID3D12Resource), (void**)&m_VB));
-    //    HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &ibDesc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, __uuidof(ID3D12Resource), (void**)&m_IB));
-
 
     if (m_triangleBLAS == nullptr)
     {
@@ -1723,11 +1702,15 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
     CComPtr<ID3D12Device5> device;
     HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
 
-    GraphicsResource instanceDescBuffer = GraphicsMemory::Get(nullptr).Allocate(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * m_numInstancesInTLAS);
-    D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)instanceDescBuffer.Memory();
+    if (!m_instanceDescBuffer.Memory())
+    {
+        m_instanceDescBuffer = GraphicsMemory::Get(nullptr).Allocate(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * m_maxInstances);
+    }
+
+    D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)m_instanceDescBuffer.Memory();
 
     //float time = (float)m_timer.GetTotalSeconds() / 5.0f;  // Slow it down
-    float sizeReductionPerInstance = 1.0f / m_numInstancesInTLAS;
+    //float sizeReductionPerInstance = 1.0f / m_numInstancesInTLAS;
 
     for (UINT i = 0; i < m_numInstancesInTLAS; i++)
     {
@@ -1738,11 +1721,11 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
         instanceDescs[i].InstanceMask = 0xFF;
 
         ZeroMemory(instanceDescs[i].Transform, sizeof(instanceDescs[i].Transform));
-        float size = 1.0f - (i * sizeReductionPerInstance);
+        //float size = 1.0f - (i * sizeReductionPerInstance);
 
         memset(instanceDescs[i].Transform, 0, sizeof(instanceDescs[i].Transform));
 
-        //instanceDescs[i].Transform[0][0] = instanceDescs[i].Transform[1][1] = instanceDescs[i].Transform[2][2] = size;	// Scaled "Identity" matrix.
+        instanceDescs[i].Transform[0][0] = instanceDescs[i].Transform[1][1] = instanceDescs[i].Transform[2][2] = instanceDescs[i].Transform[3][4] = 1.0f;	// Scaled "Identity" matrix.
         //instanceDescs[i].Transform[0][3] = sinf(time + i);
         //instanceDescs[i].Transform[1][3] = 0;
         //instanceDescs[i].Transform[2][3] = (float)i;
@@ -1752,7 +1735,7 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
     topLevelBuildDesc.Inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
     topLevelBuildDesc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     topLevelBuildDesc.Inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    topLevelBuildDesc.Inputs.InstanceDescs = instanceDescBuffer.GpuAddress();
+    topLevelBuildDesc.Inputs.InstanceDescs = m_instanceDescBuffer.GpuAddress();
 
     if (m_TLAS == nullptr)
     {
@@ -2191,13 +2174,6 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
 
     HRR(AdvanceToNextCommandList());
 
-    //m_commandList[m_commandListIndex]->RSSetViewports(1, &m_viewPort);
-    //m_commandList[m_commandListIndex]->RSSetScissorRects(1, &m_scissorRect);
-    //m_commandList[m_commandListIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    //m_commandList[m_commandListIndex]->IASetVertexBuffers(0, 1, &m_VBView);
-    //m_commandList[m_commandListIndex]->IASetIndexBuffer(&m_IBView);
-    //m_commandList[m_commandListIndex]->OMSetStencilRef(0);
-
     return S_OK;
 }
 
@@ -2355,7 +2331,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         HRR(DrawScreenQuad(GetCommandList(), ShadowSrv_HeapOffset, m_pipelineStateR8FullScreenQuad));
     }
 
-#if defined(TREE_XBOX)
+#if defined(TREE_XBOX) && 0
     /** RAY TRACING **/
     {
         // Build acceleation structure
@@ -2403,7 +2379,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         commandList->SetComputeRootShaderResourceView(0, m_TLAS->GetGPUVirtualAddress());
         commandList->SetComputeRoot32BitConstants(1, ARRAYSIZE(rootConstants), rootConstants, 0);
         commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
-        commandList->DispatchRays(&dispatchRaysDesc);
+//        commandList->DispatchRays(&dispatchRaysDesc);
 
         PIXEndEvent(GetCommandList());
     }
