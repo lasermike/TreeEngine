@@ -26,7 +26,6 @@ struct RayPayload
 	float dummy;    // Minimum of 4 bytes required for payloads.
 };
 
-[RootSignature(LocalRootSignature)]
 [shader("raygeneration")]
 void RayGenerationShader()
 {
@@ -45,7 +44,6 @@ void RayGenerationShader()
 	TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
 }
 
-[RootSignature(LocalRootSignature)]
 [shader("anyhit")]
 void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
@@ -58,7 +56,6 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
         IgnoreHit();
 }
 
-[RootSignature(LocalRootSignature)]
 [shader("closesthit")]
 void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
@@ -66,7 +63,6 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 	renderOutput[DispatchRaysIndex().xy] = float4(barycentrics, 1);
 }
 
-[RootSignature(LocalRootSignature)]
 [shader("miss")]
 void MissShader(inout RayPayload payload)
 {

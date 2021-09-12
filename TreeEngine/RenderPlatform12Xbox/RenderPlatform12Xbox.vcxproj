@@ -32,7 +32,7 @@
     <ProjectGuid>{50032863-DFBE-46C4-AD53-8D47248F84F6}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
-    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\Out</OutDir>
     <LayoutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\TreeXbox\Layout\</LayoutDir>
     <ShaderCompiler>dxc.exe</ShaderCompiler>
     <WindowsTargetPlatformVersion>$([Microsoft.Build.Utilities.ToolLocationHelper]::GetLatestSDKTargetPlatformVersion('Windows', '10.0'))</WindowsTargetPlatformVersion>
@@ -163,6 +163,7 @@
     <IncludePath>Inc;..\Game\.;Inc\DirectXTK12;..\Inc;$(Console_SdkIncludeRoot)</IncludePath>
     <ExecutablePath>$(Console_SdkRoot)bin;$(Console_SdkToolPath);$(ExecutablePath)</ExecutablePath>
     <LinkIncremental>true</LinkIncremental>
+    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.XboxOne.x64'">
     <Link>
@@ -394,7 +395,7 @@
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl">
       <FileType>Document</FileType>
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
-      <Outputs >$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>

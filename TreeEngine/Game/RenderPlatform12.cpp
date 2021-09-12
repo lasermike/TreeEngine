@@ -2410,7 +2410,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
 #endif
 
-#if 0
+#if 1 
     if (m_renderData->showDxrUav)
     {
         PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");

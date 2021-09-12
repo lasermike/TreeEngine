@@ -33,7 +33,7 @@
     <Keyword>Win32Proj</Keyword>
     <!-- - - - -->
     <BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
-    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\Out</OutDir>
     <LayoutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\TreeXbox\Layout\</LayoutDir>
     <MinimumVisualStudioVersion>16.0</MinimumVisualStudioVersion>
     <TargetRuntime>Native</TargetRuntime>
@@ -174,7 +174,7 @@
     <IncludePath>..\Game\.;..\Inc;$(ProjectDir);$(Console_SdkIncludeRoot)</IncludePath>
     <ExecutablePath>$(Console_SdkRoot)bin;$(WindowsSDK_ExecutablePath_x86);$(ProgramFiles)\HTML Help Workshop;$(MSBuildToolsPath32);$(FxCopDir);$(PATH);</ExecutablePath>
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
+    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\Out</OutDir>
     <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.XboxOne.x64'">
@@ -313,9 +313,9 @@
       <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;PIX_INSTRUMENTATION;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
     </ClCompile>
-    <!-- <PostBuildEvent> -->
-      <!-- <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command> -->
-    <!-- </PostBuildEvent> -->
+    <PostBuildEvent>
+      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

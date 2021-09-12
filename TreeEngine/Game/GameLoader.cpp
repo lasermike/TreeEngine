@@ -23,10 +23,6 @@ GameLoader::GameLoader()
 
 void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData)
 {
-    //	Load(0, pScene, pRenderData, pPlayer, gameData);
-    //	LoadGraph(pScene, pRenderData, pPlayer, gameData);
-    //	LoadTrees(pScene, pRenderData, pPlayer, gameData);
-    //	LoadTestBlock(pScene, pRenderData, pCamera, gameData);
 }
 
 HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, const char* filename)
@@ -221,6 +217,29 @@ void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
+
+void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+{
+    WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+    params4->position = XMFLOAT3(0, 1.5, 0);
+    params4->scale = XMFLOAT3(1, 1, 1);
+    XMStoreFloat4(&params4->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
+    params4->primitiveType = PrimitiveType_Box;
+
+    scene->AddChild(new Primitive(params4));
+
+    // Init lights
+    renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+    renderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+    renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+    renderData->time = 0;
+
+    // Camera
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+}
+
 
 
 double SegLengthPlusRand(LSystemParams* params, double cmdParam)
@@ -831,6 +850,9 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
         break;
     case 7:
         LoadGraph(pScene, pRenderData, pPlayer, gameData);
+        break;
+    case 8:
+        LoadSimpleBox(pScene, pRenderData, pPlayer, gameData);
         break;
     default:
         ASSERT(false);
