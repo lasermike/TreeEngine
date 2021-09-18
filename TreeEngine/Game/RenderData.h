@@ -83,7 +83,7 @@ struct RenderData
     static const int    SMapHeight = 2048;
     BoundingSphere      mSceneBounds;
     ShadowMap*          pShadowMap;        // Owned by Game
-    UavBuffer*          pDxrBuffer;        // Owned by Game
+    UavBuffer*          pDxrOutBuffer;     // Filled by hit/miss shaders.  Owned by Game.
     XMFLOAT4X4          lightView;
     XMFLOAT4X4          lightProj;
     XMFLOAT4X4          shadowTransform;
@@ -95,7 +95,7 @@ struct RenderData
 
     IInputManager*       inputManager;
 
-    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrBuffer(nullptr), instanceData(nullptr), wireframe(false), showShadowBuffer(false), showDxrUav(false), inputManager(nullptr)
+    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), wireframe(false), showShadowBuffer(false), showDxrUav(false), inputManager(nullptr)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());
         XMStoreFloat4x4(&projection, XMMatrixIdentity());

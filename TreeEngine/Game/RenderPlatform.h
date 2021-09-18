@@ -14,7 +14,7 @@
 
 class RenderPlatform;
 class RenderManager;
-enum CbvSrvHeapOffsets;
+enum CbvSrvUavHeapOffsets;
 
 #if defined(TREE_XBOX) && defined(TREE3D12)
 #include "DxrHelper.h"
@@ -793,7 +793,7 @@ private:
 
     // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
-    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, CbvSrvHeapOffsets srvOffset, ID3D12PipelineState* pso);
+    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, CbvSrvUavHeapOffsets srvOffset, ID3D12PipelineState* pso);
 
     void TrimUploadHeaps(bool removeTerminatedHeaps);
 

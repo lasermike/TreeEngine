@@ -38,18 +38,18 @@ bool useImGui = true;
 using namespace DirectX;
 
 
-enum CbvSrvHeapOffsets
+enum CbvSrvUavHeapOffsets
 {
     // Global descriptors
     ShadowSrv_HeapOffset = 0,
     NullSrv_HeapOffset = 1,
     BranchData1Srv_HeapOffset = 2,
     BranchData2Srv_HeapOffset = 3,
-    Offscreen1_SrvHeapOffset = 4,
-    Offscreen2_SrvHeapOffset = 5,
-    Offscreen1_UavHeapOffset = 6,
-    Offscreen2_UavHeapOffset = 7,
-    ImGui_SrvHeapOffset = 8,
+    ImGui_SrvHeapOffset = 4,
+    Offscreen1_SrvHeapOffset = 5,
+    Offscreen2_SrvHeapOffset = 6,
+    Offscreen1_UavHeapOffset = 7,
+    Offscreen2_UavHeapOffset = 8,
     DxrOut_SrvHeapOffset = 9,
     DxrOut_UavHeapOffset = 10,
     DxrVB_SrvHeapOffset = 11,
@@ -62,7 +62,7 @@ enum CbvSrvHeapOffsets
     Material0_HeapOffset = 16,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
     Texture0Srv_HeapOffset = 17,
-    Num_CbvSrvHeapOffsets
+    Num_CbvSrvUavHeapOffsets
 };
  
 const int numGlobalDescriptors = Material0_HeapOffset;
@@ -93,8 +93,8 @@ enum srvRootSignatureOffsets
 enum RootSignatureParams
 {
     ShadowSrvTableRootSignatureParam = 0,
-    CbvTableRootSignatureParam,
-    SrvTableRootSignatureParam,
+    MaterialCbvTableRootSignatureParam,
+    MaterialSrvTableRootSignatureParam,
     BranchDataRootSignatureParam,
     ChangesPerPassRootSignatureParam,
     ChangesEveryFrameRootSignatureParam,
@@ -105,6 +105,25 @@ const int maxTotalTexturesInScene = 4;
 const int maxNumMaterials = 9;
 
 int RenderUnit::s_nextId = 0;
+
+// The discrepancy in size is due to PSO's being larger on Scarlett
+#if defined(__XBOX_SCARLETT) || defined(_GAMING_XBOX_SCARLETT)
+#define SIZEOF_GPU_APPEND_BUFFER_STRUCT 108
+#else
+#define SIZEOF_GPU_APPEND_BUFFER_STRUCT 104
+#endif
+
+template<typename T>
+inline T AlignUp(T size, size_t alignment) noexcept
+{
+    if (alignment > 0)
+    {
+        assert(((alignment - 1) & alignment) == 0);
+        auto mask = static_cast<T>(alignment - 1);
+        return (size + mask) & ~mask;
+    }
+    return size;
+}
 
 HRESULT RenderPlatform12::CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin)
 {
@@ -194,7 +213,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     //   3  SRV descriptor                      BranchDataCbv_HeapOffset,
     //   4  Constant buffer descriptor          ChangesPerPassCbv_HeapOffset,
     //   5  Constant buffer descriptor          ChangesEveryFrame_HeapOffset,
-
+    //   6  DXR buffers descriptor table
     //   cbuffer cbBranchData : register( b0 )
     //   cbuffer cbChangesPerPass : register(b1)
     //   cbuffer cbChangesEveryFrame : register(b2)
@@ -208,12 +227,12 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     CD3DX12_ROOT_PARAMETER rootParameters[7];
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-    rootParameters[CbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
-    rootParameters[SrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[MaterialCbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[MaterialSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[BranchDataRootSignatureParam].InitAsShaderResourceView(BranchDataRootSignatureShaderSlot);
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
-    rootParameters[UavTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_VERTEX);
+    rootParameters[UavTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_ALL);
 
     D3D12_STATIC_SAMPLER_DESC sampler[4];
     sampler[0] = D3D12_STATIC_SAMPLER_DESC();
@@ -619,18 +638,19 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         m_numInstancesInTLAS = 1;
 
         // Create screen sized output buffer
-        m_renderData->pDxrBuffer = new UavBuffer(GetDevice(),
+        m_renderData->pDxrOutBuffer = new UavBuffer(GetDevice(),
             m_swapChainFormat,
             m_descriptorHeap.hCPU(DxrOut_SrvHeapOffset),
             m_descriptorHeap.hGPU(DxrOut_SrvHeapOffset),
             m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
-            m_nonVisibleDescriptorHeap.hCPU(DxrOut_UavHeapOffset),
+            m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
             m_renderData->projectionData.screenWidth,
             m_renderData->projectionData.screenHeight);
 
         const UINT maxWorldVertices = 50000;
         auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
+        // IB World
         // Create index world buffer
         auto descIBBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * maxWorldVertices, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
         HRR(GetDevice()->CreateCommittedResource(
@@ -658,12 +678,19 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         GetDevice()->CreateUnorderedAccessView(m_IBWorld, nullptr, &descIBUAV, m_descriptorHeap.hCPU(DxrIB_UavHeapOffset));
 
+        // VB World
+        uint64_t vbWorldBufferSize = sizeof(XMFLOAT3) * maxWorldVertices;
+        vbWorldBufferSize = AlignUp(vbWorldBufferSize, 16);
+
+        // Aligning buffer to 4096 to align with the page size
+        vbWorldBufferSize = AlignUp(vbWorldBufferSize, 4096);
+
         // Create vertex world buffer
-        auto descBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(XMFLOAT3) * maxWorldVertices, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        auto vbDescBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbWorldBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER);
         HRR(GetDevice()->CreateCommittedResource(
             &defaultHeapProperties,
             D3D12_HEAP_FLAG_NONE,
-            &descBuffer,
+            &vbDescBuffer,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, //D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
             nullptr,
             __uuidof(ID3D12Resource), (void**) &m_VBWorld));
@@ -672,14 +699,22 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         D3D12_SHADER_RESOURCE_VIEW_DESC descSRV = {};
         descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        descSRV.Format = DXGI_FORMAT_UNKNOWN;
         descSRV.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
         descSRV.Buffer.NumElements = maxWorldVertices;
         descSRV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
 
         GetDevice()->CreateShaderResourceView(m_VBWorld, &descSRV, m_descriptorHeap.hCPU(DxrVB_SrvHeapOffset));
 
+        // VB World Counter
         // Create counter for vertex output
-        auto descCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        uint64_t vbWorldCounterBufferSize = sizeof(uint64_t);
+        vbWorldCounterBufferSize = AlignUp(vbWorldCounterBufferSize, 16);
+
+        // Aligning buffer to 4096 to align with the page size
+        vbWorldCounterBufferSize = AlignUp(vbWorldCounterBufferSize, 4096);
+
+        auto descCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbWorldCounterBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER);
         HRR(GetDevice()->CreateCommittedResource(
             &defaultHeapProperties,
             D3D12_HEAP_FLAG_NONE,
@@ -698,17 +733,25 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         GetDevice()->CreateUnorderedAccessView(m_VBWorld, m_VBWorldCounter, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
 
         // The second UAV view is needed for the Clear operation to reset the counter
-        D3D12_UNORDERED_ACCESS_VIEW_DESC descCounterUAV = {};
-        descCounterUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        descCounterUAV.Buffer.NumElements = 1;
-        descCounterUAV.Buffer.StructureByteStride = sizeof(UINT);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavCountDesc =
+        {
+            DXGI_FORMAT_UNKNOWN,                                    // DXGI_FORMAT Format;
+            D3D12_UAV_DIMENSION_BUFFER,                             // D3D12_UAV_DIMENSION ViewDimension;
+            {
+                0,                                                  // UINT64 FirstElement;
+                1,                                                  // UINT NumElements;
+                sizeof(uint64_t),                                   // UINT StructureByteStride;
+                0,                                                  // UINT64 CounterOffsetInBytes;
+                D3D12_BUFFER_UAV_FLAG_NONE,                         // D3D12_BUFFER_UAV_FLAGS Flags;
+            },                                                      // D3D12_BUFFER_UAV Buffer;
+        };
 
-        GetDevice()->CreateUnorderedAccessView(m_VBWorldCounter, nullptr, &descCounterUAV, m_nonVisibleDescriptorHeap.hCPU(DxrVBCounter_UavHeapOffset));
+        GetDevice()->CreateUnorderedAccessView(m_VBWorldCounter, nullptr, &uavCountDesc, m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset));
 
-        GetDevice()->CopyDescriptorsSimple(1, m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(DxrVBCounter_UavHeapOffset), D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        GetDevice()->CopyDescriptorsSimple(1, m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset), m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset), D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
         // Counter readback
-        auto descReadBackCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT));
+        auto descReadBackCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbWorldCounterBufferSize);
         HRR(GetDevice()->CreateCommittedResource(
             &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK),
             D3D12_HEAP_FLAG_NONE,
@@ -955,8 +998,15 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_gameLevelResources.clear();
     m_nextFreeShaderHeapDescriptor = 0;
 
-    SafeDelete(&m_renderData->pDxrBuffer);
     SafeDelete(&m_renderData->pShadowMap);
+
+    // DXR
+    SafeDelete(&m_renderData->pDxrOutBuffer);
+
+    m_IBWorld.Release();
+    m_VBWorld.Release();
+    m_VBWorldCounter.Release();
+    m_VBWorldCounterReadback.Release();
 
     return S_OK;
 }
@@ -982,11 +1032,11 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     ru->m_material->m_constBuffer->CopyData(0, mat);
 
     // Set constant buffer view
-    GetCommandList()->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, ru->m_material->m_cbvSrvHeapTable);
+    GetCommandList()->SetGraphicsRootDescriptorTable(MaterialCbvTableRootSignatureParam, ru->m_material->m_cbvSrvHeapTable);
 
     // Set texture buffer view
     CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(ru->m_material->m_cbvSrvHeapTable, numTexturesPerMaterial, m_descriptorHeap.GetIncrementSize());
-    GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureRange);
+    GetCommandList()->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, textureRange);
 
     GetCommandList()->SetPipelineState(ru->m_pipelineStates[pass]);
 
@@ -1328,7 +1378,7 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     return S_OK;
 }
 
-HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, CbvSrvHeapOffsets srvOffset, ID3D12PipelineState* pso)
+HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList, CbvSrvUavHeapOffsets srvOffset, ID3D12PipelineState* pso)
 {
     UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
@@ -1339,12 +1389,12 @@ HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList,
     GetCommandList()->IASetIndexBuffer(&m_screenQuadIBView);
 
     D3D12_GPU_DESCRIPTOR_HANDLE srvHandle = m_descriptorHeap.hGPU(srvOffset);
-    GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, srvHandle);
+    GetCommandList()->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, srvHandle);
 
     commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
     D3D12_GPU_DESCRIPTOR_HANDLE nullSrvHandleGpu = m_descriptorHeap.hGPU(NullSrv_HeapOffset);
-    GetCommandList()->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, nullSrvHandleGpu);
+    GetCommandList()->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, nullSrvHandleGpu);
 
     return S_OK;
 }
@@ -1627,7 +1677,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorldCounter, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
     GetCommandList()->CopyResource(m_VBWorldCounterReadback, m_VBWorldCounter);
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorldCounter, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-
 
     HR(GetCommandList()->Close());
     ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
@@ -2215,16 +2264,17 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 
     // Set default material (first material).  Will be changed by calls to SetRenderUnit()
     D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_descriptorHeap.hGPU(Material0_HeapOffset);
-    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(CbvTableRootSignatureParam, materialHandle);
+    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(MaterialCbvTableRootSignatureParam, materialHandle);
 
     D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
-    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(SrvTableRootSignatureParam, textureHandle);
+    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, textureHandle);
 
     // Set root signature constant buffers
     m_commandList[m_commandListIndex]->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
     m_commandList[m_commandListIndex]->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
     m_commandList[m_commandListIndex]->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
 
+    // Set output buffers for DXR vertices
     m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(UavTableRootSignatureParam, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
 
     m_commandList[m_commandListIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -2300,7 +2350,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     const UINT clearCounter[] = { 0, 0, 0, 0 };
     GetCommandList()->ClearUnorderedAccessViewUint(
         m_descriptorHeap.hGPU(DxrVBCounter_UavHeapOffset),
-        m_nonVisibleDescriptorHeap.hCPU(DxrVBCounter_UavHeapOffset),
+        m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset),
         m_VBWorldCounter,
         clearCounter,
         0,
@@ -2410,25 +2460,35 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
 #endif
 
-#if 1 
+#if 1
     if (m_renderData->showDxrUav)
     {
         PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");
 
         //UINT clearColor[4] = { 200, 0, 0, 1 };
-        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(DxrOut_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(DxrOut_UavHeapOffset),
-        //    m_renderData->pDxrBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
+        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(DxrVB_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(DxrVB_UavHeapOffset),
+        //    m_renderData->pDxrOutBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
 
+        GetCommandList()->RSSetViewports(1, &GetViewport());
+        GetCommandList()->RSSetScissorRects(1, &m_scissorRect);
+
+        // DXR vertex buffer to SRV
+        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
         // Change to DEPTH_WRITE.
-        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrBuffer->uavOutput,
+        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         GetCommandList()->ResourceBarrier(1, &toReadBarrier);
 
-        HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad)); 
+        HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
+        //HRR(DrawScreenQuad(GetCommandList(), DxrVB_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
+
+
+        // DXR vertex buffer to UAV
+        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
         D3D12_RESOURCE_BARRIER barriers[1];
-        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         GetCommandList()->ResourceBarrier(ARRAYSIZE(barriers), barriers);
 
         PIXEndEvent(GetCommandList());
