@@ -18,8 +18,8 @@ SamplerState samPoint : register(s2);
 SamplerState samLinearWrap : register(s3);
 
 AppendStructuredBuffer<float3> outputVertices     : register(u0);
-AppendStructuredBuffer<uint> outputIndices        : register(u1);
-ConsumeStructuredBuffer<uint> outputVertexCounter : register(u2);
+ConsumeStructuredBuffer<uint> outputVertexCounter : register(u1);
+AppendStructuredBuffer<uint> outputIndices        : register(u2);
 
 struct InstancedData
 {
@@ -61,6 +61,7 @@ struct VS_INPUT
     float2 Tex : TEXCOORD0;
     float3 TangentL : TANGENT;
     float4x4 World  : WORLD;
+    uint  VertexID : SV_VertexID;
 };
 
 //--------------------------------------------------------------------------------------
@@ -140,7 +141,7 @@ PS_INPUT VS(VS_INPUT input)
 
     // Write transformed vertex for DXR
     outputVertices.Append(out0);
-    outputIndices.Append(0);
+    outputIndices.Append(input.VertexID);
     //
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));

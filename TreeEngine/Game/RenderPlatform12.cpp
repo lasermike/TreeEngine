@@ -53,15 +53,16 @@ enum CbvSrvUavHeapOffsets
     DxrOut_SrvHeapOffset = 9,
     DxrOut_UavHeapOffset = 10,
     DxrVB_SrvHeapOffset = 11,
-    DxrVB_UavHeapOffset = 12,
-    DxrIB_UavHeapOffset = 13,
+    DxrIB_SrvHeapOffset = 12,
+    DxrVB_UavHeapOffset = 13,
     DxrVBCounter_UavHeapOffset = 14,
-    DxrIB_SrvHeapOffset = 15,
+    DxrIB_UavHeapOffset = 15,
+    DxrIBCounter_UavHeapOffset = 16,
 
     // Per-material descriptors
-    Material0_HeapOffset = 16,
+    Material0_HeapOffset = 17,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 17,
+    Texture0Srv_HeapOffset = 18,
     Num_CbvSrvUavHeapOffsets
 };
  
@@ -193,7 +194,6 @@ HRESULT RenderPlatform12::AdvanceToNextCommandList()
 HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData)
 {
     // Create command lists.
-    //for (int i = 0; i < RenderPlatform12::FrameCount; i++)
     for (int i = 0; i < RenderPlatform12::kNumCommandLists; i++)
     {
         HRR(GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator), (void**)&m_commandAllocator[i]));
@@ -578,6 +578,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     WaitForPreviousFrame();
+    //WaitOnGpu();
+    //HRR(AdvanceToNextCommandList());
 
     // Setup Dear ImGui context
     if (useImGui)
@@ -650,14 +652,72 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         const UINT maxWorldVertices = 50000;
         auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
+        //
+        // VB and IB World Counter
+        // Create counter for vertex output
+        uint64_t vbibWorldCounterBufferSize = sizeof(uint64_t) * 2;
+        vbibWorldCounterBufferSize = AlignUp(vbibWorldCounterBufferSize, 16);
+
+        // Aligning buffer to 4096 to align with the page size
+        vbibWorldCounterBufferSize = AlignUp(vbibWorldCounterBufferSize, 4096);
+
+        auto descCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbibWorldCounterBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER);
+        HRR(GetDevice()->CreateCommittedResource(
+            &defaultHeapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &descCounterBuffer,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            __uuidof(ID3D12Resource), (void**)&m_UavWorldCounter));
+
+        HRR(m_UavWorldCounter->SetName(L" UAV World Counter"));
+
+        // The second UAV view is needed for the Clear operation to reset the counter
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavCountDesc =
+        {
+            DXGI_FORMAT_UNKNOWN,                                    // DXGI_FORMAT Format;
+            D3D12_UAV_DIMENSION_BUFFER,                             // D3D12_UAV_DIMENSION ViewDimension;
+            {
+                0,                                                  // UINT64 FirstElement;
+                2,                                                  // UINT NumElements;
+                sizeof(uint64_t),                                   // UINT StructureByteStride;
+                0,                                                  // UINT64 CounterOffsetInBytes;
+                D3D12_BUFFER_UAV_FLAG_NONE,                         // D3D12_BUFFER_UAV_FLAGS Flags;
+            },                                                      // D3D12_BUFFER_UAV Buffer;
+        };
+
+        GetDevice()->CreateUnorderedAccessView(m_UavWorldCounter, nullptr, &uavCountDesc, m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset));
+
+        uavCountDesc.Buffer.FirstElement = 1;
+        GetDevice()->CreateUnorderedAccessView(m_UavWorldCounter, nullptr, &uavCountDesc, m_descriptorHeap.hCPU(DxrIBCounter_UavHeapOffset));
+
+        // Counter readback
+        auto descReadBackCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbibWorldCounterBufferSize);
+        HRR(GetDevice()->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK),
+            D3D12_HEAP_FLAG_NONE,
+            &descReadBackCounterBuffer,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            __uuidof(ID3D12Resource), (void**)&m_UavWorldCounterReadback));
+
+        HRR(m_UavWorldCounterReadback->SetName(L"UAV Counter read back"));
+
+        //
         // IB World
+        uint64_t iBWorldBufferSize = sizeof(UINT) * maxWorldVertices; 
+        iBWorldBufferSize = AlignUp(iBWorldBufferSize, 16);
+
+        // Aligning buffer to 4096 to align with the page size   // WHY?
+        iBWorldBufferSize = AlignUp(iBWorldBufferSize, 4096);
+
         // Create index world buffer
-        auto descIBBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * maxWorldVertices, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        auto descIBBuffer = CD3DX12_RESOURCE_DESC::Buffer(iBWorldBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
         HRR(GetDevice()->CreateCommittedResource(
             &defaultHeapProperties,
             D3D12_HEAP_FLAG_NONE,
             &descIBBuffer,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, //D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
             nullptr,
             __uuidof(ID3D12Resource), (void**)&m_IBWorld));
 
@@ -675,9 +735,11 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         descIBUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
         descIBUAV.Buffer.NumElements = maxWorldVertices;
         descIBUAV.Buffer.StructureByteStride = sizeof(UINT);
+        descIBUAV.Buffer.CounterOffsetInBytes = sizeof(uint64_t);
 
-        GetDevice()->CreateUnorderedAccessView(m_IBWorld, nullptr, &descIBUAV, m_descriptorHeap.hCPU(DxrIB_UavHeapOffset));
+        GetDevice()->CreateUnorderedAccessView(m_IBWorld, m_UavWorldCounter, &descIBUAV, m_descriptorHeap.hCPU(DxrIB_UavHeapOffset));
 
+        //
         // VB World
         uint64_t vbWorldBufferSize = sizeof(XMFLOAT3) * maxWorldVertices;
         vbWorldBufferSize = AlignUp(vbWorldBufferSize, 16);
@@ -691,7 +753,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             &defaultHeapProperties,
             D3D12_HEAP_FLAG_NONE,
             &vbDescBuffer,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, //D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
             nullptr,
             __uuidof(ID3D12Resource), (void**) &m_VBWorld));
 
@@ -699,68 +761,20 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         D3D12_SHADER_RESOURCE_VIEW_DESC descSRV = {};
         descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        descSRV.Format = DXGI_FORMAT_UNKNOWN;
+        descSRV.Format = DXGI_FORMAT_R32G32B32_FLOAT;
         descSRV.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
         descSRV.Buffer.NumElements = maxWorldVertices;
         descSRV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
 
-        GetDevice()->CreateShaderResourceView(m_VBWorld, &descSRV, m_descriptorHeap.hCPU(DxrVB_SrvHeapOffset));
+        //GetDevice()->CreateShaderResourceView(m_VBWorld, &descSRV, m_descriptorHeap.hCPU(DxrVB_SrvHeapOffset));
 
-        // VB World Counter
-        // Create counter for vertex output
-        uint64_t vbWorldCounterBufferSize = sizeof(uint64_t);
-        vbWorldCounterBufferSize = AlignUp(vbWorldCounterBufferSize, 16);
-
-        // Aligning buffer to 4096 to align with the page size
-        vbWorldCounterBufferSize = AlignUp(vbWorldCounterBufferSize, 4096);
-
-        auto descCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbWorldCounterBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER);
-        HRR(GetDevice()->CreateCommittedResource(
-            &defaultHeapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &descCounterBuffer,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            nullptr,
-            __uuidof(ID3D12Resource), (void**) &m_VBWorldCounter));
-
-        HRR(m_VBWorldCounter->SetName(L"VBWorld Counter"));
 
         D3D12_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
         descUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
         descUAV.Buffer.NumElements = maxWorldVertices;
         descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
 
-        GetDevice()->CreateUnorderedAccessView(m_VBWorld, m_VBWorldCounter, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
-
-        // The second UAV view is needed for the Clear operation to reset the counter
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavCountDesc =
-        {
-            DXGI_FORMAT_UNKNOWN,                                    // DXGI_FORMAT Format;
-            D3D12_UAV_DIMENSION_BUFFER,                             // D3D12_UAV_DIMENSION ViewDimension;
-            {
-                0,                                                  // UINT64 FirstElement;
-                1,                                                  // UINT NumElements;
-                sizeof(uint64_t),                                   // UINT StructureByteStride;
-                0,                                                  // UINT64 CounterOffsetInBytes;
-                D3D12_BUFFER_UAV_FLAG_NONE,                         // D3D12_BUFFER_UAV_FLAGS Flags;
-            },                                                      // D3D12_BUFFER_UAV Buffer;
-        };
-
-        GetDevice()->CreateUnorderedAccessView(m_VBWorldCounter, nullptr, &uavCountDesc, m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset));
-
-        GetDevice()->CopyDescriptorsSimple(1, m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset), m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset), D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-        // Counter readback
-        auto descReadBackCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbWorldCounterBufferSize);
-        HRR(GetDevice()->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK),
-            D3D12_HEAP_FLAG_NONE,
-            &descReadBackCounterBuffer,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            __uuidof(ID3D12Resource), (void**)&m_VBWorldCounterReadback));
-
-        HRR(m_VBWorldCounterReadback->SetName(L"VBWorld Counter read back"));
+        GetDevice()->CreateUnorderedAccessView(m_VBWorld, m_UavWorldCounter, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
     }
 #endif
 
@@ -1005,8 +1019,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     m_IBWorld.Release();
     m_VBWorld.Release();
-    m_VBWorldCounter.Release();
-    m_VBWorldCounterReadback.Release();
+    m_UavWorldCounter.Release();
+    m_UavWorldCounterReadback.Release();
 
     return S_OK;
 }
@@ -1656,53 +1670,26 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     if (!buildEveryFrame && m_triangleBLAS != nullptr)
         return S_OK;
 
-    CComPtr<ID3D12Device5> device;
-    HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
-
-    //// Create new commandlist
-    //CComPtr<ID3D12CommandQueue> copyQueue;
-    //CComPtr <ID3D12CommandAllocator> copyAllocator;
-    //CComPtr <ID3D12GraphicsCommandList> copyList;
-
-    //D3D12_COMMAND_QUEUE_DESC descCopyQueue = {};
-    //descCopyQueue.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    //descCopyQueue.Type = D3D12_COMMAND_LIST_TYPE_COPY;
-    //device->CreateCommandQueue(&descCopyQueue, __uuidof(ID3D12CommandQueue), (void**)&copyQueue);
-    //device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, __uuidof(ID3D12CommandAllocator), (void**)&copyAllocator);
-    //device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, copyAllocator, nullptr, __uuidof(ID3D12GraphicsCommandList), (void**)&copyList);
-
-    D3D12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-    GetCommandList()->ResourceBarrier(1, &uavBarrier);
-
-    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorldCounter, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
-    GetCommandList()->CopyResource(m_VBWorldCounterReadback, m_VBWorldCounter);
-    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorldCounter, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-
-    HR(GetCommandList()->Close());
-    ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
-    GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-    WaitOnGpu();
-
-    HRR(AdvanceToNextCommandList());
+    PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
     unsigned int* pNumVertices;
-    m_VBWorldCounterReadback->Map(0, nullptr, reinterpret_cast<void**>(&pNumVertices));
+    m_UavWorldCounterReadback->Map(0, nullptr, reinterpret_cast<void**>(&pNumVertices));
 
     const UINT vertexCount = *pNumVertices;
     const UINT vertexSize = sizeof(XMFLOAT3);
     const UINT indexCount = *pNumVertices;
     const UINT indexSize = sizeof(UINT);
 
-    // Build a BLAS for one triangle...
+    // Build a BLAS 
     D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = { D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES, D3D12_RAYTRACING_GEOMETRY_FLAG_NONE, {} };
+
     geometryDesc.Triangles.VertexCount = vertexCount;
     geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+    geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress();
     geometryDesc.Triangles.VertexBuffer.StrideInBytes = vertexSize;
+
     geometryDesc.Triangles.IndexCount = indexCount;
     geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-
-    geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress();
     geometryDesc.Triangles.IndexBuffer = m_IBWorld->GetGPUVirtualAddress();
 
 
@@ -1726,6 +1713,9 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     if (m_triangleBLAS == nullptr)
     {
+        CComPtr<ID3D12Device5> device;
+        HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
+
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO preBuildInfo;
         device->GetRaytracingAccelerationStructurePrebuildInfo(&rtInputs, &preBuildInfo);
 
@@ -1740,6 +1730,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     }
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_IBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
     CComPtr<ID3D12GraphicsCommandList6> commandList;
     HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
@@ -1751,15 +1742,16 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     GetCommandList()->ResourceBarrier(1, &uavBarrier2);	// Need the bottom level build to finish before we can build a top-level acceleration structure.
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ));
+    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_IBWorld, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
+    PIXEndEvent(GetCommandList());
 
     HR(GetCommandList()->Close());
-    //ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
+    ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
     GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     WaitOnGpu();
-
-    GetCommandList()->Reset(GetCommandAllocator(), m_pipelineState);
+    HRR(AdvanceToNextCommandList());
 
     return S_OK;
 }
@@ -1768,6 +1760,8 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
 {
     if (!buildEveryFrame && m_TLAS != nullptr)
         return S_OK;
+
+    PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build top level Acceleration Structures");
 
     CComPtr<ID3D12Device5> device;
     HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
@@ -1787,9 +1781,15 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
         instanceDescs[i].InstanceMask = 0xFF;
 
         ZeroMemory(instanceDescs[i].Transform, sizeof(instanceDescs[i].Transform));
-        float size = 1.0f - (i * sizeReductionPerInstance);
+        instanceDescs[i].Transform[0][0] = 1.0f;
+        instanceDescs[i].Transform[1][1] = 1.0f;
+        instanceDescs[i].Transform[2][2] = 1.0f;
+        instanceDescs[i].Transform[2][3] = 1.0f;
 
-        memset(instanceDescs[i].Transform, 0, sizeof(instanceDescs[i].Transform));
+        //float size = 1.0f - (i * sizeReductionPerInstance);
+
+        //TODO decide actual strategy
+        //memset(instanceDescs[i].Transform, 0, sizeof(instanceDescs[i].Transform));
 
         //instanceDescs[i].Transform[0][0] = instanceDescs[i].Transform[1][1] = instanceDescs[i].Transform[2][2] = size;	// Scaled "Identity" matrix.
         //instanceDescs[i].Transform[0][3] = sinf(time + i);
@@ -1833,13 +1833,13 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
     D3D12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
     commandList->ResourceBarrier(1, &uavBarrier);	// Need the top level build to finish before we can render with it...
 
+    PIXEndEvent(GetCommandList());
 
     HR(GetCommandList()->Close());
     ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
     GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     WaitOnGpu();
-
     HRR(AdvanceToNextCommandList());
 
     return S_OK;
@@ -2255,7 +2255,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     // Ensure last frame is completed
     WaitOnFence();
 
-    PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList[m_commandListIndex], TREE_COLOR_DRAW_TEXT, L"Render");
+    PIXBeginEvent((ID3D12GraphicsCommandList*)m_commandList[m_commandListIndex], TREE_COLOR_DRAW_TEXT, L"RenderProlog");
 
 #if defined(TREE_XBOX)
     m_framePipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
@@ -2351,12 +2351,22 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     GetCommandList()->ClearUnorderedAccessViewUint(
         m_descriptorHeap.hGPU(DxrVBCounter_UavHeapOffset),
         m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset),
-        m_VBWorldCounter,
+        m_UavWorldCounter,
+        clearCounter,
+        0,
+        nullptr);
+
+    GetCommandList()->ClearUnorderedAccessViewUint(
+        m_descriptorHeap.hGPU(DxrIBCounter_UavHeapOffset),
+        m_descriptorHeap.hCPU(DxrIBCounter_UavHeapOffset),
+        m_UavWorldCounter,
         clearCounter,
         0,
         nullptr);
 
 #endif
+
+    PIXEndEvent((ID3D12GraphicsCommandList*)m_commandList[m_commandListIndex]); // RenderProlog
 
     return S_OK;
 }
@@ -2400,30 +2410,38 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 {
     HRESULT hr = S_OK;
 
-    if (m_renderData->showShadowBuffer)
-    {
-        HRR(DrawScreenQuad(GetCommandList(), ShadowSrv_HeapOffset, m_pipelineStateR8FullScreenQuad));
-    }
-
 #if defined(TREE_XBOX)
     /** RAY TRACING **/
     {
-        // Build acceleation structure
+        // Run command list up to this point
         HR(GetCommandList()->Close());
         ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
         GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
         WaitOnGpu();
-
         HRR(AdvanceToNextCommandList());
 
+        CComPtr<ID3D12Device5> device;
+        HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
 
-        PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build Acceleration Structures");
+        // Check size of the VB output buffer
+        D3D12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
+        GetCommandList()->ResourceBarrier(1, &uavBarrier);
+
+        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_UavWorldCounter, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
+        GetCommandList()->CopyResource(m_UavWorldCounterReadback, m_UavWorldCounter);
+        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_UavWorldCounter, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+        HR(GetCommandList()->Close());
+        ID3D12CommandList* ppCommandLists2[] = { GetCommandList() };
+        GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists2), ppCommandLists2);
+
+        WaitOnGpu();
+        HRR(AdvanceToNextCommandList());
 
         BuildBottomLevelAccelerationStructure(true);
+        
         BuildTopLevelAccelerationStructure(true);
-
-        PIXEndEvent(GetCommandList());
     }
 
     {
@@ -2446,7 +2464,6 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         UINT rootConstants[4] = { dispatchRaysDesc.Width, dispatchRaysDesc.Height, (UINT)D3D12_RAY_FLAG_NONE /*m_rayFlags*/, 0 /*m_holeSize*/ };
 
-        //auto heap = m_csuDescriptorHeap->Heap();
         commandList->SetComputeRootSignature(m_globalRootSignature);
         commandList->SetDescriptorHeaps(1, m_descriptorHeap);
         commandList->SetPipelineState1(m_raytracingStateObject);
@@ -2455,10 +2472,18 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
         commandList->DispatchRays(&dispatchRaysDesc);
 
-        PIXEndEvent(GetCommandList());
+        PIXEndEvent(GetCommandList()); // Raytrace render
     }
 
 #endif
+
+    PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render Epilog");
+
+    if (m_renderData->showShadowBuffer)
+    {
+        HRR(DrawScreenQuad(GetCommandList(), ShadowSrv_HeapOffset, m_pipelineStateR8FullScreenQuad));
+    }
+
 
 #if 1
     if (m_renderData->showDxrUav)
@@ -2491,11 +2516,11 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         GetCommandList()->ResourceBarrier(ARRAYSIZE(barriers), barriers);
 
-        PIXEndEvent(GetCommandList());
+        PIXEndEvent(GetCommandList()); //Show DXR UA
     }
 #endif
 
-    PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing");
+    PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing");
 
     // use compute to post process
     CD3DX12_CPU_DESCRIPTOR_HANDLE offscreen1Handle(m_rtvHeap.hCPU(FrameCount));
@@ -2563,6 +2588,8 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
     if (imGuiInitialized)
     {
+        PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"IM GUI");
+
         // Draw UI
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         //bool show_demo_window = true;
@@ -2573,11 +2600,13 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         ImGui::Render();
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList[m_commandListIndex]);
+
+        PIXEndEvent(GetCommandList()); // IM GUI
     }
 
     m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-    PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Render
+    PIXEndEvent(GetCommandList()); // Render Epilog
 
                                                                // Execute the command list.
     HR(GetCommandList()->Close());
