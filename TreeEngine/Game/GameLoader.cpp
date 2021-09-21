@@ -221,7 +221,7 @@ void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, Gam
 void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
-    params4->position = XMFLOAT3(0, 1.5, 0);
+    params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(1, 1, 1);
     XMStoreFloat4(&params4->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
     params4->primitiveType = PrimitiveType_Box;
@@ -236,7 +236,7 @@ void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     renderData->time = 0;
 
     // Camera
-    player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(-6.0f, 1.5f, -6.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 

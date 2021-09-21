@@ -31,11 +31,11 @@ void RayGenerationShader()
 {
 	// Orthographic projection, just as if we were already in NDC.
 	float2 vpos = DispatchRaysIndex().xy;
-	float3 rayOrigin = float3(-4.0, 1.5, -4.0); //float3(-1, 1, -5);
+	float3 rayOrigin = float3(-1, 1, -5); //float3(-1, 1, -5);
 
 	rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
     
-	float3 rayDir = float3(0.7, 0, .7);  //float3(0, 0, 1);
+	float3 rayDir = float3(0, 0, 1);  //float3(0, 0, 1);
 
 	RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
 	RayPayload payload = { 0.0f };
