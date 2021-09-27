@@ -29,7 +29,7 @@ struct RayPayload
 [shader("raygeneration")]
 void RayGenerationShader()
 {
-	// Orthographic projection, just as if we were already in NDC.
+	// Orthographic projection, just as if we were already in NDC.  But this is world coordinates!
 	float2 vpos = DispatchRaysIndex().xy;
 	float3 rayOrigin = float3(-1, 1, -5); //float3(-1, 1, -5);
 

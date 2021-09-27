@@ -180,8 +180,6 @@ HRESULT RenderPlatform12::AdvanceToNextCommandList()
         HR(m_commandList[m_commandListIndex]->Reset(GetCommandAllocator(), m_pipelineState));
     }
 
-    HRESULT hr = S_OK;
-
     // Set necessary state.
     m_commandList[m_commandListIndex]->SetGraphicsRootSignature(m_rootSignature);
 
@@ -1063,6 +1061,8 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     GetCommandList()->IASetVertexBuffers(0, 2, buffers);
     GetCommandList()->IASetIndexBuffer(ru->m_mesh->m_inputLayout == SKINNED_INPUT_LAYOUT ? &m_skinnedIBView : &m_IBView);
 
+    m_currentMesh = ru->m_mesh;
+
     return S_OK;
 }
 
@@ -1071,8 +1071,15 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     UINT InstanceCount,
     UINT StartIndexLocation,
     INT BaseVertexLocation,
-    UINT StartInstanceLocation)
+    UINT StartInstanceLocation) 
 {
+#if defined(TREE_XBOX)
+
+    m_drawnVertices.push_back(DrawnVertexRecord(IndexCountPerInstance, StartIndexLocation, m_nextVbWorldStart, 0, m_currentMesh));
+    m_nextVbWorldStart += IndexCountPerInstance;
+
+#endif
+
     GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
     return S_OK;
 }
@@ -1672,13 +1679,22 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
-    unsigned int* pNumVertices;
-    m_UavWorldCounterReadback->Map(0, nullptr, reinterpret_cast<void**>(&pNumVertices));
+    unsigned int* pSizeVbWorld;
+    m_UavWorldCounterReadback->Map(0, nullptr, reinterpret_cast<void**>(&pSizeVbWorld));
 
-    const UINT vertexCount = *pNumVertices;
-    const UINT vertexSize = sizeof(XMFLOAT3);
-    const UINT indexCount = *pNumVertices;
-    const UINT indexSize = sizeof(UINT);
+
+    UINT vertexCount = 0;
+    UINT vertexSize = sizeof(XMFLOAT3);
+    UINT indexCount = 0;
+    UINT indexSize = sizeof(UINT);
+
+    vertexCount = *pSizeVbWorld;
+
+    for (DrawnVertexRecord& dvr : m_drawnVertices)
+    {
+        indexCount += dvr.indexBufferCount;
+    }
+
 
     // Build a BLAS 
     D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = { D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES, D3D12_RAYTRACING_GEOMETRY_FLAG_NONE, {} };
@@ -1690,7 +1706,8 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     geometryDesc.Triangles.IndexCount = indexCount;
     geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-    geometryDesc.Triangles.IndexBuffer = m_IBWorld->GetGPUVirtualAddress();
+    geometryDesc.Triangles.IndexBuffer = m_drawnVertices[0].mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + m_drawnVertices[0].indexBufferStart;   // m_IBWorld->GetGPUVirtualAddress();
+    //    geometryDesc.Triangles.IndexBuffer = m_indexBuffer.buffer->GetGPUVirtualAddress() + m_drawnVertices[0].indexBufferStart;   // m_IBWorld->GetGPUVirtualAddress();
 
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs;
@@ -2363,6 +2380,10 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         clearCounter,
         0,
         nullptr);
+
+    m_nextVbWorldStart = 0;
+    m_drawnVertices.clear();
+
 
 #endif
 

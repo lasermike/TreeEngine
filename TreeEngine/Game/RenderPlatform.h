@@ -578,11 +578,14 @@ protected:
 #endif
 
     D3DBuffer*                        m_currentInstanceBuffer;
+
+    Mesh*                             m_currentMesh;
+
 public:
 
     RenderPlatform() :
         m_vertexShader(nullptr), m_pixelShader(nullptr), m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
-        m_drawScreenVertexShader(nullptr), m_drawR8ScreenPixelShader(nullptr), m_drawRGBScreenPixelShader(nullptr), imGuiInitialized(false)
+        m_drawScreenVertexShader(nullptr), m_drawR8ScreenPixelShader(nullptr), m_drawRGBScreenPixelShader(nullptr), imGuiInitialized(false), m_currentMesh(nullptr)
     { }
 
 #if defined(TREE3D12) || defined(TREE3D11)
@@ -920,6 +923,27 @@ public:
 
     DirectX::GraphicsResource m_instanceDescBuffer;
     D3D12_RAY_FLAGS m_rayFlags;
+
+    struct DrawnVertexRecord
+    {
+        DrawnVertexRecord(UINT indexCountPerInstance, UINT startIndexLocation, UINT nextVbWorldStart, UINT vbWorldCount, Mesh* thisMesh)
+        {
+            indexBufferCount = indexCountPerInstance;
+            indexBufferStart = startIndexLocation;
+            vbWorldStart = nextVbWorldStart;
+            vertexBufferCount = vbWorldCount;
+            mesh = thisMesh;
+        }
+
+        UINT indexBufferCount;
+        UINT indexBufferStart;
+        UINT vbWorldStart;
+        UINT vertexBufferCount;
+        Mesh* mesh;
+    };
+
+    UINT m_nextVbWorldStart = 0;
+    std::vector<DrawnVertexRecord> m_drawnVertices;
 
 #endif
 };
