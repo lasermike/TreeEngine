@@ -1903,10 +1903,16 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 {
     HRESULT hr = S_OK;
 
+    WaitForPreviousFrame();
+
+#if defined(TREE_XBOX)
+    // Ensure we present a blank screen before cleaning up resources.
     if (m_commandQueue)
     {
-        WaitForPreviousFrame();
+        (void)m_commandQueue->PresentX(0, nullptr, nullptr);
     }
+
+#endif
 
 #if !defined(TREE_XBOX)
     m_pSwapChain.Release();
