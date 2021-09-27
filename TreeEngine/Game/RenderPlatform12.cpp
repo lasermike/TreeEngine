@@ -632,7 +632,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             m_renderData->SMapHeight);
     }
 
-#if defined(TREE_XBOX)
+//#if defined(DXR_ENABLED)
     if (true /*useDxr*/)
     {
         m_numInstancesInTLAS = 1;
@@ -773,8 +773,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
 
         GetDevice()->CreateUnorderedAccessView(m_VBWorld, m_UavWorldCounter, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
-    }
-#endif
+    } //DXR
+//#endif
 
     return S_OK;
 }
@@ -890,6 +890,23 @@ void RenderPlatform12::WaitForPreviousFrame()
     }
 }
 
+void RenderPlatform12::AdvanceToNextFrame()
+{
+    if (m_commandQueue)
+    {
+        IncrementFenceOnGPU();
+    }
+
+#if defined(TREE_XBOX)
+    m_frameIndex = (m_frameIndex + 1) % FrameCount;
+#else
+    if (m_pSwapChain)
+    {
+        m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+    }
+#endif
+}
+
 void RenderPlatform12::IncrementFenceOnGPU()
 {
     // Signal and increment the fence value.
@@ -909,15 +926,6 @@ void RenderPlatform12::WaitOnFence()
         HR(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
-
-#if defined(TREE_XBOX)
-    m_frameIndex = (m_frameIndex + 1) % FrameCount;
-#else
-    if (m_pSwapChain)
-    {
-        m_frameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
-    }
-#endif
 }
 
 HRESULT RenderPlatform12::UninitGameLevelGraphics()
@@ -1012,6 +1020,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     SafeDelete(&m_renderData->pShadowMap);
 
+//#if defined(DXR_ENABLED)
     // DXR
     SafeDelete(&m_renderData->pDxrOutBuffer);
 
@@ -1019,6 +1028,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_VBWorld.Release();
     m_UavWorldCounter.Release();
     m_UavWorldCounterReadback.Release();
+//#endif
 
     return S_OK;
 }
@@ -1073,11 +1083,10 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     INT BaseVertexLocation,
     UINT StartInstanceLocation) 
 {
-#if defined(TREE_XBOX)
+#if defined(ENABLE_DXR)
 
     m_drawnVertices.push_back(DrawnVertexRecord(IndexCountPerInstance, StartIndexLocation, m_nextVbWorldStart, 0, m_currentMesh));
     m_nextVbWorldStart += IndexCountPerInstance;
-
 #endif
 
     GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
@@ -1579,14 +1588,17 @@ HRESULT RenderPlatform12::InitDevice()
         0U,
         nullptr,
         D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE));
-
-    CreateRaytracingPipeline();
 #endif
+
+#if defined(ENABLE_DXR)
+    CreateRaytracingPipeline();
+#endif 
+
 
     return hr;
 }
 
-#if defined(TREE_XBOX)
+#if defined(ENABLE_DXR)
 HRESULT RenderPlatform12::CreateRaytracingPipeline()
 {
     CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
@@ -2190,7 +2202,7 @@ IDXGISwapChain* RenderPlatform12::GetSwapChain()
 
 HRESULT RenderPlatform12::UninitDevice()
 {
-#if defined (TREE_XBOX)
+#if defined (ENABLE_DXR)
     m_raytracingStateObject.Release();
     m_raytracingStateObjectProps.Release();
     m_globalRootSignature.Release();
@@ -2361,7 +2373,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         }
     }
 
-#if defined(TREE_XBOX)
+#if defined (ENABLE_DXR)
 
     // Clear the counter value on every update
     const UINT clearCounter[] = { 0, 0, 0, 0 };
@@ -2431,7 +2443,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 {
     HRESULT hr = S_OK;
 
-#if defined(TREE_XBOX)
+#if defined(DXR_ENABLED)
     /** RAY TRACING **/
     {
         // Run command list up to this point
@@ -2506,7 +2518,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     }
 
 
-#if 1
+#if defined(ENABLE_DXR)
     if (m_renderData->showDxrUav)
     {
         PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");
@@ -2650,7 +2662,8 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
     m_graphicsMemory->Commit(m_commandQueue);
 
-    IncrementFenceOnGPU();
+    AdvanceToNextFrame();
+    //IncrementFenceOnGPU();
 
     return hr;
 }

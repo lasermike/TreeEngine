@@ -809,6 +809,7 @@ private:
     void WaitOnFence();
 
     void WaitOnGpu();
+    void AdvanceToNextFrame();
 
 public:
 
@@ -898,7 +899,15 @@ public:
     // TODO: move into interface
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
 
-#if defined(TREE_XBOX)
+    // DXR buffers
+    CComPtr<ID3D12Resource>     m_VBWorld, m_IBWorld;
+    CComPtr<ID3D12Resource>     m_UavWorldCounter;
+    CComPtr<ID3D12Resource>     m_UavWorldCounterReadback;
+
+    uint32_t m_numInstancesInTLAS;
+
+#if defined(DXR_ENABLED)
+
     HRESULT CreateRaytracingPipeline();
     HRESULT BuildTopLevelAccelerationStructure(bool buildEveryFrame);
     HRESULT BuildBottomLevelAccelerationStructure(bool buildEveryFrame);
@@ -911,15 +920,12 @@ public:
 
     CComPtr<ID3D12Resource>		m_TLAS, m_TLASScratch;
     CComPtr<ID3D12Resource>		m_triangleBLAS;
-    CComPtr<ID3D12Resource>		m_VBWorld, m_IBWorld, m_scratch;
+    CComPtr<ID3D12Resource>		m_scratch;
 
-    CComPtr<ID3D12Resource>     m_UavWorldCounter;
-    CComPtr<ID3D12Resource>     m_UavWorldCounterReadback;
 
     ShaderBindingTable<SimpleTriangleRecord, 1, 2, 1> m_shaderBindingTable;
 
     static const uint32_t MAX_INSTANCES_IN_TLAS = 10;
-    uint32_t m_numInstancesInTLAS;
 
     DirectX::GraphicsResource m_instanceDescBuffer;
     D3D12_RAY_FLAGS m_rayFlags;
