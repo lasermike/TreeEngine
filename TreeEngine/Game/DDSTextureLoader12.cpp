@@ -976,8 +976,7 @@ void InitializeTexture(GpuResource& Dest, RenderPlatform12* renderPlatform,
 
     UINT64 uploadBufferSize = GetRequiredIntermediateSize(Dest.GetResource(), 0, NumSubresources);
 
-    //CommandContext& InitContext = CommandContext::Begin();
-    HR(renderPlatform->GetCommandList()->Reset(renderPlatform->GetCommandAllocator(), nullptr));
+    //HR(renderPlatform->GetCommandList()->Reset(renderPlatform->GetCommandAllocator(), nullptr));
 
     D3D12_HEAP_PROPERTIES HeapProps;
     HeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -1026,12 +1025,7 @@ void InitializeTexture(GpuResource& Dest, RenderPlatform12* renderPlatform,
     // Execute the command list and wait for it to finish so we can release the upload buffer
     //InitContext.Finish(true);
 
-    // Execute the comfmand list.
-    HR(renderPlatform->GetCommandList()->Close());
-    ID3D12CommandList* ppCommandLists[] = { renderPlatform->GetCommandList() };
-    renderPlatform->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-    renderPlatform->WaitForPreviousFrame();
+    renderPlatform->ExecuteCurrentCommandList(true);
 
     UploadBuffer->Release();
 }

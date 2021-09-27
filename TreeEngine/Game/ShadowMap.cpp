@@ -31,7 +31,9 @@ UavBuffer::UavBuffer(XSF::D3DDevice* device,
 
     device->CreateUnorderedAccessView(uavOutput, nullptr, &uavDesc, bufferNonVisibleUavCpu);
 
+#if defined(TREE_XBOX)
     device->CopyDescriptorsSimple(1, bufferUavCpu, bufferNonVisibleUavCpu, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+#endif
 
     //Describe and create a SRV for the texture.
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};

@@ -830,7 +830,7 @@ public:
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
     D3DCommandList* GetCommandList() const { return m_commandList[m_commandListIndex]; }
-    HRESULT AdvanceToNextCommandList();
+    HRESULT ExecuteCurrentCommandList(bool waitOnFence);
 
     //
     // Base RenderPlatform methods
