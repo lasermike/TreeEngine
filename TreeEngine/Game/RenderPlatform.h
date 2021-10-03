@@ -17,6 +17,8 @@ class RenderManager;
 enum CbvSrvUavHeapOffsets;
 
 #if defined(TREE_XBOX) && defined(TREE3D12)
+
+#define DXR_ENABLED
 #include "DxrHelper.h"
 
 struct SimpleTriangleRecord : public ShaderRecord
@@ -885,12 +887,12 @@ public:
 
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer)
     {
-        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedVertexBuffer : &m_vertexBuffer;
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_vertexBuffer : &m_skinnedVertexBuffer;
     }
 
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer)
     { 
-        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_indexBuffer : &m_skinnedIndexBuffer;
     }
 
     // TODO: Do we like this platform specific call?
@@ -1086,13 +1088,13 @@ public:
     void SetFrameSceneData(CBChangesEveryFrame* cb);
 
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer)
-    { 
-        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedVertexBuffer : &m_vertexBuffer;
+    {
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_vertexBuffer : &m_skinnedVertexBuffer;
     }
 
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer)
     {
-        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_indexBuffer : &m_skinnedIndexBuffer;
     }
 
     // TODO: Do we like this platform specific call?

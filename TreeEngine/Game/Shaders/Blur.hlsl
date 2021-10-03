@@ -23,7 +23,7 @@ cbuffer cbSettings : register(b0)
     float w10;
 };
 
-static const int gMaxBlurRadius = 5;
+static const int gMaxBlurRadius = 3;
 
 
 Texture2D gInput            : register(t0);

@@ -224,7 +224,7 @@ void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(1, 1, 1);
     XMStoreFloat4(&params4->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
-    params4->primitiveType = PrimitiveType_Box;
+    params4->primitiveType = PrimitiveType_CylinderHD; //PrimitiveType_Cylinder;
 
     scene->AddChild(new Primitive(params4));
 
@@ -842,16 +842,16 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
     case 4:
         LoadTrees(pScene, pRenderData, pPlayer, gameData);
         break;
+    //case 5:
+    //    LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
+    //    break;
     case 5:
-        LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 6:
         LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 7:
+    case 6:
         LoadGraph(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 8:
+    case 7:
         LoadSimpleBox(pScene, pRenderData, pPlayer, gameData);
         break;
     default:

@@ -91,8 +91,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     HRR(ReloadDevice());
 
-    //m_currentScene = 8;  //SimpleBox
-    m_currentScene = 0;
+    m_currentScene = 7;  //SimpleBox
 
     m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 

@@ -740,7 +740,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         descIBUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
         descIBUAV.Buffer.NumElements = maxWorldVertices;
         descIBUAV.Buffer.StructureByteStride = sizeof(UINT);
-        descIBUAV.Buffer.CounterOffsetInBytes = 0; // sizeof(uint64_t);
+        descIBUAV.Buffer.CounterOffsetInBytes = sizeof(uint64_t);
 
         GetDevice()->CreateUnorderedAccessView(m_IBWorld, m_UavWorldCounter, &descIBUAV, m_descriptorHeap.hCPU(DxrIB_UavHeapOffset));
 
@@ -1094,7 +1094,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     INT BaseVertexLocation,
     UINT StartInstanceLocation) 
 {
-#if defined(ENABLE_DXR)
+#if defined(DXR_ENABLED)
 
     m_drawnVertices.push_back(DrawnVertexRecord(IndexCountPerInstance, StartIndexLocation, m_nextVbWorldStart, 0, m_currentMesh));
     m_nextVbWorldStart += IndexCountPerInstance;
@@ -1144,7 +1144,7 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &textureDesc,
-        D3D12_RESOURCE_STATE_COMMON,
+        D3D12_RESOURCE_STATE_COPY_DEST,
         nullptr,
         __uuidof(ID3D12Resource), (void**)&createdTexture));
 
@@ -1601,7 +1601,7 @@ HRESULT RenderPlatform12::InitDevice()
         D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE));
 #endif
 
-#if defined(ENABLE_DXR)
+#if defined(DXR_ENABLED)
     CreateRaytracingPipeline();
 #endif 
 
@@ -1609,7 +1609,7 @@ HRESULT RenderPlatform12::InitDevice()
     return hr;
 }
 
-#if defined(ENABLE_DXR)
+#if defined(DXR_ENABLED)
 HRESULT RenderPlatform12::CreateRaytracingPipeline()
 {
     CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
@@ -1705,6 +1705,9 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     unsigned int* pSizeVbWorld;
     m_UavWorldCounterReadback->Map(0, nullptr, reinterpret_cast<void**>(&pSizeVbWorld));
 
+    unsigned int* pSizeIbWorld = pSizeVbWorld + 1;
+
+    ASSERT(*pSizeIbWorld == *pSizeIbWorld);
 
     UINT vertexCount = 0;
     UINT vertexSize = sizeof(XMFLOAT3);
@@ -1712,24 +1715,58 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     UINT indexSize = sizeof(UINT);
 
     vertexCount = *pSizeVbWorld;
-
+     
     for (DrawnVertexRecord& dvr : m_drawnVertices)
     {
         indexCount += dvr.indexBufferCount;
     }
 
+    /////////////
+    struct vec3
+    {
+        float x;
+        float y;
+        float z;
+    };
+
+    int* pIndexBuffer = nullptr;
+    m_drawnVertices[0].mesh->m_indexBuffer->buffer->Map(0, nullptr, ((void**)&pIndexBuffer));
+    pIndexBuffer += m_drawnVertices[0].indexBufferStart;
+
+    int* pIBWorld = nullptr;
+    m_IBWorld->Map(0, nullptr, ((void**)&pIBWorld));
+
+    vec3* pVBWorld = nullptr;
+    m_VBWorld->Map(0, nullptr, ((void**)&pVBWorld));
+
+    std::vector<vec3> altVbWorld;
+    altVbWorld.resize(vertexCount);
+    memcpy(altVbWorld.data(), pVBWorld, vertexCount * sizeof(vec3));
+
+    for (int i = 0; i < vertexCount; i++)
+    {
+        pVBWorld[pIBWorld[i]] = altVbWorld.data()[i];
+    }
+
+    m_IBWorld->Unmap(0, nullptr);
+    m_VBWorld->Unmap(0, nullptr);
+    m_drawnVertices[0].mesh->m_indexBuffer->buffer->Unmap(0, nullptr);
+
+        ///////////////
 
     // Build a BLAS 
     D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = { D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES, D3D12_RAYTRACING_GEOMETRY_FLAG_NONE, {} };
 
     geometryDesc.Triangles.VertexCount = vertexCount;
     geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+    
     geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress();
     geometryDesc.Triangles.VertexBuffer.StrideInBytes = vertexSize;
 
-    geometryDesc.Triangles.IndexCount = indexCount;
+    geometryDesc.Triangles.IndexCount = m_drawnVertices[0].indexBufferCount;
     geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-    geometryDesc.Triangles.IndexBuffer = m_drawnVertices[0].mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + m_drawnVertices[0].indexBufferStart;   // m_IBWorld->GetGPUVirtualAddress();
+    //geometryDesc.Triangles.IndexBuffer = m_IBWorld->GetGPUVirtualAddress();
+    geometryDesc.Triangles.IndexBuffer = (D3D12_GPU_VIRTUAL_ADDRESS) (((UINT*) m_drawnVertices[0].mesh->m_indexBuffer->buffer->GetGPUVirtualAddress()) + m_drawnVertices[0].indexBufferStart);
     //    geometryDesc.Triangles.IndexBuffer = m_indexBuffer.buffer->GetGPUVirtualAddress() + m_drawnVertices[0].indexBufferStart;   // m_IBWorld->GetGPUVirtualAddress();
 
 
@@ -2209,7 +2246,7 @@ IDXGISwapChain* RenderPlatform12::GetSwapChain()
 
 HRESULT RenderPlatform12::UninitDevice()
 {
-#if defined (ENABLE_DXR)
+#if defined (DXR_ENABLED)
     m_raytracingStateObject.Release();
     m_raytracingStateObjectProps.Release();
     m_globalRootSignature.Release();
@@ -2380,7 +2417,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         }
     }
 
-#if defined (ENABLE_DXR)
+#if defined (DXR_ENABLED)
 
     // Clear the counter value on every update
     const UINT clearCounter[] = { 0, 0, 0, 0 };
@@ -2515,7 +2552,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     }
 
 
-#if defined(ENABLE_DXR)
+#if defined(DXR_ENABLED)
     if (m_renderData->showDxrUav)
     {
         PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");
@@ -2562,7 +2599,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     m_commandList[m_commandListIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     // blur stuff
-    auto weights = CalcGaussWeights(1.5f);
+    auto weights = CalcGaussWeights(1.3f);
     int blurRadius = (int)weights.size() / 2;
 
     m_commandList[m_commandListIndex]->SetComputeRootSignature(m_computeRootSignature);
