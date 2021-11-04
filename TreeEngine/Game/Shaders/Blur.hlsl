@@ -45,9 +45,9 @@ struct DrawRecord
 
 // Compute Root Sig (VSasCS)
 StructuredBuffer<DrawRecord> drawRecords: register(t0);
-RWBuffer<float3> outputVertices     : register(u0);
-Buffer<float3> staticVertices : register(t1);
-Buffer<uint> staticIndices : register(t2);
+RWStructuredBuffer<float3> outputVertices     : register(u0);
+StructuredBuffer<float3> staticVertices : register(t1);
+StructuredBuffer<uint> staticIndices : register(t2);
 
 struct InstancedData // (Copied from Tree.hlsl)
 {
@@ -56,10 +56,9 @@ struct InstancedData // (Copied from Tree.hlsl)
     uint InstanceOffsetPrev;
     uint InstanceOffsetNext;
 };
-
+ 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
-
-
+ 
 [numthreads(1, 32, 1)]
 void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
 {
@@ -73,28 +72,12 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
         int inputInstance = drawRecord.startingInstance;
         float4x4 world = InstanceBuffer[inputInstance].World;
 
-        float3 out0 = mul(float4(vertex, 1.0f), world).xyz;
+        float4 vertex4 = float4(vertex, 1.0f);
+        float4 out0 = mul(vertex4, world);
 
-        outputVertices[drawRecord.vbWorldStart + dispatchThreadID.y] = out0;
+        uint vbIndex = drawRecord.vbWorldStart + dispatchThreadID.y;
+        outputVertices[vbIndex] = out0.xyz;
     }
-
-    //outputVertices[inputIndex] = out0;
-    //outputIndices.Append(inputIndex);
-
-    /*
-    PS_INPUT output = (PS_INPUT)0;
-
-    float4x4 world = input.World;
-
-    float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
-    output.PosW = out0;
-
-    // Write transformed vertex for DXR
-    outputVertices.Append(out0);
-    outputIndices.Append(input.VertexID);
-    //
-
-    */
 }
 
 #define N 256

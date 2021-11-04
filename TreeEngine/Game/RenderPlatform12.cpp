@@ -336,16 +336,16 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Create compute root signature
     {
         CD3DX12_DESCRIPTOR_RANGE srvTable;
-        srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // Blur input / DrawRecords
+        srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // Blur input / DrawRecords                    t0
 
         CD3DX12_DESCRIPTOR_RANGE uavTable;
-        uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0); // Blur output
+        uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0); // Blur output / compute vertex output         u0
 
         CD3DX12_DESCRIPTOR_RANGE srvTable2;
-        srvTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1); // DXR compute vertices (VBInput, IBInput)
+        srvTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1); // DXR compute vertices (VBInput, IBInput)    t1 - t2
 
         CD3DX12_DESCRIPTOR_RANGE srvTable3;
-        srvTable3.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3); // DXR VSasCS compute (instances)
+        srvTable3.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3); // DXR VSasCS compute (instances)             t3
 
         // Root parameter can be a table, root descriptor or root constants.
         CD3DX12_ROOT_PARAMETER slotRootParameter[5];
@@ -446,6 +446,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // SRV view of simple vertex buffer
     D3D12_SHADER_RESOURCE_VIEW_DESC vertexBufferSRVdesc = {};
     vertexBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    vertexBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
     vertexBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
     vertexBufferSRVdesc.Buffer.NumElements = geometryData.vertices.size();
     vertexBufferSRVdesc.Buffer.StructureByteStride = sizeof(SimpleVertex);
@@ -481,7 +482,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // SRV view of simple index buffer
     D3D12_SHADER_RESOURCE_VIEW_DESC indexBufferSRVdesc = {};
-    indexBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;  // 0?
+    indexBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
+    indexBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     indexBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
     indexBufferSRVdesc.Buffer.NumElements = geometryData.indices.size();
     indexBufferSRVdesc.Buffer.StructureByteStride = sizeof(UINT);
@@ -864,12 +866,12 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         HRR(m_VBWorld->SetName(L"VB World"));
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-        descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        descSRV.Format = DXGI_FORMAT_R32G32B32_FLOAT;
-        descSRV.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        descSRV.Buffer.NumElements = maxWorldVertices;
-        descSRV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
+        //D3D12_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+        //descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        //descSRV.Format = DXGI_FORMAT_R32G32B32_FLOAT;
+        //descSRV.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        //descSRV.Buffer.NumElements = maxWorldVertices;
+        //descSRV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
 
         //GetDevice()->CreateShaderResourceView(m_VBWorld, &descSRV, m_descriptorHeap.hCPU(DxrVB_SrvHeapOffset));
 
@@ -878,8 +880,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         descUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
         descUAV.Buffer.NumElements = maxWorldVertices;
         descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
-
-        GetDevice()->CreateUnorderedAccessView(m_VBWorld, m_UavWorldCounter, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
+        GetDevice()->CreateUnorderedAccessView(m_VBWorld, nullptr, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
 
         // 
         // Create draw record
@@ -2645,6 +2646,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
             maxIndexCount = std::max(maxIndexCount, m_drawRecords[i].indexBufferCount);
         }
 
+        // Run VSasCS
         UINT numGroupsY = (UINT)ceilf(maxIndexCount / 32.0f);
         m_commandList[m_commandListIndex]->Dispatch(m_drawRecords.size(), numGroupsY, 1);
 

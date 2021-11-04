@@ -41,12 +41,21 @@ echo  Manifest      !manifestFilename!
 @rem ***************************************************************************
 :BuildShader 
 @rem %1 = inputfile, %2 = stage, %3 = entrypoint %4 = Output dir
-echo  BuildShader inputFile  %1
-echo  BuildShader stage      %2
 echo  BuildShader entryPoint %3
+echo  BuildShader stage      %2
+echo  BuildShader inputFile  %1
 echo  BuildShader outputDir  %4
 
 set copyToLayout=1
+set isXbox=0
+
+if !platform! == "Gaming.Xbox.Scarlett.x64" (
+   echo  Compiling shaders for Scarlett...
+   set cmdline=!cmdline! /Fc !outputFolder!%3.cso.txt 
+   set isXbox=1
+) else (
+	rem set cmdline=!cmdline!
+)
 
 @if %2==vs (
   set target=vs_6_0
@@ -72,20 +81,16 @@ ECHO  BuildShader target !target!
 @rem Compile!
 set cmdline=!compiler! /Zi /T %target% /E %3 
 
-if !platform! == "Gaming.Xbox.Scarlett.x64" (
-   echo  Compiling shaders for Scarlett...
-   set cmdline=!cmdline! /Fc !outputFolder!%3.cso.txt 
-) else (
-	rem set cmdline=!cmdline!
-)
-
 if [%2] == [rootsig] (
 	set cmdline=!cmdline! /Fh !outputFolder!%3.inc 
 ) else if [%2] == [lib] (
 	set cmdline=!cmdline! /Fh !outputFolder!%3.inc /Fd !outputFolder!%3.pdb /Vn g_%3 
 ) else (
 	set outputfile=%~4%~n3.cso
-	set cmdline=!cmdline! /Zpr /Od /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
+	set cmdline=!cmdline! /Zpr /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
+	if !isXbox! == 1 (
+		set cmdline=!cmdline! /noprecompile 
+	)
 )
 
 set finalcmd=!cmdline! !inputFile!
