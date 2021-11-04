@@ -25,13 +25,82 @@ cbuffer cbSettings : register(b0)
 
 static const int gMaxBlurRadius = 3;
 
-
+// Compute Root Sig (Blur)
 Texture2D gInput            : register(t0);
 RWTexture2D<float4> gOutput : register(u0);
+
+
+struct DrawRecord
+{
+    uint startingInstance;
+    uint numInstances;
+
+    uint indexBufferCount;
+    uint indexBufferStart;
+    uint vbWorldStart;
+    uint vertexBufferCount;
+    double mesh;
+
+};
+
+// Compute Root Sig (VSasCS)
+StructuredBuffer<DrawRecord> drawRecords: register(t0);
+RWBuffer<float3> outputVertices     : register(u0);
+RWBuffer<float3> staticVertices : register(u1);
+RWBuffer<uint> staticIndices : register(u2);
+
+struct InstancedData // (Copied from Tree.hlsl)
+{
+    float4x4 World; //  : WORLD;
+    uint InstanceOffset;
+    uint InstanceOffsetPrev;
+    uint InstanceOffsetNext;
+};
+
+StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
+
+
+[numthreads(1, 32, 1)]
+void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
+{
+    DrawRecord drawRecord = drawRecords[groupID.x];
+
+    if (dispatchThreadID.y < drawRecord.indexBufferCount)
+    {
+        uint index = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.y];
+        float3 vertex = staticVertices[index];
+
+        int inputInstance = drawRecord.startingInstance;
+        float4x4 world = InstanceBuffer[inputInstance].World;
+
+        float3 out0 = mul(float4(vertex, 1.0f), world).xyz;
+
+        outputVertices[drawRecord.vbWorldStart + dispatchThreadID.y] = out0;
+    }
+
+    //outputVertices[inputIndex] = out0;
+    //outputIndices.Append(inputIndex);
+
+    /*
+    PS_INPUT output = (PS_INPUT)0;
+
+    float4x4 world = input.World;
+
+    float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
+    output.PosW = out0;
+
+    // Write transformed vertex for DXR
+    outputVertices.Append(out0);
+    outputIndices.Append(input.VertexID);
+    //
+
+    */
+}
 
 #define N 256
 #define CacheSize (N + 2*gMaxBlurRadius)
 groupshared float4 gCache[CacheSize];
+
 
 [numthreads(N, 1, 1)]
 void HorzBlurCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID)

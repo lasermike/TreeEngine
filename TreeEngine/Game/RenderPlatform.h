@@ -902,9 +902,10 @@ public:
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
 
     // DXR buffers
-    CComPtr<ID3D12Resource>     m_VBWorld, m_IBWorld;
+    CComPtr<ID3D12Resource>     m_VBWorld, m_IBWorld, m_PrimWorld;
     CComPtr<ID3D12Resource>     m_UavWorldCounter;
     CComPtr<ID3D12Resource>     m_UavWorldCounterReadback;
+    CComPtr<ID3D12Resource>     m_DrawRecords;
 
     uint32_t m_numInstancesInTLAS;
 
@@ -932,16 +933,21 @@ public:
     DirectX::GraphicsResource m_instanceDescBuffer;
     D3D12_RAY_FLAGS m_rayFlags;
 
-    struct DrawnVertexRecord
+    struct DrawRecord
     {
-        DrawnVertexRecord(UINT indexCountPerInstance, UINT startIndexLocation, UINT nextVbWorldStart, UINT vbWorldCount, Mesh* thisMesh)
+        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT nextVbWorldStart, UINT vbWorldCount, Mesh* thisMesh)
         {
+            startingInstance = startInstance;
+            numInstances = numberInstances;
             indexBufferCount = indexCountPerInstance;
             indexBufferStart = startIndexLocation;
             vbWorldStart = nextVbWorldStart;
             vertexBufferCount = vbWorldCount;
             mesh = thisMesh;
         }
+
+        UINT startingInstance;
+        UINT numInstances;
 
         UINT indexBufferCount;
         UINT indexBufferStart;
@@ -951,7 +957,7 @@ public:
     };
 
     UINT m_nextVbWorldStart = 0;
-    std::vector<DrawnVertexRecord> m_drawnVertices;
+    std::vector<DrawRecord> m_drawRecords;
 
 #endif
 };

@@ -224,7 +224,7 @@ void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(1, 1, 1);
     XMStoreFloat4(&params4->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
-    params4->primitiveType = PrimitiveType_CylinderHD; //PrimitiveType_Cylinder;
+    params4->primitiveType = PrimitiveType_Cylinder; //PrimitiveType_Cylinder;
 
     scene->AddChild(new Primitive(params4));
 

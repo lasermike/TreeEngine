@@ -9,6 +9,7 @@
 //--------------------------------------------------------------------------------------
 // Constant Buffer Variables
 //--------------------------------------------------------------------------------------
+// Graphics root sig
 Texture2D txDiffuse : register(t0);
 TextureCube txCubeMap : register(t0);
 Texture2D txShadowMap : register(t1);
@@ -17,11 +18,7 @@ SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 SamplerState samLinearWrap : register(s3);
 
-AppendStructuredBuffer<float3> outputVertices     : register(u0);
-ConsumeStructuredBuffer<uint> outputVertexCounter : register(u1);
-AppendStructuredBuffer<uint> outputIndices        : register(u2);
-
-struct InstancedData
+struct InstancedData // (cloned in compute)
 {
     float4x4 World; //  : WORLD;
     uint InstanceOffset;
@@ -30,6 +27,12 @@ struct InstancedData
 };
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
+
+//AppendStructuredBuffer<float3> outputVertices     : register(u0);
+//ConsumeStructuredBuffer<uint> outputVertexCounter : register(u1);
+//AppendStructuredBuffer<uint> outputIndices        : register(u2);
+//ConsumeStructuredBuffer<uint> outputIndicesCounter : register(u3);
+
 
 cbuffer cbChangesPerPass : register(b1)
 {
@@ -140,8 +143,8 @@ PS_INPUT VS(VS_INPUT input)
     output.PosW = out0;
 
     // Write transformed vertex for DXR
-    outputVertices.Append(out0);
-    outputIndices.Append(input.VertexID);
+    //outputVertices.Append(out0);
+    //outputIndices.Append(input.VertexID);
     //
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
@@ -192,8 +195,8 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     output.PosW = out0;
 
     // Write transformed vertex for DXR
-    outputVertices.Append(out0);
-    outputIndices.Append(input.VertexID);
+    //outputVertices.Append(out0);
+    //outputIndices.Append(input.VertexID);
     //
 
     output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
