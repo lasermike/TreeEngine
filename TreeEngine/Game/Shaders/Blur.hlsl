@@ -46,8 +46,8 @@ struct DrawRecord
 // Compute Root Sig (VSasCS)
 StructuredBuffer<DrawRecord> drawRecords: register(t0);
 RWBuffer<float3> outputVertices     : register(u0);
-RWBuffer<float3> staticVertices : register(u1);
-RWBuffer<uint> staticIndices : register(u2);
+Buffer<float3> staticVertices : register(t1);
+Buffer<uint> staticIndices : register(t2);
 
 struct InstancedData // (Copied from Tree.hlsl)
 {
@@ -57,7 +57,7 @@ struct InstancedData // (Copied from Tree.hlsl)
     uint InstanceOffsetNext;
 };
 
-StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
+StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
 
 
 [numthreads(1, 32, 1)]

@@ -61,7 +61,7 @@ enum CbvSrvUavHeapOffsets
     DxrPrim_UavHeapOffset = 17,
     DxrPrimCounter_UavHeapOffset = 18,
     VBInput_UavHeapOffset = 19,
-    IBInput_UavHeapOffset = 20,
+    IBInput_SrvHeapOffset = 20,
     DrawRecords_SrvHeapOffset = 21,
 
     // Per-material descriptors
@@ -341,11 +341,11 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         CD3DX12_DESCRIPTOR_RANGE uavTable;
         uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0); // Blur output
 
-        CD3DX12_DESCRIPTOR_RANGE uavTable2;
-        uavTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 1); // DXR compute vertices (VBInput, IBInput)
-
         CD3DX12_DESCRIPTOR_RANGE srvTable2;
-        srvTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2); // DXR VSasCS compute (instances)
+        srvTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1); // DXR compute vertices (VBInput, IBInput)
+
+        CD3DX12_DESCRIPTOR_RANGE srvTable3;
+        srvTable3.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3); // DXR VSasCS compute (instances)
 
         // Root parameter can be a table, root descriptor or root constants.
         CD3DX12_ROOT_PARAMETER slotRootParameter[5];
@@ -354,8 +354,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         slotRootParameter[0].InitAsConstants(12, 0);
         slotRootParameter[1].InitAsDescriptorTable(1, &srvTable);
         slotRootParameter[2].InitAsDescriptorTable(1, &uavTable);
-        slotRootParameter[3].InitAsDescriptorTable(1, &uavTable2);
-        slotRootParameter[4].InitAsDescriptorTable(1, &srvTable2);
+        slotRootParameter[3].InitAsDescriptorTable(1, &srvTable2);
+        slotRootParameter[4].InitAsDescriptorTable(1, &srvTable3);
 
         // A root signature is an array of root parameters.
         CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(5, slotRootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -443,12 +443,15 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_VBView.StrideInBytes = sizeof(SimpleVertex);
     m_VBView.SizeInBytes = UINT(sizeof(SimpleVertex) * geometryData.vertices.size());
 
-    // UAV view of simple vertex buffer
-    D3D12_UNORDERED_ACCESS_VIEW_DESC vertexBufferUAVdesc = {};
-    vertexBufferUAVdesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-    vertexBufferUAVdesc.Buffer.NumElements = geometryData.vertices.size();
-    vertexBufferUAVdesc.Buffer.StructureByteStride = sizeof(SimpleVertex);
-    GetDevice()->CreateUnorderedAccessView(m_vertexBuffer, nullptr, &vertexBufferUAVdesc, m_descriptorHeap.hCPU(VBInput_UavHeapOffset));
+    // SRV view of simple vertex buffer
+    D3D12_SHADER_RESOURCE_VIEW_DESC vertexBufferSRVdesc = {};
+    vertexBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    vertexBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    vertexBufferSRVdesc.Buffer.NumElements = geometryData.vertices.size();
+    vertexBufferSRVdesc.Buffer.StructureByteStride = sizeof(SimpleVertex);
+
+    GetDevice()->CreateShaderResourceView(m_vertexBuffer, &vertexBufferSRVdesc, m_descriptorHeap.hCPU(VBInput_UavHeapOffset));
+
 
     // Index buffer
     // upload to staging buffer
@@ -471,22 +474,20 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     GetCommandList()->CopyResource(m_indexBuffer.buffer, simpleIndexUploadBuffer.Resource());
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_indexBuffer.buffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-    // copy the index data to the index buffer
-    //m_indexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
-    //memcpy(dataBegin, &geometryData.indices[0], sizeof(UINT) * geometryData.indices.size());
-    //m_indexBuffer.buffer->Unmap(0, nullptr);
-
     // Initialize the index buffer view.
     m_IBView.BufferLocation = m_indexBuffer.buffer->GetGPUVirtualAddress();
     m_IBView.SizeInBytes = UINT(sizeof(UINT) * geometryData.indices.size());
     m_IBView.Format = DXGI_FORMAT_R32_UINT;
 
-    // UAV view of simple index buffer
-    D3D12_UNORDERED_ACCESS_VIEW_DESC indexBufferUAVdesc = {};
-    indexBufferUAVdesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-    indexBufferUAVdesc.Buffer.NumElements = geometryData.indices.size();
-    indexBufferUAVdesc.Buffer.StructureByteStride = sizeof(UINT);
-    GetDevice()->CreateUnorderedAccessView(m_indexBuffer, nullptr, &indexBufferUAVdesc, m_descriptorHeap.hCPU(IBInput_UavHeapOffset));
+    // SRV view of simple index buffer
+    D3D12_SHADER_RESOURCE_VIEW_DESC indexBufferSRVdesc = {};
+    indexBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;  // 0?
+    indexBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    indexBufferSRVdesc.Buffer.NumElements = geometryData.indices.size();
+    indexBufferSRVdesc.Buffer.StructureByteStride = sizeof(UINT);
+
+    GetDevice()->CreateShaderResourceView(m_indexBuffer, &indexBufferSRVdesc, m_descriptorHeap.hCPU(IBInput_SrvHeapOffset));
+
 
     //
     // Skinned vertex and index buffer
@@ -2638,24 +2639,17 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs["VSasCS"]);
 
-        //  Transition vertex buffer to a UAV
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.buffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ));
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_indexBuffer.buffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-
         UINT maxIndexCount = 0;
         for (int i = 0; i < m_drawRecords.size(); i++)
         {
             maxIndexCount = std::max(maxIndexCount, m_drawRecords[i].indexBufferCount);
         }
 
-        m_commandList[m_commandListIndex]->Dispatch(m_drawRecords.size(), maxIndexCount, 1); // TODO reduce groups to match shader!! !!! !!
+        UINT numGroupsY = (UINT)ceilf(maxIndexCount / 32.0f);
+        m_commandList[m_commandListIndex]->Dispatch(m_drawRecords.size(), numGroupsY, 1);
 
         // Run command list up to this point
         HRR(ExecuteCurrentCommandList(true));
-
-        //  Transition vertex buffer back to being a vertex buffer
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_indexBuffer.buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 
 
         CComPtr<ID3D12Device5> device;
