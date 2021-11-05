@@ -845,22 +845,35 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         //
         // VB World
         uint64_t vbWorldBufferSize = sizeof(XMFLOAT3) * maxWorldVertices;
-        vbWorldBufferSize = AlignUp(vbWorldBufferSize, 16);
+        //vbWorldBufferSize = AlignUp(vbWorldBufferSize, 16);
 
-        // Aligning buffer to 4096 to align with the page size
-        vbWorldBufferSize = AlignUp(vbWorldBufferSize, 4096);
+        //// Aligning buffer to 4096 to align with the page size
+        //vbWorldBufferSize = AlignUp(vbWorldBufferSize, 4096);
 
         // Create vertex world buffer
-        auto vbDescBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbWorldBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
-#if defined(TREE_XBOX)
-            | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER
-#endif
-            );
+//        auto vbDescBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbWorldBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+//#if defined(TREE_XBOX)
+//            | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER
+//#endif
+//            );
+
+        D3D12_RESOURCE_DESC vbDescBuffer = {};
+        vbDescBuffer.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        vbDescBuffer.Width = vbWorldBufferSize;
+        vbDescBuffer.Height = 1;
+        vbDescBuffer.DepthOrArraySize = 1;
+        vbDescBuffer.MipLevels = 1;
+        vbDescBuffer.Format = DXGI_FORMAT_UNKNOWN;
+        vbDescBuffer.SampleDesc.Count = 1;
+        vbDescBuffer.SampleDesc.Quality = 0;
+        vbDescBuffer.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        vbDescBuffer.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
         HRR(GetDevice()->CreateCommittedResource(
             &defaultHeapProperties,
             D3D12_HEAP_FLAG_NONE,
             &vbDescBuffer,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
             nullptr,
             __uuidof(ID3D12Resource), (void**) &m_VBWorld));
 
@@ -880,6 +893,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         descUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
         descUAV.Buffer.NumElements = maxWorldVertices;
         descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
+        //descUAV.Format = DXGI_FORMAT_R32_FLOAT;
         GetDevice()->CreateUnorderedAccessView(m_VBWorld, nullptr, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
 
         // 
@@ -1225,7 +1239,13 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 {
 #if defined(DXR_ENABLED)
 
-    m_drawRecords.push_back(DrawRecord(StartIndexLocation, IndexCountPerInstance, StartInstanceLocation, InstanceCount, m_nextVbWorldStart, 0, m_currentMesh));
+    m_drawRecords.push_back(DrawRecord(StartIndexLocation,
+                                       IndexCountPerInstance,
+                                       StartInstanceLocation,
+                                       InstanceCount,
+                                       BaseVertexLocation,
+                                       m_nextVbWorldStart,
+                                       m_currentMesh));
     m_nextVbWorldStart += IndexCountPerInstance;
 #endif
 

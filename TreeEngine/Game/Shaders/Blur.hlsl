@@ -38,15 +38,30 @@ struct DrawRecord
     uint indexBufferCount;
     uint indexBufferStart;
     uint vbWorldStart;
-    uint vertexBufferCount;
+    uint baseVertexLocation;
     double mesh;
 
 };
 
+struct OutputVertex
+{
+    float x;
+    float y;
+    float z;
+};
+
+struct SimpleVertex
+{
+    float3 Pos;
+    float3 Normal;
+    float2 Tex;
+    float3 TangentU;
+};
+
 // Compute Root Sig (VSasCS)
 StructuredBuffer<DrawRecord> drawRecords: register(t0);
-RWStructuredBuffer<float3> outputVertices     : register(u0);
-StructuredBuffer<float3> staticVertices : register(t1);
+RWStructuredBuffer<OutputVertex> outputVertices     : register(u0);
+StructuredBuffer<SimpleVertex> staticVertices : register(t1);
 StructuredBuffer<uint> staticIndices : register(t2);
 
 struct InstancedData // (Copied from Tree.hlsl)
@@ -67,7 +82,7 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
     if (dispatchThreadID.y < drawRecord.indexBufferCount)
     {
         uint index = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.y];
-        float3 vertex = staticVertices[index];
+        float3 vertex = staticVertices.Load(drawRecord.baseVertexLocation + index).Pos;
 
         int inputInstance = drawRecord.startingInstance;
         float4x4 world = InstanceBuffer[inputInstance].World;
@@ -76,7 +91,15 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
         float4 out0 = mul(vertex4, world);
 
         uint vbIndex = drawRecord.vbWorldStart + dispatchThreadID.y;
-        outputVertices[vbIndex] = out0.xyz;
+
+        outputVertices[vbIndex].x = out0.x;
+        outputVertices[vbIndex].y = out0.y;
+        outputVertices[vbIndex].z = out0.z;
+
+        //vbIndex = vbIndex * 3;
+        //outputVertices[vbIndex] = out0.x;
+        //outputVertices[vbIndex + 1] = out0.y;
+        //outputVertices[vbIndex + 2] = out0.z;
     }
 }
 
