@@ -4,6 +4,8 @@
 //
 // Copyright (c) Microsoft Corporation. All rights reserved.
 //--------------------------------------------------------------------------------------
+
+#include "SharedTypes.hlsli"
 #include "Materials.fx"
 
 //--------------------------------------------------------------------------------------
@@ -18,21 +20,8 @@ SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 SamplerState samLinearWrap : register(s3);
 
-struct InstancedData // (cloned in compute)
-{
-    float4x4 World; //  : WORLD;
-    uint InstanceOffset;
-    uint InstanceOffsetPrev;
-    uint InstanceOffsetNext;
-};
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
-
-//AppendStructuredBuffer<float3> outputVertices     : register(u0);
-//ConsumeStructuredBuffer<uint> outputVertexCounter : register(u1);
-//AppendStructuredBuffer<uint> outputIndices        : register(u2);
-//ConsumeStructuredBuffer<uint> outputIndicesCounter : register(u3);
-
 
 cbuffer cbChangesPerPass : register(b1)
 {

@@ -2,6 +2,8 @@
 // Performs a separable Guassian blur with a blur radius up to 5 pixels.
 //=============================================================================
 
+#include "SharedTypes.hlsli"
+
 cbuffer cbSettings : register(b0)
 {
     // We cannot have an array entry in a constant buffer that gets mapped onto
@@ -29,7 +31,6 @@ static const int gMaxBlurRadius = 3;
 Texture2D gInput            : register(t0);
 RWTexture2D<float4> gOutput : register(u0);
 
-
 struct DrawRecord
 {
     uint startingInstance;
@@ -39,15 +40,8 @@ struct DrawRecord
     uint indexBufferStart;
     uint vbWorldStart;
     uint baseVertexLocation;
-    double mesh;
+    uint vertexCount;
 
-};
-
-struct OutputVertex
-{
-    float x;
-    float y;
-    float z;
 };
 
 struct SimpleVertex
@@ -60,18 +54,10 @@ struct SimpleVertex
 
 // Compute Root Sig (VSasCS)
 StructuredBuffer<DrawRecord> drawRecords: register(t0);
-RWStructuredBuffer<OutputVertex> outputVertices     : register(u0);
+RWStructuredBuffer<float4> outputVertices     : register(u0);
 StructuredBuffer<SimpleVertex> staticVertices : register(t1);
 StructuredBuffer<uint> staticIndices : register(t2);
 
-struct InstancedData // (Copied from Tree.hlsl)
-{
-    float4x4 World; //  : WORLD;
-    uint InstanceOffset;
-    uint InstanceOffsetPrev;
-    uint InstanceOffsetNext;
-};
- 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
  
 [numthreads(1, 32, 1)]
@@ -92,14 +78,7 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
 
         uint vbIndex = drawRecord.vbWorldStart + index;
 
-        outputVertices[vbIndex].x = out0.x;
-        outputVertices[vbIndex].y = out0.y;
-        outputVertices[vbIndex].z = out0.z;
-
-        //vbIndex = vbIndex * 3;
-        //outputVertices[vbIndex] = out0.x;
-        //outputVertices[vbIndex + 1] = out0.y;
-        //outputVertices[vbIndex + 2] = out0.z;
+        outputVertices[vbIndex] = out0;
     }
 }
 

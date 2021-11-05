@@ -935,7 +935,7 @@ public:
 
     struct DrawRecord
     {
-        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, Mesh* thisMesh)
+        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices/*, Mesh* thisMesh*/)
         {
             startingInstance = startInstance;
             numInstances = numberInstances;
@@ -943,7 +943,8 @@ public:
             indexBufferStart = startIndexLocation;
             baseVertexLocation = baseVertexLoc;
             vbWorldStart = nextVbWorldStart;
-            mesh = thisMesh;
+            vertexCount = numVertices;
+            //mesh = thisMesh;
         }
 
         UINT startingInstance;
@@ -953,7 +954,8 @@ public:
         UINT indexBufferStart;
         UINT vbWorldStart;
         UINT baseVertexLocation;
-        Mesh* mesh;
+        UINT vertexCount;
+        //Mesh* mesh;
     };
 
     UINT m_nextVbWorldStart = 0;

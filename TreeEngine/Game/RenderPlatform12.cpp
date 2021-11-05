@@ -844,7 +844,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         //
         // VB World
-        uint64_t vbWorldBufferSize = sizeof(XMFLOAT3) * maxWorldVertices;
+        uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
         //vbWorldBufferSize = AlignUp(vbWorldBufferSize, 16);
 
         //// Aligning buffer to 4096 to align with the page size
@@ -892,7 +892,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         D3D12_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
         descUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
         descUAV.Buffer.NumElements = maxWorldVertices;
-        descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
+        descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT4);
         //descUAV.Format = DXGI_FORMAT_R32_FLOAT;
         GetDevice()->CreateUnorderedAccessView(m_VBWorld, nullptr, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
 
@@ -1245,8 +1245,9 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
                                        InstanceCount,
                                        BaseVertexLocation,
                                        m_nextVbWorldStart,
-                                       m_currentMesh));
-    m_nextVbWorldStart += IndexCountPerInstance;
+                                       m_currentMesh->m_bufferOffsets->VertexCount /*, m_currentMesh*/));
+
+    m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount;
 #endif
 
     GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
@@ -1851,100 +1852,37 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
-    UINT vertexCount = 60; //HACK
-    UINT vertexSize = sizeof(XMFLOAT3);
+    D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[m_drawRecords.size()];
+    ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * m_drawRecords.size());
 
-    //for (DrawRecord& dr : m_drawRecords)
-    //{
-    //    vertexCount += dr.indexBufferCount;
-    //}
-
-
-#if 0
-
-    unsigned int* pSizeVbWorld;
-    m_UavWorldCounterReadback->Map(0, nullptr, reinterpret_cast<void**>(&pSizeVbWorld));
-
-    unsigned int* pSizeIbWorld = pSizeVbWorld + 2;
-
-    ASSERT(*pSizeIbWorld == *pSizeVbWorld);
-    //ASSERT(m_drawnVertices[0].indexBufferCount.vertexBufferCount == *pSizeVbWorld);
-
-    UINT indexCount = 0;
-    UINT indexSize = sizeof(UINT);
-
-    vertexCount = *pSizeVbWorld;
-
-    for (DrawnVertexRecord& dvr : m_drawnVertices)
+    for (int i = 0; i < m_drawRecords.size(); i++)
     {
-        indexCount += dvr.indexBufferCount;
+        DrawRecord& dr = m_drawRecords[i];
+        D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = geometryDescs[i];
+
+        geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+        geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+
+        geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+        geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + dr.vbWorldStart * sizeof(XMFLOAT4);
+        geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(XMFLOAT4);
+        geometryDesc.Triangles.VertexCount = dr.vertexCount;
+
+        geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+        geometryDesc.Triangles.IndexBuffer = m_indexBuffer.buffer->GetGPUVirtualAddress() + dr.indexBufferStart * sizeof(UINT);   // TEMPTEMP  dr.mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + dr.indexBufferStart;
+        geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
+
     }
-
-    /////////////
-
-    int* pIndexBuffer = nullptr;
-    m_drawnVertices[0].mesh->m_indexBuffer->buffer->Map(0, nullptr, ((void**)&pIndexBuffer));
-    pIndexBuffer += m_drawnVertices[0].indexBufferStart;
-
-    int* pIBWorld = nullptr;
-    m_IBWorld->Map(0, nullptr, ((void**)&pIBWorld));
-
-    int* pPrimWorld = nullptr;
-    m_PrimWorld->Map(0, nullptr, ((void**)&pPrimWorld));
-
-    XMFLOAT3* pVBWorld = nullptr;
-    m_VBWorld->Map(0, nullptr, ((void**)&pVBWorld));
-
-    std::vector<XMFLOAT3> altVbWorld;
-    altVbWorld.resize(vertexCount);
-    memcpy(altVbWorld.data(), pVBWorld, vertexCount * sizeof(XMFLOAT3));
-
-    for (int i = 0; i < vertexCount; i++)
-    {
-        pVBWorld[pIBWorld[i]] = altVbWorld.data()[i];
-    }
-
-    m_IBWorld->Unmap(0, nullptr);
-    m_PrimWorld->Unmap(0, nullptr);
-    m_VBWorld->Unmap(0, nullptr);
-    m_drawnVertices[0].mesh->m_indexBuffer->buffer->Unmap(0, nullptr);
-#endif
 
     ///////////////
-
-    // Build a BLAS 
-    D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = { D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES, D3D12_RAYTRACING_GEOMETRY_FLAG_NONE, {} };
-
-    geometryDesc.Triangles.VertexCount = vertexCount;
-    geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-    
-    geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress();
-    geometryDesc.Triangles.VertexBuffer.StrideInBytes = vertexSize;
-
-    geometryDesc.Triangles.IndexCount = m_drawRecords[0].indexBufferCount;
-    geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-    //geometryDesc.Triangles.IndexBuffer = m_IBWorld->GetGPUVirtualAddress();
-    geometryDesc.Triangles.IndexBuffer = (D3D12_GPU_VIRTUAL_ADDRESS) (((UINT*)m_drawRecords[0].mesh->m_indexBuffer->buffer->GetGPUVirtualAddress()) + m_drawRecords[0].indexBufferStart);
-    //    geometryDesc.Triangles.IndexBuffer = m_indexBuffer.buffer->GetGPUVirtualAddress() + m_drawnVertices[0].indexBufferStart;   // m_IBWorld->GetGPUVirtualAddress();
 
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs;
     rtInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
     rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    rtInputs.NumDescs = 1;
+    rtInputs.NumDescs = m_drawRecords.size();
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    rtInputs.pGeometryDescs = &geometryDesc;
-
-    //if (m_VB == nullptr)
-    //{
-    //    // Create all the resources only once, even if we're going to rebuild the BLAS every frame.		
-    //    D3D12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexCount * vertexSize);
-    //    D3D12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(indexCount * indexSize);
-
-
-    //    HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &vbDesc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, __uuidof(ID3D12Resource), (void**)&m_VB));
-    //    HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &ibDesc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, __uuidof(ID3D12Resource), (void**)&m_IB));
-
+    rtInputs.pGeometryDescs = geometryDescs;
 
     if (m_triangleBLAS == nullptr)
     {
@@ -1982,6 +1920,8 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     PIXEndEvent(GetCommandList());
 
     HRR(ExecuteCurrentCommandList(true));
+
+    delete[] geometryDescs;
 
     return S_OK;
 }

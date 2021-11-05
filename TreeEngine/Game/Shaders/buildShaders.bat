@@ -89,23 +89,16 @@ if [%2] == [rootsig] (
 	set outputfile=%~4%~n3.cso
 	set cmdline=!cmdline! /Od /Zpr /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
 	if !isXbox! == 1 (
-		set cmdline=!cmdline! /noprecompile 
+		set cmdline=!cmdline! /noprecompile
 	)
 )
 
 set finalcmd=!cmdline! !inputFile!
 
-rem SET count=1
-rem FOR /F "tokens=* USEBACKQ" %%F IN (`where dxc`) DO (
-rem   SET var!count!=%%F
-rem   SET /a count=!count!+1
-rem )
-rem ECHO %var1%
-
 echo !finalcmd!
 call !finalcmd!
 
-@if ERRORLEVEL 1 goto ENDOFSCRIPT
+@if NOT ERRORLEVEL 0 goto ENDOFSCRIPT
 
 echo Succeeded
 
@@ -124,7 +117,7 @@ if [!copyToLayout!]==[1] (
 
 @rem Subroutines
 :ENDOFSCRIPT
-@if ERRORLEVEL 1 (
+@if NOT ERRORLEVEL 0 (
 	@set AnyErrors=1
 	echo Fail > %~2/builderr.txt
 	if "%incremental%"=="1" (

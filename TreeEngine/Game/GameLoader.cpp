@@ -220,13 +220,21 @@ void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, Gam
 
 void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
+    WorldObjectParams* params1 = new WorldObjectParams(PrimitiveGeneratorType);
+    params1->position = XMFLOAT3(0, 0.5, 0);
+    params1->scale = XMFLOAT3(0.5, 0.5, 0.5);
+    XMStoreFloat4(&params1->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
+    params1->primitiveType = PrimitiveType_Cylinder;
+
+
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(1, 1, 1);
     //XMStoreFloat4(&params4->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
-    params4->primitiveType = PrimitiveType_Cylinder; //PrimitiveType_Cylinder;
+    params4->primitiveType = PrimitiveType_Box; //PrimitiveType_Cylinder;
 
-    scene->AddChild(new Primitive(params4));
+    scene->AddChild(new Primitive(params4));  // Box
+    scene->AddChild(new Primitive(params1));  // Cylinder
 
     // Init lights
     renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
