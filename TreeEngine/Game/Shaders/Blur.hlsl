@@ -25,6 +25,13 @@ cbuffer cbSettings : register(b0)
     float w10;
 };
 
+cbuffer cbChangesPerPass : register(b1)
+{
+    matrix View;
+    matrix Projection;
+};
+
+
 static const int gMaxBlurRadius = 3;
 
 // Compute Root Sig (Blur)

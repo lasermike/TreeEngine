@@ -6,6 +6,10 @@
 #include "Game.h"
 #include "InputManager.h"
 
+#ifdef TREE_XBOX
+#include <GameInput.h>
+#endif
+
 #include <appnotify.h>
 
 using namespace DirectX;
@@ -18,10 +22,15 @@ namespace
 };
 
 // Tree engine
-//Game* g_game = nullptr;
 InputManager g_inputManager;
+CComPtr<IGameInput>                 g_gameInput;
+CComPtr<IGameInputReading>          g_reading;
+std::vector<APP_LOCAL_DEVICE_ID>    g_deviceIds;
+wchar_t                             g_deviceString[20];
+std::wstring                        g_buttonString;
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void GatherGamepadInput();
 
 void UpdateFrameAndRender()
 {
@@ -86,6 +95,12 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lp
 
         SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(g_game.get()));
 
+        if (FAILED(GameInputCreate(&g_gameInput)))
+        {
+            return 1;
+        }
+
+
         g_plmSuspendComplete = CreateEventEx(nullptr, nullptr, 0, EVENT_MODIFY_STATE | SYNCHRONIZE);
         g_plmSignalResume = CreateEventEx(nullptr, nullptr, 0, EVENT_MODIFY_STATE | SYNCHRONIZE);
         if (!g_plmSuspendComplete || !g_plmSignalResume)
@@ -123,6 +138,8 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lp
         }
         else
         {
+            GatherGamepadInput();
+
             UpdateFrameAndRender();
         }
     }
@@ -140,6 +157,77 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR lp
     XGameRuntimeUninitialize();
 
     return (int) msg.wParam;
+}
+
+bool IsSameDevice(APP_LOCAL_DEVICE_ID first, APP_LOCAL_DEVICE_ID second)
+{
+    if (memcmp(&first, &second, APP_LOCAL_DEVICE_ID_SIZE) == 0)
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void GatherGamepadInput()
+{
+
+    FrameInputData& inputData = g_inputManager.GetFrameInput(0);
+
+    if (FAILED(g_gameInput->GetCurrentReading(GameInputKindGamepad, nullptr, &g_reading)))
+    {
+        // Failure indicates no gamepad is connected
+        g_buttonString.clear();
+    }
+    else
+    {
+        CComPtr<IGameInputDevice> device;
+        g_reading->GetDevice(&device);
+
+        if (device != nullptr)
+        {
+            int currentDevice = -1;
+            auto deviceInfo = device->GetDeviceInfo();
+
+            for (size_t i = 0; i < g_deviceIds.size(); i++)
+            {
+                if (IsSameDevice(g_deviceIds[size_t(i)], deviceInfo->deviceId))
+                {
+                    currentDevice = int(i);
+                    break;
+                }
+            }
+
+            if (currentDevice == -1)
+            {
+                currentDevice = (int)g_deviceIds.size() - 1;
+                g_deviceIds.emplace_back(deviceInfo->deviceId);
+            }
+
+            swprintf(g_deviceString, 19, L"Gamepad index: %d", currentDevice);
+        }
+        else
+        {
+            swprintf(g_deviceString, 19, L"No Device");
+        }
+
+        GameInputGamepadState state;
+
+        if (g_reading->GetGamepadState(&state))
+        {
+            g_buttonString = L"Buttons pressed:  ";
+
+            int exitComboPressed = 0;
+
+            inputData.key['W'] = state.buttons & GameInputGamepadDPadUp;
+
+            inputData.key['S'] = state.buttons & GameInputGamepadDPadDown;
+
+            inputData.key['D'] = state.buttons & GameInputGamepadDPadRight;
+
+            inputData.key['A'] = state.buttons & GameInputGamepadDPadLeft;
+        }
+    }
 }
 
 // Windows procedure
@@ -193,6 +281,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
+
 
 // Exit helper
 void ExitGame()

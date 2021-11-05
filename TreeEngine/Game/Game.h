@@ -18,6 +18,8 @@
 class ThreadPool;
 class BitmapFont;
 interface IInputManager;
+interface IGameInput;
+interface IGameInputReading;
 
 class Game
 {
@@ -82,6 +84,7 @@ private:
     void Update(DX::StepTimer const& timer);
     void Regenerate();
     void HandleInput(bool key[512]);
+    void HandleGamepadInput(bool key[512]);
 
     HRESULT ReloadDevice();
     void UpdateViewMatrix();
@@ -113,7 +116,7 @@ private:
     int                                 m_nextScreenHeight;
     bool                                m_renderToSharedTexture;
 
-    bool                                m_resetTree;
+    bool                                   m_resetTree;
     bool                                m_showShadowBuffer;
     bool                                m_showDxrUav;
     bool                                m_paused;

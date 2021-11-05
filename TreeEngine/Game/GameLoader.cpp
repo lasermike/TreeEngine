@@ -547,7 +547,7 @@ void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
     //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
     //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7, -0.7, 0.7, 0.0)));
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0)));
 
     renderData->numPointLights = 1;
 

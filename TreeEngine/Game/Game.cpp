@@ -18,7 +18,6 @@ using namespace Windows::Graphics::Display;
 #endif 
 #endif 
 
-
 #define D3D_DEBUG_INFO
 
 Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
@@ -320,6 +319,9 @@ void Game::ComputeCPU()
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
 
     FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
+
+    m_player->HandleInput(inputData.key);
+
     HandleInput(inputData.key);
 
     m_timer.Tick([&]()
@@ -362,8 +364,6 @@ void Game::Render(bool oculus)
 
 void Game::HandleInput(bool key[512])  // WM_KEYDOWN
 {
-    m_player->HandleInput(key);
-
     const char availableKeys[] = { '0', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3' };
     for (char k : availableKeys)
     {
