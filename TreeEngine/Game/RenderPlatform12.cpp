@@ -1851,8 +1851,14 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
-    UINT vertexCount = 0;
+    UINT vertexCount = 60; //HACK
     UINT vertexSize = sizeof(XMFLOAT3);
+
+    //for (DrawRecord& dr : m_drawRecords)
+    //{
+    //    vertexCount += dr.indexBufferCount;
+    //}
+
 
 #if 0
 

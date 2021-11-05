@@ -90,7 +90,7 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
         float4 vertex4 = float4(vertex, 1.0f);
         float4 out0 = mul(vertex4, world);
 
-        uint vbIndex = drawRecord.vbWorldStart + dispatchThreadID.y;
+        uint vbIndex = drawRecord.vbWorldStart + index;
 
         outputVertices[vbIndex].x = out0.x;
         outputVertices[vbIndex].y = out0.y;
