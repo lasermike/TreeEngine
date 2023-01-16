@@ -5,8 +5,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#include "SharedTypes.hlsli"
 #include "Materials.fx"
+#include "SharedTypes.hlsli"
 
 //--------------------------------------------------------------------------------------
 // Constant Buffer Variables
@@ -22,22 +22,6 @@ SamplerState samLinearWrap : register(s3);
 
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
-
-cbuffer cbChangesPerPass : register(b1)
-{
-    matrix View;
-    matrix Projection;
-};
-
-cbuffer cbChangesEveryFrame : register(b2)
-{
-    DirectionalLight light;
-    float4 eyePos;
-    matrix shadowMatrix;
-    uint globalFlags;  // bit 0 = use shadow maps
-    int numDirectionalLights;
-    int numPointLights;
-};
 
 cbuffer cbMaterial : register (b3)
 {

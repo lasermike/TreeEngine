@@ -234,6 +234,7 @@ void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params4->primitiveType = PrimitiveType_Box; //PrimitiveType_Cylinder;
 
     scene->AddChild(new Primitive(params4));  // Box
+
     scene->AddChild(new Primitive(params1));  // Cylinder
 
     // Init lights
@@ -587,8 +588,10 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->GetGeneratorParameters()._segmentLength = .01f; // 0.5f;
     params3->GetGeneratorParameters().thickness = .04f;
     params3->GetGeneratorParameters()._numIterations = 1;
-    params3->position = XMFLOAT3(0, 1.0, 0);
-    params3->_animationSpeed = 5.0f;
+    params3->position = XMFLOAT3(0, 0.5, 0);
+    params3->scale = XMFLOAT3(0.5, 0.5, 0.5);
+    params3->_animationSpeed = 5.0f;    params3->position = XMFLOAT3(0, 0.5, 0);
+
 
     params3->GetGeneratorParameters()._axiom = "F(20) A";
     params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) z(1) F(30) A] [Z(0.33074)F(50)A] "));
@@ -614,12 +617,14 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
     scene->AddChild(new Tree(params3));
 
+#if 0
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
     params4->primitiveType = PrimitiveType_CylinderHD;
     scene->AddChild(new Primitive(params4));
+#endif
 
 
     // Init lights 

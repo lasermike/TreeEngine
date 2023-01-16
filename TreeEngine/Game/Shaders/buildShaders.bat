@@ -54,7 +54,7 @@ if !platform! == "Gaming.Xbox.Scarlett.x64" (
    set cmdline=!cmdline! /Fc !outputFolder!%3.cso.txt 
    set isXbox=1
 ) else (
-	rem set cmdline=!cmdline!
+	set cmdline=!cmdline!
 )
 
 @if %2==vs (
@@ -79,7 +79,7 @@ if !platform! == "Gaming.Xbox.Scarlett.x64" (
 ECHO  BuildShader target !target!
 
 @rem Compile!
-set cmdline=!compiler! /Zi /T %target% /E %3 
+set cmdline=!compiler! /Zi /Qembed_debug /T %target% /E %3 
 
 if [%2] == [rootsig] (
 	set cmdline=!cmdline! /Fh !outputFolder!%3.inc 

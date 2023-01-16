@@ -2,6 +2,7 @@
 // Performs a separable Guassian blur with a blur radius up to 5 pixels.
 //=============================================================================
 
+#include "Materials.fx"
 #include "SharedTypes.hlsli"
 
 cbuffer cbSettings : register(b0)
@@ -25,13 +26,6 @@ cbuffer cbSettings : register(b0)
     float w10;
 };
 
-cbuffer cbChangesPerPass : register(b1)
-{
-    matrix View;
-    matrix Projection;
-};
-
-
 static const int gMaxBlurRadius = 3;
 
 // Compute Root Sig (Blur)
@@ -45,9 +39,12 @@ struct DrawRecord
 
     uint indexBufferCount;
     uint indexBufferStart;
+  
     uint vbWorldStart;
     uint baseVertexLocation;
+    
     uint vertexCount;
+    uint inputLayout;
 
 };
 
@@ -59,10 +56,21 @@ struct SimpleVertex
     float3 TangentU;
 };
 
+struct SkinnedVertex
+{
+    float3 Pos : POSITION;
+    float3 NormalL : NORMAL;
+    float2 Tex : TEXCOORD0;
+    float3 TangentL : TANGENT;
+    float  InstanceWeight1 : BLENDWEIGHT0;
+    float  InstanceWeight2 : BLENDWEIGHT1;
+    float  InstanceWeight3 : BLENDWEIGHT2;
+};
+
 // Compute Root Sig (VSasCS)
 StructuredBuffer<DrawRecord> drawRecords: register(t0);
 RWStructuredBuffer<float4> outputVertices     : register(u0);
-StructuredBuffer<SimpleVertex> staticVertices : register(t1);
+StructuredBuffer<SkinnedVertex> staticVertices : register(t1); //SimpleVertex
 StructuredBuffer<uint> staticIndices : register(t2);
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
@@ -80,10 +88,9 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
         int inputInstance = drawRecord.startingInstance;
         float4x4 world = InstanceBuffer[inputInstance].World;
 
-        float4 vertex4 = float4(vertex, 1.0f);
-        float4 out0 = mul(vertex4, world);
-
         uint vbIndex = drawRecord.vbWorldStart + index;
+
+        float4 out0 = mul(float4(vertex, 1.0f), world);
 
         outputVertices[vbIndex] = out0;
     }

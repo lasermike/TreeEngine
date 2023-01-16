@@ -62,12 +62,14 @@ enum CbvSrvUavHeapOffsets
     DxrPrimCounter_UavHeapOffset = 18,  // Not used
     VBInput_UavHeapOffset = 19,
     IBInput_SrvHeapOffset = 20,
-    DrawRecords_SrvHeapOffset = 21,
+    VBSkinnedInput_UavHeapOffset = 21,
+    IBSkinnedInput_SrvHeapOffset = 22,
+    DrawRecords_SrvHeapOffset = 23,
 
     // Per-material descriptors
-    Material0_HeapOffset = 22,
+    Material0_HeapOffset = 24,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 23,
+    Texture0Srv_HeapOffset = 25,
     Num_CbvSrvUavHeapOffsets
 };
  
@@ -457,7 +459,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     GetDevice()->CreateShaderResourceView(m_vertexBuffer, &vertexBufferSRVdesc, m_descriptorHeap.hCPU(VBInput_UavHeapOffset));
 
-
     // Index buffer
     // upload to staging buffer
     UploadBuffer<UINT> simpleIndexUploadBuffer(GetDevice(), geometryData.indices.size(), false);
@@ -519,6 +520,16 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_skinnedVBView.StrideInBytes = sizeof(SkinnedVertex);
     m_skinnedVBView.SizeInBytes = UINT(sizeof(SkinnedVertex) * geometryData.skinnedVertices.size());
 
+    // SRV view of simple vertex buffer
+    D3D12_SHADER_RESOURCE_VIEW_DESC vertexSkinnedBufferSRVdesc = {};
+    vertexSkinnedBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    vertexSkinnedBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
+    vertexSkinnedBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    vertexSkinnedBufferSRVdesc.Buffer.NumElements = geometryData.skinnedVertices.size();
+    vertexSkinnedBufferSRVdesc.Buffer.StructureByteStride = sizeof(SkinnedVertex);
+    GetDevice()->CreateShaderResourceView(m_skinnedVertexBuffer, &vertexSkinnedBufferSRVdesc, m_descriptorHeap.hCPU(VBSkinnedInput_UavHeapOffset));
+
+
     // Index buffer
     const D3D12_RESOURCE_DESC skinnedIndexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * geometryData.skinnedIndices.size());
     HRR(GetDevice()->CreateCommittedResource(
@@ -540,6 +551,16 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_skinnedIBView.BufferLocation = m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress();
     m_skinnedIBView.SizeInBytes = UINT(sizeof(UINT) * geometryData.skinnedIndices.size());
     m_skinnedIBView.Format = DXGI_FORMAT_R32_UINT;
+
+    // SRV view of simple index buffer
+    D3D12_SHADER_RESOURCE_VIEW_DESC indexSkinnedBufferSRVdesc = {};
+    indexSkinnedBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
+    indexSkinnedBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    indexSkinnedBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    indexSkinnedBufferSRVdesc.Buffer.NumElements = geometryData.skinnedIndices.size();
+    indexSkinnedBufferSRVdesc.Buffer.StructureByteStride = sizeof(UINT);
+
+    GetDevice()->CreateShaderResourceView(m_skinnedIndexBuffer, &indexSkinnedBufferSRVdesc, m_descriptorHeap.hCPU(IBSkinnedInput_SrvHeapOffset));
 
     // Debug overlay to show depth map
     HRR(BuildScreenQuadGeometryBuffers());
@@ -1184,9 +1205,6 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     //m_IBWorld.Release();
     m_VBWorld.Release();
-    //m_PrimWorld.Release();
-    //m_UavWorldCounter.Release();
-    //m_UavWorldCounterReadback.Release();
     m_DrawRecords.Release();
 //#endif
 
@@ -1251,7 +1269,8 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
                                        InstanceCount,
                                        BaseVertexLocation,
                                        m_nextVbWorldStart,
-                                       m_currentMesh->m_bufferOffsets->VertexCount /*, m_currentMesh*/));
+                                       m_currentMesh->m_bufferOffsets->VertexCount, 
+                                       m_currentMesh));
 
     m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount;
 #endif
@@ -1875,7 +1894,10 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
         geometryDesc.Triangles.VertexCount = dr.vertexCount;
 
         geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-        geometryDesc.Triangles.IndexBuffer = m_indexBuffer.buffer->GetGPUVirtualAddress() + dr.indexBufferStart * sizeof(UINT);   // TEMPTEMP  dr.mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + dr.indexBufferStart;
+        geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ?
+                                                m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress() :
+                                                m_indexBuffer.buffer->GetGPUVirtualAddress())
+                                             + dr.indexBufferStart * sizeof(UINT);   // TEMPTEMP  dr.mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + dr.indexBufferStart;
         geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
 
     }
@@ -1921,7 +1943,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     GetCommandList()->ResourceBarrier(1, &uavBarrier2);	// Need the bottom level build to finish before we can build a top-level acceleration structure.
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ));
-    //GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_IBWorld, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
     PIXEndEvent(GetCommandList());
 
@@ -2606,10 +2627,9 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(DrawRecords_SrvHeapOffset));
         GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
-        GetCommandList()->SetComputeRootDescriptorTable(3, m_descriptorHeap.hGPU(VBInput_UavHeapOffset)); // Table of 2 w/ Index buffer
+        bool bSkinned = false;
+        GetCommandList()->SetComputeRootDescriptorTable(3, m_descriptorHeap.hGPU(bSkinned ? VBSkinnedInput_UavHeapOffset : VBInput_UavHeapOffset)); // Table of 2 w/ Index buffer
         GetCommandList()->SetComputeRootDescriptorTable(4, m_renderData->instanceBuffer->srvViewGpu);
-
-
 
         m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs["VSasCS"]);
 
@@ -2672,6 +2692,8 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         commandList->SetComputeRoot32BitConstants(1, ARRAYSIZE(rootConstants), rootConstants, 0);
         commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
         commandList->SetComputeRootConstantBufferView(3, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
+        commandList->SetComputeRootConstantBufferView(4, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
+
 
         commandList->DispatchRays(&dispatchRaysDesc);
 

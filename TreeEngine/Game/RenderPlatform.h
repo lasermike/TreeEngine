@@ -902,9 +902,7 @@ public:
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
 
     // DXR buffers
-    CComPtr<ID3D12Resource>     m_VBWorld, m_IBWorld, m_PrimWorld;
-    CComPtr<ID3D12Resource>     m_UavWorldCounter;
-    CComPtr<ID3D12Resource>     m_UavWorldCounterReadback;
+    CComPtr<ID3D12Resource>     m_VBWorld;
     CComPtr<ID3D12Resource>     m_DrawRecords;
 
     uint32_t m_numInstancesInTLAS;
@@ -935,7 +933,7 @@ public:
 
     struct DrawRecord
     {
-        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices/*, Mesh* thisMesh*/)
+        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices, Mesh* thisMesh)
         {
             startingInstance = startInstance;
             numInstances = numberInstances;
@@ -944,6 +942,7 @@ public:
             baseVertexLocation = baseVertexLoc;
             vbWorldStart = nextVbWorldStart;
             vertexCount = numVertices;
+            inputLayout = thisMesh->m_inputLayout;
             //mesh = thisMesh;
         }
 
@@ -952,9 +951,13 @@ public:
 
         UINT indexBufferCount;
         UINT indexBufferStart;
+
         UINT vbWorldStart;
         UINT baseVertexLocation;
+
         UINT vertexCount;
+        InputLayouts inputLayout;
+
         //Mesh* mesh;
     };
 
