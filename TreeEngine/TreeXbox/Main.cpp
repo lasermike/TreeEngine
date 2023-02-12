@@ -219,14 +219,23 @@ void GatherGamepadInput()
 
             int exitComboPressed = 0;
 
-            inputData.key['W'] = state.buttons & GameInputGamepadDPadUp;
+            inputData.key['W'] = (state.buttons & GameInputGamepadDPadUp) || (state.leftThumbstickY > .3f);
 
-            inputData.key['S'] = state.buttons & GameInputGamepadDPadDown;
+            inputData.key['S'] = (state.buttons & GameInputGamepadDPadDown) || (state.leftThumbstickY < -.3f);
 
             inputData.key['D'] = state.buttons & GameInputGamepadDPadRight;
 
             inputData.key['A'] = state.buttons & GameInputGamepadDPadLeft;
+
+            inputData.key[VK_LEFT] = state.leftThumbstickX < -.3f;
+
+            inputData.key[VK_RIGHT] = state.leftThumbstickX > .3f;
+
+            inputData.key['Y'] = state.buttons & GameInputGamepadY;
+
         }
+
+        g_reading.Release();
     }
 }
 

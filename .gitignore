@@ -86,6 +86,7 @@ ipch/
 *.VC.opendb
 *.VC.db-shm
 *.VC.db-wal
+.vs/
 
 # Visual Studio profiler
 *.psess
