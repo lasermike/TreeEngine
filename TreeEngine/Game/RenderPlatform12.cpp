@@ -1787,6 +1787,10 @@ HRESULT RenderPlatform12::InitDevice()
 #if defined(DXR_ENABLED)
 HRESULT RenderPlatform12::CreateRaytracingPipeline()
 {
+    CComPtr<ID3D12Device8> d3dDevice8;
+    HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&d3dDevice8));
+    d3dDevice8->SetCompileTimeShaderPdbPathX(L"d:\\");
+
     CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
 
     auto raytracingLibrary = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
@@ -1809,14 +1813,16 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
     // Configure the shaders and pipeline
     {
         auto shaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-        shaderConfig->Config(4, 8);
+        shaderConfig->Config(4, 8);  // maximum payload size, and the maximum attribute size (both in bytes).
 
         auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-        pipelineConfig->Config(1);
+        UINT maxRecursionDepth = 1;
+        pipelineConfig->Config(maxRecursionDepth);
     }
 
     // Create Global Root Signature
     {
+
         // It is not currently possible to specify the D3D12XBOX_ROOT_SIGNATURE_FLAG_RAYTRACING flag in HLSL, so this must be created in C++ with that flag set.
         // To make that process simpler, we'll just deserialize the one we have, add the flag and create it again.
         CComPtr<ID3D12VersionedRootSignatureDeserializer> rootSigDeserializer;

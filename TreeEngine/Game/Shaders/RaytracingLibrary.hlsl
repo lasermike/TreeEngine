@@ -88,15 +88,19 @@ void RayGenerationShader()
 [shader("raygeneration")]
 void RayGenerationShader()
 {
-    // Orthographic projection, just as if we were already in NDC.  But this is world coordinates?
     float2 vpos = DispatchRaysIndex().xy;
-    //float3 rayOrigin = eyePos; //float3(-1, 1, -4); //float3(-1, 1, -5);
-    float3 rayOrigin = float3(-1, 1, -1); //float3(-1, 1, -5);
 
-    rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
+    //float3 rayOrigin = float3(-1, 1, -1); //float3(-1, 1, -5);
+
+    //rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
+
+    //float3 rayOrigin = mul(float4(float3(-1, 1, -1), 1.0f), transpose(View));
+    float3 rayOrigin = mul(eyePos, transpose(View));
 
     //float3 rayDir = float3(0, 0, 1);
-    float3 rayDir = float3(0, 0, 1) + float3(float2(1, -1) * (vpos / float2(dispatchWidth, dispatchHeight)), 0);
+    float3 rayDir = mul(float4(float3(0, 0, 1), 1.0f), transpose(View)); 
+
+    rayDir = rayDir + float3(float2(1, -1) * (vpos / float2(dispatchWidth, dispatchHeight)), 0);  // Poor mans projection
 
     RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
     RayPayload payload = { 0.0f };
