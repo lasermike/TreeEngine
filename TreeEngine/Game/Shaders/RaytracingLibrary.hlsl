@@ -30,13 +30,89 @@ struct RayPayload
 };
 
 
+[shader("anyhit")]
+void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
+    float3 triangleCentre = 1.0f / 3.0f;
+
+    float distanceToCentre = length(triangleCentre - barycentrics);
+
+    if (distanceToCentre < holeSize)
+        IgnoreHit();
+}
+
+[shader("closesthit")]
+void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
+    renderOutput[DispatchRaysIndex().xy] = float4(barycentrics, 1);
+}
+
+[shader("miss")]
+void MissShader(inout RayPayload payload)
+{
+    renderOutput[DispatchRaysIndex().xy] = float4(0.5, 0, 0, 1);
+}
+
+#if 1
+//chatgpt
+[shader("raygeneration")]
+void RayGenerationShader()
+{
+    // Compute the pixel coordinates in the viewport
+    float2 pixelCoords = float2(DispatchRaysIndex().xy + 0.5f) / float2(dispatchWidth, dispatchHeight);
+
+    // Compute the ray direction for this pixel
+    float4 clipRayDir = float4(pixelCoords * 2.0f - 1.0f, -1.0f, 1.0f);
+    clipRayDir.y *= -1;     // Invert Y for DirectX-style coordinates.
+
+    float4 viewRayDir = mul(clipRayDir, transpose(Projection));
+    viewRayDir.z = 1.0f;
+    viewRayDir.w = 0.0f;
+
+    float3 worldRayDir = normalize(mul(viewRayDir, transpose(View)).xyz);
+
+    RayDesc myRay = { eyePos.xyz, 0.0f, worldRayDir.xyz, 100.0f };
+    RayPayload payload = { 0.0f };
+
+    uint missShaderIndex = 1;
+    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
+}
+#endif
+
+
+#if 0
+// Original orth.  works
+
+[shader("raygeneration")]
+void RayGenerationShader()
+{
+    // Orthographic projection, just as if we were already in NDC.  But this is world coordinates?
+    float2 vpos = DispatchRaysIndex().xy;
+    float3 rayOrigin = float3(-1, 1, -4); //float3(-1, 1, -5);
+
+    rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
+
+    float3 rayDir = float3(0, 0, 1);  //float3(0, 0, 1);
+
+    RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
+    RayPayload payload = { 0.0f };
+
+    uint missShaderIndex = 1;
+    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
+}
+#endif
+
+
+
+#if 0
+// org
 // Generate a ray in world space for a camera pixel corresponding to an index from the dispatched 2D grid.
 inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
 {
 }
 
-
-#if 0
 [shader("raygeneration")]
 void RayGenerationShader()
 {
@@ -83,54 +159,6 @@ void RayGenerationShader()
 }
 #endif
 
-#if 1
-//chatgpt
-[shader("raygeneration")]
-void RayGenerationShader()
-{
-    // Compute the pixel coordinates in the viewport
-    float2 pixelCoords = float2(DispatchRaysIndex().xy + 0.5f) / float2(dispatchWidth, dispatchHeight);
-
-    // Compute the ray direction for this pixel
-    float4 clipRayDir = float4(pixelCoords * 2.0f - 1.0f, -1.0f, 1.0f);
-    clipRayDir.y *= -1;
-    float4 viewRayDir = mul(clipRayDir, transpose(Projection));
-    viewRayDir.z = 1.0f;
-    viewRayDir.w = 0.0f;
-
-    float3 worldRayDir = normalize(mul(viewRayDir, transpose(View)).xyz);
-
-    RayDesc myRay = { eyePos.xyz, 0.0f, worldRayDir.xyz, 100.0f };
-    RayPayload payload = { 0.0f };
-
-    uint missShaderIndex = 1;
-    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
-}
-#endif
-
-
-#if 0
-// Original orth.  works
-
-[shader("raygeneration")]
-void RayGenerationShader()
-{
-    // Orthographic projection, just as if we were already in NDC.  But this is world coordinates?
-    float2 vpos = DispatchRaysIndex().xy;
-    float3 rayOrigin = float3(-1, 1, -4); //float3(-1, 1, -5);
-
-    rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
-
-    float3 rayDir = float3(0, 0, 1);  //float3(0, 0, 1);
-
-    RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
-    RayPayload payload = { 0.0f };
-
-    uint missShaderIndex = 1;
-    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
-}
-#endif
-
 
 #if 0
 //WIP hm
@@ -159,28 +187,3 @@ void RayGenerationShader()
 }
 #endif
 
-
-[shader("anyhit")]
-void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
-{
-    float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
-    float3 triangleCentre = 1.0f / 3.0f;
-
-    float distanceToCentre = length(triangleCentre - barycentrics);
-
-    if (distanceToCentre < holeSize)
-        IgnoreHit();
-}
-
-[shader("closesthit")]
-void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
-{
-    float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
-	renderOutput[DispatchRaysIndex().xy] = float4(barycentrics, 1);
-}
-
-[shader("miss")]
-void MissShader(inout RayPayload payload)
-{
-	renderOutput[DispatchRaysIndex().xy] = float4(0.5, 0, 0, 1);
-}
