@@ -24,7 +24,6 @@ namespace
 // Tree engine
 InputManager g_inputManager;
 CComPtr<IGameInput>                 g_gameInput;
-CComPtr<IGameInputReading>          g_reading;
 std::vector<APP_LOCAL_DEVICE_ID>    g_deviceIds;
 wchar_t                             g_deviceString[20];
 std::wstring                        g_buttonString;
@@ -171,6 +170,7 @@ bool IsSameDevice(APP_LOCAL_DEVICE_ID first, APP_LOCAL_DEVICE_ID second)
 
 void GatherGamepadInput()
 {
+    CComPtr<IGameInputReading>          g_reading;
 
     FrameInputData& inputData = g_inputManager.GetFrameInput(0);
 
@@ -234,8 +234,6 @@ void GatherGamepadInput()
             inputData.key['Y'] = state.buttons & GameInputGamepadY;
 
         }
-
-        g_reading.Release();
     }
 }
 

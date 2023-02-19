@@ -84,25 +84,23 @@ void RayGenerationShader()
 #endif
 
 #if 1
-//WIP
+//chatgpt
 [shader("raygeneration")]
 void RayGenerationShader()
 {
-    float2 vpos = DispatchRaysIndex().xy;
+    // Compute the pixel coordinates in the viewport
+    float2 pixelCoords = float2(DispatchRaysIndex().xy + 0.5f) / float2(dispatchWidth, dispatchHeight);
 
-    //float3 rayOrigin = float3(-1, 1, -1); //float3(-1, 1, -5);
+    // Compute the ray direction for this pixel
+    float4 clipRayDir = float4(pixelCoords * 2.0f - 1.0f, -1.0f, 1.0f);
+    clipRayDir.y *= -1;
+    float4 viewRayDir = mul(clipRayDir, transpose(Projection));
+    viewRayDir.z = 1.0f;
+    viewRayDir.w = 0.0f;
 
-    //rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
+    float3 worldRayDir = normalize(mul(viewRayDir, transpose(View)).xyz);
 
-    //float3 rayOrigin = mul(float4(float3(-1, 1, -1), 1.0f), transpose(View));
-    float3 rayOrigin = mul(eyePos, transpose(View));
-
-    //float3 rayDir = float3(0, 0, 1);
-    float3 rayDir = mul(float4(float3(0, 0, 1), 1.0f), transpose(View)); 
-
-    rayDir = rayDir + float3(float2(1, -1) * (vpos / float2(dispatchWidth, dispatchHeight)), 0);  // Poor mans projection
-
-    RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
+    RayDesc myRay = { eyePos.xyz, 0.0f, worldRayDir.xyz, 100.0f };
     RayPayload payload = { 0.0f };
 
     uint missShaderIndex = 1;
@@ -117,21 +115,50 @@ void RayGenerationShader()
 [shader("raygeneration")]
 void RayGenerationShader()
 {
-	// Orthographic projection, just as if we were already in NDC.  But this is world coordinates?
-	float2 vpos = DispatchRaysIndex().xy;
-	float3 rayOrigin = float3(-1, 1, -4); //float3(-1, 1, -5);
+    // Orthographic projection, just as if we were already in NDC.  But this is world coordinates?
+    float2 vpos = DispatchRaysIndex().xy;
+    float3 rayOrigin = float3(-1, 1, -4); //float3(-1, 1, -5);
 
-	rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
+    rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
 
-	float3 rayDir = float3(0, 0, 1);  //float3(0, 0, 1);
+    float3 rayDir = float3(0, 0, 1);  //float3(0, 0, 1);
 
-	RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
-	RayPayload payload = { 0.0f };
+    RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
+    RayPayload payload = { 0.0f };
 
-	uint missShaderIndex = 1;
-	TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
+    uint missShaderIndex = 1;
+    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
 }
 #endif
+
+
+#if 0
+//WIP hm
+[shader("raygeneration")]
+void RayGenerationShader()
+{
+    float2 vpos = DispatchRaysIndex().xy;
+
+    //float3 rayOrigin = float3(-1, 1, -1); //float3(-1, 1, -5);
+
+    //rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
+
+    //float3 rayOrigin = mul(float4(float3(-1, 1, -1), 1.0f), transpose(View));
+    float3 rayOrigin = mul(eyePos, transpose(View));
+
+    //float3 rayDir = float3(0, 0, 1);
+    float3 rayDir = mul(float3(0, 0, 1), transpose(View)); 
+
+    rayDir = rayDir + float3(float2(1, -1) * (vpos / float2(dispatchWidth, dispatchHeight)), 0);  // Poor mans projection
+
+    RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
+    RayPayload payload = { 0.0f };
+
+    uint missShaderIndex = 1;
+    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
+}
+#endif
+
 
 [shader("anyhit")]
 void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
