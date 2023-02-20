@@ -89,7 +89,8 @@ if [%2] == [rootsig] (
 	set outputfile=%~4%~n3.cso
 	set cmdline=!cmdline! /Od /Zpr /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
 	if !isXbox! == 1 (
-		set cmdline=!cmdline! /noprecompile
+		set cmdline=!cmdline! 
+		rem /noprecompile
 	)
 )
 

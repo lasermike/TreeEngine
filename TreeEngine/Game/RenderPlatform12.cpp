@@ -1588,6 +1588,12 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
     psoDesc.PS = CD3DX12_SHADER_BYTECODE(*m_drawRGBScreenPixelShader);
 #endif
 
+    // alpha
+    psoDesc.BlendState.RenderTarget[0].BlendEnable = true;
+    psoDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    psoDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_COLOR;
+    psoDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_BLEND_FACTOR;
+
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineStateRGBFullScreenQuad));
 
     
@@ -2736,9 +2742,10 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         GetCommandList()->ResourceBarrier(1, &toReadBarrier);
 
-        HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
-        //HRR(DrawScreenQuad(GetCommandList(), DxrVB_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
+        FLOAT blendFactor[4] = { 0.5f,0.5f,0.5f, 1.0f };
+        GetCommandList()->OMSetBlendFactor(blendFactor);
 
+        HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
 
         // DXR vertex buffer to UAV
         GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));

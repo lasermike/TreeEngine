@@ -67,7 +67,7 @@ void RayGenerationShader()
     float4 clipRayDir = float4(pixelCoords * 2.0f - 1.0f, -1.0f, 1.0f);
     clipRayDir.y *= -1;     // Invert Y for DirectX-style coordinates.
 
-    float4 viewRayDir = mul(clipRayDir, transpose(Projection));
+    float4 viewRayDir = clipRayDir; // mul(clipRayDir, transpose(Projection));
     viewRayDir.z = 1.0f;
     viewRayDir.w = 0.0f;
 
