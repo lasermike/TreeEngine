@@ -245,8 +245,8 @@ void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     renderData->time = 0;
 
     // Camera
-    player->SetPosition(XMLoadFloat3(&XMFLOAT3(-6.0f, 1.5f, -6.0f)));
-    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), 0));
 }
 
 

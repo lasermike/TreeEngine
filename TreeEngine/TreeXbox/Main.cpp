@@ -231,7 +231,10 @@ void GatherGamepadInput()
 
             inputData.key[VK_RIGHT] = state.leftThumbstickX > .3f;
 
-            inputData.key['Y'] = state.buttons & GameInputGamepadY;
+            inputData.key['Y'] = state.buttons & GameInputGamepadLeftThumbstick;
+
+            inputData.key['N'] = state.buttons & GameInputGamepadMenu;
+            
 
         }
     }

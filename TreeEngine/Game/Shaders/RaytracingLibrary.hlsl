@@ -56,12 +56,57 @@ void MissShader(inout RayPayload payload)
 }
 
 #if 1
+//chatgpt next
+[shader("raygeneration")]
+void RayGenerationShader()
+{
+/*
+    float2 xy = index + 0.5f; // center in the middle of the pixel.
+    float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0 - 1.0;
+
+    // Invert Y for DirectX-style coordinates.
+    screenPos.y = -screenPos.y;
+
+    // Unproject the pixel coordinate into a world positon.
+    float4 world = mul(float4(screenPos, 0, 1), projectionToWorld);
+    world.xyz /= world.w;
+
+    Ray ray;
+    ray.origin = cameraPosition;
+    ray.direction = normalize(world.xyz - ray.origin);
+
+    return ray;
+ */
+
+    // Compute the pixel coordinates in the viewport
+    float2 pixelCoords = float2(DispatchRaysIndex().xy) / float2(dispatchWidth, dispatchHeight);
+
+    // Compute the ray direction for this pixel
+    float4 clipRayDir = float4(pixelCoords * 2.0f - 1.0f, -1.0f, 1.0f);
+    clipRayDir.y *= -1;     // Invert Y for DirectX-style coordinates.
+
+    float4 viewRayDir = mul(clipRayDir, transpose(Projection));
+    viewRayDir.z = 1.0f;
+    viewRayDir.w = 0.0f;
+
+    float3 worldRayDir = normalize(mul(viewRayDir, View).xyz);
+
+    RayDesc myRay = { eyePos.xyz, 0.0f, worldRayDir.xyz, 100.0f };
+    RayPayload payload = { 0.0f };
+
+    uint missShaderIndex = 1;
+    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
+}
+#endif
+
+
+#if 0
 //chatgpt
 [shader("raygeneration")]
 void RayGenerationShader()
 {
     // Compute the pixel coordinates in the viewport
-    float2 pixelCoords = float2(DispatchRaysIndex().xy + 0.5f) / float2(dispatchWidth, dispatchHeight);
+    float2 pixelCoords = float2(DispatchRaysIndex().xy ) / float2(dispatchWidth, dispatchHeight);
 
     // Compute the ray direction for this pixel
     float4 clipRayDir = float4(pixelCoords * 2.0f - 1.0f, -1.0f, 1.0f);

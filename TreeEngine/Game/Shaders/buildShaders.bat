@@ -58,13 +58,13 @@ if !platform! == "Gaming.Xbox.Scarlett.x64" (
 )
 
 @if %2==vs (
-  set target=vs_6_0
+  set target=vs_6_6
   set suffix=VS
 ) ELSE if %2==ps (
-  set target=ps_6_0
+  set target=ps_6_6
   set suffix=PS
 ) ELSE if %2==lib (
-  set target=lib_6_3
+  set target=lib_6_6
   set suffix=lib
   set copyToLayout=0
 ) ELSE if %2==rootsig (
@@ -72,7 +72,7 @@ if !platform! == "Gaming.Xbox.Scarlett.x64" (
   set suffix=inc
   set copyToLayout=0
 ) ELSE (
-  set target=cs_6_0
+  set target=cs_6_6
   set suffix=CS
 )
 
@@ -89,8 +89,7 @@ if [%2] == [rootsig] (
 	set outputfile=%~4%~n3.cso
 	set cmdline=!cmdline! /Od /Zpr /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
 	if !isXbox! == 1 (
-		set cmdline=!cmdline! 
-		rem /noprecompile
+		set cmdline=!cmdline! /noprecompile
 	)
 )
 

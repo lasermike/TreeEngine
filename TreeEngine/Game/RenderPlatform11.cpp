@@ -76,9 +76,9 @@ HRESULT RenderPlatform11::UpdateView(CBNeverChanges& cbNeverChanges, bool shadow
 HRESULT RenderPlatform11::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass)
 {
     CBChangesPerPass cbChangesPerPass;
-    XMStoreFloat4x4(&cbChangesPerPass.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+    XMStoreFloat4x4(&cbChangesPerPass.mProjection, XMLoadFloat4x4(pProjMat));
 
-    XMStoreFloat4x4(&cbChangesPerPass.mView, XMMatrixTranspose(XMLoadFloat4x4(pViewMat)));
+    XMStoreFloat4x4(&cbChangesPerPass.mView, XMLoadFloat4x4(pViewMat));
 
     m_immediateContext->UpdateSubresource(m_constBufferChangesPerPass->Resource(), 0, nullptr, &cbChangesPerPass, 0, 0);
 

@@ -91,8 +91,8 @@ PS_INPUT SkyBoxVS(VS_INPUT vin)
     // TODO:Set z = w so that z/w = 1 (i.e., skydome always on far plane).
     //output.Pos = mul(posW, gViewProj).xyww;
 
-    output.Pos = mul(float4(pos, 1.0f), transpose(View));
-    output.Pos = mul(output.Pos, transpose(Projection));
+    output.Pos = mul(float4(pos, 1.0f), View);
+    output.Pos = mul(output.Pos, Projection);
     output.Tex = vin.Tex;
 
     return output;
@@ -120,8 +120,8 @@ PS_INPUT VS(VS_INPUT input)
     //outputIndices.Append(input.VertexID);
     //
 
-    output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
-    output.Pos = mul(output.Pos, transpose(Projection));
+    output.Pos = mul(float4(output.PosW, 1.0f), View);
+    output.Pos = mul(output.Pos, Projection);
     output.Tex = input.Tex;
 
     // View direction.  Calcuate here and have it interpolated by to the pixel shader
@@ -172,8 +172,8 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     //outputIndices.Append(input.VertexID);
     //
 
-    output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
-    output.Pos = mul(output.Pos, transpose(Projection));
+    output.Pos = mul(float4(output.PosW, 1.0f), View);
+    output.Pos = mul(output.Pos, Projection);
     output.Tex = input.Tex;
 
     // View direction.  Calcuate here and have it interpolated by to the pixel shader
@@ -270,8 +270,8 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
     ShadowMapVertexOut output;
 
     float4 pos = mul(float4(input.Pos, 1.0f), input.World);
-    pos = mul(pos, transpose(View));
-    output.PosH = mul(pos, transpose(Projection));
+    pos = mul(pos, View);
+    output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
 
     return output;
@@ -284,8 +284,8 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
     float4x4 world = input.World;
     //float4x4 world = InstanceBuffer[input.InstanceOffset].World;
     float4 pos = mul(float4(input.Pos, 1.0f), world);
-    pos = mul(pos, transpose(View));
-    output.PosH = mul(pos, transpose(Projection));
+    pos = mul(pos, View);
+    output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
 
     return output;
