@@ -84,7 +84,7 @@ set cmdline=!compiler! /Zi /Qembed_debug /T %target% /E %3
 if [%2] == [rootsig] (
 	set cmdline=!cmdline! /Fh !outputFolder!%3.inc 
 ) else if [%2] == [lib] (
-	set cmdline=!cmdline! /Fh !outputFolder!%3.inc /Fd !outputFolder!%3.pdb /Vn g_%3 
+	set cmdline=!cmdline! /Zpr /Fh !outputFolder!%3.inc /Fd !outputFolder!%3.pdb /Vn g_%3 
 ) else (
 	set outputfile=%~4%~n3.cso
 	set cmdline=!cmdline! /Od /Zpr /Fo "!outputfile!" /Fd !outputFolder!%3.pdb

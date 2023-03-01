@@ -35,6 +35,8 @@ bool useImGui = true;
 #include "LocalRootSignature.inc"
 #endif
 
+#include "MathHelper.h"
+
 using namespace DirectX;
 
 
@@ -2062,9 +2064,13 @@ HRESULT RenderPlatform12::UpdateView(CBNeverChanges& cbNeverChanges, bool shadow
 HRESULT RenderPlatform12::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass)
 {
     CBChangesPerPass cbChangesPerPass = {};
-    XMStoreFloat4x4(&cbChangesPerPass.mProjection, XMLoadFloat4x4(pProjMat));
+    XMMATRIX projection = XMLoadFloat4x4(pProjMat);
+    XMStoreFloat4x4(&cbChangesPerPass.mProjection, projection);
 
-    XMStoreFloat4x4(&cbChangesPerPass.mView, XMLoadFloat4x4(pViewMat));
+    XMMATRIX view = XMLoadFloat4x4(pViewMat);
+    XMStoreFloat4x4(&cbChangesPerPass.mView, view);
+
+    XMStoreFloat4x4(&cbChangesPerPass.mInverseViewProjection, XMMatrixInverse(nullptr, view * projection));
 
     int offset = shadowPass ? ShadowPass_CBSI : NormalPass_CBSI;
     m_constBufferChangesPerPass->CopyData(offset, cbChangesPerPass);

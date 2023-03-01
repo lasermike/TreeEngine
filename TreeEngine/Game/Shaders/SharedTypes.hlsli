@@ -11,6 +11,7 @@ cbuffer cbChangesPerPass : register(b1)
 {
     matrix View;
     matrix Projection;
+    matrix InverseViewProjection;
 };
 
 cbuffer cbChangesEveryFrame : register(b2)

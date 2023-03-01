@@ -17,6 +17,7 @@ struct CBChangesPerPass
 {
     XMFLOAT4X4 mView;
     XMFLOAT4X4 mProjection;
+    XMFLOAT4X4 mInverseViewProjection;
 };
 
 __declspec(align(16))
