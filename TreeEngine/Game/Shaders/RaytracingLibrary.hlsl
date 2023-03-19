@@ -82,7 +82,7 @@ void RayGenerationShader()
     // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
     // TMin should be kept small to prevent missing geometry at close contact areas.
     ray.TMin = 0.001;
-    ray.TMax = 10000.0;
+    ray.TMax = 100.0;
     RayPayload payload = { 0.0f };
 
     uint missShaderIndex = 1;

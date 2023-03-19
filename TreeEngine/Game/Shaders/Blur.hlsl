@@ -74,7 +74,17 @@ StructuredBuffer<SkinnedVertex> staticVertices : register(t1); //SimpleVertex
 StructuredBuffer<uint> staticIndices : register(t2);
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
- 
+
+#define ComputeRootSignature    "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)," \
+                                "RootConstants(num32BitConstants=12, b0), " \
+                                "DescriptorTable(SRV(t0, numDescriptors=1)), " \
+                                "DescriptorTable(UAV(u0, numDescriptors=1)), " \
+                                "DescriptorTable(SRV(t1, numDescriptors=2)), " \
+                                "DescriptorTable(SRV(t3, numDescriptors=1)), " \
+
+//"CBV(b1) "
+
+[RootSignature(ComputeRootSignature)]
 [numthreads(1, 32, 1)]
 void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
 {
@@ -101,6 +111,7 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
 groupshared float4 gCache[CacheSize];
 
 
+[RootSignature(ComputeRootSignature)]
 [numthreads(N, 1, 1)]
 void HorzBlurCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -154,6 +165,7 @@ void HorzBlurCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : S
     gOutput[dispatchThreadID.xy] = blurColor;
 }
 
+[RootSignature(ComputeRootSignature)]
 [numthreads(1, N, 1)]
 void VertBlurCS(int3 groupThreadID : SV_GroupThreadID,
     int3 dispatchThreadID : SV_DispatchThreadID)

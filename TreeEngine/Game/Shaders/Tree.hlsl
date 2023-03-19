@@ -327,10 +327,16 @@ DSVertexOut DrawScreenQuadVS(DSVertexIn vin)
     DSVertexOut vout;
 
     float4x4 worldViewProj = float4x4(
-        0.5f, 0.0f, 0.0f, 0.0f,
-        0.0f, 0.5f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
-        0.5f, -0.5f, 0.0f, 1.0f);
+        0.0f, 0.0f, 0.0f, 1.0f);
+
+    //float4x4 worldViewProj = float4x4(
+    //    0.5f, 0.0f, 0.0f, 0.0f,
+    //    0.0f, 0.5f, 0.0f, 0.0f,
+    //    0.0f, 0.0f, 1.0f, 0.0f,
+    //    0.5f, -0.5f, 0.0f, 1.0f);
 
     vout.PosH = mul(float4(vin.PosL, 1.0f), worldViewProj);
 
