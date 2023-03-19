@@ -1995,7 +1995,7 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
         instanceDescs[i].Transform[0][0] = 1.0f;
         instanceDescs[i].Transform[1][1] = 1.0f;
         instanceDescs[i].Transform[2][2] = 1.0f;
-        instanceDescs[i].Transform[2][3] = 1.0f;
+        //instanceDescs[i].Transform[2][3] = 1.0f;
 
         //float size = 1.0f - (i * sizeReductionPerInstance);
 
