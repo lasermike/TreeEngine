@@ -29,6 +29,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     // Cylinder
     GeometryGenerator::MeshData cylinder;
     // Note: skinned VS shader assumes geometry is always 1 unit tall
+    // float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, bool buildTop, bool buildBottom, MeshData& meshData
     geoGen.CreateCylinder(0.5f, 0.5f, 1.0f, 14, 3, false, false, cylinder);
 
     // Cache the index count of each object.

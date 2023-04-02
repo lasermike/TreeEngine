@@ -16,3 +16,4 @@ Tree.hlsl,ps,SkyBoxPS
 Blur.hlsl,cs,HorzBlurCS
 Blur.hlsl,cs,VertBlurCS
 Blur.hlsl,cs,VSasCS
+Blur.hlsl,cs,VSasCSSkinned

@@ -522,7 +522,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_skinnedVBView.StrideInBytes = sizeof(SkinnedVertex);
     m_skinnedVBView.SizeInBytes = UINT(sizeof(SkinnedVertex) * geometryData.skinnedVertices.size());
 
-    // SRV view of simple vertex buffer
+    // SRV view of skinned vertex buffer
     D3D12_SHADER_RESOURCE_VIEW_DESC vertexSkinnedBufferSRVdesc = {};
     vertexSkinnedBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     vertexSkinnedBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -676,6 +676,28 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         };
         psoDest.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
         HRR(GetDevice()->CreateComputePipelineState(&psoDest, __uuidof(ID3D12PipelineState), (void**)&m_gameLevelPSOs["VSasCS"]));
+    }
+
+    {
+        //
+        // VSasCSSkinned
+        //
+        ComputeShader* VSasCSSkinned = nullptr;
+        LoadComputeShader(L"VSasCSSkinned.cso", &VSasCSSkinned);
+        D3D12_COMPUTE_PIPELINE_STATE_DESC psoDest = {};
+        psoDest.pRootSignature = m_computeRootSignature;
+        psoDest.CS =
+        {
+#if defined(TREE_XBOX)
+            reinterpret_cast<BYTE*>(VSasCSSkinned->shader.data()),
+            VSasCSSkinned->shader.size()
+#else
+            reinterpret_cast<BYTE*>(VSasCSSkinned->shader->GetBufferPointer()),
+            VSasCSSkinned->shader->GetBufferSize()
+#endif
+        };
+        psoDest.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+        HRR(GetDevice()->CreateComputePipelineState(&psoDest, __uuidof(ID3D12PipelineState), (void**)&m_gameLevelPSOs["VSasCSSkinned"]));
     }
 
 
@@ -1909,7 +1931,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
         geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
         geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ?
-                                                m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress() :
+                                                m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() :
                                                 m_indexBuffer.buffer->GetGPUVirtualAddress())
                                              + dr.indexBufferStart * sizeof(UINT);   // TEMPTEMP  dr.mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + dr.indexBufferStart;
         geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
@@ -1980,7 +2002,6 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
     GraphicsResource instanceDescBuffer = GraphicsMemory::Get(nullptr).Allocate(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * m_numInstancesInTLAS);
     D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)instanceDescBuffer.Memory();
 
-    //float time = (float)m_timer.GetTotalSeconds() / 5.0f;  // Slow it down
     float sizeReductionPerInstance = 1.0f / m_numInstancesInTLAS;
 
     for (UINT i = 0; i < m_numInstancesInTLAS; i++)
@@ -1995,17 +2016,6 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
         instanceDescs[i].Transform[0][0] = 1.0f;
         instanceDescs[i].Transform[1][1] = 1.0f;
         instanceDescs[i].Transform[2][2] = 1.0f;
-        //instanceDescs[i].Transform[2][3] = 1.0f;
-
-        //float size = 1.0f - (i * sizeReductionPerInstance);
-
-        //TODO decide actual strategy
-        //memset(instanceDescs[i].Transform, 0, sizeof(instanceDescs[i].Transform));
-
-        //instanceDescs[i].Transform[0][0] = instanceDescs[i].Transform[1][1] = instanceDescs[i].Transform[2][2] = size;	// Scaled "Identity" matrix.
-        //instanceDescs[i].Transform[0][3] = sinf(time + i);
-        //instanceDescs[i].Transform[1][3] = 0;
-        //instanceDescs[i].Transform[2][3] = (float)i;
     }
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
@@ -2645,21 +2655,25 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(DrawRecords_SrvHeapOffset));
         GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
-        bool bSkinned = false;
+        bool bSkinned = true;
         GetCommandList()->SetComputeRootDescriptorTable(3, m_descriptorHeap.hGPU(bSkinned ? VBSkinnedInput_UavHeapOffset : VBInput_UavHeapOffset)); // Table of 2 w/ Index buffer
         GetCommandList()->SetComputeRootDescriptorTable(4, m_renderData->instanceBuffer->srvViewGpu);
 
-        m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs["VSasCS"]);
+        m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs[bSkinned ? "VSasCSSkinned" : "VSasCS"]);
 
         UINT maxIndexCount = 0;
+        UINT maxInstanceCount = 0;
         for (int i = 0; i < m_drawRecords.size(); i++)
         {
             maxIndexCount = std::max(maxIndexCount, m_drawRecords[i].indexBufferCount);
+            maxInstanceCount = std::max(maxInstanceCount, m_drawRecords[i].numInstances);
         }
 
         // Run VSasCS
         UINT numGroupsY = (UINT)ceilf(maxIndexCount / 32.0f);
-        m_commandList[m_commandListIndex]->Dispatch(m_drawRecords.size(), numGroupsY, 1);
+        UINT numGroupsZ = (UINT)ceilf(maxInstanceCount / 32.0f);
+
+        m_commandList[m_commandListIndex]->Dispatch(m_drawRecords.size(), numGroupsY, numGroupsZ);
 
         // Run command list up to this point
         HRR(ExecuteCurrentCommandList(true));

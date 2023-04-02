@@ -70,19 +70,19 @@ struct SkinnedVertex
 // Compute Root Sig (VSasCS)
 StructuredBuffer<DrawRecord> drawRecords: register(t0);
 RWStructuredBuffer<float4> outputVertices     : register(u0);
-StructuredBuffer<SkinnedVertex> staticVertices : register(t1); //SimpleVertex
+StructuredBuffer<SimpleVertex> simpleVertices : register(t1);
+StructuredBuffer<SkinnedVertex> skinnedVertices : register(t1); //SimpleVertex
 StructuredBuffer<uint> staticIndices : register(t2);
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
 
-#define ComputeRootSignature    "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)," \
-                                "RootConstants(num32BitConstants=12, b0), " \
+                                //"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)," 
+#define ComputeRootSignature    "RootConstants(num32BitConstants=12, b0), " \
                                 "DescriptorTable(SRV(t0, numDescriptors=1)), " \
                                 "DescriptorTable(UAV(u0, numDescriptors=1)), " \
                                 "DescriptorTable(SRV(t1, numDescriptors=2)), " \
                                 "DescriptorTable(SRV(t3, numDescriptors=1)), " \
-
-//"CBV(b1) "
+                                "DescriptorTable(CBV(b1, numDescriptors=1)), " \
 
 [RootSignature(ComputeRootSignature)]
 [numthreads(1, 32, 1)]
@@ -93,18 +93,56 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
     if (dispatchThreadID.y < drawRecord.indexBufferCount)
     {
         uint index = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.y];
-        float3 vertex = staticVertices.Load(drawRecord.baseVertexLocation + index).Pos;
+        float3 vertex = simpleVertices.Load(drawRecord.baseVertexLocation + index).Pos;
 
+        int inputInstance = drawRecord.startingInstance;
+        float4x3 world = (float4x3) InstanceBuffer[inputInstance].World;
+
+        float3 out0 = mul(float4(vertex, 1.0f), world);
+
+        uint vbIndex = drawRecord.vbWorldStart + index;
+        outputVertices[vbIndex] = float4(out0, 1.0);
+    }
+}
+
+
+[RootSignature(ComputeRootSignature)]
+[numthreads(1, 32, 1)]
+void VSasCSSkinned(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
+{
+    // thread X = draw record
+    // thread Y = index buffer index
+    // thread Z = 
+    DrawRecord drawRecord = drawRecords[groupID.x];
+
+    if (dispatchThreadID.y < drawRecord.indexBufferCount
+        // && dispatchThreadID.z < drawRecord.numInstances
+        )
+    {
+        uint index = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.y];
+        float3 vertex = skinnedVertices.Load(drawRecord.baseVertexLocation + index).Pos;
+
+        // Current vertex
         int inputInstance = drawRecord.startingInstance;
         float4x4 world = InstanceBuffer[inputInstance].World;
 
+        float3 out0 = mul(float4(vertex, 1.0f), world);
+/*
+        // Prev vertex
+        int prevInstance = max(0, inputInstance - 1);
+        float4x3 worldPrev = (float4x3) InstanceBuffer[prevInstance].World;
+
+        float3 inputPosPrev = float3(vertex.x, 0.5f, vertex.z); // assume(!) skinned cylinder always 1 unit tall, centered on origin
+        float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
+
+        float instanceWeight = skinnedVertices.Load(drawRecord.baseVertexLocation + index).InstanceWeight1;
+        //out0 = lerp(outPrev, out0, instanceWeight);
+*/
         uint vbIndex = drawRecord.vbWorldStart + index;
-
-        float4 out0 = mul(float4(vertex, 1.0f), world);
-
-        outputVertices[vbIndex] = out0;
+        outputVertices[vbIndex] = float4(out0, 1);
     }
 }
+
 
 #define N 256
 #define CacheSize (N + 2*gMaxBlurRadius)

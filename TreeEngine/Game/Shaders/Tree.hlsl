@@ -163,7 +163,8 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     float3 inputPosPrev = float3(input.Pos.x, 0.5f, input.Pos.z); // assume(!) skinned cylinder always 1 unit tall, centered on origin
     float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
 
-    out0 = lerp(outPrev, out0, input.InstanceWeight1);
+    out0 = lerp(outPrev, out0, input.InstanceWeight1);  // cylinder has 3 ring layers.  instance weight is 0 in the bottom (y=-0.5) ring, 0.5 in the middle ring, and 1.0 in the top (y=1) ring
+                                                        // bottom ring is 100% this transform, top ring is 100% previous transform
 
     output.PosW = out0;
 
@@ -326,17 +327,21 @@ DSVertexOut DrawScreenQuadVS(DSVertexIn vin)
 {
     DSVertexOut vout;
 
+//#define FULL_SCREEN_OVERLAY
+#ifdef FULL_SCREEN_OVERLAY
     float4x4 worldViewProj = float4x4(
         1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f);
 
-    //float4x4 worldViewProj = float4x4(
-    //    0.5f, 0.0f, 0.0f, 0.0f,
-    //    0.0f, 0.5f, 0.0f, 0.0f,
-    //    0.0f, 0.0f, 1.0f, 0.0f,
-    //    0.5f, -0.5f, 0.0f, 1.0f);
+#else
+    float4x4 worldViewProj = float4x4(
+        0.5f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.5f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.5f, -0.5f, 0.0f, 1.0f);
+#endif
 
     vout.PosH = mul(float4(vin.PosL, 1.0f), worldViewProj);
 
