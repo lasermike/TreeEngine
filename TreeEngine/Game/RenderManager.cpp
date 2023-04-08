@@ -161,8 +161,11 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
         UINT startInstance = m_perFrameInstanceData[ru][object].first;
         UINT numInstances = m_perFrameInstanceData[ru][object].second;
 
-        GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets->IndexCount, numInstances, ru->m_mesh->m_bufferOffsets->IndexOffset,
-            ru->m_mesh->m_bufferOffsets->VertexOffset, startInstance);
+        if (numInstances > 0)
+        {
+            GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets->IndexCount, numInstances, ru->m_mesh->m_bufferOffsets->IndexOffset,
+                ru->m_mesh->m_bufferOffsets->VertexOffset, startInstance);
+        }
     }
     return S_OK;
 }

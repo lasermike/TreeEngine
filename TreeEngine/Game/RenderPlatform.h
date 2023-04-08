@@ -949,13 +949,13 @@ public:
         UINT startingInstance;
         UINT numInstances;
 
-        UINT indexBufferCount;
+        UINT indexBufferCount;      // Index count per instanace
         UINT indexBufferStart;
 
         UINT vbWorldStart;
         UINT baseVertexLocation;
 
-        UINT vertexCount;
+        UINT vertexCount;           // Vertex count per instanace
         InputLayouts inputLayout;
 
         //Mesh* mesh;

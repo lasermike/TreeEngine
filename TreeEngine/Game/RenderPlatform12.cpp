@@ -1296,7 +1296,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
                                        m_currentMesh->m_bufferOffsets->VertexCount, 
                                        m_currentMesh));
 
-    m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount;
+    m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount * InstanceCount;
 #endif
 
     GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
@@ -1913,28 +1913,43 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
-    D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[m_drawRecords.size()];
-    ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * m_drawRecords.size());
-
-    for (int i = 0; i < m_drawRecords.size(); i++)
+    UINT totalInstancesAllDraws = 0;
+    for (int drawRecordIndex = 0; drawRecordIndex < 1 /*m_drawRecords.size()*/; drawRecordIndex++)
     {
+        totalInstancesAllDraws += m_drawRecords[drawRecordIndex].numInstances;
+    }
+
+    D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[totalInstancesAllDraws];
+    ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * totalInstancesAllDraws);
+
+    UINT geometryDescIndex = 0;
+    for (int i = 0; i < 1 /*m_drawRecords.size()*/; i++)
+    {
+        int vertexCount;
+
         DrawRecord& dr = m_drawRecords[i];
-        D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = geometryDescs[i];
 
-        geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-        geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+        for (int instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
+        {
+            D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = geometryDescs[geometryDescIndex];
 
-        geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-        geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + dr.vbWorldStart * sizeof(XMFLOAT4);
-        geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(XMFLOAT4);
-        geometryDesc.Triangles.VertexCount = dr.vertexCount;
+            geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+            geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
-        geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-        geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ?
-                                                m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() :
-                                                m_indexBuffer.buffer->GetGPUVirtualAddress())
-                                             + dr.indexBufferStart * sizeof(UINT);   // TEMPTEMP  dr.mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + dr.indexBufferStart;
-        geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
+            geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+            geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + dr.vbWorldStart + (instanceIndex * dr.vertexCount) * sizeof(XMFLOAT4);
+            geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(XMFLOAT4);
+            geometryDesc.Triangles.VertexCount = dr.vertexCount;
+
+            geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+            geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ?
+                m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() :
+                m_indexBuffer.buffer->GetGPUVirtualAddress())
+                + dr.indexBufferStart * sizeof(UINT);   // TEMPTEMP  dr.mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + dr.indexBufferStart;
+            geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
+
+            geometryDescIndex++;
+        }
 
     }
 
@@ -1944,7 +1959,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs;
     rtInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
     rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    rtInputs.NumDescs = m_drawRecords.size();
+    rtInputs.NumDescs = totalInstancesAllDraws;
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     rtInputs.pGeometryDescs = geometryDescs;
 
@@ -2655,25 +2670,31 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(DrawRecords_SrvHeapOffset));
         GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
-        bool bSkinned = true;
-        GetCommandList()->SetComputeRootDescriptorTable(3, m_descriptorHeap.hGPU(bSkinned ? VBSkinnedInput_UavHeapOffset : VBInput_UavHeapOffset)); // Table of 2 w/ Index buffer
         GetCommandList()->SetComputeRootDescriptorTable(4, m_renderData->instanceBuffer->srvViewGpu);
 
-        m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs[bSkinned ? "VSasCSSkinned" : "VSasCS"]);
-
-        UINT maxIndexCount = 0;
-        UINT maxInstanceCount = 0;
-        for (int i = 0; i < m_drawRecords.size(); i++)
+        for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
         {
-            maxIndexCount = std::max(maxIndexCount, m_drawRecords[i].indexBufferCount);
-            maxInstanceCount = std::max(maxInstanceCount, m_drawRecords[i].numInstances);
+            DrawRecord& drawRecord = m_drawRecords[drawRecordIndex];
+
+            if (drawRecord.numInstances <= 0)
+            {
+                continue;
+            }
+
+            bool bSkinned = drawRecord.inputLayout == SKINNED_INPUT_LAYOUT;
+
+            GetCommandList()->SetComputeRoot32BitConstants(0, 1, &drawRecordIndex, 0);
+            GetCommandList()->SetComputeRootDescriptorTable(3, m_descriptorHeap.hGPU(bSkinned ? VBSkinnedInput_UavHeapOffset : VBInput_UavHeapOffset)); // Table of 2 w/ Index buffer
+
+            m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs[bSkinned ? "VSasCSSkinned" : "VSasCS"]);
+
+            // Run VSasCS
+            UINT numGroupsX = (UINT)ceilf(drawRecord.indexBufferCount / 32.0f);
+            UINT numGroupsY = (UINT)ceilf(drawRecord.numInstances / 32.0f);
+
+            m_commandList[m_commandListIndex]->Dispatch(numGroupsX, numGroupsY, 1);
+
         }
-
-        // Run VSasCS
-        UINT numGroupsY = (UINT)ceilf(maxIndexCount / 32.0f);
-        UINT numGroupsZ = (UINT)ceilf(maxInstanceCount / 32.0f);
-
-        m_commandList[m_commandListIndex]->Dispatch(m_drawRecords.size(), numGroupsY, numGroupsZ);
 
         // Run command list up to this point
         HRR(ExecuteCurrentCommandList(true));

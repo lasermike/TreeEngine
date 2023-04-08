@@ -90,8 +90,8 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     HRR(ReloadDevice());
 
-    m_currentScene = 1; // Test tree
-    //m_currentScene = 7; // simple box and cylindar
+    //m_currentScene = 1; // Test tree
+    m_currentScene = 7; // simple box and cylindar
 
     m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
