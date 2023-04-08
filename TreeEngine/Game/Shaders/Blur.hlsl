@@ -85,19 +85,19 @@ StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
                                 "DescriptorTable(CBV(b1, numDescriptors=1)), " \
 
 [RootSignature(ComputeRootSignature)]
-[numthreads(1, 32, 1)]
+[numthreads(32, 1, 1)]
 void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
 {
-    // thread X = 0
-    // thread Y = index buffer index
-    // thread Z = instance
+    // thread X = index buffer index
+    // thread Y = instance
+    // thread Z = 
     DrawRecord drawRecord = drawRecords[gBlurRadius];
 
-    if (dispatchThreadID.y < drawRecord.indexBufferCount
-        && dispatchThreadID.z < drawRecord.numInstances
+    if (dispatchThreadID.x < drawRecord.indexBufferCount
+        && dispatchThreadID.y < drawRecord.numInstances
     )
     {
-        uint vertexIndex = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.y];
+        uint vertexIndex = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.x];
         float3 vertex = simpleVertices.Load(drawRecord.baseVertexLocation + vertexIndex).Pos;
 
         int inputInstance = drawRecord.startingInstance;
@@ -120,8 +120,8 @@ void VSasCSSkinned(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID 
     // thread Z = 0
     DrawRecord drawRecord = drawRecords[gBlurRadius];
 
-    if (dispatchThreadID.y < drawRecord.indexBufferCount
-        && dispatchThreadID.z < drawRecord.numInstances
+    if (dispatchThreadID.x < drawRecord.indexBufferCount
+        && dispatchThreadID.y < drawRecord.numInstances
         )
     {
         uint vertexIndex = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.x];

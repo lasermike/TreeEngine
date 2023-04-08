@@ -1914,7 +1914,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
     UINT totalInstancesAllDraws = 0;
-    for (int drawRecordIndex = 0; drawRecordIndex < 1 /*m_drawRecords.size()*/; drawRecordIndex++)
+    for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
         totalInstancesAllDraws += m_drawRecords[drawRecordIndex].numInstances;
     }
@@ -1923,7 +1923,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * totalInstancesAllDraws);
 
     UINT geometryDescIndex = 0;
-    for (int i = 0; i < 1 /*m_drawRecords.size()*/; i++)
+    for (int i = 0; i < m_drawRecords.size(); i++)
     {
         int vertexCount;
 
