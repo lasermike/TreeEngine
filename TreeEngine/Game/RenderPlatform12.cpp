@@ -1914,7 +1914,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
     UINT totalInstancesAllDraws = 0;
-    for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
+    for (int drawRecordIndex = 0; drawRecordIndex < 1 /*m_drawRecords.size()*/; drawRecordIndex++)
     {
         totalInstancesAllDraws += m_drawRecords[drawRecordIndex].numInstances;
     }
@@ -1923,7 +1923,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * totalInstancesAllDraws);
 
     UINT geometryDescIndex = 0;
-    for (int i = 0; i < m_drawRecords.size(); i++)
+    for (int i = 0; i < 1 /*m_drawRecords.size()*/; i++)
     {
         int vertexCount;
 
@@ -1937,15 +1937,14 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
             geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
             geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-            geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + dr.vbWorldStart + (instanceIndex * dr.vertexCount) * sizeof(XMFLOAT4);
+            geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + (dr.vbWorldStart + (instanceIndex * dr.vertexCount)) * sizeof(XMFLOAT4);
             geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(XMFLOAT4);
             geometryDesc.Triangles.VertexCount = dr.vertexCount;
 
             geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
             geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ?
-                m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() :
-                m_indexBuffer.buffer->GetGPUVirtualAddress())
-                + dr.indexBufferStart * sizeof(UINT);   // TEMPTEMP  dr.mesh->m_indexBuffer->buffer->GetGPUVirtualAddress() + dr.indexBufferStart;
+                m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() : m_indexBuffer.buffer->GetGPUVirtualAddress())
+                + dr.indexBufferStart * sizeof(UINT);
             geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
 
             geometryDescIndex++;

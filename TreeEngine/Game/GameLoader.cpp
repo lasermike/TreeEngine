@@ -232,9 +232,8 @@ void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     //params4->scale = XMFLOAT3(1, 1, 1);
     params4->primitiveType = PrimitiveType_Box;
 
-    scene->AddChild(new Primitive(params4));  // Box
-
     scene->AddChild(new Primitive(params1));  // Cylinder
+    scene->AddChild(new Primitive(params4));  // Box
 
     // Init lights
     renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
