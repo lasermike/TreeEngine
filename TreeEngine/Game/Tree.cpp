@@ -139,15 +139,16 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
     {
         TreeFrame& frame = m_treeFrames[currentFrame];
-        ComputeBranchInstanceData(frame, &pFrameConfig->GetRenderData());
+        ComputeBranchStateAtTime(frame, &pFrameConfig->GetRenderData());
     }
+
+    pFrameConfig->GetRenderData().frameStats[WORLD_MATRIX_COMPUTED_STAT].stat = m_numTreeFrames;
 
     for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
     {
         TreeFrame& frame = m_treeFrames[currentFrame];
         ComputeBranchInstanceDataPass2(frame, &pFrameConfig->GetRenderData(), startInstance);
     }
-
 
     InstancedData* logBuffer = dataView + startInstance;
     InstancedData* twigBuffer = dataView + startInstance + m_logInstanceData.size();
@@ -187,14 +188,12 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     return S_OK;
 }
 
-HRESULT Tree::ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderData)
+HRESULT Tree::ComputeBranchStateAtTime(TreeFrame& frame, RenderData* pRenderData)
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeTransformationsManual");
 
     if (CalcTime(pRenderData->time) < frame.branch->depth)
         return S_OK;
-
-    pRenderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat++;
 
     XMVECTOR vChildStart;
     XMVECTOR vParentStart = XMVectorSelect(g_XMOne, XMLoadFloat3(&frame.startPosition), g_XMSelect1110.v);

@@ -235,6 +235,9 @@ void GatherGamepadInput()
 
             inputData.key['N'] = state.buttons & GameInputGamepadMenu;
             
+            inputData.key['>'] = state.buttons & GameInputGamepadRightShoulder;
+
+            inputData.key['<'] = state.buttons & GameInputGamepadLeftShoulder;
 
         }
     }

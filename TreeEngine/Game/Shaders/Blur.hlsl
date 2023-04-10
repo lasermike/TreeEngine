@@ -68,11 +68,11 @@ struct SkinnedVertex
 };
 
 // Compute Root Sig (VSasCS)
-StructuredBuffer<DrawRecord> drawRecords: register(t0);
-RWStructuredBuffer<float4> outputVertices     : register(u0);
-StructuredBuffer<SimpleVertex> simpleVertices : register(t1);
-StructuredBuffer<SkinnedVertex> skinnedVertices : register(t1); //SimpleVertex
-StructuredBuffer<uint> staticIndices : register(t2);
+StructuredBuffer<DrawRecord> drawRecords: register(t0);         // Root param index 1
+RWStructuredBuffer<float4> outputVertices     : register(u0);   // Root param index 2
+StructuredBuffer<SimpleVertex> simpleVertices : register(t1);   // Root param index 3
+StructuredBuffer<SkinnedVertex> skinnedVertices : register(t1); // Root param index 3
+StructuredBuffer<uint> staticIndices : register(t2);            // Root param index 3
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
 
@@ -129,7 +129,7 @@ void VSasCSSkinned(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID 
 
         // Current vertex
         int inputInstance = drawRecord.startingInstance + dispatchThreadID.y;
-        float4x4 world = InstanceBuffer[inputInstance].World;
+        float4x3 world = (float4x3) InstanceBuffer[inputInstance].World;
 
         float3 out0 = mul(float4(vertex, 1.0f), world);
 /* TEMP

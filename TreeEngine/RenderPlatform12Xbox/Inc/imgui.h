@@ -1490,6 +1490,13 @@ struct ImGuiIO
     ImVector<ImWchar> InputQueueCharacters;     // Queue of _characters_ input (obtained by platform back-end). Fill using AddInputCharacter() helper.
 
     IMGUI_API   ImGuiIO();
+
+    // TreeEngine specific stuff
+    float       SimulationSeconds;
+    int         SkinnedMatrixCount;
+    int         LeavesCount;
+    int         SticksCount;
+
 };
 
 //-----------------------------------------------------------------------------

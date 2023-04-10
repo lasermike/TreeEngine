@@ -34,7 +34,7 @@
     <!-- - - - -->
     <BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
     <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\Out</OutDir>
-    <LayoutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\TreeXbox\Layout\</LayoutDir>
+    <LayoutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\TreeXbox\Layout</LayoutDir>
     <MinimumVisualStudioVersion>16.0</MinimumVisualStudioVersion>
     <TargetRuntime>Native</TargetRuntime>
     <ShaderCompiler>dxc.exe</ShaderCompiler>
@@ -178,6 +178,9 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\Out</OutDir>
     <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RemoveExtraDeployFiles>True</RemoveExtraDeployFiles>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.XboxOne.x64'">
     <Link>

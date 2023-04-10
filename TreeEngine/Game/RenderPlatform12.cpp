@@ -1674,6 +1674,8 @@ HRESULT RenderPlatform12::InitDevice()
         __uuidof(ID3D12Device), (void**) &m_d3dDevice));
 
     m_d3dDevice->SetName(L"DeviceResources");
+
+
 #else
 
 #if defined(_DEBUG)
@@ -1808,6 +1810,18 @@ HRESULT RenderPlatform12::InitDevice()
 
 #if defined(DXR_ENABLED)
     CreateRaytracingPipeline();
+
+
+
+    D3D12XBOX_LIVE_DEBUGGING_GLOBAL_PARAMETERS liveDebugParams = { 0 };
+    liveDebugParams.Type = D3D12XBOX_LIVE_DEBUGGING_SHADER_STAGE_COMPUTE;
+    liveDebugParams.Flags = D3D12XBOX_LIVE_DEBUGGING_SHADER_GLOBAL_FLAGS_MEMORY_EXCEPTION;
+
+    CComPtr<ID3D12Device11> d3dDevice11;
+    HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device11), (void**)&d3dDevice11));
+
+    //d3dDevice11->EnableLiveDebuggingX(&liveDebugParams);
+
 #endif 
 
 
@@ -1914,16 +1928,18 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
     UINT totalInstancesAllDraws = 0;
-    for (int drawRecordIndex = 0; drawRecordIndex < 1 /*m_drawRecords.size()*/; drawRecordIndex++)
+    for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
         totalInstancesAllDraws += m_drawRecords[drawRecordIndex].numInstances;
     }
+
+    ASSERT(totalInstancesAllDraws < 6);
 
     D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[totalInstancesAllDraws];
     ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * totalInstancesAllDraws);
 
     UINT geometryDescIndex = 0;
-    for (int i = 0; i < 1 /*m_drawRecords.size()*/; i++)
+    for (int i = 0; i < m_drawRecords.size(); i++)
     {
         int vertexCount;
 
@@ -1952,13 +1968,15 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     }
 
+    ASSERT(geometryDescIndex == totalInstancesAllDraws);
+
     ///////////////
 
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs;
     rtInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
     rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    rtInputs.NumDescs = totalInstancesAllDraws;
+    rtInputs.NumDescs = geometryDescIndex;
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     rtInputs.pGeometryDescs = geometryDescs;
 
@@ -2144,9 +2162,6 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 #if defined(TREE_XBOX)
     // Wait until all previous GPU work is complete.
     WaitForPreviousFrame();
-
-    // Ensure we present a blank screen before cleaning up resources.
-//    HRR(m_commandQueue->PresentX(0, nullptr, nullptr));
 #endif
 
     if (imGuiInitialized)
@@ -2872,9 +2887,13 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"IM GUI");
 
         // Draw UI
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        //bool show_demo_window = true;
-        //ImGui::ShowDemoWindow(&show_demo_window);
+
+            // TreeEngine specific stuff
+        ImGuiIO& io = ImGui::GetIO();
+        io.SimulationSeconds = m_renderData->time;
+        io.SkinnedMatrixCount = m_renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat;
+        io.LeavesCount = m_renderData->frameStats[NUM_STICKS_STAT].stat;
+        io.SticksCount = m_renderData->frameStats[NUM_LEAVES_STAT].stat;
 
         bool show_metrics_window = true;
         ImGui::ShowMetricsWindow(&show_metrics_window);

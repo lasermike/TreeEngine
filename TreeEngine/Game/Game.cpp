@@ -26,7 +26,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_nextScreenWidth = 0;
     m_nextScreenHeight = 0;
     m_renderToSharedTexture = false;
-    m_paused = false;
+    m_paused = true;
     m_wireframe = false;
     m_showHelp = false;
     m_is12Driver = true;
@@ -280,7 +280,7 @@ void Game::Update(DX::StepTimer const& timer)
     if (m_timeStart == 0)
     {
         m_timeStart = timer.GetTotalSeconds();
-        m_timeCurrent = 0;
+        m_timeCurrent = 0; // 1000; //0
     }
     else if (!m_paused)
     {
@@ -365,7 +365,7 @@ void Game::Render(bool oculus)
 
 void Game::HandleInput(bool key[512])  // WM_KEYDOWN
 {
-    const char availableKeys[] = { '0', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3', 'Y'};
+    const char availableKeys[] = { '0', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3', 'Y', '<', '>'};
     for (char k : availableKeys)
     {
         if (key[k])
@@ -388,6 +388,12 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
             case '0':
                 m_timeStart = 0;
                 key[k] = false; 
+                break;
+            case '>':
+                m_timeCurrent += 1.0 / 60.0;
+                break;
+            case '<':
+                m_timeCurrent -= 1.0 / 60.0;
                 break;
             case 'Z':
                 m_showShadowBuffer = !m_showShadowBuffer;

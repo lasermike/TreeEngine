@@ -89,7 +89,7 @@ private:
     int m_numTreeFrames;
     std::vector<TreeFrame> m_treeFrames;
 
-    HRESULT ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderData);
+    HRESULT ComputeBranchStateAtTime(TreeFrame& frame, RenderData* pRenderData);
     HRESULT ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData, int startInstance);
 
     bool IsTwig(TreeFrame& frame, RenderData* pRenderData);

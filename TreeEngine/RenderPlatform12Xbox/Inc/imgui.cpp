@@ -9746,11 +9746,11 @@ void ImGui::ShowMetricsWindow(bool* p_open)
     ImGuiContext& g = *GImGui;
     ImGuiIO& io = ImGui::GetIO();
     //ImGui::Text("Dear ImGui %s", ImGui::GetVersion());
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+    ImGui::Text("Simulation Time %.3f seconds", io.SimulationSeconds);
+    ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+    ImGui::Separator();
+    ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", io.SkinnedMatrixCount, io.SticksCount, io.LeavesCount);
     ImGui::Text("UI %d vertices, %d indices (%d triangles)", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
-    //ImGui::Text("%d active windows (%d visible)", io.MetricsActiveWindows, io.MetricsRenderWindows);
-    //ImGui::Text("%d active allocations", io.MetricsActiveAllocations);
-    // ImGui::Separator();
 
     ImGui::End();
 
