@@ -26,7 +26,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_nextScreenWidth = 0;
     m_nextScreenHeight = 0;
     m_renderToSharedTexture = false;
-    m_paused = true;
+    m_paused = false;
     m_wireframe = false;
     m_showHelp = false;
     m_is12Driver = true;
@@ -90,7 +90,8 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     HRR(ReloadDevice());
 
-    m_currentScene = 1; // Test tree
+    m_currentScene = 2;
+    //m_currentScene = 1; // Test tree
     //m_currentScene = 7; // simple box and cylindar
 
     m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);

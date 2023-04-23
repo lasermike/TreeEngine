@@ -179,9 +179,7 @@
     <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\Out</OutDir>
     <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
-  <PropertyGroup>
-    <RemoveExtraDeployFiles>True</RemoveExtraDeployFiles>
-  </PropertyGroup>
+  <PropertyGroup />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.XboxOne.x64'">
     <Link>
       <AdditionalDependencies>$(Console_Libs);%(XboxExtensionsDependencies)</AdditionalDependencies>

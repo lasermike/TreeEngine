@@ -234,7 +234,9 @@ void GatherGamepadInput()
             inputData.key['Y'] = state.buttons & GameInputGamepadLeftThumbstick;
 
             inputData.key['N'] = state.buttons & GameInputGamepadMenu;
-            
+
+            inputData.key['P'] = state.buttons & GameInputGamepadView;
+
             inputData.key['>'] = state.buttons & GameInputGamepadRightShoulder;
 
             inputData.key['<'] = state.buttons & GameInputGamepadLeftShoulder;

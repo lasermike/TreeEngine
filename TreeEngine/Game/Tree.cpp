@@ -139,7 +139,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
     {
         TreeFrame& frame = m_treeFrames[currentFrame];
-        ComputeBranchStateAtTime(frame, &pFrameConfig->GetRenderData());
+        ComputeBranchVectorAtTime(frame, &pFrameConfig->GetRenderData());
     }
 
     pFrameConfig->GetRenderData().frameStats[WORLD_MATRIX_COMPUTED_STAT].stat = m_numTreeFrames;
@@ -147,7 +147,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
     {
         TreeFrame& frame = m_treeFrames[currentFrame];
-        ComputeBranchInstanceDataPass2(frame, &pFrameConfig->GetRenderData(), startInstance);
+        ComputeBranchInstanceSkinningMatrix(frame, &pFrameConfig->GetRenderData(), startInstance);
     }
 
     InstancedData* logBuffer = dataView + startInstance;
@@ -188,12 +188,14 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     return S_OK;
 }
 
-HRESULT Tree::ComputeBranchStateAtTime(TreeFrame& frame, RenderData* pRenderData)
+HRESULT Tree::ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderData)
 {
-    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeTransformationsManual");
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeBranchVectorAtTime");
 
     if (CalcTime(pRenderData->time) < frame.branch->depth)
-        return S_OK;
+    {
+        return S_FALSE;
+    }
 
     XMVECTOR vChildStart;
     XMVECTOR vParentStart = XMVectorSelect(g_XMOne, XMLoadFloat3(&frame.startPosition), g_XMSelect1110.v);
@@ -208,7 +210,8 @@ HRESULT Tree::ComputeBranchStateAtTime(TreeFrame& frame, RenderData* pRenderData
         break;
     }
 
-    ComputeBranchEnd(&vChildStart, CalcTime(pRenderData->time), frame);
+    ComputeBranchVectorEndPoint(&vChildStart, CalcTime(pRenderData->time), frame);
+
 
     // Compute child branches
     for (unsigned int c = 0; c < frame.branch->children.size(); c++)
@@ -243,10 +246,14 @@ bool Tree::IsTwig(TreeFrame& frame, RenderData* pRenderData)
     return !isLog;
 }
 
-HRESULT Tree::ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData, int startInstance)
+HRESULT Tree::ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* pRenderData, int startInstance)
 {
     XMMATRIX localToWorld;
-    ComputeTransformationsManual(&localToWorld, frame);
+    HRESULT hr = ComputeTransformationsManual(&localToWorld, frame);
+    if (hr != S_OK)
+    {
+        return hr;
+    }
 
     localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
 
@@ -427,7 +434,7 @@ __inline XMMATRIX TEMatrixTransformation
 }
 
 
-HRESULT Tree::ComputeBranchEnd(XMVECTOR* vComputedEnd, float time, TreeFrame& frame)
+HRESULT Tree::ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, TreeFrame& frame)
 {
     float animScaleFactor = 1.0f;
     if (time - 5 < frame.branch->depth)
@@ -462,6 +469,7 @@ HRESULT Tree::ComputeBranchEnd(XMVECTOR* vComputedEnd, float time, TreeFrame& fr
     XMVECTOR startToEnd = vEnd - vStart;
 
     XMVECTOR vMagY = XMVectorSet(animScaleFactor, animScaleFactor, animScaleFactor, 1);
+
     *vComputedEnd = startToEnd * vMagY + vStart;
 
     XMStoreFloat3(&frame.endPosition, *vComputedEnd);
@@ -474,6 +482,12 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFram
 {
     XMVECTOR vStart = XMLoadFloat3(&frame.startPosition);
     XMVECTOR vEnd = XMLoadFloat3(&frame.endPosition);
+
+    if (XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vEnd, vStart))) < 0.001f)
+    {
+        return S_FALSE;
+    }
+
     XMVECTOR vScale = XMLoadFloat3(&frame.scale);
     XMVECTOR vDir = XMVector3Normalize(vEnd - vStart);
     XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);

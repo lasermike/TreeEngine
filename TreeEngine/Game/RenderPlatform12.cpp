@@ -1933,8 +1933,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
         totalInstancesAllDraws += m_drawRecords[drawRecordIndex].numInstances;
     }
 
-    ASSERT(totalInstancesAllDraws < 6);
-
     D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[totalInstancesAllDraws];
     ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * totalInstancesAllDraws);
 
@@ -2732,6 +2730,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         BuildTopLevelAccelerationStructure(true);
     }
 
+#if defined(DXR_ENABLED)
     {
         // Dispatch rays
         CComPtr<ID3D12GraphicsCommandList6> commandList;
@@ -2766,6 +2765,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         PIXEndEvent(GetCommandList()); // Raytrace render
     }
+#endif
 
 #endif
 
