@@ -85,7 +85,7 @@ StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
                                 "DescriptorTable(CBV(b1, numDescriptors=1)), " \
 
 [RootSignature(ComputeRootSignature)]
-[numthreads(32, 1, 1)]
+[numthreads(32, 32, 1)]
 void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
 {
     // thread X = index buffer index
@@ -100,13 +100,13 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
         uint vertexIndex = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.x];
         float3 vertex = simpleVertices.Load(drawRecord.baseVertexLocation + vertexIndex).Pos;
 
-        int inputInstance = drawRecord.startingInstance;
+        int inputInstance = drawRecord.startingInstance + dispatchThreadID.y;
         float4x3 world = (float4x3) InstanceBuffer[inputInstance].World;
 
         float3 out0 = mul(float4(vertex, 1.0f), world);
 
-        uint vbIndex = drawRecord.vbWorldStart + vertexIndex;
-        outputVertices[vbIndex] = float4(out0, 1.0);
+        uint vbOutIndex = drawRecord.vbWorldStart + (drawRecord.vertexCount * dispatchThreadID.y) + vertexIndex;
+        outputVertices[vbOutIndex] = float4(out0, 1);
     }
 }
 
