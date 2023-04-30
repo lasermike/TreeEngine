@@ -810,7 +810,6 @@ private:
     void IncrementFenceOnGPU();
     void WaitOnFence();
 
-    void WaitOnGpu();
     void AdvanceToNextFrame();
 
 public:
@@ -825,7 +824,7 @@ public:
 
     HRESULT CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
-    void WaitForPreviousFrame();
+    void WaitForGPUWork();
     ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
     ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator[m_commandListIndex]; }
     ID3D12Fence* GetFence() { return m_fence; }

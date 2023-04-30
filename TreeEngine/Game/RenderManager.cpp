@@ -504,9 +504,13 @@ HRESULT RenderManager::RenderShadowMap()
 {
     BuildShadowTransform();
 
+    m_renderData.currentPass = ShadowMapPass;
+
     GetPlatform()->SetRenderPhase(RP_TRANSITION_TO_RENDER_SHADOW_MAP);
 
     DrawSceneToShadowMap();
+
+    m_renderData.currentPass = RegularPass;
 
     GetPlatform()->SetRenderPhase(RP_TRANSITION_FROM_RENDER_SHADOW_MAP);
 

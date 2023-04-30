@@ -182,7 +182,7 @@ HRESULT RenderPlatform12::ExecuteCurrentCommandList(bool waitOnFence)
 
 //    if (waitOnFence)
     {
-        WaitForPreviousFrame();
+        WaitForGPUWork();
     }
 
     m_commandListIndex = (m_commandListIndex + 1) % kNumCommandLists;
@@ -756,228 +756,82 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             m_renderData->SMapHeight);
     }
 
-//#if defined(DXR_ENABLED)
-    if (true /*useDxr*/)
-    {
-        m_numInstancesInTLAS = 1;
+#if defined(DXR_ENABLED)
 
-        // Create screen sized output buffer
-        m_renderData->pDxrOutBuffer = new UavBuffer(GetDevice(),
-            m_swapChainFormat,
-            m_descriptorHeap.hCPU(DxrOut_SrvHeapOffset),
-            m_descriptorHeap.hGPU(DxrOut_SrvHeapOffset),
-            m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
-            m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
-            m_renderData->projectionData.screenWidth,
-            m_renderData->projectionData.screenHeight);
+    m_numInstancesInTLAS = 1;
 
-        const UINT maxWorldVertices = 500000;
-        auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    // Create screen sized output buffer
+    m_renderData->pDxrOutBuffer = new UavBuffer(GetDevice(),
+        m_swapChainFormat,
+        m_descriptorHeap.hCPU(DxrOut_SrvHeapOffset),
+        m_descriptorHeap.hGPU(DxrOut_SrvHeapOffset),
+        m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
+        m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
+        m_renderData->projectionData.screenWidth,
+        m_renderData->projectionData.screenHeight);
 
-/*
-        //
-        // VB and IB World Counter
-        // Create counter for vertex output
-        uint64_t vbibWorldCounterBufferSize = sizeof(uint64_t) * 3;
-        vbibWorldCounterBufferSize = AlignUp(vbibWorldCounterBufferSize, 16);
+    const UINT maxWorldVertices = 500000;
+    const uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
 
-        // Aligning buffer to 4096 to align with the page size
-        vbibWorldCounterBufferSize = AlignUp(vbibWorldCounterBufferSize, 4096);
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
-        auto descCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbibWorldCounterBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+    D3D12_RESOURCE_DESC vbDescBuffer = {};
+    vbDescBuffer.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    vbDescBuffer.Width = vbWorldBufferSize;
+    vbDescBuffer.Height = 1;
+    vbDescBuffer.DepthOrArraySize = 1;
+    vbDescBuffer.MipLevels = 1;
+    vbDescBuffer.Format = DXGI_FORMAT_UNKNOWN;
+    vbDescBuffer.SampleDesc.Count = 1;
+    vbDescBuffer.SampleDesc.Quality = 0;
+    vbDescBuffer.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    vbDescBuffer.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    HRR(GetDevice()->CreateCommittedResource(
+        &defaultHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &vbDescBuffer,
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        nullptr,
+        __uuidof(ID3D12Resource), (void**) &m_VBWorld));
+
+    HRR(m_VBWorld->SetName(L"VB World"));
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
+    descUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+    descUAV.Buffer.NumElements = maxWorldVertices;
+    descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT4);
+    GetDevice()->CreateUnorderedAccessView(m_VBWorld, nullptr, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
+
+    // 
+    // Create draw record
+    const int MAX_DRAWRECORDS = 1024;
+    auto drawRecordDescBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(DrawRecord) * MAX_DRAWRECORDS, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
 #if defined(TREE_XBOX)
-            | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER
+        | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER
 #endif
-            );
+    );
 
-        HRR(GetDevice()->CreateCommittedResource(
-            &defaultHeapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &descCounterBuffer,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            nullptr,
-            __uuidof(ID3D12Resource), (void**)&m_UavWorldCounter));
+    HRR(GetDevice()->CreateCommittedResource(
+        &defaultHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &drawRecordDescBuffer,
+        D3D12_RESOURCE_STATE_GENERIC_READ, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+        nullptr,
+        __uuidof(ID3D12Resource), (void**)&m_DrawRecords));
 
-        HRR(m_UavWorldCounter->SetName(L" UAV World Counter"));
+    HRR(m_DrawRecords->SetName(L"Draw Records"));
 
-        // The second UAV view is needed for the Clear operation to reset the counter
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavCountDesc =
-        {
-            DXGI_FORMAT_UNKNOWN,                                    // DXGI_FORMAT Format;
-            D3D12_UAV_DIMENSION_BUFFER,                             // D3D12_UAV_DIMENSION ViewDimension;
-            {
-                0,                                                  // UINT64 FirstElement;
-                3,                                                  // UINT NumElements;
-                sizeof(uint64_t),                                   // UINT StructureByteStride;
-                0,                                                  // UINT64 CounterOffsetInBytes;
-                D3D12_BUFFER_UAV_FLAG_NONE,                         // D3D12_BUFFER_UAV_FLAGS Flags;
-            },                                                      // D3D12_BUFFER_UAV Buffer;
-        };
+    D3D12_SHADER_RESOURCE_VIEW_DESC descDrawRecordsSrv = {};
+    descDrawRecordsSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    descDrawRecordsSrv.Format = DXGI_FORMAT_UNKNOWN;
+    descDrawRecordsSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    descDrawRecordsSrv.Buffer.NumElements = MAX_DRAWRECORDS;
+    descDrawRecordsSrv.Buffer.StructureByteStride = sizeof(DrawRecord);
 
-        GetDevice()->CreateUnorderedAccessView(m_UavWorldCounter, nullptr, &uavCountDesc, m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset));
+    GetDevice()->CreateShaderResourceView(m_DrawRecords, &descDrawRecordsSrv, m_descriptorHeap.hCPU(DrawRecords_SrvHeapOffset));
 
-        uavCountDesc.Buffer.FirstElement = 1;
-        GetDevice()->CreateUnorderedAccessView(m_UavWorldCounter, nullptr, &uavCountDesc, m_descriptorHeap.hCPU(DxrIBCounter_UavHeapOffset));
-
-        uavCountDesc.Buffer.FirstElement = 2;
-        GetDevice()->CreateUnorderedAccessView(m_UavWorldCounter, nullptr, &uavCountDesc, m_descriptorHeap.hCPU(DxrPrimCounter_UavHeapOffset));
-
-        // Counter readback
-        auto descReadBackCounterBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbibWorldCounterBufferSize);
-        HRR(GetDevice()->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK),
-            D3D12_HEAP_FLAG_NONE,
-            &descReadBackCounterBuffer,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            __uuidof(ID3D12Resource), (void**)&m_UavWorldCounterReadback));
-
-        HRR(m_UavWorldCounterReadback->SetName(L"UAV Counter read back"));
-
-        //
-        // IB World
-        uint64_t iBWorldBufferSize = sizeof(UINT) * maxWorldVertices; 
-        iBWorldBufferSize = AlignUp(iBWorldBufferSize, 16);
-
-        // Aligning buffer to 4096 to align with the page size   // WHY?
-        iBWorldBufferSize = AlignUp(iBWorldBufferSize, 4096);
-
-        // Create index world buffer
-        auto descIBBuffer = CD3DX12_RESOURCE_DESC::Buffer(iBWorldBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        HRR(GetDevice()->CreateCommittedResource(
-            &defaultHeapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &descIBBuffer,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-            nullptr,
-            __uuidof(ID3D12Resource), (void**)&m_IBWorld));
-
-        HRR(m_IBWorld->SetName(L"IB World"));
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC descIBSRV = {};
-        descIBSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;  // 0?
-        descIBSRV.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        descIBSRV.Buffer.NumElements = maxWorldVertices;
-        descIBSRV.Buffer.StructureByteStride = sizeof(UINT);
-
-        GetDevice()->CreateShaderResourceView(m_IBWorld, &descIBSRV, m_descriptorHeap.hCPU(DxrIB_SrvHeapOffset));
-
-        D3D12_UNORDERED_ACCESS_VIEW_DESC descIBUAV = {};
-        descIBUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        descIBUAV.Buffer.NumElements = maxWorldVertices;
-        descIBUAV.Buffer.StructureByteStride = sizeof(UINT);
-        descIBUAV.Buffer.CounterOffsetInBytes = sizeof(uint64_t);
-
-        GetDevice()->CreateUnorderedAccessView(m_IBWorld, m_UavWorldCounter, &descIBUAV, m_descriptorHeap.hCPU(DxrIB_UavHeapOffset));
-
-
-        //
-        // Transformed world vertex buffer
-        //
-
-        // Create vertex world buffer
-        HRR(GetDevice()->CreateCommittedResource(
-            &defaultHeapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(iBWorldBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-            nullptr,
-            __uuidof(ID3D12Resource), (void**)&m_PrimWorld));
-
-        HRR(m_PrimWorld->SetName(L"Prim World"));
-
-        //GetDevice()->CreateShaderResourceView(m_VBWorld, &descSRV, m_descriptorHeap.hCPU(DxrVB_SrvHeapOffset));
-
-        descIBUAV.Buffer.CounterOffsetInBytes = sizeof(uint64_t) * 2;
-
-        GetDevice()->CreateUnorderedAccessView(m_PrimWorld, m_UavWorldCounter, &descIBUAV, m_descriptorHeap.hCPU(DxrPrim_UavHeapOffset));
-        */
-
-        //
-        // VB World
-        uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
-        //vbWorldBufferSize = AlignUp(vbWorldBufferSize, 16);
-
-        //// Aligning buffer to 4096 to align with the page size
-        //vbWorldBufferSize = AlignUp(vbWorldBufferSize, 4096);
-
-        // Create vertex world buffer
-//        auto vbDescBuffer = CD3DX12_RESOURCE_DESC::Buffer(vbWorldBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
-//#if defined(TREE_XBOX)
-//            | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER
-//#endif
-//            );
-
-        D3D12_RESOURCE_DESC vbDescBuffer = {};
-        vbDescBuffer.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        vbDescBuffer.Width = vbWorldBufferSize;
-        vbDescBuffer.Height = 1;
-        vbDescBuffer.DepthOrArraySize = 1;
-        vbDescBuffer.MipLevels = 1;
-        vbDescBuffer.Format = DXGI_FORMAT_UNKNOWN;
-        vbDescBuffer.SampleDesc.Count = 1;
-        vbDescBuffer.SampleDesc.Quality = 0;
-        vbDescBuffer.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        vbDescBuffer.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-        HRR(GetDevice()->CreateCommittedResource(
-            &defaultHeapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &vbDescBuffer,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            nullptr,
-            __uuidof(ID3D12Resource), (void**) &m_VBWorld));
-
-        HRR(m_VBWorld->SetName(L"VB World"));
-
-        //D3D12_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-        //descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        //descSRV.Format = DXGI_FORMAT_R32G32B32_FLOAT;
-        //descSRV.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        //descSRV.Buffer.NumElements = maxWorldVertices;
-        //descSRV.Buffer.StructureByteStride = sizeof(XMFLOAT3);
-
-        //GetDevice()->CreateShaderResourceView(m_VBWorld, &descSRV, m_descriptorHeap.hCPU(DxrVB_SrvHeapOffset));
-
-
-        D3D12_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
-        descUAV.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        descUAV.Buffer.NumElements = maxWorldVertices;
-        descUAV.Buffer.StructureByteStride = sizeof(XMFLOAT4);
-        //descUAV.Format = DXGI_FORMAT_R32_FLOAT;
-        GetDevice()->CreateUnorderedAccessView(m_VBWorld, nullptr, &descUAV, m_descriptorHeap.hCPU(DxrVB_UavHeapOffset));
-
-        // 
-        // Create draw record
-        const int MAX_DRAWRECORDS = 1024;
-        auto drawRecordDescBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(DrawRecord) * MAX_DRAWRECORDS, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
-#if defined(TREE_XBOX)
-            | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER
 #endif
-        );
-
-        HRR(GetDevice()->CreateCommittedResource(
-            &defaultHeapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &drawRecordDescBuffer,
-            D3D12_RESOURCE_STATE_GENERIC_READ, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-            nullptr,
-            __uuidof(ID3D12Resource), (void**)&m_DrawRecords));
-
-        HRR(m_DrawRecords->SetName(L"Draw Records"));
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC descDrawRecordsSrv = {};
-        descDrawRecordsSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        descDrawRecordsSrv.Format = DXGI_FORMAT_UNKNOWN;
-        descDrawRecordsSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        descDrawRecordsSrv.Buffer.NumElements = MAX_DRAWRECORDS;
-        descDrawRecordsSrv.Buffer.StructureByteStride = sizeof(DrawRecord);
-
-        GetDevice()->CreateShaderResourceView(m_DrawRecords, &descDrawRecordsSrv, m_descriptorHeap.hCPU(DrawRecords_SrvHeapOffset));
-        //GetDevice()->CreateUnorderedAccessView(m_DrawRecords, nullptr, &descDrawRecordsUAV, m_descriptorHeap.hCPU(DrawRecords_SrvHeapOffset));
-
-    } //DXR
-//#endif
 
     return S_OK;
 }
@@ -1075,16 +929,7 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
     return S_OK;
 }
 
-void RenderPlatform12::WaitOnGpu()
-{
-    if (m_commandQueue)
-    {
-        IncrementFenceOnGPU();
-        WaitOnFence();
-    }
-}
-
-void RenderPlatform12::WaitForPreviousFrame()
+void RenderPlatform12::WaitForGPUWork()
 {
     if (m_commandQueue)
     {
@@ -1135,7 +980,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 {
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
-    WaitForPreviousFrame();
+    WaitForGPUWork();
 
     if (imGuiInitialized)
     {
@@ -1287,16 +1132,19 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 {
 #if defined(DXR_ENABLED)
 
-    m_drawRecords.push_back(DrawRecord(StartIndexLocation,
-                                       IndexCountPerInstance,
-                                       StartInstanceLocation,
-                                       InstanceCount,
-                                       BaseVertexLocation,
-                                       m_nextVbWorldStart,
-                                       m_currentMesh->m_bufferOffsets->VertexCount, 
-                                       m_currentMesh));
+    if (m_renderData->currentPass == RegularPass)
+    {
+        m_drawRecords.push_back(DrawRecord(StartIndexLocation,
+            IndexCountPerInstance,
+            StartInstanceLocation,
+            InstanceCount,
+            BaseVertexLocation,
+            m_nextVbWorldStart,
+            m_currentMesh->m_bufferOffsets->VertexCount,
+            m_currentMesh));
 
-    m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount * InstanceCount;
+        m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount * InstanceCount;
+    }
 #endif
 
     GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
@@ -1779,7 +1627,7 @@ HRESULT RenderPlatform12::InitDevice()
     // Wait for the command list to execute; we are reusing the same command 
     // list in our main loop but for now, we just want to wait for setup to 
     // complete before continuing.
-    WaitForPreviousFrame();
+    WaitForGPUWork();
 
 #if defined(TREE_XBOX)
     // First, retrieve the underlying DXGI device from the D3D device.
@@ -2003,7 +1851,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     }
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
-    //GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_IBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
     CComPtr<ID3D12GraphicsCommandList6> commandList;
     HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
@@ -2129,7 +1976,7 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 {
     HRESULT hr = S_OK;
 
-    WaitForPreviousFrame();
+    WaitForGPUWork();
 
 #if defined(TREE_XBOX)
     // Ensure we present a blank screen before cleaning up resources.
@@ -2165,7 +2012,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 {
 #if defined(TREE_XBOX)
     // Wait until all previous GPU work is complete.
-    WaitForPreviousFrame();
+    WaitForGPUWork();
 #endif
 
     if (imGuiInitialized)
@@ -2571,7 +2418,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     // Make shadow map available to shaders
     if (useShadowMaps)
     {
-#if 0
+#if defined(DEBUG_SAVE_SHADOW_MAP)
         if (GetRenderData().frame == 100)
         {
             Windows::Storage::StorageFolder^ temporaryFolder = Windows::Storage::ApplicationData::Current->TemporaryFolder;
@@ -2605,24 +2452,6 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 
 #if defined (DXR_ENABLED)
 
-    //// Clear the counter value on every update
-    //const UINT clearCounter[] = { 0, 0, 0, 0 };
-    //GetCommandList()->ClearUnorderedAccessViewUint(
-    //    m_descriptorHeap.hGPU(DxrVBCounter_UavHeapOffset),
-    //    m_descriptorHeap.hCPU(DxrVBCounter_UavHeapOffset),
-    //    m_UavWorldCounter,
-    //    clearCounter,
-    //    0,
-    //    nullptr);
-
-    //GetCommandList()->ClearUnorderedAccessViewUint(
-    //    m_descriptorHeap.hGPU(DxrIBCounter_UavHeapOffset),
-    //    m_descriptorHeap.hCPU(DxrIBCounter_UavHeapOffset),
-    //    m_UavWorldCounter,
-    //    clearCounter,
-    //    0,
-    //    nullptr);
-
     m_nextVbWorldStart = 0;
     m_drawRecords.clear();
 
@@ -2630,6 +2459,8 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 #endif
 
     PIXEndEvent((ID3D12GraphicsCommandList*)m_commandList[m_commandListIndex]); // RenderProlog
+
+    PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Scene render");
 
     return S_OK;
 }
@@ -2673,76 +2504,65 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 {
     HRESULT hr = S_OK;
 
+    PIXEndEvent(GetCommandList()); // Scene render
+
+
 #if defined(DXR_ENABLED)
-    /** RAY TRACING **/
+    PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Build acceleration structure");
+
+    // First run VSasCS 
+    // Dispatch to run through contents of m_drawnVertices
+
+    DrawRecord* pDrawRecords = nullptr;
+    m_DrawRecords->Map(0, nullptr, ((void**)&pDrawRecords));
+    memcpy(pDrawRecords, m_drawRecords.data(), sizeof(DrawRecord) * m_drawRecords.size());
+    m_DrawRecords->Unmap(0, nullptr);
+
+    GetCommandList()->SetComputeRootSignature(m_computeRootSignature);
+
+    GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(DrawRecords_SrvHeapOffset));
+    GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
+    GetCommandList()->SetComputeRootDescriptorTable(4, m_renderData->instanceBuffer->srvViewGpu);
+
+    for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
-        // First run VSasCS 
-        // Dispatch to run through contents of m_drawnVertices
+        DrawRecord& drawRecord = m_drawRecords[drawRecordIndex];
 
-        DrawRecord* pDrawRecords = nullptr;
-        m_DrawRecords->Map(0, nullptr, ((void**)&pDrawRecords));
-        memcpy(pDrawRecords, m_drawRecords.data(), sizeof(DrawRecord) * m_drawRecords.size());
-        m_DrawRecords->Unmap(0, nullptr);
-
-        GetCommandList()->SetComputeRootSignature(m_computeRootSignature);
-
-        GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(DrawRecords_SrvHeapOffset));
-        GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
-        GetCommandList()->SetComputeRootDescriptorTable(4, m_renderData->instanceBuffer->srvViewGpu);
-
-        for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
+        if (drawRecord.numInstances <= 0)
         {
-            DrawRecord& drawRecord = m_drawRecords[drawRecordIndex];
-
-            if (drawRecord.numInstances <= 0)
-            {
-                continue;
-            }
-
-            bool bSkinned = drawRecord.inputLayout == SKINNED_INPUT_LAYOUT;
-
-            GetCommandList()->SetComputeRoot32BitConstants(0, 1, &drawRecordIndex, 0);
-            GetCommandList()->SetComputeRootDescriptorTable(3, m_descriptorHeap.hGPU(bSkinned ? VBSkinnedInput_UavHeapOffset : VBInput_UavHeapOffset)); // Table of 2 w/ Index buffer
-
-            m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs[bSkinned ? "VSasCSSkinned" : "VSasCS"]);
-
-            // Run VSasCS
-            UINT numGroupsX = (UINT)ceilf(drawRecord.indexBufferCount / 32.0f);
-            UINT numGroupsY = (UINT)ceilf(drawRecord.numInstances / 32.0f);
-
-            m_commandList[m_commandListIndex]->Dispatch(numGroupsX, numGroupsY, 1);
-
+            continue;
         }
 
-        // Run command list up to this point
-        HRR(ExecuteCurrentCommandList(true));
+        bool bSkinned = drawRecord.inputLayout == SKINNED_INPUT_LAYOUT;
 
+        GetCommandList()->SetComputeRoot32BitConstants(0, 1, &drawRecordIndex, 0);
+        GetCommandList()->SetComputeRootDescriptorTable(3, m_descriptorHeap.hGPU(bSkinned ? VBSkinnedInput_UavHeapOffset : VBInput_UavHeapOffset)); // Table of 2 w/ Index buffer
 
-        //CComPtr<ID3D12Device5> device;
-        //HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
+        m_commandList[m_commandListIndex]->SetPipelineState(m_gameLevelPSOs[bSkinned ? "VSasCSSkinned" : "VSasCS"]);
 
-        //// Check size of the VB output buffer
-        //D3D12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-        //GetCommandList()->ResourceBarrier(1, &uavBarrier);
+        // Run VSasCS
+        UINT numGroupsX = (UINT)ceilf(drawRecord.indexBufferCount / 32.0f);
+        UINT numGroupsY = (UINT)ceilf(drawRecord.numInstances / 32.0f);
 
-        //GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_UavWorldCounter, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
-        //GetCommandList()->CopyResource(m_UavWorldCounterReadback, m_UavWorldCounter);
-        //GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_UavWorldCounter, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+        m_commandList[m_commandListIndex]->Dispatch(numGroupsX, numGroupsY, 1);
 
-        HRR(ExecuteCurrentCommandList(true));
-
-        BuildBottomLevelAccelerationStructure(true);
-        
-        BuildTopLevelAccelerationStructure(true);
     }
+
+    BuildBottomLevelAccelerationStructure(true);
+        
+    BuildTopLevelAccelerationStructure(true);
+
+    PIXEndEvent(GetCommandList()); // Build acceleration structure
+
 
 #if defined(DXR_ENABLED)
     {
+        PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
+
         // Dispatch rays
         CComPtr<ID3D12GraphicsCommandList6> commandList;
         HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
 
-        PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
 
         // All updates to the CPU copy of the Shader Binding Table must be done before calling Commit.
         m_shaderBindingTable.Commit();
@@ -2766,10 +2586,9 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         commandList->SetComputeRootConstantBufferView(3, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
         commandList->SetComputeRootConstantBufferView(4, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
 
-
         commandList->DispatchRays(&dispatchRaysDesc);
 
-        PIXEndEvent(GetCommandList()); // Raytrace render
+        PIXEndEvent(GetCommandList());
     }
 #endif
 
@@ -2786,7 +2605,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 #if defined(DXR_ENABLED)
     if (m_renderData->showDxrUav)
     {
-        PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR UAV");
+        PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR rendered UAV");
 
         //UINT clearColor[4] = { 200, 0, 0, 1 };
         //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(DxrVB_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(DxrVB_UavHeapOffset),
@@ -2822,7 +2641,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     //
     // Post processing - blur
     //
-    PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing");
+    PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing Blur");
 
     // use compute to post process
     CD3DX12_CPU_DESCRIPTOR_HANDLE offscreen1Handle(m_rtvHeap.hCPU(FrameCount));

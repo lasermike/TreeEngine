@@ -41,8 +41,8 @@ enum RenderPass
 
 struct ProjectionData
 {
-    int                    screenWidth;
-    int                    screenHeight;
+    int                  screenWidth;
+    int                  screenHeight;
     float                fov;
     float                nearClippingPlane;
     float                farClippingPlane;
@@ -71,6 +71,8 @@ struct RenderData
     // Per frame statistics
     FrameStatistic*     frameStats;
 
+    RenderPass          currentPass;
+
     // Lighting
     XMFLOAT4            clearColor;
     int                 numDirectionalLights;
@@ -95,7 +97,8 @@ struct RenderData
 
     IInputManager*       inputManager;
 
-    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), wireframe(false), showShadowBuffer(false), showDxrUav(false), inputManager(nullptr)
+    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), wireframe(false), showShadowBuffer(false), showDxrUav(false), inputManager(nullptr),
+        currentPass(RegularPass)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());
         XMStoreFloat4x4(&projection, XMMatrixIdentity());

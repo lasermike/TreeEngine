@@ -60,7 +60,7 @@ inline ThreadPool::ThreadPool(size_t threads)
             {
                 for(;;)
                 {
-                    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Thread pool lock");
+                    //PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Thread pool lock");
 
                     std::function<void()> task;
                     {
@@ -78,7 +78,7 @@ inline ThreadPool::ThreadPool(size_t threads)
                         this->workingThreads++;
                     }
 
-                    PIXEndEvent();
+                    //PIXEndEvent();
                     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Thread pool task");
 
                     task();
