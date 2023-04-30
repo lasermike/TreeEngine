@@ -1,3 +1,4 @@
+rem call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\$(Platform) $(OutDir) RenderPlatform12Xbox
 @SETLOCAL EnableDelayedExpansion
 @echo on
 set binaryDir=%1

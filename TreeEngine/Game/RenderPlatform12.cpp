@@ -771,7 +771,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             m_renderData->projectionData.screenWidth,
             m_renderData->projectionData.screenHeight);
 
-        const UINT maxWorldVertices = 50000;
+        const UINT maxWorldVertices = 500000;
         auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 /*
@@ -1814,7 +1814,7 @@ HRESULT RenderPlatform12::InitDevice()
 
 
     D3D12XBOX_LIVE_DEBUGGING_GLOBAL_PARAMETERS liveDebugParams = { 0 };
-    liveDebugParams.Type = D3D12XBOX_LIVE_DEBUGGING_SHADER_STAGE_COMPUTE;
+    liveDebugParams.Type = D3D12XBOX_LIVE_DEBUGGING_SHADER_STAGE_ANY;
     liveDebugParams.Flags = D3D12XBOX_LIVE_DEBUGGING_SHADER_GLOBAL_FLAGS_MEMORY_EXCEPTION;
 
     CComPtr<ID3D12Device11> d3dDevice11;
@@ -1956,9 +1956,8 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
             geometryDesc.Triangles.VertexCount = dr.vertexCount;
 
             geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-            geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ?
-                m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() : m_indexBuffer.buffer->GetGPUVirtualAddress())
-                + dr.indexBufferStart * sizeof(UINT);
+            geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ? m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() : m_indexBuffer.buffer->GetGPUVirtualAddress())
+                                                    + dr.indexBufferStart * sizeof(UINT);
             geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
 
             geometryDescIndex++;
@@ -1970,13 +1969,20 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     ///////////////
 
+    static int maxGeometryDesc = 0;
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs;
     rtInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-    rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE; // D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
     rtInputs.NumDescs = geometryDescIndex;
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     rtInputs.pGeometryDescs = geometryDescs;
+
+    if (m_triangleBLAS != nullptr && geometryDescIndex > maxGeometryDesc)
+    {
+        m_triangleBLAS.Release();
+        maxGeometryDesc = geometryDescIndex;
+    }
 
     if (m_triangleBLAS == nullptr)
     {
