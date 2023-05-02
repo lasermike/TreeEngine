@@ -18,12 +18,27 @@ enum FrameStat
     MAX_FRAME_STAT
 };
 
+enum FrameStatValueType
+{
+    UINT_FrameStatValueType,
+    int_FrameStatValueType,
+    float_FrameStatValueType
+};
+
 struct FrameStatistic
 {
     FrameStat id;
     const wchar_t* name;
-    UINT stat;
+    FrameStatValueType valueType;
+    union
+    {
+        UINT stat;
+        int statInt;
+        float statFloat;
+    };
 };
+
+void SetFrameStat(FrameStatistic stats[], FrameStat stat, int value);
 
 struct BoundingSphere
 {

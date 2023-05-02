@@ -9726,7 +9726,7 @@ static void MetricsHelpMarker(const char* desc)
     }
 }
 
-void ImGui::ShowMetricsWindow(bool* p_open)
+void ImGui::ShowMetricsWindow(bool* p_open, RenderData* renderData)
 {
     if (!ImGui::Begin("Metrics", p_open))
     {
@@ -9746,11 +9746,13 @@ void ImGui::ShowMetricsWindow(bool* p_open)
     ImGuiContext& g = *GImGui;
     ImGuiIO& io = ImGui::GetIO();
     //ImGui::Text("Dear ImGui %s", ImGui::GetVersion());
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+    ImGui::Text("Simulation Time %.3f seconds", renderData->time);
+    ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+    ImGui::Separator();
+    ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat,
+        renderData->frameStats[NUM_STICKS_STAT].stat,
+        renderData->frameStats[NUM_LEAVES_STAT].stat);
     ImGui::Text("UI %d vertices, %d indices (%d triangles)", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
-    //ImGui::Text("%d active windows (%d visible)", io.MetricsActiveWindows, io.MetricsRenderWindows);
-    //ImGui::Text("%d active allocations", io.MetricsActiveAllocations);
-    // ImGui::Separator();
 
     ImGui::End();
 
@@ -10097,7 +10099,7 @@ void ImGui::ShowMetricsWindow(bool* p_open)
 
 #else
 
-void ImGui::ShowMetricsWindow(bool*) { }
+void ImGui::ShowMetricsWindow(bool*, RenderData*) { }
 
 #endif
 

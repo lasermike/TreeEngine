@@ -1561,7 +1561,7 @@ HRESULT RenderPlatform12::InitDevice()
         // Check to see if the adapter supports Direct3D 12,
         // but don't create the actual device yet.
         if (SUCCEEDED(
-            D3D12CreateDevice(hardwareAdapter, D3D_FEATURE_LEVEL_11_0,
+            D3D12CreateDevice(hardwareAdapter, D3D_FEATURE_LEVEL_12_1,
                 _uuidof(ID3D12Device), nullptr)))
         {
             break;
@@ -1572,7 +1572,7 @@ HRESULT RenderPlatform12::InitDevice()
 
     HRR(D3D12CreateDevice(
         hardwareAdapter,
-        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_12_1,
         IID_PPV_ARGS(&m_d3dDevice)
     ));
 
@@ -2714,14 +2714,15 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         // Draw UI
 
             // TreeEngine specific stuff
-        ImGuiIO& io = ImGui::GetIO();
-        io.SimulationSeconds = m_renderData->time;
-        io.SkinnedMatrixCount = m_renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat;
-        io.LeavesCount = m_renderData->frameStats[NUM_STICKS_STAT].stat;
-        io.SticksCount = m_renderData->frameStats[NUM_LEAVES_STAT].stat;
+        //ImGuiIO& io = ImGui::GetIO();
+
+        //io.SimulationSeconds = m_renderData->time;
+        //io.SkinnedMatrixCount = m_renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat;
+        //io.LeavesCount = m_renderData->frameStats[NUM_STICKS_STAT].stat;
+        //io.SticksCount = m_renderData->frameStats[NUM_LEAVES_STAT].stat;
 
         bool show_metrics_window = true;
-        ImGui::ShowMetricsWindow(&show_metrics_window);
+        ImGui::ShowMetricsWindow(&show_metrics_window, m_renderData);
 
         ImGui::Render();
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList[m_commandListIndex]);

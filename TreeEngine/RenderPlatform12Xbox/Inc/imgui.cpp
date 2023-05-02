@@ -1,4 +1,6 @@
 #include "pch.h"
+#include "RenderData.h"
+
 // dear imgui, v1.75 WIP
 // (main code and documentation)
 
@@ -9726,7 +9728,7 @@ static void MetricsHelpMarker(const char* desc)
     }
 }
 
-void ImGui::ShowMetricsWindow(bool* p_open)
+void ImGui::ShowMetricsWindow(bool* p_open, RenderData* renderData)
 {
     if (!ImGui::Begin("Metrics", p_open))
     {
@@ -9746,10 +9748,12 @@ void ImGui::ShowMetricsWindow(bool* p_open)
     ImGuiContext& g = *GImGui;
     ImGuiIO& io = ImGui::GetIO();
     //ImGui::Text("Dear ImGui %s", ImGui::GetVersion());
-    ImGui::Text("Simulation Time %.3f seconds", io.SimulationSeconds);
+    ImGui::Text("Simulation Time %.3f seconds", renderData->time);
     ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
     ImGui::Separator();
-    ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", io.SkinnedMatrixCount, io.SticksCount, io.LeavesCount);
+    ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat, 
+                                                           renderData->frameStats[NUM_STICKS_STAT].stat,
+                                                           renderData->frameStats[NUM_LEAVES_STAT].stat);
     ImGui::Text("UI %d vertices, %d indices (%d triangles)", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
 
     ImGui::End();
@@ -10097,7 +10101,7 @@ void ImGui::ShowMetricsWindow(bool* p_open)
 
 #else
 
-void ImGui::ShowMetricsWindow(bool*) { }
+void ImGui::ShowMetricsWindow(bool*, RenderData*) { }
 
 #endif
 

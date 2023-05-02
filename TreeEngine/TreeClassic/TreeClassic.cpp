@@ -8,6 +8,10 @@
 
 #define MAX_LOADSTRING 100
 
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 610; }
+
+extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\"; }
+
 #ifdef OCULUS_LEGACY
 #include <OVR_CAPI_D3D.h>
 #include <Kernel/OVR_System.h>

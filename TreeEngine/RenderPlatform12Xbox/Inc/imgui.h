@@ -27,6 +27,8 @@ Index of this file:
 
 #pragma once
 
+struct RenderData;
+
 // Configuration file with compile-time options (edit imconfig.h or #define IMGUI_USER_CONFIG to your own filename)
 #ifdef IMGUI_USER_CONFIG
 #include IMGUI_USER_CONFIG
@@ -230,7 +232,7 @@ namespace ImGui
     // Demo, Debug, Information
     IMGUI_API void          ShowDemoWindow(bool* p_open = NULL);        // create Demo window (previously called ShowTestWindow). demonstrate most ImGui features. call this to learn about the library! try to make it always available in your application!
     IMGUI_API void          ShowAboutWindow(bool* p_open = NULL);       // create About window. display Dear ImGui version, credits and build/system information.
-    IMGUI_API void          ShowMetricsWindow(bool* p_open = NULL);     // create Metrics/Debug window. display Dear ImGui internals: draw commands (with individual draw calls and vertices), window list, basic internal state, etc.
+    IMGUI_API void          ShowMetricsWindow(bool* p_open = NULL, RenderData* = NULL);     // create Metrics/Debug window. display Dear ImGui internals: draw commands (with individual draw calls and vertices), window list, basic internal state, etc.
     IMGUI_API void          ShowStyleEditor(ImGuiStyle* ref = NULL);    // add style editor block (not a window). you can pass in a reference ImGuiStyle structure to compare to, revert to and save to (else it uses the default style)
     IMGUI_API bool          ShowStyleSelector(const char* label);       // add style selector block (not a window), essentially a combo listing the default styles.
     IMGUI_API void          ShowFontSelector(const char* label);        // add font selector block (not a window), essentially a combo listing the loaded fonts.
@@ -1492,10 +1494,10 @@ struct ImGuiIO
     IMGUI_API   ImGuiIO();
 
     // TreeEngine specific stuff
-    float       SimulationSeconds;
-    int         SkinnedMatrixCount;
-    int         LeavesCount;
-    int         SticksCount;
+    //float       SimulationSeconds;
+    //int         SkinnedMatrixCount;
+    //int         LeavesCount;
+    //int         SticksCount;
 
 };
 

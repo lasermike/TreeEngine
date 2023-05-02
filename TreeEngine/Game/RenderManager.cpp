@@ -5,12 +5,30 @@
 
 FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
 { 
-    { FPS_STAT, L"FPS", 0 }, 
-    { WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", 0 }, 
-    { NUM_LEAVES_STAT, L"Num leaves", 0 },
-    { NUM_STICKS_STAT, L"Num sticks", 0 },
-    { DRIVER_12_STAT, L"DirectX 12", 0 },
+    { FPS_STAT, L"FPS", UINT_FrameStatValueType, 0 },
+    { WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", UINT_FrameStatValueType, 0 },
+    { NUM_LEAVES_STAT, L"Num leaves", UINT_FrameStatValueType, 0 },
+    { NUM_STICKS_STAT, L"Num sticks", UINT_FrameStatValueType, 0 },
+    { DRIVER_12_STAT, L"DirectX 12", UINT_FrameStatValueType, 0 },
 };
+
+void SetFrameStat(FrameStatistic stats[], FrameStat stat, UINT value)
+{
+    stats[stat].stat = value;
+    stats[stat].valueType = UINT_FrameStatValueType;
+}
+
+void SetFrameStat(FrameStatistic stats[], FrameStat stat, int value)
+{
+    stats[stat].statInt = value;
+    stats[stat].valueType = int_FrameStatValueType;
+}
+
+void SetFrameStat(FrameStatistic stats[], FrameStat stat, float value)
+{
+    stats[stat].statFloat = value;
+    stats[stat].valueType = float_FrameStatValueType;
+}
 
 
 RenderManager::RenderManager() : m_platform(nullptr)

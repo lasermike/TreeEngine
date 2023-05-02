@@ -134,6 +134,7 @@
     <None Include="..\Game\Courier_New_11.tga">
       <Filter>Game\Resources</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Game\CopyResources.cmd">
