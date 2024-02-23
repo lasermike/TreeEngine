@@ -1,25 +1,24 @@
 //--------------------------------------------------------------------------------------
 // File: RenderTargetState.h
 //
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
 // Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 //
 // http://go.microsoft.com/fwlink/?LinkID=615561
 //--------------------------------------------------------------------------------------
 
 #pragma once
 
-#if defined(_XBOX_ONE) && defined(_TITLE)
+#ifdef _GAMING_XBOX_SCARLETT
+#include <d3d12_xs.h>
+#elif (defined(_XBOX_ONE) && defined(_TITLE)) || defined(_GAMING_XBOX)
 #include <d3d12_x.h>
 #else
 #include <d3d12.h>
+#include <dxgi.h>
 #endif
 
-#include <stdint.h>
+#include <cstdint>
 
 
 namespace DirectX
@@ -28,7 +27,7 @@ namespace DirectX
     class RenderTargetState
     {
     public:
-        RenderTargetState()
+        RenderTargetState() noexcept
             : sampleMask(~0U)
             , numRenderTargets(0)
             , rtvFormats{}
@@ -39,11 +38,15 @@ namespace DirectX
         }
 
         RenderTargetState(const RenderTargetState&) = default;
+        RenderTargetState& operator=(const RenderTargetState&) = default;
+
+        RenderTargetState(RenderTargetState&&) = default;
+        RenderTargetState& operator=(RenderTargetState&&) = default;
 
         // Single render target convenience constructor
         RenderTargetState(
             _In_ DXGI_FORMAT rtFormat,
-            _In_ DXGI_FORMAT dsFormat)
+            _In_ DXGI_FORMAT dsFormat) noexcept
             : sampleMask(UINT_MAX)
             , numRenderTargets(1)
             , rtvFormats{}
@@ -58,7 +61,7 @@ namespace DirectX
         // Convenience constructor converting from DXGI_SWAPCHAIN_DESC
         RenderTargetState(
             _In_ const DXGI_SWAP_CHAIN_DESC* desc,
-            _In_ DXGI_FORMAT dsFormat)
+            _In_ DXGI_FORMAT dsFormat) noexcept
             : sampleMask(UINT_MAX)
             , numRenderTargets(1)
             , rtvFormats{}

@@ -29,7 +29,7 @@ bool useImGui = true;
 bool useImGui = true;
 #endif
 
-#if defined(TREE_XBOX)
+#if defined(DXR_ENABLED)
 #include "RaytracingLibrary.inc"
 #include "GlobalRootSignature.inc"
 #include "LocalRootSignature.inc"
@@ -1699,7 +1699,7 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
     CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
 
     auto raytracingLibrary = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-    D3D12_SHADER_BYTECODE libraryDXIL = CD3DX12_SHADER_BYTECODE((void*)g_RaytracingLibrary, sizeof(g_RaytracingLibrary));
+    D3D12_SHADER_BYTECODE libraryDXIL = CD3DX12_SHADER_BYTECODE((void*) g_RaytracingLibrary, sizeof(g_RaytracingLibrary));
     raytracingLibrary->SetDXILLibrary(&libraryDXIL);
 
     const wchar_t* rayGenExportName = L"RayGenerationShader";

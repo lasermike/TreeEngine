@@ -1,27 +1,25 @@
 //--------------------------------------------------------------------------------------
 // File: PrimitiveBatch.h
 //
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
 // Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 //
 // http://go.microsoft.com/fwlink/?LinkID=615561
 //--------------------------------------------------------------------------------------
 
 #pragma once
 
-#if defined(_XBOX_ONE) && defined(_TITLE)
+#ifdef _GAMING_XBOX_SCARLETT
+#include <d3d12_xs.h>
+#elif (defined(_XBOX_ONE) && defined(_TITLE)) || defined(_GAMING_XBOX)
 #include <d3d12_x.h>
 #else
 #include <d3d12.h>
 #endif
 
+#include <cstdint>
 #include <memory>
 #include <utility>
-#include <stdint.h>
 
 
 namespace DirectX
@@ -34,8 +32,8 @@ namespace DirectX
         protected:
             PrimitiveBatchBase(_In_ ID3D12Device* device, size_t maxIndices, size_t maxVertices, size_t vertexSize);
 
-            PrimitiveBatchBase(PrimitiveBatchBase&& moveFrom);
-            PrimitiveBatchBase& operator= (PrimitiveBatchBase&& moveFrom);
+            PrimitiveBatchBase(PrimitiveBatchBase&& moveFrom) noexcept;
+            PrimitiveBatchBase& operator= (PrimitiveBatchBase&& moveFrom) noexcept;
 
             PrimitiveBatchBase(PrimitiveBatchBase const&) = delete;
             PrimitiveBatchBase& operator= (PrimitiveBatchBase const&) = delete;
@@ -44,7 +42,7 @@ namespace DirectX
 
         public:
             // Begin/End a batch of primitive drawing operations.
-            void __cdecl Begin( _In_ ID3D12GraphicsCommandList* cmdList );
+            void __cdecl Begin(_In_ ID3D12GraphicsCommandList* cmdList);
             void __cdecl End();
 
         protected:
@@ -68,19 +66,21 @@ namespace DirectX
 
     public:
         explicit PrimitiveBatch(_In_ ID3D12Device* device, size_t maxIndices = DefaultBatchSize * 3, size_t maxVertices = DefaultBatchSize)
-          : PrimitiveBatchBase(device, maxIndices, maxVertices, sizeof(TVertex))
+            : PrimitiveBatchBase(device, maxIndices, maxVertices, sizeof(TVertex))
         { }
 
-        PrimitiveBatch(PrimitiveBatch&& moveFrom)
-          : PrimitiveBatchBase(std::move(moveFrom))
+        PrimitiveBatch(PrimitiveBatch&& moveFrom) noexcept
+            : PrimitiveBatchBase(std::move(moveFrom))
         { }
 
-        PrimitiveBatch& operator= (PrimitiveBatch&& moveFrom)
+        PrimitiveBatch& operator= (PrimitiveBatch&& moveFrom) noexcept
         {
             PrimitiveBatchBase::operator=(std::move(moveFrom));
             return *this;
         }
 
+        PrimitiveBatch(PrimitiveBatch const&) = delete;
+        PrimitiveBatch& operator= (PrimitiveBatch const&) = delete;
 
         // Similar to the D3D9 API DrawPrimitiveUP.
         void Draw(D3D_PRIMITIVE_TOPOLOGY topology, _In_reads_(vertexCount) TVertex const* vertices, size_t vertexCount)

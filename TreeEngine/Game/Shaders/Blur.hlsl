@@ -1,7 +1,7 @@
 //=============================================================================
 // Performs a separable Guassian blur with a blur radius up to 5 pixels.
 //=============================================================================
-
+ 
 #include "Materials.fx"
 #include "SharedTypes.hlsli"
 

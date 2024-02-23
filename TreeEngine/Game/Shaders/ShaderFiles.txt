@@ -17,3 +17,6 @@ Blur.hlsl,cs,HorzBlurCS
 Blur.hlsl,cs,VertBlurCS
 Blur.hlsl,cs,VSasCS
 Blur.hlsl,cs,VSasCSSkinned
+RaytracingLibrary.hlsl,lib,RaytracingLibrary
+GlobalRootSignature.hlsl,rootsig,GlobalRootSignature
+LocalRootSignature.hlsl,rootsig,LocalRootSignature
