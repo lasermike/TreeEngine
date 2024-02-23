@@ -149,7 +149,7 @@ HRESULT Game::ReloadDevice()
     }
 
     const wchar_t* dllFilename =
-#if defined(TREE3D_CLASSIC)
+#if defined(_TREE_CLASSIC)
         L"RenderPlatform12.dll";
         m_renderPlatformDLL = ::LoadLibrary(dllFilename);
 #elif defined(TREE_XBOX)

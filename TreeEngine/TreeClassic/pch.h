@@ -21,7 +21,5 @@
 #include <DirectXMath.h>
 
 // Above this line include platform specific stuff
-#define TREENGINE_WIN32
-#define TREE3D_CLASSIC
 #include <unknwn.h>
 #include <stdafx.h>

@@ -16,9 +16,8 @@ class RenderPlatform;
 class RenderManager;
 enum CbvSrvUavHeapOffsets;
 
-#if defined(TREE_XBOX) && defined(TREE3D12)
+#if defined(DXR_ENABLED)
 
-#define DXR_ENABLED
 #include "DxrHelper.h"
 
 struct SimpleTriangleRecord : public ShaderRecord

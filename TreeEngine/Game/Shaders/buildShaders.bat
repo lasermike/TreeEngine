@@ -81,6 +81,11 @@ ECHO  BuildShader target !target!
 @rem Compile!
 set cmdline=!compiler! /Zi /Qembed_debug /T %target% /E %3 
 
+if !isXbox! == 1 (
+    set cmdline=!cmdline! ./Zi
+) else (
+    set cmdline=!cmdline! ./Zs
+)
 if [%2] == [rootsig] (
 	set cmdline=!cmdline! /Fh !outputFolder!%3.inc 
 ) else if [%2] == [lib] (

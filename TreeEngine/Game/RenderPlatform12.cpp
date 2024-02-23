@@ -1068,14 +1068,13 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     SafeDelete(&m_renderData->pShadowMap);
 
-//#if defined(DXR_ENABLED)
+#if defined(DXR_ENABLED)
     // DXR
     SafeDelete(&m_renderData->pDxrOutBuffer);
-
-    //m_IBWorld.Release();
+ 
     m_VBWorld.Release();
     m_DrawRecords.Release();
-//#endif
+#endif
 
     return S_OK;
 }
@@ -1533,6 +1532,7 @@ HRESULT RenderPlatform12::InitDevice()
     {
         debugController->EnableDebugLayer();
     }
+
 #endif
 
     CComPtr<IDXGIFactory4> factory4;
@@ -1561,7 +1561,7 @@ HRESULT RenderPlatform12::InitDevice()
         // Check to see if the adapter supports Direct3D 12,
         // but don't create the actual device yet.
         if (SUCCEEDED(
-            D3D12CreateDevice(hardwareAdapter, D3D_FEATURE_LEVEL_12_1,
+            D3D12CreateDevice(hardwareAdapter, D3D_FEATURE_LEVEL_12_2,
                 _uuidof(ID3D12Device), nullptr)))
         {
             break;
@@ -1572,9 +1572,20 @@ HRESULT RenderPlatform12::InitDevice()
 
     HRR(D3D12CreateDevice(
         hardwareAdapter,
-        D3D_FEATURE_LEVEL_12_1,
-        IID_PPV_ARGS(&m_d3dDevice)
-    ));
+        D3D_FEATURE_LEVEL_12_2,
+        IID_PPV_ARGS(&m_d3dDevice)));
+
+    CComPtr<ID3D12DebugDevice> debugDevice;
+    if (SUCCEEDED(m_d3dDevice->QueryInterface(__uuidof(ID3D12DebugDevice), (void**)&debugDevice)))
+    {
+        debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
+    }
+
+    CComPtr<ID3D12Debug1> debug1;
+    if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
+    {
+        //debug1->SetEnableGPUBasedValidation(TRUE);
+    }
 
 #endif 
     // Allocate graphics memory
@@ -1659,8 +1670,7 @@ HRESULT RenderPlatform12::InitDevice()
 #if defined(DXR_ENABLED)
     CreateRaytracingPipeline();
 
-
-
+#if defined(TREE_XBOX)
     D3D12XBOX_LIVE_DEBUGGING_GLOBAL_PARAMETERS liveDebugParams = { 0 };
     liveDebugParams.Type = D3D12XBOX_LIVE_DEBUGGING_SHADER_STAGE_ANY;
     liveDebugParams.Flags = D3D12XBOX_LIVE_DEBUGGING_SHADER_GLOBAL_FLAGS_MEMORY_EXCEPTION;
@@ -1671,6 +1681,7 @@ HRESULT RenderPlatform12::InitDevice()
     //d3dDevice11->EnableLiveDebuggingX(&liveDebugParams);
 
 #endif 
+#endif
 
 
     return hr;
@@ -1679,9 +1690,11 @@ HRESULT RenderPlatform12::InitDevice()
 #if defined(DXR_ENABLED)
 HRESULT RenderPlatform12::CreateRaytracingPipeline()
 {
+#if defined(TREE_XBOX)
     CComPtr<ID3D12Device8> d3dDevice8;
     HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&d3dDevice8));
     d3dDevice8->SetCompileTimeShaderPdbPathX(L"d:\\");
+#endif
 
     CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
 
