@@ -126,8 +126,6 @@ struct RenderData
         numDirectionalLights = 1;
         numPointLights = 0;
         instanceBuffer = nullptr;
-#if defined(TREE_XBOX)
-        showDxrUav = true;
-#endif
+        showDxrUav = false;
     }
 };

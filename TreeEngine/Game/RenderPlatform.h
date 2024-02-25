@@ -899,13 +899,10 @@ public:
     // TODO: move into interface
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
 
-    // DXR buffers
-    CComPtr<ID3D12Resource>     m_VBWorld;
-    CComPtr<ID3D12Resource>     m_DrawRecords;
+#if defined(DXR_ENABLED)
 
     uint32_t m_numInstancesInTLAS;
 
-#if defined(DXR_ENABLED)
 
     HRESULT CreateRaytracingPipeline();
     HRESULT BuildTopLevelAccelerationStructure(bool buildEveryFrame);
@@ -920,6 +917,10 @@ public:
     CComPtr<ID3D12Resource>		m_TLAS, m_TLASScratch;
     CComPtr<ID3D12Resource>		m_triangleBLAS;
     CComPtr<ID3D12Resource>		m_scratch;
+
+    // DXR buffers
+    CComPtr<ID3D12Resource>     m_VBWorld;
+    CComPtr<ID3D12Resource>     m_DrawRecordsResource;
 
 
     ShaderBindingTable<SimpleTriangleRecord, 1, 2, 1> m_shaderBindingTable;

@@ -23,11 +23,7 @@
 
 #include "pix.h"
 
-#if defined(TREE_CLASSIC)
-bool useImGui = true;
-#else
-bool useImGui = true;
-#endif
+bool useImGui = false;
 
 #if defined(DXR_ENABLED)
 #include "RaytracingLibrary.inc"
@@ -758,6 +754,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
 #if defined(DXR_ENABLED)
 
+    m_renderData->showDxrUav = true;
+
     m_numInstancesInTLAS = 1;
 
     // Create screen sized output buffer
@@ -818,9 +816,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &drawRecordDescBuffer,
         D3D12_RESOURCE_STATE_GENERIC_READ, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
         nullptr,
-        __uuidof(ID3D12Resource), (void**)&m_DrawRecords));
+        __uuidof(ID3D12Resource), (void**)&m_DrawRecordsResource));
 
-    HRR(m_DrawRecords->SetName(L"Draw Records"));
+    HRR(m_DrawRecordsResource->SetName(L"Draw Records"));
 
     D3D12_SHADER_RESOURCE_VIEW_DESC descDrawRecordsSrv = {};
     descDrawRecordsSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -829,7 +827,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     descDrawRecordsSrv.Buffer.NumElements = MAX_DRAWRECORDS;
     descDrawRecordsSrv.Buffer.StructureByteStride = sizeof(DrawRecord);
 
-    GetDevice()->CreateShaderResourceView(m_DrawRecords, &descDrawRecordsSrv, m_descriptorHeap.hCPU(DrawRecords_SrvHeapOffset));
+    GetDevice()->CreateShaderResourceView(m_DrawRecordsResource, &descDrawRecordsSrv, m_descriptorHeap.hCPU(DrawRecords_SrvHeapOffset));
 
 #endif
 
@@ -1073,7 +1071,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeDelete(&m_renderData->pDxrOutBuffer);
  
     m_VBWorld.Release();
-    m_DrawRecords.Release();
+    m_DrawRecordsResource.Release();
 #endif
 
     return S_OK;
@@ -1581,11 +1579,17 @@ HRESULT RenderPlatform12::InitDevice()
         debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
     }
 
-    CComPtr<ID3D12Debug1> debug1;
-    if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
-    {
-        //debug1->SetEnableGPUBasedValidation(TRUE);
-    }
+    //CComPtr<ID3D12Debug1> debug1;
+    //if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
+    //{
+    //    debug1->SetEnableGPUBasedValidation(TRUE);
+    //}
+
+    //CComPtr<ID3D12Debug5> debug5;
+    //if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug5), (void**)&debug5)))
+    //{
+    //    debug5->SetEnableAutoName(TRUE);
+    //}
 
 #endif 
     // Allocate graphics memory
@@ -1998,10 +2002,10 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
         (void)m_commandQueue->PresentX(0, nullptr, nullptr);
     }
 
-#endif
+#else
 
-#if !defined(TREE_XBOX)
     m_pSwapChain.Release();
+
 #endif
 
     for (UINT i = 0; i < RenderPlatform12::FrameCount; i++)
@@ -2359,13 +2363,6 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
 
     HRR(ExecuteCurrentCommandList(true));
 
-    //m_commandList[m_commandListIndex]->RSSetViewports(1, &m_viewPort);
-    //m_commandList[m_commandListIndex]->RSSetScissorRects(1, &m_scissorRect);
-    //m_commandList[m_commandListIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    //m_commandList[m_commandListIndex]->IASetVertexBuffers(0, 1, &m_VBView);
-    //m_commandList[m_commandListIndex]->IASetIndexBuffer(&m_IBView);
-    //m_commandList[m_commandListIndex]->OMSetStencilRef(0);
-
     return S_OK;
 }
 
@@ -2523,14 +2520,33 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 #if defined(DXR_ENABLED)
     PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Build acceleration structure");
 
-    // First run VSasCS 
-    // Dispatch to run through contents of m_drawnVertices
+#if defined(TREE_XBOX)
+    // Copy draw records to GPU resource
 
     DrawRecord* pDrawRecords = nullptr;
-    m_DrawRecords->Map(0, nullptr, ((void**)&pDrawRecords));
+    m_DrawRecordsResource->Map(0, nullptr, ((void**)&pDrawRecords));
     memcpy(pDrawRecords, m_drawRecords.data(), sizeof(DrawRecord) * m_drawRecords.size());
-    m_DrawRecords->Unmap(0, nullptr);
+    m_DrawRecordsResource->Unmap(0, nullptr);
 
+#else
+
+    // Copy draw records from CPU to GPU
+    {
+        ResourceUploadBatch resourceUpload(GetDevice());
+        resourceUpload.Begin();
+
+        D3D12_SUBRESOURCE_DATA initData = {};
+        initData.pData = m_drawRecords.data();
+        initData.RowPitch = sizeof(DrawRecord) * m_drawRecords.size();
+        initData.SlicePitch = 0;
+
+        resourceUpload.Upload(m_DrawRecordsResource, 0, &initData, 1);
+    }
+#endif
+
+    //
+    // Run VSasCS - Compute shader that runs through contents of m_drawnVertices
+    //
     GetCommandList()->SetComputeRootSignature(m_computeRootSignature);
 
     GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(DrawRecords_SrvHeapOffset));
@@ -2767,7 +2783,6 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     m_graphicsMemory->Commit(m_commandQueue);
 
     AdvanceToNextFrame();
-    //IncrementFenceOnGPU();
 
     return hr;
 }
