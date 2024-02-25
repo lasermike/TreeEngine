@@ -197,11 +197,16 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 //
 // PIX markers and events
 //
-#if defined(PIX_INSTRUMENTATION)
+
 
 #if defined(TREE_XBOX)
 #include <pix.h>
 #pragma comment(lib, "pixEvt")
+#else
+#include "pix3.h"
+#endif
+
+#if defined(ATG_INSTRUMENTATION)
 
 #if defined(ATG_PROFILE_VERBOSE)
 
@@ -235,29 +240,7 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 
 #endif 
 
-#else
-// PC build
-#include "pix3.h"
-
-#endif
-
-#else // No PIX_INSTRUMENTATION
-
-void PIXBeginEvent(void* /*ctx*/, DWORD /*color*/, wchar_t* /*text*/, ...);
-void PIXBeginEvent(DWORD /*color*/, wchar_t* /*text*/, ...);
-
-void PIXBeginEvent(void* /*ctx*/);
-void PIXBeginEvent();
-
-void PIXEndEvent(void*);
-void PIXEndEvent();
-
-#if !defined(TREE_XBOX)
-void PIXScopedEvent(DWORD, wchar_t*, ...);
-void PIXScopedEvent(void*, DWORD, wchar_t*, ...);
-#endif
-
-#endif
+#else // No ATG_INSTRUMENTATION
 
 // Null versions
 #define ATGPROFILETHIS
@@ -273,6 +256,7 @@ void PIXScopedEvent(void*, DWORD, wchar_t*, ...);
 #define VERBOSEATGPROFILELABEL( a )
 #define VERBOSEENDATGPROFILELABEL
 
+#endif 
 
 const UINT64 XTF_COLOR_DRAW_TEXT = 0xFF0000FF;
 const UINT64 TREE_COLOR_DRAW_TEXT = 0x0000FFFF;

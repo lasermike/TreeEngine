@@ -184,7 +184,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;NDEBUG;TREE3D12;RENDERPLATFORM_EXPORTS;IMGUI_DISABLE_WIN32_FUNCTIONS;PIX_INSTRUMENTATION;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;NDEBUG;TREE3D12;RENDERPLATFORM_EXPORTS;IMGUI_DISABLE_WIN32_FUNCTIONS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -210,7 +210,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;NDEBUG;TREE3D12;RENDERPLATFORM_EXPORTS;IMGUI_DISABLE_WIN32_FUNCTIONS;PIX_INSTRUMENTATION;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;NDEBUG;TREE3D12;RENDERPLATFORM_EXPORTS;IMGUI_DISABLE_WIN32_FUNCTIONS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -236,7 +236,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;PIX_INSTRUMENTATION;IMGUI_DISABLE_WIN32_FUNCTIONS;NDEBUG;PROFILE;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;IMGUI_DISABLE_WIN32_FUNCTIONS;NDEBUG;PROFILE;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -262,7 +262,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;PIX_INSTRUMENTATION;IMGUI_DISABLE_WIN32_FUNCTIONS;NDEBUG;PROFILE;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;IMGUI_DISABLE_WIN32_FUNCTIONS;NDEBUG;PROFILE;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -286,7 +286,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;PIX_INSTRUMENTATION;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
@@ -308,7 +308,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;PIX_INSTRUMENTATION;IMGUI_DISABLE_WIN32_FUNCTIONS;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TREE_XBOX;TREENGINE_WIN32;TREE3D12;RENDERPLATFORM_EXPORTS;IMGUI_DISABLE_WIN32_FUNCTIONS;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);$(OutDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>

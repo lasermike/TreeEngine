@@ -231,19 +231,3 @@ void SetDebugName(ID3D11DeviceChild* child, const char* name) { }
 
 #endif
 
-#if defined(PIX_INSTRUMENTATION)
-#else
-
-void PIXBeginEvent(void* /*ctx*/, DWORD /*color*/, wchar_t* /*text*/, ...) { }
-void PIXBeginEvent(DWORD /*color*/, wchar_t* /*text*/, ...) { }
-
-void PIXBeginEvent(void* /*ctx*/) { }
-void PIXBeginEvent() { }
-
-void PIXEndEvent(void*) { }
-void PIXEndEvent() { }
-
-void PIXScopedEvent(void*, DWORD, wchar_t*, ...) { }
-void PIXScopedEvent(DWORD, wchar_t*, ...) { }
-
-#endif

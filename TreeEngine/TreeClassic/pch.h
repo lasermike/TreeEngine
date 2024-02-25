@@ -24,4 +24,3 @@
 #include <unknwn.h>
 #include <stdafx.h>
 
-//#define PIX_INSTRUMENTATION
