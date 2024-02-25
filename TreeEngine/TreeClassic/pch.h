@@ -23,3 +23,5 @@
 // Above this line include platform specific stuff
 #include <unknwn.h>
 #include <stdafx.h>
+
+//#define PIX_INSTRUMENTATION
