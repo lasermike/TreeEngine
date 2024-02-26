@@ -881,6 +881,8 @@ public:
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
 
+    HRESULT SetupGraphicsOnCommandList();
+
     HRESULT GetViewport(Viewport& viewport);
 
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer)

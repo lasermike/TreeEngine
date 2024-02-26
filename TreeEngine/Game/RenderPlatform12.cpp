@@ -2364,6 +2364,31 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     return S_OK;
 }
 
+HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
+{
+    HRESULT hr = S_OK;
+
+    // Set default material (first material).  Will be changed by calls to SetRenderUnit()
+    D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_descriptorHeap.hGPU(Material0_HeapOffset);
+    GetCommandList()->SetGraphicsRootDescriptorTable(MaterialCbvTableRootSignatureParam, materialHandle);
+
+    D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
+    GetCommandList()->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, textureHandle);
+
+    // Set root signature constant buffers
+    GetCommandList()->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
+    GetCommandList()->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
+    GetCommandList()->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
+
+    // Set output buffers for DXR vertices
+    GetCommandList()->SetGraphicsRootDescriptorTable(UavTableRootSignatureParam, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
+
+    GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    GetCommandList()->IASetVertexBuffers(0, 1, &m_VBView);
+
+    return hr;
+}
+
 HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
 {
     // Ensure last frame is completed
@@ -2376,26 +2401,10 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     HRR(m_d3dDevice->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &m_framePipelineToken));
 #endif
 
-    // Set default material (first material).  Will be changed by calls to SetRenderUnit()
-    D3D12_GPU_DESCRIPTOR_HANDLE materialHandle = m_descriptorHeap.hGPU(Material0_HeapOffset);
-    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(MaterialCbvTableRootSignatureParam, materialHandle);
-
-    D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
-    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, textureHandle);
-
-    // Set root signature constant buffers
-    m_commandList[m_commandListIndex]->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
-    m_commandList[m_commandListIndex]->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
-    m_commandList[m_commandListIndex]->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
-
-    // Set output buffers for DXR vertices
-    m_commandList[m_commandListIndex]->SetGraphicsRootDescriptorTable(UavTableRootSignatureParam, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
-
-    m_commandList[m_commandListIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList[m_commandListIndex]->IASetVertexBuffers(0, 1, &m_VBView);
+    HRR(SetupGraphicsOnCommandList());
 
     //TODO NEXT: use compute to copy offscreen1 to rtv
-    m_commandList[m_commandListIndex]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
     // Set initial render target to rtv for ImGui
     //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
@@ -2542,7 +2551,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
             // Upload the resources to the GPU.
             auto uploadResourcesFinished = resourceUpload.End(GetCommandQueue());
-
+              
             // Wait for the upload thread to terminate
             uploadResourcesFinished.wait();
 
@@ -2591,6 +2600,11 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render Epilog part deux");
 
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
+    GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+
+
     {
         PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
 
@@ -2623,48 +2637,6 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         commandList->DispatchRays(&dispatchRaysDesc);
     }
 
-#endif
-
-    if (m_renderData->showShadowBuffer)
-    {
-        HRR(DrawScreenQuad(GetCommandList(), ShadowSrv_HeapOffset, m_pipelineStateR8FullScreenQuad));
-    }
-
-
-#if defined(DXR_ENABLED)
-    if (m_renderData->showDxrUav)
-    {
-        PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR rendered UAV");
-
-        //UINT clearColor[4] = { 200, 0, 0, 1 };
-        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(DxrVB_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(DxrVB_UavHeapOffset),
-        //    m_renderData->pDxrOutBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
-
-        GetCommandList()->RSSetViewports(1, &GetViewport());
-        GetCommandList()->RSSetScissorRects(1, &m_scissorRect);
-
-        // DXR vertex buffer to SRV
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-
-        // Change to DEPTH_WRITE.
-        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        GetCommandList()->ResourceBarrier(1, &toReadBarrier);
-
-        FLOAT blendFactor[4] = { 0.5f,0.5f,0.5f, 1.0f };
-        GetCommandList()->OMSetBlendFactor(blendFactor);
-
-        HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
-
-        // DXR vertex buffer to UAV
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-
-        D3D12_RESOURCE_BARRIER barriers[1];
-        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        GetCommandList()->ResourceBarrier(ARRAYSIZE(barriers), barriers);
-
-        //PIXEndEvent(GetCommandList()); //Show DXR UA
-    }
 #endif
 
     //
@@ -2738,6 +2710,50 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         //PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList()); // Post processing
     }
 
+
+    HRR(SetupGraphicsOnCommandList());
+
+
+    if (m_renderData->showShadowBuffer)
+    {
+        HRR(DrawScreenQuad(GetCommandList(), ShadowSrv_HeapOffset, m_pipelineStateR8FullScreenQuad));
+    }
+
+
+#if defined(DXR_ENABLED)
+    if (m_renderData->showDxrUav)
+    {
+        PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR rendered UAV");
+
+        //UINT clearColor[4] = { 200, 0, 0, 1 };
+        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(DxrVB_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(DxrVB_UavHeapOffset),
+        //    m_renderData->pDxrOutBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
+
+        GetCommandList()->RSSetViewports(1, &GetViewport());
+        GetCommandList()->RSSetScissorRects(1, &m_scissorRect);
+
+        // DXR vertex buffer to SRV
+        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+
+        // Change to DEPTH_WRITE.
+        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        GetCommandList()->ResourceBarrier(1, &toReadBarrier);
+
+        FLOAT blendFactor[4] = { 0.5f,0.5f,0.5f, 1.0f };
+        GetCommandList()->OMSetBlendFactor(blendFactor);
+
+        HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
+
+        // DXR vertex buffer to UAV
+        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+        D3D12_RESOURCE_BARRIER barriers[1];
+        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        GetCommandList()->ResourceBarrier(ARRAYSIZE(barriers), barriers);
+    }
+#endif
+
     if (imGuiInitialized)
     {
         PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"IM GUI");
@@ -2760,6 +2776,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         //PIXEndEvent(GetCommandList()); // IM GUI
     }
+
 
     PIXEndEvent(GetCommandList()); // Render Epilog part deux
 
