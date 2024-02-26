@@ -907,6 +907,7 @@ public:
 
 
     HRESULT CreateRaytracingPipeline();
+    HRESULT BuildAccelerationStructure(bool buildEveryFrame);
     HRESULT BuildTopLevelAccelerationStructure(bool buildEveryFrame);
     HRESULT BuildBottomLevelAccelerationStructure(bool buildEveryFrame);
 
