@@ -1127,7 +1127,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 {
 #if defined(DXR_ENABLED)
 
-    if (m_renderData->currentPass == RegularPass)
+    if (m_renderData->currentPass == ShadowMapPass)
     {
         m_drawRecords.push_back(DrawRecord(StartIndexLocation,
             IndexCountPerInstance,
@@ -2443,7 +2443,21 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     HR(buffer->buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
     //TODO should Map() in D3D12 only get called once at create time?
 
-    HRR(ExecuteCurrentCommandList(true));
+    // Needs on xbox?
+    //HRR(ExecuteCurrentCommandList(true));
+
+    m_renderData->instanceData = *dataView;
+    m_renderData->instanceBuffer = buffer;
+
+#if defined (DXR_ENABLED)
+
+    m_nextVbWorldStart = 0;
+    m_drawRecords.clear();
+
+#endif
+
+    // Needed?
+    HRR(SetupGraphicsOnCommandList());
 
     return S_OK;
 }
@@ -2477,6 +2491,50 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 {
     // Ensure last frame is completed
     WaitOnFence();
+
+#if defined(DXR_ENABLED)
+
+    HRR(BuildAccelerationStructure(true));
+
+    // Needed on XBOX?
+    //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
+    //CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
+    //GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+
+    {
+        PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
+
+        // Dispatch rays
+        CComPtr<ID3D12GraphicsCommandList6> commandList;
+        HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
+
+        // All updates to the CPU copy of the Shader Binding Table must be done before calling Commit.
+        m_shaderBindingTable.Commit();
+
+        D3D12_DISPATCH_RAYS_DESC dispatchRaysDesc = {};
+        dispatchRaysDesc.Width = (UINT)m_renderData->projectionData.screenWidth;
+        dispatchRaysDesc.Height = (UINT)m_renderData->projectionData.screenHeight;
+        dispatchRaysDesc.Depth = 1;
+        dispatchRaysDesc.RayGenerationShaderRecord = m_shaderBindingTable.GetRayGenerationRecord(0);
+        dispatchRaysDesc.MissShaderTable = m_shaderBindingTable.GetMissShaderTable();
+        dispatchRaysDesc.HitGroupTable = m_shaderBindingTable.GetHitGroupShaderTable();
+
+        UINT rootConstants[4] = { dispatchRaysDesc.Width, dispatchRaysDesc.Height, (UINT)D3D12_RAY_FLAG_NONE /*m_rayFlags*/, 0 /*m_holeSize*/ };
+
+        commandList->SetComputeRootSignature(m_globalRootSignature);
+        commandList->SetDescriptorHeaps(1, m_descriptorHeap);
+        commandList->SetPipelineState1(m_raytracingStateObject);
+        commandList->SetComputeRootShaderResourceView(0, m_TLAS->GetGPUVirtualAddress());
+        commandList->SetComputeRoot32BitConstants(1, ARRAYSIZE(rootConstants), rootConstants, 0);
+        commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
+        commandList->SetComputeRootConstantBufferView(3, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
+        commandList->SetComputeRootConstantBufferView(4, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
+
+        commandList->DispatchRays(&dispatchRaysDesc);
+    }
+
+#endif
+
 
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"RenderProlog");
 
@@ -2516,6 +2574,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 
     GetCommandList()->SetPipelineState(m_pipelineState);  // Needed?  Supports rendering without material?
 
+
     // Make shadow map available to shaders
     if (useShadowMaps)
     {
@@ -2551,14 +2610,8 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         }
     }
 
-#if defined (DXR_ENABLED)
-
-    m_nextVbWorldStart = 0;
-    m_drawRecords.clear();
-
-#endif
-
     PIXEndEvent(GetCommandList()); // RenderProlog
+
 
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"RenderScene");
 
@@ -2605,49 +2658,6 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     HRESULT hr = S_OK;
 
     PIXEndEvent(GetCommandList()); // RenderScene
-
-#if defined(DXR_ENABLED)
-
-    HRR(BuildAccelerationStructure(true));
-
-    // Needed on XBOX?
-    //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
-    //CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
-    //GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
-    {
-        PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
-
-        // Dispatch rays
-        CComPtr<ID3D12GraphicsCommandList6> commandList;
-        HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
-
-        // All updates to the CPU copy of the Shader Binding Table must be done before calling Commit.
-        m_shaderBindingTable.Commit();
-
-        D3D12_DISPATCH_RAYS_DESC dispatchRaysDesc = {};
-        dispatchRaysDesc.Width = (UINT)m_renderData->projectionData.screenWidth;
-        dispatchRaysDesc.Height = (UINT)m_renderData->projectionData.screenHeight;
-        dispatchRaysDesc.Depth = 1;
-        dispatchRaysDesc.RayGenerationShaderRecord = m_shaderBindingTable.GetRayGenerationRecord(0);
-        dispatchRaysDesc.MissShaderTable = m_shaderBindingTable.GetMissShaderTable();
-        dispatchRaysDesc.HitGroupTable = m_shaderBindingTable.GetHitGroupShaderTable();
-
-        UINT rootConstants[4] = { dispatchRaysDesc.Width, dispatchRaysDesc.Height, (UINT)D3D12_RAY_FLAG_NONE /*m_rayFlags*/, 0 /*m_holeSize*/ };
-
-        commandList->SetComputeRootSignature(m_globalRootSignature);
-        commandList->SetDescriptorHeaps(1, m_descriptorHeap);
-        commandList->SetPipelineState1(m_raytracingStateObject);
-        commandList->SetComputeRootShaderResourceView(0, m_TLAS->GetGPUVirtualAddress());
-        commandList->SetComputeRoot32BitConstants(1, ARRAYSIZE(rootConstants), rootConstants, 0);
-        commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
-        commandList->SetComputeRootConstantBufferView(3, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
-        commandList->SetComputeRootConstantBufferView(4, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
-
-        commandList->DispatchRays(&dispatchRaysDesc);
-    }
-
-#endif
 
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render Epilog part deux");
 
@@ -2844,7 +2854,7 @@ HRESULT RenderPlatform12::SetRenderPhase(RenderState state)
     {
     case RP_TRANSITION_TO_RENDER_SHADOW_MAP:
     {
-        PIXBeginEvent((ID3D12GraphicsCommandList*)GetCommandList(), TREE_COLOR_DRAW_TEXT, L"RenderShadowMap");
+        PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transition depth and render shadows");
 
         GetCommandList()->SetPipelineState(m_pipelineStateShadowMap);
 
@@ -2859,6 +2869,8 @@ HRESULT RenderPlatform12::SetRenderPhase(RenderState state)
     }
     case RP_TRANSITION_FROM_RENDER_SHADOW_MAP:
     {
+        //PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transition depth to scene");
+
         GetCommandList()->RSSetViewports(1, &GetViewport());
         GetCommandList()->RSSetScissorRects(1, &m_scissorRect);
 
@@ -2869,7 +2881,7 @@ HRESULT RenderPlatform12::SetRenderPhase(RenderState state)
 
         GetCommandList()->SetPipelineState(m_pipelineState);
 
-        PIXEndEvent((ID3D12GraphicsCommandList*)GetCommandList());
+        PIXEndEvent(GetCommandList()); // Transition depth and render shadows
 
         break;
     }

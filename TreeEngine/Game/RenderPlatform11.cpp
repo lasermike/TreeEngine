@@ -614,6 +614,9 @@ HRESULT RenderPlatform11::BeginNewFrame(bool /*resetCommandList*/, D3DBuffer* bu
     HRR(m_immediateContext->Map(buffer->buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
     *dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
+    m_renderData->instanceData = *dataView;
+    m_renderData->instanceBuffer = buffer;
+
     return S_OK;
 }
 

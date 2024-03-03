@@ -136,8 +136,8 @@ HRESULT RenderManager::BeginNewFrame()
     InstancedData* dataView = nullptr;
     GetPlatform()->BeginNewFrame(true, buffer, &dataView);
 
-    m_renderData.instanceData = dataView;
-    m_renderData.instanceBuffer = buffer;
+    //m_renderData.instanceData = dataView;
+    //m_renderData.instanceBuffer = buffer;
 
     return S_OK;
 }
