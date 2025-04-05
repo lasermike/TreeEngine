@@ -1543,11 +1543,11 @@ HRESULT RenderPlatform12::InitDevice()
 
         //if (wcsstr(desc.Description, L"NVIDIA") != nullptr)
 
-        //if (wcsstr(desc.Description, L"Intel") != nullptr) //NVIDIA
-        //{
-        //    hardwareAdapter.Release();
-        //    continue;
-        //}
+        if (wcsstr(desc.Description, L"Intel") != nullptr) //NVIDIA
+        {
+            hardwareAdapter.Release();
+            continue;
+        }
 
         if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
         {
@@ -1965,6 +1965,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     PIXEndEvent(GetCommandList());
 
     HRR(ExecuteCurrentCommandList(true));
+
 
     delete[] geometryDescs;
 
@@ -2484,6 +2485,9 @@ HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
     GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     GetCommandList()->IASetVertexBuffers(0, 1, &m_VBView);
 
+    GetCommandList()->RSSetViewports(1, &GetViewport());
+    GetCommandList()->RSSetScissorRects(1, &m_scissorRect);
+
     return hr;
 }
 
@@ -2532,6 +2536,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 
         commandList->DispatchRays(&dispatchRaysDesc);
     }
+
 
 #endif
 
