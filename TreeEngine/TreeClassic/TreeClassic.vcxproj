@@ -128,7 +128,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ImportGroup Label="Shared">
-    <Import Project="..\SharedGameFiles\SharedGameFiles.vcxitems" Label="Shared" />
+    <Import Project="..\SharedEngine\SharedEngine.vcxitems" Label="Shared" />
   </ImportGroup>
   <ItemGroup>
     <ClCompile Include="TreeClassic.cpp" />

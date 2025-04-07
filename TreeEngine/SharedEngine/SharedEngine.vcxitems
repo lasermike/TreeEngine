@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{f8482d81-0da9-42b7-95f2-1b518bf83d8a}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Game.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GameLoader.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Graph.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\LSystemModelGenerator.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Materials.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\MathHelper.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Player.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Primitive.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\RenderManager.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneRoot.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Stdafx.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Tree.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TreeModel.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TreeModelGenerator.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\WorldObject.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="$(MSBuildThisFileDirectory)..\Game\bark1.dds" />
+    <Image Include="$(MSBuildThisFileDirectory)..\Game\Bark_0005_diffuse.DDS" />
+    <Image Include="$(MSBuildThisFileDirectory)..\Game\Bark_0009_diffuse.DDS" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\buildShaders.bat" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\commonshader.bat" />
+  </ItemGroup>
+</Project>
