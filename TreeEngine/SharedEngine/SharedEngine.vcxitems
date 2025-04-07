@@ -32,11 +32,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\WorldObject.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="$(MSBuildThisFileDirectory)..\Game\bark1.dds" />
-    <Image Include="$(MSBuildThisFileDirectory)..\Game\Bark_0005_diffuse.DDS" />
-    <Image Include="$(MSBuildThisFileDirectory)..\Game\Bark_0009_diffuse.DDS" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\buildShaders.bat" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\commonshader.bat" />

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35913.81 d17.13
+VisualStudioVersion = 17.13.35913.81
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreePC", "TreePC\TreePC.vcxproj", "{9B22E637-C613-479F-BEC8-59215E96EEFB}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -31,8 +31,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TreeXbox", "TreeXbox\TreeXb
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderPlatform12Xbox", "RenderPlatform12Xbox\RenderPlatform12Xbox.vcxproj", "{50032863-DFBE-46C4-AD53-8D47248F84F6}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SharedGameFiles", "SharedGameFiles\SharedGameFiles.vcxitems", "{42DCDA45-526D-45B0-ABA5-CD9FE1716FEE}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SharedEngine", "SharedEngine\SharedEngine.vcxitems", "{F8482D81-0DA9-42B7-95F2-1B518BF83D8A}"
 EndProject
@@ -305,7 +303,6 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		SharedGameFiles\SharedGameFiles.vcxitems*{1c5d34c2-bba2-4ee0-abc8-d298a515a51c}*SharedItemsImports = 4
-		SharedGameFiles\SharedGameFiles.vcxitems*{42dcda45-526d-45b0-aba5-cd9fe1716fee}*SharedItemsImports = 9
 		SharedEngine\SharedEngine.vcxitems*{f8482d81-0da9-42b7-95f2-1b518bf83d8a}*SharedItemsImports = 9
 		SharedEngine\SharedEngine.vcxitems*{ff5ea045-3150-4374-83c0-17c9c97f30f2}*SharedItemsImports = 4
 	EndGlobalSection
