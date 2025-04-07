@@ -36,6 +36,7 @@ RENDERPLATFORM_API HRESULT BeginNewFrame(bool resetCommandList, D3DBuffer* buffe
 RENDERPLATFORM_API HRESULT EndFrame(D3DBuffer* buffer);
 
 RENDERPLATFORM_API HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
+RENDERPLATFORM_API HRESULT RenderPostProcess();
 RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
 RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
@@ -64,6 +65,8 @@ RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb);
 
 RENDERPLATFORM_API D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer);
 RENDERPLATFORM_API D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer);
+
+RENDERPLATFORM_API ImGuiContext* GetImGuiContext();
 
 RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport);
 

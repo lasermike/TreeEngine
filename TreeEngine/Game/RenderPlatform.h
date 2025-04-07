@@ -14,6 +14,7 @@
 
 class RenderPlatform;
 class RenderManager;
+struct ImGuiContext;
 enum CbvSrvUavHeapOffsets;
 
 #if defined(DXR_ENABLED)
@@ -633,6 +634,7 @@ public:
     virtual HRESULT EndFrame(D3DBuffer* buffer) = 0;
 
     virtual HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) = 0;
+    virtual HRESULT RenderPostProcess() = 0;
     virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) = 0;
 
     virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
@@ -659,6 +661,8 @@ public:
 
     virtual D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) = 0;  // TODO!  Objects should be able to load their own meshes
     virtual D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) = 0;
+
+    virtual ImGuiContext* GetImGuiContext() = 0;
 
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) = 0;
@@ -855,6 +859,7 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer);
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
+    HRESULT RenderPostProcess();
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
@@ -894,6 +899,8 @@ public:
     { 
         return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_indexBuffer : &m_skinnedIndexBuffer;
     }
+
+    ImGuiContext* GetImGuiContext();
 
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -1074,6 +1081,7 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer);
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
+    HRESULT RenderPostProcess();
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
@@ -1109,6 +1117,8 @@ public:
     {
         return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_indexBuffer : &m_skinnedIndexBuffer;
     }
+
+    ImGuiContext* GetImGuiContext();
 
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -1149,6 +1159,7 @@ typedef HRESULT (*BeginNewFrameFunc)(bool resetCommandList, D3DBuffer* buffer, I
 typedef HRESULT (*EndFrameFunc)(D3DBuffer* buffer);
 
 typedef HRESULT (*RenderPrologFunc)(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
+typedef HRESULT (*RenderPostProcessFunc)();
 typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
 typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
@@ -1176,6 +1187,7 @@ typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 
 typedef D3DBuffer* (*GetVertexBufferFunc)(GeometryBuffer geometryBuffer);
 typedef D3DBuffer* (*GetIndexBufferFunc)(GeometryBuffer geometryBuffer);
+typedef ImGuiContext* (*GetImGuiContextFunc)();
 
 typedef LRESULT (*Gui_WndProcHandlerFunc)(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -1204,6 +1216,7 @@ class RenderPlatformDLL : public RenderPlatform
     EndFrameFunc EndFrameFuncPtr;
 
     RenderPrologFunc RenderPrologFuncPtr;
+    RenderPostProcessFunc RenderPostProcessFuncPtr;
     RenderEpilogFunc RenderEpilogFuncPtr;
 
     RenderSceneSetupFunc RenderSceneSetupFuncPtr;
@@ -1229,6 +1242,8 @@ class RenderPlatformDLL : public RenderPlatform
 
     GetVertexBufferFunc GetVertexBufferFuncPtr;
     GetIndexBufferFunc GetIndexBufferFuncPtr;
+
+    GetImGuiContextFunc GetImGuiContextFuncPtr;
 
     Gui_WndProcHandlerFunc Gui_WndProcHandlerFuncPtr;
 
@@ -1264,6 +1279,7 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer) { return EndFrameFuncPtr(buffer); }
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) { return RenderPrologFuncPtr(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor); }
+    HRESULT RenderPostProcess() { return RenderPostProcessFuncPtr(); }
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, renderToSharedTexture); }
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
@@ -1320,6 +1336,8 @@ public:
 
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) { return GetVertexBufferFuncPtr(geometryBuffer); }
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) { return GetIndexBufferFuncPtr(geometryBuffer); }
+
+    ImGuiContext* GetImGuiContext() { return GetImGuiContextFuncPtr(); }
 
     LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {

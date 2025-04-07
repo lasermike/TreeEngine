@@ -485,6 +485,8 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
         DrawFrameStats();
     }
 
+    HRC(GetPlatform()->RenderPostProcess());
+
     HRC(GetPlatform()->RenderEpilog(oculus, useShadowMaps, renderToSharedTexture));
 
 Cleanup:
@@ -613,6 +615,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(EndFrame);
 
     ASSIGN_FUNC(RenderProlog);
+    ASSIGN_FUNC(RenderPostProcess);
     ASSIGN_FUNC(RenderEpilog);
 
     ASSIGN_FUNC(RenderSceneSetup);
@@ -638,6 +641,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
 
     ASSIGN_FUNC(GetVertexBuffer);
     ASSIGN_FUNC(GetIndexBuffer);
+    ASSIGN_FUNC(GetImGuiContext);
 
     ASSIGN_FUNC(Gui_WndProcHandler);
 

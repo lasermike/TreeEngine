@@ -36,6 +36,8 @@ using namespace DirectX;
 
 /////  IMGUI 
 
+ImGuiContext* RenderPlatform12::GetImGuiContext() { return ImGui::GetCurrentContext(); }
+
 // Config for example app
 static const int APP_NUM_FRAMES_IN_FLIGHT = 2;
 static const int APP_NUM_BACK_BUFFERS = 2;
@@ -2774,13 +2776,12 @@ std::vector<float> CalcGaussWeights(float sigma)
     return weights;
 }
 
-HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool renderToSharedTexture)
+HRESULT RenderPlatform12::RenderPostProcess()
 {
     HRESULT hr = S_OK;
 
     PIXEndEvent(GetCommandList()); // RenderScene
 
-    PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render Epilog part deux");
 
     //
     // Post processing - blur
@@ -2850,11 +2851,21 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
         GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
     }
+
+    return hr;
+}
+
+HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool renderToSharedTexture)
+{
+    HRESULT hr = S_OK;
+
     //
     /// Post processing complete
     //
     /// Start rendering graphics again
     //
+    PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render Epilog part deux");
+
 
     HRR(SetupGraphicsOnCommandList());
 
