@@ -33,6 +33,69 @@ bool useImGui = true;
 
 using namespace DirectX;
 
+
+/////  IMGUI 
+
+// Config for example app
+static const int APP_NUM_FRAMES_IN_FLIGHT = 2;
+static const int APP_NUM_BACK_BUFFERS = 2;
+static const int APP_SRV_HEAP_SIZE = 64;
+
+struct FrameContext
+{
+    ID3D12CommandAllocator* CommandAllocator;
+    UINT64                      FenceValue;
+};
+
+// Simple free list based allocator
+struct ExampleDescriptorHeapAllocator
+{
+    ID3D12DescriptorHeap* Heap = nullptr;
+    D3D12_DESCRIPTOR_HEAP_TYPE  HeapType = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;
+    D3D12_CPU_DESCRIPTOR_HANDLE HeapStartCpu;
+    D3D12_GPU_DESCRIPTOR_HANDLE HeapStartGpu;
+    UINT                        HeapHandleIncrement;
+    ImVector<int>               FreeIndices;
+
+    void Create(ID3D12Device* device, ID3D12DescriptorHeap* heap)
+    {
+        IM_ASSERT(Heap == nullptr && FreeIndices.empty());
+        Heap = heap;
+        D3D12_DESCRIPTOR_HEAP_DESC desc = heap->GetDesc();
+        HeapType = desc.Type;
+        HeapStartCpu = Heap->GetCPUDescriptorHandleForHeapStart();
+        HeapStartGpu = Heap->GetGPUDescriptorHandleForHeapStart();
+        HeapHandleIncrement = device->GetDescriptorHandleIncrementSize(HeapType);
+        FreeIndices.reserve((int)desc.NumDescriptors);
+        for (int n = desc.NumDescriptors; n > 0; n--)
+            FreeIndices.push_back(n - 1);
+    }
+    void Destroy()
+    {
+        Heap = nullptr;
+        FreeIndices.clear();
+    }
+    void Alloc(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_desc_handle)
+    {
+        IM_ASSERT(FreeIndices.Size > 0);
+        int idx = FreeIndices.back();
+        FreeIndices.pop_back();
+        out_cpu_desc_handle->ptr = HeapStartCpu.ptr + (idx * HeapHandleIncrement);
+        out_gpu_desc_handle->ptr = HeapStartGpu.ptr + (idx * HeapHandleIncrement);
+    }
+    void Free(D3D12_CPU_DESCRIPTOR_HANDLE out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE out_gpu_desc_handle)
+    {
+        int cpu_idx = (int)((out_cpu_desc_handle.ptr - HeapStartCpu.ptr) / HeapHandleIncrement);
+        int gpu_idx = (int)((out_gpu_desc_handle.ptr - HeapStartGpu.ptr) / HeapHandleIncrement);
+        IM_ASSERT(cpu_idx == gpu_idx);
+        FreeIndices.push_back(cpu_idx);
+    }
+};
+
+
+static ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
+static ExampleDescriptorHeapAllocator g_pd3dSrvDescHeapAlloc;
+
 void ShowRenderMetricsWindow(bool* p_open, RenderData* renderData)
 {
     if (!ImGui::Begin("Metrics", p_open))
@@ -40,14 +103,6 @@ void ShowRenderMetricsWindow(bool* p_open, RenderData* renderData)
         ImGui::End();
         return;
     }
-
-    // State
-    //enum { WRT_OuterRect, WRT_OuterRectClipped, WRT_InnerRect, WRT_InnerClipRect, WRT_WorkRect, WRT_Content, WRT_ContentRegionRect, WRT_Count }; // Windows Rect Type
-    //const char* wrt_rects_names[WRT_Count] = { "OuterRect", "OuterRectClipped", "InnerRect", "InnerClipRect", "WorkRect", "Content", "ContentRegionRect" };
-    //static bool show_windows_rects = false;
-    //static int  show_windows_rect_type = WRT_WorkRect;
-    //static bool show_windows_begin_order = false;
-    //static bool show_drawcmd_details = true;
 
     // Basic info
     ImGuiContext& g = *ImGui::GetCurrentContext();
@@ -744,14 +799,31 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         // Setup Platform/Renderer bindings
         ImGui_ImplWin32_Init(m_hwnd);
-        ImGui_ImplDX12_Init(GetDevice(),
-#if defined(TREE_XBOX)
-        m_commandQueue,
-#endif 
-            FrameCount,
-            m_swapChainFormat, m_descriptorHeap,
-            m_descriptorHeap.hCPU(ImGui_SrvHeapOffset),
-            m_descriptorHeap.hGPU(ImGui_SrvHeapOffset));
+//        ImGui_ImplDX12_Init(GetDevice(),
+//#if defined(TREE_XBOX)
+//        m_commandQueue,
+//#endif 
+//            FrameCount,
+//            m_swapChainFormat, m_descriptorHeap,
+//            m_descriptorHeap.hCPU(ImGui_SrvHeapOffset),
+//            m_descriptorHeap.hGPU(ImGui_SrvHeapOffset));
+//
+
+
+        ImGui_ImplDX12_InitInfo init_info = {};
+        init_info.Device = GetDevice();
+        init_info.CommandQueue = GetCommandQueue();
+        init_info.NumFramesInFlight = APP_NUM_FRAMES_IN_FLIGHT;
+        init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
+        // Allocating SRV descriptors (for textures) is up to the application, so we provide callbacks.
+        // (current version of the backend will only allocate one descriptor, future versions will need to allocate more)
+        init_info.SrvDescriptorHeap = m_descriptorHeap;
+        init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) { return g_pd3dSrvDescHeapAlloc.Alloc(out_cpu_handle, out_gpu_handle); };
+        init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) { return g_pd3dSrvDescHeapAlloc.Free(cpu_handle, gpu_handle); };
+        ImGui_ImplDX12_Init(&init_info);
+
+
         imGuiInitialized = true;
     }
 
@@ -1644,6 +1716,18 @@ HRESULT RenderPlatform12::InitDevice()
     HRR(m_descriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, true));
 
     HRR(m_nonVisibleDescriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, numGlobalDescriptors, false));
+
+    {
+        // IM GUI
+        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        desc.NumDescriptors = APP_SRV_HEAP_SIZE;
+        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        if (GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_pd3dSrvDescHeap)) != S_OK)
+            return false;
+        g_pd3dSrvDescHeapAlloc.Create(GetDevice(), g_pd3dSrvDescHeap);
+    }
+
 
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
