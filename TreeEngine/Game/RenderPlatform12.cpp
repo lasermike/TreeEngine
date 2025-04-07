@@ -33,6 +33,38 @@ bool useImGui = true;
 
 using namespace DirectX;
 
+void ShowRenderMetricsWindow(bool* p_open, RenderData* renderData)
+{
+    if (!ImGui::Begin("Metrics", p_open))
+    {
+        ImGui::End();
+        return;
+    }
+
+    // State
+    //enum { WRT_OuterRect, WRT_OuterRectClipped, WRT_InnerRect, WRT_InnerClipRect, WRT_WorkRect, WRT_Content, WRT_ContentRegionRect, WRT_Count }; // Windows Rect Type
+    //const char* wrt_rects_names[WRT_Count] = { "OuterRect", "OuterRectClipped", "InnerRect", "InnerClipRect", "WorkRect", "Content", "ContentRegionRect" };
+    //static bool show_windows_rects = false;
+    //static int  show_windows_rect_type = WRT_WorkRect;
+    //static bool show_windows_begin_order = false;
+    //static bool show_drawcmd_details = true;
+
+    // Basic info
+    ImGuiContext& g = *ImGui::GetCurrentContext();
+    ImGuiIO& io = ImGui::GetIO();
+    //ImGui::Text("Dear ImGui %s", ImGui::GetVersion());
+    ImGui::Text("Simulation Time %.3f seconds", renderData->time);
+    ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+    ImGui::Separator();
+    ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat,
+        renderData->frameStats[NUM_STICKS_STAT].stat,
+        renderData->frameStats[NUM_LEAVES_STAT].stat);
+    ImGui::Text("UI %d vertices, %d indices (%d triangles)", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
+
+    ImGui::End();
+
+    return;
+}
 
 enum CbvSrvUavHeapOffsets
 {
@@ -2797,7 +2829,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
         //io.SticksCount = m_renderData->frameStats[NUM_LEAVES_STAT].stat;
 
         bool show_metrics_window = true;
-        ImGui::ShowMetricsWindow(&show_metrics_window, m_renderData);
+        ShowRenderMetricsWindow(&show_metrics_window, m_renderData);
 
         ImGui::Render();
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), GetCommandList());
