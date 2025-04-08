@@ -46,6 +46,14 @@ UavBuffer::UavBuffer(XSF::D3DDevice* device,
     SetDebugName(uavOutput, L"UavBuffer");
 }
 
+UavBuffer::~UavBuffer()
+{
+    if (uavOutput != nullptr)
+    {
+        uavOutput->Release();
+        uavOutput = nullptr;
+    }
+}
 
 ShadowMap::ShadowMap(XSF::D3DDevice* device, D3D12_CPU_DESCRIPTOR_HANDLE shadowMapSrvCpu, D3D12_GPU_DESCRIPTOR_HANDLE shadowMapSrvGpu,
                      D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvCpu, UINT width, UINT height)

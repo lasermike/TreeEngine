@@ -564,7 +564,7 @@ HRESULT XboxSampleFramework::StockRenderStates::GenerateStockSamplerHeap(XSF::D3
 
     // Create the stock states...
     memcpy(m_SamplerDesc, &s_StockSamplerTypes, sizeof(s_StockSamplerTypes));
-    XSF_ERROR_IF_FAILED(m_SamplerHeap.Initialize(pDev, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, static_cast<int>(StockSamplerStates::SamplerStateCount), true));
+    XSF_ERROR_IF_FAILED(m_SamplerHeap.Initialize(pDev, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, static_cast<int>(StockSamplerStates::SamplerStateCount), L"SamplerHeap", true));
     for (int i = 0; i < static_cast<int>(StockSamplerStates::SamplerStateCount); ++i)
     {
         pDev->CreateSampler(&m_SamplerDesc[i], m_SamplerHeap.hCPU(i));

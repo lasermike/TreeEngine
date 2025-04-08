@@ -721,7 +721,7 @@ private:
     D3D12_VIEWPORT                    m_viewPort;
     D3D12_RECT                        m_scissorRect;
 
-    XSF::BitmapFont*                  m_bitmapFont;
+    //XSF::BitmapFont*                  m_bitmapFont;
 
 #if defined(TREE_XBOX)
     D3D12XBOX_FRAME_PIPELINE_TOKEN    m_framePipelineToken;
@@ -818,8 +818,8 @@ private:
 public:
 
     RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
-        m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr),
-        m_bitmapFont(nullptr)
+        m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr)
+        //m_bitmapFont(nullptr)
 #if defined(TREE_XBOX)
         , m_framePipelineToken(D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL)
 #endif
@@ -999,7 +999,7 @@ class RenderPlatform11 : public RenderPlatform
 
     UploadBuffer<CBNeverChanges>*     m_constBufferNeverChanges;
 
-    XSF::BitmapFont*                  m_bitmapFont;
+    //XSF::BitmapFont*                  m_bitmapFont;
 
     // Single vertex and index buffer for all geometry with same vertex format in scene
     CComPtr<ID3D11InputLayout>        m_vertexLayout;

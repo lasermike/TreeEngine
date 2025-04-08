@@ -21,6 +21,8 @@ public:
               D3D12_CPU_DESCRIPTOR_HANDLE bufferNonVisibleUavCpu,
               UINT width, UINT height);
 
+    ~UavBuffer();
+
     ID3D12Resource* uavOutput;
     D3D12_CPU_DESCRIPTOR_HANDLE srvCpu;
     D3D12_GPU_DESCRIPTOR_HANDLE srvGpu;

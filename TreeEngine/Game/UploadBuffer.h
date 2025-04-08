@@ -42,8 +42,10 @@ public:
     UploadBuffer& operator=(const UploadBuffer& rhs) = delete;
     ~UploadBuffer()
     {
-        if(mUploadBuffer != nullptr)
-            mUploadBuffer->Unmap(0, nullptr);
+        if (mUploadBuffer != nullptr)
+        {
+            Unmap();
+        }
 
         mMappedData = nullptr;
     }

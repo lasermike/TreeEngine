@@ -21,7 +21,7 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 
-bool useImGui = true;
+bool useImGui = false;
 
 #if defined(DXR_ENABLED)
 #include "RaytracingLibrary.inc"
@@ -30,6 +30,8 @@ bool useImGui = true;
 #endif
 
 #include "MathHelper.h"
+
+#include "dxgidebug.h"
 
 using namespace DirectX;
 
@@ -472,8 +474,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     }
 
     // Init text font
-    m_bitmapFont = new XSF::BitmapFont();
-    HRR(m_bitmapFont->Create(this, L"Arial_16"));
+    //m_bitmapFont = new XSF::BitmapFont();
+    //HRR(m_bitmapFont->Create(this, L"Arial_16"));
 
     // Constant buffers
     m_constBufferNeverChanges = new UploadBuffer<CBNeverChanges>(GetDevice(), Count_CBSI /* normal + shadown pass */, true);
@@ -519,7 +521,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &vertexBufferDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr,
         __uuidof(ID3D12Resource),
         (void**) &m_vertexBuffer.buffer));
@@ -555,7 +557,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &indexBufferDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr,
         __uuidof(ID3D12Resource), 
         (void**) &m_indexBuffer.buffer));
@@ -820,7 +822,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
         // Allocating SRV descriptors (for textures) is up to the application, so we provide callbacks.
         // (current version of the backend will only allocate one descriptor, future versions will need to allocate more)
-        init_info.SrvDescriptorHeap = m_descriptorHeap;
+        init_info.SrvDescriptorHeap = g_pd3dSrvDescHeap;
         init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) { return g_pd3dSrvDescHeapAlloc.Alloc(out_cpu_handle, out_gpu_handle); };
         init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) { return g_pd3dSrvDescHeapAlloc.Free(cpu_handle, gpu_handle); };
         ImGui_ImplDX12_Init(&init_info);
@@ -893,7 +895,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &defaultHeapProperties,
         D3D12_HEAP_FLAG_NONE,
         &vbDescBuffer,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr,
         __uuidof(ID3D12Resource), (void**) &m_VBWorld));
 
@@ -918,7 +920,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &defaultHeapProperties,
         D3D12_HEAP_FLAG_NONE,
         &drawRecordDescBuffer,
-        D3D12_RESOURCE_STATE_GENERIC_READ, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+        D3D12_RESOURCE_STATE_COMMON, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
         nullptr,
         __uuidof(ID3D12Resource), (void**)&m_DrawRecordsResource));
 
@@ -1145,7 +1147,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
         cmdAlloc.Release();
     }
 
-    SafeDelete(&m_bitmapFont);
+    //SafeDelete(&m_bitmapFont);
 
     m_rootSignature.Release();
     m_computeRootSignature.Release();
@@ -1635,6 +1637,13 @@ HRESULT RenderPlatform12::InitDevice()
         debugController->EnableDebugLayer();
     }
 
+    CComPtr<ID3D12Debug5> debug5;
+    if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug5), (void**)&debug5)))
+    {
+        debug5->SetEnableAutoName(TRUE);
+    }
+
+
 #endif
 
     CComPtr<IDXGIFactory4> factory4;
@@ -1677,11 +1686,11 @@ HRESULT RenderPlatform12::InitDevice()
         D3D_FEATURE_LEVEL_12_2,
         IID_PPV_ARGS(&m_d3dDevice)));
 
-    CComPtr<ID3D12DebugDevice> debugDevice;
-    if (SUCCEEDED(m_d3dDevice->QueryInterface(__uuidof(ID3D12DebugDevice), (void**)&debugDevice)))
-    {
-        debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
-    }
+    //CComPtr<ID3D12DebugDevice> debugDevice;
+    //if (SUCCEEDED(m_d3dDevice->QueryInterface(__uuidof(ID3D12DebugDevice), (void**)&debugDevice)))
+    //{
+    //    //debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
+    //}
 
     //CComPtr<ID3D12Debug1> debug1;
     //if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
@@ -1689,11 +1698,13 @@ HRESULT RenderPlatform12::InitDevice()
     //    debug1->SetEnableGPUBasedValidation(TRUE);
     //}
 
-    //CComPtr<ID3D12Debug5> debug5;
-    //if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug5), (void**)&debug5)))
-    //{
-    //    debug5->SetEnableAutoName(TRUE);
-    //}
+    CComPtr<ID3D12InfoQueue> infoQueue;
+    if (SUCCEEDED(m_d3dDevice->QueryInterface(__uuidof(ID3D12InfoQueue), (void**)&infoQueue)))
+    {
+        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+        
+    }
+    
 
 #endif 
     // Allocate graphics memory
@@ -1703,8 +1714,8 @@ HRESULT RenderPlatform12::InitDevice()
     // Create descriptor heaps.
     //
     // Each frame has its own depth stencils and then there is one for shadows.
-    HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount + OffscreenBufferCount));
-    HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount)); // 1 for shadow
+    HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount + OffscreenBufferCount, L"rtvHeap"));
+    HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount, L"dsvHeap")); // 1 for shadow
 
     // Heap for loading textures
     // TODO: Move from device owned to scene owned
@@ -1713,12 +1724,14 @@ HRESULT RenderPlatform12::InitDevice()
     loadedTextureHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;;
     loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     HRR(GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, __uuidof(ID3D12DescriptorHeap), (void**)&m_loadTextureHeap));
+    m_loadTextureHeap->SetName(L"Loaded Texture Heap");
 
     // Shader visible heap
-    HRR(m_descriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, true));
+    HRR(m_descriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, maxNumMaterials * numDescriptorsPerMaterial + numGlobalDescriptors, L"m_descriptorHeap", true));
 
-    HRR(m_nonVisibleDescriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, numGlobalDescriptors, false));
+    HRR(m_nonVisibleDescriptorHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, numGlobalDescriptors, L"m_nonVisibleDescriptorHeap", false));
 
+    if (useImGui)
     {
         // IM GUI
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -1728,6 +1741,7 @@ HRESULT RenderPlatform12::InitDevice()
         if (GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_pd3dSrvDescHeap)) != S_OK)
             return false;
         g_pd3dSrvDescHeapAlloc.Create(GetDevice(), g_pd3dSrvDescHeap);
+        g_pd3dSrvDescHeap->SetName(L"ImGui Heap");
     }
 
 
@@ -2063,7 +2077,7 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
             D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_triangleBLAS));
-        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_scratch));
     }
 
@@ -2139,7 +2153,7 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
 
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_TLAS));
-        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasScratchDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasScratchDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_TLASScratch));
     }
 
@@ -2524,6 +2538,14 @@ HRESULT RenderPlatform12::UninitDevice()
 
     m_fence.Release();
 
+#if defined(ENABLE_DXR)
+    m_TLAS.Release();
+    m_TLASScratch.Release();
+
+    m_triangleBLAS.Release();
+    m_scratch.Release();
+#endif
+
     m_descriptorHeap.Terminate();
 
     m_nonVisibleDescriptorHeap.Terminate();
@@ -2537,18 +2559,28 @@ HRESULT RenderPlatform12::UninitDevice()
     assert(m_managedUploadHeaps.size() == 0);
 
 #if defined(_DEBUG)
-#if 0
-    CComPtr<ID3D12DebugDevice> debugDevice;
-    if (m_d3dDevice && SUCCEEDED(m_d3dDevice->QueryInterface(IID_PPV_ARGS(&debugDevice))))
-    {
-        debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
-        debugDevice.Release();
-    }
-#endif
+//#if 0
+    //CComPtr<ID3D12DebugDevice> debugDevice;
+    //if (m_d3dDevice && SUCCEEDED(m_d3dDevice->QueryInterface(IID_PPV_ARGS(&debugDevice))))
+    //{
+    //    debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
+    //    debugDevice.Release();
+    //}
+
+//#endif
 #endif
 
     m_d3dDevice.Release();
-     
+
+    {
+        CComPtr<IDXGIDebug1> dxgi_debug;
+        if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug))))
+        {
+            dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+        }
+    }
+
+
      return S_OK;
 }
 
@@ -2963,19 +2995,19 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
 HRESULT RenderPlatform12::BeginDrawText()
 {
-    m_bitmapFont->Begin(&m_viewPort);
+    //m_bitmapFont->Begin(&m_viewPort);
     return S_OK;
 }
 
 HRESULT RenderPlatform12::DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, const WCHAR* strText)
 {
-    m_bitmapFont->DrawText(sx, sy, dwColor, strText);
+    //m_bitmapFont->DrawText(sx, sy, dwColor, strText);
     return S_OK;
 }
 
 HRESULT RenderPlatform12::EndDrawText()
 {
-    m_bitmapFont->End();
+    //m_bitmapFont->End();
     return S_OK;
 }
 
