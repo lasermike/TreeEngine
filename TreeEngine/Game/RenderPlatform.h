@@ -937,7 +937,6 @@ public:
 
     static const uint32_t MAX_INSTANCES_IN_TLAS = 10;
 
-    DirectX::GraphicsResource m_instanceDescBuffer;
     D3D12_RAY_FLAGS m_rayFlags;
 
     struct DrawRecord

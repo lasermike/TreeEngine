@@ -1173,7 +1173,6 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeDelete(&m_renderData->pShadowMap);
 
 #if defined(DXR_ENABLED)
-    // DXR
     SafeDelete(&m_renderData->pDxrOutBuffer);
  
     m_VBWorld.Release();
@@ -1686,12 +1685,6 @@ HRESULT RenderPlatform12::InitDevice()
         D3D_FEATURE_LEVEL_12_2,
         IID_PPV_ARGS(&m_d3dDevice)));
 
-    //CComPtr<ID3D12DebugDevice> debugDevice;
-    //if (SUCCEEDED(m_d3dDevice->QueryInterface(__uuidof(ID3D12DebugDevice), (void**)&debugDevice)))
-    //{
-    //    //debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
-    //}
-
     //CComPtr<ID3D12Debug1> debug1;
     //if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
     //{
@@ -1701,8 +1694,9 @@ HRESULT RenderPlatform12::InitDevice()
     CComPtr<ID3D12InfoQueue> infoQueue;
     if (SUCCEEDED(m_d3dDevice->QueryInterface(__uuidof(ID3D12InfoQueue), (void**)&infoQueue)))
     {
+        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-        
+
     }
     
 
@@ -1881,6 +1875,9 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
 
         auto globalRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
         globalRootSignature->SetRootSignature(m_globalRootSignature);
+
+        mainBlob.Release();
+        errorBlob.Release();
     }
 
     // Create Local Root Signature
@@ -2512,10 +2509,17 @@ IDXGISwapChain* RenderPlatform12::GetSwapChain()
 HRESULT RenderPlatform12::UninitDevice()
 {
 #if defined (DXR_ENABLED)
+
     m_raytracingStateObject.Release();
     m_raytracingStateObjectProps.Release();
     m_globalRootSignature.Release();
     m_localRootSignature.Release();
+
+    m_TLAS.Release();
+    m_TLASScratch.Release();
+
+    m_triangleBLAS.Release();
+    m_scratch.Release();
 
 #endif
     SafeDelete(&m_graphicsMemory);
@@ -2526,6 +2530,8 @@ HRESULT RenderPlatform12::UninitDevice()
 
     m_rtvHeap.Terminate();
     m_dsvHeap.Terminate();
+    m_descriptorHeap.Terminate();
+    m_nonVisibleDescriptorHeap.Terminate();
 
     SafeDelete(&m_constBufferChangesPerPass);
 
@@ -2538,17 +2544,6 @@ HRESULT RenderPlatform12::UninitDevice()
 
     m_fence.Release();
 
-#if defined(ENABLE_DXR)
-    m_TLAS.Release();
-    m_TLASScratch.Release();
-
-    m_triangleBLAS.Release();
-    m_scratch.Release();
-#endif
-
-    m_descriptorHeap.Terminate();
-
-    m_nonVisibleDescriptorHeap.Terminate();
 
     // InitDevice objects
 #if !defined(TREE_XBOX)
@@ -2558,21 +2553,25 @@ HRESULT RenderPlatform12::UninitDevice()
 
     assert(m_managedUploadHeaps.size() == 0);
 
-#if defined(_DEBUG)
-//#if 0
-    //CComPtr<ID3D12DebugDevice> debugDevice;
-    //if (m_d3dDevice && SUCCEEDED(m_d3dDevice->QueryInterface(IID_PPV_ARGS(&debugDevice))))
-    //{
-    //    debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
-    //    debugDevice.Release();
-    //}
-
-//#endif
-#endif
-
     m_d3dDevice.Release();
 
+    //{
+    //    CComPtr<IDXGIDebug1> dxgi_debug;
+    //    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug))))
+    //    {
+    //        dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+    //    }
+    //}
+
+
+     return S_OK;
+}
+
+void DebugDumpD3DObjs()
+{
     {
+        OutputDebugString("RenderPlatform12.dll unloading. Dumping DXGI live objects ----\n");
+
         CComPtr<IDXGIDebug1> dxgi_debug;
         if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug))))
         {
@@ -2580,9 +2579,8 @@ HRESULT RenderPlatform12::UninitDevice()
         }
     }
 
-
-     return S_OK;
 }
+
 
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
