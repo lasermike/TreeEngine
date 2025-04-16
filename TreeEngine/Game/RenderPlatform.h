@@ -818,7 +818,8 @@ private:
 public:
 
     RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
-        m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr)
+        m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr),
+        m_renderTargets{ }
         //m_bitmapFont(nullptr)
 #if defined(TREE_XBOX)
         , m_framePipelineToken(D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL)
@@ -924,9 +925,10 @@ public:
     CComPtr<ID3D12RootSignature>          m_globalRootSignature;
     CComPtr<ID3D12RootSignature>          m_localRootSignature;
 
-    CComPtr<ID3D12Resource>		m_TLAS, m_TLASScratch;
-    CComPtr<ID3D12Resource>		m_triangleBLAS;
-    CComPtr<ID3D12Resource>		m_scratch;
+    CComPtr<ID3D12Resource>		m_TLAS;
+    CComPtr<ID3D12Resource>		m_scratchTLAS;
+    CComPtr<ID3D12Resource>		m_BLAS;
+    CComPtr<ID3D12Resource>		m_scratchBLAS;
 
     // DXR buffers
     CComPtr<ID3D12Resource>     m_VBWorld;
@@ -935,7 +937,7 @@ public:
 
     ShaderBindingTable<SimpleTriangleRecord, 1, 2, 1> m_shaderBindingTable;
 
-    static const uint32_t MAX_INSTANCES_IN_TLAS = 10;
+    static const uint32_t MAX_INSTANCES_IN_TLAS = 1;
 
     D3D12_RAY_FLAGS m_rayFlags;
 

@@ -196,6 +196,12 @@ enum RootSignatureParams
     UavTableRootSignatureParam,
 };
 
+const UINT maxWorldVertices = 600000;
+const uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
+
+UINT skinnedIndexBufferSize = 0;
+UINT indexBufferSize = 0;
+
 const int maxTotalTexturesInScene = 4;
 const int maxNumMaterials = 9;
 
@@ -552,7 +558,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     simpleIndexUploadBuffer.CopyData(0, geometryData.indices.size(), &geometryData.indices[0]);
     simpleIndexUploadBuffer.Unmap(); // Flush
 
-    const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * geometryData.indices.size(), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    indexBufferSize = sizeof(UINT) * geometryData.indices.size();
+
+    const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     HRR(GetDevice()->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
@@ -569,7 +577,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // Initialize the index buffer view.
     m_IBView.BufferLocation = m_indexBuffer.buffer->GetGPUVirtualAddress();
-    m_IBView.SizeInBytes = UINT(sizeof(UINT) * geometryData.indices.size());
+    m_IBView.SizeInBytes = indexBufferSize;
     m_IBView.Format = DXGI_FORMAT_R32_UINT;
 
     // SRV view of simple index buffer
@@ -616,9 +624,10 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     vertexSkinnedBufferSRVdesc.Buffer.StructureByteStride = sizeof(SkinnedVertex);
     GetDevice()->CreateShaderResourceView(m_skinnedVertexBuffer, &vertexSkinnedBufferSRVdesc, m_descriptorHeap.hCPU(VBSkinnedInput_UavHeapOffset));
 
+    skinnedIndexBufferSize = sizeof(UINT) * geometryData.skinnedIndices.size();
 
     // Index buffer
-    const D3D12_RESOURCE_DESC skinnedIndexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * geometryData.skinnedIndices.size());
+    const D3D12_RESOURCE_DESC skinnedIndexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(skinnedIndexBufferSize);
     HRR(GetDevice()->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
         D3D12_HEAP_FLAG_NONE,
@@ -631,12 +640,12 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // copy the index data to the index buffer
     dataBegin = nullptr;
     m_skinnedIndexBuffer.buffer->Map(0, nullptr, reinterpret_cast<void**>(&dataBegin));
-    memcpy(dataBegin, &geometryData.skinnedIndices[0], sizeof(UINT) * geometryData.skinnedIndices.size());
+    memcpy(dataBegin, &geometryData.skinnedIndices[0], skinnedIndexBufferSize);
     m_skinnedIndexBuffer.buffer->Unmap(0, nullptr);
 
     // Initialize the index buffer view.
     m_skinnedIBView.BufferLocation = m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress();
-    m_skinnedIBView.SizeInBytes = UINT(sizeof(UINT) * geometryData.skinnedIndices.size());
+    m_skinnedIBView.SizeInBytes = UINT(skinnedIndexBufferSize);
     m_skinnedIBView.Format = DXGI_FORMAT_R32_UINT;
 
     // SRV view of simple index buffer
@@ -873,9 +882,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
         m_renderData->projectionData.screenWidth,
         m_renderData->projectionData.screenHeight);
-
-    const UINT maxWorldVertices = 500000;
-    const uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
 
     auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
@@ -1629,18 +1635,18 @@ HRESULT RenderPlatform12::InitDevice()
 #else
 
 #if defined(_DEBUG)
-    // Enable the D3D12 debug layer.
-    CComPtr<ID3D12Debug> debugController;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-    {
-        debugController->EnableDebugLayer();
-    }
+    //// Enable the D3D12 debug layer.
+    //CComPtr<ID3D12Debug> debugController;
+    //if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+    //{
+    //    debugController->EnableDebugLayer();
+    //}
 
-    CComPtr<ID3D12Debug5> debug5;
-    if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug5), (void**)&debug5)))
-    {
-        debug5->SetEnableAutoName(TRUE);
-    }
+    //CComPtr<ID3D12Debug5> debug5;
+    //if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug5), (void**)&debug5)))
+    //{
+    //    debug5->SetEnableAutoName(TRUE);
+    //}
 
 
 #endif
@@ -1649,10 +1655,10 @@ HRESULT RenderPlatform12::InitDevice()
     HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory4)));
 
     CComPtr<IDXGIAdapter1> hardwareAdapter;
+    DXGI_ADAPTER_DESC1 desc;
 
     for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != factory4->EnumAdapters1(adapterIndex, &hardwareAdapter); ++adapterIndex)
     {
-        DXGI_ADAPTER_DESC1 desc;
         hardwareAdapter->GetDesc1(&desc);
 
         //if (wcsstr(desc.Description, L"NVIDIA") != nullptr)
@@ -1670,33 +1676,55 @@ HRESULT RenderPlatform12::InitDevice()
 
         // Check to see if the adapter supports Direct3D 12,
         // but don't create the actual device yet.
-        if (SUCCEEDED(
-            D3D12CreateDevice(hardwareAdapter, D3D_FEATURE_LEVEL_12_2,
-                _uuidof(ID3D12Device), nullptr)))
-        {
-            break;
-        }
+        //if (SUCCEEDED(
+        //    D3D12CreateDevice(hardwareAdapter, D3D_FEATURE_LEVEL_12_2,
+        //        _uuidof(ID3D12Device), nullptr)))
+        //{
+        //    break;
+        //}
 
         break;
     }
+
+#if defined(_DEBUG)
+    // Enable the D3D12 debug layer.
+    CComPtr<ID3D12Debug> debugController;
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+    {
+        debugController->EnableDebugLayer();
+    }
+#endif
 
     HRR(D3D12CreateDevice(
         hardwareAdapter,
         D3D_FEATURE_LEVEL_12_2,
         IID_PPV_ARGS(&m_d3dDevice)));
 
-    //CComPtr<ID3D12Debug1> debug1;
-    //if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
-    //{
-    //    debug1->SetEnableGPUBasedValidation(TRUE);
-    //}
+    LOGF(L"Created device: %s\n", desc.Description);
+    LOGF("\t\tVendorId: %d\n", desc.VendorId);
+    LOGF("\t\tDeviceId: %d\n", desc.DeviceId);
+    LOGF("\t\tUINT SubSysId: %d\n", desc.SubSysId);
+    LOGF("\t\tUINT Revision: %d\n", desc.Revision);
+    LOGF("\t\tSIZE_T DedicatedVideoMemory: %u\n", desc.DedicatedVideoMemory);
+    LOGF("\t\tSIZE_T DedicatedSystemMemory: %u\n", desc.DedicatedSystemMemory);
+    LOGF("\t\tSIZE_T SharedSystemMemory: %u\n", desc.SharedSystemMemory);
+    //LOG("\t\tLUID AdapterLuid: %d", desc.AdapterLuid;
+    LOGF("\t\tFlags: %d\n", desc.Flags);
+
+    CComPtr<ID3D12Debug1> debug1;
+    if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
+    {
+        //debug1->SetEnableGPUBasedValidation(TRUE);
+    }
 
     CComPtr<ID3D12InfoQueue> infoQueue;
     if (SUCCEEDED(m_d3dDevice->QueryInterface(__uuidof(ID3D12InfoQueue), (void**)&infoQueue)))
     {
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-
+        //infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+        //infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_INFO, true);
+        //infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_MESSAGE, true);
     }
     
 
@@ -1916,6 +1944,10 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 {
     HRESULT hr = S_OK;
 
+    // WHY?
+    HRR(ExecuteCurrentCommandList(true));
+
+
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transform draw records to bottom level BVH mesh data");
 
 #if defined(TREE_XBOX)
@@ -1931,12 +1963,18 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     // Copy draw records from CPU to GPU
     {
         ResourceUploadBatch resourceUpload(GetDevice());
-        resourceUpload.Begin();
+        resourceUpload.Begin(); //D3D12_COMMAND_LIST_TYPE_COPY
 
         D3D12_SUBRESOURCE_DATA initData = {};
         initData.pData = m_drawRecords.data();
         initData.RowPitch = sizeof(DrawRecord) * m_drawRecords.size();
         initData.SlicePitch = 0;
+
+        //resourceUpload.Transition(
+        //    m_DrawRecordsResource,
+        //    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+        //    D3D12_RESOURCE_STATE_COPY_DEST);
+
 
         resourceUpload.Upload(m_DrawRecordsResource, 0, &initData, 1);
 
@@ -1989,17 +2027,28 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 
     PIXEndEvent(GetCommandList()); // Transform draw records to bottom level BVH mesh data
 
+    // WHY?
+    HRR(ExecuteCurrentCommandList(true));
+
+
     BuildBottomLevelAccelerationStructure(buildEveryFrame);
 
-    BuildTopLevelAccelerationStructure(buildEveryFrame);
+    //BuildTopLevelAccelerationStructure(buildEveryFrame);
 
     return hr;
 }
 
 HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryFrame)
 {
-    if (!buildEveryFrame && m_triangleBLAS != nullptr)
+    if (!buildEveryFrame && m_BLAS != nullptr)
         return S_OK;
+
+    // WHY?  GPU Hangs if i don't release the TLAS each time.  But WHY?
+    m_BLAS.Release();
+    m_scratchBLAS.Release();
+    m_TLAS.Release();
+    m_scratchTLAS.Release();
+
 
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
@@ -2015,8 +2064,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     UINT geometryDescIndex = 0;
     for (int i = 0; i < m_drawRecords.size(); i++)
     {
-        int vertexCount;
-
         DrawRecord& dr = m_drawRecords[i];
 
         for (int instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
@@ -2036,6 +2083,20 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
                                                     + dr.indexBufferStart * sizeof(UINT);
             geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
 
+            assert(geometryDesc.Triangles.VertexBuffer.StartAddress + geometryDesc.Triangles.VertexCount * geometryDesc.Triangles.VertexBuffer.StrideInBytes
+                < m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
+
+            if (dr.inputLayout == SKINNED_INPUT_LAYOUT)
+            {
+                assert(geometryDesc.Triangles.IndexBuffer + geometryDesc.Triangles.IndexCount * sizeof(DWORD)
+                    < m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() + skinnedIndexBufferSize);
+            }
+            else
+            {
+                assert(geometryDesc.Triangles.IndexBuffer + geometryDesc.Triangles.IndexCount * sizeof(DWORD)
+                    < m_indexBuffer.buffer->GetGPUVirtualAddress() + indexBufferSize);
+            }
+
             geometryDescIndex++;
         }
 
@@ -2054,13 +2115,20 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     rtInputs.pGeometryDescs = geometryDescs;
 
-    if (m_triangleBLAS != nullptr && geometryDescIndex > maxGeometryDesc)
+    if (totalInstancesAllDraws > maxGeometryDesc)
     {
-        m_triangleBLAS.Release();
-        maxGeometryDesc = geometryDescIndex;
+        m_BLAS.Release();
+        m_scratchBLAS.Release();
+        m_TLAS.Release();
+        m_scratchTLAS.Release();
+        maxGeometryDesc = totalInstancesAllDraws;
+    }
+    else
+    {
+        maxGeometryDesc = maxGeometryDesc;
     }
 
-    if (m_triangleBLAS == nullptr)
+    if (m_BLAS == nullptr)
     {
         CComPtr<ID3D12Device5> device;
         HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
@@ -2073,9 +2141,9 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
             D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_triangleBLAS));
+            nullptr, __uuidof(ID3D12Resource), (void**)&m_BLAS));
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_scratch));
+            nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchBLAS));
     }
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
@@ -2083,8 +2151,9 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     CComPtr<ID3D12GraphicsCommandList6> commandList;
     HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
 
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = { m_triangleBLAS->GetGPUVirtualAddress(), rtInputs, 0, m_scratch->GetGPUVirtualAddress() };
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = { m_BLAS->GetGPUVirtualAddress(), rtInputs, 0, m_scratchBLAS->GetGPUVirtualAddress() };
     commandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+    commandList.Release();
 
     D3D12_RESOURCE_BARRIER uavBarrier2 = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
     GetCommandList()->ResourceBarrier(1, &uavBarrier2);	// Need the bottom level build to finish before we can build a top-level acceleration structure.
@@ -2095,14 +2164,10 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
     HRR(ExecuteCurrentCommandList(true));
 
-
     delete[] geometryDescs;
 
-    return S_OK;
-}
 
-HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFrame)
-{
+    ////// BUILD TOP ////
     if (!buildEveryFrame && m_TLAS != nullptr)
         return S_OK;
 
@@ -2118,7 +2183,7 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
 
     for (UINT i = 0; i < m_numInstancesInTLAS; i++)
     {
-        instanceDescs[i].AccelerationStructure = m_triangleBLAS->GetGPUVirtualAddress();
+        instanceDescs[i].AccelerationStructure = m_BLAS->GetGPUVirtualAddress();
         instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
         instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
         instanceDescs[i].InstanceID = i;
@@ -2151,14 +2216,14 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_TLAS));
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasScratchDesc, D3D12_RESOURCE_STATE_COMMON,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_TLASScratch));
+            nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchTLAS));
     }
 
     topLevelBuildDesc.Inputs.NumDescs = m_numInstancesInTLAS;
     topLevelBuildDesc.DestAccelerationStructureData = m_TLAS->GetGPUVirtualAddress();
-    topLevelBuildDesc.ScratchAccelerationStructureData = m_TLASScratch->GetGPUVirtualAddress();
+    topLevelBuildDesc.ScratchAccelerationStructureData = m_scratchTLAS->GetGPUVirtualAddress();
 
-    CComPtr<ID3D12GraphicsCommandList6> commandList;
+    //CComPtr<ID3D12GraphicsCommandList6> commandList;
     HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
 
     commandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
@@ -2170,6 +2235,13 @@ HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFram
 
     HRR(ExecuteCurrentCommandList(true));
 
+
+    return S_OK;
+}
+
+HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFrame)
+{
+	// TMP: Move into BLAS build for now until GPU hang is understood
     return S_OK;
 }
 
@@ -2516,10 +2588,10 @@ HRESULT RenderPlatform12::UninitDevice()
     m_localRootSignature.Release();
 
     m_TLAS.Release();
-    m_TLASScratch.Release();
+    m_scratchTLAS.Release();
 
-    m_triangleBLAS.Release();
-    m_scratch.Release();
+    m_BLAS.Release();
+    m_scratchBLAS.Release();
 
 #endif
     SafeDelete(&m_graphicsMemory);
@@ -2648,11 +2720,6 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 
     HRR(BuildAccelerationStructure(true));
 
-    // Needed on XBOX?
-    //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
-    //CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
-    //GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
     {
         PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
 
@@ -2701,16 +2768,11 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     //TODO NEXT: use compute to copy offscreen1 to rtv
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-    // Set initial render target to rtv for ImGui
-    //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
-    //GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
     // Start the Dear ImGui frame
     if (imGuiInitialized)
     {
         FrameInputData& input = m_renderData->inputManager->GetFrameInput(0);
         ImGuiIO& io = ImGui::GetIO(); (void)io;
-
         //memcpy(io.KeysDown, input.key, sizeof(input.key));
         ImGui_ImplDX12_NewFrame();
         ImGui_ImplWin32_NewFrame();
@@ -2812,10 +2874,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
 
     PIXEndEvent(GetCommandList()); // RenderScene
 
-
-    //
     // Post processing - blur
-    //
     {
         PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing Blur");
 
@@ -2889,13 +2948,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 {
     HRESULT hr = S_OK;
 
-    //
-    /// Post processing complete
-    //
-    /// Start rendering graphics again
-    //
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render Epilog part deux");
-
 
     HRR(SetupGraphicsOnCommandList());
 
@@ -2943,10 +2996,8 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     {
         PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"IM GUI");
 
-        // Draw UI
-
-            // TreeEngine specific stuff
-        //ImGuiIO& io = ImGui::GetIO();
+        ID3D12DescriptorHeap* ppHeaps[] = { g_pd3dSrvDescHeap };
+        GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
         //io.SimulationSeconds = m_renderData->time;
         //io.SkinnedMatrixCount = m_renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat;
@@ -2987,6 +3038,12 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     m_graphicsMemory->Commit(m_commandQueue);
 
     AdvanceToNextFrame();
+
+    ///TMP TMP
+    //m_TLAS.Release();
+    //m_TLASScratch.Release();
+    //m_triangleBLAS.Release();
+    //m_scratch.Release();
 
     return hr;
 }
