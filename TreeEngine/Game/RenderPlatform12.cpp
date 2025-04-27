@@ -35,6 +35,8 @@ bool useImGui = true;
 
 #include "nvapi.h"
 
+static bool g_enableDXRValidation = true;
+
 using namespace DirectX;
 
 
@@ -1062,8 +1064,7 @@ void RenderPlatform12::WaitForGPUWork()
         WaitOnFence();
     }
 
-    //TEMPTEMP
-    if (m_d3dDevice)
+    if (g_enableDXRValidation && m_d3dDevice)
     {
         CComPtr<ID3D12Device5> d3dDevice5;
         HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&d3dDevice5));
@@ -1772,14 +1773,26 @@ HRESULT RenderPlatform12::InitDevice()
     }
 
 
-    NvAPI_Initialize();
+    bool isNVidiaGPU = wcsstr(desc.Description, L"NVIDIA") != nullptr;
+    if (isNVidiaGPU)
+    {
+        if (g_enableDXRValidation)
+        {
+            NvAPI_Status nvStatus = NvAPI_Initialize();
+            assert(SUCCEEDED(nvStatus));
+            if (nvStatus != NVAPI_OK)
+            {
+                LOGF("NvAPI_Initialize failed: %d\n", nvStatus);
+            }
 
-    CComPtr<ID3D12Device5> d3dDevice5;
-    HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&d3dDevice5));
+            CComPtr<ID3D12Device5> d3dDevice5;
+            HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&d3dDevice5));
 
-    NvAPI_D3D12_EnableRaytracingValidation(d3dDevice5, NVAPI_D3D12_RAYTRACING_VALIDATION_FLAG_NONE);
-    NvPhysicalGpuHandle nvapiValidationCallbackHandle = 0;
-    NvAPI_D3D12_RegisterRaytracingValidationMessageCallback(d3dDevice5, &myValidationMessageCallback, nullptr /*(void*)&myCallbackData*/, (void**) &nvapiValidationCallbackHandle);
+            NvAPI_D3D12_EnableRaytracingValidation(d3dDevice5, NVAPI_D3D12_RAYTRACING_VALIDATION_FLAG_NONE);
+            NvPhysicalGpuHandle nvapiValidationCallbackHandle = 0;
+            NvAPI_D3D12_RegisterRaytracingValidationMessageCallback(d3dDevice5, &myValidationMessageCallback, nullptr /*(void*)&myCallbackData*/, (void**)&nvapiValidationCallbackHandle);
+        }
+    }
 
 #endif 
     // Allocate graphics memory
@@ -2154,10 +2167,13 @@ void RenderPlatform12::HandleD3D12Error(HRESULT hr)
 {
     if (hr == E_ABORT)
     {
-        CComPtr<ID3D12Device5> device;
-        HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
+        if (g_enableDXRValidation)
+        {
+            CComPtr<ID3D12Device5> device;
+            HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
 
-        NvAPI_D3D12_FlushRaytracingValidationMessages(device);
+            NvAPI_D3D12_FlushRaytracingValidationMessages(device);
+        }
     }
 }
 
@@ -2166,9 +2182,8 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuil
     //if (!buildEveryFrame && m_BLAS != nullptr)
     //    return S_OK;
 
-    // WHY?  GPU Hangs if i don't release the TLAS each time.  But WHY?
-    bool freshBuild = true; 
-                      // forceRebuild || m_TLAS.Get(m_renderData->frame) == nullptr;
+    bool freshBuild = //true; 
+                       forceRebuild || m_TLAS == nullptr;
 
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
 
@@ -2195,14 +2210,10 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuil
         m_scratchBLAS.Release();
         m_TLAS.Release();
         m_scratchTLAS.Release();
-        //m_BLASInstanceDesc.Release();
     }
 
-    //D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[totalInstancesAllDraws];
-    //ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * totalInstancesAllDraws);
 
-    //TEMPTEMP
-    UINT geometryDescIndex = m_renderData->frame % 2; // 0;
+    UINT geometryDescIndex = 0;
     for (int i = 0; i < m_drawRecords.size(); i++)
     {
         DrawRecord& dr = m_drawRecords[i];
@@ -2238,26 +2249,14 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuil
                     < m_indexBuffer.buffer->GetGPUVirtualAddress() + indexBufferSize);
             }
 
-            //TENP
-            //geometryDescIndex++;
+            geometryDescIndex++;
         }
 
     }
 
-    //TEMPTEMP
-    //ASSERT(geometryDescIndex == totalInstancesAllDraws);
+    ASSERT(geometryDescIndex == totalInstancesAllDraws);
 
     ///////////////
-
-
-
-    //TEMPTEMP
-    //static int maxGeometryDesc = 0;
-    //if (totalInstancesAllDraws != maxGeometryDesc)
-    //{
-    //    maxGeometryDesc = totalInstancesAllDraws;
-    //    freshBuild = true;
-    //}
 
     if (freshBuild)
     {
@@ -2265,7 +2264,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuil
         m_scratchBLAS.Release();
         m_TLAS.Release();
         m_scratchTLAS.Release();
-        //m_BLASInstanceDesc.Release();
     }
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs = { };
@@ -2275,9 +2273,9 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuil
     {
         rtInputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
     }
-    rtInputs.NumDescs = 1; //TEMPTEMP geometryDescIndex;
+    rtInputs.NumDescs = geometryDescIndex;
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    rtInputs.pGeometryDescs = &m_bvhGeometryDescs[geometryDescIndex];
+    rtInputs.pGeometryDescs = &m_bvhGeometryDescs[0];
 
     if (freshBuild)
     {
@@ -2334,9 +2332,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuil
 
     CComPtr<ID3D12Device5> device;
     HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
-
-    //GraphicsResource instanceDescBuffer = GraphicsMemory::Get(nullptr).Allocate(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * m_numInstancesInTLAS);
-    //D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)instanceDescBuffer.Memory();
 
     D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
     HRR(m_instancesTLAS->Map(&instanceDescs));

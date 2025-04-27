@@ -287,30 +287,30 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->position = XMFLOAT3(-2.2f, .5f, 1.0f);
     scene->AddChild(new Tree(params2));
 
-    //WorldObjectParameters<LSystemParams>* params2A = new WorldObjectParameters<LSystemParams>(*params2);
-    //params2A->position = XMFLOAT3(0.5f, .5f, 0.0f);
-    //XMStoreFloat4(&params2A->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 1.0f));
-    //scene->AddChild(new Tree(params2A));
+    WorldObjectParameters<LSystemParams>* params2A = new WorldObjectParameters<LSystemParams>(*params2);
+    params2A->position = XMFLOAT3(0.5f, .5f, 0.0f);
+    XMStoreFloat4(&params2A->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 1.0f));
+    scene->AddChild(new Tree(params2A));
 
-    //WorldObjectParameters<LSystemParams>* params2B = new WorldObjectParameters<LSystemParams>(*params2);
-    //params2B->position = XMFLOAT3(3.0f, .5f, 1.0f);
-    //XMStoreFloat4(&params2B->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 2.0f));
-    //scene->AddChild(new Tree(params2B));
+    WorldObjectParameters<LSystemParams>* params2B = new WorldObjectParameters<LSystemParams>(*params2);
+    params2B->position = XMFLOAT3(3.0f, .5f, 1.0f);
+    XMStoreFloat4(&params2B->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 2.0f));
+    scene->AddChild(new Tree(params2B));
 
-    //// Ground
-    //WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
-    //params4->position = XMFLOAT3(0, 0, 0);
-    //params4->scale = XMFLOAT3(25, .01f, 25);
-    //params4->primitiveType = PrimitiveType_CylinderHD;
-    //params4->textureFilename.push_back(L"undersea.dds");
-    //ShaderMaterial mat;
-    //mat.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
-    //mat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1);
-    //mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
-    //mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-    //mat.flags.y = 1; //1 for textured; 
-    //params4->materials.push_back(mat);
-    //scene->AddChild(new Primitive(params4));
+    // Ground
+    WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+    params4->position = XMFLOAT3(0, 0, 0);
+    params4->scale = XMFLOAT3(25, .01f, 25);
+    params4->primitiveType = PrimitiveType_CylinderHD;
+    params4->textureFilename.push_back(L"undersea.dds");
+    ShaderMaterial mat;
+    mat.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
+    mat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1);
+    mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
+    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+    mat.flags.y = 1; //1 for textured; 
+    params4->materials.push_back(mat);
+    scene->AddChild(new Primitive(params4));
 
     // Init lights
     renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
@@ -591,11 +591,11 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->_animationSpeed = 5.0f;    params3->position = XMFLOAT3(0, 0.5, 0);
 
 
-    params3->GetGeneratorParameters()._axiom = "F(20)";
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A",
+    //params3->GetGeneratorParameters()._axiom = "F(20)";
+    ////params3->GetGeneratorParameters()._rules.push_back(Rule("A",
 
-//    params3->GetGeneratorParameters()._axiom = "F(20) A";
-//    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) z(1) F(30) A] [Z(0.33074)F(50)A] "));
+    params3->GetGeneratorParameters()._axiom = "F(20) A";
+    params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) z(1) F(30) A] [Z(0.33074)F(50)A] "));
 
     //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25)] "));
 
@@ -616,8 +616,8 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
 
-    params3->meshes.push_back(PrimitiveType_Cylinder);
-    //params3->meshes.push_back(PrimitiveType_SkinnedCylinder);
+    //params3->meshes.push_back(PrimitiveType_Cylinder);
+    params3->meshes.push_back(PrimitiveType_SkinnedCylinder);
 
     scene->AddChild(new Tree(params3));
 

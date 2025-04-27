@@ -90,8 +90,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     HRR(ReloadDevice());
 
-    m_currentScene = 1;
-    //m_currentScene = 2;  // SeaScene
+    m_currentScene = 2;  // SeaScene
     //m_currentScene = 1; // Test tree
     //m_currentScene = 7; // simple box and cylindar
 
@@ -282,13 +281,13 @@ void Game::Update(DX::StepTimer const& timer)
     if (m_timeStart == 0)
     {
         m_timeStart = timer.GetTotalSeconds();
-        m_timeCurrent = 5000; //0
+        m_timeCurrent = 0;
     }
     else if (!m_paused)
     {
         m_timeCurrent += timer.GetElapsedSeconds();
     }
-    m_renderManager.GetRenderData().time = 1000.0; (float)m_timeCurrent;
+    m_renderManager.GetRenderData().time = (float)m_timeCurrent;
 
 
     if (!m_paused && m_rotateLights)
