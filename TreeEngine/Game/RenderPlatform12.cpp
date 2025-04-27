@@ -21,7 +21,7 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 
-bool useImGui = false;
+bool useImGui = true;
 
 #if defined(DXR_ENABLED)
 #include "RaytracingLibrary.inc"
@@ -32,6 +32,8 @@ bool useImGui = false;
 #include "MathHelper.h"
 
 #include "dxgidebug.h"
+
+#include "nvapi.h"
 
 using namespace DirectX;
 
@@ -872,6 +874,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_renderData->showDxrUav = true;
 
     m_numInstancesInTLAS = 1;
+    m_maxBLASInstances = maxInstances;
 
     // Create screen sized output buffer
     m_renderData->pDxrOutBuffer = new UavBuffer(GetDevice(),
@@ -941,10 +944,22 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     GetDevice()->CreateShaderResourceView(m_DrawRecordsResource, &descDrawRecordsSrv, m_descriptorHeap.hCPU(DrawRecords_SrvHeapOffset));
 
+    m_previousDrawRecordHash = 0;
+
+    m_bvhGeometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[maxInstances];
+    ZeroMemory(m_bvhGeometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * maxInstances);
+
+    m_instancesTLAS = new UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>(GetDevice(), MAX_INSTANCES_IN_TLAS, true);
+    m_instancesTLAS->Unmap();
+
+
 #endif
 
     return S_OK;
 }
+
+static D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = nullptr;
+
 
 IMGUI_IMPL_API LRESULT  ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -1046,6 +1061,15 @@ void RenderPlatform12::WaitForGPUWork()
         IncrementFenceOnGPU();
         WaitOnFence();
     }
+
+    //TEMPTEMP
+    if (m_d3dDevice)
+    {
+        CComPtr<ID3D12Device5> d3dDevice5;
+        HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&d3dDevice5));
+
+        NvAPI_D3D12_FlushRaytracingValidationMessages(d3dDevice5);
+    }
 }
 
 void RenderPlatform12::AdvanceToNextFrame()
@@ -1082,7 +1106,10 @@ void RenderPlatform12::WaitOnFence()
     if (m_fence->GetCompletedValue() < fence)
     {
         HR(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
-        WaitForSingleObject(m_fenceEvent, INFINITE);
+        if (WaitForSingleObject(m_fenceEvent, 4000) == WAIT_TIMEOUT)  //INFINITE
+        {
+            HandleD3D12Error(E_ABORT);
+        }
     }
 }
 
@@ -1183,6 +1210,9 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
  
     m_VBWorld.Release();
     m_DrawRecordsResource.Release();
+
+    SafeDelete(&m_bvhGeometryDescs);
+
 #endif
 
     return S_OK;
@@ -1601,6 +1631,20 @@ HRESULT RenderPlatform12::DrawScreenQuad(ID3D12GraphicsCommandList* commandList,
     return S_OK;
 }
 
+// Validation callback
+static void __stdcall myValidationMessageCallback(void* pUserData, NVAPI_D3D12_RAYTRACING_VALIDATION_MESSAGE_SEVERITY severity, const char* messageCode, const char* message, const char* messageDetails)
+{
+    const char* severityString = "unknown";
+    switch (severity)
+    {
+    case NVAPI_D3D12_RAYTRACING_VALIDATION_MESSAGE_SEVERITY_ERROR: severityString = "error"; break;
+    case NVAPI_D3D12_RAYTRACING_VALIDATION_MESSAGE_SEVERITY_WARNING: severityString = "warning"; break;
+    }
+
+    LOGF("Ray Tracing Validation message: %s: [%s] %s\n%s", severityString, messageCode, message, messageDetails);
+    //fflush(stderr);
+}
+
 HRESULT RenderPlatform12::InitDevice()
 {
     HRESULT hr = S_OK;
@@ -1705,9 +1749,9 @@ HRESULT RenderPlatform12::InitDevice()
     LOGF("\t\tDeviceId: %d\n", desc.DeviceId);
     LOGF("\t\tUINT SubSysId: %d\n", desc.SubSysId);
     LOGF("\t\tUINT Revision: %d\n", desc.Revision);
-    LOGF("\t\tSIZE_T DedicatedVideoMemory: %u\n", desc.DedicatedVideoMemory);
-    LOGF("\t\tSIZE_T DedicatedSystemMemory: %u\n", desc.DedicatedSystemMemory);
-    LOGF("\t\tSIZE_T SharedSystemMemory: %u\n", desc.SharedSystemMemory);
+    LOGF("\t\tDedicatedVideoMemory: %u\n", desc.DedicatedVideoMemory);
+    LOGF("\t\tDedicatedSystemMemory: %u\n", desc.DedicatedSystemMemory);
+    LOGF("\t\tSharedSystemMemory: %u\n", desc.SharedSystemMemory);
     //LOG("\t\tLUID AdapterLuid: %d", desc.AdapterLuid;
     LOGF("\t\tFlags: %d\n", desc.Flags);
 
@@ -1726,7 +1770,16 @@ HRESULT RenderPlatform12::InitDevice()
         //infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_INFO, true);
         //infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_MESSAGE, true);
     }
-    
+
+
+    NvAPI_Initialize();
+
+    CComPtr<ID3D12Device5> d3dDevice5;
+    HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&d3dDevice5));
+
+    NvAPI_D3D12_EnableRaytracingValidation(d3dDevice5, NVAPI_D3D12_RAYTRACING_VALIDATION_FLAG_NONE);
+    NvPhysicalGpuHandle nvapiValidationCallbackHandle = 0;
+    NvAPI_D3D12_RegisterRaytracingValidationMessageCallback(d3dDevice5, &myValidationMessageCallback, nullptr /*(void*)&myCallbackData*/, (void**) &nvapiValidationCallbackHandle);
 
 #endif 
     // Allocate graphics memory
@@ -2001,6 +2054,9 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
     GetCommandList()->SetComputeRootDescriptorTable(4, m_renderData->instanceBuffer->srvViewGpu);
 
+    UINT instanceCount = 0;
+    static UINT lastInstanceCount = 0;
+
     for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
         DrawRecord& drawRecord = m_drawRecords[drawRecordIndex];
@@ -2023,52 +2079,137 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 
         GetCommandList()->Dispatch(numGroupsX, numGroupsY, 1);
 
+        instanceCount += drawRecord.numInstances;
     }
+
 
     PIXEndEvent(GetCommandList()); // Transform draw records to bottom level BVH mesh data
 
     // WHY?
     HRR(ExecuteCurrentCommandList(true));
 
+    //WaitForGPUWork();
 
-    BuildBottomLevelAccelerationStructure(buildEveryFrame);
+
+    bool forceRebuild = instanceCount != lastInstanceCount;
+
+    BuildBottomLevelAccelerationStructure(forceRebuild);
 
     //BuildTopLevelAccelerationStructure(buildEveryFrame);
+
+    lastInstanceCount = instanceCount;
 
     return hr;
 }
 
-HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryFrame)
+inline std::size_t hash_combine(std::size_t seed, std::size_t value) noexcept
 {
-    if (!buildEveryFrame && m_BLAS != nullptr)
-        return S_OK;
+    return seed ^ (value + 0x9e3779b97f4a7c15ULL +
+        (seed << 6) + (seed >> 2));
+}
+
+template<>
+struct std::hash<RenderPlatform12::DrawRecord>
+{
+    std::size_t operator()(const RenderPlatform12::DrawRecord& d) const noexcept
+    {
+        std::size_t h = std::hash<UINT>{}(d.startingInstance);
+
+        h = hash_combine(h, std::hash<UINT>{}(d.numInstances));
+        h = hash_combine(h, std::hash<UINT>{}(d.indexBufferCount));
+        h = hash_combine(h, std::hash<UINT>{}(d.indexBufferStart));
+        h = hash_combine(h, std::hash<UINT>{}(d.vbWorldStart));
+        h = hash_combine(h, std::hash<UINT>{}(d.baseVertexLocation));
+        h = hash_combine(h, std::hash<UINT>{}(d.vertexCount));
+
+        /* If InputLayouts is an enum class, hash its underlying value.
+           If it’s a struct, ensure there’s std::hash<InputLayouts>. */
+        using Under = std::underlying_type_t<InputLayouts>;
+        h = hash_combine(h, std::hash<Under>{}(static_cast<Under>(d.inputLayout)));
+
+        return h;
+    }
+};
+
+inline size_t hash_combine(std::size_t& s, const RenderPlatform12::DrawRecord& v)
+{
+    std::hash<RenderPlatform12::DrawRecord> h;
+    s ^= h(v) + 0x9e3779b9 + (s << 6) + (s >> 2);
+    return s;
+}
+
+bool RenderPlatform12::DrawRecord::operator==(const DrawRecord& dr) const
+{
+    return  startingInstance == dr.startingInstance &&
+            numInstances == dr.numInstances &&
+            indexBufferCount == dr.indexBufferCount &&
+            indexBufferStart == dr.indexBufferStart &&
+            vbWorldStart == dr.vbWorldStart &&
+            baseVertexLocation == dr.baseVertexLocation &&
+            vertexCount == dr.vertexCount &&
+            inputLayout == dr.inputLayout;
+}
+
+void RenderPlatform12::HandleD3D12Error(HRESULT hr)
+{
+    if (hr == E_ABORT)
+    {
+        CComPtr<ID3D12Device5> device;
+        HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
+
+        NvAPI_D3D12_FlushRaytracingValidationMessages(device);
+    }
+}
+
+HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuild)
+{
+    //if (!buildEveryFrame && m_BLAS != nullptr)
+    //    return S_OK;
 
     // WHY?  GPU Hangs if i don't release the TLAS each time.  But WHY?
-    m_BLAS.Release();
-    m_scratchBLAS.Release();
-    m_TLAS.Release();
-    m_scratchTLAS.Release();
-
+    bool freshBuild = true; 
+                      // forceRebuild || m_TLAS.Get(m_renderData->frame) == nullptr;
 
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
+
+    size_t currentHash = 0;
 
     UINT totalInstancesAllDraws = 0;
     for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
         totalInstancesAllDraws += m_drawRecords[drawRecordIndex].numInstances;
+        
+        currentHash = hash_combine(currentHash, m_drawRecords[drawRecordIndex]);
     }
 
-    D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[totalInstancesAllDraws];
-    ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * totalInstancesAllDraws);
+    if (currentHash != m_previousDrawRecordHash)
+    {
+        freshBuild = true;
+    }
+    
+    m_previousDrawRecordHash = currentHash;
 
-    UINT geometryDescIndex = 0;
+    if (freshBuild)
+    {
+        m_BLAS.Release();
+        m_scratchBLAS.Release();
+        m_TLAS.Release();
+        m_scratchTLAS.Release();
+        //m_BLASInstanceDesc.Release();
+    }
+
+    //D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[totalInstancesAllDraws];
+    //ZeroMemory(geometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * totalInstancesAllDraws);
+
+    //TEMPTEMP
+    UINT geometryDescIndex = m_renderData->frame % 2; // 0;
     for (int i = 0; i < m_drawRecords.size(); i++)
     {
         DrawRecord& dr = m_drawRecords[i];
 
         for (int instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
         {
-            D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = geometryDescs[geometryDescIndex];
+            D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = m_bvhGeometryDescs[geometryDescIndex];
 
             geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
             geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
@@ -2097,39 +2238,52 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
                     < m_indexBuffer.buffer->GetGPUVirtualAddress() + indexBufferSize);
             }
 
-            geometryDescIndex++;
+            //TENP
+            //geometryDescIndex++;
         }
 
     }
 
-    ASSERT(geometryDescIndex == totalInstancesAllDraws);
+    //TEMPTEMP
+    //ASSERT(geometryDescIndex == totalInstancesAllDraws);
 
     ///////////////
 
-    static int maxGeometryDesc = 0;
 
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs;
-    rtInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-    rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE; // D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    rtInputs.NumDescs = geometryDescIndex;
-    rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    rtInputs.pGeometryDescs = geometryDescs;
 
-    if (totalInstancesAllDraws > maxGeometryDesc)
+    //TEMPTEMP
+    //static int maxGeometryDesc = 0;
+    //if (totalInstancesAllDraws != maxGeometryDesc)
+    //{
+    //    maxGeometryDesc = totalInstancesAllDraws;
+    //    freshBuild = true;
+    //}
+
+    if (freshBuild)
     {
         m_BLAS.Release();
         m_scratchBLAS.Release();
         m_TLAS.Release();
         m_scratchTLAS.Release();
-        maxGeometryDesc = totalInstancesAllDraws;
-    }
-    else
-    {
-        maxGeometryDesc = maxGeometryDesc;
+        //m_BLASInstanceDesc.Release();
     }
 
-    if (m_BLAS == nullptr)
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs = { };
+    rtInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+    rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+    if (!freshBuild)
     {
+        rtInputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+    }
+    rtInputs.NumDescs = 1; //TEMPTEMP geometryDescIndex;
+    rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+    rtInputs.pGeometryDescs = &m_bvhGeometryDescs[geometryDescIndex];
+
+    if (freshBuild)
+    {
+        assert(m_BLAS == nullptr);
+        assert(m_scratchBLAS == nullptr);
+
         CComPtr<ID3D12Device5> device;
         HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
 
@@ -2139,11 +2293,13 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
         D3D12_RESOURCE_DESC blasDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
         D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
-            D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+        D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_BLAS));
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchBLAS));
+
     }
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
@@ -2151,7 +2307,10 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     CComPtr<ID3D12GraphicsCommandList6> commandList;
     HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
 
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = { m_BLAS->GetGPUVirtualAddress(), rtInputs, 0, m_scratchBLAS->GetGPUVirtualAddress() };
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = { m_BLAS->GetGPUVirtualAddress(),
+                                                                                rtInputs, 
+                                                                                freshBuild ? 0 : m_BLAS->GetGPUVirtualAddress(),
+                                                                                m_scratchBLAS->GetGPUVirtualAddress() };
     commandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
     commandList.Release();
 
@@ -2168,18 +2327,20 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
 
     ////// BUILD TOP ////
-    if (!buildEveryFrame && m_TLAS != nullptr)
-        return S_OK;
+    //if (!buildEveryFrame && m_TLAS != nullptr)
+    //    return S_OK;
 
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build top level Acceleration Structures");
 
     CComPtr<ID3D12Device5> device;
     HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
 
-    GraphicsResource instanceDescBuffer = GraphicsMemory::Get(nullptr).Allocate(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * m_numInstancesInTLAS);
-    D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)instanceDescBuffer.Memory();
+    //GraphicsResource instanceDescBuffer = GraphicsMemory::Get(nullptr).Allocate(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * m_numInstancesInTLAS);
+    //D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)instanceDescBuffer.Memory();
 
-    float sizeReductionPerInstance = 1.0f / m_numInstancesInTLAS;
+    D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
+    HRR(m_instancesTLAS->Map(&instanceDescs));
+    
 
     for (UINT i = 0; i < m_numInstancesInTLAS; i++)
     {
@@ -2198,11 +2359,20 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
     topLevelBuildDesc.Inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
     topLevelBuildDesc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    topLevelBuildDesc.Inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    topLevelBuildDesc.Inputs.InstanceDescs = instanceDescBuffer.GpuAddress();
-
-    if (m_TLAS == nullptr)
+    topLevelBuildDesc.Inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+    if (!freshBuild)
     {
+        topLevelBuildDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+    }
+
+    m_instancesTLAS->Unmap();
+    topLevelBuildDesc.Inputs.InstanceDescs = m_instancesTLAS->GetGPUVirtualAddress(0);
+
+    if (freshBuild)
+    {
+        assert(m_TLAS == nullptr);
+        assert(m_scratchTLAS == nullptr);
+
         // Create all the resources only once, even if we're going to rebuild the TLAS every frame.
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO tlasPrebuildInfo;
         topLevelBuildDesc.Inputs.NumDescs = MAX_INSTANCES_IN_TLAS;  // Create enough room for several when we create the buffers.
@@ -2213,14 +2383,20 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
 
         D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
+
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_TLAS));
+
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasScratchDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchTLAS));
     }
 
     topLevelBuildDesc.Inputs.NumDescs = m_numInstancesInTLAS;
     topLevelBuildDesc.DestAccelerationStructureData = m_TLAS->GetGPUVirtualAddress();
+    topLevelBuildDesc.SourceAccelerationStructureData = freshBuild ? 
+                                                        0 : 
+                                                        m_TLAS->GetGPUVirtualAddress();
+
     topLevelBuildDesc.ScratchAccelerationStructureData = m_scratchTLAS->GetGPUVirtualAddress();
 
     //CComPtr<ID3D12GraphicsCommandList6> commandList;
@@ -2234,7 +2410,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool buildEveryF
     PIXEndEvent(GetCommandList());
 
     HRR(ExecuteCurrentCommandList(true));
-
 
     return S_OK;
 }
@@ -2718,9 +2893,10 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 
 #if defined(DXR_ENABLED)
 
-    HRR(BuildAccelerationStructure(true));
-
+    if (m_drawRecords.size() > 0)
     {
+        HRR(BuildAccelerationStructure(true));
+
         PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
 
         // Dispatch rays
