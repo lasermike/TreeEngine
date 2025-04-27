@@ -1756,6 +1756,7 @@ HRESULT RenderPlatform12::InitDevice()
     //LOG("\t\tLUID AdapterLuid: %d", desc.AdapterLuid;
     LOGF("\t\tFlags: %d\n", desc.Flags);
 
+#if defined(_DEBUG)
     CComPtr<ID3D12Debug1> debug1;
     if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
     {
@@ -1772,6 +1773,7 @@ HRESULT RenderPlatform12::InitDevice()
         //infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_MESSAGE, true);
     }
 
+#endif
 
     bool isNVidiaGPU = wcsstr(desc.Description, L"NVIDIA") != nullptr;
     if (isNVidiaGPU)
@@ -2010,9 +2012,6 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 {
     HRESULT hr = S_OK;
 
-    // WHY?
-    HRR(ExecuteCurrentCommandList(true));
-
 
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transform draw records to bottom level BVH mesh data");
 
@@ -2029,7 +2028,7 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     // Copy draw records from CPU to GPU
     {
         ResourceUploadBatch resourceUpload(GetDevice());
-        resourceUpload.Begin(); //D3D12_COMMAND_LIST_TYPE_COPY
+        resourceUpload.Begin();
 
         D3D12_SUBRESOURCE_DATA initData = {};
         initData.pData = m_drawRecords.data();
@@ -2098,17 +2097,9 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 
     PIXEndEvent(GetCommandList()); // Transform draw records to bottom level BVH mesh data
 
-    // WHY?
-    HRR(ExecuteCurrentCommandList(true));
-
-    //WaitForGPUWork();
-
 
     bool forceRebuild = instanceCount != lastInstanceCount;
-
-    BuildBottomLevelAccelerationStructure(forceRebuild);
-
-    //BuildTopLevelAccelerationStructure(buildEveryFrame);
+    HRR(BuildBLASandTLAS(forceRebuild));
 
     lastInstanceCount = instanceCount;
 
@@ -2177,15 +2168,12 @@ void RenderPlatform12::HandleD3D12Error(HRESULT hr)
     }
 }
 
-HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuild)
+HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 {
-    //if (!buildEveryFrame && m_BLAS != nullptr)
-    //    return S_OK;
-
-    bool freshBuild = //true; 
-                       forceRebuild || m_TLAS == nullptr;
-
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
+
+    bool freshBuild = forceRebuild || m_TLAS == nullptr;
+
 
     size_t currentHash = 0;
 
@@ -2406,12 +2394,6 @@ HRESULT RenderPlatform12::BuildBottomLevelAccelerationStructure(bool forceRebuil
 
     HRR(ExecuteCurrentCommandList(true));
 
-    return S_OK;
-}
-
-HRESULT RenderPlatform12::BuildTopLevelAccelerationStructure(bool buildEveryFrame)
-{
-	// TMP: Move into BLAS build for now until GPU hang is understood
     return S_OK;
 }
 

@@ -950,8 +950,7 @@ public:
 
     HRESULT CreateRaytracingPipeline();
     HRESULT BuildAccelerationStructure(bool buildEveryFrame);
-    HRESULT BuildTopLevelAccelerationStructure(bool buildEveryFrame);
-    HRESULT BuildBottomLevelAccelerationStructure(bool forceRebuild);
+    HRESULT BuildBLASandTLAS(bool forceRebuild);
 
     // DXR Objects
     CComPtr<ID3D12StateObject>            m_raytracingStateObject;

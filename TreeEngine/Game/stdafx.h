@@ -114,6 +114,7 @@ __inline void ReportFailure(const char* msg, const char* file, long line, HRESUL
 #define HRC(x) if (FAILED(x)) goto Cleanup;
 #define HRR(x) (x)
 #define LOG(x)
+#define LOGF(fmt, ...)
 #define ASSERTSZ(x, str)
 #endif
 #endif 
