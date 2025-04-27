@@ -959,21 +959,11 @@ public:
     CComPtr<ID3D12RootSignature>          m_globalRootSignature;
     CComPtr<ID3D12RootSignature>          m_localRootSignature;
 
-
-    //DoubleBufferResource		m_TLAS;
-    //DoubleBufferResource		m_scratchTLAS;
-    //DoubleBufferResource		m_BLAS;
-    //DoubleBufferResource		m_scratchBLAS;
-    //DoubleBufferResource        m_BLASInstanceDesc;
-
     CComPtr<ID3D12Resource>		m_TLAS;
     CComPtr<ID3D12Resource>		m_scratchTLAS;
     CComPtr<ID3D12Resource>		m_BLAS;
     CComPtr<ID3D12Resource>		m_scratchBLAS;
-    //CComPtr<ID3D12Resource>		m_instancesTLAS;
-    //CComPtr<ID3D12Resource>		m_instancesBLAS;
     UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesTLAS;
-    UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesBLAS;
 
 
     // DXR buffers
