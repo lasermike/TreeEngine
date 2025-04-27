@@ -93,6 +93,10 @@ __inline void ReportFailure(const char* msg, const char* file, long line, HRESUL
         {        \
             Util.Output("Log: %s \n", x);  \
         }        
+#define LOGF(fmt, ...)    \
+        {        \
+            Util.Output(fmt, __VA_ARGS__);  \
+        }        
 #endif 
 
 #define ASSERTSZ(x, str) \
@@ -123,6 +127,14 @@ struct Utility
         vsprintf_s(string_text, fnt, args);
         va_end(args);
         OutputDebugStringA(string_text);
+    }
+    void Output(const WCHAR* fnt, ...)
+    {
+        static WCHAR string_text[256 * 256];
+        va_list args; va_start(args, fnt);
+        vswprintf_s(string_text, fnt, args);
+        va_end(args);
+        OutputDebugStringW(string_text);
     }
 } static Util;
 

@@ -50,6 +50,24 @@ public:
         mMappedData = nullptr;
     }
 
+    HRESULT Map(T** mappedStruct)
+    {
+        HRESULT hr = E_FAIL;
+        if (!mapped)
+        {
+            *mappedStruct = nullptr;
+
+            hr = mUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mMappedData));
+            if (SUCCEEDED(hr))
+            {
+                mapped = true;
+                *mappedStruct = (T*) mMappedData;
+            }
+        }
+
+        return hr;
+    }
+
     void Unmap()
     {
         if (mapped)

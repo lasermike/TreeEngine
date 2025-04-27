@@ -652,5 +652,4 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
 
 RenderPlatformDLL::~RenderPlatformDLL()
 {
-
 }

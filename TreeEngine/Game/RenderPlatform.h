@@ -135,6 +135,38 @@ struct DoubleBuffer
 };
 
 #if defined(TREE3D12)
+struct DoubleBufferResource
+{
+    ID3D12Resource* buffers[2];
+
+    DoubleBufferResource()
+    {
+        buffers[0] = nullptr;
+        buffers[1] = nullptr;
+    }
+
+    //HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
+
+    ID3D12Resource* Get(UINT frame) { return buffers[frame % 2]; }
+
+    void Release()
+    {
+        if (buffers[0] != nullptr)
+        {
+            buffers[0]->Release();
+            buffers[0] = nullptr;
+        }
+
+        if (buffers[1] != nullptr)
+        {
+            buffers[1]->Release();
+            buffers[1] = nullptr;
+        }
+    }
+};
+#endif
+
+#if defined(TREE3D12)
 #define InputElementDesc D3D12_INPUT_ELEMENT_DESC
 #define InputClassificationVertex D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA
 #define InputClassificationInstance D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA
@@ -815,10 +847,13 @@ private:
 
     void AdvanceToNextFrame();
 
+    void HandleD3D12Error(HRESULT hr);
+
 public:
 
     RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
-        m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr)
+        m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr),
+        m_renderTargets{ }
         //m_bitmapFont(nullptr)
 #if defined(TREE_XBOX)
         , m_framePipelineToken(D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL)
@@ -916,7 +951,7 @@ public:
     HRESULT CreateRaytracingPipeline();
     HRESULT BuildAccelerationStructure(bool buildEveryFrame);
     HRESULT BuildTopLevelAccelerationStructure(bool buildEveryFrame);
-    HRESULT BuildBottomLevelAccelerationStructure(bool buildEveryFrame);
+    HRESULT BuildBottomLevelAccelerationStructure(bool forceRebuild);
 
     // DXR Objects
     CComPtr<ID3D12StateObject>            m_raytracingStateObject;
@@ -924,9 +959,12 @@ public:
     CComPtr<ID3D12RootSignature>          m_globalRootSignature;
     CComPtr<ID3D12RootSignature>          m_localRootSignature;
 
-    CComPtr<ID3D12Resource>		m_TLAS, m_TLASScratch;
-    CComPtr<ID3D12Resource>		m_triangleBLAS;
-    CComPtr<ID3D12Resource>		m_scratch;
+    CComPtr<ID3D12Resource>		m_TLAS;
+    CComPtr<ID3D12Resource>		m_scratchTLAS;
+    CComPtr<ID3D12Resource>		m_BLAS;
+    CComPtr<ID3D12Resource>		m_scratchBLAS;
+    UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesTLAS;
+
 
     // DXR buffers
     CComPtr<ID3D12Resource>     m_VBWorld;
@@ -935,9 +973,12 @@ public:
 
     ShaderBindingTable<SimpleTriangleRecord, 1, 2, 1> m_shaderBindingTable;
 
-    static const uint32_t MAX_INSTANCES_IN_TLAS = 10;
+    static const uint32_t MAX_INSTANCES_IN_TLAS = 1;
 
-    DirectX::GraphicsResource m_instanceDescBuffer;
+    D3D12_RAYTRACING_GEOMETRY_DESC* m_bvhGeometryDescs;
+
+    uint32_t m_maxBLASInstances;
+
     D3D12_RAY_FLAGS m_rayFlags;
 
     struct DrawRecord
@@ -968,10 +1009,13 @@ public:
         InputLayouts inputLayout;
 
         //Mesh* mesh;
+
+        bool operator==(const DrawRecord&) const;
     };
 
     UINT m_nextVbWorldStart = 0;
     std::vector<DrawRecord> m_drawRecords;
+    size_t m_previousDrawRecordHash;
 
 #endif
 };

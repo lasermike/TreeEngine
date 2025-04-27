@@ -591,11 +591,13 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->_animationSpeed = 5.0f;    params3->position = XMFLOAT3(0, 0.5, 0);
 
 
-    params3->GetGeneratorParameters()._axiom = "F(20) A";
-    
-    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25)] "));
+    //params3->GetGeneratorParameters()._axiom = "F(20)";
+    ////params3->GetGeneratorParameters()._rules.push_back(Rule("A",
 
+    params3->GetGeneratorParameters()._axiom = "F(20) A";
     params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) z(1) F(30) A] [Z(0.33074)F(50)A] "));
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25)] "));
 
     //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) [z(1) $(1) F(5)] F(10) [z(1) F(30)] F(10) [z(1) $(1) F(30)] F(25) A] [Z(0.33074)F(50)A] "));
 
@@ -614,6 +616,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
 
+    //params3->meshes.push_back(PrimitiveType_Cylinder);
     params3->meshes.push_back(PrimitiveType_SkinnedCylinder);
 
     scene->AddChild(new Tree(params3));
