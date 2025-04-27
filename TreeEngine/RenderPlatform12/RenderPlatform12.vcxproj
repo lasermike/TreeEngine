@@ -58,8 +58,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);Inc;..\Game\.;Inc\DirectXTK12;..\Inc;$(OutDir)</IncludePath>
-    <LibraryPath>Lib\Release;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);Inc;..\Game\.;Inc\DirectXTK12;..\Inc;$(OutDir);$(SolutionDir)nvapi</IncludePath>
+    <LibraryPath>Lib\Release;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)nvapi\amd64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -99,7 +99,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3dcompiler.lib; DirectXTK12.lib; d2d1.lib; d3d12.lib; dxgi.lib; windowscodecs.lib; dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3dcompiler.lib; DirectXTK12.lib; d2d1.lib; d3d12.lib; dxgi.lib; windowscodecs.lib; dwrite.lib;nvapi64.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>call $(SolutionDir)\..\Misc\copyrobo $(OutDir) $(BinsDir)$(Configuration)\$(Platform)\TreeClassic $(RootNamespace).dll $(RootNamespace).pdb /XO</Command>
