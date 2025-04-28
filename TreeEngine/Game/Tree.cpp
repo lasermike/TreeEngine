@@ -65,10 +65,10 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     InputLayouts inputLayout = BASIC_INPUT_LAYOUT;
     if (_params->meshes[0] == PrimitiveType_SkinnedCylinder)
     {
+        inputLayout = SKINNED_INPUT_LAYOUT;
         geometryBuffer = SKINNED_PRIMITIVE_GEOMETRY_BUFFER;
         vsFilename = L"VSSkinned.cso";
         shadowVsFilename = L"BuildShadowMapVSSkinned.cso";
-        inputLayout = SKINNED_INPUT_LAYOUT;
     }
 
     // Create material, mesh, and reserve render unit

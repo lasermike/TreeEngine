@@ -2202,16 +2202,17 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             assert(geometryDesc.Triangles.VertexBuffer.StartAddress + geometryDesc.Triangles.VertexCount * geometryDesc.Triangles.VertexBuffer.StrideInBytes
                 < m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
 
+            D3D12_GPU_VIRTUAL_ADDRESS indexBufferEnd;
             if (dr.inputLayout == SKINNED_INPUT_LAYOUT)
             {
-                assert(geometryDesc.Triangles.IndexBuffer + geometryDesc.Triangles.IndexCount * sizeof(DWORD)
-                    < m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() + skinnedIndexBufferSize);
+                indexBufferEnd = m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() + skinnedIndexBufferSize;
             }
             else
             {
-                assert(geometryDesc.Triangles.IndexBuffer + geometryDesc.Triangles.IndexCount * sizeof(DWORD)
-                    < m_indexBuffer.buffer->GetGPUVirtualAddress() + indexBufferSize);
+                indexBufferEnd = m_indexBuffer.buffer->GetGPUVirtualAddress() + indexBufferSize;
             }
+            assert(geometryDesc.Triangles.IndexBuffer + geometryDesc.Triangles.IndexCount * sizeof(DWORD)
+                 <= indexBufferEnd);
 
             geometryDescIndex++;
         }
