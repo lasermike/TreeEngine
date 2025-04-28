@@ -35,7 +35,12 @@ bool useImGui = true;
 
 #include "nvapi.h"
 
-static bool g_enableDXRValidation = true;
+static bool g_enableDXRValidation = 
+#if defined(_DEBUG)
+    true;
+#else 
+    false;
+#endif
 
 using namespace DirectX;
 
@@ -275,7 +280,7 @@ HRESULT RenderPlatform12::ExecuteCurrentCommandList(bool waitOnFence)
     ID3D12CommandList* ppCommandLists[] = { GetCommandList() };
     GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-//    if (waitOnFence)
+    if (waitOnFence)
     {
         WaitForGPUWork();
     }
@@ -959,8 +964,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     return S_OK;
 }
-
-static D3D12_RAYTRACING_GEOMETRY_DESC* geometryDescs = nullptr;
 
 
 IMGUI_IMPL_API LRESULT  ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -2012,7 +2015,6 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 {
     HRESULT hr = S_OK;
 
-
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transform draw records to bottom level BVH mesh data");
 
 #if defined(TREE_XBOX)
@@ -2022,7 +2024,6 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     m_DrawRecordsResource->Map(0, nullptr, ((void**)&pDrawRecords));
     memcpy(pDrawRecords, m_drawRecords.data(), sizeof(DrawRecord) * m_drawRecords.size());
     m_DrawRecordsResource->Unmap(0, nullptr);
-
 #else
 
     // Copy draw records from CPU to GPU
@@ -2034,12 +2035,6 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
         initData.pData = m_drawRecords.data();
         initData.RowPitch = sizeof(DrawRecord) * m_drawRecords.size();
         initData.SlicePitch = 0;
-
-        //resourceUpload.Transition(
-        //    m_DrawRecordsResource,
-        //    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        //    D3D12_RESOURCE_STATE_COPY_DEST);
-
 
         resourceUpload.Upload(m_DrawRecordsResource, 0, &initData, 1);
 
@@ -2066,9 +2061,6 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
     GetCommandList()->SetComputeRootDescriptorTable(4, m_renderData->instanceBuffer->srvViewGpu);
 
-    UINT instanceCount = 0;
-    static UINT lastInstanceCount = 0;
-
     for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
         DrawRecord& drawRecord = m_drawRecords[drawRecordIndex];
@@ -2090,18 +2082,13 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
         UINT numGroupsY = (UINT)ceilf(drawRecord.numInstances / 32.0f);
 
         GetCommandList()->Dispatch(numGroupsX, numGroupsY, 1);
-
-        instanceCount += drawRecord.numInstances;
     }
 
 
     PIXEndEvent(GetCommandList()); // Transform draw records to bottom level BVH mesh data
 
 
-    bool forceRebuild = instanceCount != lastInstanceCount;
-    HRR(BuildBLASandTLAS(forceRebuild));
-
-    lastInstanceCount = instanceCount;
+    HRR(BuildBLASandTLAS(false));
 
     return hr;
 }
@@ -2174,14 +2161,11 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     bool freshBuild = forceRebuild || m_TLAS == nullptr;
 
-
+    // Hash the draw records to see if the geometry is the same as last build
     size_t currentHash = 0;
 
-    UINT totalInstancesAllDraws = 0;
     for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
-        totalInstancesAllDraws += m_drawRecords[drawRecordIndex].numInstances;
-        
         currentHash = hash_combine(currentHash, m_drawRecords[drawRecordIndex]);
     }
 
@@ -2191,14 +2175,6 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     }
     
     m_previousDrawRecordHash = currentHash;
-
-    if (freshBuild)
-    {
-        m_BLAS.Release();
-        m_scratchBLAS.Release();
-        m_TLAS.Release();
-        m_scratchTLAS.Release();
-    }
 
 
     UINT geometryDescIndex = 0;
@@ -2242,8 +2218,6 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     }
 
-    ASSERT(geometryDescIndex == totalInstancesAllDraws);
-
     ///////////////
 
     if (freshBuild)
@@ -2263,7 +2237,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     }
     rtInputs.NumDescs = geometryDescIndex;
     rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    rtInputs.pGeometryDescs = &m_bvhGeometryDescs[0];
+    rtInputs.pGeometryDescs = m_bvhGeometryDescs;
 
     if (freshBuild)
     {
@@ -2285,7 +2259,6 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             nullptr, __uuidof(ID3D12Resource), (void**)&m_BLAS));
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchBLAS));
-
     }
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
@@ -2307,15 +2280,10 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     PIXEndEvent(GetCommandList());
 
-    HRR(ExecuteCurrentCommandList(true));
-
-    delete[] geometryDescs;
+    //HRR(ExecuteCurrentCommandList(true));
 
 
     ////// BUILD TOP ////
-    //if (!buildEveryFrame && m_TLAS != nullptr)
-    //    return S_OK;
-
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build top level Acceleration Structures");
 
     CComPtr<ID3D12Device5> device;
@@ -2382,9 +2350,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     topLevelBuildDesc.ScratchAccelerationStructureData = m_scratchTLAS->GetGPUVirtualAddress();
 
-    //CComPtr<ID3D12GraphicsCommandList6> commandList;
     HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
-
     commandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
 
     D3D12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
@@ -2392,7 +2358,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     PIXEndEvent(GetCommandList());
 
-    HRR(ExecuteCurrentCommandList(true));
+    //HRR(ExecuteCurrentCommandList(true));
 
     return S_OK;
 }
@@ -3162,8 +3128,6 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
         ImGui::Render();
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), GetCommandList());
-
-        //PIXEndEvent(GetCommandList()); // IM GUI
     }
 
 
@@ -3172,7 +3136,7 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
     // Execute the command list.
-    HRR(ExecuteCurrentCommandList(false));
+    HRR(ExecuteCurrentCommandList(true));
 
     // Present the frame.
 #if defined(TREE_XBOX)
@@ -3191,12 +3155,6 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     m_graphicsMemory->Commit(m_commandQueue);
 
     AdvanceToNextFrame();
-
-    ///TMP TMP
-    //m_TLAS.Release();
-    //m_TLASScratch.Release();
-    //m_triangleBLAS.Release();
-    //m_scratch.Release();
 
     return hr;
 }
