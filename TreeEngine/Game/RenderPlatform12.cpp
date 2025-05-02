@@ -17,6 +17,7 @@
 #include "ResourceUploadBatch.h"
 
 #include "inputManager.h"
+
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
@@ -47,7 +48,15 @@ using namespace DirectX;
 
 /////  IMGUI 
 
-ImGuiContext* RenderPlatform12::GetImGuiContext() { return ImGui::GetCurrentContext(); }
+ImGuiContext* RenderPlatform12::GetImGuiContext()
+{ 
+    if (imGuiInitialized)
+    {
+        return ImGui::GetCurrentContext();
+    }
+
+    return nullptr; 
+}
 
 // Config for example app
 static const int APP_NUM_FRAMES_IN_FLIGHT = 2;
@@ -108,31 +117,6 @@ struct ExampleDescriptorHeapAllocator
 
 static ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
 static ExampleDescriptorHeapAllocator g_pd3dSrvDescHeapAlloc;
-
-void ShowRenderMetricsWindow(bool* p_open, RenderData* renderData)
-{
-    if (!ImGui::Begin("Metrics", p_open))
-    {
-        ImGui::End();
-        return;
-    }
-
-    // Basic info
-    ImGuiContext& g = *ImGui::GetCurrentContext();
-    ImGuiIO& io = ImGui::GetIO();
-    //ImGui::Text("Dear ImGui %s", ImGui::GetVersion());
-    ImGui::Text("Simulation Time %.3f seconds", renderData->time);
-    ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-    ImGui::Separator();
-    ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat,
-        renderData->frameStats[NUM_STICKS_STAT].stat,
-        renderData->frameStats[NUM_LEAVES_STAT].stat);
-    ImGui::Text("UI %d vertices, %d indices (%d triangles)", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
-
-    ImGui::End();
-
-    return;
-}
 
 enum CbvSrvUavHeapOffsets
 {
@@ -821,16 +805,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         // Setup Platform/Renderer bindings
         ImGui_ImplWin32_Init(m_hwnd);
-//        ImGui_ImplDX12_Init(GetDevice(),
-//#if defined(TREE_XBOX)
-//        m_commandQueue,
-//#endif 
-//            FrameCount,
-//            m_swapChainFormat, m_descriptorHeap,
-//            m_descriptorHeap.hCPU(ImGui_SrvHeapOffset),
-//            m_descriptorHeap.hGPU(ImGui_SrvHeapOffset));
-//
-
 
         ImGui_ImplDX12_InitInfo init_info = {};
         init_info.Device = GetDevice();
@@ -845,24 +819,23 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) { return g_pd3dSrvDescHeapAlloc.Free(cpu_handle, gpu_handle); };
         ImGui_ImplDX12_Init(&init_info);
 
+        // Load Fonts
+        // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
+        // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
+        // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
+        // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+        // - Read 'docs/FONTS.txt' for more instructions and details.
+        // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
+        //io.Fonts->AddFontDefault();
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
+        //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
+        //IM_ASSERT(font != NULL);
 
         imGuiInitialized = true;
     }
-
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-    // - Read 'docs/FONTS.txt' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
-    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
-    //IM_ASSERT(font != NULL);
 
     // Init shadow map
     if (useShadowMaps)
@@ -2888,17 +2861,6 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     //TODO NEXT: use compute to copy offscreen1 to rtv
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-    // Start the Dear ImGui frame
-    if (imGuiInitialized)
-    {
-        FrameInputData& input = m_renderData->inputManager->GetFrameInput(0);
-        ImGuiIO& io = ImGui::GetIO(); (void)io;
-        //memcpy(io.KeysDown, input.key, sizeof(input.key));
-        ImGui_ImplDX12_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-        ImGui::NewFrame();
-    }
-
     // Set initial render target to offscreenbuffer1
     CD3DX12_CPU_DESCRIPTOR_HANDLE offscreen1Handle(m_rtvHeap.hCPU(FrameCount));
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
@@ -3064,7 +3026,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
     return hr;
 }
 
-HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool renderToSharedTexture)
+HRESULT RenderPlatform12::RenderDebugUI()
 {
     HRESULT hr = S_OK;
 
@@ -3114,25 +3076,32 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
     if (imGuiInitialized)
     {
-        PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"IM GUI");
+        PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Setup IM GUI");
+
+        ImGui_ImplDX12_NewFrame();
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
 
         ID3D12DescriptorHeap* ppHeaps[] = { g_pd3dSrvDescHeap };
         GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    }
 
-        //io.SimulationSeconds = m_renderData->time;
-        //io.SkinnedMatrixCount = m_renderData->frameStats[WORLD_MATRIX_COMPUTED_STAT].stat;
-        //io.LeavesCount = m_renderData->frameStats[NUM_STICKS_STAT].stat;
-        //io.SticksCount = m_renderData->frameStats[NUM_LEAVES_STAT].stat;
+    PIXEndEvent(GetCommandList()); // Render Epilog part deux
 
-        bool show_metrics_window = true;
-        ShowRenderMetricsWindow(&show_metrics_window, m_renderData);
 
+    return hr;
+}
+
+HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool renderToSharedTexture)
+{
+    HRESULT hr = S_OK;
+
+    if (imGuiInitialized)
+    {
+        PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render IM GUI");
         ImGui::Render();
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), GetCommandList());
     }
-
-
-    PIXEndEvent(GetCommandList()); // Render Epilog part deux
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 

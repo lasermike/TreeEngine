@@ -667,6 +667,7 @@ public:
 
     virtual HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) = 0;
     virtual HRESULT RenderPostProcess() = 0;
+    virtual HRESULT RenderDebugUI() = 0;
     virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) = 0;
 
     virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
@@ -895,6 +896,7 @@ public:
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
     HRESULT RenderPostProcess();
+    HRESULT RenderDebugUI();
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
@@ -1125,6 +1127,7 @@ public:
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
     HRESULT RenderPostProcess();
+    HRESULT RenderDebugUI();
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
@@ -1203,6 +1206,7 @@ typedef HRESULT (*EndFrameFunc)(D3DBuffer* buffer);
 
 typedef HRESULT (*RenderPrologFunc)(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
 typedef HRESULT (*RenderPostProcessFunc)();
+typedef HRESULT (*RenderDebugUIFunc)();
 typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
 typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
@@ -1260,6 +1264,7 @@ class RenderPlatformDLL : public RenderPlatform
 
     RenderPrologFunc RenderPrologFuncPtr;
     RenderPostProcessFunc RenderPostProcessFuncPtr;
+    RenderDebugUIFunc RenderDebugUIFuncPtr;
     RenderEpilogFunc RenderEpilogFuncPtr;
 
     RenderSceneSetupFunc RenderSceneSetupFuncPtr;
@@ -1323,6 +1328,8 @@ public:
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) { return RenderPrologFuncPtr(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor); }
     HRESULT RenderPostProcess() { return RenderPostProcessFuncPtr(); }
+    HRESULT RenderDebugUI() { return RenderDebugUIFuncPtr(); }
+
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, renderToSharedTexture); }
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }

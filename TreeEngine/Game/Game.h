@@ -21,7 +21,7 @@ interface IInputManager;
 interface IGameInput;
 interface IGameInputReading;
 
-class Game
+class Game : public IDebugUI
 {
 public:
 
@@ -61,6 +61,8 @@ public:
     void operator delete(void* mem) { return _aligned_free(mem); }
 
     HRESULT Initialize(bool renderToSharedTexture);
+
+    HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
 
 #if defined(TREENGINE_WIN32)
     void SetWindow(HWND hwnd)

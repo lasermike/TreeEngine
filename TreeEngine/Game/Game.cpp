@@ -10,6 +10,9 @@
 #include "InputManager.h"
 #include "ThreadPool.h"
 
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+
 using namespace DirectX;
 
 #ifndef _XBOX_ONE
@@ -163,6 +166,7 @@ HRESULT Game::ReloadDevice()
     assert(m_renderPlatformDLL != nullptr);
 
     m_renderManager.SetPlatform(m_renderPlatformDLL);
+    m_renderManager.SetDebugUI(this);
 
 #if defined(TREENGINE_WIN32)
     m_renderManager.GetPlatform()->SetWindow(m_hwnd);
@@ -309,6 +313,30 @@ void Game::Update(DX::StepTimer const& timer)
 
     HR(m_renderManager.EndFrame());
 
+}
+
+HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
+{
+    bool bOpen = true;
+    if (!ImGui::Begin("Metrics", &bOpen))
+    {
+        ImGui::End();
+        return S_FALSE;
+    }
+
+    // Basic info
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui::Text("Simulation Time %.3f seconds", m_renderManager.GetRenderData().time);
+    ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+    ImGui::Separator();
+    ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", m_renderManager.GetRenderData().frameStats[WORLD_MATRIX_COMPUTED_STAT].stat,
+        m_renderManager.GetRenderData().frameStats[NUM_STICKS_STAT].stat,
+        m_renderManager.GetRenderData().frameStats[NUM_LEAVES_STAT].stat);
+    ImGui::Text("UI %d vertices, %d indices (%d triangles)", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
+
+    ImGui::End();
+
+    return S_OK;
 }
 
 

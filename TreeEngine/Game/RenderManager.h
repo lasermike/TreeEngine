@@ -35,6 +35,11 @@ interface IRenderFrame
     virtual RenderData& GetRenderData() = 0;
 };
 
+interface IDebugUI
+{
+    virtual HRESULT UpdateDebugUI(ImGuiContext * imGuiContext) = 0;
+};
+
 class RenderManager : public IRenderFrame
 {
     // Filled in during scene initialization
@@ -56,6 +61,8 @@ class RenderManager : public IRenderFrame
 
     // 11 or 12
     RenderPlatform*                                 m_platform;
+
+    IDebugUI*                                       m_pDebugUI;
 
     DisplayMode                         m_displayMode;
 
@@ -84,6 +91,7 @@ public:
     ~RenderManager();
 
     HRESULT SetPlatform(HMODULE platformDLL);
+    HRESULT SetDebugUI(IDebugUI* debugUI) { m_pDebugUI = debugUI; return S_OK; }
 
     HRESULT InitDevice();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);

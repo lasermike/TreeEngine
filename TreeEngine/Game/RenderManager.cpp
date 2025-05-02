@@ -3,6 +3,9 @@
 
 #include "Primitive.h" // TEMPTEMP
 
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+
 FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
 { 
     { FPS_STAT, L"FPS", UINT_FrameStatValueType, 0 },
@@ -31,7 +34,7 @@ void SetFrameStat(FrameStatistic stats[], FrameStat stat, float value)
 }
 
 
-RenderManager::RenderManager() : m_platform(nullptr)
+RenderManager::RenderManager() : m_platform(nullptr), m_pDebugUI(nullptr)
 {
     m_displayMode = Monitor;
 
@@ -60,7 +63,6 @@ HRESULT RenderManager::SetPlatform(HMODULE platformDLL)
     
     return S_OK;
 }
-
 
 HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
 {
@@ -487,7 +489,18 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
 
     HRC(GetPlatform()->RenderPostProcess());
 
+    HRC(GetPlatform()->RenderDebugUI());
+
+    ImGuiContext* imGuiContext = m_platform->GetImGuiContext();
+    if (imGuiContext && m_pDebugUI != nullptr)
+    {
+        ImGui::SetCurrentContext(imGuiContext);
+        m_pDebugUI->UpdateDebugUI(imGuiContext);
+    }
+
+
     HRC(GetPlatform()->RenderEpilog(oculus, useShadowMaps, renderToSharedTexture));
+
 
 Cleanup:
     return;
@@ -616,6 +629,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
 
     ASSIGN_FUNC(RenderProlog);
     ASSIGN_FUNC(RenderPostProcess);
+    ASSIGN_FUNC(RenderDebugUI);
     ASSIGN_FUNC(RenderEpilog);
 
     ASSIGN_FUNC(RenderSceneSetup);

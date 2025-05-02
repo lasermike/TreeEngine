@@ -285,7 +285,9 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters().SegmentLength = SegLengthPlusRand;
 
     params2->position = XMFLOAT3(-2.2f, .5f, 1.0f);
-    scene->AddChild(new Tree(params2));
+
+    // Commented out, one tree for now
+    //scene->AddChild(new Tree(params2));
 
     WorldObjectParameters<LSystemParams>* params2A = new WorldObjectParameters<LSystemParams>(*params2);
     params2A->position = XMFLOAT3(0.5f, .5f, 0.0f);
@@ -295,7 +297,7 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     WorldObjectParameters<LSystemParams>* params2B = new WorldObjectParameters<LSystemParams>(*params2);
     params2B->position = XMFLOAT3(3.0f, .5f, 1.0f);
     XMStoreFloat4(&params2B->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 2.0f));
-    scene->AddChild(new Tree(params2B));
+    //scene->AddChild(new Tree(params2B));
 
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);

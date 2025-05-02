@@ -54,11 +54,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <LibraryPath>Lib\Debug;$(WindowsSDK_LibraryPath_x64);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)nvapi\amd64</LibraryPath>
-    <IncludePath>$(SolutionDir)packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);Inc;..\Game\.;Inc\DirectXTK12;..\Inc;$(OutDir);$(SolutionDir)nvapi</IncludePath>
+    <IncludePath>$(SolutionDir)packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);Inc;..\Game\.;Inc\DirectXTK12;..\Inc;$(OutDir);$(SolutionDir)nvapi;$(SolutionDir)imgui</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);Inc;..\Game\.;Inc\DirectXTK12;..\Inc;$(OutDir);$(SolutionDir)nvapi</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);Inc;..\Game\.;Inc\DirectXTK12;..\Inc;$(OutDir);$(SolutionDir)nvapi;$(SolutionDir)imgui</IncludePath>
     <LibraryPath>Lib\Release;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)nvapi\amd64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -134,27 +134,27 @@
     <ClCompile Include="..\Game\Stdafx.cpp" />
     <ClCompile Include="..\Game\StockRenderStates12.cpp" />
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="Inc\imgui.cpp">
+    <ClCompile Include="..\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_draw.cpp">
+    <ClCompile Include="..\imgui\imgui_draw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_impl_dx12.cpp">
+    <ClCompile Include="..\imgui\imgui_impl_dx12.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_impl_win32.cpp">
+    <ClCompile Include="..\imgui\imgui_impl_win32.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_widgets.cpp">
+    <ClCompile Include="..\imgui\imgui_widgets.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_tables.cpp">
+    <ClCompile Include="..\imgui\imgui_tables.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
