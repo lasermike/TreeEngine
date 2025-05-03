@@ -315,24 +315,113 @@ void Game::Update(DX::StepTimer const& timer)
 
 }
 
+char* GetWorldObjectName(WorldObject* obj)
+{
+    switch (obj->GetObjectType())
+    {
+    case WorldObjectType:
+    default:
+        return "Object";
+    case PrimitiveObjectType:
+        return "Primitive";
+    case TreeType:
+        return "Tree";
+    case GraphType:
+        return "Graph";
+    }
+}
+
+const int inputBufferSize = 2048;
+static char s_textInputBuffers[10][inputBufferSize];
+static int s_buffersInUse = 0;
+
+
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
     bool bOpen = true;
-    if (!ImGui::Begin("Metrics", &bOpen))
+    if (!ImGui::Begin("Debug UI", &bOpen))
     {
         ImGui::End();
         return S_FALSE;
     }
 
-    // Basic info
-    ImGuiIO& io = ImGui::GetIO();
-    ImGui::Text("Simulation Time %.3f seconds", m_renderManager.GetRenderData().time);
-    ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-    ImGui::Separator();
-    ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", m_renderManager.GetRenderData().frameStats[WORLD_MATRIX_COMPUTED_STAT].stat,
-        m_renderManager.GetRenderData().frameStats[NUM_STICKS_STAT].stat,
-        m_renderManager.GetRenderData().frameStats[NUM_LEAVES_STAT].stat);
-    ImGui::Text("UI %d vertices, %d indices (%d triangles)", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
+    if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        // Basic info
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui::Text("Simulation Time %.3f seconds", m_renderManager.GetRenderData().time);
+        ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        ImGui::Separator();
+        ImGui::Text("Skinned: %d \t Sticks: %d \t Leaves: %d", m_renderManager.GetRenderData().frameStats[WORLD_MATRIX_COMPUTED_STAT].stat,
+            m_renderManager.GetRenderData().frameStats[NUM_STICKS_STAT].stat,
+            m_renderManager.GetRenderData().frameStats[NUM_LEAVES_STAT].stat);
+        ImGui::Text("UI %d vertices, %d indices (%d triangles)", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
+    }
+
+    static bool uiPaused = false;
+
+#if 0
+    if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::Checkbox("Pause", &uiPaused);
+        ImGui::InputText()
+        ImGui::DragIntRange2
+    }
+#endif
+
+    int nextInputBuffer = 0;
+
+    if (ImGui::CollapsingHeader("Scene", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (WorldObject* obj : m_pScene->Children())
+        {
+            WorldObjectParams& params = obj->GetParams();
+
+            ImGui::SeparatorText(GetWorldObjectName(obj));
+            ImGui::Text("Primitive type: %d", params.primitiveType);
+
+            if (params.generatorType == LSystemGeneratorType)
+            {
+                //Tree* treeObj = (Tree*) obj;
+                WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
+                //ImGui::Text("Axiom");
+                //ImGui::SameLine();
+                strcpy(s_textInputBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
+                ImGui::InputText("Axiom", s_textInputBuffers[nextInputBuffer++], inputBufferSize, 0 /*ImGuiInputTextFlags*/);
+
+                for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
+                {
+                    Rule& rule = lsystemParams.GetGeneratorParameters()._rules[r];
+
+                    if (ImGui::TreeNode("Rule"))
+                    {
+                        strcpy(s_textInputBuffers[nextInputBuffer], rule.input.c_str());
+                        ImGui::InputText("Input", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+
+                        sprintf(s_textInputBuffers[nextInputBuffer], "%d", rule.numIterations);
+                        ImGui::InputText("Iterations", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+
+                        strcpy(s_textInputBuffers[nextInputBuffer], rule.output.c_str());
+                        ImGui::InputText("Output", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+
+                        ImGui::TreePop();
+                    }
+                }
+            }
+
+            
+            //switch (obj->GetObjectType())
+            //{
+            //case PrimitiveObjectType:
+            //    ImGui::Text("Primitive type: %d", params.primitiveType);
+            //    break;
+            //case TreeType:
+            //     break
+            //}
+        }
+
+    }
+
 
     ImGui::End();
 
