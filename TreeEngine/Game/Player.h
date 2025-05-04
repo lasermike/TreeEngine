@@ -43,6 +43,9 @@ public:
     XMMATRIX GetViewMatrix();
     XMVECTOR GetEyePosition();
 
+    float* GetEyePositionPtr() { return (float*) & _position; }
+    float* GetEyeRotationPtr() { return (float*) &_rotation; }
+
     inline void Update(DX::StepTimer const& timer, RenderData* pRenderData)
     {
     }

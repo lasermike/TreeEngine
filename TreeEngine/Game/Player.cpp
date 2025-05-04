@@ -12,9 +12,20 @@ XMMATRIX Camera::GetViewMatrix()
     XMVECTOR finalForward = XMVector3Transform(XMVectorSet(0, 0, 1, 0), rotMat);
 
     XMVECTOR pos = m_parent->GetPosition();
-    pos += XMVectorSet(m_hmdPosition.x, m_hmdPosition.y, m_hmdPosition.z, 0);
+    pos += XMVectorSet(m_hmdPosition.x, m_hmdPosition.y, m_hmdPosition.z, 0);  //VR
+
+    if (XMVector3Equal(finalForward, XMVectorZero()) ||
+        XMVector3IsInfinite(finalForward) ||
+        XMVector3Equal(finalUp, XMVectorZero()) ||
+        XMVector3IsInfinite(finalUp))
+    {
+        return XMMatrixIdentity();
+    }
+
+    XMVECTOR focusPosition = pos + finalForward;
+
     return XMMatrixLookAtLH(pos, 
-                            pos + finalForward, 
+                            focusPosition, 
                             finalUp);
 }
 

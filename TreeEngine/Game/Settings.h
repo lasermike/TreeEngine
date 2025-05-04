@@ -3,8 +3,9 @@
 class Settings
 {
 public:
-    static const int inputBufferSize = 2048;
-    char m_textInputBuffers[10][inputBufferSize];
+    // TODO: Tracking for these is a mess
+    static const int ruleTextBufferSize = 2048;
+    char m_ruleTextEditBuffers[10][ruleTextBufferSize];
     int m_buffersInUse = 0;
 
     bool m_paused;

@@ -23,6 +23,9 @@ using namespace Windows::Graphics::Display;
 
 #define D3D_DEBUG_INFO
 
+extern Game* g_game;
+
+
 Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 {
     m_needsResize = false;
@@ -268,6 +271,8 @@ void Game::Update(DX::StepTimer const& timer)
 
         m_timeStart = 0;
 
+        m_settings.m_buffersInUse = 0;
+
         // Load the next/prev scene
         m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
 
@@ -341,6 +346,18 @@ const char s_szPrimitiveTypeNames[PrimitiveType_MAX + 1][32] =
     STR(PrimitiveType_Sprite),
 };
 
+int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
+{
+    if (g_game)
+    {
+        g_game->m_resetTree = true;
+
+        *((string*)data->UserData) = data->Buf;
+    }
+    return 0;
+}
+
+
 
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
@@ -393,9 +410,16 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Pause", &m_settings.m_paused);
 
         // Time
-        double rangeMin = 0.0, rangeMax = __max(m_timeCurrent, 10);
+        double rangeMin = 0.0, rangeMax = __max(m_timeCurrent, 50);
         ImGui::SliderScalar("Time", ImGuiDataType_Double, &m_timeCurrent, &rangeMin, &rangeMax, "%.3f", 0 /*flags*/);
 
+        // Camera
+        ImGui::PushItemWidth(200);
+        ImGui::DragFloat3("Camera Position", (float*) m_player->GetEyePositionPtr(), ImGuiColorEditFlags_Float);
+        ImGui::DragFloat3("Camera Orientation", (float*)m_player->GetEyeRotationPtr(), ImGuiColorEditFlags_Float);
+        ImGui::PopItemWidth();
+
+        // Options
         ImGui::Checkbox("Show DXR Debug UAV", &m_settings.m_showDxrUav);
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
@@ -443,10 +467,29 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                 {
                     WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
 
-                    ImGui::InputInt("Iterations", &lsystemParams.GetGeneratorParameters()._numIterations);
+                    // Iterations - TODO: make this is common code
+                    ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
+                    if (ImGui::ArrowButton("##left", ImGuiDir_Left) &&
+                        lsystemParams.GetGeneratorParameters()._numIterations > 0)
+                    {
+                        lsystemParams.GetGeneratorParameters()._numIterations--;
+                        m_resetTree = true;
+                    }
+                    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+                    if (ImGui::ArrowButton("##right", ImGuiDir_Right))
+                    {
+                        lsystemParams.GetGeneratorParameters()._numIterations++;
+                        m_resetTree = true;
+                    }
+                    ImGui::PopItemFlag();
+                    ImGui::SetNextItemWidth(24);
+                    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+                    ImGui::LabelText("Iterations", "%d", lsystemParams.GetGeneratorParameters()._numIterations);
 
-                    strcpy(m_settings.m_textInputBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
-                    ImGui::InputText("Axiom", m_settings.m_textInputBuffers[nextInputBuffer++], m_settings.inputBufferSize, 0 /*ImGuiInputTextFlags*/);
+                    // Axiom and rules
+                    strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
+                    ImGui::InputText("Axiom", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize, 
+                                     ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &lsystemParams.GetGeneratorParameters()._axiom);
 
                     for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
                     {
@@ -454,18 +497,28 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
                         if (ImGui::TreeNodeEx("Rule", ImGuiTreeNodeFlags_DefaultOpen))
                         {
-                            auto InputText = [&](char* label, char* value)
+                            // Rule input
+                            if (!m_settings.isInUse(nextInputBuffer))
                             {
-                                if (!m_settings.isInUse(nextInputBuffer))
-                                {
-                                    strcpy(m_settings.m_textInputBuffers[nextInputBuffer], value);
-                                }
-                                ImGui::InputText(label, m_settings.m_textInputBuffers[nextInputBuffer++], m_settings.inputBufferSize);
-                            };
+                                strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], rule.input.c_str());
+                            }
 
-                            InputText("Input", (char*) rule.input.c_str());
-                            ImGui::InputInt("Iterations", &rule.numIterations);
-                            InputText("Output", (char*)rule.output.c_str());
+                            ImGui::InputText("Input", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
+                                             ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.input);
+
+                            // Rule output
+                            if (!m_settings.isInUse(nextInputBuffer))
+                            {
+                                strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], rule.output.c_str());
+                            }
+
+                            ImGui::InputText("Output", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
+                                ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.output);
+
+                            //ImGui::InputTextMultiline("Output", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
+                            //    ImVec2(0, 60), ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.output);
+
+                            //ImGui::InputInt("Iterations", &rule.numIterations); TODO: Fix this!
 
                             ImGui::TreePop();
                         }

@@ -2859,29 +2859,24 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     HRR(SetupGraphicsOnCommandList());
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle;
 
     //TODO NEXT: use compute to copy offscreen1 to rtv
     if (m_settings->m_enablePostProcessing)
     {
+        // Render scene to m_offscreenBuffer1
+        rtvHandle = m_rtvHeap.hCPU(FrameCount);
         GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-        // Set initial render target to offscreenbuffer1
-        CD3DX12_CPU_DESCRIPTOR_HANDLE offscreen1Handle(m_rtvHeap.hCPU(FrameCount));
-        GetCommandList()->OMSetRenderTargets(1, &offscreen1Handle, FALSE, &dsvHandle);
-        GetCommandList()->ClearRenderTargetView(offscreen1Handle, &m_renderData->clearColor.x, 0, nullptr);
     }
     else
     {
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
-        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
-
+        // Render scene to m_renderTargets[m_frameIndex]
+        rtvHandle = m_rtvHeap.hCPU(m_frameIndex);
         GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-        GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-        GetCommandList()->ClearRenderTargetView(rtvHandle, &m_renderData->clearColor.x, 0, nullptr); // TODO refactor out with case above
-
     }
 
+    GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    GetCommandList()->ClearRenderTargetView(rtvHandle, &m_renderData->clearColor.x, 0, nullptr); // TODO refactor out with case above
     GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     GetCommandList()->SetPipelineState(m_pipelineState);  // Needed here?  Supports rendering without material?

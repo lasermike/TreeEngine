@@ -452,7 +452,7 @@ void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");
     params2->textureFilename.push_back(L"FirBranchWithNeedles.dds");
 
-    params2->position = XMFLOAT3(0, .5f, -2.0f);
+    params2->position = XMFLOAT3(0, .1f, -2.0f);
     params2->GetGeneratorParameters()._angle = XM_2PI;
     params2->GetGeneratorParameters()._numIterations = 14;
     params2->_animationSpeed = 15.0f;

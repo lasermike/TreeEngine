@@ -21,6 +21,8 @@ class BitmapFont;
 interface IInputManager;
 interface IGameInput;
 interface IGameInputReading;
+struct ImGuiInputTextCallbackData;
+
 
 class Game : public IDebugUI
 {
@@ -96,6 +98,9 @@ private:
 
     HRESULT ReloadDevice();
     void UpdateViewMatrix();
+    
+    static int RuleTextEditCallback(ImGuiInputTextCallbackData* data);
+
 
     // Managers
     GameLoader                           m_loader;
