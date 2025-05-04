@@ -794,39 +794,40 @@ void GameLoader::Regenerate(SceneRoot* pScene)
     }
 
     int treeNum = 0;
-    for (auto t = pScene->Children().begin(); t != pScene->Children().end(); t++)
+    for (WorldObject* obj : pScene->Children())
+    //for (auto& t = pScene->Children().begin(); t != pScene->Children().end(); t++)
     {
         treeNum++;
 
-        GeneratorType genType = (*t)->GetParams().generatorType;
+        GeneratorType genType = obj->GetParams().generatorType;
         if (genType == LSystemGeneratorType)
         {
-            WorldObjectParameters<LSystemParams>& wop = (*t)->GetParams<LSystemParams>();
+            WorldObjectParameters<LSystemParams>& wop = obj->GetParams<LSystemParams>();
 
             LSystemModelGenerator generater(wop.GetGeneratorParameters()); // TODO
-            (*t)->Create(&generater);
+            obj->Create(&generater);
         }
         else if (genType == FixedTreeGeneratorType)
         {
             FixedTreeModelGenerator generator(_seeds[_currentSeed] * treeNum);
-            (*t)->Create(&generator);
+            obj->Create(&generator);
         }
         else if (genType == PrimitiveGeneratorType)
         {
-            PrimitiveModelGenerator planeGen((*t)->GetParams().primitiveType);
-            (*t)->Create(&planeGen);
+            PrimitiveModelGenerator planeGen(obj->GetParams().primitiveType);
+            obj->Create(&planeGen);
         }
         else if (genType == GraphGeneratorType)
         {
-            WorldObjectParameters<GraphParams>& wop = (*t)->GetParams<GraphParams>();
+            WorldObjectParameters<GraphParams>& wop = obj->GetParams<GraphParams>();
             GraphModelGenerator graphGen(wop.GetGeneratorParameters());
-            (*t)->Create(&graphGen);
+            obj->Create(&graphGen);
         }
         else if (genType == FSGraphGeneratorType)
         {
-            WorldObjectParameters<FSGraphParams>& wop = (*t)->GetParams<FSGraphParams>();
+            WorldObjectParameters<FSGraphParams>& wop = obj->GetParams<FSGraphParams>();
             FSGraphModelGenerator graphGen(wop.GetGeneratorParameters());
-            (*t)->Create(&graphGen);
+            obj->Create(&graphGen);
         }
         else
         {

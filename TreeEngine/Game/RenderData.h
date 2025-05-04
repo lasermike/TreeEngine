@@ -105,14 +105,14 @@ struct RenderData
     XMFLOAT4X4          lightProj;
     XMFLOAT4X4          shadowTransform;
 
-    bool                wireframe;
-    bool                showShadowBuffer;
-    bool                showDxrUav;
+    //bool                wireframe;
+    //bool                showShadowBuffer;
+    //bool                showDxrUav;
 
 
     IInputManager*       inputManager;
 
-    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), wireframe(false), showShadowBuffer(false), showDxrUav(false), inputManager(nullptr),
+    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), inputManager(nullptr),
         currentPass(RegularPass)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());
@@ -126,6 +126,5 @@ struct RenderData
         numDirectionalLights = 1;
         numPointLights = 0;
         instanceBuffer = nullptr;
-        showDxrUav = false;
     }
 };

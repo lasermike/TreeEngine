@@ -3,6 +3,8 @@
 
 #include "Primitive.h" // TEMPTEMP
 
+#include "Settings.h"
+
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 
@@ -59,7 +61,7 @@ HRESULT RenderManager::SetPlatform(HMODULE platformDLL)
     SafeDelete(&m_platform);
 
     //m_platform = new RenderPlatform12(&m_renderData);
-    m_platform = new RenderPlatformDLL(platformDLL, &m_renderData);
+    m_platform = new RenderPlatformDLL(platformDLL, &m_renderData, m_settings);
     
     return S_OK;
 }
@@ -456,12 +458,12 @@ void RenderManager::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp,
+void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp,
     bool renderToSharedTexture, float* clearColor)
 {
     HRESULT hr = S_OK;
 
-    GetPlatform()->RenderProlog(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor);
+    GetPlatform()->RenderProlog(oculus, m_settings->m_wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor);
 
     UpdateViewProjection(&GetRenderData().view, &GetRenderData().projection, false);
 
@@ -487,9 +489,9 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
         DrawFrameStats();
     }
 
-    HRC(GetPlatform()->RenderPostProcess());
+    HRC(GetPlatform()->RenderPostProcess());  // Does effects and then copies offscreen back to render target 
 
-    HRC(GetPlatform()->RenderDebugUI());
+    HRC(GetPlatform()->RenderDebugUI());  // If ImGui is enabled it will be initialized here
 
     ImGuiContext* imGuiContext = m_platform->GetImGuiContext();
     if (imGuiContext && m_pDebugUI != nullptr)
@@ -598,10 +600,10 @@ void RenderManager::DrawSceneToShadowMap()
 }
 
 
-RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
+RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data, Settings* settings)
 {
     CreateFunc createFuncPtr = (CreateFunc) ::GetProcAddress(module, "Create");
-    HR(createFuncPtr(data));
+    HR(createFuncPtr(data, settings));
 
     InitDeviceFuncPtr = (InitDeviceFunc) ::GetProcAddress(module, "InitDevice");
 

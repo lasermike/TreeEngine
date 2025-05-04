@@ -30,14 +30,15 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_nextScreenHeight = 0;
     m_renderToSharedTexture = false;
     m_settings.m_paused = false;
-    m_wireframe = false;
+    m_settings.m_wireframe = false;
     m_showHelp = false;
     m_is12Driver = true;
     m_rotateLights = false;
     m_timeStart = 0;
     m_resetTree = true;
-    m_showShadowBuffer = false;
-    m_showDxrUav = false;
+    m_settings.m_showShadowBuffer = false;
+    m_settings.m_showDxrUav = false;
+    m_settings.m_enablePostProcessing = true;
     m_advanceScene = 0;
     m_advanceSceneAmount = 0;
     m_currentScene = 0;
@@ -166,8 +167,10 @@ HRESULT Game::ReloadDevice()
 
     assert(m_renderPlatformDLL != nullptr);
 
-    m_renderManager.SetPlatform(m_renderPlatformDLL);
     m_renderManager.SetDebugUI(this);
+    m_renderManager.SetSettings(&m_settings);
+
+    m_renderManager.SetPlatform(m_renderPlatformDLL); // Set this last
 
 #if defined(TREENGINE_WIN32)
     m_renderManager.GetPlatform()->SetWindow(m_hwnd);
@@ -342,7 +345,7 @@ const char s_szPrimitiveTypeNames[PrimitiveType_MAX + 1][32] =
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
     bool bOpen = true;
-    if (!ImGui::Begin("Debug UI", &bOpen))
+    if (!ImGui::Begin("Debug UI", &bOpen, ImGuiWindowFlags_NoFocusOnAppearing))
     {
         ImGui::End();
         return S_FALSE;
@@ -368,10 +371,35 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
     {
+        // Scene select
+        ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
+        if (ImGui::ArrowButton("##left", ImGuiDir_Left)) 
+        { 
+            m_advanceScene = true;
+            m_advanceSceneAmount = -1;
+        }
+        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+        if (ImGui::ArrowButton("##right", ImGuiDir_Right)) 
+        { 
+            m_advanceScene = true;
+            m_advanceSceneAmount = 1;
+        }
+        ImGui::PopItemFlag();
+        ImGui::SetNextItemWidth(24);
+        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+        ImGui::LabelText("Scene", "%d", m_currentScene);
+
+        //Pause
         ImGui::Checkbox("Pause", &m_settings.m_paused);
 
+        // Time
         double rangeMin = 0.0, rangeMax = __max(m_timeCurrent, 10);
         ImGui::SliderScalar("Time", ImGuiDataType_Double, &m_timeCurrent, &rangeMin, &rangeMax, "%.3f", 0 /*flags*/);
+
+        ImGui::Checkbox("Show DXR Debug UAV", &m_settings.m_showDxrUav);
+        ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
+        ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
+        ImGui::Checkbox("Enable Post Processing", &m_settings.m_enablePostProcessing);
     }
 
     int nextInputBuffer = 0;
@@ -411,9 +439,12 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
             if (params.generatorType == LSystemGeneratorType)
             {
-                if (ImGui::TreeNode("L System"))
+                if (ImGui::TreeNodeEx( "L System", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
+
+                    ImGui::InputInt("Iterations", &lsystemParams.GetGeneratorParameters()._numIterations);
+
                     strcpy(m_settings.m_textInputBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
                     ImGui::InputText("Axiom", m_settings.m_textInputBuffers[nextInputBuffer++], m_settings.inputBufferSize, 0 /*ImGuiInputTextFlags*/);
 
@@ -421,7 +452,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                     {
                         Rule& rule = lsystemParams.GetGeneratorParameters()._rules[r];
 
-                        if (ImGui::TreeNode("Rule"))
+                        if (ImGui::TreeNodeEx("Rule", ImGuiTreeNodeFlags_DefaultOpen))
                         {
                             auto InputText = [&](char* label, char* value)
                             {
@@ -499,7 +530,7 @@ void Game::Render(bool oculus)
     XMStoreFloat4x4(&m_renderManager.GetRenderData().view, m_player->GetViewMatrix());
     m_renderManager.GetRenderData().eyePos = m_player->GetEyePosition();
 
-    m_renderManager.Render(oculus, m_wireframe, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
+    m_renderManager.Render(oculus, m_gameData.useAlphaBlendedRenderTarget, m_gameData.useShadowMaps, m_showHelp,
                            m_renderToSharedTexture, &m_gameData.clearColor.x);
 
     PIXEndEvent();  // Render
@@ -539,8 +570,8 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
                 m_timeCurrent -= 1.0 / 60.0;
                 break;
             case 'Z':
-                m_showShadowBuffer = !m_showShadowBuffer;
-                m_renderManager.GetRenderData().showShadowBuffer = m_showShadowBuffer;
+                m_settings.m_showShadowBuffer = !m_settings.m_showShadowBuffer;
+                m_settings.m_showShadowBuffer = m_settings.m_showShadowBuffer;
                 key[k] = false;
                 break;
             case 'P':
@@ -548,8 +579,8 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
                 key[k] = false;
                 break;
             case 'M':
-                m_wireframe = !m_wireframe;
-                m_renderManager.GetRenderData().wireframe = m_wireframe;
+                m_settings.m_wireframe = !m_settings.m_wireframe;
+                m_settings.m_wireframe = m_settings.m_wireframe;
                 key[k] = false;
                 m_reloadDevice = true;
                 break;
@@ -558,7 +589,8 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
                 key[k] = false;
                 break;
             case 'R':
-                m_advanceScene = true;
+                m_resetTree = true;
+                //m_timeStart = 0;
                 key[k] = false;
                 break;
             case 'N':

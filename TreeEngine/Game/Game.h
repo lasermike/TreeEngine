@@ -126,10 +126,10 @@ private:
     bool                                m_renderToSharedTexture;
 
     bool                                m_resetTree;
-    bool                                m_showShadowBuffer;
-    bool                                m_showDxrUav;
     //bool                                m_paused;
-    bool                                m_wireframe;
+    //bool                                m_showShadowBuffer;
+    //bool                                m_showDxrUav;
+    //bool                                m_wireframe;
     bool                                m_showHelp;
     bool                                m_is12Driver;
     bool                                m_rotateLights;

@@ -8,7 +8,7 @@
 #define RENDERPLATFORM_API extern "C" __declspec(dllimport)
 #endif
 
-RENDERPLATFORM_API HRESULT Create(RenderData* data);
+RENDERPLATFORM_API HRESULT Create(RenderData* data, Settings* settings);
 
 /////
 

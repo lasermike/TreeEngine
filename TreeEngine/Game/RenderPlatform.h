@@ -11,7 +11,7 @@
 #include "RenderData.h"
 #include "StockRenderStates.h"
 
-
+class Settings;
 class RenderPlatform;
 class RenderManager;
 struct ImGuiContext;
@@ -831,6 +831,7 @@ private:
     };
 
     RenderData*                    m_renderData;
+    Settings*                      m_settings;
 
     // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
@@ -852,7 +853,7 @@ private:
 
 public:
 
-    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
+    RenderPlatform12(RenderData* renderData, Settings* settings) : m_renderData(renderData), m_settings(settings), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
         m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr),
         m_renderTargets{ }
         //m_bitmapFont(nullptr)
@@ -1180,7 +1181,7 @@ public:
 ///
 //
 
-typedef HRESULT (*CreateFunc)(RenderData* data);
+typedef HRESULT (*CreateFunc)(RenderData* data, Settings* settings);
 
 #if defined(TREENGINE_WIN32)
 typedef void(*SetWindowFunc)(HWND hwnd);
@@ -1301,7 +1302,7 @@ class RenderPlatformDLL : public RenderPlatform
     GetDeviceFunc GetDeviceFuncPtr;
 
 public:
-    RenderPlatformDLL(HMODULE module, RenderData* data);
+    RenderPlatformDLL(HMODULE module, RenderData* data, Settings* settings);
     ~RenderPlatformDLL();
 
 #if defined(TREENGINE_WIN32)
