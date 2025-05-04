@@ -9,6 +9,7 @@
 #include "StepTimer.h"
 #include "Player.h"
 #include "RenderManager.h"
+#include "Settings.h"
 
 //#if !defined(WIN32) || defined(TREENGINE_XBOX)
 //#include "agile.h"
@@ -97,36 +98,37 @@ private:
     void UpdateViewMatrix();
 
     // Managers
-    GameLoader                            m_loader;
+    GameLoader                           m_loader;
+    Settings                             m_settings;
     RenderManager                        m_renderManager;
-    HMODULE                             m_renderPlatformDLL;
+    HMODULE                              m_renderPlatformDLL;
 
     // Owned objectes
-    ThreadPool*                            m_threadPool;
-    SceneRoot*                            m_pScene;
-    Player*                                m_player;
+    ThreadPool*                          m_threadPool;
+    SceneRoot*                           m_pScene;
+    Player*                              m_player;
 
     // Unowned objects
     IInputManager*                        m_inputMgr;   
 
     // Game state
     DX::StepTimer                        m_timer;
-    double                                m_timeStart;
-    double                                m_timeCurrent;
-    int                                    m_currentScene;
-    bool                                m_advanceScene;
-    int                                    m_advanceSceneAmount;
-    bool                                m_reloadDevice;
+    double                               m_timeStart;
+    double                               m_timeCurrent;
+    int                                  m_currentScene;
+    bool                                 m_advanceScene;
+    int                                  m_advanceSceneAmount;
+    bool                                 m_reloadDevice;
 
     bool                                m_needsResize;
     int                                 m_nextScreenWidth;
     int                                 m_nextScreenHeight;
     bool                                m_renderToSharedTexture;
 
-    bool                                   m_resetTree;
+    bool                                m_resetTree;
     bool                                m_showShadowBuffer;
     bool                                m_showDxrUav;
-    bool                                m_paused;
+    //bool                                m_paused;
     bool                                m_wireframe;
     bool                                m_showHelp;
     bool                                m_is12Driver;

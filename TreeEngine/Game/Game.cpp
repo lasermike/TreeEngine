@@ -29,7 +29,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_nextScreenWidth = 0;
     m_nextScreenHeight = 0;
     m_renderToSharedTexture = false;
-    m_paused = false;
+    m_settings.m_paused = false;
     m_wireframe = false;
     m_showHelp = false;
     m_is12Driver = true;
@@ -288,14 +288,14 @@ void Game::Update(DX::StepTimer const& timer)
         m_timeStart = timer.GetTotalSeconds();
         m_timeCurrent = 0;
     }
-    else if (!m_paused)
+    else if (!m_settings.m_paused)
     {
         m_timeCurrent += timer.GetElapsedSeconds();
     }
     m_renderManager.GetRenderData().time = (float)m_timeCurrent;
 
 
-    if (!m_paused && m_rotateLights)
+    if (!m_settings.m_paused && m_rotateLights)
     {
         // Light rotation
         XMVECTOR quat = XMQuaternionRotationNormal(XMVectorSet(0.0f, 1.0f, 0.0f, 1.f), 0.05f); //m_timeCurrent / 1000
@@ -338,10 +338,6 @@ const char s_szPrimitiveTypeNames[PrimitiveType_MAX + 1][32] =
     STR(PrimitiveType_Sprite),
 };
 
-const int inputBufferSize = 2048;
-static char s_textInputBuffers[10][inputBufferSize];
-static int s_buffersInUse = 0;
-
 
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
@@ -370,14 +366,13 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     static bool uiPaused = false;
 
-#if 0
     if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::Checkbox("Pause", &uiPaused);
-        ImGui::InputText()
-        ImGui::DragIntRange2
+        ImGui::Checkbox("Pause", &m_settings.m_paused);
+
+        double rangeMin = 0.0, rangeMax = __max(m_timeCurrent, 10);
+        ImGui::SliderScalar("Time", ImGuiDataType_Double, &m_timeCurrent, &rangeMin, &rangeMax, "%.3f", 0 /*flags*/);
     }
-#endif
 
     int nextInputBuffer = 0;
 
@@ -419,8 +414,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                 if (ImGui::TreeNode("L System"))
                 {
                     WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
-                    strcpy(s_textInputBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
-                    ImGui::InputText("Axiom", s_textInputBuffers[nextInputBuffer++], inputBufferSize, 0 /*ImGuiInputTextFlags*/);
+                    strcpy(m_settings.m_textInputBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
+                    ImGui::InputText("Axiom", m_settings.m_textInputBuffers[nextInputBuffer++], m_settings.inputBufferSize, 0 /*ImGuiInputTextFlags*/);
 
                     for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
                     {
@@ -428,14 +423,18 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
                         if (ImGui::TreeNode("Rule"))
                         {
-                            strcpy(s_textInputBuffers[nextInputBuffer], rule.input.c_str());
-                            ImGui::InputText("Input", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+                            auto InputText = [&](char* label, char* value)
+                            {
+                                if (!m_settings.isInUse(nextInputBuffer))
+                                {
+                                    strcpy(m_settings.m_textInputBuffers[nextInputBuffer], value);
+                                }
+                                ImGui::InputText(label, m_settings.m_textInputBuffers[nextInputBuffer++], m_settings.inputBufferSize);
+                            };
 
-                            sprintf(s_textInputBuffers[nextInputBuffer], "%d", rule.numIterations);
-                            ImGui::InputText("Iterations", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
-
-                            strcpy(s_textInputBuffers[nextInputBuffer], rule.output.c_str());
-                            ImGui::InputText("Output", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+                            InputText("Input", (char*) rule.input.c_str());
+                            ImGui::InputInt("Iterations", &rule.numIterations);
+                            InputText("Output", (char*)rule.output.c_str());
 
                             ImGui::TreePop();
                         }
@@ -445,6 +444,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             }
         }
 
+        m_settings.m_buffersInUse = nextInputBuffer;
     }
 
 
@@ -544,7 +544,7 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
                 key[k] = false;
                 break;
             case 'P':
-                m_paused = !m_paused;
+                m_settings.m_paused = !m_settings.m_paused;
                 key[k] = false;
                 break;
             case 'M':
