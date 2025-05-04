@@ -514,18 +514,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         
         if (WasDown != IsDown)
         {
-            if (IsDown)
+            if (IsDown && 
+                (!g_game || !g_game->DebugUIKeyCaptured()))  //No new keyboard downs if debug ui has focus
+            {
                 input.key[wParam] = true;
+            }
             else if (WasDown)
+            {
                 input.key[wParam] = false;
+            }
         }
     }
-    //case WM_KEYDOWN:
- //       input.key[wParam] = !(lParam & 1 << 30);
- //       break;
- //   case WM_KEYUP:
- //       input.key[wParam] = false;
- //       break;
     case WM_COMMAND:
         wmId    = LOWORD(wParam);
         wmEvent = HIWORD(wParam);

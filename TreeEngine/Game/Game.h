@@ -64,6 +64,11 @@ public:
 
     HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
 
+    bool DebugUIKeyCaptured()
+    {
+        return m_bDebugUIKeyCaptured;
+    }
+
 #if defined(TREENGINE_WIN32)
     void SetWindow(HWND hwnd)
     {
@@ -128,6 +133,7 @@ private:
     bool                                m_rotateLights;
     GameData                            m_gameData;
 
+    bool                                m_bDebugUIKeyCaptured;
 
 #if defined(TREENGINE_WIN32)
     HWND                              m_hwnd;

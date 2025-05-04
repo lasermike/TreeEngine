@@ -43,6 +43,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_currentScene = 0;
     m_reloadDevice = false;
     m_renderPlatformDLL = nullptr;
+    m_bDebugUIKeyCaptured = false;
 
     m_player = nullptr;
     m_threadPool = nullptr;
@@ -315,21 +316,27 @@ void Game::Update(DX::StepTimer const& timer)
 
 }
 
-char* GetWorldObjectName(WorldObject* obj)
+
+#define STR(str) #str
+
+const char s_szObjectTypeNames[ObjectType_MAX + 1][32] =
 {
-    switch (obj->GetObjectType())
-    {
-    case WorldObjectType:
-    default:
-        return "Object";
-    case PrimitiveObjectType:
-        return "Primitive";
-    case TreeType:
-        return "Tree";
-    case GraphType:
-        return "Graph";
-    }
-}
+    STR(ObjectType_World),
+    STR(ObjectType_Primitive),
+    STR(ObjectType_Tree),
+    STR(ObjectType_Graph),
+};
+
+const char s_szPrimitiveTypeNames[PrimitiveType_MAX + 1][32] =
+{
+    STR(PrimitiveType_Box),
+    STR(PrimitiveType_Cylinder),
+    STR(PrimitiveType_CylinderLD),
+    STR(PrimitiveType_CylinderHD),
+    STR(PrimitiveType_FSQuad),
+    STR(PrimitiveType_SkinnedCylinder),
+    STR(PrimitiveType_Sprite),
+};
 
 const int inputBufferSize = 2048;
 static char s_textInputBuffers[10][inputBufferSize];
@@ -345,10 +352,13 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         return S_FALSE;
     }
 
+    ImGuiIO& io = ImGui::GetIO();
+
+    m_bDebugUIKeyCaptured = io.WantCaptureKeyboard;
+
     if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen))
     {
         // Basic info
-        ImGuiIO& io = ImGui::GetIO();
         ImGui::Text("Simulation Time %.3f seconds", m_renderManager.GetRenderData().time);
         ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
         ImGui::Separator();
@@ -377,47 +387,62 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         {
             WorldObjectParams& params = obj->GetParams();
 
-            ImGui::SeparatorText(GetWorldObjectName(obj));
-            ImGui::Text("Primitive type: %d", params.primitiveType);
+            ImGui::SeparatorText(s_szObjectTypeNames[obj->GetObjectType()]);
+            ImGui::Text("Primitive type: %s", s_szPrimitiveTypeNames[params.primitiveType]);
+
+            if (ImGui::TreeNode("Materials"))
+            {
+                for (int m = 0; m < params.materials.size(); m++)
+                {
+                    auto& mat = params.materials[m];
+                    ImGui::Text("Material %d", m);
+                    ImGui::PushItemWidth(200);
+                    ImGui::ColorEdit4("Diffuse##2f", (float*)&mat.Diffuse, ImGuiColorEditFlags_Float);
+                    ImGui::ColorEdit4("Specular##2f", (float*)&mat.Specular, ImGuiColorEditFlags_Float);
+                    ImGui::ColorEdit4("Ambient##2f", (float*)&mat.Ambient, ImGuiColorEditFlags_Float);
+                    ImGui::PopItemWidth();
+                }
+
+                for (int t = 0; t < params.textureFilename.size(); t++)
+                {
+                    char path[MAX_PATH];
+                    if (WideCharToMultiByte(CP_UTF8, 0, params.textureFilename[t].c_str(), -1, path, MAX_PATH, nullptr, nullptr))
+                    {
+                        ImGui::Text("Texture %d: %s", t, path);
+                    }
+                }
+                ImGui::TreePop();
+            }
 
             if (params.generatorType == LSystemGeneratorType)
             {
-                //Tree* treeObj = (Tree*) obj;
-                WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
-                //ImGui::Text("Axiom");
-                //ImGui::SameLine();
-                strcpy(s_textInputBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
-                ImGui::InputText("Axiom", s_textInputBuffers[nextInputBuffer++], inputBufferSize, 0 /*ImGuiInputTextFlags*/);
-
-                for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
+                if (ImGui::TreeNode("L System"))
                 {
-                    Rule& rule = lsystemParams.GetGeneratorParameters()._rules[r];
+                    WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
+                    strcpy(s_textInputBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
+                    ImGui::InputText("Axiom", s_textInputBuffers[nextInputBuffer++], inputBufferSize, 0 /*ImGuiInputTextFlags*/);
 
-                    if (ImGui::TreeNode("Rule"))
+                    for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
                     {
-                        strcpy(s_textInputBuffers[nextInputBuffer], rule.input.c_str());
-                        ImGui::InputText("Input", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+                        Rule& rule = lsystemParams.GetGeneratorParameters()._rules[r];
 
-                        sprintf(s_textInputBuffers[nextInputBuffer], "%d", rule.numIterations);
-                        ImGui::InputText("Iterations", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+                        if (ImGui::TreeNode("Rule"))
+                        {
+                            strcpy(s_textInputBuffers[nextInputBuffer], rule.input.c_str());
+                            ImGui::InputText("Input", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
 
-                        strcpy(s_textInputBuffers[nextInputBuffer], rule.output.c_str());
-                        ImGui::InputText("Output", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+                            sprintf(s_textInputBuffers[nextInputBuffer], "%d", rule.numIterations);
+                            ImGui::InputText("Iterations", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
 
-                        ImGui::TreePop();
+                            strcpy(s_textInputBuffers[nextInputBuffer], rule.output.c_str());
+                            ImGui::InputText("Output", s_textInputBuffers[nextInputBuffer++], inputBufferSize);
+
+                            ImGui::TreePop();
+                        }
                     }
+                    ImGui::TreePop();
                 }
             }
-
-            
-            //switch (obj->GetObjectType())
-            //{
-            //case PrimitiveObjectType:
-            //    ImGui::Text("Primitive type: %d", params.primitiveType);
-            //    break;
-            //case TreeType:
-            //     break
-            //}
         }
 
     }

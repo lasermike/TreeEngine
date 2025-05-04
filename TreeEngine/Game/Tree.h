@@ -103,7 +103,7 @@ public:
 
     virtual void Create(ModelGenerator* generator) { return Create((TreeModelGenerator*)generator); }
     void Create(TreeModelGenerator* generator);
-    virtual ObjectType GetObjectType() { return TreeType; }
+    virtual ObjectType GetObjectType() { return ObjectType_Tree; }
 
     virtual HRESULT InitGraphics(RenderManager& renderManager);
 

@@ -39,7 +39,7 @@ class Primitive : public WorldObject
 public:
     Primitive(WorldObjectParams* wop);
     ~Primitive();
-    virtual ObjectType GetObjectType() { return PrimitiveObjectType; }
+    virtual ObjectType GetObjectType() { return ObjectType_Primitive; }
 
     virtual void Create(ModelGenerator* generator) { return Create((PrimitiveModelGenerator*)generator); }
     virtual void Create(PrimitiveModelGenerator* generator);

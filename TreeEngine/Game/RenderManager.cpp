@@ -175,7 +175,7 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 
     for (auto object : ru->reservations)
     {
-        if (pass == ShadowMapPass && object->GetObjectType() == PrimitiveObjectType)
+        if (pass == ShadowMapPass && object->GetObjectType() == ObjectType_Primitive)
             continue;
 
         UINT startInstance = m_perFrameInstanceData[ru][object].first;
