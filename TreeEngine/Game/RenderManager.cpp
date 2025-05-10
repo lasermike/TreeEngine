@@ -7,6 +7,7 @@
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
+#include "implot.h"
 
 FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
 { 
@@ -493,10 +494,18 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
 
     HRC(GetPlatform()->RenderDebugUI());  // If ImGui is enabled it will be initialized here
 
-    ImGuiContext* imGuiContext = m_platform->GetImGuiContext();
-    if (imGuiContext && m_pDebugUI != nullptr)
+    ImGuiContext* imGuiContext = nullptr;
+    ImPlotContext* imPlotContext = nullptr;
+    ;
+    if (SUCCEEDED(m_platform->GetImGuiContext(&imGuiContext, &imPlotContext)) &&
+        imGuiContext && m_pDebugUI != nullptr)
     {
         ImGui::SetCurrentContext(imGuiContext);
+
+        if (imPlotContext)
+        {
+            ImPlot::SetCurrentContext(imPlotContext);
+        }
         m_pDebugUI->UpdateDebugUI(imGuiContext);
     }
 

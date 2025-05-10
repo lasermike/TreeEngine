@@ -13,6 +13,7 @@ public:
     bool m_showDxrUav;
     bool m_wireframe;
     bool m_enablePostProcessing;
+    bool m_showPerfGraph;
 
 public:
 

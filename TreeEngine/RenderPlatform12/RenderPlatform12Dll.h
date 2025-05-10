@@ -67,7 +67,7 @@ RENDERPLATFORM_API void SetFrameSceneData(CBChangesEveryFrame* cb);
 RENDERPLATFORM_API D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer);
 RENDERPLATFORM_API D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer);
 
-RENDERPLATFORM_API ImGuiContext* GetImGuiContext();
+RENDERPLATFORM_API HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext);
 
 RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport);
 

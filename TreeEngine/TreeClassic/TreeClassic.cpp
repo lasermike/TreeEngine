@@ -326,7 +326,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     else
     {
 #endif
-        RECT rc = { 0, 0, 1600, 1080};
+        // Window size
+        RECT rc = { 0, 0, 1600, 1200 };
         AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
         m_hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);

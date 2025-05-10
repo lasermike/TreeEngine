@@ -15,6 +15,7 @@ class Settings;
 class RenderPlatform;
 class RenderManager;
 struct ImGuiContext;
+struct ImPlotContext;
 enum CbvSrvUavHeapOffsets;
 
 #if defined(DXR_ENABLED)
@@ -695,7 +696,7 @@ public:
     virtual D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) = 0;  // TODO!  Objects should be able to load their own meshes
     virtual D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) = 0;
 
-    virtual ImGuiContext* GetImGuiContext() = 0;
+    virtual HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext) = 0;
 
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) = 0;
@@ -938,7 +939,7 @@ public:
         return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_indexBuffer : &m_skinnedIndexBuffer;
     }
 
-    ImGuiContext* GetImGuiContext();
+    HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext);
 
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -1165,8 +1166,7 @@ public:
         return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_indexBuffer : &m_skinnedIndexBuffer;
     }
 
-    ImGuiContext* GetImGuiContext();
-
+    HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext)
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -1235,7 +1235,7 @@ typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 
 typedef D3DBuffer* (*GetVertexBufferFunc)(GeometryBuffer geometryBuffer);
 typedef D3DBuffer* (*GetIndexBufferFunc)(GeometryBuffer geometryBuffer);
-typedef ImGuiContext* (*GetImGuiContextFunc)();
+typedef HRESULT (*GetImGuiContextFunc)(ImGuiContext** imguiContext, ImPlotContext** implotContext);
 
 typedef LRESULT (*Gui_WndProcHandlerFunc)(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -1388,7 +1388,7 @@ public:
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) { return GetVertexBufferFuncPtr(geometryBuffer); }
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) { return GetIndexBufferFuncPtr(geometryBuffer); }
 
-    ImGuiContext* GetImGuiContext() { return GetImGuiContextFuncPtr(); }
+    HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext) { return GetImGuiContextFuncPtr(imguiContext, implotContext); }
 
     LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {

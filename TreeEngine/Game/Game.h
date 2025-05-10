@@ -142,6 +142,18 @@ private:
 
     bool                                m_bDebugUIKeyCaptured;
 
+    //static const int                    kNumFrameTimeLogEntries = 4000;
+    //double                              m_frameTimeLog[kNumFrameTimeLogEntries];
+    //int                                 m_currentFrameTimeLogEntry;
+
+
+    static constexpr size_t FRAME_DURATION_HISTORY_SIZE = 400; // Adjust size as needed
+
+    float m_timeStamps[FRAME_DURATION_HISTORY_SIZE];
+
+    float m_frameDurations[FRAME_DURATION_HISTORY_SIZE];
+    size_t m_timestampIndex = 0;
+
 #if defined(TREENGINE_WIN32)
     HWND                              m_hwnd;
 #else

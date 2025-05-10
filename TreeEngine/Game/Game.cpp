@@ -12,6 +12,7 @@
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
+#include "implot.h"
 
 using namespace DirectX;
 
@@ -42,6 +43,7 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_settings.m_showShadowBuffer = false;
     m_settings.m_showDxrUav = false;
     m_settings.m_enablePostProcessing = true;
+    m_settings.m_showPerfGraph = true;
     m_advanceScene = 0;
     m_advanceSceneAmount = 0;
     m_currentScene = 0;
@@ -52,6 +54,10 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_player = nullptr;
     m_threadPool = nullptr;
     assert(m_inputMgr);
+
+    std::fill(std::begin(m_timeStamps), std::end(m_timeStamps), 0.0f);
+    std::fill(std::begin(m_frameDurations), std::end(m_frameDurations), 0.0f);
+    
 }
 
 void Game::UpdateViewMatrix()
@@ -98,8 +104,9 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     HRR(ReloadDevice());
 
+    m_currentScene = 0;
     //m_currentScene = 2;  // SeaScene
-    m_currentScene = 1; // Test tree
+    //m_currentScene = 1; // Test tree
     //m_currentScene = 7; // simple box and cylindar
 
     m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
@@ -228,6 +235,13 @@ void Game::Regenerate()
 void Game::Update(DX::StepTimer const& timer)
 {
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"Update");
+
+    // Update frame duration circular array
+    m_timeStamps[m_timestampIndex] = timer.GetTotalSeconds();
+
+    float frameDuration = static_cast<float>(timer.GetElapsedSeconds() * 1000.0); // Convert to milliseconds
+    m_frameDurations[m_timestampIndex] = frameDuration;
+    m_timestampIndex = (m_timestampIndex + 1) % FRAME_DURATION_HISTORY_SIZE;
 
     // Reset stats
     for (int i = 0; i < MAX_FRAME_STAT; i++)
@@ -361,10 +375,52 @@ int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
 
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
+    // Perf overlay
+    if (m_settings.m_showPerfGraph)
+    {
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 window_size = ImVec2(viewport->Size.x, 250.0f);  // 150 px tall
+        ImVec2 window_pos = ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - window_size.y - 10.0f);
+
+        ImGui::SetNextWindowPos(window_pos);
+        ImGui::SetNextWindowSize(window_size);
+        ImGui::SetNextWindowBgAlpha(0.0); // Optional: translucent background
+
+
+        ImVec4 transparent = ImVec4(0, 0, 0, 0); // RGBA with 0 alpha
+        ImPlot::GetStyle().Colors[ImPlotCol_PlotBg] = transparent;
+        ImPlot::GetStyle().Colors[ImPlotCol_PlotBorder] = transparent;
+        ImPlot::GetStyle().Colors[ImPlotCol_FrameBg] = transparent; // Optional
+        ImPlot::GetStyle().Colors[ImPlotCol_LegendBg] = transparent; // Optional
+
+        ImPlot::GetStyle().Colors[ImPlotCol_Line] = ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+        ImPlot::GetStyle().LineWeight = 2.0f;
+
+        if (ImGui::Begin("TransparentPlot", nullptr,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoBackground))
+        {
+            if (ImPlot::BeginPlot("##Performance"), ImVec2(0, 0), ImPlotFlags_CanvasOnly)
+            {
+                ImGui::SetNextWindowBgAlpha(0.0f); // Optional: translucent background
+                ImPlot::SetupAxisLimitsConstraints(ImAxis_Y1, 0.0, 60.0);
+                ImPlot::SetupAxes("Seconds", "MS", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                ImPlot::PlotLine("Frame Duration", m_timeStamps, m_frameDurations, FRAME_DURATION_HISTORY_SIZE,
+                    ImPlotLineFlags_None, m_timestampIndex);
+                ImPlot::EndPlot();
+            }
+
+            ImGui::End();
+        }
+    }
+
+
+    // Debug Settings 
     bool bOpen = true;
     if (!ImGui::Begin("Debug UI", &bOpen, ImGuiWindowFlags_NoFocusOnAppearing))
     {
-        ImGui::End();
+        //ImGui::End();
         return S_FALSE;
     }
 
@@ -390,14 +446,14 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
     {
         // Scene select
         ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
-        if (ImGui::ArrowButton("##left", ImGuiDir_Left)) 
-        { 
+        if (ImGui::ArrowButton("##left", ImGuiDir_Left))
+        {
             m_advanceScene = true;
             m_advanceSceneAmount = -1;
         }
         ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-        if (ImGui::ArrowButton("##right", ImGuiDir_Right)) 
-        { 
+        if (ImGui::ArrowButton("##right", ImGuiDir_Right))
+        {
             m_advanceScene = true;
             m_advanceSceneAmount = 1;
         }
@@ -415,7 +471,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
         // Camera
         ImGui::PushItemWidth(200);
-        ImGui::DragFloat3("Camera Position", (float*) m_player->GetEyePositionPtr(), ImGuiColorEditFlags_Float);
+        ImGui::DragFloat3("Camera Position", (float*)m_player->GetEyePositionPtr(), ImGuiColorEditFlags_Float);
         ImGui::DragFloat3("Camera Orientation", (float*)m_player->GetEyeRotationPtr(), ImGuiColorEditFlags_Float);
         ImGui::PopItemWidth();
 
@@ -424,6 +480,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
         ImGui::Checkbox("Enable Post Processing", &m_settings.m_enablePostProcessing);
+        ImGui::Checkbox("Show Performance Graphs", &m_settings.m_showPerfGraph);
     }
 
     int nextInputBuffer = 0;
@@ -463,20 +520,20 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
             if (params.generatorType == LSystemGeneratorType)
             {
-                if (ImGui::TreeNodeEx( "L System", ImGuiTreeNodeFlags_DefaultOpen))
+                if (ImGui::TreeNodeEx("L System", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
 
                     // Iterations - TODO: make this is common code
                     ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
-                    if (ImGui::ArrowButton("##left", ImGuiDir_Left) &&
+                    if (ImGui::ArrowButton("left", ImGuiDir_Left) &&
                         lsystemParams.GetGeneratorParameters()._numIterations > 0)
                     {
                         lsystemParams.GetGeneratorParameters()._numIterations--;
                         m_resetTree = true;
                     }
                     ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-                    if (ImGui::ArrowButton("##right", ImGuiDir_Right))
+                    if (ImGui::ArrowButton("right", ImGuiDir_Right))
                     {
                         lsystemParams.GetGeneratorParameters()._numIterations++;
                         m_resetTree = true;
@@ -488,8 +545,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
                     // Axiom and rules
                     strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
-                    ImGui::InputText("Axiom", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize, 
-                                     ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &lsystemParams.GetGeneratorParameters()._axiom);
+                    ImGui::InputText("Axiom", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
+                        ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &lsystemParams.GetGeneratorParameters()._axiom);
 
                     for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
                     {
@@ -504,7 +561,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                             }
 
                             ImGui::InputText("Input", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
-                                             ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.input);
+                                ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.input);
 
                             // Rule output
                             if (!m_settings.isInUse(nextInputBuffer))
@@ -531,8 +588,9 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         m_settings.m_buffersInUse = nextInputBuffer;
     }
 
-
     ImGui::End();
+
+
 
     return S_OK;
 }
