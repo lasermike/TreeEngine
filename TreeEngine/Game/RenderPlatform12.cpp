@@ -1983,10 +1983,10 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
     HRR(d3dDevice5->CreateStateObject(raytracingPipeline, __uuidof(ID3D12StateObject), (void**)&m_raytracingStateObject));
     HRR(m_raytracingStateObject->QueryInterface(__uuidof(ID3D12StateObjectProperties), (void**)&m_raytracingStateObjectProps));
 
-    SimpleTriangleRecord rayGenRecord(m_raytracingStateObjectProps, rayGenExportName);
-    SimpleTriangleRecord emptyMissShader;
-    SimpleTriangleRecord validMissShader(m_raytracingStateObjectProps, missShaderExportName);
-    SimpleTriangleRecord hitGroupRecord(m_raytracingStateObjectProps, hitGroupExportName);
+    TreeShaderRecord rayGenRecord(m_raytracingStateObjectProps, rayGenExportName);
+    TreeShaderRecord emptyMissShader;
+    TreeShaderRecord validMissShader(m_raytracingStateObjectProps, missShaderExportName);
+    TreeShaderRecord hitGroupRecord(m_raytracingStateObjectProps, hitGroupExportName);
 
     m_shaderBindingTable.SetRayGenRecord(0, rayGenRecord);
     m_shaderBindingTable.SetMissShaderRecord(0, emptyMissShader);

@@ -22,14 +22,14 @@ enum CbvSrvUavHeapOffsets;
 
 #include "DxrHelper.h"
 
-struct SimpleTriangleRecord : public ShaderRecord
+struct TreeShaderRecord : public ShaderRecord
 {
-    SimpleTriangleRecord() : ShaderRecord()
+    TreeShaderRecord() : ShaderRecord()
     {
 
     }
 
-    SimpleTriangleRecord(ID3D12StateObjectProperties* props, LPCWSTR exportName)
+    TreeShaderRecord(ID3D12StateObjectProperties* props, LPCWSTR exportName)
     {
         Initialize(props, exportName);
     }
@@ -974,7 +974,7 @@ public:
     CComPtr<ID3D12Resource>     m_DrawRecordsResource;
 
 
-    ShaderBindingTable<SimpleTriangleRecord, 1, 2, 1> m_shaderBindingTable;
+    ShaderBindingTable<TreeShaderRecord, 1, 2, 1> m_shaderBindingTable;
 
     static const uint32_t MAX_INSTANCES_IN_TLAS = 1;
 
