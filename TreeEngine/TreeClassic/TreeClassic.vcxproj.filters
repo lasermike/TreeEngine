@@ -53,6 +53,12 @@
     <ClCompile Include="..\imgui\imgui_tables.cpp">
       <Filter>Platform Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\ImGui\implot.cpp">
+      <Filter>Platform Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ImGui\implot_items.cpp">
+      <Filter>Platform Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="TreeClassic.rc">
