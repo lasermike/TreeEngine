@@ -76,3 +76,14 @@ Conditional compilation selects the API: `TREE3D12` for DX12, `TREE3D11` for DX1
 - Platform differences are handled via `#if defined(TREE3D12)` / `#if defined(TREE3D11)` preprocessor guards
 - ImGui (with ImPlot) is integrated for debug UI — toggled via `UpdateDebugUI()` in `Game.cpp`
 - Matrix convention: second row is view/look vector (scaled), last row is translation
+
+## Window and DPI
+
+TreeClassic is per-monitor DPI aware (`DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2`), set at startup in `_tWinMain` before window creation. This ensures real pixel coordinates on multi-monitor setups.
+
+Key points for window/input changes:
+- **WM_SIZE** in `TreeClassic.cpp` WndProc triggers `OnWindowSizeChanged()` → deferred swap chain resize via `Game::OnResize()` / `m_needsResize`
+- **WM_DPICHANGED** resizes the window to the OS-suggested rect so it stays correctly sized when dragged between monitors with different DPI
+- `RenderManager::OnResize()` calls `ReleaseSwapChainResources()` before `RenderPlatform12::OnResize()`, so the swap chain is fully recreated each resize
+- ImGui gets display size from `GetClientRect()` every frame in `ImGui_ImplWin32_NewFrame()` and mouse coordinates from `WM_MOUSEMOVE` via `GET_X_LPARAM`/`GET_Y_LPARAM` — both must be in the same coordinate space as the swap chain to avoid click offset bugs
+

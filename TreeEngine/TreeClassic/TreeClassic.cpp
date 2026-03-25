@@ -113,7 +113,9 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: Place code here.
+    // Set per-monitor DPI awareness before creating any windows.
+    // This ensures real pixel coordinates on multi-monitor setups.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     // Initialize global strings
     LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -482,6 +484,9 @@ void OnWindowSizeChanged()
     windowWidth = rect.right - rect.left;
     windowHeight = rect.bottom - rect.top;
 
+    if (windowWidth == 0 || windowHeight == 0)
+        return;
+
     g_game->OnResize(windowWidth, windowHeight);
 }
 
@@ -542,6 +547,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             return DefWindowProc(hWnd, message, wParam, lParam);
         }
         break;
+    case WM_SIZE:
+        if (wParam != SIZE_MINIMIZED && g_game)
+        {
+            OnWindowSizeChanged();
+        }
+        break;
+    case WM_DPICHANGED:
+    {
+        RECT* prcNewWindow = reinterpret_cast<RECT*>(lParam);
+        SetWindowPos(hWnd, NULL,
+            prcNewWindow->left, prcNewWindow->top,
+            prcNewWindow->right - prcNewWindow->left,
+            prcNewWindow->bottom - prcNewWindow->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        break;
+    }
     case WM_PAINT:
         hdc = BeginPaint(hWnd, &ps);
         // TODO: Add any drawing code here...
