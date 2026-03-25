@@ -61,7 +61,7 @@ class FSGraph : public WorldObject
 public:
     FSGraph(WorldObjectParams* wop);
     ~FSGraph();
-    virtual ObjectType GetObjectType() { return PrimitiveObjectType; }
+    virtual ObjectType GetObjectType() { return ObjectType_Primitive; }
 
     //virtual void Create(ModelGenerator* generator) { return Create((PrimitiveModelGenerator*)generator); }
     virtual void Create(FSGraphModelGenerator* generator);

@@ -11,9 +11,30 @@
 #include "RenderData.h"
 #include "StockRenderStates.h"
 
-
+class Settings;
 class RenderPlatform;
 class RenderManager;
+struct ImGuiContext;
+struct ImPlotContext;
+enum CbvSrvUavHeapOffsets;
+
+#if defined(DXR_ENABLED)
+
+#include "DxrHelper.h"
+
+struct TreeShaderRecord : public ShaderRecord
+{
+    TreeShaderRecord() : ShaderRecord()
+    {
+
+    }
+
+    TreeShaderRecord(ID3D12StateObjectProperties* props, LPCWSTR exportName)
+    {
+        Initialize(props, exportName);
+    }
+};
+#endif
 
 namespace XboxSampleFramework
 {
@@ -113,6 +134,38 @@ struct DoubleBuffer
         buffers[1] = nullptr;
     }
 };
+
+#if defined(TREE3D12)
+struct DoubleBufferResource
+{
+    ID3D12Resource* buffers[2];
+
+    DoubleBufferResource()
+    {
+        buffers[0] = nullptr;
+        buffers[1] = nullptr;
+    }
+
+    //HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
+
+    ID3D12Resource* Get(UINT frame) { return buffers[frame % 2]; }
+
+    void Release()
+    {
+        if (buffers[0] != nullptr)
+        {
+            buffers[0]->Release();
+            buffers[0] = nullptr;
+        }
+
+        if (buffers[1] != nullptr)
+        {
+            buffers[1]->Release();
+            buffers[1] = nullptr;
+        }
+    }
+};
+#endif
 
 #if defined(TREE3D12)
 #define InputElementDesc D3D12_INPUT_ELEMENT_DESC
@@ -560,11 +613,14 @@ protected:
 #endif
 
     D3DBuffer*                        m_currentInstanceBuffer;
+
+    Mesh*                             m_currentMesh;
+
 public:
 
     RenderPlatform() :
         m_vertexShader(nullptr), m_pixelShader(nullptr), m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
-        m_drawScreenVertexShader(nullptr), m_drawScreenPixelShader(nullptr), imGuiInitialized(false)
+        m_drawScreenVertexShader(nullptr), m_drawR8ScreenPixelShader(nullptr), m_drawRGBScreenPixelShader(nullptr), imGuiInitialized(false), m_currentMesh(nullptr)
     { }
 
 #if defined(TREE3D12) || defined(TREE3D11)
@@ -611,7 +667,9 @@ public:
     virtual HRESULT EndFrame(D3DBuffer* buffer) = 0;
 
     virtual HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) = 0;
-    virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) = 0;
+    virtual HRESULT RenderPostProcess() = 0;
+    virtual HRESULT RenderDebugUI() = 0;
+    virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) = 0;
 
     virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
     virtual HRESULT SetRenderPhase(RenderState state) = 0;
@@ -638,6 +696,8 @@ public:
     virtual D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) = 0;  // TODO!  Objects should be able to load their own meshes
     virtual D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) = 0;
 
+    virtual HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext) = 0;
+
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) = 0;
 
@@ -651,7 +711,8 @@ public:
     VertexShader*                      m_shadowVertexShader;
     PixelShader*                       m_shadowPixelShader;
     VertexShader*                      m_drawScreenVertexShader;
-    PixelShader*                       m_drawScreenPixelShader;
+    PixelShader*                       m_drawR8ScreenPixelShader;
+    PixelShader*                       m_drawRGBScreenPixelShader;
 };
 
 #if defined(TREE3D12)
@@ -671,6 +732,7 @@ private:
     DescriptorHeapWrapper             m_rtvHeap;
     DescriptorHeapWrapper             m_dsvHeap;
     DescriptorHeapWrapper             m_descriptorHeap;
+    DescriptorHeapWrapper             m_nonVisibleDescriptorHeap;
     int                               m_nextFreeShaderHeapDescriptor;
     DirectX::GraphicsMemory*          m_graphicsMemory;
 
@@ -682,8 +744,10 @@ private:
     CComPtr<ID3D12RootSignature>       m_rootSignature;
     CComPtr<ID3D12RootSignature>       m_computeRootSignature;
     CComPtr<ID3D12CommandQueue>        m_commandQueue;
-    CComPtr<ID3D12GraphicsCommandList> m_commandList[RenderPlatform12::FrameCount];
-    CComPtr<ID3D12CommandAllocator>    m_commandAllocator[RenderPlatform12::FrameCount];
+
+    static const int                   kNumCommandLists = 12; // RenderPlatform12::FrameCount
+    CComPtr<ID3D12GraphicsCommandList> m_commandList[kNumCommandLists];
+    CComPtr<ID3D12CommandAllocator>    m_commandAllocator[kNumCommandLists];
 
     UINT                              m_frameIndex;
     UINT                              m_commandListIndex;
@@ -691,7 +755,7 @@ private:
     D3D12_VIEWPORT                    m_viewPort;
     D3D12_RECT                        m_scissorRect;
 
-    XSF::BitmapFont*                  m_bitmapFont;
+    //XSF::BitmapFont*                  m_bitmapFont;
 
 #if defined(TREE_XBOX)
     D3D12XBOX_FRAME_PIPELINE_TOKEN    m_framePipelineToken;
@@ -745,8 +809,9 @@ private:
 
     // PSO -TODO: consolidate in game level pso's
     CComPtr<ID3D12PipelineState>      m_pipelineState;
-    CComPtr<ID3D12PipelineState>      m_pipelineStateFullScreenQuad;
+    CComPtr<ID3D12PipelineState>      m_pipelineStateR8FullScreenQuad;
     CComPtr<ID3D12PipelineState>      m_pipelineStateShadowMap;
+    CComPtr<ID3D12PipelineState>      m_pipelineStateRGBFullScreenQuad;
 
     // Fences
     CComPtr<ID3D12Fence>              m_fence;
@@ -767,10 +832,11 @@ private:
     };
 
     RenderData*                    m_renderData;
+    Settings*                      m_settings;
 
     // Internal methods
     HRESULT BuildScreenQuadGeometryBuffers();
-    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, D3D12_CPU_DESCRIPTOR_HANDLE depthTexture);
+    HRESULT DrawScreenQuad(ID3D12GraphicsCommandList* pContext, CbvSrvUavHeapOffsets srvOffset, ID3D12PipelineState* pso);
 
     void TrimUploadHeaps(bool removeTerminatedHeaps);
 
@@ -782,11 +848,16 @@ private:
     void IncrementFenceOnGPU();
     void WaitOnFence();
 
+    void AdvanceToNextFrame();
+
+    void HandleD3D12Error(HRESULT hr);
+
 public:
 
-    RenderPlatform12(RenderData* renderData) : m_renderData(renderData), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
+    RenderPlatform12(RenderData* renderData, Settings* settings) : m_renderData(renderData), m_settings(settings), m_fenceEvent(nullptr), m_nextFreeShaderHeapDescriptor(0),
         m_constBufferNeverChanges(nullptr), m_constBufferChangesPerPass(nullptr), m_constBufferChangesEveryFrame(nullptr),
-        m_bitmapFont(nullptr)
+        m_renderTargets{ }
+        //m_bitmapFont(nullptr)
 #if defined(TREE_XBOX)
         , m_framePipelineToken(D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL)
 #endif
@@ -794,13 +865,14 @@ public:
 
     HRESULT CreateConstantBuffer(UINT size, D3D12_CONSTANT_BUFFER_VIEW_DESC& newViewDesc, ID3D12Resource** buffer, UINT8** cpuBufferBegin);
     void ManageUploadHeap(CpuGpuHeap* pUploadHeap);
-    void WaitForPreviousFrame();
+    void WaitForGPUWork();
     ID3D12CommandQueue* GetCommandQueue() { return m_commandQueue; }
     ID3D12CommandAllocator* GetCommandAllocator() { return m_commandAllocator[m_commandListIndex]; }
     ID3D12Fence* GetFence() { return m_fence; }
     ID3D12Device* GetDevice() { return m_d3dDevice; }
     D3D12_VIEWPORT& GetViewport() { return m_viewPort; }
     D3DCommandList* GetCommandList() const { return m_commandList[m_commandListIndex]; }
+    HRESULT ExecuteCurrentCommandList(bool waitOnFence);
 
     //
     // Base RenderPlatform methods
@@ -825,7 +897,9 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer);
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
-    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+    HRESULT RenderPostProcess();
+    HRESULT RenderDebugUI();
+    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
@@ -851,23 +925,102 @@ public:
 
     void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
 
+    HRESULT SetupGraphicsOnCommandList();
+
     HRESULT GetViewport(Viewport& viewport);
 
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer)
     {
-        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedVertexBuffer : &m_vertexBuffer;
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_vertexBuffer : &m_skinnedVertexBuffer;
     }
 
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer)
     { 
-        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_indexBuffer : &m_skinnedIndexBuffer;
     }
+
+    HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext);
 
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
     // TODO: move into interface
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
+
+#if defined(DXR_ENABLED)
+
+    uint32_t m_numInstancesInTLAS;
+
+
+    HRESULT CreateRaytracingPipeline();
+    HRESULT BuildAccelerationStructure(bool buildEveryFrame);
+    HRESULT BuildBLASandTLAS(bool forceRebuild);
+
+    // DXR Objects
+    CComPtr<ID3D12StateObject>            m_raytracingStateObject;
+    CComPtr<ID3D12StateObjectProperties>  m_raytracingStateObjectProps;
+    CComPtr<ID3D12RootSignature>          m_globalRootSignature;
+    CComPtr<ID3D12RootSignature>          m_localRootSignature;
+
+    CComPtr<ID3D12Resource>		m_TLAS;
+    CComPtr<ID3D12Resource>		m_scratchTLAS;
+    CComPtr<ID3D12Resource>		m_BLAS;
+    CComPtr<ID3D12Resource>		m_scratchBLAS;
+    UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesTLAS;
+
+
+    // DXR buffers
+    CComPtr<ID3D12Resource>     m_VBWorld;
+    CComPtr<ID3D12Resource>     m_DrawRecordsResource;
+
+
+    ShaderBindingTable<TreeShaderRecord, 1, 2, 1> m_shaderBindingTable;
+
+    static const uint32_t MAX_INSTANCES_IN_TLAS = 1;
+
+    D3D12_RAYTRACING_GEOMETRY_DESC* m_bvhGeometryDescs;
+
+    uint32_t m_maxBLASInstances;
+
+    D3D12_RAY_FLAGS m_rayFlags;
+
+    struct DrawRecord
+    {
+        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices, Mesh* thisMesh)
+        {
+            startingInstance = startInstance;
+            numInstances = numberInstances;
+            indexBufferCount = indexCountPerInstance;
+            indexBufferStart = startIndexLocation;
+            baseVertexLocation = baseVertexLoc;
+            vbWorldStart = nextVbWorldStart;
+            vertexCount = numVertices;
+            inputLayout = thisMesh->m_inputLayout;
+            //mesh = thisMesh;
+        }
+
+        UINT startingInstance;
+        UINT numInstances;
+
+        UINT indexBufferCount;      // Index count per instanace
+        UINT indexBufferStart;
+
+        UINT vbWorldStart;
+        UINT baseVertexLocation;
+
+        UINT vertexCount;           // Vertex count per instanace
+        InputLayouts inputLayout;
+
+        //Mesh* mesh;
+
+        bool operator==(const DrawRecord&) const;
+    };
+
+    UINT m_nextVbWorldStart = 0;
+    std::vector<DrawRecord> m_drawRecords;
+    size_t m_previousDrawRecordHash;
+
+#endif
 };
 
 #elif defined(TREE3D11)
@@ -893,7 +1046,7 @@ class RenderPlatform11 : public RenderPlatform
 
     UploadBuffer<CBNeverChanges>*     m_constBufferNeverChanges;
 
-    XSF::BitmapFont*                  m_bitmapFont;
+    //XSF::BitmapFont*                  m_bitmapFont;
 
     // Single vertex and index buffer for all geometry with same vertex format in scene
     CComPtr<ID3D11InputLayout>        m_vertexLayout;
@@ -975,7 +1128,9 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer);
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
-    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+    HRESULT RenderPostProcess();
+    HRESULT RenderDebugUI();
+    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
@@ -1002,15 +1157,16 @@ public:
     void SetFrameSceneData(CBChangesEveryFrame* cb);
 
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer)
-    { 
-        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedVertexBuffer : &m_vertexBuffer;
+    {
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_vertexBuffer : &m_skinnedVertexBuffer;
     }
 
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer)
     {
-        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_skinnedIndexBuffer : &m_indexBuffer;
+        return geometryBuffer == PRIMITIVE_GEOMETRY_BUFFER ? &m_indexBuffer : &m_skinnedIndexBuffer;
     }
 
+    HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext)
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -1025,7 +1181,7 @@ public:
 ///
 //
 
-typedef HRESULT (*CreateFunc)(RenderData* data);
+typedef HRESULT (*CreateFunc)(RenderData* data, Settings* settings);
 
 #if defined(TREENGINE_WIN32)
 typedef void(*SetWindowFunc)(HWND hwnd);
@@ -1050,7 +1206,9 @@ typedef HRESULT (*BeginNewFrameFunc)(bool resetCommandList, D3DBuffer* buffer, I
 typedef HRESULT (*EndFrameFunc)(D3DBuffer* buffer);
 
 typedef HRESULT (*RenderPrologFunc)(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor);
-typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture);
+typedef HRESULT (*RenderPostProcessFunc)();
+typedef HRESULT (*RenderDebugUIFunc)();
+typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
 typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
 typedef HRESULT (*SetRenderPhaseFunc)(RenderState state);
@@ -1077,6 +1235,7 @@ typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 
 typedef D3DBuffer* (*GetVertexBufferFunc)(GeometryBuffer geometryBuffer);
 typedef D3DBuffer* (*GetIndexBufferFunc)(GeometryBuffer geometryBuffer);
+typedef HRESULT (*GetImGuiContextFunc)(ImGuiContext** imguiContext, ImPlotContext** implotContext);
 
 typedef LRESULT (*Gui_WndProcHandlerFunc)(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -1105,6 +1264,8 @@ class RenderPlatformDLL : public RenderPlatform
     EndFrameFunc EndFrameFuncPtr;
 
     RenderPrologFunc RenderPrologFuncPtr;
+    RenderPostProcessFunc RenderPostProcessFuncPtr;
+    RenderDebugUIFunc RenderDebugUIFuncPtr;
     RenderEpilogFunc RenderEpilogFuncPtr;
 
     RenderSceneSetupFunc RenderSceneSetupFuncPtr;
@@ -1131,6 +1292,8 @@ class RenderPlatformDLL : public RenderPlatform
     GetVertexBufferFunc GetVertexBufferFuncPtr;
     GetIndexBufferFunc GetIndexBufferFuncPtr;
 
+    GetImGuiContextFunc GetImGuiContextFuncPtr;
+
     Gui_WndProcHandlerFunc Gui_WndProcHandlerFuncPtr;
 
 
@@ -1139,7 +1302,7 @@ class RenderPlatformDLL : public RenderPlatform
     GetDeviceFunc GetDeviceFuncPtr;
 
 public:
-    RenderPlatformDLL(HMODULE module, RenderData* data);
+    RenderPlatformDLL(HMODULE module, RenderData* data, Settings* settings);
     ~RenderPlatformDLL();
 
 #if defined(TREENGINE_WIN32)
@@ -1165,7 +1328,10 @@ public:
     HRESULT EndFrame(D3DBuffer* buffer) { return EndFrameFuncPtr(buffer); }
 
     HRESULT RenderProlog(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor) { return RenderPrologFuncPtr(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor); }
-    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture); }
+    HRESULT RenderPostProcess() { return RenderPostProcessFuncPtr(); }
+    HRESULT RenderDebugUI() { return RenderDebugUIFuncPtr(); }
+
+    HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, renderToSharedTexture); }
 
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
     HRESULT SetRenderPhase(RenderState state) { return SetRenderPhaseFuncPtr(state); }
@@ -1221,6 +1387,8 @@ public:
 
     D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer) { return GetVertexBufferFuncPtr(geometryBuffer); }
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) { return GetIndexBufferFuncPtr(geometryBuffer); }
+
+    HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext) { return GetImGuiContextFuncPtr(imguiContext, implotContext); }
 
     LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {

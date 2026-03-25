@@ -1,0 +1,114 @@
+//--------------------------------------------------------------------------------------
+// RaytracingLibrary.hlsl
+//
+// Single HLSL file containing a Ray Generation, Miss, Any-Hit and Closest Hit Shader
+// Compiled as a single /Tlib_6_3 DXIL shader library.
+//
+// Advanced Technology Group (ATG)
+// Copyright (C) Microsoft Corporation. All rights reserved.
+//--------------------------------------------------------------------------------------
+
+#include "Materials.fx"
+#include "SharedTypes.hlsli"
+
+#include "LocalRootSignature.hlsl"
+
+RaytracingAccelerationStructure Scene : register(t0);
+RWTexture2D<float4> renderOutput : register(u0);
+
+cbuffer Params : register(b0)
+{
+    uint dispatchWidth;
+    uint dispatchHeight;
+    uint rayFlags;
+    float holeSize;
+};
+
+struct RayPayload
+{
+    float dummy;    // Minimum of 4 bytes required for payloads.
+};
+
+
+[shader("anyhit")]
+void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
+    float3 triangleCentre = 1.0f / 3.0f;
+
+    float distanceToCentre = length(triangleCentre - barycentrics);
+
+    if (distanceToCentre < holeSize)
+        IgnoreHit();
+}
+
+[shader("closesthit")]
+void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
+    renderOutput[DispatchRaysIndex().xy] = float4(barycentrics, 1);
+}
+
+[shader("miss")]
+void MissShader(inout RayPayload payload)
+{
+    renderOutput[DispatchRaysIndex().xy] = float4(0.5, 0, 0, 1);
+}
+
+#if 1
+[shader("raygeneration")]
+void RayGenerationShader()
+{
+
+    float2 xy = DispatchRaysIndex().xy + 0.5f; // center in the middle of the pixel.
+    float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0 - 1.0;
+
+    // Invert Y for DirectX-style coordinates.
+    screenPos.y = -screenPos.y;
+
+    // Unproject the pixel coordinate into a ray.
+    float4 world = mul(float4(screenPos, 0, 1), InverseViewProjection);
+
+    world.xyz /= world.w;
+    
+    float3 origin = eyePos.xyz;
+    float3 direction = normalize(world.xyz - origin); 
+
+    // Trace the ray.
+    // Set the ray's extents.
+    RayDesc ray;
+    ray.Origin = origin;
+    ray.Direction = direction;
+    // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
+    // TMin should be kept small to prevent missing geometry at close contact areas.
+    ray.TMin = 0.001;
+    ray.TMax = 100.0;
+    RayPayload payload = { 0.0f };
+
+    uint missShaderIndex = 1;
+    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, ray, payload);
+}
+#endif
+
+#if 0
+// Orth
+
+[shader("raygeneration")]
+void RayGenerationShader()
+{
+    // Orthographic projection, just as if we were already in NDC.  But this is world coordinates?
+    float2 vpos = DispatchRaysIndex().xy;
+    float3 rayOrigin = float3(-1, 1, -4); //float3(-1, 1, -5);
+
+    rayOrigin.xy += float2(2, -2) * (vpos / float2(dispatchWidth, dispatchHeight));
+
+    float3 rayDir = float3(0, 0, 1);  //float3(0, 0, 1);
+
+    RayDesc myRay = { rayOrigin, 0.0f, rayDir, 100.0f };
+    RayPayload payload = { 0.0f };
+
+    uint missShaderIndex = 1;
+    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, myRay, payload);
+}
+#endif
+

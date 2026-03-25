@@ -5,6 +5,7 @@
 #include "StockRenderStates.h"
 
 class WorldObject;
+class Settings;
 
 enum DisplayMode
 {
@@ -35,6 +36,11 @@ interface IRenderFrame
     virtual RenderData& GetRenderData() = 0;
 };
 
+interface IDebugUI
+{
+    virtual HRESULT UpdateDebugUI(ImGuiContext * imGuiContext) = 0;
+};
+
 class RenderManager : public IRenderFrame
 {
     // Filled in during scene initialization
@@ -56,6 +62,10 @@ class RenderManager : public IRenderFrame
 
     // 11 or 12
     RenderPlatform*                                 m_platform;
+
+    Settings*                                       m_settings;
+
+    IDebugUI*                                       m_pDebugUI;
 
     DisplayMode                         m_displayMode;
 
@@ -84,6 +94,8 @@ public:
     ~RenderManager();
 
     HRESULT SetPlatform(HMODULE platformDLL);
+    HRESULT SetDebugUI(IDebugUI* debugUI) { m_pDebugUI = debugUI; return S_OK; }
+    HRESULT SetSettings(Settings* settings) { m_settings = settings; return S_OK; }
 
     HRESULT InitDevice();
     HRESULT OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture);
@@ -121,7 +133,7 @@ public:
     HRESULT BeginNewFrame();
     HRESULT EndFrame();
 
-    void Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
+    void Render(bool oculus, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp,
                 bool m_renderToSharedTexture, float* clearColor);
 
     HRESULT DrawFrameStats();

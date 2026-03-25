@@ -54,6 +54,9 @@
     <ClInclude Include="Inc\d3dx12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\RenderCommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -98,23 +101,40 @@
     <ClCompile Include="..\Game\StockRenderStates12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Inc\imgui.cpp">
+    <ClCompile Include="..\Game\RenderCommon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ImGui\implot.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_demo.cpp">
+    <ClCompile Include="..\ImGui\implot_items.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_draw.cpp">
+    <ClCompile Include="..\imgui\imgui.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_impl_dx12.cpp">
+    <ClCompile Include="..\imgui\imgui_draw.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_impl_win32.cpp">
+    <ClCompile Include="..\imgui\imgui_impl_dx12.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="Inc\imgui_widgets.cpp">
+    <ClCompile Include="..\imgui\imgui_impl_win32.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
+    <ClCompile Include="..\imgui\imgui_tables.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\imgui\imgui_widgets.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Game\Shaders\RaytracingLibrary.hlsl" />
+    <CustomBuild Include="..\Game\Shaders\LocalRootSignature.hlsl" />
+    <CustomBuild Include="..\Game\Shaders\GlobalRootSignature.hlsl" />
   </ItemGroup>
 </Project>

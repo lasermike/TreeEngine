@@ -429,7 +429,7 @@ HRESULT BitmapFont::Create(RenderPlatform12* renderPlatform, ID3D12Resource* con
         spSerializedSignature->GetBufferSize(),
         IID_GRAPHICS_PPV_ARGS(&m_spRootSignature)));
 
-    XSF_RETURN_IF_FAILED(m_CBSRVHeap.Initialize(pDevice, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, c_CBHeapEnd, true));
+    XSF_RETURN_IF_FAILED(m_CBSRVHeap.Initialize(pDevice, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, c_CBHeapEnd, L"CBSRVHeap", true));
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;

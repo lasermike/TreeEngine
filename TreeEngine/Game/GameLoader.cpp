@@ -23,10 +23,6 @@ GameLoader::GameLoader()
 
 void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData)
 {
-    //	Load(0, pScene, pRenderData, pPlayer, gameData);
-    //	LoadGraph(pScene, pRenderData, pPlayer, gameData);
-    //	LoadTrees(pScene, pRenderData, pPlayer, gameData);
-    //	LoadTestBlock(pScene, pRenderData, pCamera, gameData);
 }
 
 HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, const char* filename)
@@ -222,6 +218,36 @@ void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
+void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+{
+    WorldObjectParams* params1 = new WorldObjectParams(PrimitiveGeneratorType);
+    params1->position = XMFLOAT3(0, 1.0, 0);
+    params1->scale = XMFLOAT3(0.5, 0.5, 0.5);
+    XMStoreFloat4(&params1->rotation, XMQuaternionRotationAxis(XMVectorSet(.7f, .7f, .7f, 1), XM_PIDIV2));
+    params1->primitiveType = PrimitiveType_Cylinder;
+
+
+    WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+    params4->position = XMFLOAT3(0, 0, 0);
+    //params4->scale = XMFLOAT3(1, 1, 1);
+    params4->primitiveType = PrimitiveType_Box;
+
+    scene->AddChild(new Primitive(params1));  // Cylinder
+    scene->AddChild(new Primitive(params4));  // Box
+
+    // Init lights
+    renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+    renderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+    renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+    renderData->time = 0;
+
+    // Camera
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), 0));
+}
+
+
 
 double SegLengthPlusRand(LSystemParams* params, double cmdParam)
 {
@@ -259,7 +285,9 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params2->GetGeneratorParameters().SegmentLength = SegLengthPlusRand;
 
     params2->position = XMFLOAT3(-2.2f, .5f, 1.0f);
-    scene->AddChild(new Tree(params2));
+
+    // Commented out, one tree for now
+    //scene->AddChild(new Tree(params2));
 
     WorldObjectParameters<LSystemParams>* params2A = new WorldObjectParameters<LSystemParams>(*params2);
     params2A->position = XMFLOAT3(0.5f, .5f, 0.0f);
@@ -269,7 +297,7 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     WorldObjectParameters<LSystemParams>* params2B = new WorldObjectParameters<LSystemParams>(*params2);
     params2B->position = XMFLOAT3(3.0f, .5f, 1.0f);
     XMStoreFloat4(&params2B->rotation, XMQuaternionRotationNormal(XMVectorSet(0, 1, 0, 0), 2.0f));
-    scene->AddChild(new Tree(params2B));
+    //scene->AddChild(new Tree(params2B));
 
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
@@ -424,7 +452,7 @@ void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");
     params2->textureFilename.push_back(L"FirBranchWithNeedles.dds");
 
-    params2->position = XMFLOAT3(0, .5f, -2.0f);
+    params2->position = XMFLOAT3(0, .1f, -2.0f);
     params2->GetGeneratorParameters()._angle = XM_2PI;
     params2->GetGeneratorParameters()._numIterations = 14;
     params2->_animationSpeed = 15.0f;
@@ -520,7 +548,7 @@ void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
     //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
     //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7, -0.7, 0.7, 0.0)));
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0)));
 
     renderData->numPointLights = 1;
 
@@ -560,11 +588,18 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->GetGeneratorParameters()._segmentLength = .01f; // 0.5f;
     params3->GetGeneratorParameters().thickness = .04f;
     params3->GetGeneratorParameters()._numIterations = 1;
-    params3->position = XMFLOAT3(0, 1.0, 0);
-    params3->_animationSpeed = 5.0f;
+    params3->position = XMFLOAT3(0, 0.5, 0);
+    params3->scale = XMFLOAT3(0.5, 0.5, 0.5);
+    params3->_animationSpeed = 5.0f;    params3->position = XMFLOAT3(0, 0.5, 0);
+
+
+    //params3->GetGeneratorParameters()._axiom = "F(20)";
+    ////params3->GetGeneratorParameters()._rules.push_back(Rule("A",
 
     params3->GetGeneratorParameters()._axiom = "F(20) A";
     params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) z(1) F(30) A] [Z(0.33074)F(50)A] "));
+
+    //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25)] "));
 
     //params3->GetGeneratorParameters()._rules.push_back(Rule("A", "F(10) [z(0.33074) F(25) [z(1) $(1) F(5)] F(10) [z(1) F(30)] F(10) [z(1) $(1) F(30)] F(25) A] [Z(0.33074)F(50)A] "));
 
@@ -583,16 +618,19 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     params3->materials.push_back(trunkMaterial);
     params3->materials.push_back(leafMaterial);
 
+    //params3->meshes.push_back(PrimitiveType_Cylinder);
     params3->meshes.push_back(PrimitiveType_SkinnedCylinder);
 
     scene->AddChild(new Tree(params3));
 
+#if 0
     // Ground
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
     params4->primitiveType = PrimitiveType_CylinderHD;
     scene->AddChild(new Primitive(params4));
+#endif
 
 
     // Init lights 
@@ -756,39 +794,40 @@ void GameLoader::Regenerate(SceneRoot* pScene)
     }
 
     int treeNum = 0;
-    for (auto t = pScene->Children().begin(); t != pScene->Children().end(); t++)
+    for (WorldObject* obj : pScene->Children())
+    //for (auto& t = pScene->Children().begin(); t != pScene->Children().end(); t++)
     {
         treeNum++;
 
-        GeneratorType genType = (*t)->GetParams().generatorType;
+        GeneratorType genType = obj->GetParams().generatorType;
         if (genType == LSystemGeneratorType)
         {
-            WorldObjectParameters<LSystemParams>& wop = (*t)->GetParams<LSystemParams>();
+            WorldObjectParameters<LSystemParams>& wop = obj->GetParams<LSystemParams>();
 
             LSystemModelGenerator generater(wop.GetGeneratorParameters()); // TODO
-            (*t)->Create(&generater);
+            obj->Create(&generater);
         }
         else if (genType == FixedTreeGeneratorType)
         {
             FixedTreeModelGenerator generator(_seeds[_currentSeed] * treeNum);
-            (*t)->Create(&generator);
+            obj->Create(&generator);
         }
         else if (genType == PrimitiveGeneratorType)
         {
-            PrimitiveModelGenerator planeGen((*t)->GetParams().primitiveType);
-            (*t)->Create(&planeGen);
+            PrimitiveModelGenerator planeGen(obj->GetParams().primitiveType);
+            obj->Create(&planeGen);
         }
         else if (genType == GraphGeneratorType)
         {
-            WorldObjectParameters<GraphParams>& wop = (*t)->GetParams<GraphParams>();
+            WorldObjectParameters<GraphParams>& wop = obj->GetParams<GraphParams>();
             GraphModelGenerator graphGen(wop.GetGeneratorParameters());
-            (*t)->Create(&graphGen);
+            obj->Create(&graphGen);
         }
         else if (genType == FSGraphGeneratorType)
         {
-            WorldObjectParameters<FSGraphParams>& wop = (*t)->GetParams<FSGraphParams>();
+            WorldObjectParameters<FSGraphParams>& wop = obj->GetParams<FSGraphParams>();
             FSGraphModelGenerator graphGen(wop.GetGeneratorParameters());
-            (*t)->Create(&graphGen);
+            obj->Create(&graphGen);
         }
         else
         {
@@ -823,14 +862,17 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
     case 4:
         LoadTrees(pScene, pRenderData, pPlayer, gameData);
         break;
+    //case 5:
+    //    LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
+    //    break;
     case 5:
-        LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 6:
         LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
         break;
-    case 7:
+    case 6:
         LoadGraph(pScene, pRenderData, pPlayer, gameData);
+        break;
+    case 7:
+        LoadSimpleBox(pScene, pRenderData, pPlayer, gameData);
         break;
     default:
         ASSERT(false);

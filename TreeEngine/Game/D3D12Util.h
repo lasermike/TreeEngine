@@ -207,6 +207,7 @@ namespace XboxSampleFramework
             _In_ D3DDevice* const pDevice,
             D3D12_DESCRIPTOR_HEAP_TYPE Type,
             UINT NumDescriptors,
+            LPCWSTR Name,
             bool bShaderVisible = false)
         {
             ZeroMemory(&m_Desc, sizeof(m_Desc));
@@ -227,6 +228,8 @@ namespace XboxSampleFramework
             }
             m_HandleIncrementSize = pDevice->GetDescriptorHandleIncrementSize(m_Desc.Type);
 
+            m_pDH->SetName(Name);
+
             return S_OK;
         }
 
@@ -237,6 +240,7 @@ namespace XboxSampleFramework
 
         operator ID3D12DescriptorHeap*() { return m_pDH; }
         operator ID3D12DescriptorHeap*() const { return m_pDH; }
+        operator ID3D12DescriptorHeap* const* () const { return &m_pDH; }
 
         D3D12_CPU_DESCRIPTOR_HANDLE hCPU(UINT index) const
         {

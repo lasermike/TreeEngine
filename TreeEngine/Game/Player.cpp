@@ -12,9 +12,20 @@ XMMATRIX Camera::GetViewMatrix()
     XMVECTOR finalForward = XMVector3Transform(XMVectorSet(0, 0, 1, 0), rotMat);
 
     XMVECTOR pos = m_parent->GetPosition();
-    pos += XMVectorSet(m_hmdPosition.x, m_hmdPosition.y, m_hmdPosition.z, 0);
+    pos += XMVectorSet(m_hmdPosition.x, m_hmdPosition.y, m_hmdPosition.z, 0);  //VR
+
+    if (XMVector3Equal(finalForward, XMVectorZero()) ||
+        XMVector3IsInfinite(finalForward) ||
+        XMVector3Equal(finalUp, XMVectorZero()) ||
+        XMVector3IsInfinite(finalUp))
+    {
+        return XMMatrixIdentity();
+    }
+
+    XMVECTOR focusPosition = pos + finalForward;
+
     return XMMatrixLookAtLH(pos, 
-                            pos + finalForward, 
+                            focusPosition, 
                             finalUp);
 }
 
@@ -44,7 +55,7 @@ void Player::HandleInput(bool key[512])  // WM_KEYDOWN
 {
     XMMATRIX rot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
 
-    const char availableKeys[] = { 'W', 'S', 'D', 'A', VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN };
+    const char availableKeys[] = { 'W', 'S', 'D', 'A', VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, 'Y'};
     for (char k : availableKeys)
     {
         if (key[k])
@@ -53,6 +64,11 @@ void Player::HandleInput(bool key[512])  // WM_KEYDOWN
 
             switch (k)
             {
+            case 'Y':
+                SetPosition(XMVectorSet(-6.0f, 1.5f, -6.0f, 1.0));
+                SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+                key[k] = false;
+                break;
             case 'A':
                 XMStoreFloat3(&_position, XMLoadFloat3(&_position) + XMVector4Transform(XMVectorSet(-0.05f, 0, 0, 1), rot));
                 break;

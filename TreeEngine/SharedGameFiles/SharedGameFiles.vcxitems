@@ -12,7 +12,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ProjectCapability Include="SourceItemsFromImports" />
-    <ClCompile Include="..\Game\Game.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Game.cpp" />
     <ClCompile Include="..\Game\GameLoader.cpp" />
     <ClCompile Include="..\Game\GeometryGenerator.cpp" />
     <ClCompile Include="..\Game\Graph.cpp" />
@@ -64,20 +64,5 @@
     <None Include="..\Game\Shaders\commonshader.bat">
       <FileType>Document</FileType>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
-      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(FullPath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
-      <FileType>Document</FileType>
-      <Command>call ..\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" "$(OutDir)" "$(LayoutDir)" "%(Fullpath)" "$(Platform)" "$(Configuration)"</Command>
-      <Outputs >$(OutDir)\%(Filename)%(Extension).txt</Outputs>
-    </CustomBuild>
-  </ItemGroup>
+  </ItemGroup> 
 </Project>

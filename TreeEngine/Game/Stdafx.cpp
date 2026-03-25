@@ -211,12 +211,12 @@ void XSF::PrintNoVarargs( const wchar_t* msg )
 
 #if defined(TREE3D12)
 #if defined(_DEBUG)
-void SetDebugName(ID3D12DeviceChild* child, const char* name)
+
+void SetDebugName(ID3D12DeviceChild* child, const wchar_t* name)
 {
-#if !defined(TREE_XBOX)
-    child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
-#endif
+    child->SetName(name);
 }
+
 #endif //_DEBUG -> NDEBUG
 
 #else
@@ -224,29 +224,10 @@ void SetDebugName(ID3D12DeviceChild* child, const char* name)
 // Naming
 //
 #if defined(_DEBUG) && !defined(_XBOX_ONE) && defined(TREE3D11) // NAMING
-void SetDebugName(ID3D11DeviceChild* child, const char* name)
-{
-    //child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT) strlen(name), name);
-}
+void SetDebugName(ID3D11DeviceChild* child, const char* name) { }
 
 #else
 #endif // TREE3D12
 
 #endif
 
-#if defined(PIX_INSTRUMENTATION)
-#else
-
-void PIXBeginEvent(void* /*ctx*/, DWORD /*color*/, wchar_t* /*text*/, ...) { }
-void PIXBeginEvent(DWORD /*color*/, wchar_t* /*text*/, ...) { }
-
-void PIXBeginEvent(void* /*ctx*/) { }
-void PIXBeginEvent() { }
-
-void PIXEndEvent(void*) { }
-void PIXEndEvent() { }
-
-void PIXScopedEvent(void*, DWORD, wchar_t*, ...) { }
-void PIXScopedEvent(DWORD, wchar_t*, ...) { }
-
-#endif

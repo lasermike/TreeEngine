@@ -21,10 +21,11 @@ enum GeneratorType
 
 enum ObjectType
 {
-    WorldObjectType,
-    PrimitiveObjectType,
-    TreeType,
-    GraphType,
+    ObjectType_World,
+    ObjectType_Primitive,
+    ObjectType_Tree,
+    ObjectType_Graph,
+    ObjectType_MAX = ObjectType_Graph
 };
 
 enum Extent
@@ -92,7 +93,7 @@ protected:
 
     bool        _drawInstanced;
 
-    unique_ptr<WorldObjectParams> _params;
+    WorldObjectParams* _params;
     XMFLOAT3    _position;
     XMFLOAT4    _rotation; // Quaternion
     XMFLOAT3    _scale;
@@ -108,9 +109,9 @@ public:
     WorldObject(WorldObjectParams* pParams);
     virtual ~WorldObject(void);
 
-    virtual ObjectType GetObjectType() { return WorldObjectType; }
+    virtual ObjectType GetObjectType() { return ObjectType_World; }
     WorldObjectParams& GetParams() { return *_params; }
-    template <class T> WorldObjectParameters<T>& GetParams() { return *(WorldObjectParameters<T>*)_params.get(); }
+    template <class T> WorldObjectParameters<T>& GetParams() { return *(WorldObjectParameters<T>*)_params; }
 
     virtual void Create(ModelGenerator* /*generator*/) { }
 

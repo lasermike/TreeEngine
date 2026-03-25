@@ -89,12 +89,12 @@ private:
     int m_numTreeFrames;
     std::vector<TreeFrame> m_treeFrames;
 
-    HRESULT ComputeBranchInstanceData(TreeFrame& frame, RenderData* pRenderData);
-    HRESULT ComputeBranchInstanceDataPass2(TreeFrame& frame, RenderData* pRenderData, int startInstance);
+    HRESULT ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderData);
+    HRESULT ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* pRenderData, int startInstance);
 
     bool IsTwig(TreeFrame& frame, RenderData* pRenderData);
 
-    HRESULT ComputeBranchEnd(XMVECTOR* vComputedEnd, float time, TreeFrame& frame);
+    HRESULT ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, TreeFrame& frame);
     HRESULT ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFrame& frame);
 
 public:
@@ -103,7 +103,7 @@ public:
 
     virtual void Create(ModelGenerator* generator) { return Create((TreeModelGenerator*)generator); }
     void Create(TreeModelGenerator* generator);
-    virtual ObjectType GetObjectType() { return TreeType; }
+    virtual ObjectType GetObjectType() { return ObjectType_Tree; }
 
     virtual HRESULT InitGraphics(RenderManager& renderManager);
 

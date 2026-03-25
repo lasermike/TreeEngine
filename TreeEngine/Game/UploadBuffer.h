@@ -32,6 +32,8 @@ public:
 
         HR(mUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mMappedData)));
 
+        mapped = true;
+
         // We do not need to unmap until we are done with the resource.  However, we must not write to
         // the resource while it is in use by the GPU (so we must use synchronization techniques).
     }
@@ -40,10 +42,39 @@ public:
     UploadBuffer& operator=(const UploadBuffer& rhs) = delete;
     ~UploadBuffer()
     {
-        if(mUploadBuffer != nullptr)
-            mUploadBuffer->Unmap(0, nullptr);
+        if (mUploadBuffer != nullptr)
+        {
+            Unmap();
+        }
 
         mMappedData = nullptr;
+    }
+
+    HRESULT Map(T** mappedStruct)
+    {
+        HRESULT hr = E_FAIL;
+        if (!mapped)
+        {
+            *mappedStruct = nullptr;
+
+            hr = mUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mMappedData));
+            if (SUCCEEDED(hr))
+            {
+                mapped = true;
+                *mappedStruct = (T*) mMappedData;
+            }
+        }
+
+        return hr;
+    }
+
+    void Unmap()
+    {
+        if (mapped)
+        {
+            mUploadBuffer->Unmap(0, nullptr);
+            mapped = false;
+        }
     }
 
     ID3D12Resource* Resource()const
@@ -54,6 +85,11 @@ public:
     void CopyData(int elementIndex, const T& data)
     {
         memcpy(&mMappedData[elementIndex*mElementByteSize], &data, sizeof(T));
+    }
+
+    void CopyData(int startElementIndex, int numElements, const T* data)
+    {
+        memcpy(&mMappedData[startElementIndex * mElementByteSize], data, sizeof(T) * numElements);
     }
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC View()
@@ -76,6 +112,7 @@ private:
 
     UINT mElementByteSize = 0;
     bool mIsConstantBuffer = false;
+    bool mapped = false;
 
 #else
     UploadBuffer(ID3D11Device* device, UINT elementCount, bool isConstantBuffer) //:

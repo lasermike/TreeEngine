@@ -9,6 +9,7 @@
 #include "StepTimer.h"
 #include "Player.h"
 #include "RenderManager.h"
+#include "Settings.h"
 
 //#if !defined(WIN32) || defined(TREENGINE_XBOX)
 //#include "agile.h"
@@ -18,8 +19,12 @@
 class ThreadPool;
 class BitmapFont;
 interface IInputManager;
+interface IGameInput;
+interface IGameInputReading;
+struct ImGuiInputTextCallbackData;
 
-class Game
+
+class Game : public IDebugUI
 {
 public:
 
@@ -60,6 +65,13 @@ public:
 
     HRESULT Initialize(bool renderToSharedTexture);
 
+    HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
+
+    bool DebugUIKeyCaptured()
+    {
+        return m_bDebugUIKeyCaptured;
+    }
+
 #if defined(TREENGINE_WIN32)
     void SetWindow(HWND hwnd)
     {
@@ -82,31 +94,36 @@ private:
     void Update(DX::StepTimer const& timer);
     void Regenerate();
     void HandleInput(bool key[512]);
+    void HandleGamepadInput(bool key[512]);
 
     HRESULT ReloadDevice();
     void UpdateViewMatrix();
+    
+    static int RuleTextEditCallback(ImGuiInputTextCallbackData* data);
+
 
     // Managers
-    GameLoader                            m_loader;
+    GameLoader                           m_loader;
+    Settings                             m_settings;
     RenderManager                        m_renderManager;
-    HMODULE                             m_renderPlatformDLL;
+    HMODULE                              m_renderPlatformDLL;
 
     // Owned objectes
-    ThreadPool*                            m_threadPool;
-    SceneRoot*                            m_pScene;
-    Player*                                m_player;
+    ThreadPool*                          m_threadPool;
+    SceneRoot*                           m_pScene;
+    Player*                              m_player;
 
     // Unowned objects
     IInputManager*                        m_inputMgr;   
 
     // Game state
     DX::StepTimer                        m_timer;
-    double                                m_timeStart;
-    double                                m_timeCurrent;
-    int                                    m_currentScene;
-    bool                                m_advanceScene;
-    int                                    m_advanceSceneAmount;
-    bool                                m_reloadDevice;
+    double                               m_timeStart;
+    double                               m_timeCurrent;
+    int                                  m_currentScene;
+    bool                                 m_advanceScene;
+    int                                  m_advanceSceneAmount;
+    bool                                 m_reloadDevice;
 
     bool                                m_needsResize;
     int                                 m_nextScreenWidth;
@@ -114,14 +131,28 @@ private:
     bool                                m_renderToSharedTexture;
 
     bool                                m_resetTree;
-    bool                                m_showShadowBuffer;
-    bool                                m_paused;
-    bool                                m_wireframe;
+    //bool                                m_paused;
+    //bool                                m_showShadowBuffer;
+    //bool                                m_showDxrUav;
+    //bool                                m_wireframe;
     bool                                m_showHelp;
     bool                                m_is12Driver;
     bool                                m_rotateLights;
     GameData                            m_gameData;
 
+    bool                                m_bDebugUIKeyCaptured;
+
+    //static const int                    kNumFrameTimeLogEntries = 4000;
+    //double                              m_frameTimeLog[kNumFrameTimeLogEntries];
+    //int                                 m_currentFrameTimeLogEntry;
+
+
+    static constexpr size_t FRAME_DURATION_HISTORY_SIZE = 400; // Adjust size as needed
+
+    float m_timeStamps[FRAME_DURATION_HISTORY_SIZE];
+
+    float m_frameDurations[FRAME_DURATION_HISTORY_SIZE];
+    size_t m_timestampIndex = 0;
 
 #if defined(TREENGINE_WIN32)
     HWND                              m_hwnd;

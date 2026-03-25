@@ -32,160 +32,32 @@
     </Text>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Game\BitmapFont.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\CComPtr.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\DDSTextureLoader.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\DXMath.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\Game.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\GameLoader.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\GeometryGenerator.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\Graph.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\LSystemModelGenerator.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\Materials.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\MathHelper.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\Model.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\Player.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\Primitive.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\RenderData.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\RenderManager.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\RenderStates.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\Resource.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\SceneRoot.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\ShadowMap.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\stdafx.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\StepTimer.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\StockRenderStates.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\Tree.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\TreeModel.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\TreeModelGenerator.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\WorldObject.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>Platform Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Resource.h">
-      <Filter>Platform Source</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>Platform Source</Filter>
-    </ClInclude>
-    <ClInclude Include="TreeClassic.h">
-      <Filter>Platform Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Game\UploadBuffer.h">
-      <Filter>Game\Source</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="TreeClassic.cpp">
       <Filter>Platform Source</Filter>
     </ClCompile>
     <ClCompile Include="pch.cpp">
       <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\Game.cpp">
-      <Filter>Game\Source</Filter>
+    <ClCompile Include="..\imgui\imgui.cpp">
+      <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\GameLoader.cpp">
-      <Filter>Game\Source</Filter>
+    <ClCompile Include="..\imgui\imgui_draw.cpp">
+      <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\GeometryGenerator.cpp">
-      <Filter>Game\Source</Filter>
+    <ClCompile Include="..\imgui\imgui_impl_win32.cpp">
+      <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\Graph.cpp">
-      <Filter>Game\Source</Filter>
+    <ClCompile Include="..\imgui\imgui_widgets.cpp">
+      <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\LSystemModelGenerator.cpp">
-      <Filter>Game\Source</Filter>
+    <ClCompile Include="..\imgui\imgui_tables.cpp">
+      <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\Materials.cpp">
-      <Filter>Game\Source</Filter>
+    <ClCompile Include="..\ImGui\implot.cpp">
+      <Filter>Platform Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\Game\MathHelper.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\Player.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\Primitive.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\RenderManager.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\SceneRoot.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\Stdafx.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\Tree.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\TreeModel.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\TreeModelGenerator.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\WorldObject.cpp">
-      <Filter>Game\Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Game\RenderPlatform.cpp">
-      <Filter>Game\Source</Filter>
+    <ClCompile Include="..\ImGui\implot_items.cpp">
+      <Filter>Platform Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -200,52 +72,13 @@
     <Image Include="TreeClassic.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Game\Bark_0005_diffuse.DDS">
-      <Filter>Game\Resources</Filter>
-    </Image>
-    <Image Include="..\Game\Bark_0009_diffuse.DDS">
-      <Filter>Game\Resources</Filter>
-    </Image>
-    <Image Include="..\Game\bark2.dds">
-      <Filter>Game\Resources</Filter>
-    </Image>
-    <Image Include="..\Game\snow.dds">
-      <Filter>Game\Resources</Filter>
-    </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Game\Shaders\buildShaders.bat">
-      <Filter>Game\Shaders</Filter>
-    </None>
-    <None Include="..\Game\Shaders\commonshader.bat">
-      <Filter>Game\Shaders</Filter>
-    </None>
-    <None Include="..\Game\Arial_16.abc">
-      <Filter>Game\Resources</Filter>
-    </None>
-    <None Include="..\Game\Arial_16.tga">
-      <Filter>Game\Resources</Filter>
-    </None>
-    <None Include="..\Game\Courier_New_11.abc">
-      <Filter>Game\Resources</Filter>
-    </None>
-    <None Include="..\Game\Courier_New_11.tga">
-      <Filter>Game\Resources</Filter>
-    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\Game\Shaders\ATGFont.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\Game\Shaders\Tree.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\Game\Shaders\Blur.hlsl">
-      <Filter>Game\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\Game\CopyResources.cmd">
-      <Filter>Game\Resources</Filter>
-    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\ATGFont.hlsl" />
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tree.hlsl" />
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl" />
   </ItemGroup>
 </Project>

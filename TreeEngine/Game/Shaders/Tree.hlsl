@@ -4,11 +4,14 @@
 //
 // Copyright (c) Microsoft Corporation. All rights reserved.
 //--------------------------------------------------------------------------------------
+
 #include "Materials.fx"
+#include "SharedTypes.hlsli"
 
 //--------------------------------------------------------------------------------------
 // Constant Buffer Variables
 //--------------------------------------------------------------------------------------
+// Graphics root sig
 Texture2D txDiffuse : register(t0);
 TextureCube txCubeMap : register(t0);
 Texture2D txShadowMap : register(t1);
@@ -17,31 +20,8 @@ SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 SamplerState samLinearWrap : register(s3);
 
-struct InstancedData
-{
-    float4x4 World; //  : WORLD;
-    uint InstanceOffset;
-    uint InstanceOffsetPrev;
-    uint InstanceOffsetNext;
-};
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
-
-cbuffer cbChangesPerPass : register(b1)
-{
-    matrix View;
-    matrix Projection;
-};
-
-cbuffer cbChangesEveryFrame : register(b2)
-{
-    DirectionalLight light;
-    float4 eyePos;
-    matrix shadowMatrix;
-    uint globalFlags;  // bit 0 = use shadow maps
-    int numDirectionalLights;
-    int numPointLights;
-};
 
 cbuffer cbMaterial : register (b3)
 {
@@ -57,6 +37,7 @@ struct VS_INPUT
     float2 Tex : TEXCOORD0;
     float3 TangentL : TANGENT;
     float4x4 World  : WORLD;
+    uint  VertexID : SV_VertexID;
 };
 
 //--------------------------------------------------------------------------------------
@@ -73,6 +54,7 @@ struct VS_SKINNED_INPUT
     uint  InstanceOffset : BLENDINDICES0;
     uint  InstanceOffsetPrev : BLENDINDICES1;
     uint  InstanceOffsetNext : BLENDINDICES2;
+    uint  VertexID : SV_VertexID;
 };
 
 struct PS_INPUT
@@ -109,8 +91,8 @@ PS_INPUT SkyBoxVS(VS_INPUT vin)
     // TODO:Set z = w so that z/w = 1 (i.e., skydome always on far plane).
     //output.Pos = mul(posW, gViewProj).xyww;
 
-    output.Pos = mul(float4(pos, 1.0f), transpose(View));
-    output.Pos = mul(output.Pos, transpose(Projection));
+    output.Pos = mul(float4(pos, 1.0f), View);
+    output.Pos = mul(output.Pos, Projection);
     output.Tex = vin.Tex;
 
     return output;
@@ -133,8 +115,13 @@ PS_INPUT VS(VS_INPUT input)
     float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
     output.PosW = out0;
 
-    output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
-    output.Pos = mul(output.Pos, transpose(Projection));
+    // Write transformed vertex for DXR
+    //outputVertices.Append(out0);
+    //outputIndices.Append(input.VertexID);
+    //
+
+    output.Pos = mul(float4(output.PosW, 1.0f), View);
+    output.Pos = mul(output.Pos, Projection);
     output.Tex = input.Tex;
 
     // View direction.  Calcuate here and have it interpolated by to the pixel shader
@@ -161,8 +148,8 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
 {
     PS_INPUT output = (PS_INPUT)0;
 
-    float4x3 world = input.World;
-    float4x3 worldPrev = InstanceBuffer[input.InstanceOffsetPrev].World;
+    float4x3 world = (float4x3) input.World;
+    float4x3 worldPrev = (float4x3) InstanceBuffer[input.InstanceOffsetPrev].World;
 
     //float4x4 world = float4x4(world2, float4(0,0,0,1));
     //float4x4 worldPrev = float4x4(worldPrev2, float4(0, 0, 0, 1));
@@ -176,12 +163,18 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     float3 inputPosPrev = float3(input.Pos.x, 0.5f, input.Pos.z); // assume(!) skinned cylinder always 1 unit tall, centered on origin
     float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
 
-    out0 = lerp(outPrev, out0, input.InstanceWeight1);
+    out0 = lerp(outPrev, out0, input.InstanceWeight1);  // cylinder has 3 ring layers.  instance weight is 0 in the bottom (y=-0.5) ring, 0.5 in the middle ring, and 1.0 in the top (y=1) ring
+                                                        // bottom ring is 100% this transform, top ring is 100% previous transform
 
     output.PosW = out0;
 
-    output.Pos = mul(float4(output.PosW, 1.0f), transpose(View));
-    output.Pos = mul(output.Pos, transpose(Projection));
+    // Write transformed vertex for DXR
+    //outputVertices.Append(out0);
+    //outputIndices.Append(input.VertexID);
+    //
+
+    output.Pos = mul(float4(output.PosW, 1.0f), View);
+    output.Pos = mul(output.Pos, Projection);
     output.Tex = input.Tex;
 
     // View direction.  Calcuate here and have it interpolated by to the pixel shader
@@ -278,8 +271,8 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
     ShadowMapVertexOut output;
 
     float4 pos = mul(float4(input.Pos, 1.0f), input.World);
-    pos = mul(pos, transpose(View));
-    output.PosH = mul(pos, transpose(Projection));
+    pos = mul(pos, View);
+    output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
 
     return output;
@@ -292,8 +285,8 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
     float4x4 world = input.World;
     //float4x4 world = InstanceBuffer[input.InstanceOffset].World;
     float4 pos = mul(float4(input.Pos, 1.0f), world);
-    pos = mul(pos, transpose(View));
-    output.PosH = mul(pos, transpose(Projection));
+    pos = mul(pos, View);
+    output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
 
     return output;
@@ -334,11 +327,21 @@ DSVertexOut DrawScreenQuadVS(DSVertexIn vin)
 {
     DSVertexOut vout;
 
+//#define FULL_SCREEN_OVERLAY
+#ifdef FULL_SCREEN_OVERLAY
+    float4x4 worldViewProj = float4x4(
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
+
+#else
     float4x4 worldViewProj = float4x4(
         0.5f, 0.0f, 0.0f, 0.0f,
         0.0f, 0.5f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
         0.5f, -0.5f, 0.0f, 1.0f);
+#endif
 
     vout.PosH = mul(float4(vin.PosL, 1.0f), worldViewProj);
 
@@ -347,7 +350,7 @@ DSVertexOut DrawScreenQuadVS(DSVertexIn vin)
     return vout;
 }
 
-float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
+float4 DrawR8ScreenQuadPS(DSVertexOut input) : SV_Target
 {
     float4 c = txDiffuse.Sample(samLinear, input.Tex).r;
 
@@ -357,6 +360,13 @@ float4 DrawScreenQuadPS(DSVertexOut input) : SV_Target
     // draw test circle 
     //float len = length(input.Tex - 0.5);
     //return float4(len, len, len,1);
+}
+
+float4 DrawRGBScreenQuadPS(DSVertexOut input) : SV_Target
+{
+    float4 c = txDiffuse.Sample(samLinear, input.Tex);
+
+    return float4(c.rgb, 1);
 }
 
 /////////////////////////////////////////////////////////

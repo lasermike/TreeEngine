@@ -9,6 +9,12 @@
 Gaming.Xbox.Scarlett.x64/
 Gaming.Xbox.XboxOne.x64/
 
+TreeEngine/TreeClassic/Image/Loose/
+Loose/
+
+#Shaders
+*.cso
+
 # Build results
 [Dd]ebug/
 [Dd]ebug12/
@@ -80,6 +86,7 @@ ipch/
 *.VC.opendb
 *.VC.db-shm
 *.VC.db-wal
+.vs/
 
 # Visual Studio profiler
 *.psess

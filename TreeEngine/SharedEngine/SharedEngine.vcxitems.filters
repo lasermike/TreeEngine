@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\buildShaders.bat" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\commonshader.bat" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Tree.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Game.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GameLoader.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Graph.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\LSystemModelGenerator.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Materials.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\MathHelper.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Player.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Primitive.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\RenderManager.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneRoot.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Stdafx.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TreeModel.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TreeModelGenerator.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\WorldObject.cpp" />
+  </ItemGroup>
+</Project>

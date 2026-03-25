@@ -1,0 +1,3 @@
+RaytracingLibrary.hlsl,lib,RaytracingLibrary
+GlobalRootSignature.hlsl,rootsig,GlobalRootSignature
+LocalRootSignature.hlsl,rootsig,LocalRootSignature

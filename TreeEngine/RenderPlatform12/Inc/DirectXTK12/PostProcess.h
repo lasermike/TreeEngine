@@ -1,19 +1,17 @@
 //--------------------------------------------------------------------------------------
 // File: PostProcess.h
 //
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
 // Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 //
 // http://go.microsoft.com/fwlink/?LinkID=615561
 //--------------------------------------------------------------------------------------
 
 #pragma once
 
-#if defined(_XBOX_ONE) && defined(_TITLE)
+#ifdef _GAMING_XBOX_SCARLETT
+#include <d3d12_xs.h>
+#elif (defined(_XBOX_ONE) && defined(_TITLE)) || defined(_GAMING_XBOX)
 #include <d3d12_x.h>
 #else
 #include <d3d12.h>
@@ -21,7 +19,6 @@
 
 #include <DirectXMath.h>
 #include <memory>
-#include <functional>
 
 #include "RenderTargetState.h"
 
@@ -33,9 +30,18 @@ namespace DirectX
     class IPostProcess
     {
     public:
-        virtual ~IPostProcess() { }
+        virtual ~IPostProcess() = default;
+
+        IPostProcess(const IPostProcess&) = delete;
+        IPostProcess& operator=(const IPostProcess&) = delete;
+
+        IPostProcess(IPostProcess&&) = delete;
+        IPostProcess& operator=(IPostProcess&&) = delete;
 
         virtual void __cdecl Process(_In_ ID3D12GraphicsCommandList* commandList) = 0;
+
+    protected:
+        IPostProcess() = default;
     };
 
 
@@ -44,7 +50,7 @@ namespace DirectX
     class BasicPostProcess : public IPostProcess
     {
     public:
-        enum Effect
+        enum Effect : unsigned int
         {
             Copy,
             Monochrome,
@@ -58,13 +64,13 @@ namespace DirectX
         };
 
         explicit BasicPostProcess(_In_ ID3D12Device* device, const RenderTargetState& rtState, Effect fx);
-        BasicPostProcess(BasicPostProcess&& moveFrom);
-        BasicPostProcess& operator= (BasicPostProcess&& moveFrom);
+        BasicPostProcess(BasicPostProcess&& moveFrom) noexcept;
+        BasicPostProcess& operator= (BasicPostProcess&& moveFrom) noexcept;
 
         BasicPostProcess(BasicPostProcess const&) = delete;
         BasicPostProcess& operator= (BasicPostProcess const&) = delete;
 
-        virtual ~BasicPostProcess();
+        ~BasicPostProcess() override;
 
         // IPostProcess methods.
         void __cdecl Process(_In_ ID3D12GraphicsCommandList* commandList) override;
@@ -94,7 +100,7 @@ namespace DirectX
     class DualPostProcess : public IPostProcess
     {
     public:
-        enum Effect
+        enum Effect : unsigned int
         {
             Merge,
             BloomCombine,
@@ -102,13 +108,13 @@ namespace DirectX
         };
 
         explicit DualPostProcess(_In_ ID3D12Device* device, const RenderTargetState& rtState, Effect fx);
-        DualPostProcess(DualPostProcess&& moveFrom);
-        DualPostProcess& operator= (DualPostProcess&& moveFrom);
+        DualPostProcess(DualPostProcess&& moveFrom) noexcept;
+        DualPostProcess& operator= (DualPostProcess&& moveFrom) noexcept;
 
         DualPostProcess(DualPostProcess const&) = delete;
         DualPostProcess& operator= (DualPostProcess const&) = delete;
 
-        virtual ~DualPostProcess();
+        ~DualPostProcess() override;
 
         // IPostProcess methods.
         void __cdecl Process(_In_ ID3D12GraphicsCommandList* commandList) override;
@@ -136,7 +142,8 @@ namespace DirectX
     class ToneMapPostProcess : public IPostProcess
     {
     public:
-        enum Operator           // Tone-mapping operator
+        // Tone-mapping operator
+        enum Operator : unsigned int
         {
             None,               // Pass-through
             Saturate,           // Clamp [0,1]
@@ -145,7 +152,8 @@ namespace DirectX
             Operator_Max
         };
 
-        enum TransferFunction   // Electro-Optical Transfer Function (EOTF)
+        // Electro-Optical Transfer Function (EOTF)
+        enum TransferFunction : unsigned int
         {
             Linear,             // Pass-through
             SRGB,               // sRGB (Rec.709 and approximate sRGB display curve)
@@ -155,18 +163,18 @@ namespace DirectX
 
         explicit ToneMapPostProcess(_In_ ID3D12Device* device, const RenderTargetState& rtState,
             Operator op, TransferFunction func
-    #if defined(_XBOX_ONE) && defined(_TITLE)
+        #if (defined(_XBOX_ONE) && defined(_TITLE)) || defined(_GAMING_XBOX)
             , bool mrt = false
-    #endif
+        #endif
         );
 
-        ToneMapPostProcess(ToneMapPostProcess&& moveFrom);
-        ToneMapPostProcess& operator= (ToneMapPostProcess&& moveFrom);
+        ToneMapPostProcess(ToneMapPostProcess&& moveFrom) noexcept;
+        ToneMapPostProcess& operator= (ToneMapPostProcess&& moveFrom) noexcept;
 
         ToneMapPostProcess(ToneMapPostProcess const&) = delete;
         ToneMapPostProcess& operator= (ToneMapPostProcess const&) = delete;
 
-        virtual ~ToneMapPostProcess();
+        ~ToneMapPostProcess() override;
 
         // IPostProcess methods.
         void __cdecl Process(_In_ ID3D12GraphicsCommandList* commandList) override;

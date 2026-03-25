@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "SceneRoot.h"
 #include "GeometryGenerator.h"
-#include "ShadowMap.h"
 #include "RenderManager.h"
 #include "ThreadPool.h"
 

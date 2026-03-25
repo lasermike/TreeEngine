@@ -32,4 +32,7 @@
       <UniqueIdentifier>{ffcdc6a8-f957-46a2-8ec7-4a79a09c5b75}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+  <ItemGroup>
+    <MGCCompile Include="MicrosoftGame.Config" />
+  </ItemGroup>
 </Project>

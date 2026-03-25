@@ -10,6 +10,25 @@
 //#include "d3dUtil.h"
 //#include "Camera.h"
 
+class UavBuffer
+{
+public:
+    UavBuffer(XSF::D3DDevice* device, 
+              DXGI_FORMAT dxgiFormat,
+              D3D12_CPU_DESCRIPTOR_HANDLE bufferSrvCpu,
+              D3D12_GPU_DESCRIPTOR_HANDLE bufferSrvGpu,
+              D3D12_CPU_DESCRIPTOR_HANDLE bufferUavCpu,
+              D3D12_CPU_DESCRIPTOR_HANDLE bufferNonVisibleUavCpu,
+              UINT width, UINT height);
+
+    ~UavBuffer();
+
+    ID3D12Resource* uavOutput;
+    D3D12_CPU_DESCRIPTOR_HANDLE srvCpu;
+    D3D12_GPU_DESCRIPTOR_HANDLE srvGpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE srvCpuNonVisible;
+};
+
 class ShadowMap
 {
 public:
@@ -19,6 +38,7 @@ public:
 #elif defined(TREE3D11)
     ShadowMap(XSF::D3DDevice* device, UINT width, UINT height);
 #else
+#error ShadowMap should not be used outside of RenderPlatform
     ShadowMap();
 #endif
 

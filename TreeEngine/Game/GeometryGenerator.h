@@ -27,6 +27,7 @@ enum PrimitiveType
     PrimitiveType_FSQuad,
     PrimitiveType_SkinnedCylinder,
     PrimitiveType_Sprite,
+    PrimitiveType_MAX = PrimitiveType_Sprite
 };
 
 struct SimpleVertex

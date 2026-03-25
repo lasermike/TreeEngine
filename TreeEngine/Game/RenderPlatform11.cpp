@@ -76,9 +76,9 @@ HRESULT RenderPlatform11::UpdateView(CBNeverChanges& cbNeverChanges, bool shadow
 HRESULT RenderPlatform11::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pProjMat, bool shadowPass)
 {
     CBChangesPerPass cbChangesPerPass;
-    XMStoreFloat4x4(&cbChangesPerPass.mProjection, XMMatrixTranspose(XMLoadFloat4x4(pProjMat)));
+    XMStoreFloat4x4(&cbChangesPerPass.mProjection, XMLoadFloat4x4(pProjMat));
 
-    XMStoreFloat4x4(&cbChangesPerPass.mView, XMMatrixTranspose(XMLoadFloat4x4(pViewMat)));
+    XMStoreFloat4x4(&cbChangesPerPass.mView, XMLoadFloat4x4(pViewMat));
 
     m_immediateContext->UpdateSubresource(m_constBufferChangesPerPass->Resource(), 0, nullptr, &cbChangesPerPass, 0, 0);
 
@@ -614,6 +614,9 @@ HRESULT RenderPlatform11::BeginNewFrame(bool /*resetCommandList*/, D3DBuffer* bu
     HRR(m_immediateContext->Map(buffer->buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
     *dataView = reinterpret_cast<InstancedData*>(mappedData.pData);
 
+    m_renderData->instanceData = *dataView;
+    m_renderData->instanceBuffer = buffer;
+
     return S_OK;
 }
 
@@ -723,7 +726,7 @@ HRESULT RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlph
     return S_OK;
 }
 
-HRESULT RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool showShadowBuffer, bool renderToSharedTexture)
+HRESULT RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture)
 {
     HRESULT hr = S_OK;
 
@@ -734,7 +737,7 @@ HRESULT RenderPlatform11::RenderEpilog(bool oculus, bool useShadowMaps, bool sho
         m_immediateContext->PSSetShaderResources(1, 1, &depthTexture);
     }
 
-    if (showShadowBuffer)
+    if (m_renderData->showShadowBuffer)
     {
         HRC(DrawScreenQuad(m_immediateContext, m_renderData->pShadowMap->DepthMapSRV()));
     }

@@ -93,6 +93,10 @@ __inline void ReportFailure(const char* msg, const char* file, long line, HRESUL
         {        \
             Util.Output("Log: %s \n", x);  \
         }        
+#define LOGF(fmt, ...)    \
+        {        \
+            Util.Output(fmt, __VA_ARGS__);  \
+        }        
 #endif 
 
 #define ASSERTSZ(x, str) \
@@ -110,6 +114,7 @@ __inline void ReportFailure(const char* msg, const char* file, long line, HRESUL
 #define HRC(x) if (FAILED(x)) goto Cleanup;
 #define HRR(x) (x)
 #define LOG(x)
+#define LOGF(fmt, ...)
 #define ASSERTSZ(x, str)
 #endif
 #endif 
@@ -123,6 +128,14 @@ struct Utility
         vsprintf_s(string_text, fnt, args);
         va_end(args);
         OutputDebugStringA(string_text);
+    }
+    void Output(const WCHAR* fnt, ...)
+    {
+        static WCHAR string_text[256 * 256];
+        va_list args; va_start(args, fnt);
+        vswprintf_s(string_text, fnt, args);
+        va_end(args);
+        OutputDebugStringW(string_text);
     }
 } static Util;
 
@@ -161,7 +174,7 @@ void SafeDelete(T* obj)
 #define XSF_ERROR_IF_FAILED( exp ) exp  
 
 #if defined(TREE3D12)
-__inline void SetDebugName(ID3D12DeviceChild* /*child*/, const char* /*name*/) { }
+__inline void SetDebugName(ID3D12DeviceChild* /*child*/, const wchar_t* /*name*/) { }
 //void GetHardwareAdapter(IDXGIFactory4* pFactory, IDXGIAdapter1** ppAdapter);
 #elif defined(TREE3D11)
 __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
@@ -178,18 +191,12 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 //
 // Naming of objects
 //
-#if defined(_XBOX_ONE) // NAMING
-    __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) { }
-#else
-
 #if defined(TREE3D12)
-    void SetDebugName(ID3D12DeviceChild* child, const char* name);
+    void SetDebugName(ID3D12DeviceChild* child, const wchar_t* name);
 
 #elif defined(TREE3D11)
     void SetDebugName(ID3D11DeviceChild* child, const char* name);
 #endif
-
-#endif // NAMING
 
 #endif  // NDEBUG
 
@@ -203,11 +210,16 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 //
 // PIX markers and events
 //
-#if defined(PIX_INSTRUMENTATION)
+
 
 #if defined(TREE_XBOX)
 #include <pix.h>
 #pragma comment(lib, "pixEvt")
+#else
+#include "pix3.h"
+#endif
+
+#if defined(ATG_INSTRUMENTATION)
 
 #if defined(ATG_PROFILE_VERBOSE)
 
@@ -241,29 +253,7 @@ __inline void SetDebugName(ID3D11DeviceChild* /*child*/, const char* /*name*/) {
 
 #endif 
 
-#else
-// PC build
-#include "pix3.h"
-
-#endif
-
-#else // No PIX_INSTRUMENTATION
-
-void PIXBeginEvent(void* /*ctx*/, DWORD /*color*/, wchar_t* /*text*/, ...);
-void PIXBeginEvent(DWORD /*color*/, wchar_t* /*text*/, ...);
-
-void PIXBeginEvent(void* /*ctx*/);
-void PIXBeginEvent();
-
-void PIXEndEvent(void*);
-void PIXEndEvent();
-
-#if !defined(TREE_XBOX)
-void PIXScopedEvent(DWORD, wchar_t*, ...);
-void PIXScopedEvent(void*, DWORD, wchar_t*, ...);
-#endif
-
-#endif
+#else // No ATG_INSTRUMENTATION
 
 // Null versions
 #define ATGPROFILETHIS
@@ -279,6 +269,7 @@ void PIXScopedEvent(void*, DWORD, wchar_t*, ...);
 #define VERBOSEATGPROFILELABEL( a )
 #define VERBOSEENDATGPROFILELABEL
 
+#endif 
 
 const UINT64 XTF_COLOR_DRAW_TEXT = 0xFF0000FF;
 const UINT64 TREE_COLOR_DRAW_TEXT = 0x0000FFFF;

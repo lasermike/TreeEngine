@@ -8,36 +8,48 @@
 // module in the DirectXTex package or as part of the DirectXTK library to load
 // these files which use standard Direct3D resource creation APIs.
 //
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
 // Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 //
 // http://go.microsoft.com/fwlink/?LinkID=615561
 //--------------------------------------------------------------------------------------
 
 #pragma once
 
-#if !defined(_XBOX_ONE) || !defined(_TITLE)
-#error This module only supports Xbox One exclusive apps
+#if !(defined(_XBOX_ONE) && defined(_TITLE)) && !defined(_GAMING_XBOX)
+#error This module only supports Xbox exclusive apps
 #endif
 
+#ifdef _GAMING_XBOX_SCARLETT
+#include <d3d12_xs.h>
+#else
 #include <d3d12_x.h>
+#endif
 
-#include <stdint.h>
+#ifdef _GAMING_XBOX
+#pragma comment(lib,"xmem.lib")
+#endif
+
+#include <cstdint>
+
+#ifndef DDS_ALPHA_MODE_DEFINED
+#define DDS_ALPHA_MODE_DEFINED
+namespace DirectX
+{
+    enum DDS_ALPHA_MODE : uint32_t
+    {
+        DDS_ALPHA_MODE_UNKNOWN = 0,
+        DDS_ALPHA_MODE_STRAIGHT = 1,
+        DDS_ALPHA_MODE_PREMULTIPLIED = 2,
+        DDS_ALPHA_MODE_OPAQUE = 3,
+        DDS_ALPHA_MODE_CUSTOM = 4,
+    };
+}
+#endif
 
 namespace Xbox
 {
-    enum DDS_ALPHA_MODE
-    {
-        DDS_ALPHA_MODE_UNKNOWN       = 0,
-        DDS_ALPHA_MODE_STRAIGHT      = 1,
-        DDS_ALPHA_MODE_PREMULTIPLIED = 2,
-        DDS_ALPHA_MODE_OPAQUE        = 3,
-        DDS_ALPHA_MODE_CUSTOM        = 4,
-    };
+    using DirectX::DDS_ALPHA_MODE;
 
     //
     //  NOTE: Flush the GPU caches before using textures created 
@@ -69,7 +81,7 @@ namespace Xbox
         _Outptr_ void** grfxMemory,
         _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr, 
         _In_ bool forceSRGB = false,
-        _Out_opt_ bool* isCubeMap = nullptr);
+        _Out_opt_ bool* isCubeMap = nullptr) noexcept;
 
     HRESULT __cdecl CreateDDSTextureFromFile( 
         _In_ ID3D12Device* d3dDevice,
@@ -78,7 +90,7 @@ namespace Xbox
         _Outptr_ void** grfxMemory,
         _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
         _In_ bool forceSRGB = false,
-        _Out_opt_ bool* isCubeMap = nullptr);
+        _Out_opt_ bool* isCubeMap = nullptr) noexcept;
 
-    void FreeDDSTextureMemory(_In_opt_ void* grfxMemory);
+    void FreeDDSTextureMemory(_In_opt_ void* grfxMemory) noexcept;
 }

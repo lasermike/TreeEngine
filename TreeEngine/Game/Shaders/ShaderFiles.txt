@@ -4,7 +4,8 @@ Tree.hlsl,vs,VS
 Tree.hlsl,vs,VSSkinned
 Tree.hlsl,ps,PS
 Tree.hlsl,vs,DrawScreenQuadVS
-Tree.hlsl,ps,DrawScreenQuadPS
+Tree.hlsl,ps,DrawR8ScreenQuadPS
+Tree.hlsl,ps,DrawRGBScreenQuadPS
 Tree.hlsl,vs,BuildShadowMapVS
 Tree.hlsl,ps,BuildShadowMapPS
 Tree.hlsl,vs,BuildShadowMapVSSkinned
@@ -14,3 +15,8 @@ Tree.hlsl,vs,SkyBoxVS
 Tree.hlsl,ps,SkyBoxPS
 Blur.hlsl,cs,HorzBlurCS
 Blur.hlsl,cs,VertBlurCS
+Blur.hlsl,cs,VSasCS
+Blur.hlsl,cs,VSasCSSkinned
+RaytracingLibrary.hlsl,lib,RaytracingLibrary
+GlobalRootSignature.hlsl,rootsig,GlobalRootSignature
+LocalRootSignature.hlsl,rootsig,LocalRootSignature

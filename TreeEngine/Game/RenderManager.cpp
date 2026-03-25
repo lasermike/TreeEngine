@@ -3,17 +3,41 @@
 
 #include "Primitive.h" // TEMPTEMP
 
+#include "Settings.h"
+
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+#include "implot.h"
+
 FrameStatistic g_frameStats[MAX_FRAME_STAT] = 
 { 
-    { FPS_STAT, L"FPS", 0 }, 
-    { WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", 0 }, 
-    { NUM_LEAVES_STAT, L"Num leaves", 0 },
-    { NUM_STICKS_STAT, L"Num sticks", 0 },
-    { DRIVER_12_STAT, L"DirectX 12", 0 },
+    { FPS_STAT, L"FPS", UINT_FrameStatValueType, 0 },
+    { WORLD_MATRIX_COMPUTED_STAT, L"World Matrix Computed", UINT_FrameStatValueType, 0 },
+    { NUM_LEAVES_STAT, L"Num leaves", UINT_FrameStatValueType, 0 },
+    { NUM_STICKS_STAT, L"Num sticks", UINT_FrameStatValueType, 0 },
+    { DRIVER_12_STAT, L"DirectX 12", UINT_FrameStatValueType, 0 },
 };
 
+void SetFrameStat(FrameStatistic stats[], FrameStat stat, UINT value)
+{
+    stats[stat].stat = value;
+    stats[stat].valueType = UINT_FrameStatValueType;
+}
 
-RenderManager::RenderManager() : m_platform(nullptr)
+void SetFrameStat(FrameStatistic stats[], FrameStat stat, int value)
+{
+    stats[stat].statInt = value;
+    stats[stat].valueType = int_FrameStatValueType;
+}
+
+void SetFrameStat(FrameStatistic stats[], FrameStat stat, float value)
+{
+    stats[stat].statFloat = value;
+    stats[stat].valueType = float_FrameStatValueType;
+}
+
+
+RenderManager::RenderManager() : m_platform(nullptr), m_pDebugUI(nullptr)
 {
     m_displayMode = Monitor;
 
@@ -38,11 +62,10 @@ HRESULT RenderManager::SetPlatform(HMODULE platformDLL)
     SafeDelete(&m_platform);
 
     //m_platform = new RenderPlatform12(&m_renderData);
-    m_platform = new RenderPlatformDLL(platformDLL, &m_renderData);
+    m_platform = new RenderPlatformDLL(platformDLL, &m_renderData, m_settings);
     
     return S_OK;
 }
-
 
 HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
 {
@@ -118,8 +141,8 @@ HRESULT RenderManager::BeginNewFrame()
     InstancedData* dataView = nullptr;
     GetPlatform()->BeginNewFrame(true, buffer, &dataView);
 
-    m_renderData.instanceData = dataView;
-    m_renderData.instanceBuffer = buffer;
+    //m_renderData.instanceData = dataView;
+    //m_renderData.instanceBuffer = buffer;
 
     return S_OK;
 }
@@ -155,14 +178,17 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 
     for (auto object : ru->reservations)
     {
-        if (pass == ShadowMapPass && object->GetObjectType() == PrimitiveObjectType)
+        if (pass == ShadowMapPass && object->GetObjectType() == ObjectType_Primitive)
             continue;
 
         UINT startInstance = m_perFrameInstanceData[ru][object].first;
         UINT numInstances = m_perFrameInstanceData[ru][object].second;
 
-        GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets->IndexCount, numInstances, ru->m_mesh->m_bufferOffsets->IndexOffset,
-            ru->m_mesh->m_bufferOffsets->VertexOffset, startInstance);
+        if (numInstances > 0)
+        {
+            GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets->IndexCount, numInstances, ru->m_mesh->m_bufferOffsets->IndexOffset,
+                ru->m_mesh->m_bufferOffsets->VertexOffset, startInstance);
+        }
     }
     return S_OK;
 }
@@ -378,7 +404,6 @@ HRESULT RenderManager::UpdateView(XMFLOAT4X4* pViewMat, bool shadowPass)
 {
     ASSERT(0);
     CBNeverChanges cbNeverChanges;
-    //XMStoreFloat4x4(&cbNeverChanges.mView, XMMatrixTranspose(XMLoadFloat4x4(pViewMat)));
     return GetPlatform()->UpdateView(cbNeverChanges, shadowPass);
 }
 
@@ -434,12 +459,12 @@ void RenderManager::UninitDevice()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
-void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp, bool showShadowBuffer,
+void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool useShadowMaps, bool showHelp,
     bool renderToSharedTexture, float* clearColor)
 {
     HRESULT hr = S_OK;
 
-    GetPlatform()->RenderProlog(oculus, wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor);
+    GetPlatform()->RenderProlog(oculus, m_settings->m_wireframe, useAlphaBlendedRenderTarget, useShadowMaps, clearColor);
 
     UpdateViewProjection(&GetRenderData().view, &GetRenderData().projection, false);
 
@@ -465,7 +490,28 @@ void RenderManager::Render(bool oculus, bool wireframe, bool useAlphaBlendedRend
         DrawFrameStats();
     }
 
-    HRC(GetPlatform()->RenderEpilog(oculus, useShadowMaps, showShadowBuffer, renderToSharedTexture));
+    HRC(GetPlatform()->RenderPostProcess());  // Does effects and then copies offscreen back to render target 
+
+    HRC(GetPlatform()->RenderDebugUI());  // If ImGui is enabled it will be initialized here
+
+    ImGuiContext* imGuiContext = nullptr;
+    ImPlotContext* imPlotContext = nullptr;
+    ;
+    if (SUCCEEDED(m_platform->GetImGuiContext(&imGuiContext, &imPlotContext)) &&
+        imGuiContext && m_pDebugUI != nullptr)
+    {
+        ImGui::SetCurrentContext(imGuiContext);
+
+        if (imPlotContext)
+        {
+            ImPlot::SetCurrentContext(imPlotContext);
+        }
+        m_pDebugUI->UpdateDebugUI(imGuiContext);
+    }
+
+
+    HRC(GetPlatform()->RenderEpilog(oculus, useShadowMaps, renderToSharedTexture));
+
 
 Cleanup:
     return;
@@ -502,9 +548,13 @@ HRESULT RenderManager::RenderShadowMap()
 {
     BuildShadowTransform();
 
+    m_renderData.currentPass = ShadowMapPass;
+
     GetPlatform()->SetRenderPhase(RP_TRANSITION_TO_RENDER_SHADOW_MAP);
 
     DrawSceneToShadowMap();
+
+    m_renderData.currentPass = RegularPass;
 
     GetPlatform()->SetRenderPhase(RP_TRANSITION_FROM_RENDER_SHADOW_MAP);
 
@@ -559,10 +609,10 @@ void RenderManager::DrawSceneToShadowMap()
 }
 
 
-RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
+RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data, Settings* settings)
 {
     CreateFunc createFuncPtr = (CreateFunc) ::GetProcAddress(module, "Create");
-    HR(createFuncPtr(data));
+    HR(createFuncPtr(data, settings));
 
     InitDeviceFuncPtr = (InitDeviceFunc) ::GetProcAddress(module, "InitDevice");
 
@@ -589,6 +639,8 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
     ASSIGN_FUNC(EndFrame);
 
     ASSIGN_FUNC(RenderProlog);
+    ASSIGN_FUNC(RenderPostProcess);
+    ASSIGN_FUNC(RenderDebugUI);
     ASSIGN_FUNC(RenderEpilog);
 
     ASSIGN_FUNC(RenderSceneSetup);
@@ -614,6 +666,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
 
     ASSIGN_FUNC(GetVertexBuffer);
     ASSIGN_FUNC(GetIndexBuffer);
+    ASSIGN_FUNC(GetImGuiContext);
 
     ASSIGN_FUNC(Gui_WndProcHandler);
 
@@ -624,5 +677,4 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data)
 
 RenderPlatformDLL::~RenderPlatformDLL()
 {
-
 }

@@ -8,6 +8,10 @@
 
 #define MAX_LOADSTRING 100
 
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 610; }
+
+extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\"; }
+
 #ifdef OCULUS_LEGACY
 #include <OVR_CAPI_D3D.h>
 #include <Kernel/OVR_System.h>
@@ -109,7 +113,9 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: Place code here.
+    // Set per-monitor DPI awareness before creating any windows.
+    // This ensures real pixel coordinates on multi-monitor setups.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     // Initialize global strings
     LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -322,7 +328,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     else
     {
 #endif
-        RECT rc = { 0, 0, 1600, 1080};
+        // Window size
+        RECT rc = { 0, 0, 1600, 1200 };
         AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
         m_hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
@@ -477,6 +484,9 @@ void OnWindowSizeChanged()
     windowWidth = rect.right - rect.left;
     windowHeight = rect.bottom - rect.top;
 
+    if (windowWidth == 0 || windowHeight == 0)
+        return;
+
     g_game->OnResize(windowWidth, windowHeight);
 }
 
@@ -510,18 +520,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         
         if (WasDown != IsDown)
         {
-            if (IsDown)
+            if (IsDown && 
+                (!g_game || !g_game->DebugUIKeyCaptured()))  //No new keyboard downs if debug ui has focus
+            {
                 input.key[wParam] = true;
+            }
             else if (WasDown)
+            {
                 input.key[wParam] = false;
+            }
         }
     }
-    //case WM_KEYDOWN:
- //       input.key[wParam] = !(lParam & 1 << 30);
- //       break;
- //   case WM_KEYUP:
- //       input.key[wParam] = false;
- //       break;
     case WM_COMMAND:
         wmId    = LOWORD(wParam);
         wmEvent = HIWORD(wParam);
@@ -538,6 +547,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             return DefWindowProc(hWnd, message, wParam, lParam);
         }
         break;
+    case WM_SIZE:
+        if (wParam != SIZE_MINIMIZED && g_game)
+        {
+            OnWindowSizeChanged();
+        }
+        break;
+    case WM_DPICHANGED:
+    {
+        RECT* prcNewWindow = reinterpret_cast<RECT*>(lParam);
+        SetWindowPos(hWnd, NULL,
+            prcNewWindow->left, prcNewWindow->top,
+            prcNewWindow->right - prcNewWindow->left,
+            prcNewWindow->bottom - prcNewWindow->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        break;
+    }
     case WM_PAINT:
         hdc = BeginPaint(hWnd, &ps);
         // TODO: Add any drawing code here...

@@ -1,22 +1,21 @@
 //--------------------------------------------------------------------------------------
 // File: SpriteBatch.h
 //
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
 // Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 //
 // http://go.microsoft.com/fwlink/?LinkID=615561
 //--------------------------------------------------------------------------------------
 
 #pragma once
 
-#if defined(_XBOX_ONE) && defined(_TITLE)
+#ifdef _GAMING_XBOX_SCARLETT
+#include <d3d12_xs.h>
+#elif (defined(_XBOX_ONE) && defined(_TITLE)) || defined(_GAMING_XBOX)
 #include <d3d12_x.h>
 #else
 #include <d3d12.h>
+#include <dxgi.h>
 #endif
 
 #include <DirectXMath.h>
@@ -30,7 +29,7 @@
 namespace DirectX
 {
     class ResourceUploadBatch;
-    
+
     enum SpriteSortMode
     {
         SpriteSortMode_Deferred,
@@ -39,8 +38,8 @@ namespace DirectX
         SpriteSortMode_BackToFront,
         SpriteSortMode_FrontToBack,
     };
-    
-    enum SpriteEffects
+
+    enum SpriteEffects : uint32_t
     {
         SpriteEffects_None = 0,
         SpriteEffects_FlipHorizontally = 1,
@@ -56,7 +55,7 @@ namespace DirectX
             _In_opt_ const D3D12_BLEND_DESC* blend = nullptr,
             _In_opt_ const D3D12_DEPTH_STENCIL_DESC* depthStencil = nullptr,
             _In_opt_ const D3D12_RASTERIZER_DESC* rasterizer = nullptr,
-            _In_opt_ const D3D12_GPU_DESCRIPTOR_HANDLE* samplerDescriptor = nullptr)
+            _In_opt_ const D3D12_GPU_DESCRIPTOR_HANDLE* isamplerDescriptor = nullptr) noexcept
             :
             blendDesc(blend ? *blend : s_DefaultBlendDesc),
             depthStencilDesc(depthStencil ? *depthStencil : s_DefaultDepthStencilDesc),
@@ -67,8 +66,8 @@ namespace DirectX
             customVertexShader{},
             customPixelShader{}
         {
-            if (samplerDescriptor)
-                this->samplerDescriptor = *samplerDescriptor;
+            if (isamplerDescriptor)
+                this->samplerDescriptor = *isamplerDescriptor;
         }
 
         D3D12_BLEND_DESC            blendDesc;
@@ -85,13 +84,13 @@ namespace DirectX
         static const D3D12_RASTERIZER_DESC      s_DefaultRasterizerDesc;
         static const D3D12_DEPTH_STENCIL_DESC   s_DefaultDepthStencilDesc;
     };
-    
+
     class SpriteBatch
     {
     public:
         SpriteBatch(_In_ ID3D12Device* device, ResourceUploadBatch& upload, const SpriteBatchPipelineStateDescription& psoDesc, _In_opt_ const D3D12_VIEWPORT* viewport = nullptr);
-        SpriteBatch(SpriteBatch&& moveFrom);
-        SpriteBatch& operator= (SpriteBatch&& moveFrom);
+        SpriteBatch(SpriteBatch&& moveFrom) noexcept;
+        SpriteBatch& operator= (SpriteBatch&& moveFrom) noexcept;
 
         SpriteBatch(SpriteBatch const&) = delete;
         SpriteBatch& operator= (SpriteBatch const&) = delete;
@@ -101,6 +100,11 @@ namespace DirectX
         // Begin/End a batch of sprite drawing operations.
         void XM_CALLCONV Begin(
             _In_ ID3D12GraphicsCommandList* commandList,
+            SpriteSortMode sortMode = SpriteSortMode_Deferred,
+            FXMMATRIX transformMatrix = MatrixIdentity);
+        void XM_CALLCONV Begin(
+            _In_ ID3D12GraphicsCommandList* commandList,
+            D3D12_GPU_DESCRIPTOR_HANDLE sampler,
             SpriteSortMode sortMode = SpriteSortMode_Deferred,
             FXMMATRIX transformMatrix = MatrixIdentity);
         void __cdecl End();
@@ -120,11 +124,11 @@ namespace DirectX
         void XM_CALLCONV Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSRV, XMUINT2 const& textureSize, RECT const& destinationRectangle, _In_opt_ RECT const* sourceRectangle, FXMVECTOR color = Colors::White, float rotation = 0, XMFLOAT2 const& origin = Float2Zero, SpriteEffects effects = SpriteEffects_None, float layerDepth = 0);
 
         // Rotation mode to be applied to the sprite transformation
-        void __cdecl SetRotation( DXGI_MODE_ROTATION mode );
-        DXGI_MODE_ROTATION __cdecl GetRotation() const;
+        void __cdecl SetRotation(DXGI_MODE_ROTATION mode);
+        DXGI_MODE_ROTATION __cdecl GetRotation() const noexcept;
 
         // Set viewport for sprite transformation
-        void __cdecl SetViewport( const D3D12_VIEWPORT& viewPort );
+        void __cdecl SetViewport(const D3D12_VIEWPORT& viewPort);
 
     private:
         // Private implementation.
