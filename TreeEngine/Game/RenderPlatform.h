@@ -252,10 +252,11 @@ struct LoadedTexture
 #if defined(TREE3D12)
     ID3D12Resource* texture;
     D3D12_CPU_DESCRIPTOR_HANDLE textureView;
+    UINT textureSlot;
 
-    LoadedTexture() : texture(nullptr), textureView(CD3DX12_CPU_DESCRIPTOR_HANDLE()) { }
+    LoadedTexture() : texture(nullptr), textureView(CD3DX12_CPU_DESCRIPTOR_HANDLE()), textureSlot(0) { }
     LoadedTexture(ID3D12Resource* textureParam, D3D12_CPU_DESCRIPTOR_HANDLE textureViewParam, UINT textureSlotParam) :
-        texture(textureParam), textureView(textureViewParam) { }
+        texture(textureParam), textureView(textureViewParam), textureSlot(textureSlotParam) { }
 #elif defined(TREE3D11)
     ID3D11ShaderResourceView* texture;
 
@@ -982,7 +983,11 @@ public:
         UINT vertexBufferOffset;
         UINT indexBufferOffset;
         UINT vertexCount;
-        UINT pad;
+        UINT baseVertexLocation;    // offset into original vertex buffer for normals/UVs
+        INT  textureIndex;          // index into DXR texture array (-1 = no texture)
+        UINT isSkinned;             // 1 if skinned vertex buffer, 0 if simple
+        UINT pad1;
+        UINT pad2;
     };
     UploadBuffer<DxrGeometryInfo>* m_dxrGeometryInfoBuffer;
 
@@ -999,7 +1004,7 @@ public:
 
     struct DrawRecord
     {
-        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices, Mesh* thisMesh, ShaderMaterial shaderMat)
+        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices, Mesh* thisMesh, ShaderMaterial shaderMat, INT texIndex)
         {
             startingInstance = startInstance;
             numInstances = numberInstances;
@@ -1010,6 +1015,7 @@ public:
             vertexCount = numVertices;
             inputLayout = thisMesh->m_inputLayout;
             material = shaderMat;
+            textureIndex = texIndex;
         }
 
         UINT startingInstance;
@@ -1025,6 +1031,7 @@ public:
         InputLayouts inputLayout;
 
         ShaderMaterial material;
+        INT textureIndex;           // index into DXR texture array (-1 = no texture)
 
         bool operator==(const DrawRecord&) const;
     };

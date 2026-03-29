@@ -157,11 +157,15 @@ enum CbvSrvUavHeapOffsets
     DrawRecords_SrvHeapOffset = 23,
     DxrMaterial_SrvHeapOffset = 24,
     DxrGeometryInfo_SrvHeapOffset = 25,
+    DxrTexture0_SrvHeapOffset = 26,     // Start of DXR texture slots (up to maxTotalTexturesInScene)
+    DxrTexture1_SrvHeapOffset = 27,
+    DxrTexture2_SrvHeapOffset = 28,
+    DxrTexture3_SrvHeapOffset = 29,
 
     // Per-material descriptors
-    Material0_HeapOffset = 26,
+    Material0_HeapOffset = 30,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 27,
+    Texture0Srv_HeapOffset = 31,
     Num_CbvSrvUavHeapOffsets
 };
  
@@ -1272,6 +1276,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 
     if (m_renderData->currentPass == ShadowMapPass)
     {
+        INT texIdx = (m_currentMaterial && m_currentMaterial->m_texture) ? (INT)m_currentMaterial->m_texture->textureSlot : -1;
         m_drawRecords.push_back(DrawRecord(StartIndexLocation,
             IndexCountPerInstance,
             StartInstanceLocation,
@@ -1280,7 +1285,8 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
             m_nextVbWorldStart,
             m_currentMesh->m_bufferOffsets->VertexCount,
             m_currentMesh,
-            m_currentMaterial ? m_currentMaterial->m_shaderMaterial : ShaderMaterial()));
+            m_currentMaterial ? m_currentMaterial->m_shaderMaterial : ShaderMaterial(),
+            texIdx));
 
         m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount * InstanceCount;
     }
@@ -1301,6 +1307,10 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
     *texture = new LoadedTexture(resource, newDescriptor, (UINT)textureIndex);
 
     assert((*texture)->texture != nullptr);
+
+    // Copy texture SRV to DXR contiguous texture slots for raytracing
+    D3D12_CPU_DESCRIPTOR_HANDLE dxrTextureDest = m_descriptorHeap.hCPU(DxrTexture0_SrvHeapOffset + textureIndex);
+    GetDevice()->CopyDescriptorsSimple(1, dxrTextureDest, newDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     return S_OK;
 }
@@ -2218,6 +2228,9 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             geoInfo.vertexBufferOffset = dr.vbWorldStart + (instanceIndex * dr.vertexCount);
             geoInfo.indexBufferOffset = dr.indexBufferStart;
             geoInfo.vertexCount = dr.vertexCount;
+            geoInfo.baseVertexLocation = dr.baseVertexLocation;
+            geoInfo.textureIndex = dr.textureIndex;
+            geoInfo.isSkinned = (dr.inputLayout == SKINNED_INPUT_LAYOUT) ? 1 : 0;
             m_dxrGeometryInfoBuffer->CopyData(geometryDescIndex, geoInfo);
 
             geometryDescIndex++;
@@ -2878,6 +2891,9 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         commandList->SetComputeRootShaderResourceView(6, m_dxrGeometryInfoBuffer->Resource()->GetGPUVirtualAddress());
         commandList->SetComputeRootShaderResourceView(7, m_VBWorld->GetGPUVirtualAddress());
         commandList->SetComputeRootShaderResourceView(8, m_indexBuffer.buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(9, m_vertexBuffer.buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(10, m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootDescriptorTable(11, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
 
         commandList->DispatchRays(&dispatchRaysDesc);
     }

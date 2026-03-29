@@ -20,6 +20,11 @@ StructuredBuffer<ShaderMaterial> materialBuffer : register(t1);
 StructuredBuffer<DxrGeometryInfo> geometryInfoBuffer : register(t2);
 ByteAddressBuffer vertexBuffer : register(t3);   // VBWorld (float4 per vertex)
 ByteAddressBuffer indexBuffer : register(t4);
+ByteAddressBuffer originalVertexBuffer : register(t5); // SimpleVertex (44 bytes per vertex)
+ByteAddressBuffer skinnedVertexBuffer : register(t6); // SkinnedVertex (56 bytes per vertex)
+Texture2D<float4> sceneTextures[4] : register(t7);
+
+SamplerState samLinear : register(s0);
 
 cbuffer Params : register(b0)
 {
@@ -33,6 +38,56 @@ struct RayPayload
 {
     float4 color;
 };
+
+// SimpleVertex: Position(float3=12), Normal(float3=12), Tex(float2=8), Tangent(float3=12) = 44 bytes
+// SkinnedVertex: Position(float3=12), Normal(float3=12), Tex(float2=8), Tangent(float3=12), Weights(float3=12) = 56 bytes
+// Normal offset = 12, Tex offset = 24 — same for both layouts
+static const uint SIMPLE_VERTEX_STRIDE = 44;
+static const uint SKINNED_VERTEX_STRIDE = 56;
+static const uint NORMAL_OFFSET = 12;
+static const uint TEX_OFFSET = 24;
+
+struct SimpleVertexData
+{
+    float3 normal;
+    float2 tex;
+};
+
+SimpleVertexData LoadSimpleVertex(uint vertexIndex)
+{
+    uint address = vertexIndex * SIMPLE_VERTEX_STRIDE;
+    SimpleVertexData v;
+    v.normal = asfloat(uint3(
+        originalVertexBuffer.Load(address + NORMAL_OFFSET),
+        originalVertexBuffer.Load(address + NORMAL_OFFSET + 4),
+        originalVertexBuffer.Load(address + NORMAL_OFFSET + 8)));
+    v.tex = asfloat(uint2(
+        originalVertexBuffer.Load(address + TEX_OFFSET),
+        originalVertexBuffer.Load(address + TEX_OFFSET + 4)));
+    return v;
+}
+
+SimpleVertexData LoadSkinnedVertex(uint vertexIndex)
+{
+    uint address = vertexIndex * SKINNED_VERTEX_STRIDE;
+    SimpleVertexData v;
+    v.normal = asfloat(uint3(
+        skinnedVertexBuffer.Load(address + NORMAL_OFFSET),
+        skinnedVertexBuffer.Load(address + NORMAL_OFFSET + 4),
+        skinnedVertexBuffer.Load(address + NORMAL_OFFSET + 8)));
+    v.tex = asfloat(uint2(
+        skinnedVertexBuffer.Load(address + TEX_OFFSET),
+        skinnedVertexBuffer.Load(address + TEX_OFFSET + 4)));
+    return v;
+}
+
+SimpleVertexData LoadOriginalVertex(uint vertexIndex, uint isSkinned)
+{
+    if (isSkinned)
+        return LoadSkinnedVertex(vertexIndex);
+    else
+        return LoadSimpleVertex(vertexIndex);
+}
 
 float3 LoadVertexPosition(uint vertexIndex)
 {
@@ -57,31 +112,57 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 [shader("closesthit")]
 void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
+    // Barycentric weights
+    float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+
     // Look up per-geometry material and geometry info
     uint geomIndex = GeometryIndex();
     ShaderMaterial mat = materialBuffer[geomIndex];
     DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
 
-    // Load triangle vertex positions from vertex/index buffers
+    // Load triangle indices
     uint primitiveId = PrimitiveIndex();
     uint i0 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 0) * 4);
     uint i1 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 1) * 4);
     uint i2 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 2) * 4);
 
+    // Load normals and UVs from original vertex buffer, interpolate with barycentrics
+    SimpleVertexData sv0 = LoadOriginalVertex(geoInfo.baseVertexLocation + i0, geoInfo.isSkinned);
+    SimpleVertexData sv1 = LoadOriginalVertex(geoInfo.baseVertexLocation + i1, geoInfo.isSkinned);
+    SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
+
+    float3 normal = normalize(sv0.normal * bary.x + sv1.normal * bary.y + sv2.normal * bary.z);
+    float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
+
+    // Transform normal to world space using the same world matrix as the vertex positions
+    // For now, use the interpolated normal directly (vertices are already in world space via compute shader)
+    // The original normals are in object space — reconstruct world normal from world-space triangle edges as fallback
     float3 v0 = LoadVertexPosition(geoInfo.vertexBufferOffset + i0);
     float3 v1 = LoadVertexPosition(geoInfo.vertexBufferOffset + i1);
     float3 v2 = LoadVertexPosition(geoInfo.vertexBufferOffset + i2);
-
-    // Compute geometric (flat) normal
     float3 edge1 = v1 - v0;
     float3 edge2 = v2 - v0;
-    float3 normal = normalize(cross(edge1, edge2));
+    float3 worldFlatNormal = normalize(cross(edge1, edge2));
+
+    // Use flat normal direction to orient interpolated normal (flip if needed due to object-space mismatch)
+    if (dot(normal, worldFlatNormal) < 0)
+        normal = -normal;
+
+    // Use the flat world-space normal for now (smooth normals require world matrix transform)
+    // TODO: Phase 3 — pass per-instance world matrix to transform object-space normals properly
+    normal = worldFlatNormal;
 
     // Compute view direction for lighting
     float3 toEye = normalize(-WorldRayDirection());
 
-    // Compute directional lighting (matching rasterization ComputeDirectionalLight)
+    // Sample texture if material uses one
     float4 textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
+    {
+        textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord, 0);
+    }
+
+    // Compute directional lighting (matching rasterization ComputeDirectionalLight)
     float4 ambient, diffuse, spec;
     ComputeDirectionalLight(mat, textureColor, light, normal, toEye, ambient, diffuse, spec);
 
