@@ -155,11 +155,13 @@ enum CbvSrvUavHeapOffsets
     VBSkinnedInput_UavHeapOffset = 21,
     IBSkinnedInput_SrvHeapOffset = 22,
     DrawRecords_SrvHeapOffset = 23,
+    DxrMaterial_SrvHeapOffset = 24,
+    DxrGeometryInfo_SrvHeapOffset = 25,
 
     // Per-material descriptors
-    Material0_HeapOffset = 24,
+    Material0_HeapOffset = 26,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 25,
+    Texture0Srv_HeapOffset = 27,
     Num_CbvSrvUavHeapOffsets
 };
  
@@ -943,6 +945,12 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_instancesTLAS = new UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>(GetDevice(), MAX_INSTANCES_IN_TLAS, true);
     m_instancesTLAS->Unmap();
 
+    // Per-geometry material and geometry info buffers for raytracing shaders
+    UINT dxrBufferCount = max(maxInstances, 1u);
+    m_dxrMaterialBuffer = new UploadBuffer<ShaderMaterial>(GetDevice(), dxrBufferCount, false);
+
+    m_dxrGeometryInfoBuffer = new UploadBuffer<DxrGeometryInfo>(GetDevice(), dxrBufferCount, false);
+
 
 #endif
 
@@ -1201,6 +1209,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_DrawRecordsResource.Release();
 
     SafeDelete(&m_bvhGeometryDescs);
+    SafeDelete(&m_dxrMaterialBuffer);
+    SafeDelete(&m_dxrGeometryInfoBuffer);
 
 #endif
 
@@ -1246,6 +1256,7 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     GetCommandList()->IASetIndexBuffer(ru->m_mesh->m_inputLayout == SKINNED_INPUT_LAYOUT ? &m_skinnedIBView : &m_IBView);
 
     m_currentMesh = ru->m_mesh;
+    m_currentMaterial = ru->m_material;
 
     return S_OK;
 }
@@ -1268,7 +1279,8 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
             BaseVertexLocation,
             m_nextVbWorldStart,
             m_currentMesh->m_bufferOffsets->VertexCount,
-            m_currentMesh));
+            m_currentMesh,
+            m_currentMaterial ? m_currentMaterial->m_shaderMaterial : ShaderMaterial()));
 
         m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount * InstanceCount;
     }
@@ -1930,7 +1942,7 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
     // Configure the shaders and pipeline
     {
         auto shaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-        shaderConfig->Config(4, 8);  // maximum payload size, and the maximum attribute size (both in bytes).
+        shaderConfig->Config(sizeof(float) * 4, 8);  // maximum payload size (float4 color = 16 bytes), and the maximum attribute size (both in bytes).
 
         auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
         UINT maxRecursionDepth = 1;
@@ -2099,7 +2111,7 @@ struct std::hash<RenderPlatform12::DrawRecord>
         h = hash_combine(h, std::hash<UINT>{}(d.vertexCount));
 
         /* If InputLayouts is an enum class, hash its underlying value.
-           If it’s a struct, ensure there’s std::hash<InputLayouts>. */
+           If itï¿½s a struct, ensure thereï¿½s std::hash<InputLayouts>. */
         using Under = std::underlying_type_t<InputLayouts>;
         h = hash_combine(h, std::hash<Under>{}(static_cast<Under>(d.inputLayout)));
 
@@ -2199,6 +2211,15 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             assert(geometryDesc.Triangles.IndexBuffer + geometryDesc.Triangles.IndexCount * sizeof(DWORD)
                  <= indexBufferEnd);
 
+            // Populate per-geometry material and geometry info for raytracing shaders
+            m_dxrMaterialBuffer->CopyData(geometryDescIndex, dr.material);
+
+            DxrGeometryInfo geoInfo = {};
+            geoInfo.vertexBufferOffset = dr.vbWorldStart + (instanceIndex * dr.vertexCount);
+            geoInfo.indexBufferOffset = dr.indexBufferStart;
+            geoInfo.vertexCount = dr.vertexCount;
+            m_dxrGeometryInfoBuffer->CopyData(geometryDescIndex, geoInfo);
+
             geometryDescIndex++;
         }
 
@@ -2261,8 +2282,6 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     D3D12_RESOURCE_BARRIER uavBarrier2 = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
     GetCommandList()->ResourceBarrier(1, &uavBarrier2);	// Need the bottom level build to finish before we can build a top-level acceleration structure.
-
-    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ));
 
     PIXEndEvent(GetCommandList());
 
@@ -2845,6 +2864,8 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 
         UINT rootConstants[4] = { dispatchRaysDesc.Width, dispatchRaysDesc.Height, (UINT)D3D12_RAY_FLAG_NONE /*m_rayFlags*/, 0 /*m_holeSize*/ };
 
+        // VBWorld is already in NON_PIXEL_SHADER_RESOURCE state from BuildBLASandTLAS
+
         commandList->SetComputeRootSignature(m_globalRootSignature);
         commandList->SetDescriptorHeaps(1, m_descriptorHeap);
         commandList->SetPipelineState1(m_raytracingStateObject);
@@ -2853,6 +2874,10 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
         commandList->SetComputeRootConstantBufferView(3, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
         commandList->SetComputeRootConstantBufferView(4, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
+        commandList->SetComputeRootShaderResourceView(5, m_dxrMaterialBuffer->Resource()->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(6, m_dxrGeometryInfoBuffer->Resource()->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(7, m_VBWorld->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(8, m_indexBuffer.buffer->GetGPUVirtualAddress());
 
         commandList->DispatchRays(&dispatchRaysDesc);
     }
@@ -2867,6 +2892,12 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     m_framePipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
     HRR(m_d3dDevice->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &m_framePipelineToken));
 #endif
+
+	// Ask Claude why
+    // Re-establish graphics root signature and descriptor heaps after DXR compute dispatch
+    GetCommandList()->SetGraphicsRootSignature(m_rootSignature);
+    ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
+    GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     HRR(SetupGraphicsOnCommandList());
 
@@ -3090,9 +3121,6 @@ HRESULT RenderPlatform12::RenderDebugUI()
         GetCommandList()->RSSetViewports(1, &GetViewport());
         GetCommandList()->RSSetScissorRects(1, &m_scissorRect);
 
-        // DXR vertex buffer to SRV
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-
         // Change to DEPTH_WRITE.
         CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -3102,9 +3130,6 @@ HRESULT RenderPlatform12::RenderDebugUI()
         GetCommandList()->OMSetBlendFactor(blendFactor);
 
         HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
-
-        // DXR vertex buffer to UAV
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
         D3D12_RESOURCE_BARRIER barriers[1];
         barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);

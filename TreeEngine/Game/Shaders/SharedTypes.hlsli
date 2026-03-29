@@ -7,6 +7,14 @@ struct InstancedData
     uint InstanceOffsetNext;
 };
 
+struct DxrGeometryInfo
+{
+    uint vertexBufferOffset;
+    uint indexBufferOffset;
+    uint vertexCount;
+    uint pad;
+};
+
 cbuffer cbChangesPerPass : register(b1)
 {
     matrix View;

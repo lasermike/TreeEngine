@@ -615,12 +615,13 @@ protected:
     D3DBuffer*                        m_currentInstanceBuffer;
 
     Mesh*                             m_currentMesh;
+    Material*                         m_currentMaterial;
 
 public:
 
     RenderPlatform() :
         m_vertexShader(nullptr), m_pixelShader(nullptr), m_shadowVertexShader(nullptr), m_shadowPixelShader(nullptr),
-        m_drawScreenVertexShader(nullptr), m_drawR8ScreenPixelShader(nullptr), m_drawRGBScreenPixelShader(nullptr), imGuiInitialized(false), m_currentMesh(nullptr)
+        m_drawScreenVertexShader(nullptr), m_drawR8ScreenPixelShader(nullptr), m_drawRGBScreenPixelShader(nullptr), imGuiInitialized(false), m_currentMesh(nullptr), m_currentMaterial(nullptr)
     { }
 
 #if defined(TREE3D12) || defined(TREE3D11)
@@ -973,6 +974,18 @@ public:
     CComPtr<ID3D12Resource>     m_VBWorld;
     CComPtr<ID3D12Resource>     m_DrawRecordsResource;
 
+    // Per-geometry material and geometry info buffers for raytracing
+    UploadBuffer<ShaderMaterial>* m_dxrMaterialBuffer;
+
+    struct DxrGeometryInfo
+    {
+        UINT vertexBufferOffset;
+        UINT indexBufferOffset;
+        UINT vertexCount;
+        UINT pad;
+    };
+    UploadBuffer<DxrGeometryInfo>* m_dxrGeometryInfoBuffer;
+
 
     ShaderBindingTable<TreeShaderRecord, 1, 2, 1> m_shaderBindingTable;
 
@@ -986,7 +999,7 @@ public:
 
     struct DrawRecord
     {
-        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices, Mesh* thisMesh)
+        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices, Mesh* thisMesh, ShaderMaterial shaderMat)
         {
             startingInstance = startInstance;
             numInstances = numberInstances;
@@ -996,7 +1009,7 @@ public:
             vbWorldStart = nextVbWorldStart;
             vertexCount = numVertices;
             inputLayout = thisMesh->m_inputLayout;
-            //mesh = thisMesh;
+            material = shaderMat;
         }
 
         UINT startingInstance;
@@ -1011,7 +1024,7 @@ public:
         UINT vertexCount;           // Vertex count per instanace
         InputLayouts inputLayout;
 
-        //Mesh* mesh;
+        ShaderMaterial material;
 
         bool operator==(const DrawRecord&) const;
     };
