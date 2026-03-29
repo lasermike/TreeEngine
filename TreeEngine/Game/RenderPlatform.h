@@ -986,8 +986,8 @@ public:
         UINT baseVertexLocation;    // offset into original vertex buffer for normals/UVs
         INT  textureIndex;          // index into DXR texture array (-1 = no texture)
         UINT isSkinned;             // 1 if skinned vertex buffer, 0 if simple
-        UINT pad1;
-        UINT pad2;
+        UINT instanceIndex;         // index into instance buffer for world matrix
+        UINT pad;
     };
     UploadBuffer<DxrGeometryInfo>* m_dxrGeometryInfoBuffer;
 

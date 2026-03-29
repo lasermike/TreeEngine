@@ -15,8 +15,8 @@ struct DxrGeometryInfo
     uint baseVertexLocation;    // offset into original vertex buffer for normals/UVs
     int  textureIndex;          // index into DXR texture array (-1 = no texture)
     uint isSkinned;             // 1 if skinned vertex buffer, 0 if simple
-    uint pad1;
-    uint pad2;
+    uint instanceIndex;         // index into instance buffer for world matrix
+    uint pad;
 };
 
 cbuffer cbChangesPerPass : register(b1)

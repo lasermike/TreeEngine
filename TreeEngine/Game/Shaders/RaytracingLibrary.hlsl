@@ -22,7 +22,8 @@ ByteAddressBuffer vertexBuffer : register(t3);   // VBWorld (float4 per vertex)
 ByteAddressBuffer indexBuffer : register(t4);
 ByteAddressBuffer originalVertexBuffer : register(t5); // SimpleVertex (44 bytes per vertex)
 ByteAddressBuffer skinnedVertexBuffer : register(t6); // SkinnedVertex (56 bytes per vertex)
-Texture2D<float4> sceneTextures[4] : register(t7);
+StructuredBuffer<InstancedData> instanceDataBuffer : register(t7);
+Texture2D<float4> sceneTextures[4] : register(t8);
 
 SamplerState samLinear : register(s0);
 
@@ -134,23 +135,9 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float3 normal = normalize(sv0.normal * bary.x + sv1.normal * bary.y + sv2.normal * bary.z);
     float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
 
-    // Transform normal to world space using the same world matrix as the vertex positions
-    // For now, use the interpolated normal directly (vertices are already in world space via compute shader)
-    // The original normals are in object space — reconstruct world normal from world-space triangle edges as fallback
-    float3 v0 = LoadVertexPosition(geoInfo.vertexBufferOffset + i0);
-    float3 v1 = LoadVertexPosition(geoInfo.vertexBufferOffset + i1);
-    float3 v2 = LoadVertexPosition(geoInfo.vertexBufferOffset + i2);
-    float3 edge1 = v1 - v0;
-    float3 edge2 = v2 - v0;
-    float3 worldFlatNormal = normalize(cross(edge1, edge2));
-
-    // Use flat normal direction to orient interpolated normal (flip if needed due to object-space mismatch)
-    if (dot(normal, worldFlatNormal) < 0)
-        normal = -normal;
-
-    // Use the flat world-space normal for now (smooth normals require world matrix transform)
-    // TODO: Phase 3 — pass per-instance world matrix to transform object-space normals properly
-    normal = worldFlatNormal;
+    // Transform object-space normal to world space using instance world matrix
+    float4x4 worldMatrix = instanceDataBuffer[geoInfo.instanceIndex].World;
+    normal = normalize(mul(normal, (float3x3)worldMatrix));
 
     // Compute view direction for lighting
     float3 toEye = normalize(-WorldRayDirection());

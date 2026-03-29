@@ -955,6 +955,16 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     m_dxrGeometryInfoBuffer = new UploadBuffer<DxrGeometryInfo>(GetDevice(), dxrBufferCount, false);
 
+    // Clear DXR texture descriptor slots to avoid stale descriptors from previous scenes
+    D3D12_SHADER_RESOURCE_VIEW_DESC dxrNullSrvDesc = {};
+    dxrNullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    dxrNullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    dxrNullSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    for (int i = 0; i < maxTotalTexturesInScene; i++)
+    {
+        GetDevice()->CreateShaderResourceView(nullptr, &dxrNullSrvDesc, m_descriptorHeap.hCPU(DxrTexture0_SrvHeapOffset + i));
+    }
+
 
 #endif
 
@@ -2231,6 +2241,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             geoInfo.baseVertexLocation = dr.baseVertexLocation;
             geoInfo.textureIndex = dr.textureIndex;
             geoInfo.isSkinned = (dr.inputLayout == SKINNED_INPUT_LAYOUT) ? 1 : 0;
+            geoInfo.instanceIndex = dr.startingInstance + instanceIndex;
             m_dxrGeometryInfoBuffer->CopyData(geometryDescIndex, geoInfo);
 
             geometryDescIndex++;
@@ -2893,7 +2904,8 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         commandList->SetComputeRootShaderResourceView(8, m_indexBuffer.buffer->GetGPUVirtualAddress());
         commandList->SetComputeRootShaderResourceView(9, m_vertexBuffer.buffer->GetGPUVirtualAddress());
         commandList->SetComputeRootShaderResourceView(10, m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress());
-        commandList->SetComputeRootDescriptorTable(11, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
+        commandList->SetComputeRootShaderResourceView(11, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootDescriptorTable(12, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
 
         commandList->DispatchRays(&dispatchRaysDesc);
     }
