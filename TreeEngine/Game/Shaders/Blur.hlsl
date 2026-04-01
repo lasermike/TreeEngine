@@ -46,6 +46,14 @@ struct DrawRecord
     uint vertexCount;
     uint inputLayout;
 
+    // Material data (ShaderMaterial + textureIndex) — not used by compute shader
+    // but must match C++ struct layout for correct structured buffer stride
+    float4 matAmbient;
+    float4 matDiffuse;
+    float4 matSpecular;
+    float4 matReflect;
+    float4 matFlags;
+    int textureIndex;
 };
 
 struct SimpleVertex

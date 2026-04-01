@@ -41,9 +41,9 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_timeStart = 0;
     m_resetTree = true;
     m_settings.m_showShadowBuffer = false;
-    m_settings.m_showDxrUav = false;
+    m_settings.m_showDxrUav = true;
     m_settings.m_enablePostProcessing = true;
-    m_settings.m_showPerfGraph = true;
+    m_settings.m_showPerfGraph = false;
     m_advanceScene = 0;
     m_advanceSceneAmount = 0;
     m_currentScene = 0;

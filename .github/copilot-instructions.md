@@ -76,6 +76,11 @@ Conditional compilation selects the API: `TREE3D12` for DX12, `TREE3D11` for DX1
 - Platform differences are handled via `#if defined(TREE3D12)` / `#if defined(TREE3D11)` preprocessor guards
 - ImGui (with ImPlot) is integrated for debug UI — toggled via `UpdateDebugUI()` in `Game.cpp`
 - Matrix convention: second row is view/look vector (scaled), last row is translation
+- **Shared struct layouts:** Several C++ structs must stay in sync with their HLSL counterparts. When modifying these structs, update both sides:
+  - `DrawRecord` in `RenderPlatform.h` ↔ `DrawRecord` in `Shaders/Blur.hlsl` (used by VSasCS compute shader for DXR vertex transform)
+  - `ShaderMaterial` in `Materials.h` ↔ `ShaderMaterial` in `Shaders/Materials.fx`
+  - `DxrGeometryInfo` in `RenderPlatform.h` ↔ `DxrGeometryInfo` in `Shaders/SharedTypes.hlsli`
+  - `CBChangesPerPass`, `CBChangesEveryFrame`, `InstancedData` in `ConstBufferDefinitions.h` ↔ `Shaders/SharedTypes.hlsli`
 
 ## Window and DPI
 

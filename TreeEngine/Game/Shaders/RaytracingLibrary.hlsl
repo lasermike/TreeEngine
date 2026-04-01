@@ -149,6 +149,27 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord, 0);
     }
 
+    //if (DispatchRaysIndex().x < 10 && DispatchRaysIndex().y < 10)
+    //{
+        //float4 test = asfloat(vertexBuffer.Load4(19320 * 16));
+        //payload.color = float4(abs(test.xyz), 1);
+        ////payload.color = float4(1, 0, 0, 1); 
+        //return;
+    //}
+
+    //if (GeometryIndex() > 321)
+    //{ 
+    //    payload.color = float4(1, 0, 0, 1); 
+    //    return; 
+    // }
+
+    ////temp
+    //if (geoInfo.textureIndex == 1)
+    //{
+    //    payload.color = float4(1, 0, 0, 1);
+    //    return;
+    //}
+
     // Compute directional lighting (matching rasterization ComputeDirectionalLight)
     float4 ambient, diffuse, spec;
     ComputeDirectionalLight(mat, textureColor, light, normal, toEye, ambient, diffuse, spec);
