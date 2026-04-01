@@ -101,13 +101,39 @@ float3 LoadVertexPosition(uint vertexIndex)
 [shader("anyhit")]
 void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
-    float3 triangleCentre = 1.0f / 3.0f;
+    // Alpha clip — reject transparent pixels in textured geometry
+    uint geomIndex = GeometryIndex();
+    ShaderMaterial mat = materialBuffer[geomIndex];
 
-    float distanceToCentre = length(triangleCentre - barycentrics);
+    if (mat.flags.z > 0)
+    {
+        DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
 
-    if (distanceToCentre < holeSize)
-        IgnoreHit();
+        if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
+        {
+            float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
+            float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+
+            uint primitiveId = PrimitiveIndex();
+            uint i0 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 0) * 4);
+            uint i1 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 1) * 4);
+            uint i2 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 2) * 4);
+
+            SimpleVertexData sv0 = LoadOriginalVertex(geoInfo.baseVertexLocation + i0, geoInfo.isSkinned);
+            SimpleVertexData sv1 = LoadOriginalVertex(geoInfo.baseVertexLocation + i1, geoInfo.isSkinned);
+            SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
+
+            float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
+
+            float4 textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord, 0);
+
+            if (textureColor.a < mat.flags.z)
+            {
+                IgnoreHit();
+                return;
+            }
+        }
+    }
 }
 
 [shader("closesthit")]
