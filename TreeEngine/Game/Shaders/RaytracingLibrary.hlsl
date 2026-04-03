@@ -101,17 +101,23 @@ float3 LoadVertexPosition(uint vertexIndex)
 [shader("anyhit")]
 void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    // Alpha clip — reject transparent pixels in textured geometry
     uint geomIndex = GeometryIndex();
     ShaderMaterial mat = materialBuffer[geomIndex];
 
+    // Backface culling for single-sided geometry (not alpha-clipped/double-sided)
+    if (mat.flags.z == 0 && HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
+    {
+        IgnoreHit();
+        return;
+    }
+
+    // Alpha clip — reject transparent pixels in textured geometry
     if (mat.flags.z > 0)
     {
         DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
 
         if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
         {
-            float3 barycentrics = float3(attr.barycentrics.xy, 1 - attr.barycentrics.x - attr.barycentrics.y);
             float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
             uint primitiveId = PrimitiveIndex();
