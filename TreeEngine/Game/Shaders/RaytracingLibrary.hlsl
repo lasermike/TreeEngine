@@ -19,11 +19,12 @@ RWTexture2D<float4> renderOutput : register(u0);
 StructuredBuffer<ShaderMaterial> materialBuffer : register(t1);
 StructuredBuffer<DxrGeometryInfo> geometryInfoBuffer : register(t2);
 ByteAddressBuffer vertexBuffer : register(t3);   // VBWorld (float4 per vertex)
-ByteAddressBuffer indexBuffer : register(t4);
+ByteAddressBuffer indexBuffer : register(t4);    // Basic index buffer
 ByteAddressBuffer originalVertexBuffer : register(t5); // SimpleVertex (44 bytes per vertex)
 ByteAddressBuffer skinnedVertexBuffer : register(t6); // SkinnedVertex (56 bytes per vertex)
 StructuredBuffer<InstancedData> instanceDataBuffer : register(t7);
-Texture2D<float4> sceneTextures[4] : register(t8);
+ByteAddressBuffer skinnedIndexBuffer : register(t8); // Skinned index buffer
+Texture2D<float4> sceneTextures[4] : register(t9);
 
 SamplerState samLinear : register(s0);
 
@@ -90,6 +91,14 @@ SimpleVertexData LoadOriginalVertex(uint vertexIndex, uint isSkinned)
         return LoadSimpleVertex(vertexIndex);
 }
 
+uint LoadIndex(uint indexOffset, uint isSkinned)
+{
+    if (isSkinned)
+        return skinnedIndexBuffer.Load(indexOffset * 4);
+    else
+        return indexBuffer.Load(indexOffset * 4);
+}
+
 float3 LoadVertexPosition(uint vertexIndex)
 {
     // VBWorld stores float4 per vertex (16 bytes stride)
@@ -103,6 +112,7 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 {
     uint geomIndex = GeometryIndex();
     ShaderMaterial mat = materialBuffer[geomIndex];
+    DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
 
     // Backface culling for single-sided geometry (not alpha-clipped/double-sided)
     if (mat.flags.z == 0 && HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
@@ -112,32 +122,27 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
     }
 
     // Alpha clip — reject transparent pixels in textured geometry
-    if (mat.flags.z > 0)
+    if (mat.flags.z > 0 && mat.flags.y > 0 && geoInfo.textureIndex >= 0)
     {
-        DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
+        float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
-        if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
+        uint primitiveId = PrimitiveIndex();
+        uint i0 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 0, geoInfo.isSkinned);
+        uint i1 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 1, geoInfo.isSkinned);
+        uint i2 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 2, geoInfo.isSkinned);
+
+        SimpleVertexData sv0 = LoadOriginalVertex(geoInfo.baseVertexLocation + i0, geoInfo.isSkinned);
+        SimpleVertexData sv1 = LoadOriginalVertex(geoInfo.baseVertexLocation + i1, geoInfo.isSkinned);
+        SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
+
+        float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
+
+        float4 textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord, 0);
+
+        if (textureColor.a < mat.flags.z)
         {
-            float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-
-            uint primitiveId = PrimitiveIndex();
-            uint i0 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 0) * 4);
-            uint i1 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 1) * 4);
-            uint i2 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 2) * 4);
-
-            SimpleVertexData sv0 = LoadOriginalVertex(geoInfo.baseVertexLocation + i0, geoInfo.isSkinned);
-            SimpleVertexData sv1 = LoadOriginalVertex(geoInfo.baseVertexLocation + i1, geoInfo.isSkinned);
-            SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
-
-            float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
-
-            float4 textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord, 0);
-
-            if (textureColor.a < mat.flags.z)
-            {
-                IgnoreHit();
-                return;
-            }
+            IgnoreHit();
+            return;
         }
     }
 }
@@ -153,18 +158,18 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     ShaderMaterial mat = materialBuffer[geomIndex];
     DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
 
-    // Load triangle indices
+    // Load triangle indices from the correct index buffer
     uint primitiveId = PrimitiveIndex();
-    uint i0 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 0) * 4);
-    uint i1 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 1) * 4);
-    uint i2 = indexBuffer.Load((geoInfo.indexBufferOffset + primitiveId * 3 + 2) * 4);
+    uint i0 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 0, geoInfo.isSkinned);
+    uint i1 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 1, geoInfo.isSkinned);
+    uint i2 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 2, geoInfo.isSkinned);
 
     // Load normals and UVs from original vertex buffer, interpolate with barycentrics
     SimpleVertexData sv0 = LoadOriginalVertex(geoInfo.baseVertexLocation + i0, geoInfo.isSkinned);
     SimpleVertexData sv1 = LoadOriginalVertex(geoInfo.baseVertexLocation + i1, geoInfo.isSkinned);
     SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
-
     float3 normal = normalize(sv0.normal * bary.x + sv1.normal * bary.y + sv2.normal * bary.z);
+
     float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
 
     // Transform object-space normal to world space using instance world matrix
@@ -182,26 +187,6 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     }
 
     //if (DispatchRaysIndex().x < 10 && DispatchRaysIndex().y < 10)
-    //{
-        //float4 test = asfloat(vertexBuffer.Load4(19320 * 16));
-        //payload.color = float4(abs(test.xyz), 1);
-        ////payload.color = float4(1, 0, 0, 1); 
-        //return;
-    //}
-
-    //if (GeometryIndex() > 321)
-    //{ 
-    //    payload.color = float4(1, 0, 0, 1); 
-    //    return; 
-    // }
-
-    ////temp
-    //if (geoInfo.textureIndex == 1)
-    //{
-    //    payload.color = float4(1, 0, 0, 1);
-    //    return;
-    //}
-
     // Compute directional lighting (matching rasterization ComputeDirectionalLight)
     float4 ambient, diffuse, spec;
     ComputeDirectionalLight(mat, textureColor, light, normal, toEye, ambient, diffuse, spec);

@@ -2905,7 +2905,8 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         commandList->SetComputeRootShaderResourceView(9, m_vertexBuffer.buffer->GetGPUVirtualAddress());
         commandList->SetComputeRootShaderResourceView(10, m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress());
         commandList->SetComputeRootShaderResourceView(11, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
-        commandList->SetComputeRootDescriptorTable(12, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
+        commandList->SetComputeRootShaderResourceView(12, m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootDescriptorTable(13, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
 
         commandList->DispatchRays(&dispatchRaysDesc);
     }
