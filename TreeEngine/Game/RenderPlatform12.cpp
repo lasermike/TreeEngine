@@ -1965,7 +1965,7 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
         shaderConfig->Config(sizeof(float) * 4, 8);  // maximum payload size (float4 color = 16 bytes), and the maximum attribute size (both in bytes).
 
         auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-        UINT maxRecursionDepth = 1;
+        UINT maxRecursionDepth = 2;  // Primary ray + shadow ray
         pipelineConfig->Config(maxRecursionDepth);
     }
 
@@ -2015,13 +2015,15 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
     HRR(d3dDevice5->CreateStateObject(raytracingPipeline, __uuidof(ID3D12StateObject), (void**)&m_raytracingStateObject));
     HRR(m_raytracingStateObject->QueryInterface(__uuidof(ID3D12StateObjectProperties), (void**)&m_raytracingStateObjectProps));
 
+    const wchar_t* shadowMissExportName = L"ShadowMissShader";
+
     TreeShaderRecord rayGenRecord(m_raytracingStateObjectProps, rayGenExportName);
-    TreeShaderRecord emptyMissShader;
+    TreeShaderRecord shadowMissShader(m_raytracingStateObjectProps, shadowMissExportName);
     TreeShaderRecord validMissShader(m_raytracingStateObjectProps, missShaderExportName);
     TreeShaderRecord hitGroupRecord(m_raytracingStateObjectProps, hitGroupExportName);
 
     m_shaderBindingTable.SetRayGenRecord(0, rayGenRecord);
-    m_shaderBindingTable.SetMissShaderRecord(0, emptyMissShader);
+    m_shaderBindingTable.SetMissShaderRecord(0, shadowMissShader);
     m_shaderBindingTable.SetMissShaderRecord(1, validMissShader);
     m_shaderBindingTable.SetHitGroupRecord(0, hitGroupRecord);
 

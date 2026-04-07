@@ -186,13 +186,52 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord, 0);
     }
 
-    //if (DispatchRaysIndex().x < 10 && DispatchRaysIndex().y < 10)
-    // Compute directional lighting (matching rasterization ComputeDirectionalLight)
-    float4 ambient, diffuse, spec;
-    ComputeDirectionalLight(mat, textureColor, light, normal, toEye, ambient, diffuse, spec);
+    // Cast shadow ray toward the light
+    float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+    float3 lightDir = -light.Direction;
+    float shadowFactor = 0.0f;
+
+    RayDesc shadowRay;
+    shadowRay.Origin = hitPos + normal * 0.001f;  // Offset to avoid self-intersection
+    shadowRay.Direction = lightDir;
+    shadowRay.TMin = 0.001;
+    shadowRay.TMax = 100.0;
+
+    // Shadow ray payload: initialized to 0 (in shadow).
+    // If the ray misses all geometry, ShadowMissShader sets it to 1 (lit).
+    // RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH + RAY_FLAG_SKIP_CLOSEST_HIT_SHADER
+    // makes the shadow ray stop at the first blocker and skip ClosestHit.
+    RayPayload shadowPayload = { float4(0, 0, 0, 0) };
+    uint shadowMissIndex = 0;
+    TraceRay(Scene,
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+        ~0, 0, 0, shadowMissIndex, shadowRay, shadowPayload);
+    shadowFactor = shadowPayload.color.x;
+
+    // Compute lighting manually with shadow factor
+    float3 L = lightDir;
+    float4 ambient = mat.Ambient * light.Ambient * textureColor;
+
+    float diffuseFactor = max(dot(L, normal), 0.0f);
+    float4 diffuse = diffuseFactor * mat.Diffuse * light.Diffuse * textureColor * shadowFactor;
+    
+    float4 spec = float4(0, 0, 0, 0);
+    if (diffuseFactor > 0.0f)
+    {
+        float3 v = reflect(-L, normal);
+        float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
+        spec = specFactor * mat.Specular * light.Specular * textureColor * shadowFactor;
+    }
 
     payload.color = ambient + diffuse + spec;
     payload.color.a = 1.0f;
+}
+
+[shader("miss")]
+void ShadowMissShader(inout RayPayload payload)
+{
+    // Shadow ray missed all geometry — surface is lit
+    payload.color = float4(1, 1, 1, 1);
 }
 
 [shader("miss")]
