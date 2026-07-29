@@ -113,6 +113,17 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+    // Set the current directory to the executable's directory
+    // This ensures shader files and other resources are found correctly
+    WCHAR exePath[MAX_PATH];
+    GetModuleFileName(NULL, exePath, MAX_PATH);
+    WCHAR* lastSlash = wcsrchr(exePath, L'\\');
+    if (lastSlash)
+    {
+        *lastSlash = L'\0';
+        SetCurrentDirectory(exePath);
+    }
+
     // Set per-monitor DPI awareness before creating any windows.
     // This ensures real pixel coordinates on multi-monitor setups.
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
