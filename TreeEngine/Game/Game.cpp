@@ -41,9 +41,10 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_timeStart = 0;
     m_resetTree = true;
     m_settings.m_showShadowBuffer = false;
-    m_settings.m_showDxrUav = true;
+    m_settings.m_showDxrUav = false;
     m_settings.m_enablePostProcessing = true;
     m_settings.m_showPerfGraph = false;
+    m_settings.m_showDebugUI = false;
     m_advanceScene = 0;
     m_advanceSceneAmount = 0;
     m_currentScene = 0;
@@ -375,6 +376,11 @@ int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
 
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
+    if (!m_settings.m_showDebugUI)
+    {
+        return S_OK;
+    }
+
     // Perf overlay
     if (m_settings.m_showPerfGraph)
     {
@@ -650,7 +656,7 @@ void Game::Render(bool oculus)
 
 void Game::HandleInput(bool key[512])  // WM_KEYDOWN
 {
-    const char availableKeys[] = { '0', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3', 'Y', '<', '>'};
+    const char availableKeys[] = { '0', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3', 'Y', '<', '>', VK_TAB };
     for (char k : availableKeys)
     {
         if (key[k])
@@ -695,8 +701,8 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
                 key[k] = false;
                 m_reloadDevice = true;
                 break;
-            case 'H':
-                m_showHelp = !m_showHelp;
+            case VK_TAB:
+                m_settings.m_showDebugUI = !m_settings.m_showDebugUI;
                 key[k] = false;
                 break;
             case 'R':
