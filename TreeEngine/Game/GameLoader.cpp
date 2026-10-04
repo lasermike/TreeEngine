@@ -564,6 +564,138 @@ void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, Gam
 }
 
 
+void LoadAITree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+{
+    ShaderMaterial trunkMaterial;
+    trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
+    trunkMaterial.Diffuse = XMFLOAT4(Colors::BurlyWood); //XMFLOAT4(0.6f, 0.6f, 0.6f, 1.0f);
+    trunkMaterial.Specular = XMFLOAT4(0.1f, .1f, .1f, 1.0f);
+    trunkMaterial.flags.y = 1; //useTextures
+
+    ShaderMaterial leafMaterial;
+    leafMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
+    leafMaterial.Specular = XMFLOAT4(0, .5f, .1f, 1.0);
+    leafMaterial.flags.y = true; //useTextures  TODO
+    leafMaterial.flags.z = true; //clip alpha
+
+    WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
+    params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");
+    params2->textureFilename.push_back(L"FirBranchWithNeedles.dds");
+
+    params2->position = XMFLOAT3(0, .1f, -2.0f);
+    params2->GetGeneratorParameters()._angle = XM_2PI;
+    params2->GetGeneratorParameters()._numIterations = 14;
+    params2->_animationSpeed = 15.0f;
+    params2->depthLOD = 1;
+    params2->GetGeneratorParameters()._segmentLength = .01f; // 0.5f;
+    params2->GetGeneratorParameters().thickness = .08f;
+    params2->GetGeneratorParameters()._constants = "";
+
+    params2->GetGeneratorParameters()._axiom = "F(50) T(100,.1)";
+
+    params2->GetGeneratorParameters()._rules.push_back(Rule(
+        "T(t,r)",
+            "[Y(r ) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
+            "[Y(r + .33) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
+            "[Y(r + .66) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.9,r + .24) "));
+    params2->GetGeneratorParameters()._rules.push_back(Rule(
+        "B(b)",
+            "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.75)] [!(.02) $(1) x(-0.1) F(b * 0.75)] B(b * 0.95) "));
+
+    params2->materials.push_back(trunkMaterial);
+    params2->materials.push_back(leafMaterial);
+
+    params2->meshes.push_back(PrimitiveType_SkinnedCylinder);
+
+    scene->AddChild(new Tree(params2));
+
+    // Ground
+    WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
+    params4->position = XMFLOAT3(0, 0, 0);
+    params4->scale = XMFLOAT3(25, .01f, 25);
+    params4->primitiveType = PrimitiveType_CylinderHD;
+    params4->textureFilename.push_back(L"grid1.png");
+
+    ShaderMaterial mat;
+    mat.Ambient = XMFLOAT4(.3f, .3f, .3f, 1);
+    mat.Diffuse = XMFLOAT4(.8f, .8f, .8f, 1);
+    mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
+    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+    mat.flags.y = 1; //1 for textured;
+    params4->materials.push_back(mat);
+
+    scene->AddChild(new Primitive(params4));
+
+    // Skybox
+    WorldObjectParams* params5 = new WorldObjectParams(PrimitiveGeneratorType);
+    params5->position = XMFLOAT3(0, 0, 0);
+    XMStoreFloat4(&params5->rotation, XMQuaternionRotationRollPitchYaw(0.0f, -XM_PIDIV4, 0.0f));
+    params5->scale = XMFLOAT3(-30.0f, -30.0f, -30.0f);
+    params5->primitiveType = PrimitiveType_Box;
+    mat.Ambient = XMFLOAT4(1, 1, 1, 1);
+    mat.Diffuse = XMFLOAT4(0, 0, 9, 1);
+    mat.Specular = XMFLOAT4(0, 0, 0, 0);
+    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
+    mat.flags.y = 1; //1 for textured;
+    params5->materials.push_back(mat);
+    params5->cubeMap = true;
+    params5->textureFilename.push_back(L"coords.dds");
+    scene->AddChild(new Primitive(params5));
+
+    //axis X
+    mat = ShaderMaterial();
+    XMStoreFloat4(&mat.Ambient, Colors::Red);
+    WorldObjectParams* paramsX = new WorldObjectParams(PrimitiveGeneratorType);
+    paramsX->position = XMFLOAT3(-3.5f, 0, 0);
+    paramsX->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
+    XMStoreFloat4(&paramsX->rotation, XMQuaternionRotationRollPitchYaw(0.0f,0.0f,XM_PIDIV2));
+    paramsX->primitiveType = PrimitiveType_CylinderHD;
+    paramsX->materials.push_back(mat);
+    scene->AddChild(new Primitive(paramsX));
+
+    // axis Y
+    XMStoreFloat4(&mat.Ambient, Colors::Green);
+    WorldObjectParams* paramsY = new WorldObjectParams(PrimitiveGeneratorType);
+    paramsY->position = XMFLOAT3(-4, 0.5f, 0);
+    paramsY->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
+    XMStoreFloat4(&paramsY->rotation, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, 0.0f));
+    paramsY->primitiveType = PrimitiveType_CylinderHD;
+    paramsY->materials.push_back(mat);
+    scene->AddChild(new Primitive(paramsY));
+
+    // axis Z
+    XMStoreFloat4(&mat.Ambient, Colors::Blue);
+    WorldObjectParams* paramsZ = new WorldObjectParams(PrimitiveGeneratorType);
+    paramsZ->position = XMFLOAT3(-4, 0.0f, 0.5f);
+    paramsZ->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
+    XMStoreFloat4(&paramsZ->rotation, XMQuaternionRotationRollPitchYaw(XM_PIDIV2, 0.0f, 0.0f));
+    paramsZ->primitiveType = PrimitiveType_CylinderHD;
+    paramsZ->materials.push_back(mat);
+    scene->AddChild(new Primitive(paramsZ));
+
+    // Init lights
+    renderData->dirLights[0].Ambient = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
+    //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
+    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0)));
+
+    renderData->numPointLights = 1;
+
+    // Camera
+#if ALT_POSITION
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -5.0f)));
+    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
+#else
+    player->SetPosition(XMLoadFloat3(&XMFLOAT3(1.11395788, 0.711319208, 2.05959034)));
+    player->SetRotation(XMVectorSet(0.00989040267, 0.978999615, 0.0489907376, 0));
+#endif
+    XMStoreFloat4(&gameData->clearColor, Colors::Navy);
+}
+
+
 void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
 {
     ShaderMaterial trunkMaterial;
@@ -839,7 +971,7 @@ void GameLoader::Regenerate(SceneRoot* pScene)
 
 int GameLoader::GetNumScenes()
 { 
-    return 7;
+    return 9;
 }
 
 
@@ -873,6 +1005,9 @@ void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, 
         break;
     case 7:
         LoadSimpleBox(pScene, pRenderData, pPlayer, gameData);
+        break;
+    case 8:
+        LoadAITree(pScene, pRenderData, pPlayer, gameData);
         break;
     default:
         ASSERT(false);

@@ -16,6 +16,10 @@
 #include "ScreenGrab12.h"
 
 #include "ResourceUploadBatch.h"
+#include "TextureLoading.h"
+#if !defined(TREE_XBOX)
+#include "WICTextureLoader.h"
+#endif
 
 #include "inputManager.h"
 
@@ -211,7 +215,7 @@ const uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
 UINT skinnedIndexBufferSize = 0;
 UINT indexBufferSize = 0;
 
-const int maxTotalTexturesInScene = 4;
+const int maxTotalTexturesInScene = 8;
 const int maxNumMaterials = 9;
 
 int RenderUnit::s_nextId = 0;
@@ -1312,7 +1316,37 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_descriptorHeap.GetIncrementSize());
 
     ID3D12Resource* resource = nullptr;
-    HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
+    if (IsWicTextureFile(textureFilename))
+    {
+#if defined(TREE_XBOX)
+        return E_NOTIMPL; // WIC is unavailable on Xbox; use DDS textures there.
+#else
+        TextureCOMScope com;
+        HRR(com.Result());
+
+        ResourceUploadBatch resourceUpload(GetDevice());
+        resourceUpload.Begin();
+        CComPtr<ID3D12Resource> wicTexture;
+        HRR(CreateWICTextureFromFile(GetDevice(), resourceUpload, textureFilename, &wicTexture, true /*generateMips*/));
+        resourceUpload.Transition(wicTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        auto uploadFinished = resourceUpload.End(GetCommandQueue());
+        uploadFinished.get();
+
+        const auto textureDesc = wicTexture->GetDesc();
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = textureDesc.Format;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = textureDesc.MipLevels;
+        GetDevice()->CreateShaderResourceView(wicTexture, &srvDesc, newDescriptor);
+        resource = wicTexture.Detach();
+#endif
+    }
+    else
+    {
+        HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
+    }
 
     *texture = new LoadedTexture(resource, newDescriptor, (UINT)textureIndex);
 

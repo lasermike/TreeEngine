@@ -105,7 +105,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     HRR(ReloadDevice());
 
-    m_currentScene = 0;
+    m_currentScene = 8; // LoadAITree
     //m_currentScene = 2;  // SeaScene
     //m_currentScene = 1; // Test tree
     //m_currentScene = 7; // simple box and cylindar

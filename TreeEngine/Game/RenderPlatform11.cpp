@@ -9,6 +9,7 @@
 #include "ShadowMap.h"
 
 #include "DirectXTex.h"
+#include "TextureLoading.h"
 
 class InputLayoutsManager
 {
@@ -812,7 +813,18 @@ HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int /*text
 {
     // Load the Texture
     ID3D11ShaderResourceView* tex = nullptr;
-    HRR(CreateDDSTextureFromFile(GetDevice(), textureFilename, nullptr, &tex));
+    if (IsWicTextureFile(textureFilename))
+    {
+        TextureCOMScope com;
+        HRR(com.Result());
+        DirectX::ScratchImage image;
+        HRR(DirectX::LoadFromWICFile(textureFilename, DirectX::WIC_FLAGS_NONE, nullptr, image));
+        HRR(DirectX::CreateShaderResourceView(GetDevice(), image.GetImages(), image.GetImageCount(), image.GetMetadata(), &tex));
+    }
+    else
+    {
+        HRR(CreateDDSTextureFromFile(GetDevice(), textureFilename, nullptr, &tex));
+    }
 
     *loadedTexture = new LoadedTexture(tex);
 
