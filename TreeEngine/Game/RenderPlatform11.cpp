@@ -649,11 +649,12 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
 
     // Set samplers
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-    ID3D11SamplerState* samplers[3] = { stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap),
+    ID3D11SamplerState* samplers[4] = { stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap),
         stockStates.GetSamplerState(StockSamplerStates::UseShadowMap),
-        stockStates.GetSamplerState(StockSamplerStates::MinMagLinearMipPointUVWClamp)
+        stockStates.GetSamplerState(StockSamplerStates::MinMagLinearMipPointUVWClamp),
+        stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap)
     };
-    m_immediateContext->PSSetSamplers(0, 3, samplers);
+    m_immediateContext->PSSetSamplers(0, 4, samplers);
 
     // Set shaders
     if (pass == ShadowMapPass)

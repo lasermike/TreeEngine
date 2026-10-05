@@ -49,6 +49,7 @@ struct ShaderMaterial
     float4 Specular; // w = SpecPower
     float4 Reflect;
     float4 flags; // x = n/a, y = bool useTexture, z = float clip alpha threshold
+    float4 textureCoordScale; // xy = UV scale
 };
 
 //---------------------------------------------------------------------------------------

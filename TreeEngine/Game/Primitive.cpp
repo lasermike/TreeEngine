@@ -55,6 +55,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
     swprintf(resourceName, 64, L"primitive%d", _id);
 
     // Create material, mesh, and reserve render unit
+    _params->materials[0].textureCoordScale = XMFLOAT4(_params->textureCoordScale.x, _params->textureCoordScale.y, 1, 1);
     Material* newMaterial = nullptr;
     renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
 

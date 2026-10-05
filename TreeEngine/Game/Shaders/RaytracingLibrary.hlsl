@@ -137,7 +137,7 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 
         float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
 
-        float4 textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord, 0);
+        float4 textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord * mat.textureCoordScale.xy, 0);
 
         if (textureColor.a < mat.flags.z)
         {
@@ -183,7 +183,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float4 textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
     if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
     {
-        textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord, 0);
+        textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord * mat.textureCoordScale.xy, 0);
     }
 
     // Cast shadow ray toward the light

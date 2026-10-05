@@ -582,6 +582,7 @@ void LoadAITree(SceneRoot* scene, RenderData* renderData, Player* player, GameDa
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");
     params2->textureFilename.push_back(L"FirBranchWithNeedles.dds");
+//    params2->textureCoordScale = XMFLOAT2(.5, .5);
 
     params2->position = XMFLOAT3(0, .1f, -2.0f);
     params2->GetGeneratorParameters()._angle = XM_2PI;
@@ -615,7 +616,8 @@ void LoadAITree(SceneRoot* scene, RenderData* renderData, Player* player, GameDa
     params4->position = XMFLOAT3(0, 0, 0);
     params4->scale = XMFLOAT3(25, .01f, 25);
     params4->primitiveType = PrimitiveType_CylinderHD;
-    params4->textureFilename.push_back(L"grid1.png");
+    params4->textureFilename.push_back(L"grid3.png");
+    params4->textureCoordScale = XMFLOAT2(4, 4);
 
     ShaderMaterial mat;
     mat.Ambient = XMFLOAT4(.3f, .3f, .3f, 1);

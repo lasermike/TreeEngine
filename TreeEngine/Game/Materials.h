@@ -40,6 +40,7 @@ struct ShaderMaterial
     { 
         Ambient = Diffuse = Specular = Reflect = XMFLOAT4(0,0,0, 1.0f);
         flags = XMFLOAT4(0,0,0,0);
+        textureCoordScale = XMFLOAT4(1, 1, 1, 1);
     }
 
     XMFLOAT4 Ambient;
@@ -47,7 +48,10 @@ struct ShaderMaterial
     XMFLOAT4 Specular; // w = SpecPower
     XMFLOAT4 Reflect;
     XMFLOAT4 flags; // x = n/a, y = useTexture
+    XMFLOAT4 textureCoordScale; // xy = UV scale; float4 keeps CPU/HLSL packing aligned.
 };
+
+static_assert(sizeof(ShaderMaterial) == 96, "ShaderMaterial must match Materials.fx");
 
 struct CBMaterial
 {

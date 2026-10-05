@@ -216,7 +216,7 @@ UINT skinnedIndexBufferSize = 0;
 UINT indexBufferSize = 0;
 
 const int maxTotalTexturesInScene = 8;
-const int maxNumMaterials = 9;
+const int maxNumMaterials = 64; // Allow separate trunk, twig, and leaf materials per tree.
 
 int RenderUnit::s_nextId = 0;
 

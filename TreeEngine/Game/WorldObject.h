@@ -43,6 +43,7 @@ public:
     WorldObjectParams(GeneratorType genType) :
         position(0, 0, 0),
         scale(1, 1, 1),
+        textureCoordScale(1, 1),
         depthLOD(4),
         generatorType(genType),
         _animationSpeed(1.0f),
@@ -56,6 +57,7 @@ public:
 
     XMFLOAT3 position;
     XMFLOAT3 scale;
+    XMFLOAT2 textureCoordScale; // Multiply texture UVs; (1, 1) preserves the original mapping.
     XMFLOAT4 rotation; // Quaternion
     GeneratorType generatorType;
     float _animationSpeed;

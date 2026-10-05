@@ -219,7 +219,7 @@ float4 PS(PS_INPUT input) : SV_Target
     float4 textureColor;
     if (mat.flags.y > 0)  //use texture
     {
-        textureColor = txDiffuse.Sample(samLinear, input.Tex);
+        textureColor = txDiffuse.Sample(samLinearWrap, input.Tex * mat.textureCoordScale.xy);
 
         if (mat.flags.z > 0)  // clip alpha threshold
         {
@@ -299,7 +299,7 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
 {
     if (mat.flags.z > 0)  // clip alpha threshold
     {
-        float4 textureColor = txDiffuse.Sample(samLinear, input.Tex);
+        float4 textureColor = txDiffuse.Sample(samLinearWrap, input.Tex * mat.textureCoordScale.xy);
 
         // Don't write transparent pixels to the shadow map.
         clip(textureColor.a - mat.flags.z);
