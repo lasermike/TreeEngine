@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "name": "AI Tree",
+  "camera": {
+    "position": [1.11395788, 0.711319208, 2.05959034],
+    "rotation": [0.00989040267, 0.978999615, 0.0489907376, 0]
+  },
+  "render": {
+    "clearColor": [0, 0, 0.5019608, 1],
+    "useShadowMaps": true,
+    "useAlphaBlendedRenderTarget": true
+  },
+  "light": {
+    "ambient": [0.6, 0.6, 0.6, 1],
+    "diffuse": [1, 1, 1, 1],
+    "specular": [0.6, 0.6, 0.6, 1],
+    "direction": [-0.7, -0.7, 0.7]
+  },
+  "pointLightCount": 1,
+  "materials": {
+    "bark": {
+      "ambient": [0.3, 0.3, 0.3, 1],
+      "diffuse": [0.87058824, 0.72156864, 0.5294118, 1],
+      "specular": [0.1, 0.1, 0.1, 1],
+      "texture": "Bark_0005_diffuse.dds"
+    },
+    "needles": {
+      "ambient": [0.5, 0.5, 0.5, 1],
+      "diffuse": [1, 1, 1, 1],
+      "specular": [0, 0.5, 0.1, 1],
+      "texture": "FirBranchWithNeedles.dds",
+      "alphaClipThreshold": 1
+    },
+    "ground": {
+      "ambient": [0.3, 0.3, 0.3, 1],
+      "diffuse": [0.8, 0.8, 0.8, 1],
+      "specular": [0.3, 0.3, 0.3, 4],
+      "texture": "grid3.png"
+    },
+    "sky": {
+      "ambient": [1, 1, 1, 1],
+      "diffuse": [0, 0, 9, 1],
+      "specular": [0, 0, 0, 0],
+      "texture": "coords.dds"
+    },
+    "axis-red": { "ambient": [1, 0, 0, 1] },
+    "axis-green": { "ambient": [0, 0.5019608, 0, 1] },
+    "axis-blue": { "ambient": [0, 0, 1, 1] }
+  },
+  "objects": [
+    {
+      "id": "tree",
+      "type": "tree",
+      "transform": { "position": [0, 0.1, -2] },
+      "animationSpeed": 15,
+      "depthLOD": 1,
+      "trunkShape": "skinnedCylinder",
+      "materials": { "trunk": "bark", "leaf": "needles" },
+      "generator": {
+        "axiom": "F(50) T(100,.1)",
+        "angle": 6.283185307179586,
+        "iterations": 14,
+        "segmentLength": 0.01,
+        "thickness": 0.08,
+        "segmentLengthBehavior": "constant",
+        "rules": [
+          {
+            "input": "T(t,r)",
+            "output": "[Y(r ) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) [Y(r + .33) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) [Y(r + .66) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.9,r + .24) "
+          },
+          {
+            "input": "B(b)",
+            "output": "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.75)] [!(.02) $(1) x(-0.1) F(b * 0.75)] B(b * 0.95) "
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "scale": [25, 0.01, 25] },
+      "textureCoordScale": [4, 4],
+      "material": "ground"
+    },
+    {
+      "id": "skybox",
+      "type": "primitive",
+      "shape": "box",
+      "cubeMap": true,
+      "transform": { "scale": [-30, -30, -30], "rotationDegrees": [0, -45, 0] },
+      "material": "sky"
+    },
+    {
+      "id": "axis-x",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "position": [-3.5, 0, 0], "scale": [0.1, 1, 0.1], "rotationDegrees": [0, 0, 90] },
+      "material": "axis-red"
+    },
+    {
+      "id": "axis-y",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "position": [-4, 0.5, 0], "scale": [0.1, 1, 0.1] },
+      "material": "axis-green"
+    },
+    {
+      "id": "axis-z",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "position": [-4, 0, 0.5], "scale": [0.1, 1, 0.1], "rotationDegrees": [90, 0, 0] },
+      "material": "axis-blue"
+    }
+  ]
+}

@@ -72,22 +72,24 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     }
 
     // Create material, mesh, and reserve render unit
-    for (auto& material : _params->materials)
+    auto shaderMaterials = _params->materials;
+    for (auto& material : shaderMaterials)
     {
-        material.textureCoordScale = XMFLOAT4(_params->textureCoordScale.x, _params->textureCoordScale.y, 1, 1);
+        material.textureCoordScale.x *= _params->textureCoordScale.x;
+        material.textureCoordScale.y *= _params->textureCoordScale.y;
     }
     const std::wstring trunkMaterialName = L"trunk" + std::to_wstring(_id);
     const std::wstring twigMaterialName = L"twig" + std::to_wstring(_id);
     const std::wstring leafMaterialName = L"leaf" + std::to_wstring(_id);
     Material* pTrunk = nullptr;
-    renderManager.CreateMaterial(trunkMaterialName.c_str(), _params->textureFilename[0].c_str(), vsFilename.c_str(), nullptr, shadowVsFilename.c_str(), nullptr, _params->materials[0], StockRenderState(), &pTrunk);
+    renderManager.CreateMaterial(trunkMaterialName.c_str(), _params->textureFilename[0].c_str(), vsFilename.c_str(), nullptr, shadowVsFilename.c_str(), nullptr, shaderMaterials[0], StockRenderState(), &pTrunk);
     Mesh* pNewMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_params->meshes[0]);
     renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, inputLayout, &pNewMesh);
     renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
 
     Material* pTwig = nullptr;
-    renderManager.CreateMaterial(twigMaterialName.c_str(), _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, _params->materials[0], StockRenderState(), &pTwig);
+    renderManager.CreateMaterial(twigMaterialName.c_str(), _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, shaderMaterials[0], StockRenderState(), &pTwig);
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
     renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
@@ -97,7 +99,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     leafState.blendState = StockBlendStates::Overwrite;
     Material* pLeaf = nullptr;
     const wchar_t* leafTexture = _params->textureFilename.size() > 1 ? _params->textureFilename[1].c_str() : nullptr;
-    renderManager.CreateMaterial(leafMaterialName.c_str(), leafTexture, nullptr, nullptr, nullptr, nullptr, _params->materials[1], leafState, &pLeaf);
+    renderManager.CreateMaterial(leafMaterialName.c_str(), leafTexture, nullptr, nullptr, nullptr, nullptr, shaderMaterials[1], leafState, &pLeaf);
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Sprite);
     renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);

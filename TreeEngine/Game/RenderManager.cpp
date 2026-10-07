@@ -57,6 +57,12 @@ RenderManager::~RenderManager()
     SafeDelete(&m_platform);
 }
 
+void RenderManager::ApplySceneSettings(const SceneRenderSettings& settings)
+{
+    // Assign the scene settings only; all frame state and resources remain intact.
+    m_renderData.ApplySceneSettings(settings);
+}
+
 HRESULT RenderManager::SetPlatform(HMODULE platformDLL)
 {
     SafeDelete(&m_platform);

@@ -104,6 +104,8 @@ public:
     RenderPlatform* GetPlatformBase() { return m_platform; }
 
     RenderData& GetRenderData() { return m_renderData; }
+    const SceneRenderSettings& GetSceneSettings() const { return m_renderData; }
+    void ApplySceneSettings(const SceneRenderSettings& settings);
 
     RenderPlatform* GetPlatform() { return (RenderPlatform*)m_platform; }
 

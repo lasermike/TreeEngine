@@ -1,5 +1,6 @@
 #pragma once
 #include "Materials.h"
+#include "SceneRenderSettings.h"
 #include "ConstBufferDefinitions.h"
 
 class ShadowMap;
@@ -66,8 +67,13 @@ struct ProjectionData
 // Centalized data necessary to render a frame.
 // Alignment/padding for SSE types
 __declspec(align(16)) 
-struct RenderData
+struct RenderData : SceneRenderSettings
 {
+    void ApplySceneSettings(const SceneRenderSettings& settings)
+    {
+        SceneRenderSettings::operator=(settings);
+    }
+
     // General
     float               time;
     UINT                frame;
@@ -87,13 +93,6 @@ struct RenderData
     FrameStatistic*     frameStats;
 
     RenderPass          currentPass;
-
-    // Lighting
-    XMFLOAT4            clearColor;
-    int                 numDirectionalLights;
-    int                 numPointLights;
-    DirectionalLight    dirLights[1];
-    PointLight          pointLights[1];
 
     // Shadows
     static const int    SMapWidth = 2048;
@@ -120,11 +119,6 @@ struct RenderData
         XMStoreFloat4x4(&lightView, XMMatrixIdentity());
         XMStoreFloat4x4(&lightProj, XMMatrixIdentity());
         XMStoreFloat4x4(&shadowTransform, XMMatrixIdentity());
-        memset(&dirLights, 0, sizeof(DirectionalLight) * _countof(dirLights));
-        memset(&pointLights, 0, sizeof(PointLight) * _countof(pointLights));
-        
-        numDirectionalLights = 1;
-        numPointLights = 0;
         instanceBuffer = nullptr;
     }
 };

@@ -110,7 +110,9 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     //m_currentScene = 1; // Test tree
     //m_currentScene = 7; // simple box and cylindar
 
-    m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
+    SceneRenderSettings sceneSettings = m_renderManager.GetSceneSettings();
+    HRR(m_loader.Load(m_currentScene, m_pScene, &sceneSettings, m_player, &m_gameData));
+    m_renderManager.ApplySceneSettings(sceneSettings);
 
     m_needsResize = true;
 
@@ -268,34 +270,40 @@ void Game::Update(DX::StepTimer const& timer)
 
     if (m_advanceScene)
     {
-        // Clean out game state 
-        m_pScene->DeleteAllChildren();
-        m_renderManager.UninitGameLevelGraphics();
-        m_gameData.ResetToDefaults();
-
-        // Determine which scene to load
-        m_currentScene += m_advanceSceneAmount;
-        m_currentScene = m_currentScene % m_loader.GetNumScenes();
-        if (m_currentScene < 0)
+        int nextSceneIndex = (m_currentScene + m_advanceSceneAmount) % m_loader.GetNumScenes();
+        if (nextSceneIndex < 0)
         {
-            m_currentScene += m_loader.GetNumScenes();
+            nextSceneIndex += m_loader.GetNumScenes();
         }
-
         m_advanceScene = false;
         m_advanceSceneAmount = 0;
 
-        m_timeStart = 0;
-
-        m_settings.m_buffersInUse = 0;
-
-        // Load the next/prev scene
-        m_loader.Load(m_currentScene, m_pScene, &m_renderManager.GetRenderData(), m_player, &m_gameData);
-
-        // Create models and device objects
-        m_resetTree = true;
-
-        // Recreate backbuffer with level specific clear color
-        m_needsResize = true;
+        // Validate and build the next scene before discarding the current one.
+        auto nextScene = std::make_unique<SceneRoot>();
+        SceneRenderSettings nextSceneSettings = m_renderManager.GetSceneSettings();
+        GameData nextGameData;
+        const XMVECTOR oldPosition = m_player->GetPosition();
+        const XMVECTOR oldRotation = m_player->GetRotation();
+        if (SUCCEEDED(m_loader.Load(nextSceneIndex, nextScene.get(), &nextSceneSettings, m_player, &nextGameData)))
+        {
+            m_pScene->DeleteAllChildren();
+            m_renderManager.UninitGameLevelGraphics();
+            delete m_pScene;
+            m_pScene = nextScene.release();
+            m_currentScene = nextSceneIndex;
+            m_gameData = nextGameData;
+            m_renderManager.ApplySceneSettings(nextSceneSettings);
+            m_renderManager.GetRenderData().time = 0;
+            m_timeStart = 0;
+            m_settings.m_buffersInUse = 0;
+            m_resetTree = true;
+            m_needsResize = true;
+        }
+        else
+        {
+            m_player->SetPosition(oldPosition);
+            m_player->SetRotation(oldRotation);
+        }
     }
 
     // Rebuild tree if necessary
@@ -493,11 +501,15 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     if (ImGui::CollapsingHeader("Scene", ImGuiTreeNodeFlags_DefaultOpen))
     {
+        ImGui::Text("%s", m_loader.GetSceneName(m_currentScene));
+        if (!m_loader.GetLastError().empty())
+            ImGui::TextWrapped("Scene load failed: %s", m_loader.GetLastError().c_str());
         for (WorldObject* obj : m_pScene->Children())
         {
             WorldObjectParams& params = obj->GetParams();
+            ImGui::PushID(obj);
 
-            ImGui::SeparatorText(s_szObjectTypeNames[obj->GetObjectType()]);
+            ImGui::SeparatorText(params.name.empty() ? s_szObjectTypeNames[obj->GetObjectType()] : params.name.c_str());
             ImGui::Text("Primitive type: %s", s_szPrimitiveTypeNames[params.primitiveType]);
 
             if (ImGui::TreeNode("Materials"))
@@ -529,6 +541,21 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                 if (ImGui::TreeNodeEx("L System", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
+                    const auto& generator = lsystemParams.GetGeneratorParameters();
+                    const int remainingBuffers = static_cast<int>(_countof(m_settings.m_ruleTextEditBuffers)) - nextInputBuffer;
+                    bool canEdit = remainingBuffers > 0
+                        && generator._rules.size() <= static_cast<size_t>((remainingBuffers - 1) / 2)
+                        && generator._axiom.size() < m_settings.ruleTextBufferSize;
+                    for (const auto& rule : generator._rules)
+                        canEdit = canEdit && rule.input.size() < m_settings.ruleTextBufferSize
+                            && rule.output.size() < m_settings.ruleTextBufferSize;
+                    if (!canEdit)
+                    {
+                        ImGui::TextWrapped("These rules exceed the live editor's capacity. Edit the scene JSON to change them.");
+                        ImGui::TreePop();
+                        ImGui::PopID();
+                        continue;
+                    }
 
                     // Iterations - TODO: make this is common code
                     ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
@@ -557,6 +584,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                     for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
                     {
                         Rule& rule = lsystemParams.GetGeneratorParameters()._rules[r];
+                        ImGui::PushID(r);
 
                         if (ImGui::TreeNodeEx("Rule", ImGuiTreeNodeFlags_DefaultOpen))
                         {
@@ -585,10 +613,12 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
                             ImGui::TreePop();
                         }
+                        ImGui::PopID();
                     }
                     ImGui::TreePop();
                 }
             }
+            ImGui::PopID();
         }
 
         m_settings.m_buffersInUse = nextInputBuffer;

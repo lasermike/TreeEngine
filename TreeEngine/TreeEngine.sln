@@ -34,6 +34,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderPlatform12Xbox", "Ren
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SharedEngine", "SharedEngine\SharedEngine.vcxitems", "{F8482D81-0DA9-42B7-95F2-1B518BF83D8A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SceneDefinitionTests", "Tests\SceneDefinitionTests.vcxproj", "{584953DB-0978-4C28-A4D6-E15C51F60C28}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Durango = Debug|Durango
@@ -58,6 +60,28 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug|Durango.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug|Gaming.Xbox.Scarlett.x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug|Gaming.Xbox.XboxOne.x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug|Win32.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug|x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug|x64.Build.0 = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug12|Durango.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug12|Gaming.Xbox.Scarlett.x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug12|Gaming.Xbox.XboxOne.x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug12|Win32.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug12|x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Debug12|x64.Build.0 = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Profile|Durango.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Profile|Gaming.Xbox.Scarlett.x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Profile|Gaming.Xbox.XboxOne.x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Profile|Win32.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Profile|x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Release|Durango.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Release|Gaming.Xbox.Scarlett.x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Release|Gaming.Xbox.XboxOne.x64.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Release|Win32.ActiveCfg = Debug|x64
+		{584953DB-0978-4C28-A4D6-E15C51F60C28}.Release|x64.ActiveCfg = Debug|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug|Durango.ActiveCfg = Debug|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug|Gaming.Xbox.Scarlett.x64.ActiveCfg = Debug|x64
 		{9B22E637-C613-479F-BEC8-59215E96EEFB}.Debug|Gaming.Xbox.XboxOne.x64.ActiveCfg = Debug|x64

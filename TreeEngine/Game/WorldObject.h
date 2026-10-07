@@ -55,6 +55,8 @@ public:
 
     virtual ~WorldObjectParams() { }
 
+    std::string name; // Stable authored object ID; empty for legacy scenes.
+
     XMFLOAT3 position;
     XMFLOAT3 scale;
     XMFLOAT2 textureCoordScale; // Multiply texture UVs; (1, 1) preserves the original mapping.

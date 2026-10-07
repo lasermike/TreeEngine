@@ -8,6 +8,10 @@
 #include "Player.h"
 #include "Graph.h"
 #include <directxcolors.h>
+#include "SceneDefinition.h"
+#include "SceneInstantiation.h"
+#include "SceneRenderSettings.h"
+#include <stdexcept>
 
 void GameData::ResetToDefaults()
 {
@@ -19,10 +23,6 @@ void GameData::ResetToDefaults()
 GameLoader::GameLoader()
 {
     _currentSeed = 0;
-}
-
-void GameLoader::Load(char* /*name*/, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData)
-{
 }
 
 HRESULT LoadGraphPoints(std::vector<XMFLOAT2>& points, const char* filename)
@@ -116,7 +116,7 @@ HRESULT CreateBufferOfGraphPoints(std::vector<float>& buffer, UINT& width, const
     return S_OK;
 }
 
-void LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadFSGraph(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     // Graph params
     WorldObjectParameters<FSGraphParams>* graphParams = new WorldObjectParameters<FSGraphParams>(FSGraphGeneratorType);
@@ -134,11 +134,10 @@ void LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameD
 
     // Init lights
     //m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderSettings->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(5.0f, 1.5f, -8.2f)));
@@ -150,7 +149,7 @@ void LoadFSGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameD
 }
 
 
-void LoadGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadGraph(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     // Graph
     WorldObjectParameters<GraphParams>* graphParams = new WorldObjectParameters<GraphParams>(GraphGeneratorType);
@@ -174,12 +173,11 @@ void LoadGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameDat
 
     // Init lights
     //m_light.Direction = XMFLOAT3(-.7f, -.7f, .7f);
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-    //renderData->dirLights[0].Direction = XMFLOAT3(0.0f, 0.0f, 1.0f);
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderSettings->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
+    //renderSettings->dirLights[0].Direction = XMFLOAT3(0.0f, 0.0f, 1.0f);
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(5.0f, 1.5f, -8.2f)));
@@ -189,7 +187,7 @@ void LoadGraph(SceneRoot* scene, RenderData* renderData, Player* player, GameDat
 }
 
 
-void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadTestBlock(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
     params4->position = XMFLOAT3(0, 0, 2);
@@ -207,18 +205,17 @@ void LoadTestBlock(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     scene->AddChild(new Primitive(params4));
 
     // Init lights
-    renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+    renderSettings->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
-void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadSimpleBox(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     WorldObjectParams* params1 = new WorldObjectParams(PrimitiveGeneratorType);
     params1->position = XMFLOAT3(0, 1.0, 0);
@@ -236,11 +233,10 @@ void LoadSimpleBox(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     scene->AddChild(new Primitive(params4));  // Box
 
     // Init lights
-    renderData->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(0.7f, 0.7f, 0.6f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(0.8f, 0.8f, 0.7f, 1.0f);
+    renderSettings->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
@@ -255,7 +251,7 @@ double SegLengthPlusRand(LSystemParams* params, double cmdParam)
     return len;
 }
 
-void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadSeaScene(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params2->_animationSpeed = 4.0f;
@@ -315,18 +311,17 @@ void LoadSeaScene(SceneRoot* scene, RenderData* renderData, Player* player, Game
     scene->AddChild(new Primitive(params4));
 
     // Init lights
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.0, -0.7f, 0.7f);
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderSettings->dirLights[0].Direction = XMFLOAT3(-0.0, -0.7f, 0.7f);
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
-void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadCurvesScene(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
@@ -413,11 +408,10 @@ void LoadCurvesScene(SceneRoot* scene, RenderData* renderData, Player* player, G
     scene->AddChild(new Primitive(params4));
 
     // Init lights 
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0f)));
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    XMStoreFloat3(&renderSettings->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0f)));
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
@@ -433,7 +427,7 @@ float SegLengthParam(LSystemParams* params, float cmdParam)
 }
 
 
-void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadTreeScene(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
@@ -543,14 +537,14 @@ void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, Gam
     scene->AddChild(new Primitive(paramsZ));
 
     // Init lights 
-    renderData->dirLights[0].Ambient = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
-    //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0)));
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    //XMStoreFloat3(&renderSettings->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
+    //XMStoreFloat3(&renderSettings->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
+    XMStoreFloat3(&renderSettings->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0)));
 
-    renderData->numPointLights = 1;
+    renderSettings->numPointLights = 1;
 
     // Camera
 #if ALT_POSITION
@@ -564,141 +558,40 @@ void LoadTreeScene(SceneRoot* scene, RenderData* renderData, Player* player, Gam
 }
 
 
-void LoadAITree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+namespace
 {
-    ShaderMaterial trunkMaterial;
-    trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
-    trunkMaterial.Diffuse = XMFLOAT4(Colors::BurlyWood); //XMFLOAT4(0.6f, 0.6f, 0.6f, 1.0f);
-    trunkMaterial.Specular = XMFLOAT4(0.1f, .1f, .1f, 1.0f);
-    trunkMaterial.flags.y = 1; //useTextures
-
-    ShaderMaterial leafMaterial;
-    leafMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    XMStoreFloat4(&leafMaterial.Diffuse, Colors::White);
-    leafMaterial.Specular = XMFLOAT4(0, .5f, .1f, 1.0);
-    leafMaterial.flags.y = true; //useTextures  TODO
-    leafMaterial.flags.z = true; //clip alpha
-
-    WorldObjectParameters<LSystemParams>* params2 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
-    params2->textureFilename.push_back(L"Bark_0005_diffuse.dds");
-    params2->textureFilename.push_back(L"FirBranchWithNeedles.dds");
-//    params2->textureCoordScale = XMFLOAT2(.5, .5);
-
-    params2->position = XMFLOAT3(0, .1f, -2.0f);
-    params2->GetGeneratorParameters()._angle = XM_2PI;
-    params2->GetGeneratorParameters()._numIterations = 14;
-    params2->_animationSpeed = 15.0f;
-    params2->depthLOD = 1;
-    params2->GetGeneratorParameters()._segmentLength = .01f; // 0.5f;
-    params2->GetGeneratorParameters().thickness = .08f;
-    params2->GetGeneratorParameters()._constants = "";
-
-    params2->GetGeneratorParameters()._axiom = "F(50) T(100,.1)";
-
-    params2->GetGeneratorParameters()._rules.push_back(Rule(
-        "T(t,r)",
-            "[Y(r ) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
-            "[Y(r + .33) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) "
-            "[Y(r + .66) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.9,r + .24) "));
-    params2->GetGeneratorParameters()._rules.push_back(Rule(
-        "B(b)",
-            "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.75)] [!(.02) $(1) x(-0.1) F(b * 0.75)] B(b * 0.95) "));
-
-    params2->materials.push_back(trunkMaterial);
-    params2->materials.push_back(leafMaterial);
-
-    params2->meshes.push_back(PrimitiveType_SkinnedCylinder);
-
-    scene->AddChild(new Tree(params2));
-
-    // Ground
-    WorldObjectParams* params4 = new WorldObjectParams(PrimitiveGeneratorType);
-    params4->position = XMFLOAT3(0, 0, 0);
-    params4->scale = XMFLOAT3(25, .01f, 25);
-    params4->primitiveType = PrimitiveType_CylinderHD;
-    params4->textureFilename.push_back(L"grid3.png");
-    params4->textureCoordScale = XMFLOAT2(4, 4);
-
-    ShaderMaterial mat;
-    mat.Ambient = XMFLOAT4(.3f, .3f, .3f, 1);
-    mat.Diffuse = XMFLOAT4(.8f, .8f, .8f, 1);
-    mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
-    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-    mat.flags.y = 1; //1 for textured;
-    params4->materials.push_back(mat);
-
-    scene->AddChild(new Primitive(params4));
-
-    // Skybox
-    WorldObjectParams* params5 = new WorldObjectParams(PrimitiveGeneratorType);
-    params5->position = XMFLOAT3(0, 0, 0);
-    XMStoreFloat4(&params5->rotation, XMQuaternionRotationRollPitchYaw(0.0f, -XM_PIDIV4, 0.0f));
-    params5->scale = XMFLOAT3(-30.0f, -30.0f, -30.0f);
-    params5->primitiveType = PrimitiveType_Box;
-    mat.Ambient = XMFLOAT4(1, 1, 1, 1);
-    mat.Diffuse = XMFLOAT4(0, 0, 9, 1);
-    mat.Specular = XMFLOAT4(0, 0, 0, 0);
-    mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-    mat.flags.y = 1; //1 for textured;
-    params5->materials.push_back(mat);
-    params5->cubeMap = true;
-    params5->textureFilename.push_back(L"coords.dds");
-    scene->AddChild(new Primitive(params5));
-
-    //axis X
-    mat = ShaderMaterial();
-    XMStoreFloat4(&mat.Ambient, Colors::Red);
-    WorldObjectParams* paramsX = new WorldObjectParams(PrimitiveGeneratorType);
-    paramsX->position = XMFLOAT3(-3.5f, 0, 0);
-    paramsX->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
-    XMStoreFloat4(&paramsX->rotation, XMQuaternionRotationRollPitchYaw(0.0f,0.0f,XM_PIDIV2));
-    paramsX->primitiveType = PrimitiveType_CylinderHD;
-    paramsX->materials.push_back(mat);
-    scene->AddChild(new Primitive(paramsX));
-
-    // axis Y
-    XMStoreFloat4(&mat.Ambient, Colors::Green);
-    WorldObjectParams* paramsY = new WorldObjectParams(PrimitiveGeneratorType);
-    paramsY->position = XMFLOAT3(-4, 0.5f, 0);
-    paramsY->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
-    XMStoreFloat4(&paramsY->rotation, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, 0.0f));
-    paramsY->primitiveType = PrimitiveType_CylinderHD;
-    paramsY->materials.push_back(mat);
-    scene->AddChild(new Primitive(paramsY));
-
-    // axis Z
-    XMStoreFloat4(&mat.Ambient, Colors::Blue);
-    WorldObjectParams* paramsZ = new WorldObjectParams(PrimitiveGeneratorType);
-    paramsZ->position = XMFLOAT3(-4, 0.0f, 0.5f);
-    paramsZ->scale = XMFLOAT3(0.1f, 1.0f, 0.1f);
-    XMStoreFloat4(&paramsZ->rotation, XMQuaternionRotationRollPitchYaw(XM_PIDIV2, 0.0f, 0.0f));
-    paramsZ->primitiveType = PrimitiveType_CylinderHD;
-    paramsZ->materials.push_back(mat);
-    scene->AddChild(new Primitive(paramsZ));
-
-    // Init lights
-    renderData->dirLights[0].Ambient = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.1f, -0.7f, 0.7f, 0.0f)));
-    //XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(0.205409616, -0.703511178, 0.680309653, 0.0)));
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0)));
-
-    renderData->numPointLights = 1;
-
-    // Camera
-#if ALT_POSITION
-    player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -5.0f)));
-    player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 0));
-#else
-    player->SetPosition(XMLoadFloat3(&XMFLOAT3(1.11395788, 0.711319208, 2.05959034)));
-    player->SetRotation(XMVectorSet(0.00989040267, 0.978999615, 0.0489907376, 0));
-#endif
-    XMStoreFloat4(&gameData->clearColor, Colors::Navy);
+    std::string SceneFilename(const std::string& filename)
+    {
+        if (std::ifstream(filename)) return filename;
+        const std::string sourcePath = "Game/Resources/" + filename;
+        if (std::ifstream(sourcePath)) return sourcePath;
+        char executable[MAX_PATH] = {};
+        DWORD length = GetModuleFileNameA(nullptr, executable, MAX_PATH);
+        if (length && length < MAX_PATH)
+        {
+            std::string directory(executable);
+            auto slash = directory.find_last_of("/\\");
+            if (slash != std::string::npos)
+            {
+                const std::string deployedPath = directory.substr(0, slash + 1) + filename;
+                if (std::ifstream(deployedPath)) return deployedPath;
+            }
+        }
+        return filename; // ReadScene reports the missing file with its name.
+    }
 }
 
+void LoadAITree(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
+{
+    auto definition = SceneData::ReadScene(SceneFilename("Scenes/ai-tree.scene.json"));
+#if ALT_POSITION
+    definition.camera.position = XMFLOAT3(0, 1.5f, -5);
+    definition.camera.rotation = XMFLOAT4(0, 0, 0, 1);
+#endif
+    InstantiateScene(definition, *scene, *renderSettings, *player, *gameData);
+}
 
-void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadTestTree(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     ShaderMaterial trunkMaterial;
     trunkMaterial.Ambient = XMFLOAT4(.3f, .3f, .3f, 1.0f);
@@ -768,11 +661,10 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
 
 
     // Init lights 
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    XMStoreFloat3(&renderData->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0f)));
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    XMStoreFloat3(&renderSettings->dirLights[0].Direction, XMVector3Normalize(XMVectorSet(-0.7f, -0.7f, 0.7f, 0.0f)));
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(0.0f, 1.5f, -6.0f)));
@@ -781,7 +673,7 @@ void LoadTestTree(SceneRoot* scene, RenderData* renderData, Player* player, Game
     XMStoreFloat4(&gameData->clearColor, Colors::IndianRed);
 }
 
-void LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadTrees(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     WorldObjectParams* params3 = new WorldObjectParams(FixedTreeGeneratorType);
     params3->depthLOD = 2;
@@ -831,18 +723,17 @@ void LoadTrees(SceneRoot* scene, RenderData* renderData, Player* player, GameDat
     scene->AddChild(new Primitive(params7));
 
     // Init lights
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderSettings->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
 
-void LoadTrees2(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadTrees2(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
     params5->position = XMFLOAT3(0, .5f, 0);
@@ -865,17 +756,16 @@ void LoadTrees2(SceneRoot* scene, RenderData* renderData, Player* player, GameDa
     scene->AddChild(new Primitive(params4));
 
     // Init lights
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderSettings->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
     player->SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
 }
-void LoadTrees3(SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData)
+void LoadTrees3(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     // ?:A 
     // p1 :A?[&FL!A]/////’[&FL!A]///////’[&FL!A] 
@@ -909,11 +799,10 @@ void LoadTrees3(SceneRoot* scene, RenderData* renderData, Player* player, GameDa
     scene->AddChild(new Primitive(params4));
 
     // Init lights
-    renderData->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-    renderData->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    renderData->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
-    renderData->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
-    renderData->time = 0;
+    renderSettings->dirLights[0].Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
+    renderSettings->dirLights[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    renderSettings->dirLights[0].Specular = XMFLOAT4(.6f, .6f, .6f, 1.0f);
+    renderSettings->dirLights[0].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 
     // Camera
     player->SetPosition(XMLoadFloat3(&XMFLOAT3(-4.0f, 1.5f, -4.0f)));
@@ -971,49 +860,86 @@ void GameLoader::Regenerate(SceneRoot* pScene)
 
 }
 
-int GameLoader::GetNumScenes()
-{ 
-    return 9;
+namespace
+{
+    using SceneLoader = void (*)(SceneRoot*, SceneRenderSettings*, Player*, GameData*);
+    struct SceneEntry
+    {
+        const char* id;
+        const char* name;
+        SceneLoader load;
+    };
+
+    const SceneEntry sceneCatalog[] = {
+        { "LoadTreeScene", "Tree", LoadTreeScene },
+        { "LoadTestTree", "Test Tree", LoadTestTree },
+        { "LoadSeaScene", "Sea", LoadSeaScene },
+        { "LoadCurvesScene", "Curves", LoadCurvesScene },
+        { "LoadTrees", "Trees", LoadTrees },
+        { "LoadTestBlock", "Test Block", LoadTestBlock },
+        { "LoadGraph", "Graph", LoadGraph },
+        { "LoadSimpleBox", "Simple Box", LoadSimpleBox },
+        { "LoadAITree", "AI Tree", LoadAITree }
+    };
 }
 
-
-void GameLoader::Load(int sceneNum, SceneRoot* pScene, RenderData* pRenderData, Player* pPlayer, GameData* gameData)
+int GameLoader::GetNumScenes()
 {
-    switch (sceneNum)
-    {
-    case 0:
-        LoadTreeScene(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 1:
-        LoadTestTree(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 2:
-        LoadSeaScene(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 3:
-        LoadCurvesScene(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 4:
-        LoadTrees(pScene, pRenderData, pPlayer, gameData);
-        break;
-    //case 5:
-    //    LoadFSGraph(pScene, pRenderData, pPlayer, gameData);
-    //    break;
-    case 5:
-        LoadTestBlock(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 6:
-        LoadGraph(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 7:
-        LoadSimpleBox(pScene, pRenderData, pPlayer, gameData);
-        break;
-    case 8:
-        LoadAITree(pScene, pRenderData, pPlayer, gameData);
-        break;
-    default:
-        ASSERT(false);
-    }
+    return static_cast<int>(_countof(sceneCatalog));
+}
 
-    pRenderData->clearColor = gameData->clearColor;
+const char* GameLoader::GetSceneName(int sceneNum) const
+{
+    return sceneNum >= 0 && sceneNum < static_cast<int>(_countof(sceneCatalog))
+        ? sceneCatalog[sceneNum].name : nullptr;
+}
+
+HRESULT GameLoader::Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
+{
+    m_lastError.clear();
+    if (sceneNum < 0 || sceneNum >= GetNumScenes())
+    {
+        m_lastError = "Scene index is outside the catalog";
+        return E_INVALIDARG;
+    }
+    try
+    {
+        sceneCatalog[sceneNum].load(scene, renderSettings, player, gameData);
+        renderSettings->clearColor = gameData->clearColor;
+        return S_OK;
+    }
+    catch (const std::exception& error)
+    {
+        m_lastError = error.what();
+        OutputDebugStringA((m_lastError + "\n").c_str());
+        return E_FAIL;
+    }
+}
+
+HRESULT GameLoader::Load(const char* name, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
+{
+    if (name)
+    {
+        for (int i = 0; i < GetNumScenes(); ++i)
+            if (std::string(name) == sceneCatalog[i].id || std::string(name) == sceneCatalog[i].name)
+                return Load(i, scene, renderSettings, player, gameData);
+    }
+    m_lastError.clear();
+    if (!name || !*name)
+    {
+        m_lastError = "A scene name or JSON filename is required";
+        return E_INVALIDARG;
+    }
+    try
+    {
+        auto definition = SceneData::ReadScene(SceneFilename(name));
+        InstantiateScene(definition, *scene, *renderSettings, *player, *gameData);
+        return S_OK;
+    }
+    catch (const std::exception& error)
+    {
+        m_lastError = error.what();
+        OutputDebugStringA((m_lastError + "\n").c_str());
+        return E_FAIL;
+    }
 }

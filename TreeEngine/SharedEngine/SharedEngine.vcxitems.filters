@@ -4,6 +4,8 @@
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\buildShaders.bat" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\commonshader.bat" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\ai-tree.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\README.md" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Tree.cpp" />
@@ -22,5 +24,12 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TreeModel.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TreeModelGenerator.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\WorldObject.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneRenderSettings.h" />
   </ItemGroup>
 </Project>
