@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 class Settings
 {
@@ -15,6 +16,10 @@ public:
     bool m_enablePostProcessing;
     bool m_showDebugUI;
     bool m_showPerfGraph;
+
+    // Automated capture request, consumed by the renderer before Present.
+    std::wstring m_captureFilename;
+    HRESULT m_captureResult = S_OK;
 
 public:
 

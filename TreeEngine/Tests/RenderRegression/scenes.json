@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "width": 640,
+  "height": 480,
+  "seed": 12345,
+  "warmupFrames": 3,
+  "postProcessing": true,
+  "modes": ["raster", "raytracing"],
+  "times": [0, 1, 5],
+  "rmsTolerance": 0.002,
+  "maxErrorTolerance": 1.0,
+  "scenes": [
+    { "id": "tree", "name": "LoadTreeScene" },
+    { "id": "test-tree", "name": "LoadTestTree" },
+    { "id": "sea", "name": "LoadSeaScene" },
+    { "id": "curves", "name": "LoadCurvesScene" },
+    { "id": "trees", "name": "LoadTrees" },
+    { "id": "test-block", "name": "LoadTestBlock" },
+    { "id": "graph", "name": "LoadGraph" },
+    { "id": "simple-box", "name": "LoadSimpleBox" },
+    { "id": "ai-tree", "name": "LoadAITree" }
+  ]
+}

@@ -22,13 +22,13 @@ XMVECTOR SceneRoot::GetExtents(Extent extent)
     for (; i != _children.end(); i++)
     {
         XMVECTOR cur = (*i)->GetExtents(extent);
-        if (XMVectorGetY(cur) > XMVectorGetY(retval)) 
+        if (XMVectorGetY(cur) > XMVectorGetY(retval))
         {
             retval = cur;
         }
     }
 
-    return retval; 
+    return retval;
 }
 
 UINT32 SceneRoot::GetMaxInstances()
@@ -74,49 +74,57 @@ void SceneRoot::DeleteAllChildren()
 }
 
 
-HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool)
+HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool, bool synchronous)
 {
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"SceneRoot::Update");
 
     HRESULT hr = S_OK;
 
-    UINT numObjs = (UINT) _children.size();
-    UINT objsPerThread = std::max(1U, numObjs / threadPool.GetNumWorkers());
-
-    WorkData threadData = { 0, 0 /*first*/, objsPerThread /*end*/, &renderFrame }; 
-
-	//std::list<WorkData> workData;
-
-    for (UINT i = 0; i < threadPool.GetNumWorkers() && threadData.end <= numObjs; i++)
+    if (synchronous)
     {
-        if (i + 1 == threadPool.GetNumWorkers()) // Make sure the last iteration has all remaining objs
+        for (WorldObject* child : _children)
+            child->ComputeConstants(&renderFrame);
+    }
+    else
+    {
+        UINT numObjs = (UINT) _children.size();
+        UINT objsPerThread = std::max(1U, numObjs / threadPool.GetNumWorkers());
+
+        WorkData threadData = { 0, 0 /*first*/, objsPerThread /*end*/, &renderFrame };
+
+        //std::list<WorkData> workData;
+
+        for (UINT i = 0; i < threadPool.GetNumWorkers() && threadData.end <= numObjs; i++)
         {
-            threadData.end = numObjs;
+            if (i + 1 == threadPool.GetNumWorkers()) // Make sure the last iteration has all remaining objs
+            {
+                threadData.end = numObjs;
+            }
+
+            //workData.push_back(threadData);
+            threadPool.enqueue([this](WorkData data)
+                               {
+                                   UINT num = 0;
+                                   for (auto c : _children)
+                                   {
+                                       if (num >= data.start && num < data.end)
+                                       {
+                                           c->ComputeConstants((IRenderFrame*) data.param1);
+                                       }
+                                       num++;
+                                   }
+                               }, threadData);
+            threadData.start  += objsPerThread;
+            threadData.end  += objsPerThread;
         }
 
-        //workData.push_back(threadData);
-        threadPool.enqueue([this](WorkData data)
-                           {
-                               UINT num = 0;
-                               for (auto c : _children)
-                               {
-                                   if (num >= data.start && num < data.end)
-                                   {
-                                       c->ComputeConstants((IRenderFrame*) data.param1);
-                                   }
-                                   num++;
-                               }
-                           }, threadData);    
-        threadData.start  += objsPerThread;
-        threadData.end  += objsPerThread;
+        threadPool.WaitTilDone();
     }
-
-    threadPool.WaitTilDone();
 
     _boundingBox[0] = _boundingBox[1] = XMFLOAT3(0,0,0);
     XMVECTOR bbmin = XMLoadFloat3(&_boundingBox[0]);
     XMVECTOR bbmax = XMLoadFloat3(&_boundingBox[1]);
-    
+
     for (WorldObject* c : _children)
     {
         bbmin = XMVectorMin(bbmin, XMLoadFloat3(&c->GetBoundingBox()[0]));

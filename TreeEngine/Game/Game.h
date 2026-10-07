@@ -65,6 +65,9 @@ public:
 
     HRESULT Initialize(bool renderToSharedTexture);
 
+    void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing);
+    HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {});
+
     HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
 
     bool DebugUIKeyCaptured()
@@ -92,7 +95,7 @@ public:
 private:
 
     void Update(DX::StepTimer const& timer);
-    void Regenerate();
+    HRESULT Regenerate();
     void HandleInput(bool key[512]);
     void HandleGamepadInput(bool key[512]);
 
@@ -139,6 +142,8 @@ private:
     bool                                m_is12Driver;
     bool                                m_rotateLights;
     GameData                            m_gameData;
+    bool m_renderTestMode = false;
+    std::string m_renderTestScene;
 
     bool                                m_bDebugUIKeyCaptured;
 

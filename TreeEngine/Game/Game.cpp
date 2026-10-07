@@ -9,6 +9,7 @@
 #include "RenderManager.h"
 #include "InputManager.h"
 #include "ThreadPool.h"
+#include <cmath>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -105,13 +106,20 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     HRR(ReloadDevice());
 
-    m_currentScene = 8; // LoadAITree
+    if (!m_renderTestMode) m_currentScene = 8; // LoadAITree
     //m_currentScene = 2;  // SeaScene
     //m_currentScene = 1; // Test tree
     //m_currentScene = 7; // simple box and cylindar
 
     SceneRenderSettings sceneSettings = m_renderManager.GetSceneSettings();
-    HRR(m_loader.Load(m_currentScene, m_pScene, &sceneSettings, m_player, &m_gameData));
+    if (m_renderTestMode)
+    {
+        HRR(m_loader.Load(m_renderTestScene.c_str(), m_pScene, &sceneSettings, m_player, &m_gameData));
+    }
+    else
+    {
+        HRR(m_loader.Load(m_currentScene, m_pScene, &sceneSettings, m_player, &m_gameData));
+    }
     m_renderManager.ApplySceneSettings(sceneSettings);
 
     m_needsResize = true;
@@ -119,7 +127,8 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     // Create thread pool
     //may return 0 when not able to detect
     unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
-    m_threadPool = new ThreadPool(concurentThreadsSupported ? concurentThreadsSupported : 1);
+    // Keep render-test object updates ordered so shared instance data is repeatable.
+    m_threadPool = new ThreadPool(m_renderTestMode ? 1 : (concurentThreadsSupported ? concurentThreadsSupported : 1));
 
     return S_OK;
 }
@@ -216,7 +225,7 @@ HRESULT Game::ReloadDevice()
     return hr;
 }
 
-void Game::Regenerate()
+HRESULT Game::Regenerate()
 {
     HRESULT hr = S_OK;
 
@@ -227,12 +236,56 @@ void Game::Regenerate()
     m_loader.Regenerate(m_pScene);
 
     // Init render manager
-    hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
-    assert(SUCCEEDED(hr));
+    HRR(m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps));
 
     // Init new stuff
-    hr = m_pScene->InitGraphics(m_renderManager);
-    assert(SUCCEEDED(hr));
+    HRR(m_pScene->InitGraphics(m_renderManager));
+    return S_OK;
+}
+
+void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing)
+{
+    m_renderTestMode = true;
+    m_renderTestScene = sceneName;
+    m_settings.m_showDxrUav = rayTracing;
+    m_settings.m_enablePostProcessing = postProcessing;
+    m_settings.m_showDebugUI = false;
+    m_settings.m_showPerfGraph = false;
+    m_settings.m_showShadowBuffer = false;
+    m_settings.m_wireframe = false;
+    m_rotateLights = false;
+    m_showHelp = false;
+}
+
+HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& captureFilename)
+{
+    if (!m_renderTestMode || !std::isfinite(simulationTime) || simulationTime < 0) return E_INVALIDARG;
+    if (m_needsResize)
+    {
+        HRR(m_renderManager.OnResize(m_nextScreenWidth, m_nextScreenHeight, false));
+        m_needsResize = false;
+    }
+    if (m_resetTree)
+    {
+        HRR(Regenerate());
+        m_resetTree = false;
+    }
+
+    PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Render regression frame");
+    auto& renderData = m_renderManager.GetRenderData();
+    renderData.time = static_cast<float>(simulationTime);
+    renderData.frame++;
+    m_timeCurrent = simulationTime;
+    XMStoreFloat4x4(&renderData.view, m_player->GetViewMatrix());
+    renderData.eyePos = m_player->GetEyePosition();
+    HRR(m_renderManager.BeginNewFrame());
+    HRR(m_pScene->Update(m_renderManager, *m_threadPool, true));
+    HRR(m_renderManager.EndFrame());
+    m_settings.m_captureFilename = captureFilename;
+    m_settings.m_captureResult = captureFilename.empty() ? S_OK : E_PENDING;
+    ComputeGPU();
+    Render(false);
+    return m_settings.m_captureResult;
 }
 
 void Game::Update(DX::StepTimer const& timer)
@@ -309,7 +362,7 @@ void Game::Update(DX::StepTimer const& timer)
     // Rebuild tree if necessary
     if (m_resetTree)
     {
-        Regenerate();
+        HR(Regenerate());
         m_resetTree = false;
     }
 

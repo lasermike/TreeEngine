@@ -5,6 +5,9 @@
 #include "TreeClassic.h"
 #include "Game.h"
 #include "InputManager.h"
+#include "RenderTestCapture.h"
+#include <iostream>
+#include <crtdbg.h>
 
 #define MAX_LOADSTRING 100
 
@@ -113,6 +116,18 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+    try { ParseRenderTestCommandLine(); }
+    catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 2; }
+    if (GetRenderTestRequest())
+    {
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+#if defined(_DEBUG)
+        _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+        _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+#endif
+        srand(GetRenderTestRequest()->seed);
+    }
+
     // Set the current directory to the executable's directory
     // This ensures shader files and other resources are found correctly
     WCHAR exePath[MAX_PATH];
@@ -136,7 +151,15 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     // Perform application initialization:
     if (!InitInstance (hInstance, nCmdShow))
     {
-        return FALSE;
+        return GetRenderTestRequest() ? 3 : FALSE;
+    }
+
+    if (GetRenderTestRequest())
+    {
+        int result = RunRenderTestCapture(*g_game);
+        delete g_game;
+        g_game = nullptr;
+        return result;
     }
 
     // Main message loop:
@@ -341,6 +364,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 #endif
         // Window size
         RECT rc = { 0, 0, 1600, 1200 };
+        if (GetRenderTestRequest())
+        {
+            rc.right = GetRenderTestRequest()->width;
+            rc.bottom = GetRenderTestRequest()->height;
+        }
         AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
         m_hWnd = CreateWindow(L"OVRAppWindow", szTitle, WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
@@ -355,6 +383,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     }
 
     g_game = new Game(&g_inputManager);
+    if (GetRenderTestRequest())
+        g_game->ConfigureRenderTest(GetRenderTestRequest()->scene,
+            GetRenderTestRequest()->mode == "raytracing", GetRenderTestRequest()->postProcessing);
     g_game->SetWindow(m_hWnd);
     OnWindowSizeChanged();
     g_game->GetRenderManager().GetRenderData().inputManager = &g_inputManager;
@@ -375,8 +406,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     DIRECTX.SwapChain = g_game->GetRenderManager().GetPlatform()->GetSwapChain();
 #endif
 
-    ShowWindow(m_hWnd, nCmdShow);
-    UpdateWindow(m_hWnd);
+    if (!GetRenderTestRequest())
+    {
+        ShowWindow(m_hWnd, nCmdShow);
+        UpdateWindow(m_hWnd);
+    }
 
 #ifdef OCULUS_LEGACY
     // Oculus mode
@@ -486,6 +520,11 @@ HRESULT ConfigOculusDevice()
 
 void OnWindowSizeChanged()
 {
+    if (GetRenderTestRequest() && g_game)
+    {
+        g_game->OnResize(GetRenderTestRequest()->width, GetRenderTestRequest()->height);
+        return;
+    }
     ASSERT(m_hWnd);
 
     RECT rect = {0};

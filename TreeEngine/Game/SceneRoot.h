@@ -22,7 +22,7 @@ public:
 	HRESULT InitGraphics(RenderManager& renderManager); 
 	HRESULT CleanUpDeviceObjects();
 
-	HRESULT Update(IRenderFrame& renderFrame, ThreadPool& threadPool);
+	HRESULT Update(IRenderFrame& renderFrame, ThreadPool& threadPool, bool synchronous = false);
 
 	void AddChild(WorldObject* obj)
 	{

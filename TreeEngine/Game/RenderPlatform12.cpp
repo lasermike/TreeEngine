@@ -19,6 +19,7 @@
 #include "TextureLoading.h"
 #if !defined(TREE_XBOX)
 #include "WICTextureLoader.h"
+#include <wincodec.h>
 #endif
 
 #include "inputManager.h"
@@ -2068,6 +2069,10 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 {
     HRESULT hr = S_OK;
 
+    const size_t drawRecordBufferSize = static_cast<size_t>(m_DrawRecordsResource->GetDesc().Width);
+    if (m_drawRecords.size() > drawRecordBufferSize / sizeof(DrawRecord))
+        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transform draw records to bottom level BVH mesh data");
 
 #if defined(TREE_XBOX)
@@ -2084,10 +2089,15 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
         ResourceUploadBatch resourceUpload(GetDevice());
         resourceUpload.Begin();
 
+        // Upload copies the destination's entire subresource, regardless of RowPitch.
+        // Pad unused records so it never reads beyond the live CPU vector.
+        std::vector<unsigned char> uploadRecords(drawRecordBufferSize, 0);
+        if (!m_drawRecords.empty())
+            memcpy(uploadRecords.data(), m_drawRecords.data(), m_drawRecords.size() * sizeof(DrawRecord));
         D3D12_SUBRESOURCE_DATA initData = {};
-        initData.pData = m_drawRecords.data();
-        initData.RowPitch = sizeof(DrawRecord) * m_drawRecords.size();
-        initData.SlicePitch = 0;
+        initData.pData = uploadRecords.data();
+        initData.RowPitch = static_cast<LONG_PTR>(drawRecordBufferSize);
+        initData.SlicePitch = initData.RowPitch;
 
         resourceUpload.Upload(m_DrawRecordsResource, 0, &initData, 1);
 
@@ -3238,6 +3248,21 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     HRR(ExecuteCurrentCommandList(true));
 
     // Present the frame.
+    if (!m_settings->m_captureFilename.empty())
+    {
+#if !defined(TREE_XBOX)
+        TextureCOMScope com;
+        m_settings->m_captureResult = com.Result();
+        if (SUCCEEDED(m_settings->m_captureResult))
+            m_settings->m_captureResult = DirectX::SaveWICTextureToFile(m_commandQueue,
+                m_renderTargets[m_frameIndex], GUID_ContainerFormatPng,
+                m_settings->m_captureFilename.c_str(), D3D12_RESOURCE_STATE_PRESENT,
+                D3D12_RESOURCE_STATE_PRESENT, &GUID_WICPixelFormat24bppBGR);
+#else
+        m_settings->m_captureResult = E_NOTIMPL;
+#endif
+        m_settings->m_captureFilename.clear();
+    }
 #if defined(TREE_XBOX)
     // Present the backbuffer using the PresentX API.
     D3D12XBOX_PRESENT_PLANE_PARAMETERS planeParameters = {};
