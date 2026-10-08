@@ -352,6 +352,7 @@ struct Material
     wstring                         m_name;
     ShaderMaterial                  m_shaderMaterial;
     LoadedTexture*                  m_texture;
+    bool                            m_isSkybox = false;
 
     VertexShader*                   m_vertexShader;
     PixelShader*                    m_pixelShader;
@@ -952,6 +953,8 @@ public:
 #if defined(DXR_ENABLED)
 
     uint32_t m_numInstancesInTLAS;
+    bool m_dxrEnabledThisFrame = false;
+    INT m_dxrSkyInstance = -1;
 
 
     HRESULT CreateRaytracingPipeline();
@@ -1037,6 +1040,7 @@ public:
     };
 
     UINT m_nextVbWorldStart = 0;
+    static_assert(sizeof(DrawRecord) == 132, "DrawRecord must match Blur.hlsl");
     std::vector<DrawRecord> m_drawRecords;
     size_t m_previousDrawRecordHash;
 
@@ -1420,4 +1424,3 @@ public:
     IUnknown* GetDevice() { return GetDeviceFuncPtr(); }
 
 };
-

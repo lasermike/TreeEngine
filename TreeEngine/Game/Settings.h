@@ -12,7 +12,6 @@ public:
     bool m_paused;
     bool m_dxrEnabled;
     bool m_showShadowBuffer;
-    bool m_showDxrUav;
     bool m_wireframe;
     bool m_enablePostProcessing;
     bool m_showDebugUI;
@@ -27,13 +26,7 @@ public:
     Settings()
     {
         m_paused = false;
-        m_dxrEnabled =
-#if defined(DXR_ENABLED)
-            true;
-#else
-            false;
-#endif
-
+        m_dxrEnabled = true;
     }
 
     bool isInUse(int index)

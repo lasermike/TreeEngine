@@ -24,7 +24,8 @@ ByteAddressBuffer originalVertexBuffer : register(t5); // SimpleVertex (44 bytes
 ByteAddressBuffer skinnedVertexBuffer : register(t6); // SkinnedVertex (56 bytes per vertex)
 StructuredBuffer<InstancedData> instanceDataBuffer : register(t7);
 ByteAddressBuffer skinnedIndexBuffer : register(t8); // Skinned index buffer
-Texture2D<float4> sceneTextures[4] : register(t9);
+Texture2D<float4> sceneTextures[8] : register(t9);
+TextureCube<float4> skyTexture : register(t17);
 
 SamplerState samLinear : register(s0);
 
@@ -33,7 +34,8 @@ cbuffer Params : register(b0)
     uint dispatchWidth;
     uint dispatchHeight;
     uint rayFlags;
-    float holeSize;
+    int skyInstanceIndex;
+    float4 backgroundColor;
 };
 
 struct RayPayload
@@ -237,7 +239,32 @@ void ShadowMissShader(inout RayPayload payload)
 [shader("miss")]
 void MissShader(inout RayPayload payload)
 {
-    payload.color = float4(0.2, 0.2, 0.4, 1);
+    payload.color = backgroundColor;
+    if (skyInstanceIndex >= 0)
+    {
+        float3x3 skyWorld =
+            (float3x3)instanceDataBuffer[skyInstanceIndex].World;
+        float3 a = skyWorld[0];
+        float3 b = skyWorld[1];
+        float3 c = skyWorld[2];
+        float determinant = dot(a, cross(b, c));
+
+        if (abs(determinant) > 1e-8)
+        {
+            // Undo the skybox's rotation and scale.
+            // SkyBoxVS samples the negative local position.
+            float3 direction = WorldRayDirection();
+            float3 localDirection = float3(
+                dot(direction, cross(b, c)),
+                dot(direction, cross(c, a)),
+                dot(direction, cross(a, b))) / determinant;
+
+            payload.color = float4(
+                skyTexture.SampleLevel(
+                    samLinear, -localDirection, 0).rgb,
+                1);
+        }
+    }
 }
 
 [shader("raygeneration")]
@@ -271,4 +298,3 @@ void RayGenerationShader()
     // Write final color from payload to output
     renderOutput[DispatchRaysIndex().xy] = payload.color;
 }
-

@@ -8,6 +8,7 @@ struct RenderTestPoint
 {
     double time;
     std::wstring filename;
+    std::string mode;
 };
 
 struct RenderTestRequest

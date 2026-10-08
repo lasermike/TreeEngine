@@ -42,7 +42,6 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_timeStart = 0;
     m_resetTree = true;
     m_settings.m_showShadowBuffer = false;
-    m_settings.m_showDxrUav = false;
     m_settings.m_enablePostProcessing = true;
     m_settings.m_showPerfGraph = false;
     m_settings.m_showDebugUI = false;
@@ -543,7 +542,6 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::PopItemWidth();
 
         // Options
-        ImGui::Checkbox("Show DXR Debug UAV", &m_settings.m_showDxrUav);
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
         ImGui::Checkbox("Enable Post Processing", &m_settings.m_enablePostProcessing);

@@ -167,10 +167,12 @@ enum CbvSrvUavHeapOffsets
     DxrTexture2_SrvHeapOffset = 28,
     DxrTexture3_SrvHeapOffset = 29,
 
+    DxrSky_SrvHeapOffset = 34, // Follows the eight DXR scene texture slots.
+
     // Per-material descriptors
-    Material0_HeapOffset = 30,
+    Material0_HeapOffset = 35,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 31,
+    Texture0Srv_HeapOffset = 36,
     Num_CbvSrvUavHeapOffsets
 };
  
@@ -969,6 +971,10 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     {
         GetDevice()->CreateShaderResourceView(nullptr, &dxrNullSrvDesc, m_descriptorHeap.hCPU(DxrTexture0_SrvHeapOffset + i));
     }
+    dxrNullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+    dxrNullSrvDesc.TextureCube.MipLevels = 1;
+    GetDevice()->CreateShaderResourceView(nullptr, &dxrNullSrvDesc,
+        m_descriptorHeap.hCPU(DxrSky_SrvHeapOffset));
 
 
 #endif
@@ -1288,9 +1294,32 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     UINT StartInstanceLocation) 
 {
 #if defined(DXR_ENABLED)
-    if (m_settings->m_dxrEnabled
-        && m_renderData->currentPass == ShadowMapPass)
+    if (m_dxrEnabledThisFrame
+        && m_renderData->currentPass == RegularPass)
     {
+        if (m_currentMaterial && m_currentMaterial->m_isSkybox)
+        {
+            if (m_currentMaterial->m_texture && InstanceCount > 0)
+            {
+                m_dxrSkyInstance = static_cast<INT>(StartInstanceLocation);
+                GetDevice()->CopyDescriptorsSimple(
+                    1,
+                    m_descriptorHeap.hCPU(DxrSky_SrvHeapOffset),
+                    m_currentMaterial->m_texture->textureView,
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            }
+
+            // Sky follows the camera and supplies the ray-miss background.
+            // Keep its raster draw, but exclude it from ray geometry.
+            GetCommandList()->DrawIndexedInstanced(
+                IndexCountPerInstance,
+                InstanceCount,
+                StartIndexLocation,
+                BaseVertexLocation,
+                StartInstanceLocation);
+            return S_OK;
+        }
+
         INT texIdx = (m_currentMaterial && m_currentMaterial->m_texture) ? (INT)m_currentMaterial->m_texture->textureSlot : -1;
         m_drawRecords.push_back(DrawRecord(StartIndexLocation,
             IndexCountPerInstance,
@@ -2866,6 +2895,8 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
 
 #if defined (DXR_ENABLED)
 
+    m_dxrEnabledThisFrame = m_settings->m_dxrEnabled;
+    m_dxrSkyInstance = -1;
     m_nextVbWorldStart = 0;
     m_drawRecords.clear();
 
@@ -2910,57 +2941,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     // Ensure last frame is completed
     WaitOnFence();
 
-#if defined(DXR_ENABLED)
 
-    if (m_settings->m_dxrEnabled &&
-        m_drawRecords.size() > 0)
-    {
-        HRR(BuildAccelerationStructure(true));
-
-        PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
-
-        // Dispatch rays
-        CComPtr<ID3D12GraphicsCommandList6> commandList;
-        HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
-
-        // All updates to the CPU copy of the Shader Binding Table must be done before calling Commit.
-        m_shaderBindingTable.Commit();
-
-        D3D12_DISPATCH_RAYS_DESC dispatchRaysDesc = {};
-        dispatchRaysDesc.Width = (UINT)m_renderData->projectionData.screenWidth;
-        dispatchRaysDesc.Height = (UINT)m_renderData->projectionData.screenHeight;
-        dispatchRaysDesc.Depth = 1;
-        dispatchRaysDesc.RayGenerationShaderRecord = m_shaderBindingTable.GetRayGenerationRecord(0);
-        dispatchRaysDesc.MissShaderTable = m_shaderBindingTable.GetMissShaderTable();
-        dispatchRaysDesc.HitGroupTable = m_shaderBindingTable.GetHitGroupShaderTable();
-
-        UINT rootConstants[4] = { dispatchRaysDesc.Width, dispatchRaysDesc.Height, (UINT)D3D12_RAY_FLAG_NONE /*m_rayFlags*/, 0 /*m_holeSize*/ };
-
-        // VBWorld is already in NON_PIXEL_SHADER_RESOURCE state from BuildBLASandTLAS
-
-        commandList->SetComputeRootSignature(m_globalRootSignature);
-        commandList->SetDescriptorHeaps(1, m_descriptorHeap);
-        commandList->SetPipelineState1(m_raytracingStateObject);
-        commandList->SetComputeRootShaderResourceView(0, m_TLAS->GetGPUVirtualAddress());
-        commandList->SetComputeRoot32BitConstants(1, ARRAYSIZE(rootConstants), rootConstants, 0);
-        commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
-        commandList->SetComputeRootConstantBufferView(3, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
-        commandList->SetComputeRootConstantBufferView(4, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
-        commandList->SetComputeRootShaderResourceView(5, m_dxrMaterialBuffer->Resource()->GetGPUVirtualAddress());
-        commandList->SetComputeRootShaderResourceView(6, m_dxrGeometryInfoBuffer->Resource()->GetGPUVirtualAddress());
-        commandList->SetComputeRootShaderResourceView(7, m_VBWorld->GetGPUVirtualAddress());
-        commandList->SetComputeRootShaderResourceView(8, m_indexBuffer.buffer->GetGPUVirtualAddress());
-        commandList->SetComputeRootShaderResourceView(9, m_vertexBuffer.buffer->GetGPUVirtualAddress());
-        commandList->SetComputeRootShaderResourceView(10, m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress());
-        commandList->SetComputeRootShaderResourceView(11, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
-        commandList->SetComputeRootShaderResourceView(12, m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress());
-        commandList->SetComputeRootDescriptorTable(13, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
-
-        commandList->DispatchRays(&dispatchRaysDesc);
-    }
-
-
-#endif
 
 
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"RenderProlog");
@@ -2970,8 +2951,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     HRR(m_d3dDevice->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &m_framePipelineToken));
 #endif
 
-	// Ask Claude why
-    // Re-establish graphics root signature and descriptor heaps after DXR compute dispatch
+    // Establish graphics bindings for the scene pass.
     GetCommandList()->SetGraphicsRootSignature(m_rootSignature);
     ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
     GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
@@ -3084,6 +3064,83 @@ HRESULT RenderPlatform12::RenderPostProcess()
 {
     HRESULT hr = S_OK;
 
+#if defined(DXR_ENABLED)
+
+    if (m_dxrEnabledThisFrame &&
+        m_drawRecords.size() > 0)
+    {
+        HRR(BuildAccelerationStructure(true));
+
+        PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
+
+        // Dispatch rays
+        CComPtr<ID3D12GraphicsCommandList6> commandList;
+        HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
+
+        // All updates to the CPU copy of the Shader Binding Table must be done before calling Commit.
+        m_shaderBindingTable.Commit();
+
+        D3D12_DISPATCH_RAYS_DESC dispatchRaysDesc = {};
+        dispatchRaysDesc.Width = (UINT)m_renderData->projectionData.screenWidth;
+        dispatchRaysDesc.Height = (UINT)m_renderData->projectionData.screenHeight;
+        dispatchRaysDesc.Depth = 1;
+        dispatchRaysDesc.RayGenerationShaderRecord = m_shaderBindingTable.GetRayGenerationRecord(0);
+        dispatchRaysDesc.MissShaderTable = m_shaderBindingTable.GetMissShaderTable();
+        dispatchRaysDesc.HitGroupTable = m_shaderBindingTable.GetHitGroupShaderTable();
+
+        UINT rootConstants[4] = {
+            dispatchRaysDesc.Width,
+            dispatchRaysDesc.Height,
+            static_cast<UINT>(D3D12_RAY_FLAG_NONE),
+            static_cast<UINT>(m_dxrSkyInstance)
+        };
+
+        // VBWorld is already in NON_PIXEL_SHADER_RESOURCE state from BuildBLASandTLAS
+
+        commandList->SetComputeRootSignature(m_globalRootSignature);
+        commandList->SetDescriptorHeaps(1, m_descriptorHeap);
+        commandList->SetPipelineState1(m_raytracingStateObject);
+        commandList->SetComputeRootShaderResourceView(0, m_TLAS->GetGPUVirtualAddress());
+        commandList->SetComputeRoot32BitConstants(1, ARRAYSIZE(rootConstants), rootConstants, 0);
+        commandList->SetComputeRoot32BitConstants(1, 4, &m_renderData->clearColor, 4);
+        commandList->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrOut_UavHeapOffset));
+        commandList->SetComputeRootConstantBufferView(3, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
+        commandList->SetComputeRootConstantBufferView(4, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
+        commandList->SetComputeRootShaderResourceView(5, m_dxrMaterialBuffer->Resource()->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(6, m_dxrGeometryInfoBuffer->Resource()->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(7, m_VBWorld->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(8, m_indexBuffer.buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(9, m_vertexBuffer.buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(10, m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(11, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootShaderResourceView(12, m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress());
+        commandList->SetComputeRootDescriptorTable(13, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
+        commandList->SetComputeRootDescriptorTable(14, m_descriptorHeap.hGPU(DxrSky_SrvHeapOffset));
+
+        commandList->DispatchRays(&dispatchRaysDesc);
+
+        // Replace the main image before blur/UI; the DXR texture matches the target size and format.
+        ID3D12Resource* colorTarget = m_settings->m_enablePostProcessing
+            ? static_cast<ID3D12Resource*>(m_offscreenBuffer1)
+            : static_cast<ID3D12Resource*>(m_renderTargets[m_frameIndex]);
+        ID3D12Resource* dxrOutput = m_renderData->pDxrOutBuffer->uavOutput;
+        D3D12_RESOURCE_BARRIER toCopy[] = {
+            CD3DX12_RESOURCE_BARRIER::Transition(dxrOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
+            CD3DX12_RESOURCE_BARRIER::Transition(colorTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST)
+        };
+        GetCommandList()->ResourceBarrier(ARRAYSIZE(toCopy), toCopy);
+        GetCommandList()->CopyResource(colorTarget, dxrOutput);
+        D3D12_RESOURCE_BARRIER restore[] = {
+            CD3DX12_RESOURCE_BARRIER::Transition(dxrOutput, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
+            CD3DX12_RESOURCE_BARRIER::Transition(colorTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET),
+            CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+        };
+        GetCommandList()->ResourceBarrier(ARRAYSIZE(restore), restore);
+    }
+
+
+#endif
+
     //PIXEndEvent(GetCommandList()); // RenderScene
 
     // Incoming resource state when post processing is enabled
@@ -3186,34 +3243,7 @@ HRESULT RenderPlatform12::RenderDebugUI()
     }
 
 
-#if defined(DXR_ENABLED)
-    if (m_settings->m_dxrEnabled &&
-        m_settings->m_showDxrUav)
-    {
-        PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR rendered UAV");
 
-        //UINT clearColor[4] = { 200, 0, 0, 1 };
-        //GetCommandList()->ClearUnorderedAccessViewUint(m_descriptorHeap.hGPU(DxrVB_UavHeapOffset), m_nonVisibleDescriptorHeap.hCPU(DxrVB_UavHeapOffset),
-        //    m_renderData->pDxrOutBuffer->uavOutput, (UINT*) &clearColor, 0, nullptr);
-
-        GetCommandList()->RSSetViewports(1, &GetViewport());
-        GetCommandList()->RSSetScissorRects(1, &m_scissorRect);
-
-        // Change to DEPTH_WRITE.
-        CD3DX12_RESOURCE_BARRIER toReadBarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        GetCommandList()->ResourceBarrier(1, &toReadBarrier);
-
-        FLOAT blendFactor[4] = { 0.5f,0.5f,0.5f, 1.0f };
-        GetCommandList()->OMSetBlendFactor(blendFactor);
-
-        HRR(DrawScreenQuad(GetCommandList(), DxrOut_SrvHeapOffset, m_pipelineStateRGBFullScreenQuad));
-
-        D3D12_RESOURCE_BARRIER barriers[1];
-        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderData->pDxrOutBuffer->uavOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        GetCommandList()->ResourceBarrier(ARRAYSIZE(barriers), barriers);
-    }
-#endif
 
     if (imGuiInitialized)
     {
@@ -3409,4 +3439,3 @@ void PixelShader::Release()
     }
 #endif
 }
-

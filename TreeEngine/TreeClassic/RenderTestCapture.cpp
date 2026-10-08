@@ -55,8 +55,11 @@ void ParseRenderTestCommandLine()
     for (const auto& value : json.at("captures"))
     {
         RenderTestPoint point = { value.at("time").get<double>(), Wide(value.at("filename").get<std::string>()) };
+        point.mode = value.value("mode", parsed->mode);
         if (!std::isfinite(point.time) || point.time < 0 || point.filename.empty())
             throw std::runtime_error("Invalid capture time or filename");
+        if (point.mode != "raster" && point.mode != "raytracing")
+            throw std::runtime_error("Invalid capture mode");
         parsed->captures.push_back(point);
     }
     if (parsed->captures.empty()) throw std::runtime_error("No captures requested");
@@ -75,9 +78,10 @@ int RunRenderTestCapture(Game& game)
     {
         for (const auto& point : request->captures)
         {
+            game.ConfigureRenderTest(request->scene, point.mode == "raytracing", request->postProcessing);
             for (int frame = 0; frame <= request->warmupFrames; ++frame)
             {
-                std::cerr << "Rendering " << request->scene << " / " << request->mode
+                std::cerr << "Rendering " << request->scene << " / " << point.mode
                     << " at " << point.time << "s, frame " << frame << std::endl;
                 MSG message;
                 while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
@@ -90,7 +94,7 @@ int RunRenderTestCapture(Game& game)
                     frame == request->warmupFrames ? point.filename : std::wstring());
                 if (FAILED(result)) throw std::runtime_error("Rendering/capture failed, HRESULT=" + std::to_string(static_cast<unsigned>(result)));
             }
-            report["captures"].push_back({ { "time", point.time }, { "success", true } });
+            report["captures"].push_back({ { "time", point.time }, { "mode", point.mode }, { "success", true } });
         }
         report["success"] = true;
     }

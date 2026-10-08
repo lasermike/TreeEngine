@@ -60,6 +60,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
     shaderMaterial.textureCoordScale.y *= _params->textureCoordScale.y;
     Material* newMaterial = nullptr;
     renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, shaderMaterial, StockRenderState(), &newMaterial);
+    newMaterial->m_isSkybox = _params->cubeMap;
 
     Mesh* newMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_model->GetPrimitiveType());
@@ -95,4 +96,3 @@ HRESULT Primitive::ComputeConstants(IRenderFrame* pFrameConfig)
 
     return S_OK;
 }
-

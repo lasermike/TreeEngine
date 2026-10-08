@@ -15,6 +15,9 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 
 # Check the comparison math independently of the renderer.
 .\Tests\RenderRegression\test-image-comparison.ps1
+
+# Verify DXR on/off/on in one process, with and without postprocessing.
+.\Tests\RenderRegression\test-dxr-toggle.ps1
 ```
 
 Requires Visual Studio C++ build tools, the game's existing dependencies/resources,
@@ -35,9 +38,9 @@ simulation/shader time is set directly for each sample, with three warmup frames
 at that same time before capture. This tests the current time-driven scenes;
 future simulations that integrate state over elapsed frames will need a fixed
 step progression. Screenshots are captured from the completed D3D12 backbuffer
-before presentation. Raster uses the normal raster display. Raytracing uses the
-game's existing **Show DXR Debug UAV** display, including its compositing with
-the raster image; it does not change the renderer's presentation behavior.
+before presentation. Raster uses the normal raster display. Raytracing enables
+DXR and replaces the main color image with its output before postprocessing and
+UI. Gold from the previous DXR debug panel must be regenerated for this change.
 
 The comparison decodes PNGs and computes RGB RMS over all pixels and channels:
 `sqrt(mean((actual - gold)^2)) / 255`. Alpha is ignored. The default RMS tolerance
@@ -63,9 +66,17 @@ update only affected scenes/modes, and rerun comparison before committing gold.
 Keep baseline generation and comparison on the same GPU/driver/build settings
 where possible; different hardware can produce legitimate pixel differences.
 
-During initial validation, raster output was pixel-identical across runs. DXR
-exposed an out-of-bounds draw-record upload, which has been corrected by padding
-the CPU upload data to the destination buffer size. The Trees DXR output at
-5 seconds still varies between runs and remains a failure at the configured
-tolerance. It needs renderer investigation before the DXR suite can serve as a
-consistently green gate for scene conversions.
+During validation, DXR exposed an out-of-bounds draw-record upload, corrected by
+padding CPU upload data to the destination buffer size, and a compute shader
+draw-record layout that lacked the material texture-scale field. Both have been
+corrected. Fullscreen DXR captures are now pixel-identical across repeated runs
+on the validation machine.
+
+The native capture request also accepts an optional `mode` on each capture
+point, overriding the request mode. `test-dxr-toggle.ps1` uses this to switch
+raytracing/raster/raytracing in the same process at a fixed time, checks that the
+two DXR images match, and verifies that disabling DXR restores raster output.
+It covers scenes with and without a skybox, and compares the AI Tree skybox
+region against raster output to verify its texture and orientation.
+For scenes without a skybox, DXR ray misses use the scene's clear color. The
+toggle test also checks that this background matches raster output.

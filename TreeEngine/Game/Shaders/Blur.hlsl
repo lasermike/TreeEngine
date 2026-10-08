@@ -53,6 +53,7 @@ struct DrawRecord
     float4 matSpecular;
     float4 matReflect;
     float4 matFlags;
+    float4 matTextureCoordScale;
     int textureIndex;
 };
 

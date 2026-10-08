@@ -105,7 +105,7 @@ struct RenderData : SceneRenderSettings
 
     IInputManager*       inputManager;
 
-    RenderData() : time(0.0f), frame(0), m_dxrEnabled(false), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), inputManager(nullptr),
+    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), inputManager(nullptr),
         currentPass(RegularPass)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());
