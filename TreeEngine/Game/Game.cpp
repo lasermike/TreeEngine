@@ -247,7 +247,7 @@ void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bo
 {
     m_renderTestMode = true;
     m_renderTestScene = sceneName;
-    m_settings.m_showDxrUav = rayTracing;
+    m_settings.m_dxrEnabled = rayTracing;
     m_settings.m_enablePostProcessing = postProcessing;
     m_settings.m_showDebugUI = false;
     m_settings.m_showPerfGraph = false;
@@ -547,6 +547,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
         ImGui::Checkbox("Enable Post Processing", &m_settings.m_enablePostProcessing);
+        ImGui::Checkbox("Enable DXR", &m_settings.m_dxrEnabled);
         ImGui::Checkbox("Show Performance Graphs", &m_settings.m_showPerfGraph);
     }
 

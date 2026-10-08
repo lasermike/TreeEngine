@@ -77,7 +77,6 @@ struct RenderData : SceneRenderSettings
     // General
     float               time;
     UINT                frame;
-
     // Transformations
     ProjectionData      projectionData;
 
@@ -104,14 +103,9 @@ struct RenderData : SceneRenderSettings
     XMFLOAT4X4          lightProj;
     XMFLOAT4X4          shadowTransform;
 
-    //bool                wireframe;
-    //bool                showShadowBuffer;
-    //bool                showDxrUav;
-
-
     IInputManager*       inputManager;
 
-    RenderData() : time(0.0f), frame(0), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), inputManager(nullptr),
+    RenderData() : time(0.0f), frame(0), m_dxrEnabled(false), pShadowMap(nullptr), pDxrOutBuffer(nullptr), instanceData(nullptr), inputManager(nullptr),
         currentPass(RegularPass)
     {
         XMStoreFloat4x4(&view, XMMatrixIdentity());

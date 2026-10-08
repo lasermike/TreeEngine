@@ -51,7 +51,7 @@
     {
       "id": "tree",
       "type": "tree",
-      "transform": { "position": [0, 0.1, -2] },
+      "transform": { "position": [1, 0.1, -2] },
       "animationSpeed": 15,
       "depthLOD": 1,
       "trunkShape": "skinnedCylinder",

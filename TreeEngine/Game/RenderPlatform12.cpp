@@ -1288,8 +1288,8 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     UINT StartInstanceLocation) 
 {
 #if defined(DXR_ENABLED)
-
-    if (m_renderData->currentPass == ShadowMapPass)
+    if (m_settings->m_dxrEnabled
+        && m_renderData->currentPass == ShadowMapPass)
     {
         INT texIdx = (m_currentMaterial && m_currentMaterial->m_texture) ? (INT)m_currentMaterial->m_texture->textureSlot : -1;
         m_drawRecords.push_back(DrawRecord(StartIndexLocation,
@@ -2204,19 +2204,6 @@ bool RenderPlatform12::DrawRecord::operator==(const DrawRecord& dr) const
             inputLayout == dr.inputLayout;
 }
 
-void RenderPlatform12::HandleD3D12Error(HRESULT hr)
-{
-    if (hr == E_ABORT)
-    {
-        if (g_enableDXRValidation)
-        {
-            CComPtr<ID3D12Device5> device;
-            HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
-
-            NvAPI_D3D12_FlushRaytracingValidationMessages(device);
-        }
-    }
-}
 
 HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 {
@@ -2439,6 +2426,20 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 }
 
 #endif
+
+void RenderPlatform12::HandleD3D12Error(HRESULT hr)
+{
+    if (hr == E_ABORT)
+    {
+        if (g_enableDXRValidation)
+        {
+            CComPtr<ID3D12Device5> device;
+            HR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
+
+            NvAPI_D3D12_FlushRaytracingValidationMessages(device);
+        }
+    }
+}
 
 HRESULT RenderPlatform12::UpdateView(CBNeverChanges& cbNeverChanges, bool shadowPass)
 {
@@ -2911,7 +2912,8 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 
 #if defined(DXR_ENABLED)
 
-    if (m_drawRecords.size() > 0)
+    if (m_settings->m_dxrEnabled &&
+        m_drawRecords.size() > 0)
     {
         HRR(BuildAccelerationStructure(true));
 
@@ -3185,7 +3187,8 @@ HRESULT RenderPlatform12::RenderDebugUI()
 
 
 #if defined(DXR_ENABLED)
-    if (m_settings->m_showDxrUav)
+    if (m_settings->m_dxrEnabled &&
+        m_settings->m_showDxrUav)
     {
         PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Show DXR rendered UAV");
 
