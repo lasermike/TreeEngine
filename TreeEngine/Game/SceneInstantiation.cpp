@@ -46,7 +46,7 @@ namespace
         result.flags.z = definition.alphaClipThreshold;
         result.textureCoordScale = XMFLOAT4(definition.textureCoordScale.x, definition.textureCoordScale.y, 1, 1);
         return result;
-    }
+    } 
 
     std::wstring RuntimeTexture(const std::string& texture, const std::string& objectId)
     {
