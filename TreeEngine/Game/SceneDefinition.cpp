@@ -261,7 +261,11 @@ namespace SceneData
                     auto primitive = std::make_unique<PrimitiveDefinition>();
                     if (value.contains("shape")) primitive->shape = ReadShape(value["shape"], path + ".shape");
                     if (value.contains("cubeMap")) primitive->cubeMap = Boolean(value["cubeMap"], path + ".cubeMap");
-                    if (value.contains("material")) primitive->material = MaterialReference(value["material"], path + ".material", scene);
+                    if (value.contains("material"))
+                    {
+                        primitive->hasMaterial = true;
+                        primitive->material = MaterialReference(value["material"], path + ".material", scene);
+                    }
                     if (primitive->cubeMap && primitive->material.texture.empty()) Invalid(path + ".material.texture", "cube maps require a DDS texture");
                     if (primitive->cubeMap)
                     {
@@ -280,6 +284,7 @@ namespace SceneData
                         Invalid(path + ".trunkShape", "expected cylinder or skinnedCylinder");
                     if (value.contains("materials"))
                     {
+                        tree->hasMaterials = true;
                         Fields(value["materials"], path + ".materials", { "trunk", "leaf" });
                         if (value["materials"].contains("trunk")) tree->trunk = MaterialReference(value["materials"]["trunk"], path + ".materials.trunk", scene);
                         if (value["materials"].contains("leaf")) tree->leaf = MaterialReference(value["materials"]["leaf"], path + ".materials.leaf", scene);
@@ -287,6 +292,24 @@ namespace SceneData
                     if (!value.contains("generator")) Invalid(path + ".generator", "required property");
                     tree->generator = ReadGenerator(value["generator"], path + ".generator");
                     object = std::move(tree);
+                }
+                else if (type == "fixedTree")
+                {
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape" });
+                    auto tree = std::make_unique<FixedTreeDefinition>();
+                    if (value.contains("trunkShape")) tree->trunkShape = ReadShape(value["trunkShape"], path + ".trunkShape");
+                    if (tree->trunkShape != Shape::Cylinder && tree->trunkShape != Shape::SkinnedCylinder)
+                        Invalid(path + ".trunkShape", "expected cylinder or skinnedCylinder");
+                    object = std::move(tree);
+                }
+                else if (type == "graph")
+                {
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "dataFile" });
+                    auto graph = std::make_unique<GraphDefinition>();
+                    if (!value.contains("dataFile")) Invalid(path + ".dataFile", "required property");
+                    graph->dataFile = String(value["dataFile"], path + ".dataFile");
+                    if (graph->dataFile.empty()) Invalid(path + ".dataFile", "must not be empty");
+                    object = std::move(graph);
                 }
                 else Invalid(path + ".type", "unknown object type '" + type + "'");
                 CommonObject(value, path, *object);

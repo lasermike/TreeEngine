@@ -27,7 +27,7 @@ namespace SceneData
     };
 
     enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite };
-    enum class ObjectKind { Primitive, Tree };
+    enum class ObjectKind { Primitive, Tree, FixedTree, Graph };
     enum class SegmentLengthBehavior { Constant, RandomAddition };
 
     struct ObjectDefinition
@@ -47,6 +47,7 @@ namespace SceneData
         PrimitiveDefinition() : ObjectDefinition(ObjectKind::Primitive) {}
         Shape shape = Shape::Box;
         bool cubeMap = false;
+        bool hasMaterial = false;
         MaterialDefinition material;
     };
 
@@ -74,9 +75,22 @@ namespace SceneData
     {
         TreeDefinition() : ObjectDefinition(ObjectKind::Tree) {}
         Shape trunkShape = Shape::SkinnedCylinder;
+        bool hasMaterials = false;
         MaterialDefinition trunk;
         MaterialDefinition leaf;
         LSystemDefinition generator;
+    };
+
+    struct FixedTreeDefinition : ObjectDefinition
+    {
+        FixedTreeDefinition() : ObjectDefinition(ObjectKind::FixedTree) {}
+        Shape trunkShape = Shape::SkinnedCylinder;
+    };
+
+    struct GraphDefinition : ObjectDefinition
+    {
+        GraphDefinition() : ObjectDefinition(ObjectKind::Graph) {}
+        std::string dataFile;
     };
 
     struct DirectionalLightDefinition

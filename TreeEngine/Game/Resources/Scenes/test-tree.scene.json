@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "name": "Test Tree",
+  "camera": {
+    "position": [0, 1.5, -6]
+  },
+  "render": {
+    "clearColor": [0.8039216, 0.3607843, 0.3607843, 1]
+  },
+  "light": {
+    "ambient": [0.5, 0.5, 0.5, 1],
+    "diffuse": [1, 1, 1, 1],
+    "specular": [0.6, 0.6, 0.6, 1],
+    "direction": [-0.7, -0.7, 0.7]
+  },
+  "materials": {
+    "trunk": {
+      "ambient": [0.3, 0.3, 0.3, 1],
+      "diffuse": [0, 1, 0, 1],
+      "specular": [0.1, 0.1, 0.1, 1]
+    },
+    "needles": {
+      "ambient": [0.4, 0.4, 0.4, 1],
+      "diffuse": [1, 1, 1, 1],
+      "specular": [0, 0.5, 0.1, 1],
+      "texture": "FirBranchWithNeedles.dds",
+      "alphaClipThreshold": 0.6
+    }
+  },
+  "objects": [
+    {
+      "id": "test-tree",
+      "type": "tree",
+      "transform": {
+        "position": [0, 0.5, 0],
+        "scale": [0.5, 0.5, 0.5]
+      },
+      "animationSpeed": 5,
+      "depthLOD": 1,
+      "trunkShape": "skinnedCylinder",
+      "materials": { "trunk": "trunk", "leaf": "needles" },
+      "generator": {
+        "axiom": "F(20) A",
+        "angle": 0.7853981633974483,
+        "iterations": 1,
+        "segmentLength": 0.01,
+        "thickness": 0.04,
+        "rules": [
+          {
+            "input": "A",
+            "output": "F(10) [z(0.33074) F(25) z(1) F(30) A] [Z(0.33074)F(50)A] "
+          }
+        ]
+      }
+    }
+  ]
+}

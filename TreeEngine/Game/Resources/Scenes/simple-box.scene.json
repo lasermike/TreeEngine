@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "name": "Simple Box",
+  "camera": {
+    "position": [0, 1.5, -6]
+  },
+  "light": {
+    "ambient": [0.2, 0.2, 0.2, 1],
+    "diffuse": [0.7, 0.7, 0.6, 1],
+    "specular": [0.8, 0.8, 0.7, 1],
+    "direction": [-0.57735, -0.57735, 0.57735]
+  },
+  "objects": [
+    {
+      "id": "cylinder",
+      "type": "primitive",
+      "shape": "cylinder",
+      "transform": {
+        "position": [0, 1, 0],
+        "scale": [0.5, 0.5, 0.5],
+        "rotation": [0.4082483, 0.4082483, 0.4082483, 0.7071068]
+      }
+    },
+    {
+      "id": "box",
+      "type": "primitive",
+      "shape": "box"
+    }
+  ]
+}

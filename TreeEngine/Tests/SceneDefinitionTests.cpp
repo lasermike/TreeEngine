@@ -11,7 +11,7 @@ namespace
     using Json = nlohmann::json;
     int checks = 0;
 
-    std::string DefaultSceneFilename()
+    std::string TestDataFilename(const std::string& basename)
     {
         char executable[32768] = {};
         DWORD length = GetModuleFileNameA(nullptr, executable, static_cast<DWORD>(sizeof(executable)));
@@ -21,7 +21,7 @@ namespace
         auto slash = filename.find_last_of("/\\");
         if (slash == std::string::npos)
             throw std::runtime_error("Test executable path has no directory");
-        return filename.substr(0, slash + 1) + "TestData/ai-tree.scene.json";
+        return filename.substr(0, slash + 1) + "TestData/" + basename;
     }
 
     void Check(bool condition, const char* description)
@@ -55,6 +55,7 @@ int main(int argc, char** argv)
         Check(defaults.objects[0]->transform.scale.x == 1 && defaults.objects[0]->transform.rotation.w == 1, "transform default is not identity");
         Check(defaults.objects[0]->textureCoordScale.x == 1 && defaults.objects[0]->textureCoordScale.y == 1, "object UV default is not identity");
         auto& primitive = static_cast<SceneData::PrimitiveDefinition&>(*defaults.objects[0]);
+        Check(!primitive.hasMaterial, "omitted primitive material was marked as authored");
         Check(primitive.material.textureCoordScale.x == 1 && primitive.material.textureCoordScale.y == 1, "material UV default is not identity");
         Check(defaults.useShadowMaps && defaults.useAlphaBlendedRenderTarget, "render defaults changed");
 
@@ -65,6 +66,7 @@ int main(int argc, char** argv)
         authored["objects"][0]["transform"] = { { "rotationDegrees", { 0, 0, 90 } }, { "scale", { -30, -30, -30 } } };
         auto named = SceneData::ParseScene(authored.dump(), "test.scene.json");
         auto& ground = static_cast<SceneData::PrimitiveDefinition&>(*named.objects[0]);
+        Check(ground.hasMaterial, "authored primitive material was marked as omitted");
         Check(ground.material.texture == "grid.png", "material reference did not resolve");
         Check(ground.material.textureCoordScale.x == 2 && ground.textureCoordScale.y == 5, "authored texture scales lost");
         Check(std::abs(ground.transform.rotation.z - 0.70710678f) < 1e-6f, "degree rotation was not converted");
@@ -109,6 +111,7 @@ int main(int argc, char** argv)
         treeJson["objects"][0] = Json::parse(R"({"id":"tree","type":"tree","generator":{"axiom":"F","rules":[{"input":"F","output":"F[+F]","iterations":2}],"segmentLengthBehavior":"randomAddition"}})");
         auto treeScene = SceneData::ParseScene(treeJson.dump(), "test.scene.json");
         auto& tree = static_cast<SceneData::TreeDefinition&>(*treeScene.objects[0]);
+        Check(!tree.hasMaterials, "omitted tree materials were marked as authored");
         Check(tree.generator.rules[0].iterations == 2, "per-rule iterations lost");
         Check(tree.generator.segmentLengthBehavior == SceneData::SegmentLengthBehavior::RandomAddition, "named segment behavior lost");
         bad = treeJson; bad["objects"][0]["generator"]["iterations"] = 1.5;
@@ -118,18 +121,55 @@ int main(int argc, char** argv)
         bad = treeJson; bad["objects"][0]["generator"]["segmentLength"] = 0;
         Reject(bad.dump(), "segmentLength");
 
-        const std::string filename = argc > 1 ? argv[1] : DefaultSceneFilename();
+        auto fixedTreeJson = minimal;
+        fixedTreeJson["objects"][0] = Json::parse(R"({"id":"fixed","type":"fixedTree","trunkShape":"cylinder"})");
+        auto fixedTreeScene = SceneData::ParseScene(fixedTreeJson.dump(), "test.scene.json");
+        Check(fixedTreeScene.objects[0]->kind == SceneData::ObjectKind::FixedTree, "fixed tree object kind changed");
+        Check(static_cast<SceneData::FixedTreeDefinition&>(*fixedTreeScene.objects[0]).trunkShape == SceneData::Shape::Cylinder,
+            "fixed tree trunk shape changed");
+        bad = fixedTreeJson; bad["objects"][0]["trunkShape"] = "box";
+        Reject(bad.dump(), "trunkShape");
+
+        auto graphJson = minimal;
+        graphJson["objects"][0] = Json::parse(R"({"id":"graph","type":"graph","dataFile":"graphdata.txt"})");
+        auto graphScene = SceneData::ParseScene(graphJson.dump(), "test.scene.json");
+        Check(graphScene.objects[0]->kind == SceneData::ObjectKind::Graph, "graph object kind changed");
+        Check(static_cast<SceneData::GraphDefinition&>(*graphScene.objects[0]).dataFile == "graphdata.txt", "graph data file changed");
+        bad = graphJson; bad["objects"][0].erase("dataFile");
+        Reject(bad.dump(), "dataFile");
+        bad = graphJson; bad["objects"][0]["dataFile"] = "";
+        Reject(bad.dump(), "dataFile");
+
+        const std::string filename = argc > 1 ? argv[1] : TestDataFilename("ai-tree.scene.json");
         auto ai = SceneData::ReadScene(filename);
         Check(ai.name == "AI Tree" && ai.objects.size() == 6, "AI tree scene topology changed");
         auto& aiTree = static_cast<SceneData::TreeDefinition&>(*ai.objects[0]);
         Check(aiTree.generator.iterations == 14 && aiTree.generator.rules.size() == 2, "AI tree generator changed");
         Check(aiTree.generator.axiom == "F(50) T(100,.1)", "AI tree axiom changed");
-        Check(aiTree.trunk.texture == "Bark_0005_diffuse.dds" && aiTree.leaf.alphaClipThreshold == 1, "tree material settings changed");
+        Check(aiTree.trunk.texture == "Bark_0005_diffuse.dds" && aiTree.leaf.alphaClipThreshold == 0.6f, "tree material settings changed");
         auto& aiGround = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
         Check(aiGround.material.texture == "grid3.png" && aiGround.textureCoordScale.x == 4 && aiGround.textureCoordScale.y == 4, "ground texture or tiling changed");
         auto& sky = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[2]);
         Check(sky.cubeMap && sky.material.texture == "coords.dds", "skybox changed");
         Check(ai.camera.rotation.w == 0 && ai.camera.position.z == 2.05959034f, "legacy camera changed");
+
+        const std::pair<const char*, const char*> catalogScenes[] = {
+            { "tree.scene.json", "Tree" },
+            { "test-tree.scene.json", "Test Tree" },
+            { "sea.scene.json", "Sea" },
+            { "curves.scene.json", "Curves" },
+            { "trees.scene.json", "Trees" },
+            { "test-block.scene.json", "Test Block" },
+            { "graph.scene.json", "Graph" },
+            { "simple-box.scene.json", "Simple Box" },
+            { "ai-tree.scene.json", "AI Tree" }
+        };
+        for (const auto& catalogScene : catalogScenes)
+        {
+            auto scene = SceneData::ReadScene(TestDataFilename(catalogScene.first));
+            Check(scene.name == catalogScene.second, "catalog scene name changed");
+        }
+
         bool missingFileRejected = false;
         try { SceneData::ReadScene("does-not-exist.scene.json"); }
         catch (const std::runtime_error& e) { missingFileRejected = std::string(e.what()).find("cannot open") != std::string::npos; }

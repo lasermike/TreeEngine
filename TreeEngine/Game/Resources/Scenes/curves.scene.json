@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "name": "Curves",
+  "camera": {
+    "position": [0, 1.5, -6]
+  },
+  "render": {
+    "clearColor": [1, 1, 1, 1]
+  },
+  "light": {
+    "ambient": [0.5, 0.5, 0.5, 1],
+    "diffuse": [1, 1, 1, 1],
+    "specular": [0.6, 0.6, 0.6, 1],
+    "direction": [-0.7, -0.7, 0.7]
+  },
+  "materials": {
+    "curve": {
+      "ambient": [0.3, 0.3, 0.3, 1],
+      "diffuse": [1, 1, 1, 1],
+      "specular": [0.1, 0.1, 0.1, 1],
+      "texture": "urchinskin.dds"
+    },
+    "leaf": {
+      "diffuse": [0, 0.5019608, 0, 1],
+      "specular": [0, 0.3, 0.1, 1]
+    },
+    "ground": {
+      "ambient": [0.9, 0.9, 0.9, 1],
+      "diffuse": [1, 1, 1, 1],
+      "specular": [0.3, 0.3, 0.3, 4]
+    }
+  },
+  "objects": [
+    {
+      "id": "koch",
+      "type": "tree",
+      "transform": {
+        "position": [-1, 1, 2],
+        "scale": [3, 3, 3],
+        "rotationDegrees": [0, 90, 0]
+      },
+      "animationSpeed": 150,
+      "depthLOD": 1,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "curve", "leaf": "leaf" },
+      "generator": {
+        "axiom": "F(0.1) x F(0.1) x F(0.1) x F(0.1) x F(0.1) x F(0.1) x",
+        "angle": 1.047198,
+        "iterations": 3,
+        "segmentLength": 6,
+        "thickness": 0.01,
+        "rules": [
+          {
+            "input": "F(a)",
+            "output": "F(a*0.33) X F(a*0.33) x x F(a*0.33) X F(a*0.33)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hilbert-1",
+      "type": "tree",
+      "transform": { "position": [0, 1, 0] },
+      "animationSpeed": 2,
+      "depthLOD": 1,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "curve", "leaf": "leaf" },
+      "generator": {
+        "axiom": "A",
+        "angle": 1.5707963267948966,
+        "iterations": 1,
+        "segmentLength": 0.1,
+        "thickness": 0.01,
+        "initialDirection": [1, 0, 0],
+        "rules": [
+          {
+            "input": "A",
+            "output": "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hilbert-2",
+      "type": "tree",
+      "transform": { "position": [-1, 1, 0] },
+      "animationSpeed": 15,
+      "depthLOD": 1,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "curve", "leaf": "leaf" },
+      "generator": {
+        "axiom": "A",
+        "angle": 1.5707963267948966,
+        "iterations": 2,
+        "segmentLength": 0.1,
+        "thickness": 0.01,
+        "initialDirection": [1, 0, 0],
+        "rules": [
+          {
+            "input": "A",
+            "output": "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hilbert-3",
+      "type": "tree",
+      "transform": { "position": [-2, 1, 0] },
+      "animationSpeed": 30,
+      "depthLOD": 1,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "curve", "leaf": "leaf" },
+      "generator": {
+        "axiom": "A",
+        "angle": 1.5707963267948966,
+        "iterations": 3,
+        "segmentLength": 0.1,
+        "thickness": 0.01,
+        "initialDirection": [1, 0, 0],
+        "rules": [
+          {
+            "input": "A",
+            "output": "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hilbert-4",
+      "type": "tree",
+      "transform": { "position": [-4, 1, 0] },
+      "animationSpeed": 100,
+      "depthLOD": 1,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "curve", "leaf": "leaf" },
+      "generator": {
+        "axiom": "A",
+        "angle": 1.5707963267948966,
+        "iterations": 4,
+        "segmentLength": 0.1,
+        "thickness": 0.01,
+        "initialDirection": [1, 0, 0],
+        "rules": [
+          {
+            "input": "A",
+            "output": "YXAFYXAFAzFYxxAFAyFZxxAFAzFxAzx"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "scale": [25, 0.01, 25] },
+      "material": "ground"
+    }
+  ]
+}

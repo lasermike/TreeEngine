@@ -5,8 +5,11 @@
 #include "SceneRoot.h"
 #include "Primitive.h"
 #include "Tree.h"
+#include "Graph.h"
 #include "LSystemModelGenerator.h"
 #include "Player.h"
+#include <fstream>
+#include <sstream>
 #include <stdexcept>
 
 namespace
@@ -73,6 +76,52 @@ namespace
         throw std::runtime_error("Object '" + objectId + "': texture '" + texture + "' was not found");
     }
 
+    std::string RuntimeDataFile(const std::string& filename, const std::string& objectId)
+    {
+        std::vector<std::string> candidates = { filename, "Game/" + filename, "Game/Resources/" + filename };
+        char executable[MAX_PATH] = {};
+        DWORD length = GetModuleFileNameA(nullptr, executable, MAX_PATH);
+        if (length && length < MAX_PATH)
+        {
+            std::string directory(executable);
+            auto slash = directory.find_last_of("/\\");
+            if (slash != std::string::npos)
+                candidates.push_back(directory.substr(0, slash + 1) + filename);
+        }
+        for (const auto& candidate : candidates)
+            if (std::ifstream(candidate)) return candidate;
+        throw std::runtime_error("Object '" + objectId + "': data file '" + filename + "' was not found");
+    }
+
+    std::vector<XMFLOAT2> LoadGraphPoints(const std::string& filename, const std::string& objectId)
+    {
+        std::ifstream input(RuntimeDataFile(filename, objectId));
+        std::vector<XMFLOAT2> values;
+        float maxX = 0;
+        std::string line;
+        while (std::getline(input, line))
+        {
+            std::stringstream fields(line);
+            std::string time;
+            std::string value;
+            if (!std::getline(fields, time, ',') || !std::getline(fields, value, ','))
+                throw std::runtime_error("Object '" + objectId + "': malformed graph row");
+            float x = static_cast<float>(std::atof(time.c_str()));
+            float y = static_cast<float>(std::atof(value.c_str()));
+            values.emplace_back(x, y);
+            maxX = std::max(maxX, x);
+        }
+        if (values.size() < 2 || maxX <= 0 || values[1].x == 0)
+            throw std::runtime_error("Object '" + objectId + "': graph data requires at least two positive time samples");
+
+        std::vector<XMFLOAT2> points;
+        float xScale = 10.0f / maxX;
+        float xDelta = .5f / values[1].x;
+        for (size_t i = 1; i < values.size(); ++i)
+            points.emplace_back(values[i].x * xScale, values[i].y * xDelta);
+        return points;
+    }
+
     void CommonParameters(const SceneData::ObjectDefinition& definition, WorldObjectParams& parameters)
     {
         parameters.name = definition.id;
@@ -103,22 +152,28 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             CommonParameters(primitive, *parameters);
             parameters->primitiveType = RuntimeShape(primitive.shape);
             parameters->cubeMap = primitive.cubeMap;
-            parameters->textureFilename.push_back(RuntimeTexture(primitive.material.texture, primitive.id));
-            parameters->materials.push_back(RuntimeMaterial(primitive.material));
+            if (primitive.hasMaterial)
+            {
+                parameters->textureFilename.push_back(RuntimeTexture(primitive.material.texture, primitive.id));
+                parameters->materials.push_back(RuntimeMaterial(primitive.material));
+            }
             auto runtime = std::make_unique<Primitive>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));
         }
-        else
+        else if (object->kind == SceneData::ObjectKind::Tree)
         {
             const auto& tree = static_cast<const SceneData::TreeDefinition&>(*object);
             auto parameters = std::make_unique<WorldObjectParameters<LSystemParams>>(LSystemGeneratorType);
             CommonParameters(tree, *parameters);
             parameters->meshes.push_back(RuntimeShape(tree.trunkShape));
-            parameters->textureFilename.push_back(RuntimeTexture(tree.trunk.texture, tree.id));
-            parameters->textureFilename.push_back(RuntimeTexture(tree.leaf.texture, tree.id));
-            parameters->materials.push_back(RuntimeMaterial(tree.trunk));
-            parameters->materials.push_back(RuntimeMaterial(tree.leaf));
+            if (tree.hasMaterials)
+            {
+                parameters->textureFilename.push_back(RuntimeTexture(tree.trunk.texture, tree.id));
+                parameters->textureFilename.push_back(RuntimeTexture(tree.leaf.texture, tree.id));
+                parameters->materials.push_back(RuntimeMaterial(tree.trunk));
+                parameters->materials.push_back(RuntimeMaterial(tree.leaf));
+            }
             auto& generator = parameters->GetGeneratorParameters();
             generator._axiom = tree.generator.axiom;
             generator._constants = tree.generator.constants;
@@ -131,6 +186,26 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                 generator.SegmentLength = RandomSegmentLength;
             for (const auto& rule : tree.generator.rules)
                 generator._rules.emplace_back(rule.input.c_str(), rule.iterations, rule.output.c_str());
+            auto runtime = std::make_unique<Tree>(parameters.get());
+            parameters.release();
+            objects.push_back(std::move(runtime));
+        }
+        else if (object->kind == SceneData::ObjectKind::FixedTree)
+        {
+            const auto& tree = static_cast<const SceneData::FixedTreeDefinition&>(*object);
+            auto parameters = std::make_unique<WorldObjectParams>(FixedTreeGeneratorType);
+            CommonParameters(tree, *parameters);
+            parameters->meshes.push_back(RuntimeShape(tree.trunkShape));
+            auto runtime = std::make_unique<Tree>(parameters.get());
+            parameters.release();
+            objects.push_back(std::move(runtime));
+        }
+        else
+        {
+            const auto& graph = static_cast<const SceneData::GraphDefinition&>(*object);
+            auto parameters = std::make_unique<WorldObjectParameters<GraphParams>>(GraphGeneratorType);
+            CommonParameters(graph, *parameters);
+            parameters->GetGeneratorParameters().points = LoadGraphPoints(graph.dataFile, graph.id);
             auto runtime = std::make_unique<Tree>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));

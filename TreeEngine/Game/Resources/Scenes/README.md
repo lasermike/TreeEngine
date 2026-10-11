@@ -1,12 +1,12 @@
 # Scene definitions
 
-`ai-tree.scene.json` replaces the former `LoadAITree` setup. The AI Tree entry
-is still scene index 8. The other eight entries currently use their C++ loaders.
-The catalog in `GameLoader.cpp` determines the scene count and display names.
+All nine catalog scenes are defined by `*.scene.json` files in this directory.
+The catalog in `GameLoader.cpp` determines scene order, loader IDs, display names,
+and filenames. Existing scene indexes and loader IDs remain unchanged.
 
 Edit the source JSON here and build TreeClassic to copy it into the executable's
 `Scenes` folder. During development you can also edit the deployed JSON directly
-and cycle away from AI Tree and back to reload it. Live rule editing continues
+and cycle away from a scene and back to reload it. Live rule editing continues
 to affect runtime parameters; it does not save changes to JSON.
 
 The loader accepts a catalog name (`AI Tree`), loader ID (`LoadAITree`), or JSON
@@ -17,7 +17,7 @@ reported to the debugger and returned to application initialization.
 Scene loaders produce a `SceneRenderSettings` value containing background and
 lighting values. On successful activation, `RenderManager::ApplySceneSettings`
 applies it without changing renderer resources or frame state. Scene time resets
-separately during activation. Both JSON and legacy C++ scenes use this path.
+separately during activation. All catalog scenes use this path.
 
 ## Structure
 
@@ -50,7 +50,13 @@ The default shape is `box`. Cube maps require a DDS texture.
 
 A `tree` supports `trunkShape` (`skinnedCylinder` by default, or `cylinder`),
 named `materials.trunk` and `materials.leaf`, and a required `generator`.
-The generator is currently an L-system; fixed trees and graphs remain legacy.
+The generator is currently an L-system.
+
+A `fixedTree` creates the existing fixed procedural tree generator and supports
+`trunkShape` (`skinnedCylinder` by default, or `cylinder`).
+
+A `graph` requires `dataFile`, a CSV file containing the graph samples. Its
+normalization matches the former `LoadGraph` behavior.
 
 ## Materials
 
@@ -93,13 +99,14 @@ random value from zero to `0.2`, matching the existing sea-scene callback.
 `SceneDefinitionTests` is included in `TreeEngine.sln` and builds with the
 desktop Debug/x64 and Debug12/x64 solution configurations. In Visual Studio,
 set it as the startup project and use Start Without Debugging (Ctrl+F5).
-The build copies the AI Tree JSON into `Tests/build/TestData`. The test executable
+The build copies all catalog JSON into `Tests/build/TestData`. The test executable
 locates that data relative to itself and can run from any working directory.
 
 From the repository workspace, build `Tests/SceneDefinitionTests.vcxproj` with
 MSBuild (`Debug`, `x64`) and run `Tests/build/SceneDefinitionTests.exe`.
 The tests exercise defaults, references, transforms, rule settings, malformed
-input, and preservation of the AI Tree scene data.
+input, material omission semantics, fixed trees, graphs, every catalog scene,
+and preservation of the AI Tree scene data.
 
 The JSON parser is the vendored nlohmann/json 3.11.3 single header under
 `Game/ThirdParty/nlohmann`, with its MIT license.

@@ -33,13 +33,14 @@
   <ItemGroup>
     <ClCompile Include="SceneDefinitionTests.cpp" />
     <ClCompile Include="..\Game\SceneDefinition.cpp" />
-    <None Include="..\Game\Resources\Scenes\ai-tree.scene.json" />
+    <SceneJson Include="..\Game\Resources\Scenes\*.scene.json" />
+    <None Include="@(SceneJson)" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets" />
   <Target Name="CopySceneTestData" AfterTargets="Build">
-    <Copy SourceFiles="$(ProjectDir)..\Game\Resources\Scenes\ai-tree.scene.json"
-          DestinationFiles="$(OutDir)TestData\ai-tree.scene.json"
+    <Copy SourceFiles="@(SceneJson)"
+          DestinationFolder="$(OutDir)TestData\"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

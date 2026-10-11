@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "name": "Sea",
+  "camera": {
+    "position": [-4, 1.5, -4],
+    "rotationDegrees": [0, 45, 0]
+  },
+  "light": {
+    "ambient": [0.5, 0.5, 0.5, 1],
+    "diffuse": [1, 1, 1, 1],
+    "specular": [0.6, 0.6, 0.6, 1],
+    "direction": [0, -0.7, 0.7]
+  },
+  "materials": {
+    "urchin": {
+      "ambient": [0.3, 0.3, 0.3, 1],
+      "diffuse": [1, 1, 1, 1],
+      "specular": [0.1, 0.1, 0.1, 1],
+      "texture": "urchinskin.dds"
+    },
+    "leaf": {
+      "diffuse": [0, 0.5019608, 0, 1],
+      "specular": [0, 0.3, 0.1, 1]
+    },
+    "seafloor": {
+      "ambient": [0.3, 0.3, 0.3, 1],
+      "diffuse": [1, 1, 1, 1],
+      "specular": [0.3, 0.3, 0.3, 4],
+      "texture": "undersea.dds"
+    }
+  },
+  "objects": [
+    {
+      "id": "urchin",
+      "type": "tree",
+      "transform": {
+        "position": [0.5, 0.5, 0],
+        "rotationDegrees": [0, 57.2957795, 0]
+      },
+      "animationSpeed": 4,
+      "depthLOD": 1,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "urchin", "leaf": "leaf" },
+      "generator": {
+        "axiom": "F Z F",
+        "angle": 0.453972,
+        "iterations": 4,
+        "segmentLength": 0.28,
+        "thickness": 0.02,
+        "segmentLengthBehavior": "randomAddition",
+        "rules": [
+          {
+            "input": "F",
+            "output": "F [z F][Z F][X y F z F][x Y F]"
+          }
+        ]
+      }
+    },
+    {
+      "id": "seafloor",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "scale": [25, 0.01, 25] },
+      "material": "seafloor"
+    }
+  ]
+}

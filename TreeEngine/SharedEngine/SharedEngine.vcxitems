@@ -38,7 +38,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneRenderSettings.h" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
-    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\ai-tree.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\*.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\README.md" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\buildShaders.bat" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\commonshader.bat" />

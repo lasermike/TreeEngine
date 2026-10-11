@@ -768,10 +768,10 @@ void LoadTrees2(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* p
 void LoadTrees3(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
 {
     // ?:A 
-    // p1 :A?[&FL!A]/////’[&FL!A]///////’[&FL!A] 
+    // p1 :A?[&FL!A]/////ï¿½[&FL!A]///////ï¿½[&FL!A]
     // p2 :F? S ///// F 
     // p3 :S? FL 
-    // p4 :L? [’’’??{-f+f+f-|-f+f+f}]
+    // p4 :L? [ï¿½ï¿½ï¿½??{-f+f+f-|-f+f+f}]
 
     // INCOMPLETE TREE!
     WorldObjectParameters<LSystemParams>* params5 = new WorldObjectParameters<LSystemParams>(LSystemGeneratorType);
@@ -781,11 +781,11 @@ void LoadTrees3(SceneRoot* scene, SceneRenderSettings* renderSettings, Player* p
     params5->GetGeneratorParameters()._constants = "";
     params5->GetGeneratorParameters()._axiom = "A";
     params5->GetGeneratorParameters()._rules.push_back(Rule("A", "+++&&&[/FLA]---&&&[/FLA]+++&&&[/FLA]"));
-    //params5->GetGeneratorParameters()._rules.push_back(Rule("A", "[&FL!A]/////’[&FL!A]///////’[&FL!A]"));
+    //params5->GetGeneratorParameters()._rules.push_back(Rule("A", "[&FL!A]/////ï¿½[&FL!A]///////ï¿½[&FL!A]"));
     params5->GetGeneratorParameters()._rules.push_back(Rule("F", "S----F"));
     params5->GetGeneratorParameters()._rules.push_back(Rule("S", "FL"));
-    ////params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’^^f]"));
-    ////params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[’’’??{-f+f+f-|-f+f+f}]"));
+    ////params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[ï¿½ï¿½ï¿½^^f]"));
+    ////params5->GetGeneratorParameters()._rules.push_back(Rule("L", "[ï¿½ï¿½ï¿½??{-f+f+f-|-f+f+f}]"));
     params5->GetGeneratorParameters()._angle = 0.1963495f;
     params5->GetGeneratorParameters()._numIterations = 1;
     params5->GetGeneratorParameters()._segmentLength = .1f;
@@ -862,25 +862,43 @@ void GameLoader::Regenerate(SceneRoot* pScene)
 
 namespace
 {
-    using SceneLoader = void (*)(SceneRoot*, SceneRenderSettings*, Player*, GameData*);
     struct SceneEntry
     {
         const char* id;
         const char* name;
-        SceneLoader load;
+        const char* filename;
     };
 
     const SceneEntry sceneCatalog[] = {
-        { "LoadTreeScene", "Tree", LoadTreeScene },
-        { "LoadTestTree", "Test Tree", LoadTestTree },
-        { "LoadSeaScene", "Sea", LoadSeaScene },
-        { "LoadCurvesScene", "Curves", LoadCurvesScene },
-        { "LoadTrees", "Trees", LoadTrees },
-        { "LoadTestBlock", "Test Block", LoadTestBlock },
-        { "LoadGraph", "Graph", LoadGraph },
-        { "LoadSimpleBox", "Simple Box", LoadSimpleBox },
-        { "LoadAITree", "AI Tree", LoadAITree }
+        { "LoadTreeScene", "Tree", "Scenes/tree.scene.json" },
+        { "LoadTestTree", "Test Tree", "Scenes/test-tree.scene.json" },
+        { "LoadSeaScene", "Sea", "Scenes/sea.scene.json" },
+        { "LoadCurvesScene", "Curves", "Scenes/curves.scene.json" },
+        { "LoadTrees", "Trees", "Scenes/trees.scene.json" },
+        { "LoadTestBlock", "Test Block", "Scenes/test-block.scene.json" },
+        { "LoadGraph", "Graph", "Scenes/graph.scene.json" },
+        { "LoadSimpleBox", "Simple Box", "Scenes/simple-box.scene.json" },
+        { "LoadAITree", "AI Tree", "Scenes/ai-tree.scene.json" }
     };
+
+    void LoadJsonScene(
+        const char* filename,
+        SceneRoot* scene,
+        SceneRenderSettings* renderSettings,
+        Player* player,
+        GameData* gameData)
+    {
+        auto definition = SceneData::ReadScene(SceneFilename(filename));
+#if ALT_POSITION
+        if (std::string(filename) == "Scenes/tree.scene.json"
+            || std::string(filename) == "Scenes/ai-tree.scene.json")
+        {
+            definition.camera.position = XMFLOAT3(0, 1.5f, -5);
+            definition.camera.rotation = XMFLOAT4(0, 0, 0, 1);
+        }
+#endif
+        InstantiateScene(definition, *scene, *renderSettings, *player, *gameData);
+    }
 }
 
 int GameLoader::GetNumScenes()
@@ -904,7 +922,7 @@ HRESULT GameLoader::Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* re
     }
     try
     {
-        sceneCatalog[sceneNum].load(scene, renderSettings, player, gameData);
+        LoadJsonScene(sceneCatalog[sceneNum].filename, scene, renderSettings, player, gameData);
         renderSettings->clearColor = gameData->clearColor;
         return S_OK;
     }
@@ -932,8 +950,7 @@ HRESULT GameLoader::Load(const char* name, SceneRoot* scene, SceneRenderSettings
     }
     try
     {
-        auto definition = SceneData::ReadScene(SceneFilename(name));
-        InstantiateScene(definition, *scene, *renderSettings, *player, *gameData);
+        LoadJsonScene(name, scene, renderSettings, player, gameData);
         return S_OK;
     }
     catch (const std::exception& error)
