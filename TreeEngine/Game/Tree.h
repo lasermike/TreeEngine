@@ -1,9 +1,11 @@
 #pragma once
+#include <array>
 #include "pch.h"
 #include <vector>
 #include <queue>
 #include "WorldObject.h"
 #include "TreeModel.h"
+#include "TreeSegment.h"
 #include "Materials.h"
 
 typedef long HRESULT;
@@ -56,23 +58,9 @@ private:
         }
     };
 
-    InstanceDataArray                      m_logInstanceData;
-    InstanceDataArray                      m_twigInstanceData;
-    InstanceDataArray                      m_leafInstanceData;
-
-    RenderUnit*                            m_logUnit;
-    RenderUnit*                            m_twigUnit;
-    RenderUnit*                            m_leafUnit;
-
-    enum
-    {
-        LOG_BRANCH_TYPE,
-        TWIG_BRANCH_TYPE,
-        LEAF_BRANCH_TYPE,
-        MAX_BRANCH_TYPE
-    };
-
-    int                                    m_numInstancesPerType[MAX_BRANCH_TYPE];
+    std::array<InstanceDataArray, TreeSegmentCount> m_segmentInstanceData;
+    std::array<RenderUnit*, TreeSegmentCount> m_segmentRenderUnits = {};
+    std::array<int, TreeSegmentCount> m_numInstancesPerSegment = {};
 
     struct TreeFrame
     {
@@ -92,7 +80,7 @@ private:
     HRESULT ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderData);
     HRESULT ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* pRenderData, int startInstance);
 
-    bool IsTwig(TreeFrame& frame, RenderData* pRenderData);
+    TreeSegment SelectSegmentType(TreeFrame& frame, RenderData* pRenderData) const;
 
     HRESULT ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, TreeFrame& frame);
     HRESULT ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFrame& frame);
@@ -111,4 +99,3 @@ public:
     virtual unsigned int GetNumInstances();
     virtual unsigned int GetMaxInstances();
 };
-

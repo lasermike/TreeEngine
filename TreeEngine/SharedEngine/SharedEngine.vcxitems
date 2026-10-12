@@ -37,6 +37,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneRenderSettings.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\*.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\README.md" />

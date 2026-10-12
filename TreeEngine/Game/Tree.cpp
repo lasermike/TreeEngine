@@ -78,32 +78,32 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
         material.textureCoordScale.x *= _params->textureCoordScale.x;
         material.textureCoordScale.y *= _params->textureCoordScale.y;
     }
-    const std::wstring trunkMaterialName = L"trunk" + std::to_wstring(_id);
-    const std::wstring twigMaterialName = L"twig" + std::to_wstring(_id);
-    const std::wstring leafMaterialName = L"leaf" + std::to_wstring(_id);
-    Material* pTrunk = nullptr;
-    renderManager.CreateMaterial(trunkMaterialName.c_str(), _params->textureFilename[0].c_str(), vsFilename.c_str(), nullptr, shadowVsFilename.c_str(), nullptr, shaderMaterials[0], StockRenderState(), &pTrunk);
+    const std::wstring branchLOD0MaterialName = L"BranchLOD0_" + std::to_wstring(_id);
+    const std::wstring branchLOD1MaterialName = L"BranchLOD1_" + std::to_wstring(_id);
+    const std::wstring leafLOD0MaterialName = L"LeafLOD0_" + std::to_wstring(_id);
+    Material* pBranchLOD0 = nullptr;
+    renderManager.CreateMaterial(branchLOD0MaterialName.c_str(), _params->textureFilename[0].c_str(), vsFilename.c_str(), nullptr, shadowVsFilename.c_str(), nullptr, shaderMaterials[0], StockRenderState(), &pBranchLOD0);
     Mesh* pNewMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_params->meshes[0]);
-    renderManager.CreateMesh(L"trunk", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, inputLayout, &pNewMesh);
-    renderManager.ReserveRenderUnit(pTrunk, pNewMesh, this, &m_logUnit);
+    renderManager.CreateMesh(L"BranchLOD0", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, inputLayout, &pNewMesh);
+    renderManager.ReserveRenderUnit(pBranchLOD0, pNewMesh, this, &m_segmentRenderUnits[TreeSegmentIndex(TreeSegment::BranchLOD0)]);
 
-    Material* pTwig = nullptr;
-    renderManager.CreateMaterial(twigMaterialName.c_str(), _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, shaderMaterials[0], StockRenderState(), &pTwig);
+    Material* pBranchLOD1 = nullptr;
+    renderManager.CreateMaterial(branchLOD1MaterialName.c_str(), _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, shaderMaterials[0], StockRenderState(), &pBranchLOD1);
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
-    renderManager.CreateMesh(L"twig", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
-    renderManager.ReserveRenderUnit(pTwig, pNewMesh, this, &m_twigUnit);
+    renderManager.CreateMesh(L"BranchLOD1", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
+    renderManager.ReserveRenderUnit(pBranchLOD1, pNewMesh, this, &m_segmentRenderUnits[TreeSegmentIndex(TreeSegment::BranchLOD1)]);
 
-    StockRenderState leafState;
-    leafState.blendState = StockBlendStates::Overwrite;
-    Material* pLeaf = nullptr;
-    const wchar_t* leafTexture = _params->textureFilename.size() > 1 ? _params->textureFilename[1].c_str() : nullptr;
-    renderManager.CreateMaterial(leafMaterialName.c_str(), leafTexture, nullptr, nullptr, nullptr, nullptr, shaderMaterials[1], leafState, &pLeaf);
+    StockRenderState leafLOD0State;
+    leafLOD0State.blendState = StockBlendStates::Overwrite;
+    Material* pLeafLOD0 = nullptr;
+    const wchar_t* leafLOD0Texture = _params->textureFilename.size() > 1 ? _params->textureFilename[1].c_str() : nullptr;
+    renderManager.CreateMaterial(leafLOD0MaterialName.c_str(), leafLOD0Texture, nullptr, nullptr, nullptr, nullptr, shaderMaterials[1], leafLOD0State, &pLeafLOD0);
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Sprite);
-    renderManager.CreateMesh(L"leaf", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
-    renderManager.ReserveRenderUnit(pLeaf, pNewMesh, this, &m_leafUnit);
+    renderManager.CreateMesh(L"LeafLOD0", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
+    renderManager.ReserveRenderUnit(pLeafLOD0, pNewMesh, this, &m_segmentRenderUnits[TreeSegmentIndex(TreeSegment::LeafLOD0)]);
 
     return S_OK;
 }
@@ -130,10 +130,11 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         _extents[i] = XMFLOAT3(0, 0, 0);
     }
 
-    m_logInstanceData.clear();
-    m_twigInstanceData.clear();
-    m_leafInstanceData.clear();
-    ZeroMemory(m_numInstancesPerType, sizeof(m_numInstancesPerType));
+    for (auto& instanceData : m_segmentInstanceData)
+    {
+        instanceData.clear();
+    }
+    m_numInstancesPerSegment.fill(0);
 
     if (m_treeFrames.size() < _treeModel->treeData.numBranches)
     {
@@ -159,38 +160,21 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         ComputeBranchInstanceSkinningMatrix(frame, &pFrameConfig->GetRenderData(), startInstance);
     }
 
-    InstancedData* logBuffer = dataView + startInstance;
-    InstancedData* twigBuffer = dataView + startInstance + m_logInstanceData.size();
-    InstancedData* leafBuffer = dataView + startInstance + m_logInstanceData.size() + m_twigInstanceData.size();
-
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Compute Constants memcpy");
 
-    // TODO add to render unit specific data view
-    if (m_logInstanceData.size())
+    UINT segmentOffset = startInstance;
+    for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
     {
-        memcpy(logBuffer, &m_logInstanceData[0], m_logInstanceData.size() * sizeof(InstancedData));
+        InstanceDataArray& instanceData = m_segmentInstanceData[segmentIndex];
+        if (instanceData.size() > 0)
+        {
+            memcpy(dataView + segmentOffset, &instanceData[0], instanceData.size() * sizeof(InstancedData));
+        }
+
+        pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, segmentOffset, (UINT)instanceData.size());
+        segmentOffset += (UINT)instanceData.size();
     }
-
-    if (m_twigInstanceData.size() > 0)
-    {
-        memcpy(twigBuffer, &m_twigInstanceData[0], m_twigInstanceData.size() * sizeof(InstancedData));
-    }
-
-    if (m_leafInstanceData.size() > 0)
-    {
-        memcpy(leafBuffer, &m_leafInstanceData[0], m_leafInstanceData.size() * sizeof(InstancedData));
-    }
-
-    //int numInstances = m_logInstanceData.size() + m_twigInstanceData.size() + m_leafInstanceData.size();
-    //for (int i = 0; i < numInstances; i++)
-    //{
-    //    logBuffer[i].InstanceOffset = startInstance + i;
-    //}
-
-    pFrameConfig->SetInstances(m_logUnit, this, startInstance, (UINT)m_logInstanceData.size());
-    pFrameConfig->SetInstances(m_twigUnit, this, startInstance + (UINT)m_logInstanceData.size(), (UINT)m_twigInstanceData.size());
-    pFrameConfig->SetInstances(m_leafUnit, this, startInstance + (UINT)m_logInstanceData.size() + (UINT)m_twigInstanceData.size(), (UINT)m_leafInstanceData.size());
 
     PIXEndEvent();
 
@@ -212,10 +196,8 @@ HRESULT Tree::ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderDat
     switch (frame.branch->geometryType)
     {
     case Leaf:
-        m_numInstancesPerType[LEAF_BRANCH_TYPE]++;
-        break;
     case Stick:
-        m_numInstancesPerType[IsTwig(frame, pRenderData) ? TWIG_BRANCH_TYPE : LOG_BRANCH_TYPE]++;
+        m_numInstancesPerSegment[TreeSegmentIndex(SelectSegmentType(frame, pRenderData))]++;
         break;
     }
 
@@ -247,12 +229,18 @@ HRESULT Tree::ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderDat
     return S_OK;
 }
 
-bool Tree::IsTwig(TreeFrame& frame, RenderData* pRenderData)
+TreeSegment Tree::SelectSegmentType(TreeFrame& frame, RenderData* pRenderData) const
 {
-    bool isLog =  _params->depthLOD != -1 &&
-            (frame.branch->depth < _params->depthLOD || XMVectorGetX(XMVector3LengthSq(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)) < 100.0f);
+    if (frame.branch->geometryType == Leaf)
+    {
+        return TreeSegment::LeafLOD0;
+    }
 
-    return !isLog;
+    bool useBranchLOD0 = _params->depthLOD != -1 &&
+        (frame.branch->depth < _params->depthLOD ||
+            XMVectorGetX(XMVector3LengthSq(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)) < 100.0f);
+
+    return useBranchLOD0 ? TreeSegment::BranchLOD0 : TreeSegment::BranchLOD1;
 }
 
 HRESULT Tree::ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* pRenderData, int startInstance)
@@ -273,59 +261,39 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* 
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants push_back");
 
-    int instanceOffset = 0;
-    // Decide which geometry model to use
+    TreeSegment segment = SelectSegmentType(frame, pRenderData);
+    size_t segmentIndex = TreeSegmentIndex(segment);
+    int instanceOffset = startInstance;
+    for (size_t i = 0; i < segmentIndex; ++i)
+    {
+        instanceOffset += m_numInstancesPerSegment[i];
+    }
+    instanceOffset += m_segmentInstanceData[segmentIndex].size();
+
+    data.InstanceOffset = instanceOffset;
+    if (frame.parentFrame && frame.parentFrame->instanceOffset != 0xFFFFFFFF)
+    {
+        data.InstanceOffsetPrev = frame.parentFrame->instanceOffset;
+    }
+    else
+    {
+        data.InstanceOffsetPrev = instanceOffset;
+    }
+
+    if (segment == TreeSegment::BranchLOD0)
+    {
+        data.InstanceOffsetNext = frame.instanceOffsetNext;
+    }
+
+    m_segmentInstanceData[segmentIndex].push_back(data);
+
     switch (frame.branch->geometryType)
     {
     case Leaf:
-        instanceOffset = startInstance + m_numInstancesPerType[LOG_BRANCH_TYPE] + m_numInstancesPerType[TWIG_BRANCH_TYPE] + m_leafInstanceData.size();
-        data.InstanceOffset = instanceOffset;
-        if (frame.parentFrame && frame.parentFrame->instanceOffset != 0xFFFFFFFF)
-        {
-            data.InstanceOffsetPrev = frame.parentFrame->instanceOffset;
-        }
-        else
-        {
-            data.InstanceOffsetPrev = instanceOffset;
-        }
-
-        m_leafInstanceData.push_back(data);
         pRenderData->frameStats[NUM_LEAVES_STAT].stat++;
         break;
     case Stick:
-        if (IsTwig(frame, pRenderData))
-        {
-            instanceOffset = startInstance + m_numInstancesPerType[LOG_BRANCH_TYPE] + m_twigInstanceData.size();
-            data.InstanceOffset = instanceOffset;
-            if (frame.parentFrame && frame.parentFrame->instanceOffset != 0xFFFFFFFF)
-            {
-                data.InstanceOffsetPrev = frame.parentFrame->instanceOffset;
-            }
-            else
-            {
-                data.InstanceOffsetPrev = instanceOffset;
-            }
-            m_twigInstanceData.push_back(data);
-        }
-        else
-        {
-            instanceOffset = startInstance + m_logInstanceData.size();
-            data.InstanceOffset = instanceOffset;
-            if (frame.parentFrame && frame.parentFrame->instanceOffset != 0xFFFFFFFF)
-            {
-                data.InstanceOffsetPrev = frame.parentFrame->instanceOffset;
-            }
-            else
-            {
-                data.InstanceOffsetPrev = instanceOffset;
-            }
-
-            data.InstanceOffsetNext = frame.instanceOffsetNext;
-
-            m_logInstanceData.push_back(data);
-        }
         pRenderData->frameStats[NUM_STICKS_STAT].stat++;
-
         break;
     }
 
@@ -575,8 +543,14 @@ unsigned int Tree::GetNumInstances()
 {
     if (_treeModel)
     {
-        assert((UINT)_treeModel->treeData.numBranches >= m_logInstanceData.size() + m_twigInstanceData.size() + m_leafInstanceData.size());
-        return (unsigned int)(m_logInstanceData.size() + m_twigInstanceData.size() + m_leafInstanceData.size());
+        unsigned int numInstances = 0;
+        for (auto& instanceData : m_segmentInstanceData)
+        {
+            numInstances += instanceData.size();
+        }
+
+        assert((UINT)_treeModel->treeData.numBranches >= numInstances);
+        return numInstances;
     }
     else
         return 0;
