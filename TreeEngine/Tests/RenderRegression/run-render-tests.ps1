@@ -88,7 +88,7 @@ foreach ($scene in $selectedScenes) {
                 try { if ($actualImage.Width -ne $config.width -or $actualImage.Height -ne $config.height) { throw 'Captured dimensions differ from the request.' } } finally { $actualImage.Dispose() }
                 if ($UpdateGold) {
                     Copy-Item -LiteralPath $actual -Destination $gold -Force
-                    [IO.File]::WriteAllText($goldMetadata, $settingsText, $utf8)
+                    [IO.File]::WriteAllText($goldMetadata, $settingsText + [Environment]::NewLine, $utf8)
                     $row.status = 'gold-updated'
                 } else {
                     if (-not (Test-Path -LiteralPath $gold)) { throw 'Gold image is missing. Review captures and use -UpdateGold to establish a baseline.' }
