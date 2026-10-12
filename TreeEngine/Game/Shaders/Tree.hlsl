@@ -71,6 +71,18 @@ struct PS_INPUT
 
 static const bool TSLights = true;
 
+float3 SkinVertexPosition(VS_SKINNED_INPUT input)
+{
+    float4x3 world = (float4x3) input.World;
+    float3 position = mul(float4(input.Pos, 1.0f), world).xyz;
+
+    float4x3 worldPrev = (float4x3) InstanceBuffer[input.InstanceOffsetPrev].World;
+    float3 inputPosPrev = float3(input.Pos.x, 0.5f, input.Pos.z);
+    float3 positionPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
+
+    return lerp(positionPrev, position, input.InstanceWeight1);
+}
+
 //--------------------------------------------------------------------------------------
 // Skybox
 //--------------------------------------------------------------------------------------
@@ -149,24 +161,7 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     PS_INPUT output = (PS_INPUT)0;
 
     float4x3 world = (float4x3) input.World;
-    float4x3 worldPrev = (float4x3) InstanceBuffer[input.InstanceOffsetPrev].World;
-
-    //float4x4 world = float4x4(world2, float4(0,0,0,1));
-    //float4x4 worldPrev = float4x4(worldPrev2, float4(0, 0, 0, 1));
-
-
-    //float4x4 world = InstanceBuffer[input.InstanceOffset].World;
-    //float4x4 worldNext = InstanceBuffer[input.InstanceOffsetNext].World;
-
-    float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
-
-    float3 inputPosPrev = float3(input.Pos.x, 0.5f, input.Pos.z); // assume(!) skinned cylinder always 1 unit tall, centered on origin
-    float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
-
-    out0 = lerp(outPrev, out0, input.InstanceWeight1);  // cylinder has 3 ring layers.  instance weight is 0 in the bottom (y=-0.5) ring, 0.5 in the middle ring, and 1.0 in the top (y=1) ring
-                                                        // bottom ring is 100% this transform, top ring is 100% previous transform
-
-    output.PosW = out0;
+    output.PosW = SkinVertexPosition(input);
 
     // Write transformed vertex for DXR
     //outputVertices.Append(out0);
@@ -282,9 +277,7 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
 { 
     ShadowMapVertexOut output;
 
-    float4x4 world = input.World;
-    //float4x4 world = InstanceBuffer[input.InstanceOffset].World;
-    float4 pos = mul(float4(input.Pos, 1.0f), world);
+    float4 pos = float4(SkinVertexPosition(input), 1.0f);
     pos = mul(pos, View);
     output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
