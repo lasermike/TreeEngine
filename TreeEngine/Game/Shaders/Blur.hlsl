@@ -143,11 +143,14 @@ void VSasCSSkinned(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID 
 
         float3 out0 = mul(float4(vertex.Pos, 1.0f), world);
 
-        float4x3 worldPrev = (float4x3) InstanceBuffer[instance.InstanceOffsetPrev].World;
-        float3 inputPosPrev = float3(vertex.Pos.x, 0.5f, vertex.Pos.z);
-        float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
+        if (instance.InstanceOffsetPrev != instance.InstanceOffset)
+        {
+            float4x3 worldPrev = (float4x3) InstanceBuffer[instance.InstanceOffsetPrev].World;
+            float3 inputPosPrev = float3(vertex.Pos.x, 0.5f, vertex.Pos.z);
+            float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
 
-        out0 = lerp(outPrev, out0, vertex.InstanceWeight1);
+            out0 = lerp(outPrev, out0, vertex.InstanceWeight1);
+        }
 
         uint vbOutIndex = drawRecord.vbWorldStart + (drawRecord.vertexCount * dispatchThreadID.y) + vertexIndex;
         outputVertices[vbOutIndex] = float4(out0, 1);

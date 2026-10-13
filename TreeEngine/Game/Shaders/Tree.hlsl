@@ -76,6 +76,11 @@ float3 SkinVertexPosition(VS_SKINNED_INPUT input)
     float4x3 world = (float4x3) input.World;
     float3 position = mul(float4(input.Pos, 1.0f), world).xyz;
 
+    if (input.InstanceOffsetPrev == input.InstanceOffset)
+    {
+        return position;
+    }
+
     float4x3 worldPrev = (float4x3) InstanceBuffer[input.InstanceOffsetPrev].World;
     float3 inputPosPrev = float3(input.Pos.x, 0.5f, input.Pos.z);
     float3 positionPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;

@@ -28,7 +28,7 @@
       "ambient": [0.5, 0.5, 0.5, 1],
       "diffuse": [1, 1, 1, 1],
       "specular": [0, 0.5, 0.1, 1],
-      "texture": "FirBranchWithNeedles.dds",
+      "texture": "FirBranchTip.dds",
       "alphaClipThreshold": 0.6
     },
     "ground": {
@@ -51,26 +51,34 @@
     {
       "id": "tree",
       "type": "tree",
-      "transform": { "position": [1, 0.1, -2] },
+      "transform": { "position": [1, 0.0, -2] },
       "animationSpeed": 15,
       "depthLOD": 1,
       "trunkShape": "skinnedCylinder",
       "materials": { "trunk": "bark", "leaf": "needles" },
       "generator": {
-        "axiom": "F(50) T(100,.1)",
+        "axiom": "F(35) A(100,0)",
         "angle": 6.283185307179586,
-        "iterations": 14,
-        "segmentLength": 0.01,
+        "iterations": 11,
+        "segmentLength": 0.022,
         "thickness": 0.08,
         "segmentLengthBehavior": "constant",
         "rules": [
           {
-            "input": "T(t,r)",
-            "output": "[Y(r ) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) [Y(r + .33) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) [Y(r + .66) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.9,r + .24) "
+            "input": "D(d,r)",
+            "output": "!(d * .0008) F(d * .16) [Y(r) z(.025) $(1) L(d * .7)] [Y(r + .25) Z(.02) $(1) L(d * .6)]"
           },
           {
-            "input": "B(b)",
-            "output": "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.75)] [!(.02) $(1) x(-0.1) F(b * 0.75)] B(b * 0.95) "
+            "input": "C(c,r)",
+            "output": "!(c * .0008) F(c * .18) [Y(r) z(.08) D(c * .7,r + .2)] [Y(r + .5) Z(.07) D(c * .6,r + .7)] x(.008) Z(.012) C(c * .65,r + .37)"
+          },
+          {
+            "input": "B(b,r)",
+            "output": "!(b * .00085) F(b * .26) [Y(r + .24) z(.045) D(b * .38,r + .11)] [Y(r) z(.1) C(b * .6,r + .31)] [Y(r + .5) Z(.09) C(b * .52,r + .67)] x(.005) Z(.008) B(b * .76,r + .19)"
+          },
+          {
+            "input": "A(t,r)",
+            "output": "!(t * .0009) F(t * .14) [Y(r + .17) z(.05) $(1) L(t * .15)] [Y(r) z(.21) B(t * .46,r + .13)] [Y(r + .31) z(.19) B(t * .4,r + .47)] [Y(r + .66) z(.2) B(t * .34,r + .81)] x(.0015) Z(.0025) A(t * .93,r + .382)"
           }
         ]
       }

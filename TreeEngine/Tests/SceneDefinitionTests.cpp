@@ -144,9 +144,10 @@ int main(int argc, char** argv)
         auto ai = SceneData::ReadScene(filename);
         Check(ai.name == "AI Tree" && ai.objects.size() == 6, "AI tree scene topology changed");
         auto& aiTree = static_cast<SceneData::TreeDefinition&>(*ai.objects[0]);
-        Check(aiTree.generator.iterations == 14 && aiTree.generator.rules.size() == 2, "AI tree generator changed");
-        Check(aiTree.generator.axiom == "F(50) T(100,.1)", "AI tree axiom changed");
-        Check(aiTree.trunk.texture == "Bark_0005_diffuse.dds" && aiTree.leaf.alphaClipThreshold == 0.6f, "tree material settings changed");
+        Check(aiTree.generator.iterations == 11 && aiTree.generator.rules.size() == 4, "AI tree generator changed");
+        Check(aiTree.generator.axiom == "F(35) A(100,0)", "AI tree axiom changed");
+        Check(aiTree.trunk.texture == "Bark_0005_diffuse.dds" && aiTree.leaf.texture == "FirBranchTip.dds" &&
+            aiTree.leaf.alphaClipThreshold == 0.6f, "tree material settings changed");
         auto& aiGround = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
         Check(aiGround.material.texture == "grid3.png" && aiGround.textureCoordScale.x == 4 && aiGround.textureCoordScale.y == 4, "ground texture or tiling changed");
         auto& sky = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[2]);
