@@ -142,16 +142,19 @@ int main(int argc, char** argv)
         Reject(bad.dump(), "dataFile");
 
         auto modelJson = minimal;
-        modelJson["objects"][0] = Json::parse(R"({"id":"environment","type":"model","source":"Models/environment.glb","transform":{"position":[1,2,3]}})");
+        modelJson["objects"][0] = Json::parse(R"({"id":"environment","type":"model","source":"Models/environment.glb","forceLit":true,"transform":{"position":[1,2,3]}})");
         auto modelScene = SceneData::ParseScene(modelJson.dump(), "test.scene.json");
         Check(modelScene.objects[0]->kind == SceneData::ObjectKind::Model, "model object kind changed");
         auto& model = static_cast<SceneData::ModelDefinition&>(*modelScene.objects[0]);
         Check(model.source == "Models/environment.glb", "model source changed");
+        Check(model.forceLit, "model forceLit override changed");
         Check(model.transform.position.x == 1 && model.transform.position.z == 3, "model transform changed");
         bad = modelJson; bad["objects"][0].erase("source");
         Reject(bad.dump(), "source");
         bad = modelJson; bad["objects"][0]["source"] = "environment.obj";
         Reject(bad.dump(), "source");
+        bad = modelJson; bad["objects"][0]["forceLit"] = "yes";
+        Reject(bad.dump(), "forceLit");
         bad = modelJson; bad["objects"][0]["textureCoordScale"] = { 2, 2 };
         Reject(bad.dump(), "textureCoordScale");
 
@@ -216,18 +219,17 @@ int main(int argc, char** argv)
 
         const std::string filename = argc > 1 ? argv[1] : TestDataFilename("ai-tree.scene.json");
         auto ai = SceneData::ReadScene(filename);
-        Check(ai.name == "AI Tree" && ai.objects.size() == 7, "AI tree scene topology changed");
+        Check(ai.name == "AI Tree" && ai.objects.size() == 6, "AI tree scene topology changed");
         auto& aiTree = static_cast<SceneData::TreeDefinition&>(*ai.objects[0]);
         Check(aiTree.generator.iterations == 11 && aiTree.generator.rules.size() == 4, "AI tree generator changed");
         Check(aiTree.generator.axiom == "F(35) A(100,0)", "AI tree axiom changed");
         Check(aiTree.trunk.texture == "Bark_0005_diffuse.dds" && aiTree.leaf.texture == "FirBranchTip.dds" &&
             aiTree.leaf.alphaClipThreshold == 0.6f, "tree material settings changed");
-        auto& aiGround = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
-        Check(aiGround.material.texture == "grid3.png" && aiGround.textureCoordScale.x == 4 && aiGround.textureCoordScale.y == 4, "ground texture or tiling changed");
-        auto& sky = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[2]);
-        Check(sky.cubeMap && sky.material.texture == "coords.dds", "skybox changed");
-        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[6]);
-        Check(aiModel.source == "Models/Gltf/pond_with_waterfalls.glb", "AI tree imported model changed");
+        auto& sky = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
+        Check(sky.cubeMap && sky.material.texture == "cube.dds", "skybox changed");
+        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[5]);
+        Check(aiModel.source == "Models/Gltf/pond_with_waterfalls.glb" && aiModel.forceLit,
+            "AI tree imported model changed");
         Check(ai.camera.rotation.w == 0 && ai.camera.position.z == 2.05959034f, "legacy camera changed");
 
         const std::pair<const char*, const char*> catalogScenes[] = {

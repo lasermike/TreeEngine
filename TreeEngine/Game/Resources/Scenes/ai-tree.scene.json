@@ -116,6 +116,7 @@
       "id": "embedded-glb",
       "type": "model",
       "source": "Models/Gltf/pond_with_waterfalls.glb",
+      "forceLit": true,
       "transform": {
         "position": [0, 0, 0],
         "scale": [ 0.003, 0.003, 0.003 ]

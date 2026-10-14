@@ -13,6 +13,7 @@ public:
     GltfModelParams() : WorldObjectParams(ModelGeneratorType) {}
 
     std::shared_ptr<GltfAsset> asset;
+    bool forceLit = false;
 };
 
 class GltfModel : public WorldObject
@@ -24,6 +25,7 @@ class GltfModel : public WorldObject
     };
 
     std::shared_ptr<GltfAsset> m_asset;
+    bool m_forceLit;
     std::vector<RenderBatch> m_batches;
 
 public:

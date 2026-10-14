@@ -233,6 +233,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             auto parameters = std::make_unique<GltfModelParams>();
             CommonParameters(model, *parameters);
             parameters->asset = RuntimeModel(model.source, model.id);
+            parameters->forceLit = model.forceLit;
             auto runtime = std::make_unique<GltfModel>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));

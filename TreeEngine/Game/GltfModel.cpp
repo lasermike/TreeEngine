@@ -7,7 +7,8 @@
 
 GltfModel::GltfModel(GltfModelParams* parameters)
     : WorldObject(parameters),
-      m_asset(parameters->asset)
+      m_asset(parameters->asset),
+      m_forceLit(parameters->forceLit)
 {
 }
 
@@ -39,7 +40,10 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
         }
         ShaderMaterial shaderMaterial = imported.shaderMaterial;
-        std::wstring name = assetName + L"#material" + std::to_wstring(i);
+        if (m_forceLit)
+            shaderMaterial.flags.w = 0.0f;
+        std::wstring name = assetName + L"#material" + std::to_wstring(i)
+            + (m_forceLit ? L"#forceLit" : L"");
         HRR(renderManager.CreateMaterial(
             name.c_str(), texture, nullptr, nullptr, nullptr, nullptr,
             shaderMaterial, state, &materials[i]));

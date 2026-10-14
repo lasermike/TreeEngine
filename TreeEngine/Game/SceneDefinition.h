@@ -97,6 +97,7 @@ namespace SceneData
     {
         ModelDefinition() : ObjectDefinition(ObjectKind::Model) {}
         std::string source;
+        bool forceLit = false;
     };
 
     struct DirectionalLightDefinition

@@ -313,11 +313,13 @@ namespace SceneData
                 }
                 else if (type == "model")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source" });
+                    Fields(value, path, { "id", "type", "transform", "source", "forceLit" });
                     auto model = std::make_unique<ModelDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     model->source = String(value["source"], path + ".source");
                     if (model->source.empty()) Invalid(path + ".source", "must not be empty");
+                    if (value.contains("forceLit"))
+                        model->forceLit = Boolean(value["forceLit"], path + ".forceLit");
                     auto dot = model->source.find_last_of('.');
                     std::string extension = dot == std::string::npos
                         ? std::string()
