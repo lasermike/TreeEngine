@@ -16,6 +16,7 @@
 
 #include "pch.h"
 #include <directxmath.h>
+#include <set>
 #include <vector>
 
 enum PrimitiveType
@@ -70,6 +71,7 @@ struct GeometryBufferData
 
     std::vector<SkinnedVertex> skinnedVertices;
     std::vector<UINT> skinnedIndices;
+    std::set<const void*> appendedAssets;
 
 
     GeometryBufferData() : vertices(), indices()
@@ -86,6 +88,7 @@ struct GeometryBufferData
         indices.clear();
         skinnedVertices.clear();
         skinnedIndices.clear();
+        appendedAssets.clear();
     }
 
     const BufferOffsets* const GetBufferOffsets(PrimitiveType primType)
@@ -213,4 +216,3 @@ private:
     void BuildCylinderTopCap(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, MeshData& meshData);
     void BuildCylinderBottomCap(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, MeshData& meshData);
 };
-

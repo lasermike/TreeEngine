@@ -17,6 +17,7 @@ enum GeneratorType
     LSystemGeneratorType,
     GraphGeneratorType,
     FSGraphGeneratorType,
+    ModelGeneratorType,
 };
 
 enum ObjectType
@@ -25,7 +26,8 @@ enum ObjectType
     ObjectType_Primitive,
     ObjectType_Tree,
     ObjectType_Graph,
-    ObjectType_MAX = ObjectType_Graph
+    ObjectType_Model,
+    ObjectType_MAX = ObjectType_Model
 };
 
 enum Extent
@@ -119,6 +121,7 @@ public:
 
     virtual void Create(ModelGenerator* /*generator*/) { }
 
+    virtual void AppendGeometry(GeometryBufferData& /*geometryData*/) { }
     virtual HRESULT InitGraphics(RenderManager& renderManager);
     virtual HRESULT CleanUpDeviceObjects();
 
@@ -134,4 +137,3 @@ public:
     void SetRotation(XMVECTOR rot) { return XMStoreFloat4(&_rotation, rot); }
 
 };
-

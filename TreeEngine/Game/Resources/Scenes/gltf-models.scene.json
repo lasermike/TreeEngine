@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "name": "glTF Models",
+  "camera": {
+    "position": [0.5, 2.25, -7]
+  },
+  "render": {
+    "clearColor": [0.12, 0.17, 0.24, 1]
+  },
+  "light": {
+    "ambient": [0.3, 0.3, 0.3, 1],
+    "diffuse": [0.9, 0.9, 0.85, 1],
+    "specular": [0.5, 0.5, 0.5, 1],
+    "direction": [-0.57735, -0.57735, 0.57735]
+  },
+  "materials": {
+    "ground": {
+      "ambient": [0.15, 0.15, 0.15, 1],
+      "diffuse": [0.32, 0.38, 0.28, 1],
+      "specular": [0.05, 0.05, 0.05, 1]
+    }
+  },
+  "objects": [
+    {
+      "id": "ground",
+      "type": "primitive",
+      "shape": "box",
+      "material": "ground",
+      "transform": {
+        "position": [0, -0.05, 0],
+        "scale": [8, 0.1, 8]
+      }
+    },
+    {
+      "id": "embedded-glb",
+      "type": "model",
+      "source": "Models/Gltf/static-scene.glb",
+      "transform": {
+        "position": [-2, 0, 0]
+      }
+    },
+    {
+      "id": "external-gltf",
+      "type": "model",
+      "source": "Models/Gltf/static-scene.gltf",
+      "transform": {
+        "position": [1, 0, 0]
+      }
+    },
+    {
+      "id": "treeengine-tree",
+      "type": "fixedTree",
+      "transform": {
+        "position": [0.5, 0.5, -1.5],
+        "scale": [0.6, 0.6, 0.6]
+      },
+      "depthLOD": 2,
+      "trunkShape": "skinnedCylinder"
+    }
+  ]
+}

@@ -19,6 +19,8 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GltfLoader.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Graph.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\LSystemModelGenerator.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Materials.cpp" />
@@ -37,7 +39,12 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneRenderSettings.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfLoader.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
+    <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\LICENSE" />
+    <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\NOTICE.txt" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\*.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\README.md" />

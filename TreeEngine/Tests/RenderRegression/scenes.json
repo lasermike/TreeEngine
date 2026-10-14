@@ -18,6 +18,7 @@
     { "id": "test-block", "name": "LoadTestBlock" },
     { "id": "graph", "name": "LoadGraph" },
     { "id": "simple-box", "name": "LoadSimpleBox" },
-    { "id": "ai-tree", "name": "LoadAITree" }
+    { "id": "ai-tree", "name": "LoadAITree" },
+    { "id": "gltf-models", "name": "LoadGltfDemo" }
   ]
 }

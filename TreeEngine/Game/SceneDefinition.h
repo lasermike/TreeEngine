@@ -27,7 +27,7 @@ namespace SceneData
     };
 
     enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite };
-    enum class ObjectKind { Primitive, Tree, FixedTree, Graph };
+    enum class ObjectKind { Primitive, Tree, FixedTree, Graph, Model };
     enum class SegmentLengthBehavior { Constant, RandomAddition };
 
     struct ObjectDefinition
@@ -91,6 +91,12 @@ namespace SceneData
     {
         GraphDefinition() : ObjectDefinition(ObjectKind::Graph) {}
         std::string dataFile;
+    };
+
+    struct ModelDefinition : ObjectDefinition
+    {
+        ModelDefinition() : ObjectDefinition(ObjectKind::Model) {}
+        std::string source;
     };
 
     struct DirectionalLightDefinition

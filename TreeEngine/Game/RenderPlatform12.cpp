@@ -1327,12 +1327,12 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
             InstanceCount,
             BaseVertexLocation,
             m_nextVbWorldStart,
-            m_currentMesh->m_bufferOffsets->VertexCount,
+            m_currentMesh->m_bufferOffsets.VertexCount,
             m_currentMesh,
             m_currentMaterial ? m_currentMaterial->m_shaderMaterial : ShaderMaterial(),
             texIdx));
 
-        m_nextVbWorldStart += m_currentMesh->m_bufferOffsets->VertexCount * InstanceCount;
+        m_nextVbWorldStart += m_currentMesh->m_bufferOffsets.VertexCount * InstanceCount;
     }
 #endif
 
@@ -1387,6 +1387,46 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
     GetDevice()->CopyDescriptorsSimple(1, dxrTextureDest, newDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     return S_OK;
+}
+
+HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* /*name*/, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** texture)
+{
+#if defined(TREE_XBOX)
+    return E_NOTIMPL;
+#else
+    assert(textureIndex < maxTotalTexturesInScene);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(
+        m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(),
+        textureIndex,
+        m_descriptorHeap.GetIncrementSize());
+
+    TextureCOMScope com;
+    HRR(com.Result());
+    ResourceUploadBatch resourceUpload(GetDevice());
+    resourceUpload.Begin();
+    CComPtr<ID3D12Resource> wicTexture;
+    HRR(CreateWICTextureFromMemory(GetDevice(), resourceUpload, data, dataSize, &wicTexture, true));
+    resourceUpload.Transition(
+        wicTexture,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    auto uploadFinished = resourceUpload.End(GetCommandQueue());
+    uploadFinished.get();
+
+    const auto textureDesc = wicTexture->GetDesc();
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = textureDesc.Format;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = textureDesc.MipLevels;
+    GetDevice()->CreateShaderResourceView(wicTexture, &srvDesc, newDescriptor);
+    ID3D12Resource* resource = wicTexture.Detach();
+    *texture = new LoadedTexture(resource, newDescriptor, static_cast<UINT>(textureIndex));
+
+    D3D12_CPU_DESCRIPTOR_HANDLE dxrTextureDest = m_descriptorHeap.hCPU(DxrTexture0_SrvHeapOffset + textureIndex);
+    GetDevice()->CopyDescriptorsSimple(1, dxrTextureDest, newDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    return S_OK;
+#endif
 }
 
 HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture)

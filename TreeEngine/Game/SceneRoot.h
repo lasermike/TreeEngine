@@ -19,6 +19,7 @@ public:
 	SceneRoot() { };
 	~SceneRoot(); 
 
+	void AppendGeometry(GeometryBufferData& geometryData);
 	HRESULT InitGraphics(RenderManager& renderManager); 
 	HRESULT CleanUpDeviceObjects();
 
@@ -38,4 +39,3 @@ public:
 
     UINT32 GetMaxInstances();
 };
-

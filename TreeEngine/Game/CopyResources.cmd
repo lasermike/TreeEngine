@@ -9,7 +9,4 @@ mkdir %dest%
  
 call ..\..\misc\copyrobo %gamedir% %dest% %files% %options%
 
-call ..\..\misc\copyrobo %gamedir%\Resources %dest% %options%
-
-call ..\..\misc\copyrobo %gamedir%\Resources\Scenes %dest%\Scenes *.json %options%
-
+call ..\..\misc\copyrobo %gamedir%\Resources %dest% *.* /E %options%

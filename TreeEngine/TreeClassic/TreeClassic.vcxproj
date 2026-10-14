@@ -196,6 +196,28 @@
     <Import Project="..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets')" />
     <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.targets')" />
   </ImportGroup>
+  <ItemGroup>
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Resources\**\*.*" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\graphdata.txt" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Courier_New_11.tga" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Arial_16.abc" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Arial_16.tga" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\bark2.dds" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Bark_0005_diffuse.dds" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Courier_New_11.abc" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\snow.dds" />
+    <UpToDateCheckInput Include="@(GameResource)" />
+    <UpToDateCheckInput Include="$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd" />
+    <UpToDateCheckOutput Include="$(IntDir)CopyResources.stamp" />
+  </ItemGroup>
+  <Target Name="CopyGameResourcesWhenChanged"
+          AfterTargets="Build"
+          Inputs="@(GameResource);$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd"
+          Outputs="$(IntDir)CopyResources.stamp">
+    <MakeDir Directories="$(IntDir)" />
+    <Exec Command="call &quot;$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd&quot; &quot;$(OutDir).&quot;" />
+    <Touch Files="$(IntDir)CopyResources.stamp" AlwaysCreate="true" />
+  </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>

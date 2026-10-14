@@ -188,6 +188,13 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord * mat.textureCoordScale.xy, 0);
     }
 
+    if (mat.flags.w > 0)
+    {
+        payload.color = mat.Diffuse * textureColor;
+        payload.color.a = 1.0f;
+        return;
+    }
+
     // Cast shadow ray toward the light
     float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     float3 lightDir = -light.Direction;

@@ -6,6 +6,8 @@
 
 class WorldObject;
 class Settings;
+class SceneRoot;
+struct GltfTextureSource;
 
 enum DisplayMode
 {
@@ -122,6 +124,10 @@ public:
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, 
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename, 
                            ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
+    HRESULT CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
+                           const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
+                           const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,
+                           ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
     HRESULT CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
         const GeometryBufferData::BufferOffsets* bufferIndices, InputLayouts inputLayout, Mesh** newMesh);
 
@@ -129,7 +135,7 @@ public:
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
     HRESULT GetInstanceIndex(WorldObject* object, UINT&);
 
-    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
+    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, SceneRoot& scene);
     virtual HRESULT UninitGameLevelGraphics();
 
     HRESULT BeginNewFrame();
@@ -143,4 +149,3 @@ public:
 
     HRESULT ChangePlatform(int platform);
 };
-

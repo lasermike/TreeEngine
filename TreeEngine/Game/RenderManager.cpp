@@ -1,5 +1,7 @@
  #include "pch.h"
 #include "RenderManager.h"
+ #include "GltfLoader.h"
+ #include "SceneRoot.h"
 
 #include "Primitive.h" // TEMPTEMP
 
@@ -73,7 +75,7 @@ HRESULT RenderManager::SetPlatform(HMODULE platformDLL)
     return S_OK;
 }
 
-HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps)
+HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, SceneRoot& scene)
 {
     HRR(UninitGameLevelGraphics());
 
@@ -82,6 +84,7 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
  
     // Create vertices and indice for geometry
     GeometryGenerator::BuildGeometryBuffers(m_geometryData);
+    scene.AppendGeometry(m_geometryData);
 
     GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps, m_geometryData);
 
@@ -192,8 +195,8 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 
         if (numInstances > 0)
         {
-            GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets->IndexCount, numInstances, ru->m_mesh->m_bufferOffsets->IndexOffset,
-                ru->m_mesh->m_bufferOffsets->VertexOffset, startInstance);
+            GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets.IndexCount, numInstances, ru->m_mesh->m_bufferOffsets.IndexOffset,
+                ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance);
         }
     }
     return S_OK;
@@ -335,6 +338,75 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     m_materials[name] = newMat;
     *newMaterial = newMat;
 
+    return S_OK;
+}
+
+HRESULT RenderManager::CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
+    const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
+    const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,
+    ShaderMaterial& shaderMaterial, StockRenderState renderState, Material** newMaterial)
+{
+    if (!textureSource || !textureSource->IsMemoryBacked())
+    {
+        const wchar_t* filename = textureSource ? textureSource->filename.c_str() : nullptr;
+        return CreateMaterial(name, filename, vertexShaderFilename, pixelShaderFilename,
+            shadowVertexShaderFilename, shadowPixelShaderFilename, shaderMaterial, renderState, newMaterial);
+    }
+
+    auto existing = m_materials.find(name);
+    if (existing != m_materials.end())
+    {
+        *newMaterial = existing->second;
+        return S_FALSE;
+    }
+
+    LoadedTexture* texture = nullptr;
+    auto existingTexture = m_textures.find(textureSource->key);
+    if (existingTexture == m_textures.end())
+    {
+        HRR(GetPlatform()->LoadTextureFromMemory(
+            textureSource->key.c_str(),
+            textureSource->encodedData.data(),
+            textureSource->encodedData.size(),
+            static_cast<int>(m_textures.size()),
+            &texture));
+        m_textures[textureSource->key] = texture;
+    }
+    else
+    {
+        texture = existingTexture->second;
+    }
+
+    VertexShader* vertexShader = nullptr;
+    PixelShader* pixelShader = nullptr;
+    VertexShader* shadowVertexShader = nullptr;
+    PixelShader* shadowPixelShader = nullptr;
+    if (vertexShaderFilename && *vertexShaderFilename)
+    {
+        HRR(LoadShader(vertexShaderFilename, ShaderType_VertexShader));
+        vertexShader = m_vertexShaders[vertexShaderFilename];
+    }
+    if (pixelShaderFilename && *pixelShaderFilename)
+    {
+        HRR(LoadShader(pixelShaderFilename, ShaderType_PixelShader));
+        pixelShader = m_pixelShaders[pixelShaderFilename];
+    }
+    if (shadowVertexShaderFilename && *shadowVertexShaderFilename)
+    {
+        HRR(LoadShader(shadowVertexShaderFilename, ShaderType_VertexShader));
+        shadowVertexShader = m_vertexShaders[shadowVertexShaderFilename];
+    }
+    if (shadowPixelShaderFilename && *shadowPixelShaderFilename)
+    {
+        HRR(LoadShader(shadowPixelShaderFilename, ShaderType_PixelShader));
+        shadowPixelShader = m_pixelShaders[shadowPixelShaderFilename];
+    }
+
+    Material* material = nullptr;
+    HRR(GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shadowVertexShader,
+        shadowPixelShader, shaderMaterial, renderState, static_cast<int>(m_materials.size()), &material));
+    m_materials[name] = material;
+    *newMaterial = material;
     return S_OK;
 }
 
@@ -661,6 +733,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data, Settings*
     ASSIGN_FUNC(CreateMaterial);
     ASSIGN_FUNC(SetRenderUnit);
     ASSIGN_FUNC(LoadTexture);
+    ASSIGN_FUNC(LoadTextureFromMemory);
     ASSIGN_FUNC(CreateTexture2D);
     ASSIGN_FUNC(CreateD3DBuffer);
     ASSIGN_FUNC(CreateRenderUnit);

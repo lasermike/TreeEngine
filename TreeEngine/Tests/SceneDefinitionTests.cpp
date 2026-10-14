@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "GltfLoader.h"
 #include "SceneDefinition.h"
 #include "RenderData.h"
 #include "ThirdParty/nlohmann/json.hpp"
@@ -140,9 +141,82 @@ int main(int argc, char** argv)
         bad = graphJson; bad["objects"][0]["dataFile"] = "";
         Reject(bad.dump(), "dataFile");
 
+        auto modelJson = minimal;
+        modelJson["objects"][0] = Json::parse(R"({"id":"environment","type":"model","source":"Models/environment.glb","transform":{"position":[1,2,3]}})");
+        auto modelScene = SceneData::ParseScene(modelJson.dump(), "test.scene.json");
+        Check(modelScene.objects[0]->kind == SceneData::ObjectKind::Model, "model object kind changed");
+        auto& model = static_cast<SceneData::ModelDefinition&>(*modelScene.objects[0]);
+        Check(model.source == "Models/environment.glb", "model source changed");
+        Check(model.transform.position.x == 1 && model.transform.position.z == 3, "model transform changed");
+        bad = modelJson; bad["objects"][0].erase("source");
+        Reject(bad.dump(), "source");
+        bad = modelJson; bad["objects"][0]["source"] = "environment.obj";
+        Reject(bad.dump(), "source");
+        bad = modelJson; bad["objects"][0]["textureCoordScale"] = { 2, 2 };
+        Reject(bad.dump(), "textureCoordScale");
+
+        auto externalGltf = LoadGltfAsset(TestDataFilename("static-scene.gltf"));
+        Check(externalGltf->renderParts.size() == 2, "glTF hierarchy instances were not imported");
+        Check(externalGltf->primitives.size() == 2, "mirrored glTF node did not receive a winding variant");
+        Check(externalGltf->materials.size() == 2 && externalGltf->textures.size() == 1, "glTF materials or textures were not imported");
+        Check(!externalGltf->textures[0].IsMemoryBacked()
+            && externalGltf->textures[0].filename.find(L"checker.png") != std::wstring::npos,
+            "external glTF image did not resolve relative to the asset");
+        Check(externalGltf->primitives[0].vertices.size() == 6
+            && externalGltf->primitives[0].indices.size() == 6,
+            "double-sided glTF primitive was not expanded");
+        const auto& generatedVertex = externalGltf->primitives[0].vertices[0];
+        Check(std::abs(generatedVertex.Normal.z) > 0.9f, "missing glTF normals were not generated");
+        Check(std::abs(generatedVertex.TangentU.x) > 0.1f || std::abs(generatedVertex.TangentU.y) > 0.1f,
+            "missing glTF tangents were not generated");
+        const auto& forwardPart = externalGltf->renderParts[0];
+        Check(std::abs(forwardPart.transform._41 - 1.0f) < 1e-6f
+            && std::abs(forwardPart.transform._43 + 1.0f) < 1e-6f,
+            "glTF node transform was not converted to left-handed coordinates");
+        Check(std::abs(externalGltf->boundsMin.x) < 1e-6f
+            && std::abs(externalGltf->boundsMin.y) < 1e-6f
+            && std::abs(externalGltf->boundsMin.z + 1.0f) < 1e-6f
+            && std::abs(externalGltf->boundsMax.x - 2.0f) < 1e-6f
+            && std::abs(externalGltf->boundsMax.y - 3.0f) < 1e-6f
+            && std::abs(externalGltf->boundsMax.z) < 1e-6f,
+            "glTF hierarchy bounds changed");
+
+        GeometryBufferData importedGeometry;
+        externalGltf->AppendGeometry(importedGeometry);
+        size_t appendedVertices = importedGeometry.vertices.size();
+        size_t appendedIndices = importedGeometry.indices.size();
+        Check(appendedVertices == 12 && appendedIndices == 12, "glTF geometry was not appended to the shared buffers");
+        externalGltf->AppendGeometry(importedGeometry);
+        Check(importedGeometry.vertices.size() == appendedVertices && importedGeometry.indices.size() == appendedIndices,
+            "shared glTF geometry was appended more than once");
+        importedGeometry.Release();
+        externalGltf->AppendGeometry(importedGeometry);
+        Check(importedGeometry.vertices.size() == appendedVertices, "glTF geometry was not rebuilt after buffer release");
+
+        auto embeddedGlb = LoadGltfAsset(TestDataFilename("static-scene.glb"));
+        Check(embeddedGlb->textures.size() == 1 && embeddedGlb->textures[0].IsMemoryBacked(),
+            "GLB embedded image was not retained in memory");
+        Check(embeddedGlb->textures[0].mimeType == "image/png" && embeddedGlb->textures[0].encodedData.size() > 16,
+            "GLB embedded image metadata changed");
+
+        auto blendedGltf = LoadGltfAsset(TestDataFilename("unsupported-blend.gltf"));
+        Check(blendedGltf->materials[0].alphaBlend, "glTF alpha blending was not retained");
+        Check(blendedGltf->materials[0].shaderMaterial.flags.x == 1.0f,
+            "glTF alpha blending did not preserve source alpha");
+        Check(std::abs(blendedGltf->materials[0].shaderMaterial.flags.z - (1.0f / 255.0f)) < 1e-6f,
+            "glTF alpha blending did not retain a DXR visibility cutoff");
+        auto unlitBlendGltf = LoadGltfAsset(TestDataFilename("unlit-blend.gltf"));
+        Check(unlitBlendGltf->materials[0].alphaBlend
+            && unlitBlendGltf->materials[0].shaderMaterial.flags.w == 1.0f,
+            "KHR_materials_unlit alpha blending was not imported");
+        bool linesRejected = false;
+        try { LoadGltfAsset(TestDataFilename("unsupported-lines.gltf")); }
+        catch (const std::runtime_error& error) { linesRejected = std::string(error.what()).find("not TRIANGLES") != std::string::npos; }
+        Check(linesRejected, "unsupported glTF primitive mode was accepted");
+
         const std::string filename = argc > 1 ? argv[1] : TestDataFilename("ai-tree.scene.json");
         auto ai = SceneData::ReadScene(filename);
-        Check(ai.name == "AI Tree" && ai.objects.size() == 6, "AI tree scene topology changed");
+        Check(ai.name == "AI Tree" && ai.objects.size() == 7, "AI tree scene topology changed");
         auto& aiTree = static_cast<SceneData::TreeDefinition&>(*ai.objects[0]);
         Check(aiTree.generator.iterations == 11 && aiTree.generator.rules.size() == 4, "AI tree generator changed");
         Check(aiTree.generator.axiom == "F(35) A(100,0)", "AI tree axiom changed");
@@ -152,6 +226,8 @@ int main(int argc, char** argv)
         Check(aiGround.material.texture == "grid3.png" && aiGround.textureCoordScale.x == 4 && aiGround.textureCoordScale.y == 4, "ground texture or tiling changed");
         auto& sky = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[2]);
         Check(sky.cubeMap && sky.material.texture == "coords.dds", "skybox changed");
+        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[6]);
+        Check(aiModel.source == "Models/Gltf/pond_with_waterfalls.glb", "AI tree imported model changed");
         Check(ai.camera.rotation.w == 0 && ai.camera.position.z == 2.05959034f, "legacy camera changed");
 
         const std::pair<const char*, const char*> catalogScenes[] = {
@@ -163,7 +239,8 @@ int main(int argc, char** argv)
             { "test-block.scene.json", "Test Block" },
             { "graph.scene.json", "Graph" },
             { "simple-box.scene.json", "Simple Box" },
-            { "ai-tree.scene.json", "AI Tree" }
+            { "ai-tree.scene.json", "AI Tree" },
+            { "gltf-models.scene.json", "glTF Models" }
         };
         for (const auto& catalogScene : catalogScenes)
         {

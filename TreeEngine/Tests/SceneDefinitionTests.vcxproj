@@ -32,14 +32,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="SceneDefinitionTests.cpp" />
+    <ClCompile Include="..\Game\GltfLoader.cpp" />
     <ClCompile Include="..\Game\SceneDefinition.cpp" />
     <SceneJson Include="..\Game\Resources\Scenes\*.scene.json" />
+    <GltfAsset Include="Assets\Gltf\*.*" />
     <None Include="@(SceneJson)" />
+    <None Include="@(GltfAsset)" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets" />
   <Target Name="CopySceneTestData" AfterTargets="Build">
     <Copy SourceFiles="@(SceneJson)"
+          DestinationFolder="$(OutDir)TestData\"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(GltfAsset)"
           DestinationFolder="$(OutDir)TestData\"
           SkipUnchangedFiles="true" />
   </Target>

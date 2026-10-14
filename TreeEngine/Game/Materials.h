@@ -47,7 +47,7 @@ struct ShaderMaterial
     XMFLOAT4 Diffuse;
     XMFLOAT4 Specular; // w = SpecPower
     XMFLOAT4 Reflect;
-    XMFLOAT4 flags; // x = n/a, y = useTexture
+    XMFLOAT4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
     XMFLOAT4 textureCoordScale; // xy = UV scale; float4 keeps CPU/HLSL packing aligned.
 };
 
@@ -64,4 +64,3 @@ public:
     Materials();
     ~Materials();
 };
-

@@ -834,6 +834,18 @@ HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int /*text
     return S_OK;
 }
 
+HRESULT RenderPlatform11::LoadTextureFromMemory(const wchar_t* /*name*/, const uint8_t* data, size_t dataSize, int /*textureIndex*/, LoadedTexture** loadedTexture)
+{
+    TextureCOMScope com;
+    HRR(com.Result());
+    DirectX::ScratchImage image;
+    HRR(DirectX::LoadFromWICMemory(data, dataSize, DirectX::WIC_FLAGS_NONE, nullptr, image));
+    ID3D11ShaderResourceView* texture = nullptr;
+    HRR(DirectX::CreateShaderResourceView(GetDevice(), image.GetImages(), image.GetImageCount(), image.GetMetadata(), &texture));
+    *loadedTexture = new LoadedTexture(texture);
+    return S_OK;
+}
+
 HRESULT RenderPlatform11::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps, VertexShader* shadowVs, PixelShader* shadowPs,
                                          ShaderMaterial& shaderMaterial, StockRenderState renderState, int /*materialNum*/, Material** newMaterial)
 {

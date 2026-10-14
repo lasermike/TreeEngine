@@ -213,7 +213,7 @@ HRESULT Game::ReloadDevice()
         }
 
         // Init render manager
-        hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps);
+        hr = m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps, *m_pScene);
         assert(SUCCEEDED(hr));
 
         // Init new stuff
@@ -235,7 +235,7 @@ HRESULT Game::Regenerate()
     m_loader.Regenerate(m_pScene);
 
     // Init render manager
-    HRR(m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps));
+    HRR(m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps, *m_pScene));
 
     // Init new stuff
     HRR(m_pScene->InitGraphics(m_renderManager));
@@ -821,6 +821,4 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
         }
     }
 }
-
-
 

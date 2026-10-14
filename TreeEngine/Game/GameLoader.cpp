@@ -852,6 +852,10 @@ void GameLoader::Regenerate(SceneRoot* pScene)
             FSGraphModelGenerator graphGen(wop.GetGeneratorParameters());
             obj->Create(&graphGen);
         }
+        else if (genType == ModelGeneratorType)
+        {
+            continue;
+        }
         else
         {
             ASSERT(0);
@@ -878,7 +882,8 @@ namespace
         { "LoadTestBlock", "Test Block", "Scenes/test-block.scene.json" },
         { "LoadGraph", "Graph", "Scenes/graph.scene.json" },
         { "LoadSimpleBox", "Simple Box", "Scenes/simple-box.scene.json" },
-        { "LoadAITree", "AI Tree", "Scenes/ai-tree.scene.json" }
+        { "LoadAITree", "AI Tree", "Scenes/ai-tree.scene.json" },
+        { "LoadGltfDemo", "glTF Models", "Scenes/gltf-models.scene.json" }
     };
 
     void LoadJsonScene(

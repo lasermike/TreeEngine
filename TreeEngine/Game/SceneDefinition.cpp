@@ -311,6 +311,23 @@ namespace SceneData
                     if (graph->dataFile.empty()) Invalid(path + ".dataFile", "must not be empty");
                     object = std::move(graph);
                 }
+                else if (type == "model")
+                {
+                    Fields(value, path, { "id", "type", "transform", "source" });
+                    auto model = std::make_unique<ModelDefinition>();
+                    if (!value.contains("source")) Invalid(path + ".source", "required property");
+                    model->source = String(value["source"], path + ".source");
+                    if (model->source.empty()) Invalid(path + ".source", "must not be empty");
+                    auto dot = model->source.find_last_of('.');
+                    std::string extension = dot == std::string::npos
+                        ? std::string()
+                        : model->source.substr(dot);
+                    for (auto& character : extension)
+                        character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+                    if (extension != ".gltf" && extension != ".glb")
+                        Invalid(path + ".source", "expected a .gltf or .glb asset");
+                    object = std::move(model);
+                }
                 else Invalid(path + ".type", "unknown object type '" + type + "'");
                 CommonObject(value, path, *object);
                 if (!ids.insert(object->id).second) Invalid(path + ".id", "duplicate object ID '" + object->id + "'");

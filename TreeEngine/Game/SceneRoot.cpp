@@ -43,6 +43,14 @@ UINT32 SceneRoot::GetMaxInstances()
     return numInstances;
 }
 
+void SceneRoot::AppendGeometry(GeometryBufferData& geometryData)
+{
+    for (auto child : _children)
+    {
+        child->AppendGeometry(geometryData);
+    }
+}
+
 HRESULT SceneRoot::InitGraphics(RenderManager& renderManager)
 {
     for (auto i : _children)

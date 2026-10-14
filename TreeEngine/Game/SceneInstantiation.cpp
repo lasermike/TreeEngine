@@ -6,11 +6,13 @@
 #include "Primitive.h"
 #include "Tree.h"
 #include "Graph.h"
+#include "GltfModel.h"
 #include "LSystemModelGenerator.h"
 #include "Player.h"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <map>
 
 namespace
 {
@@ -122,6 +124,21 @@ namespace
         return points;
     }
 
+    std::shared_ptr<GltfAsset> RuntimeModel(const std::string& filename, const std::string& objectId)
+    {
+        static std::map<std::string, std::weak_ptr<GltfAsset>> cache;
+        std::string resolved = RuntimeDataFile(filename, objectId);
+        auto existing = cache.find(resolved);
+        if (existing != cache.end())
+        {
+            auto asset = existing->second.lock();
+            if (asset) return asset;
+        }
+        auto asset = LoadGltfAsset(resolved);
+        cache[resolved] = asset;
+        return asset;
+    }
+
     void CommonParameters(const SceneData::ObjectDefinition& definition, WorldObjectParams& parameters)
     {
         parameters.name = definition.id;
@@ -200,13 +217,23 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             parameters.release();
             objects.push_back(std::move(runtime));
         }
-        else
+        else if (object->kind == SceneData::ObjectKind::Graph)
         {
             const auto& graph = static_cast<const SceneData::GraphDefinition&>(*object);
             auto parameters = std::make_unique<WorldObjectParameters<GraphParams>>(GraphGeneratorType);
             CommonParameters(graph, *parameters);
             parameters->GetGeneratorParameters().points = LoadGraphPoints(graph.dataFile, graph.id);
             auto runtime = std::make_unique<Tree>(parameters.get());
+            parameters.release();
+            objects.push_back(std::move(runtime));
+        }
+        else
+        {
+            const auto& model = static_cast<const SceneData::ModelDefinition&>(*object);
+            auto parameters = std::make_unique<GltfModelParams>();
+            CommonParameters(model, *parameters);
+            parameters->asset = RuntimeModel(model.source, model.id);
+            auto runtime = std::make_unique<GltfModel>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));
         }

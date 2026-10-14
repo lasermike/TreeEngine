@@ -229,6 +229,9 @@ float4 PS(PS_INPUT input) : SV_Target
     else
         textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
 
+    if (mat.flags.w > 0)
+        return mat.Diffuse * textureColor;
+
     // Only the first light casts a shadow.
     float3 shadow = float3(1.0f, 1.0f, 1.0f);
 
@@ -251,8 +254,8 @@ float4 PS(PS_INPUT input) : SV_Target
 
     float4 litColor = ambient + diffuse + spec;
 
-    // Common to take alpha from diffuse material.
-//    litColor.a = mat.Diffuse.a;
+    if (mat.flags.x > 0)
+        litColor.a = mat.Diffuse.a * textureColor.a;
 
     return litColor;
 }

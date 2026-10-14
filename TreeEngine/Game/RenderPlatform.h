@@ -494,13 +494,13 @@ struct Mesh //: public MeshBuffers
     D3DBuffer* m_vertexBuffer;
     D3DBuffer* m_indexBuffer;
 
-    const GeometryBufferData::BufferOffsets* m_bufferOffsets;
+    GeometryBufferData::BufferOffsets m_bufferOffsets;
 
 public:
-    Mesh() : m_bufferOffsets(nullptr), m_vertexBuffer(nullptr), m_indexBuffer(nullptr), m_inputLayout(BASIC_INPUT_LAYOUT) { }
+    Mesh() : m_bufferOffsets(), m_vertexBuffer(nullptr), m_indexBuffer(nullptr), m_inputLayout(BASIC_INPUT_LAYOUT) { }
     Mesh(D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer, const GeometryBufferData::BufferOffsets* bufferOffsets, InputLayouts inputLayout) :
         m_vertexBuffer(vertexBuffer), m_indexBuffer(indexBuffer), m_inputLayout(inputLayout),
-        m_bufferOffsets(bufferOffsets)
+        m_bufferOffsets(*bufferOffsets)
     {
         //assert(m_bufferOffsets);
     }
@@ -688,6 +688,7 @@ public:
                                    ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial) = 0;
     virtual HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass) = 0;
     virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
+    virtual HRESULT LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture) = 0;
     virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
     virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer) = 0;
     virtual HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader) = 0;
@@ -918,6 +919,7 @@ public:
                            ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
     HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
+    HRESULT LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
     HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
@@ -1170,6 +1172,7 @@ public:
                            ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
     HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
+    HRESULT LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
     HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit);
 
@@ -1247,6 +1250,7 @@ typedef HRESULT (*CreateMaterialFunc)(const wchar_t* name, LoadedTexture* textur
                                       ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial);
 typedef HRESULT (*SetRenderUnitFunc)(RenderUnit* ru, RenderPass pass);
 typedef HRESULT (*LoadTextureFunc)(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
+typedef HRESULT (*LoadTextureFromMemoryFunc)(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture);
 typedef HRESULT (*CreateTexture2DFunc)(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
 typedef HRESULT (*CreateD3DBufferFunc)(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
@@ -1304,6 +1308,7 @@ class RenderPlatformDLL : public RenderPlatform
     CreateMaterialFunc CreateMaterialFuncPtr;
     SetRenderUnitFunc SetRenderUnitFuncPtr;
     LoadTextureFunc LoadTextureFuncPtr;
+    LoadTextureFromMemoryFunc LoadTextureFromMemoryFuncPtr;
     CreateTexture2DFunc CreateTexture2DFuncPtr;
     CreateD3DBufferFunc CreateD3DBufferFuncPtr;
     CreateRenderUnitFunc CreateRenderUnitFuncPtr;
@@ -1380,6 +1385,10 @@ public:
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture)
     {
         return LoadTextureFuncPtr(textureFilename, textureIndex, loadedTexture);
+    }
+    HRESULT LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture)
+    {
+        return LoadTextureFromMemoryFuncPtr(name, data, dataSize, textureIndex, loadedTexture);
     }
 
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture)

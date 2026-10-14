@@ -41,7 +41,7 @@
       "ambient": [1, 1, 1, 1],
       "diffuse": [0, 0, 9, 1],
       "specular": [0, 0, 0, 0],
-      "texture": "coords.dds"
+      "texture": "cube.dds"
     },
     "axis-red": { "ambient": [1, 0, 0, 1] },
     "axis-green": { "ambient": [0, 0.5019608, 0, 1] },
@@ -84,14 +84,6 @@
       }
     },
     {
-      "id": "ground",
-      "type": "primitive",
-      "shape": "cylinderHD",
-      "transform": { "scale": [25, 0.01, 25] },
-      "textureCoordScale": [4, 4],
-      "material": "ground"
-    },
-    {
       "id": "skybox",
       "type": "primitive",
       "shape": "box",
@@ -119,6 +111,15 @@
       "shape": "cylinderHD",
       "transform": { "position": [-4, 0, 0.5], "scale": [0.1, 1, 0.1], "rotationDegrees": [90, 0, 0] },
       "material": "axis-blue"
+    },
+    {
+      "id": "embedded-glb",
+      "type": "model",
+      "source": "Models/Gltf/pond_with_waterfalls.glb",
+      "transform": {
+        "position": [0, 0, 0],
+        "scale": [ 0.003, 0.003, 0.003 ]
+      }
     }
   ]
 }
