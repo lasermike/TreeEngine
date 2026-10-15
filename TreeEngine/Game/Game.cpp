@@ -10,6 +10,7 @@
 #include "InputManager.h"
 #include "ThreadPool.h"
 #include <cmath>
+#include <chrono>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -242,9 +243,10 @@ HRESULT Game::Regenerate()
     return S_OK;
 }
 
-void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing)
+void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile)
 {
     m_renderTestMode = true;
+    m_renderManager.GetRenderData().profile.enabled = profile;
     m_renderTestScene = sceneName;
     m_settings.m_dxrEnabled = rayTracing;
     m_settings.m_enablePostProcessing = postProcessing;
@@ -278,7 +280,10 @@ HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& capture
     XMStoreFloat4x4(&renderData.view, m_player->GetViewMatrix());
     renderData.eyePos = m_player->GetEyePosition();
     HRR(m_renderManager.BeginNewFrame());
+    auto updateStart = std::chrono::steady_clock::now();
     HRR(m_pScene->Update(m_renderManager, *m_threadPool, true));
+    renderData.profile.sceneUpdateMs = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - updateStart).count();
     HRR(m_renderManager.EndFrame());
     m_settings.m_captureFilename = captureFilename;
     m_settings.m_captureResult = captureFilename.empty() ? S_OK : E_PENDING;
@@ -821,4 +826,3 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
         }
     }
 }
-

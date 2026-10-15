@@ -76,6 +76,23 @@ private:
 
     int m_numTreeFrames;
     std::vector<TreeFrame> m_treeFrames;
+    struct BranchPose
+    {
+        XMFLOAT4X4 world;
+        bool renderable = false;
+    };
+    std::vector<BranchPose> m_branchPoses;
+    float m_matureTime = 0;
+    float m_lastPoseTime = 0;
+    XMFLOAT3 m_lastPosePosition = {};
+    XMFLOAT4 m_lastPoseRotation = {};
+    bool m_poseValid = false;
+    bool m_reusePose = false;
+    XMFLOAT3 m_lastEyePosition = {};
+    int m_lastDepthLOD = 0;
+    UINT m_lastInstanceStart = 0;
+    UINT m_cachedLeafCount = 0;
+    UINT m_cachedStickCount = 0;
 
     HRESULT ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderData);
     HRESULT ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* pRenderData, int startInstance);

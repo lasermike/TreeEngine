@@ -20,6 +20,11 @@ Tree::~Tree(void)
 void Tree::Create(TreeModelGenerator* generator)
 {
     _treeModel = generator->Create();
+    m_poseValid = false;
+    m_branchPoses.assign(_treeModel->treeData.numBranches, BranchPose());
+    m_matureTime = 0;
+    for (int i = 0; i < _treeModel->treeData.numBranches; ++i)
+        m_matureTime = std::max(m_matureTime, static_cast<float>(_treeModel->treeData.pBranches[i].depth) + 5.0f);
     if (_params->_animationSpeed == 0.0f)
     {
         _params->_animationSpeed = _treeModel->treeData.numLevels / 10.0f;
@@ -36,6 +41,7 @@ void Tree::Create(TreeModelGenerator* generator)
 HRESULT Tree::InitGraphics(RenderManager& renderManager)
 {
     HRR(CleanUpDeviceObjects());
+    m_poseValid = false;
 
     if (_params->materials.size() < 1)
     {
@@ -120,44 +126,84 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     HRR(pFrameConfig->GetInstanceIndex(this, startInstance));
 
     InstancedData* dataView = pFrameConfig->GetRenderData().instanceData;
+    RenderData& renderData = pFrameConfig->GetRenderData();
+    const float poseTime = std::min(CalcTime(renderData.time), m_matureTime);
+    m_reusePose = renderData.cacheTreePoses && m_poseValid && poseTime == m_lastPoseTime
+        && XMVector3Equal(XMLoadFloat3(&_position), XMLoadFloat3(&m_lastPosePosition))
+        && XMVector4Equal(XMLoadFloat4(&_rotation), XMLoadFloat4(&m_lastPoseRotation));
+    const bool reuseInstances = m_reusePose && startInstance == m_lastInstanceStart
+        && _params->depthLOD == m_lastDepthLOD
+        && XMVector3Equal(renderData.eyePos, XMLoadFloat3(&m_lastEyePosition));
 
-    // Clear bounding box
-    _boundingBox[0] = XMFLOAT3(-1, -1, -1);
-    _boundingBox[1] = XMFLOAT3(1, 1, 1);
-
-    for (int i = 0; i < NUM_EXTENTS; i++)
+    if (!reuseInstances)
     {
-        _extents[i] = XMFLOAT3(0, 0, 0);
+        m_cachedLeafCount = m_cachedStickCount = 0;
+        if (!m_reusePose)
+        {
+            _boundingBox[0] = XMFLOAT3(-1, -1, -1);
+            _boundingBox[1] = XMFLOAT3(1, 1, 1);
+            for (int i = 0; i < NUM_EXTENTS; i++)
+                _extents[i] = XMFLOAT3(0, 0, 0);
+        }
+
+        for (auto& instanceData : m_segmentInstanceData)
+        {
+            instanceData.clear();
+        }
+        m_numInstancesPerSegment.fill(0);
+
+        if (m_treeFrames.size() < _treeModel->treeData.numBranches)
+        {
+            m_treeFrames.resize(_treeModel->treeData.numBranches);
+        }
+
+        if (!m_reusePose)
+        {
+            m_poseValid = false;
+            TreeFrame firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), -1, 0, 0 };
+            m_treeFrames[0] = firstFrame;
+            m_numTreeFrames = 1;
+        }
+
+        for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
+        {
+            TreeFrame& frame = m_treeFrames[currentFrame];
+            if (!m_reusePose)
+            {
+                HRR(ComputeBranchVectorAtTime(frame, &renderData));
+            }
+            else if (CalcTime(renderData.time) >= frame.branch->depth
+                && (frame.branch->geometryType == Leaf || frame.branch->geometryType == Stick))
+            {
+                m_numInstancesPerSegment[TreeSegmentIndex(SelectSegmentType(frame, &renderData))]++;
+            }
+            frame.instanceOffset = -1;
+        }
+
+        for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
+        {
+            TreeFrame& frame = m_treeFrames[currentFrame];
+            HRR(ComputeBranchInstanceSkinningMatrix(frame, &renderData, startInstance));
+        }
+        m_lastPoseTime = poseTime;
+        m_lastPosePosition = _position;
+        m_lastPoseRotation = _rotation;
+        m_poseValid = true;
+        XMStoreFloat3(&m_lastEyePosition, renderData.eyePos);
+        m_lastDepthLOD = _params->depthLOD;
+        m_lastInstanceStart = startInstance;
     }
-
-    for (auto& instanceData : m_segmentInstanceData)
+    else
     {
-        instanceData.clear();
+        renderData.frameStats[NUM_LEAVES_STAT].stat += m_cachedLeafCount;
+        renderData.frameStats[NUM_STICKS_STAT].stat += m_cachedStickCount;
     }
-    m_numInstancesPerSegment.fill(0);
-
-    if (m_treeFrames.size() < _treeModel->treeData.numBranches)
+    renderData.frameStats[WORLD_MATRIX_COMPUTED_STAT].stat = m_numTreeFrames;
+    if (renderData.profile.enabled)
     {
-        m_treeFrames.resize(_treeModel->treeData.numBranches);
-    }
-
-    // Queue first branch
-    TreeFrame firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), 0xFFFFFFFF, 0, 0 /* next */ };
-    m_treeFrames[0] = firstFrame;
-    m_numTreeFrames = 1;
-
-    for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
-    {
-        TreeFrame& frame = m_treeFrames[currentFrame];
-        ComputeBranchVectorAtTime(frame, &pFrameConfig->GetRenderData());
-    }
-
-    pFrameConfig->GetRenderData().frameStats[WORLD_MATRIX_COMPUTED_STAT].stat = m_numTreeFrames;
-
-    for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
-    {
-        TreeFrame& frame = m_treeFrames[currentFrame];
-        ComputeBranchInstanceSkinningMatrix(frame, &pFrameConfig->GetRenderData(), startInstance);
+        renderData.profile.poseCacheBytes += m_branchPoses.capacity() * sizeof(BranchPose);
+        if (m_reusePose) renderData.profile.reusedPoseBranches += m_numTreeFrames;
+        else renderData.profile.rebuiltPoseBranches += m_numTreeFrames;
     }
 
     PIXEndEvent();
@@ -245,17 +291,22 @@ TreeSegment Tree::SelectSegmentType(TreeFrame& frame, RenderData* pRenderData) c
 
 HRESULT Tree::ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* pRenderData, int startInstance)
 {
-    XMMATRIX localToWorld;
-    HRESULT hr = ComputeTransformationsManual(&localToWorld, frame);
-    if (hr != S_OK)
+    if (frame.branch->id < 0 || static_cast<size_t>(frame.branch->id) >= m_branchPoses.size())
+        return E_UNEXPECTED;
+    BranchPose& pose = m_branchPoses[frame.branch->id];
+    if (!m_reusePose)
     {
-        return hr;
+        XMMATRIX localToWorld;
+        HRESULT hr = ComputeTransformationsManual(&localToWorld, frame);
+        pose.renderable = hr == S_OK;
+        if (hr != S_OK) return hr;
+        localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
+        XMStoreFloat4x4(&pose.world, localToWorld);
     }
+    if (!pose.renderable) return S_FALSE;
 
-    localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
-
-    InstancedData data;
-    XMStoreFloat4x4(&data.World, localToWorld);
+    InstancedData data = {};
+    data.World = pose.world;
 
 
     PIXEndEvent();
@@ -290,9 +341,11 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* 
     switch (frame.branch->geometryType)
     {
     case Leaf:
+        m_cachedLeafCount++;
         pRenderData->frameStats[NUM_LEAVES_STAT].stat++;
         break;
     case Stick:
+        m_cachedStickCount++;
         pRenderData->frameStats[NUM_STICKS_STAT].stat++;
         break;
     }
@@ -303,10 +356,14 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* 
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeBranchInstanceData");
 
     //Compute bounding box
-    XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMVector3Transform(XMVectorSet(-1.0f, -1.0f, -1.0f, 0), localToWorld),
-        XMLoadFloat3(&_boundingBox[0])));
-    XMStoreFloat3(&_boundingBox[1], XMVectorMax(XMVector3Transform(XMVectorSet(1.0f, 1.0f, 1.0f, 0), localToWorld),
-        XMLoadFloat3(&_boundingBox[1])));
+    if (!m_reusePose)
+    {
+        XMMATRIX localToWorld = XMLoadFloat4x4(&pose.world);
+        XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMVector3Transform(XMVectorSet(-1.0f, -1.0f, -1.0f, 0), localToWorld),
+            XMLoadFloat3(&_boundingBox[0])));
+        XMStoreFloat3(&_boundingBox[1], XMVectorMax(XMVector3Transform(XMVectorSet(1.0f, 1.0f, 1.0f, 0), localToWorld),
+            XMLoadFloat3(&_boundingBox[1])));
+    }
 
     return S_OK;
 }

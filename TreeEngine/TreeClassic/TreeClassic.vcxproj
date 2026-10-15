@@ -188,6 +188,11 @@
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <CustomBuild>
+      <AdditionalInputs>$(SolutionDir)Game\Shaders\buildShaders.bat;$(SolutionDir)Game\Shaders\shaderFiles.txt;$(SolutionDir)Game\Shaders\SharedTypes.hlsli;$(SolutionDir)Game\Shaders\Materials.fx;%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>

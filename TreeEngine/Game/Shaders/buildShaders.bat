@@ -11,6 +11,8 @@ set outputFolder=%2
 @set inputFile=%4
 set platform=%5
 set config=%6
+set optimization=/Od
+if /I "%~6"=="Release" set optimization=/O3
 set manifestFilename=%7
 
 echo *BuildShaders
@@ -31,12 +33,13 @@ echo  Manifest      !manifestFilename!
   if %%G==%~nx4 call :BuildShader !InputFile! %%H %%I !outputFolder!
 )
 
-@if %AnyErrors%==1 (
-	call :SetError
+@if !AnyErrors! NEQ 0 (
+    echo Shader compilation FAIL
+    exit /b !AnyErrors!
 )
 
-@goto :ENDOFSCRIPT
-@goto :EOF
+@echo OK > "%~2\%~nx4.txt"
+@exit /b 0
 
 @rem ***************************************************************************
 :BuildShader 
@@ -89,10 +92,10 @@ if !isXbox! == 1 (
 if [%2] == [rootsig] (
 	set cmdline=!cmdline! /Fh !outputFolder!%3.inc 
 ) else if [%2] == [lib] (
-	set cmdline=!cmdline! /Od /Zpr /Fh !outputFolder!%3.inc /Fd !outputFolder!%3.pdb /Vn g_%3 
+	set cmdline=!cmdline! !optimization! /Zpr /Fh !outputFolder!%3.inc /Fd !outputFolder!%3.pdb /Vn g_%3
 ) else (
 	set outputfile=%~4%~n3.cso
-	set cmdline=!cmdline! /Od /Zpr /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
+	set cmdline=!cmdline! !optimization! /Zpr /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
 	if !isXbox! == 1 (
 		if [%2] == [cs] (
 			set cmdline=!cmdline!
@@ -107,7 +110,10 @@ set finalcmd=!cmdline! !inputFile!
 echo !finalcmd!
 call !finalcmd!
 
-@if NOT ERRORLEVEL 0 goto ENDOFSCRIPT
+@if errorlevel 1 (
+    set AnyErrors=1
+    exit /b 1
+)
 
 echo Succeeded
 
@@ -118,6 +124,10 @@ if [!copyToLayout!]==[1] (
 		mkdir %layoutFolder%
 	)
 	xcopy "!outputfile!" %layoutFolder% /y
+    if errorlevel 1 (
+        set AnyErrors=1
+        exit /b 1
+    )
 )
 
 @goto :EOF

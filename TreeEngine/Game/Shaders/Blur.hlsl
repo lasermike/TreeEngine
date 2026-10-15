@@ -94,50 +94,42 @@ StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
                                 "DescriptorTable(CBV(b1, numDescriptors=1)), " \
 
 [RootSignature(ComputeRootSignature)]
-[numthreads(32, 32, 1)]
+[numthreads(128, 1, 1)]
 void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
 {
-    // thread X = index buffer index
-    // thread Y = instance
-    // thread Z = 
     DrawRecord drawRecord = drawRecords[gBlurRadius];
 
-    if (dispatchThreadID.x < drawRecord.indexBufferCount
-        && dispatchThreadID.y < drawRecord.numInstances
-    )
+    if (dispatchThreadID.x < drawRecord.vertexCount * drawRecord.numInstances)
     {
-        uint vertexIndex = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.x];
+        uint vertexIndex = dispatchThreadID.x % drawRecord.vertexCount;
+        uint instanceIndex = dispatchThreadID.x / drawRecord.vertexCount;
         float3 vertex = simpleVertices.Load(drawRecord.baseVertexLocation + vertexIndex).Pos;
 
-        int inputInstance = drawRecord.startingInstance + dispatchThreadID.y;
+        int inputInstance = drawRecord.startingInstance + instanceIndex;
         float4x3 world = (float4x3) InstanceBuffer[inputInstance].World;
 
         float3 out0 = mul(float4(vertex, 1.0f), world);
 
-        uint vbOutIndex = drawRecord.vbWorldStart + (drawRecord.vertexCount * dispatchThreadID.y) + vertexIndex;
+        uint vbOutIndex = drawRecord.vbWorldStart + dispatchThreadID.x;
         outputVertices[vbOutIndex] = float4(out0, 1);
     }
 }
 
 
 [RootSignature(ComputeRootSignature)]
-[numthreads(32, 32, 1)]
+[numthreads(128, 1, 1)]
 void VSasCSSkinned(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
 {
-    // thread X = index buffer index
-    // thread Y = instance
-    // thread Z = 0
     DrawRecord drawRecord = drawRecords[gBlurRadius];
 
-    if (dispatchThreadID.x < drawRecord.indexBufferCount
-        && dispatchThreadID.y < drawRecord.numInstances
-        )
+    if (dispatchThreadID.x < drawRecord.vertexCount * drawRecord.numInstances)
     {
-        uint vertexIndex = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.x];
+        uint vertexIndex = dispatchThreadID.x % drawRecord.vertexCount;
+        uint instanceIndex = dispatchThreadID.x / drawRecord.vertexCount;
         SkinnedVertex vertex = skinnedVertices.Load(drawRecord.baseVertexLocation + vertexIndex);
 
         // Current vertex
-        int inputInstance = drawRecord.startingInstance + dispatchThreadID.y;
+        int inputInstance = drawRecord.startingInstance + instanceIndex;
         InstancedData instance = InstanceBuffer[inputInstance];
         float4x3 world = (float4x3) instance.World;
 
@@ -152,7 +144,7 @@ void VSasCSSkinned(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID 
             out0 = lerp(outPrev, out0, vertex.InstanceWeight1);
         }
 
-        uint vbOutIndex = drawRecord.vbWorldStart + (drawRecord.vertexCount * dispatchThreadID.y) + vertexIndex;
+        uint vbOutIndex = drawRecord.vbWorldStart + dispatchThreadID.x;
         outputVertices[vbOutIndex] = float4(out0, 1);
     }
 }

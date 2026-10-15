@@ -2,6 +2,9 @@
 #include "Materials.h"
 #include "SceneRenderSettings.h"
 #include "ConstBufferDefinitions.h"
+#include <array>
+#include <string>
+#include <cstdint>
 
 class ShadowMap;
 class UavBuffer;
@@ -55,6 +58,34 @@ enum RenderPass
     NUM_RENDER_PASSES
 };
 
+enum class ProfilePass
+{
+    Frame, Shadow, Main, Deformation, BLAS, TLAS, Rays, Count
+};
+
+struct RenderProfile
+{
+    bool enabled = false;
+    bool valid = false;
+    std::wstring adapter;
+    std::array<double, static_cast<size_t>(ProfilePass::Count)> gpuMs = {};
+    double sceneUpdateMs = 0;
+    double drawUploadMs = 0;
+    UINT drawRecords = 0;
+    UINT worldVertices = 0;
+    UINT skinnedVertices = 0;
+    UINT indexEntries = 0;
+    UINT dispatchGroups = 0;
+    UINT rebuiltPoseBranches = 0;
+    UINT reusedPoseBranches = 0;
+    std::uint64_t poseCacheBytes = 0;
+    std::uint64_t drawUploadBytes = 0;
+    std::uint64_t drawUploadCapacityBytes = 0;
+    std::uint64_t worldVertexCapacityBytes = 0;
+    std::uint64_t accelerationStructureBytes = 0;
+    bool rebuiltBLAS = false;
+};
+
 struct ProjectionData
 {
     int                  screenWidth;
@@ -90,6 +121,8 @@ struct RenderData : SceneRenderSettings
 
     // Per frame statistics
     FrameStatistic*     frameStats;
+    RenderProfile       profile;
+    bool                cacheTreePoses = true;
 
     RenderPass          currentPass;
 

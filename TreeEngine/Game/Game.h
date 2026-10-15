@@ -65,7 +65,7 @@ public:
 
     HRESULT Initialize(bool renderToSharedTexture);
 
-    void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing);
+    void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile = false);
     HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {});
 
     HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
@@ -167,5 +167,4 @@ private:
 #endif
 
 };
-
 

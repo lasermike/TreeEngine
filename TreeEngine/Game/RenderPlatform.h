@@ -756,6 +756,14 @@ private:
     UINT                              m_frameIndex;
     UINT                              m_commandListIndex;
 
+    CComPtr<ID3D12QueryHeap>           m_profileQueries;
+    CComPtr<ID3D12Resource>            m_profileReadback;
+    UINT64                           m_profileFrequency = 0;
+    UINT                             m_profileQueryMask = 0;
+    HRESULT BeginProfileFrame();
+    void ProfileTimestamp(ProfilePass pass, bool end);
+    HRESULT ResolveProfileFrame();
+
     D3D12_VIEWPORT                    m_viewPort;
     D3D12_RECT                        m_scissorRect;
 
@@ -979,6 +987,9 @@ public:
     // DXR buffers
     CComPtr<ID3D12Resource>     m_VBWorld;
     CComPtr<ID3D12Resource>     m_DrawRecordsResource;
+    CComPtr<ID3D12Resource>     m_drawRecordUploads[FrameCount];
+    BYTE*                     m_drawRecordUploadData[FrameCount] = {};
+    D3D12_RESOURCE_STATES      m_drawRecordState = D3D12_RESOURCE_STATE_COPY_DEST;
 
     // Per-geometry material and geometry info buffers for raytracing
     UploadBuffer<ShaderMaterial>* m_dxrMaterialBuffer;

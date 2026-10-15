@@ -111,8 +111,8 @@ __inline void ReportFailure(const char* msg, const char* file, long line, HRESUL
 #else
 #ifndef HRR
 #define HR(x) (x)
-#define HRC(x) if (FAILED(x)) goto Cleanup;
-#define HRR(x) (x)
+#define HRC(x) hr = (x); if (FAILED(hr)) goto Cleanup;
+#define HRR(x) do { HRESULT hr2 = (x); if (FAILED(hr2)) { Util.Output("ERROR: %s(%d), HR:%x - " #x "\n", __FILE__, (DWORD)__LINE__, hr2); return hr2; } } while (0)
 #define LOG(x)
 #define LOGF(fmt, ...)
 #define ASSERTSZ(x, str)

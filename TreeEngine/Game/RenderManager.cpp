@@ -175,7 +175,7 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     // Render each unit
     for (RenderUnit* ru : m_renderUnits)
     {
-        Render(ru, pass);
+        HRR(Render(ru, pass));
     }
 
     return S_OK;
@@ -183,7 +183,7 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
 
 HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 {
-    GetPlatform()->SetRenderUnit(ru, pass);
+    HRR(GetPlatform()->SetRenderUnit(ru, pass));
 
     for (auto object : ru->reservations)
     {
@@ -195,8 +195,8 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 
         if (numInstances > 0)
         {
-            GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets.IndexCount, numInstances, ru->m_mesh->m_bufferOffsets.IndexOffset,
-                ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance);
+            HRR(GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets.IndexCount, numInstances, ru->m_mesh->m_bufferOffsets.IndexOffset,
+                ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance));
         }
     }
     return S_OK;
@@ -592,6 +592,8 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
 
 
 Cleanup:
+    if (FAILED(hr))
+        m_settings->m_captureResult = hr;
     return;
 }
 

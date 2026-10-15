@@ -200,6 +200,11 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <CustomBuild>
+      <AdditionalInputs>$(SolutionDir)Game\Shaders\buildShaders.bat;$(SolutionDir)Game\Shaders\shaderFiles.txt;$(SolutionDir)Game\Shaders\SharedTypes.hlsli;$(SolutionDir)Game\Shaders\Materials.fx;%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets')" />

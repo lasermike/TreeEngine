@@ -12,10 +12,20 @@ TreeEngine uses MSBuild via Visual Studio 2022. Open `TreeEngine/TreeEngine.sln`
 
 Of these configurations, only `Debug|x64` and `Release|x64` are actively maintained. The UWP and Xbox targets are not currently built or tested.  UWP will likely be deprecated in the future.
 
+Build through the solution, not individual project files:
 
-**Shader compilation:** `TreeEngine/Game/Shaders/buildShaders.bat` compiles HLSL → `.cso` via `fxc.exe`/`dxc.exe`. PostBuild steps in vcxproj files also handle this.
+```powershell
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$msbuild = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+& $msbuild TreeEngine\TreeEngine.sln /t:Build /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo
+& $msbuild TreeEngine\TreeEngine.sln /t:Build /p:Configuration=Release /p:Platform=x64 /v:minimal /nologo
+```
 
-There are no automated tests or CI pipelines.
+Desktop solution mappings include TreeClassic in both configurations and exclude Xbox projects, so desktop builds do not require the GDK.
+
+**Shader compilation:** `TreeEngine/Game/Shaders/buildShaders.bat` compiles HLSL → `.cso` via `fxc.exe`/`dxc.exe`. Desktop builds use `/Od` for Debug and `/O3` for Release, including embedded DXR libraries, while retaining debug information and row-major matrices. Compilation/deployment failures fail the build; desktop project dependencies include the script and shared shader inputs.
+
+**Tests:** The Debug solution builds `TreeEngine\Tests\build\SceneDefinitionTests.exe`. Deterministic GPU image tests, comparison-math tests, DXR toggling, and tree pose-cache/capacity tests live in `TreeEngine\Tests\RenderRegression`. See its README for commands, profiling, and known baseline limitations. These require the deployed resources and, for rendering, a DX12/DXR-capable GPU. There is no CI pipeline.
 
 ## Simulation
 TreeEngine is a plant and tree growth simulator.  Plants are defined by L-Systems (in `LSystemModelGenerator.cpp`) and grow over time based on growth rules.  The simulation runs in real-time, with the main loop updating plant growth, physics, and rendering each frame.
@@ -91,4 +101,3 @@ Key points for window/input changes:
 - **WM_DPICHANGED** resizes the window to the OS-suggested rect so it stays correctly sized when dragged between monitors with different DPI
 - `RenderManager::OnResize()` calls `ReleaseSwapChainResources()` before `RenderPlatform12::OnResize()`, so the swap chain is fully recreated each resize
 - ImGui gets display size from `GetClientRect()` every frame in `ImGui_ImplWin32_NewFrame()` and mouse coordinates from `WM_MOUSEMOVE` via `GET_X_LPARAM`/`GET_Y_LPARAM` — both must be in the same coordinate space as the swap chain to avoid click offset bugs
-

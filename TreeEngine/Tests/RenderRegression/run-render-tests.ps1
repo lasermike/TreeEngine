@@ -1,19 +1,23 @@
 [CmdletBinding()]
 param(
     [string]$Executable,
-    [string]$Manifest = "$PSScriptRoot\scenes.json",
-    [string]$GoldDirectory = "$PSScriptRoot\Gold",
-    [string]$OutputDirectory = "$PSScriptRoot\Artifacts",
+    [string]$Manifest,
+    [string]$GoldDirectory,
+    [string]$OutputDirectory,
     [string[]]$Scenes = @(),
     [ValidateSet('raster', 'raytracing')][string[]]$Modes = @(),
     [switch]$UpdateGold,
     [switch]$Build,
+    [ValidateRange(0, 10000)][int]$BenchmarkFrames = 0,
     [ValidateRange(1, 1800)][int]$TimeoutSeconds = 120
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $workspaceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+if (-not $Manifest) { $Manifest = Join-Path $PSScriptRoot 'scenes.json' }
+if (-not $GoldDirectory) { $GoldDirectory = Join-Path $PSScriptRoot 'Gold' }
+if (-not $OutputDirectory) { $OutputDirectory = Join-Path $PSScriptRoot 'Artifacts' }
 if ($Build) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     $msbuild = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
@@ -56,6 +60,7 @@ foreach ($scene in $selectedScenes) {
             scene = $scene.name; mode = $mode; seed = $config.seed; width = $config.width; height = $config.height
             warmupFrames = $config.warmupFrames; postProcessing = $config.postProcessing; report = $workerReportPath; captures = $points
         }
+        if ($BenchmarkFrames) { $request.benchmarkFrames = $BenchmarkFrames }
         $requestPath = Join-Path $jobDirectory 'request.json'
         [IO.File]::WriteAllText($requestPath, ($request | ConvertTo-Json -Depth 10), $utf8)
         $jobError = $null

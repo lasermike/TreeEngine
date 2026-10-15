@@ -2,6 +2,7 @@
 
 #include "RenderPlatform.h"
 #include "Settings.h"
+#include <chrono>
 
 #include "DDSTextureLoader12.h"
 #include "BitmapFont12.h"
@@ -923,9 +924,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // 
     // Create draw record
     const int MAX_DRAWRECORDS = 1024;
-    auto drawRecordDescBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(DrawRecord) * MAX_DRAWRECORDS, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+    auto drawRecordDescBuffer = CD3DX12_RESOURCE_DESC::Buffer(sizeof(DrawRecord) * MAX_DRAWRECORDS
 #if defined(TREE_XBOX)
-        | D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER
+        , D3D12XBOX_RESOURCE_FLAG_ALLOW_INDIRECT_BUFFER
 #endif
     );
 
@@ -933,11 +934,23 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &defaultHeapProperties,
         D3D12_HEAP_FLAG_NONE,
         &drawRecordDescBuffer,
-        D3D12_RESOURCE_STATE_COMMON, // | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+        D3D12_RESOURCE_STATE_COPY_DEST,
         nullptr,
         __uuidof(ID3D12Resource), (void**)&m_DrawRecordsResource));
 
     HRR(m_DrawRecordsResource->SetName(L"Draw Records"));
+    m_drawRecordState = D3D12_RESOURCE_STATE_COPY_DEST;
+#if !defined(TREE_XBOX)
+    const auto uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    for (UINT frame = 0; frame < FrameCount; ++frame)
+    {
+        HRR(GetDevice()->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE, &drawRecordDescBuffer,
+            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_drawRecordUploads[frame])));
+        D3D12_RANGE readRange = { 0, 0 };
+        HRR(m_drawRecordUploads[frame]->Map(0, &readRange,
+            reinterpret_cast<void**>(&m_drawRecordUploadData[frame])));
+    }
+#endif
 
     D3D12_SHADER_RESOURCE_VIEW_DESC descDrawRecordsSrv = {};
     descDrawRecordsSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -1206,6 +1219,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     m_rootSignature.Release();
     m_computeRootSignature.Release();
+    m_profileQueries.Release();
+    m_profileReadback.Release();
 
     m_pipelineState.Release();
     m_pipelineStateR8FullScreenQuad.Release();
@@ -1232,6 +1247,13 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
  
     m_VBWorld.Release();
     m_DrawRecordsResource.Release();
+    for (UINT frame = 0; frame < FrameCount; ++frame)
+    {
+        if (m_drawRecordUploads[frame])
+            m_drawRecordUploads[frame]->Unmap(0, nullptr);
+        m_drawRecordUploadData[frame] = nullptr;
+        m_drawRecordUploads[frame].Release();
+    }
 
     SafeDelete(&m_bvhGeometryDescs);
     SafeDelete(&m_dxrMaterialBuffer);
@@ -1321,6 +1343,10 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
         }
 
         INT texIdx = (m_currentMaterial && m_currentMaterial->m_texture) ? (INT)m_currentMaterial->m_texture->textureSlot : -1;
+        const UINT64 vertexCount = static_cast<UINT64>(m_currentMesh->m_bufferOffsets.VertexCount) * InstanceCount;
+        if (vertexCount > maxWorldVertices - m_nextVbWorldStart
+            || m_drawRecords.size() >= m_DrawRecordsResource->GetDesc().Width / sizeof(DrawRecord))
+            return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
         m_drawRecords.push_back(DrawRecord(StartIndexLocation,
             IndexCountPerInstance,
             StartInstanceLocation,
@@ -1332,7 +1358,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
             m_currentMaterial ? m_currentMaterial->m_shaderMaterial : ShaderMaterial(),
             texIdx));
 
-        m_nextVbWorldStart += m_currentMesh->m_bufferOffsets.VertexCount * InstanceCount;
+        m_nextVbWorldStart += static_cast<UINT>(vertexCount);
     }
 #endif
 
@@ -2137,6 +2163,7 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
 HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 {
     HRESULT hr = S_OK;
+    auto uploadStart = std::chrono::steady_clock::now();
 
     const size_t drawRecordBufferSize = static_cast<size_t>(m_DrawRecordsResource->GetDesc().Width);
     if (m_drawRecords.size() > drawRecordBufferSize / sizeof(DrawRecord))
@@ -2152,38 +2179,31 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     memcpy(pDrawRecords, m_drawRecords.data(), sizeof(DrawRecord) * m_drawRecords.size());
     m_DrawRecordsResource->Unmap(0, nullptr);
 #else
-
-    // Copy draw records from CPU to GPU
+    // The existing frame fence protects reuse of this upload slot.
+    const size_t liveBytes = sizeof(DrawRecord) * m_drawRecords.size();
+    if (liveBytes)
     {
-        ResourceUploadBatch resourceUpload(GetDevice());
-        resourceUpload.Begin();
-
-        // Upload copies the destination's entire subresource, regardless of RowPitch.
-        // Pad unused records so it never reads beyond the live CPU vector.
-        std::vector<unsigned char> uploadRecords(drawRecordBufferSize, 0);
-        if (!m_drawRecords.empty())
-            memcpy(uploadRecords.data(), m_drawRecords.data(), m_drawRecords.size() * sizeof(DrawRecord));
-        D3D12_SUBRESOURCE_DATA initData = {};
-        initData.pData = uploadRecords.data();
-        initData.RowPitch = static_cast<LONG_PTR>(drawRecordBufferSize);
-        initData.SlicePitch = initData.RowPitch;
-
-        resourceUpload.Upload(m_DrawRecordsResource, 0, &initData, 1);
-
-        resourceUpload.Transition(
-            m_DrawRecordsResource,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-        // Upload the resources to the GPU.
-        auto uploadResourcesFinished = resourceUpload.End(GetCommandQueue());
-
-        // Wait for the upload thread to terminate
-        uploadResourcesFinished.wait();
-
+        memcpy(m_drawRecordUploadData[m_frameIndex], m_drawRecords.data(), liveBytes);
+        if (m_drawRecordState != D3D12_RESOURCE_STATE_COPY_DEST)
+            GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+                m_DrawRecordsResource, m_drawRecordState, D3D12_RESOURCE_STATE_COPY_DEST));
+        GetCommandList()->CopyBufferRegion(m_DrawRecordsResource, 0,
+            m_drawRecordUploads[m_frameIndex], 0, liveBytes);
+        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+            m_DrawRecordsResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+        m_drawRecordState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 #endif
 
+    if (m_renderData->profile.enabled)
+    {
+        m_renderData->profile.drawUploadMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - uploadStart).count();
+        m_renderData->profile.drawUploadBytes = m_drawRecords.size() * sizeof(DrawRecord);
+        m_renderData->profile.drawUploadCapacityBytes = FrameCount * drawRecordBufferSize;
+        m_renderData->profile.worldVertexCapacityBytes = vbWorldBufferSize;
+    }
+    ProfileTimestamp(ProfilePass::Deformation, false);
     //
     // Run VSasCS - Compute shader that runs through contents of m_drawnVertices
     //
@@ -2210,12 +2230,22 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
         GetCommandList()->SetPipelineState(m_gameLevelPSOs[bSkinned ? "VSasCSSkinned" : "VSasCS"]);
 
         // Run VSasCS
-        UINT numGroupsX = (UINT)ceilf(drawRecord.indexBufferCount / 32.0f);
-        UINT numGroupsY = (UINT)ceilf(drawRecord.numInstances / 32.0f);
+        UINT numGroupsX = (drawRecord.vertexCount * drawRecord.numInstances + 127) / 128;
+        UINT numGroupsY = 1;
 
         GetCommandList()->Dispatch(numGroupsX, numGroupsY, 1);
+        if (m_renderData->profile.enabled)
+        {
+            auto& profile = m_renderData->profile;
+            profile.drawRecords++;
+            profile.worldVertices += drawRecord.vertexCount * drawRecord.numInstances;
+            profile.skinnedVertices += bSkinned ? drawRecord.vertexCount * drawRecord.numInstances : 0;
+            profile.indexEntries += drawRecord.indexBufferCount * drawRecord.numInstances;
+            profile.dispatchGroups += numGroupsX * numGroupsY;
+        }
     }
 
+    ProfileTimestamp(ProfilePass::Deformation, true);
 
     PIXEndEvent(GetCommandList()); // Transform draw records to bottom level BVH mesh data
 
@@ -2277,6 +2307,7 @@ bool RenderPlatform12::DrawRecord::operator==(const DrawRecord& dr) const
 HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 {
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
+    ProfileTimestamp(ProfilePass::BLAS, false);
 
     bool freshBuild = forceRebuild || m_TLAS == nullptr;
 
@@ -2294,9 +2325,15 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     }
     
     m_previousDrawRecordHash = currentHash;
+    m_renderData->profile.rebuiltBLAS = freshBuild;
 
 
     UINT geometryDescIndex = 0;
+    UINT64 geometryCount = 0;
+    for (const auto& record : m_drawRecords)
+        geometryCount += record.numInstances;
+    if (geometryCount > m_maxBLASInstances)
+        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
     for (int i = 0; i < m_drawRecords.size(); i++)
     {
         DrawRecord& dr = m_drawRecords[i];
@@ -2319,7 +2356,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
 
             assert(geometryDesc.Triangles.VertexBuffer.StartAddress + geometryDesc.Triangles.VertexCount * geometryDesc.Triangles.VertexBuffer.StrideInBytes
-                < m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
+                <= m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
 
             D3D12_GPU_VIRTUAL_ADDRESS indexBufferEnd;
             if (dr.inputLayout == SKINNED_INPUT_LAYOUT)
@@ -2410,12 +2447,14 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     GetCommandList()->ResourceBarrier(1, &uavBarrier2);	// Need the bottom level build to finish before we can build a top-level acceleration structure.
 
     PIXEndEvent(GetCommandList());
+    ProfileTimestamp(ProfilePass::BLAS, true);
 
     //HRR(ExecuteCurrentCommandList(true));
 
 
     ////// BUILD TOP ////
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build top level Acceleration Structures");
+    ProfileTimestamp(ProfilePass::TLAS, false);
 
     CComPtr<ID3D12Device5> device;
     HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
@@ -2488,6 +2527,10 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     commandList->ResourceBarrier(1, &uavBarrier);	// Need the top level build to finish before we can render with it...
 
     PIXEndEvent(GetCommandList());
+    ProfileTimestamp(ProfilePass::TLAS, true);
+    if (m_renderData->profile.enabled)
+        m_renderData->profile.accelerationStructureBytes = m_BLAS->GetDesc().Width + m_TLAS->GetDesc().Width
+            + m_scratchBLAS->GetDesc().Width + m_scratchTLAS->GetDesc().Width;
 
     //HRR(ExecuteCurrentCommandList(true));
 
@@ -2920,8 +2963,76 @@ void DebugDumpD3DObjs()
 //--------------------------------------------------------------------------------------
 // Render a frame.  May be called twice for stereo rendering
 //--------------------------------------------------------------------------------------
+HRESULT RenderPlatform12::BeginProfileFrame()
+{
+    auto& profile = m_renderData->profile;
+    profile.valid = false;
+    if (!profile.enabled) return S_OK;
+    if (!m_profileQueries)
+    {
+        D3D12_QUERY_HEAP_DESC queryDesc = {};
+        queryDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+        queryDesc.Count = static_cast<UINT>(ProfilePass::Count) * 2;
+        HRR(GetDevice()->CreateQueryHeap(&queryDesc, IID_PPV_ARGS(&m_profileQueries)));
+        auto heap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+        auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(queryDesc.Count * sizeof(UINT64));
+        HRR(GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_profileReadback)));
+        HRR(GetCommandQueue()->GetTimestampFrequency(&m_profileFrequency));
+        if (!m_profileFrequency) return E_UNEXPECTED;
+#if !defined(TREE_XBOX)
+        CComPtr<IDXGIFactory4> factory;
+        CComPtr<IDXGIAdapter1> adapter;
+        HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
+        HRR(factory->EnumAdapterByLuid(GetDevice()->GetAdapterLuid(), IID_PPV_ARGS(&adapter)));
+        DXGI_ADAPTER_DESC1 adapterDesc = {};
+        HRR(adapter->GetDesc1(&adapterDesc));
+        profile.adapter = adapterDesc.Description;
+#endif
+    }
+    profile.gpuMs.fill(0);
+    profile.drawUploadMs = 0;
+    profile.drawRecords = profile.worldVertices = profile.skinnedVertices = 0;
+    profile.indexEntries = profile.dispatchGroups = 0;
+    profile.rebuiltPoseBranches = profile.reusedPoseBranches = 0;
+    profile.poseCacheBytes = profile.drawUploadBytes = profile.accelerationStructureBytes = 0;
+    profile.drawUploadCapacityBytes = profile.worldVertexCapacityBytes = 0;
+    profile.rebuiltBLAS = false;
+    m_profileQueryMask = 0;
+    ProfileTimestamp(ProfilePass::Frame, false);
+    return S_OK;
+}
+
+void RenderPlatform12::ProfileTimestamp(ProfilePass pass, bool end)
+{
+    if (!m_renderData->profile.enabled) return;
+    const UINT query = static_cast<UINT>(pass) * 2 + (end ? 1 : 0);
+    GetCommandList()->EndQuery(m_profileQueries, D3D12_QUERY_TYPE_TIMESTAMP, query);
+    m_profileQueryMask |= 1u << query;
+}
+
+HRESULT RenderPlatform12::ResolveProfileFrame()
+{
+    auto& profile = m_renderData->profile;
+    if (!profile.enabled) return S_OK;
+    UINT64* values = nullptr;
+    D3D12_RANGE range = { 0, static_cast<SIZE_T>(ProfilePass::Count) * 2 * sizeof(UINT64) };
+    HRR(m_profileReadback->Map(0, &range, reinterpret_cast<void**>(&values)));
+    for (UINT pass = 0; pass < static_cast<UINT>(ProfilePass::Count); ++pass)
+    {
+        if ((m_profileQueryMask & (3u << (pass * 2))) == (3u << (pass * 2)))
+            profile.gpuMs[pass] = static_cast<double>(values[pass * 2 + 1] - values[pass * 2])
+                * 1000.0 / m_profileFrequency;
+    }
+    D3D12_RANGE written = { 0, 0 };
+    m_profileReadback->Unmap(0, &written);
+    profile.valid = true;
+    return S_OK;
+}
+
 HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer, InstancedData** dataView)
 {
+    HRR(BeginProfileFrame());
     // Get a handle to the instance buffer.  Game will fill out data before calling Render()
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
     HR(buffer->buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
@@ -2978,6 +3089,7 @@ HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
 
 HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool useAlphaBlendedRenderTarget, bool useShadowMaps, float* clearColor)
 {
+    ProfileTimestamp(ProfilePass::Main, false);
     // Ensure last frame is completed
     WaitOnFence();
 
@@ -3103,6 +3215,7 @@ std::vector<float> CalcGaussWeights(float sigma)
 HRESULT RenderPlatform12::RenderPostProcess()
 {
     HRESULT hr = S_OK;
+    ProfileTimestamp(ProfilePass::Main, true);
 
 #if defined(DXR_ENABLED)
 
@@ -3110,6 +3223,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         m_drawRecords.size() > 0)
     {
         HRR(BuildAccelerationStructure(true));
+        ProfileTimestamp(ProfilePass::Rays, false);
 
         PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Raytrace Render");
 
@@ -3158,6 +3272,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         commandList->SetComputeRootDescriptorTable(14, m_descriptorHeap.hGPU(DxrSky_SrvHeapOffset));
 
         commandList->DispatchRays(&dispatchRaysDesc);
+        ProfileTimestamp(ProfilePass::Rays, true);
 
         // Replace the main image before blur/UI; the DXR texture matches the target size and format.
         ID3D12Resource* colorTarget = m_settings->m_enablePostProcessing
@@ -3318,7 +3433,16 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
     // Execute the command list.
+    ProfileTimestamp(ProfilePass::Frame, true);
+    if (m_renderData->profile.enabled)
+    {
+        for (UINT query = 0; query < static_cast<UINT>(ProfilePass::Count) * 2; ++query)
+            if (m_profileQueryMask & (1u << query))
+                GetCommandList()->ResolveQueryData(m_profileQueries, D3D12_QUERY_TYPE_TIMESTAMP,
+                    query, 1, m_profileReadback, query * sizeof(UINT64));
+    }
     HRR(ExecuteCurrentCommandList(true));
+    HRR(ResolveProfileFrame());
 
     // Present the frame.
     if (!m_settings->m_captureFilename.empty())
@@ -3381,6 +3505,7 @@ HRESULT RenderPlatform12::SetRenderPhase(RenderState state)
     {
     case RP_TRANSITION_TO_RENDER_SHADOW_MAP:
     {
+        ProfileTimestamp(ProfilePass::Shadow, false);
         PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transition depth and render shadows");
 
         GetCommandList()->SetPipelineState(m_pipelineStateShadowMap);
@@ -3396,6 +3521,7 @@ HRESULT RenderPlatform12::SetRenderPhase(RenderState state)
     }
     case RP_TRANSITION_FROM_RENDER_SHADOW_MAP:
     {
+        ProfileTimestamp(ProfilePass::Shadow, true);
         //PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transition depth to scene");
 
         GetCommandList()->RSSetViewports(1, &GetViewport());
