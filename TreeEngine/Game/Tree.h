@@ -113,6 +113,7 @@ public:
     virtual HRESULT InitGraphics(RenderManager& renderManager);
 
     virtual HRESULT ComputeConstants(IRenderFrame* pFrameConfig) override;
+    void AccumulateProfile(RenderProfile& profile) const;
     virtual unsigned int GetNumInstances();
     virtual unsigned int GetMaxInstances();
 };

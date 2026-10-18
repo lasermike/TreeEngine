@@ -148,7 +148,7 @@ HRESULT RenderManager::BeginNewFrame()
     D3DBuffer* buffer = m_instancedBuffer.Get(m_renderData.frame);
 
     InstancedData* dataView = nullptr;
-    GetPlatform()->BeginNewFrame(true, buffer, &dataView);
+    HRR(GetPlatform()->BeginNewFrame(true, buffer, &dataView));
 
     //m_renderData.instanceData = dataView;
     //m_renderData.instanceBuffer = buffer;

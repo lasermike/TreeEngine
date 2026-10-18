@@ -94,6 +94,16 @@ toggle test also checks that this background matches raster output.
 
 ## Profiling and pose-cache validation
 
+During normal interactive use, expand **Profile** in the Debug UI (a peer of
+Stats, Controls, and Scene) and check **Enable profiling**. It defaults off
+and takes effect at the next frame boundary; collapsing the section or hiding
+the Debug UI does not disable an enabled profiler. Uncheck it to stop collection.
+The section shows the last completed frame's CPU/GPU timings, work counters,
+adapter, and resource memory counters. CPU scene timing includes the normal
+threaded update and worker completion wait; tree counters are aggregated after
+workers finish. GPU timings use the existing frame fence, not an extra wait.
+Timers, queries, and counter aggregation still add profiling overhead.
+
 `-BenchmarkFrames` forwards the optional native request field `benchmarkFrames`
 (0 through 10,000; default 0 disables profiling). Each capture runs its warmup,
 then timed frames, then a separate screenshot frame. Samples are in each worker's

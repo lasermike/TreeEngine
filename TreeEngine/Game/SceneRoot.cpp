@@ -3,6 +3,8 @@
 #include "GeometryGenerator.h"
 #include "RenderManager.h"
 #include "ThreadPool.h"
+#include "Tree.h"
+#include <chrono>
 
 SceneRoot::~SceneRoot()
 {
@@ -87,6 +89,10 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool, boo
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"SceneRoot::Update");
 
     HRESULT hr = S_OK;
+    auto& profile = renderFrame.GetRenderData().profile;
+    std::chrono::steady_clock::time_point updateStart;
+    if (profile.enabled)
+        updateStart = std::chrono::steady_clock::now();
 
     if (synchronous)
     {
@@ -137,10 +143,15 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool, boo
     {
         bbmin = XMVectorMin(bbmin, XMLoadFloat3(&c->GetBoundingBox()[0]));
         bbmax = XMVectorMax(bbmax, XMLoadFloat3(&c->GetBoundingBox()[1]));
+        if (profile.enabled && c->GetObjectType() == ObjectType_Tree)
+            static_cast<Tree*>(c)->AccumulateProfile(profile);
     }
 
     XMStoreFloat3(&_boundingBox[0], bbmin);
     XMStoreFloat3(&_boundingBox[1], bbmax);
+    if (profile.enabled)
+        profile.sceneUpdateMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - updateStart).count();
 
     return hr;
 }

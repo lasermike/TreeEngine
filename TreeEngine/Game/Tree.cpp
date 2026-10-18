@@ -114,6 +114,13 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     return S_OK;
 }
 
+void Tree::AccumulateProfile(RenderProfile& profile) const
+{
+    profile.poseCacheBytes += m_branchPoses.capacity() * sizeof(BranchPose);
+    if (m_reusePose) profile.reusedPoseBranches += m_numTreeFrames;
+    else profile.rebuiltPoseBranches += m_numTreeFrames;
+}
+
 HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 {
     // 2 passes
@@ -199,12 +206,6 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         renderData.frameStats[NUM_STICKS_STAT].stat += m_cachedStickCount;
     }
     renderData.frameStats[WORLD_MATRIX_COMPUTED_STAT].stat = m_numTreeFrames;
-    if (renderData.profile.enabled)
-    {
-        renderData.profile.poseCacheBytes += m_branchPoses.capacity() * sizeof(BranchPose);
-        if (m_reusePose) renderData.profile.reusedPoseBranches += m_numTreeFrames;
-        else renderData.profile.rebuiltPoseBranches += m_numTreeFrames;
-    }
 
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Compute Constants memcpy");

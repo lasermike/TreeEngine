@@ -10,7 +10,6 @@
 #include "InputManager.h"
 #include "ThreadPool.h"
 #include <cmath>
-#include <chrono>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -280,10 +279,7 @@ HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& capture
     XMStoreFloat4x4(&renderData.view, m_player->GetViewMatrix());
     renderData.eyePos = m_player->GetEyePosition();
     HRR(m_renderManager.BeginNewFrame());
-    auto updateStart = std::chrono::steady_clock::now();
     HRR(m_pScene->Update(m_renderManager, *m_threadPool, true));
-    renderData.profile.sceneUpdateMs = std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - updateStart).count();
     HRR(m_renderManager.EndFrame());
     m_settings.m_captureFilename = captureFilename;
     m_settings.m_captureResult = captureFilename.empty() ? S_OK : E_PENDING;
@@ -393,6 +389,11 @@ void Game::Update(DX::StepTimer const& timer)
         XMStoreFloat3(&m_renderManager.GetRenderData().dirLights[0].Direction, vec);
     }
 
+    auto& profile = m_renderManager.GetRenderData().profile;
+    if (profile.valid)
+        m_lastProfile = profile;
+    // UI changes take effect at the next frame boundary, never between timestamp queries.
+    profile.enabled = m_profilingEnabled;
     HR(m_renderManager.BeginNewFrame());
 
     // Compute per-frame values
@@ -512,6 +513,60 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
     }
 
     static bool uiPaused = false;
+
+    if (ImGui::CollapsingHeader("Profile", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::PushTextWrapPos();
+        if (ImGui::Checkbox("Enable profiling", &m_profilingEnabled))
+            m_lastProfile.valid = false;
+        ImGui::TextWrapped("Applies next frame. CPU timers and GPU timestamp queries add profiling overhead; no extra GPU wait is added.");
+        if (!m_profilingEnabled)
+        {
+            ImGui::TextDisabled("Profiling disabled.");
+        }
+        else if (!m_lastProfile.valid)
+        {
+            ImGui::TextDisabled("Waiting for a completed profile frame...");
+        }
+        else
+        {
+            const auto& profile = m_lastProfile;
+            ImGui::TextDisabled("Last completed frame; inactive GPU passes report zero.");
+            char adapter[512];
+            if (WideCharToMultiByte(CP_UTF8, 0, profile.adapter.c_str(), -1, adapter, sizeof(adapter), nullptr, nullptr))
+                ImGui::Text("Adapter: %s", adapter);
+            else
+                ImGui::Text("Adapter name unavailable (Win32 error %lu)", GetLastError());
+
+            ImGui::SeparatorText("CPU timings");
+            ImGui::Text("Scene update (includes worker wait): %.3f ms", profile.sceneUpdateMs);
+            ImGui::Text("DXR draw upload: %.3f ms", profile.drawUploadMs);
+
+            ImGui::SeparatorText("GPU timings");
+            static const char* passNames[] = { "Frame", "Shadow", "Main", "Deformation", "BLAS", "TLAS", "Rays" };
+            static_assert(_countof(passNames) == static_cast<size_t>(ProfilePass::Count));
+            for (size_t pass = 0; pass < _countof(passNames); ++pass)
+                ImGui::Text("%s: %.3f ms", passNames[pass], profile.gpuMs[pass]);
+            ImGui::TextDisabled("Pass times are not exhaustive or additive to frame time.");
+
+            ImGui::SeparatorText("Work");
+            ImGui::Text("Pose branches rebuilt / reused: %u / %u", profile.rebuiltPoseBranches, profile.reusedPoseBranches);
+            ImGui::Text("DXR draw records: %u", profile.drawRecords);
+            ImGui::Text("DXR world / skinned vertices: %u / %u", profile.worldVertices, profile.skinnedVertices);
+            ImGui::Text("Source index entries: %u; dispatch groups: %u", profile.indexEntries, profile.dispatchGroups);
+            ImGui::Text("BLAS operation: %s", profile.drawRecords == 0 ? "Inactive" : profile.rebuiltBLAS ? "Rebuild" : "Refit");
+
+            ImGui::SeparatorText("Memory");
+            constexpr double bytesPerKiB = 1024.0;
+            constexpr double bytesPerMiB = 1024.0 * 1024.0;
+            ImGui::Text("CPU pose cache: %.2f KiB", profile.poseCacheBytes / bytesPerKiB);
+            ImGui::Text("Draw upload live / reserved: %.2f / %.2f KiB",
+                profile.drawUploadBytes / bytesPerKiB, profile.drawUploadCapacityBytes / bytesPerKiB);
+            ImGui::Text("World vertex capacity: %.2f MiB", profile.worldVertexCapacityBytes / bytesPerMiB);
+            ImGui::Text("Acceleration structures + scratch: %.2f MiB", profile.accelerationStructureBytes / bytesPerMiB);
+        }
+        ImGui::PopTextWrapPos();
+    }
 
     if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
     {

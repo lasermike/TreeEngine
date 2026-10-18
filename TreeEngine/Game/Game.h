@@ -144,6 +144,8 @@ private:
     GameData                            m_gameData;
     bool m_renderTestMode = false;
     std::string m_renderTestScene;
+    bool m_profilingEnabled = false;
+    RenderProfile m_lastProfile;
 
     bool                                m_bDebugUIKeyCaptured;
 
@@ -167,4 +169,3 @@ private:
 #endif
 
 };
-
