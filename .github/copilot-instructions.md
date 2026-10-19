@@ -8,7 +8,6 @@ TreeEngine uses MSBuild via Visual Studio 2022. Open `TreeEngine/TreeEngine.sln`
 - `Debug|x64` / `Release|x64` — Win32 desktop (TreeClassic)
 - `Debug|x64` / `Release|x64` — UWP (TreePC, requires Windows 10 SDK)
 - `Debug|Gaming.Xbox.Scarlett.x64` / `Debug|Gaming.Xbox.XboxOne.x64` — Xbox (TreeXbox, requires GDK)
-- `Debug12` / `Release` variants toggle between DX11 and DX12 code paths.  Deprecated.
 
 Of these configurations, only `Debug|x64` and `Release|x64` are actively maintained. The UWP and Xbox targets are not currently built or tested.  UWP will likely be deprecated in the future.
 

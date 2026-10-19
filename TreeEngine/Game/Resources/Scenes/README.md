@@ -97,7 +97,7 @@ random value from zero to `0.2`, matching the existing sea-scene callback.
 ## Validation tests
 
 `SceneDefinitionTests` is included in `TreeEngine.sln` and builds with the
-desktop Debug/x64 and Debug12/x64 solution configurations. In Visual Studio,
+desktop Debug/x64 solution configuration. In Visual Studio,
 set it as the startup project and use Start Without Debugging (Ctrl+F5).
 The build copies all catalog JSON into `Tests\bin\x64\Debug\TestData`. The test executable
 locates that data relative to itself and can run from any working directory.

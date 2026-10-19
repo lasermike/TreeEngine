@@ -19,11 +19,6 @@ if "a%~6%" == "aDebug" (
    SET cmdline=%cmdline% /Od /O0
 )
 
-if "a%~6%" == "aDebug12" (
-   echo Compiling shaders with optimization disabled...
-   SET cmdline=%cmdline% /Od /O0
-)
-
 if "a%~6%" == "aDebug_MonoD3D" (
    echo Compiling shaders with optimization disabled...
    SET cmdline=%cmdline% /Od /O0
@@ -57,4 +52,3 @@ if "%~5%" == "Gaming.Xbox.Scarlett.x64" (
 )
 
 @echo on
-
