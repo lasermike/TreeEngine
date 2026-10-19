@@ -4,7 +4,7 @@ param([string]$Executable, [switch]$Capacity)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if (-not $Executable) {
-    $Executable = Join-Path $PSScriptRoot '..\..\..\..\Binaries\Debug\x64\TreeClassic\TreeClassic.exe'
+    $Executable = Join-Path $PSScriptRoot '..\..\TreeClassic\bin\x64\Debug\TreeClassic.exe'
 }
 $Executable = (Resolve-Path -LiteralPath $Executable).Path
 if (-not ('TreeRenderTests.ImageComparison' -as [type])) {

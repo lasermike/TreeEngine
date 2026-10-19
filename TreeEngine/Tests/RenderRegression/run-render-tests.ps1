@@ -25,7 +25,7 @@ if ($Build) {
     & $msbuild (Join-Path $workspaceRoot 'TreeEngine.sln') /t:TreeClassic /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo
     if ($LASTEXITCODE -ne 0) { throw 'Game build failed.' }
 }
-if (-not $Executable) { $Executable = Join-Path $workspaceRoot '..\..\Binaries\Debug\x64\TreeClassic\TreeClassic.exe' }
+if (-not $Executable) { $Executable = Join-Path $workspaceRoot 'TreeClassic\bin\x64\Debug\TreeClassic.exe' }
 $Executable = (Resolve-Path -LiteralPath $Executable).Path
 $config = Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json
 if ($config.version -ne 1 -or $config.width -lt 32 -or $config.height -lt 32 -or $config.width -gt 2048 -or $config.height -gt 2048) { throw 'Invalid render-test manifest.' }

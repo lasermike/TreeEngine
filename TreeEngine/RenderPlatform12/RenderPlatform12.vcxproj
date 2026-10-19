@@ -18,7 +18,6 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>RenderPlatform12</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <BinsDir>$(SolutionDir)..\..\Binaries\</BinsDir>
     <ShaderCompiler>dxc.exe</ShaderCompiler>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -49,8 +48,9 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup />
   <PropertyGroup>
-    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
-    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+    <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+    <DesktopRuntimeDir>$(ProjectDir)..\TreeClassic\bin\$(Platform)\$(Configuration)\</DesktopRuntimeDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -78,9 +78,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d3dcompiler.lib; DirectXTK12.lib; d2d1.lib; d3d12.lib; dxgi.lib; windowscodecs.lib; dwrite.lib; nvapi64.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>call $(SolutionDir)\..\Misc\copyrobo $(OutDir) $(BinsDir)$(Configuration)\$(Platform)\TreeClassic $(RootNamespace).dll $(RootNamespace).pdb /XO</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -102,9 +99,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d3dcompiler.lib; DirectXTK12.lib; d2d1.lib; d3d12.lib; dxgi.lib; windowscodecs.lib; dwrite.lib;nvapi64.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>call $(SolutionDir)\..\Misc\copyrobo $(OutDir) $(BinsDir)$(Configuration)\$(Platform)\TreeClassic $(RootNamespace).dll $(RootNamespace).pdb /XO</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\Game\BitmapFont12.h" />
@@ -178,24 +172,24 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\RaytracingLibrary.hlsl">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\LocalRootSignature.hlsl">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Game\Shaders\GlobalRootSignature.hlsl">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
@@ -211,6 +205,17 @@
     <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.targets')" />
     <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.619.4\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.619.4\build\native\Microsoft.Direct3D.D3D12.targets')" />
   </ImportGroup>
+  <ItemGroup>
+    <UpToDateCheckOutput Include="$(DesktopRuntimeDir)$(TargetName).dll;$(DesktopRuntimeDir)$(TargetName).pdb" />
+  </ItemGroup>
+  <Target Name="DeployDesktopRenderer" AfterTargets="Link">
+    <ItemGroup>
+      <DesktopRenderer Include="$(TargetPath);$(OutDir)$(TargetName).pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DesktopRenderer)"
+          DestinationFolder="$(DesktopRuntimeDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>

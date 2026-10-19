@@ -82,14 +82,16 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>.;..\Game\.;..\Inc;$(WindowsSDK_IncludePath);$(SolutionDir)imgui;$(VC_IncludePath);</IncludePath>
     <LibraryPath>..\TreeClassic\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
-    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
-    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+    <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>.;..\Game\.;..\Inc;$(WindowsSDK_IncludePath);$(SolutionDir)imgui;$(VC_IncludePath);</IncludePath>
     <LibraryPath>..\TreeClassic\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
-    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
-    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+    <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <!-- common settings -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -103,9 +105,6 @@
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -118,9 +117,6 @@
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>Lib\x64\Release</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="..\Game\graphdata.txt" />
@@ -176,15 +172,18 @@
   <ItemGroup>
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\ATGFont.hlsl">
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tree.hlsl">
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl">
       <FileType>Document</FileType>
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>
@@ -212,16 +211,33 @@
     <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Courier_New_11.abc" />
     <GameResource Include="$(MSBuildProjectDirectory)\..\Game\snow.dds" />
     <UpToDateCheckInput Include="@(GameResource)" />
-    <UpToDateCheckInput Include="$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd" />
-    <UpToDateCheckOutput Include="$(IntDir)CopyResources.stamp" />
+    <UpToDateCheckInput Include="$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd"
+                           Condition="'$(Platform)'!='x64' Or ('$(Configuration)'!='Debug' And '$(Configuration)'!='Release')" />
+    <UpToDateCheckOutput Include="$(IntDir)CopyResources.stamp"
+                            Condition="'$(Platform)'!='x64' Or ('$(Configuration)'!='Debug' And '$(Configuration)'!='Release')" />
+    <UpToDateCheckOutput Include="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
+                            Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')" />
   </ItemGroup>
   <Target Name="CopyGameResourcesWhenChanged"
           AfterTargets="Build"
+          Condition="'$(Platform)'!='x64' Or ('$(Configuration)'!='Debug' And '$(Configuration)'!='Release')"
           Inputs="@(GameResource);$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd"
           Outputs="$(IntDir)CopyResources.stamp">
     <MakeDir Directories="$(IntDir)" />
     <Exec Command="call &quot;$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd&quot; &quot;$(OutDir).&quot;" />
     <Touch Files="$(IntDir)CopyResources.stamp" AlwaysCreate="true" />
+  </Target>
+  <Target Name="CopyDesktopGameResourcesWhenChanged"
+          AfterTargets="Link"
+          Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')"
+          Inputs="@(GameResource)"
+          Outputs="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')">
+    <Copy SourceFiles="@(GameResource)"
+          DestinationFiles="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <FileWrites Include="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
   </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

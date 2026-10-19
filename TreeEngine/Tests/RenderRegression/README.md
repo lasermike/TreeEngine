@@ -33,8 +33,19 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 Requires Visual Studio C++ build tools, the game's existing dependencies/resources,
 and a Windows GPU supporting the game's D3D12/DXR renderer. This suite uses the
 TreeClassic D3D12 build. The default executable is
-`../../Binaries/Debug/x64/TreeClassic/TreeClassic.exe` relative to TreeEngine;
-use `-Executable` to select another compatible build.
+`TreeClassic\bin\x64\Debug\TreeClassic.exe` relative to the solution directory
+(`TreeEngine` within the checkout); use `-Executable` to select another compatible
+build, such as `TreeClassic\bin\x64\Release\TreeClassic.exe`.
+
+Desktop binaries and intermediates are project-local under
+`bin\x64\<Configuration>` and `obj\x64\<Configuration>`. Run the app from its
+TreeClassic bin directory, where the build deploys the renderer DLL, shaders,
+resources, and runtime dependencies. The debugger defaults to `$(OutDir)`; if an
+existing ignored `TreeClassic.vcxproj.user` still names the old external binary
+directory, remove that working-directory override or update it to `$(OutDir)`.
+External Binaries/Intermediates directories are no longer used by the maintained
+desktop builds. Do not remove shared legacy outputs; any cleanup requires
+inspection and separate approval of the exact generated subdirectories.
 
 `scenes.json` lists ten scenes, both rendering modes, and captures at 0, 1,
 and 5 seconds (60 images). It also specifies resolution, random seed,

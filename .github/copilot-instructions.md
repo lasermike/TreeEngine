@@ -23,9 +23,23 @@ $msbuild = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuil
 
 Desktop solution mappings include TreeClassic in both configurations and exclude Xbox projects, so desktop builds do not require the GDK.
 
+**Desktop outputs:** TreeClassic, RenderPlatform12, and SceneDefinitionTests use
+`bin\$(Platform)\$(Configuration)\` and `obj\$(Platform)\$(Configuration)\`
+under their respective project directories. TreeClassic's bin directory is the
+runnable deployment, including the matching renderer DLL/PDB, shaders, resources,
+and runtime dependencies. SceneDefinitionTests remains Debug-only.
+
+The tracked TreeClassic debugger working directory is `$(OutDir)`. Existing
+checkouts may have an ignored `TreeClassic.vcxproj.user` overriding it with the
+old external path; remove that override or set it to `$(OutDir)`. Old external
+Binaries/Intermediates artifacts and `Tests\build` are no longer used by these
+desktop builds. Inspect exact generated subdirectories and obtain explicit
+approval before deleting them; do not delete shared roots or legacy outputs.
+Unsupported project/configuration output paths remain unchanged.
+
 **Shader compilation:** `TreeEngine/Game/Shaders/buildShaders.bat` compiles HLSL → `.cso` via `fxc.exe`/`dxc.exe`. Desktop builds use `/Od` for Debug and `/O3` for Release, including embedded DXR libraries, while retaining debug information and row-major matrices. Compilation/deployment failures fail the build; desktop project dependencies include the script and shared shader inputs.
 
-**Tests:** The Debug solution builds `TreeEngine\Tests\build\SceneDefinitionTests.exe`. Deterministic GPU image tests, comparison-math tests, DXR toggling, and tree pose-cache/capacity tests live in `TreeEngine\Tests\RenderRegression`. See its README for commands, profiling, and known baseline limitations. These require the deployed resources and, for rendering, a DX12/DXR-capable GPU. There is no CI pipeline.
+**Tests:** The Debug solution builds `TreeEngine\Tests\bin\x64\Debug\SceneDefinitionTests.exe`. Deterministic GPU image tests, comparison-math tests, DXR toggling, and tree pose-cache/capacity tests live in `TreeEngine\Tests\RenderRegression`. See its README for commands, profiling, and known baseline limitations. These require the deployed resources and, for rendering, a DX12/DXR-capable GPU. There is no CI pipeline.
 
 ## Simulation
 TreeEngine is a plant and tree growth simulator.  Plants are defined by L-Systems (in `LSystemModelGenerator.cpp`) and grow over time based on growth rules.  The simulation runs in real-time, with the main loop updating plant growth, physics, and rendering each frame.

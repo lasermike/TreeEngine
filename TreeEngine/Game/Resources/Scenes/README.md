@@ -99,11 +99,14 @@ random value from zero to `0.2`, matching the existing sea-scene callback.
 `SceneDefinitionTests` is included in `TreeEngine.sln` and builds with the
 desktop Debug/x64 and Debug12/x64 solution configurations. In Visual Studio,
 set it as the startup project and use Start Without Debugging (Ctrl+F5).
-The build copies all catalog JSON into `Tests/build/TestData`. The test executable
+The build copies all catalog JSON into `Tests\bin\x64\Debug\TestData`. The test executable
 locates that data relative to itself and can run from any working directory.
 
-From the repository workspace, build `Tests/SceneDefinitionTests.vcxproj` with
-MSBuild (`Debug`, `x64`) and run `Tests/build/SceneDefinitionTests.exe`.
+Build through `TreeEngine\TreeEngine.sln` from the Git checkout root with MSBuild
+(`Debug`, `x64`) and run
+`TreeEngine\Tests\bin\x64\Debug\SceneDefinitionTests.exe`.
+Its intermediates are under `Tests\obj\x64\Debug` relative to the solution
+directory; the old `Tests\build` directory is no longer used.
 The tests exercise defaults, references, transforms, rule settings, malformed
 input, material omission semantics, fixed trees, graphs, every catalog scene,
 and preservation of the AI Tree scene data.

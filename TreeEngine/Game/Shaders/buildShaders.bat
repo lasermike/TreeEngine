@@ -5,15 +5,15 @@ SETLOCAL ENABLEDELAYEDEXPANSION
 
 @set AnyErrors=0
 
-set compiler=%1
-set outputFolder=%2
-@set layoutFolder=%3
-@set inputFile=%4
+set "compiler=%~1"
+set "outputFolder=%~2"
+@set "layoutFolder=%~3"
+@set "inputFile=%~4"
 set platform=%5
 set config=%6
 set optimization=/Od
 if /I "%~6"=="Release" set optimization=/O3
-set manifestFilename=%7
+set "manifestFilename=%~7"
 
 echo *BuildShaders
 echo  InputFile     !inputFile!
@@ -29,8 +29,8 @@ echo  Manifest      !manifestFilename!
 
 @rem Build from each entry point in shader
 @rem format:filename,vs/ps,entry_point
-@FOR /F "tokens=1,2,3 delims=," %%G IN (%~dp4!manifestFilename!) DO (
-  if %%G==%~nx4 call :BuildShader !InputFile! %%H %%I !outputFolder!
+@FOR /F "usebackq tokens=1,2,3 delims=," %%G IN ("%~dp4!manifestFilename!") DO (
+  if %%G==%~nx4 call :BuildShader "!InputFile!" %%H %%I "!outputFolder!"
 )
 
 @if !AnyErrors! NEQ 0 (
@@ -54,7 +54,7 @@ set isXbox=0
 
 if !platform! == "Gaming.Xbox.Scarlett.x64" (
    echo  Compiling shaders for Scarlett...
-   set cmdline=!cmdline! /Fc !outputFolder!%3.cso.txt 
+   set cmdline=!cmdline! /Fc "!outputFolder!%3.cso.txt"
    set isXbox=1
 ) else (
 	set cmdline=!cmdline!
@@ -82,7 +82,7 @@ if !platform! == "Gaming.Xbox.Scarlett.x64" (
 ECHO  BuildShader target !target!
 
 @rem Compile!
-set cmdline=!compiler! /Zi /Qembed_debug /T %target% /E %3 
+set cmdline="!compiler!" /Zi /Qembed_debug /T %target% /E %3
 
 if !isXbox! == 1 (
     set cmdline=!cmdline! ./Zi
@@ -90,12 +90,12 @@ if !isXbox! == 1 (
     set cmdline=!cmdline! ./Zs
 )
 if [%2] == [rootsig] (
-	set cmdline=!cmdline! /Fh !outputFolder!%3.inc 
+	set cmdline=!cmdline! /Fh "!outputFolder!%3.inc"
 ) else if [%2] == [lib] (
-	set cmdline=!cmdline! !optimization! /Zpr /Fh !outputFolder!%3.inc /Fd !outputFolder!%3.pdb /Vn g_%3
+	set cmdline=!cmdline! !optimization! /Zpr /Fh "!outputFolder!%3.inc" /Fd "!outputFolder!%3.pdb" /Vn g_%3
 ) else (
 	set outputfile=%~4%~n3.cso
-	set cmdline=!cmdline! !optimization! /Zpr /Fo "!outputfile!" /Fd !outputFolder!%3.pdb
+	set cmdline=!cmdline! !optimization! /Zpr /Fo "!outputfile!" /Fd "!outputFolder!%3.pdb"
 	if !isXbox! == 1 (
 		if [%2] == [cs] (
 			set cmdline=!cmdline!
@@ -105,7 +105,7 @@ if [%2] == [rootsig] (
 	)
 )
 
-set finalcmd=!cmdline! !inputFile!
+set finalcmd=!cmdline! "!inputFile!"
 
 echo !finalcmd!
 call !finalcmd!
@@ -120,10 +120,10 @@ echo Succeeded
 @rem Copy output to deployment directory (AppX)
 if [!copyToLayout!]==[1] (
 	echo Copying !outputfile! to layout folder %layoutFolder%
-	if not exist %layoutFolder% ( 
-		mkdir %layoutFolder%
+	if not exist "!layoutFolder!" (
+		mkdir "!layoutFolder!"
 	)
-	xcopy "!outputfile!" %layoutFolder% /y
+	xcopy "!outputfile!" "!layoutFolder!" /y
     if errorlevel 1 (
         set AnyErrors=1
         exit /b 1
