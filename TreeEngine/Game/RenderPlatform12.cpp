@@ -319,6 +319,20 @@ HRESULT RenderPlatform12::ExecuteCurrentCommandList(bool waitOnFence)
 
 HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData)
 {
+    if (geometryData.vertices.size() > UINT_MAX / sizeof(SimpleVertex) ||
+        geometryData.vertices.size() > INT_MAX ||
+        geometryData.indices.size() > UINT_MAX / sizeof(UINT) ||
+        geometryData.indices.size() > INT_MAX ||
+        geometryData.skinnedVertices.size() > UINT_MAX / sizeof(SkinnedVertex) ||
+        geometryData.skinnedIndices.size() > UINT_MAX / sizeof(UINT))
+        return HRESULT_FROM_WIN32(ERROR_ARITHMETIC_OVERFLOW);
+
+    const UINT vertexCount = static_cast<UINT>(geometryData.vertices.size());
+    const int vertexCopyCount = static_cast<int>(geometryData.vertices.size());
+    const UINT indexCount = static_cast<UINT>(geometryData.indices.size());
+    const int indexCopyCount = static_cast<int>(geometryData.indices.size());
+    const UINT skinnedVertexCount = static_cast<UINT>(geometryData.skinnedVertices.size());
+    const UINT skinnedIndexCount = static_cast<UINT>(geometryData.skinnedIndices.size());
 #if defined(TREE_XBOX)
     //D3D12XBOX_DPBB_STATE dpbbDesc = {};
     //D3D12XboxInitializeDefaultDpbbState(&dpbbDesc);
@@ -542,8 +556,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // 
 
     // First upload vertex to staging buffer
-    UploadBuffer< SimpleVertex> simpleVertexUploadBuffer(GetDevice(), geometryData.vertices.size(), false);
-    simpleVertexUploadBuffer.CopyData(0, geometryData.vertices.size(), &geometryData.vertices[0]);
+    UploadBuffer< SimpleVertex> simpleVertexUploadBuffer(GetDevice(), vertexCount, false);
+    simpleVertexUploadBuffer.CopyData(0, vertexCopyCount, &geometryData.vertices[0]);
     simpleVertexUploadBuffer.Unmap(); // Flush
 
     const D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(SimpleVertex) * geometryData.vertices.size(), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
@@ -564,25 +578,25 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // initialize vertex buffer view
     m_VBView.BufferLocation = m_vertexBuffer.buffer->GetGPUVirtualAddress();
     m_VBView.StrideInBytes = sizeof(SimpleVertex);
-    m_VBView.SizeInBytes = UINT(sizeof(SimpleVertex) * geometryData.vertices.size());
+    m_VBView.SizeInBytes = static_cast<UINT>(sizeof(SimpleVertex) * vertexCount);
 
     // SRV view of simple vertex buffer
     D3D12_SHADER_RESOURCE_VIEW_DESC vertexBufferSRVdesc = {};
     vertexBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     vertexBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
     vertexBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-    vertexBufferSRVdesc.Buffer.NumElements = geometryData.vertices.size();
+    vertexBufferSRVdesc.Buffer.NumElements = vertexCount;
     vertexBufferSRVdesc.Buffer.StructureByteStride = sizeof(SimpleVertex);
 
     GetDevice()->CreateShaderResourceView(m_vertexBuffer, &vertexBufferSRVdesc, m_descriptorHeap.hCPU(VBInput_UavHeapOffset));
 
     // Index buffer
     // upload to staging buffer
-    UploadBuffer<UINT> simpleIndexUploadBuffer(GetDevice(), geometryData.indices.size(), false);
-    simpleIndexUploadBuffer.CopyData(0, geometryData.indices.size(), &geometryData.indices[0]);
+    UploadBuffer<UINT> simpleIndexUploadBuffer(GetDevice(), indexCount, false);
+    simpleIndexUploadBuffer.CopyData(0, indexCopyCount, &geometryData.indices[0]);
     simpleIndexUploadBuffer.Unmap(); // Flush
 
-    indexBufferSize = sizeof(UINT) * geometryData.indices.size();
+    indexBufferSize = static_cast<UINT>(sizeof(UINT) * indexCount);
 
     const D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     HRR(GetDevice()->CreateCommittedResource(
@@ -609,7 +623,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     indexBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
     indexBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     indexBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-    indexBufferSRVdesc.Buffer.NumElements = geometryData.indices.size();
+    indexBufferSRVdesc.Buffer.NumElements = indexCount;
     indexBufferSRVdesc.Buffer.StructureByteStride = sizeof(UINT);
 
     GetDevice()->CreateShaderResourceView(m_indexBuffer, &indexBufferSRVdesc, m_descriptorHeap.hCPU(IBInput_SrvHeapOffset));
@@ -637,18 +651,18 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // initialize vertex buffer view
     m_skinnedVBView.BufferLocation = m_skinnedVertexBuffer.buffer->GetGPUVirtualAddress();
     m_skinnedVBView.StrideInBytes = sizeof(SkinnedVertex);
-    m_skinnedVBView.SizeInBytes = UINT(sizeof(SkinnedVertex) * geometryData.skinnedVertices.size());
+    m_skinnedVBView.SizeInBytes = static_cast<UINT>(sizeof(SkinnedVertex) * skinnedVertexCount);
 
     // SRV view of skinned vertex buffer
     D3D12_SHADER_RESOURCE_VIEW_DESC vertexSkinnedBufferSRVdesc = {};
     vertexSkinnedBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     vertexSkinnedBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
     vertexSkinnedBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-    vertexSkinnedBufferSRVdesc.Buffer.NumElements = geometryData.skinnedVertices.size();
+    vertexSkinnedBufferSRVdesc.Buffer.NumElements = skinnedVertexCount;
     vertexSkinnedBufferSRVdesc.Buffer.StructureByteStride = sizeof(SkinnedVertex);
     GetDevice()->CreateShaderResourceView(m_skinnedVertexBuffer, &vertexSkinnedBufferSRVdesc, m_descriptorHeap.hCPU(VBSkinnedInput_UavHeapOffset));
 
-    skinnedIndexBufferSize = sizeof(UINT) * geometryData.skinnedIndices.size();
+    skinnedIndexBufferSize = static_cast<UINT>(sizeof(UINT) * skinnedIndexCount);
 
     // Index buffer
     const D3D12_RESOURCE_DESC skinnedIndexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(skinnedIndexBufferSize);
@@ -677,7 +691,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     indexSkinnedBufferSRVdesc.Format = DXGI_FORMAT_UNKNOWN;
     indexSkinnedBufferSRVdesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     indexSkinnedBufferSRVdesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-    indexSkinnedBufferSRVdesc.Buffer.NumElements = geometryData.skinnedIndices.size();
+    indexSkinnedBufferSRVdesc.Buffer.NumElements = skinnedIndexCount;
     indexSkinnedBufferSRVdesc.Buffer.StructureByteStride = sizeof(UINT);
 
     GetDevice()->CreateShaderResourceView(m_skinnedIndexBuffer, &indexSkinnedBufferSRVdesc, m_descriptorHeap.hCPU(IBSkinnedInput_SrvHeapOffset));
@@ -2368,11 +2382,11 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         geometryCount += record.numInstances;
     if (geometryCount > m_maxBLASInstances)
         return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
-    for (int i = 0; i < m_drawRecords.size(); i++)
+    for (size_t i = 0; i < m_drawRecords.size(); i++)
     {
         DrawRecord& dr = m_drawRecords[i];
 
-        for (int instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
+        for (UINT instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
         {
             D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = m_bvhGeometryDescs[geometryDescIndex];
 

@@ -266,7 +266,7 @@ HRESULT Tree::ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderDat
             XMFLOAT3 childStart;
             XMStoreFloat3(&childStart, vChildStart);
 
-            TreeFrame childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), 0xFFFFFFFF, 0xFFFFFFFF, frame.instanceOffset };
+            TreeFrame childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), -1, -1, frame.instanceOffset };
             m_treeFrames[m_numTreeFrames++] = childFrame;
         }
     }

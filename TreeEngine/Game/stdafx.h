@@ -169,7 +169,7 @@ void SafeDelete(T* obj)
 // XSF_ASSERT
 #ifdef NDEBUG
 
-#define XSF_ASSERT( exp )  exp 
+#define XSF_ASSERT( exp )  ((void)0)
 #define XSF_RETURN_IF_FAILED( exp ) exp   
 #define XSF_ERROR_IF_FAILED( exp ) exp  
 

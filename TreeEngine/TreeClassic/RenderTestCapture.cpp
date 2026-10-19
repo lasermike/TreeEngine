@@ -138,7 +138,13 @@ int RunRenderTestCapture(Game& game)
                         { "accelerationStructureBytes", profile.accelerationStructureBytes },
                         { "rebuiltBLAS", profile.rebuiltBLAS }
                     });
-                    report["adapter"] = std::string(profile.adapter.begin(), profile.adapter.end());
+                    const int adapterBytes = WideCharToMultiByte(CP_UTF8, 0, profile.adapter.c_str(), -1, nullptr, 0, nullptr, nullptr);
+                    if (!adapterBytes) throw std::runtime_error("Cannot encode GPU adapter name as UTF-8");
+                    std::string adapter(adapterBytes, '\0');
+                    if (!WideCharToMultiByte(CP_UTF8, 0, profile.adapter.c_str(), -1, &adapter[0], adapterBytes, nullptr, nullptr))
+                        throw std::runtime_error("Cannot encode GPU adapter name as UTF-8");
+                    adapter.pop_back(); // Remove the terminator written by WideCharToMultiByte.
+                    report["adapter"] = adapter;
                 }
             }
             report["captures"].push_back({ { "time", point.time }, { "mode", point.mode }, { "success", true },
