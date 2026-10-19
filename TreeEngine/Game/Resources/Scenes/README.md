@@ -24,7 +24,7 @@ separately during activation. All catalog scenes use this path.
 - `version`: required schema version, currently `1`.
 - `name`: required nonempty display name.
 - `camera`: transform with optional `position`, `rotation`, and `scale`.
-- `render`: optional `clearColor`, `useShadowMaps`, and `useAlphaBlendedRenderTarget`.
+- `render`: optional `clearColor`, `farClippingPlane`, `useShadowMaps`, and `useAlphaBlendedRenderTarget`. The far plane defaults to 30 and must exceed the 0.2-unit near plane.
 - `light`: optional directional-light `ambient`, `diffuse`, `specular`, and `direction`.
 - `pointLightCount`: legacy point-light activation, `0` or `1`; point-light authoring is not migrated yet.
 - `materials`: map of names to material definitions.

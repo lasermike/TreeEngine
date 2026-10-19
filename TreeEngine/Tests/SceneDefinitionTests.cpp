@@ -175,13 +175,16 @@ int main(int argc, char** argv)
         Check(!primitive.hasMaterial, "omitted primitive material was marked as authored");
         Check(primitive.material.textureCoordScale.x == 1 && primitive.material.textureCoordScale.y == 1, "material UV default is not identity");
         Check(defaults.useShadowMaps && defaults.useAlphaBlendedRenderTarget, "render defaults changed");
+        Check(defaults.farClippingPlane == 30.0f, "far clipping default changed");
 
         auto authored = minimal;
+        authored["render"]["farClippingPlane"] = 300.0;
         authored["materials"]["grid"] = { { "texture", "grid.png" }, { "textureCoordScale", { 2, 3 } } };
         authored["objects"][0]["material"] = "grid";
         authored["objects"][0]["textureCoordScale"] = { 4, 5 };
         authored["objects"][0]["transform"] = { { "rotationDegrees", { 0, 0, 90 } }, { "scale", { -30, -30, -30 } } };
         auto named = SceneData::ParseScene(authored.dump(), "test.scene.json");
+        Check(named.farClippingPlane == 300.0f, "authored far clipping plane was lost");
         auto& ground = static_cast<SceneData::PrimitiveDefinition&>(*named.objects[0]);
         Check(ground.hasMaterial, "authored primitive material was marked as omitted");
         Check(ground.material.texture == "grid.png", "material reference did not resolve");
@@ -217,6 +220,8 @@ int main(int argc, char** argv)
         Reject(bad.dump(), "animationSpeed");
         bad = minimal; bad["version"] = 2;
         Reject(bad.dump(), "version");
+        bad = minimal; bad["render"]["farClippingPlane"] = 0.2;
+        Reject(bad.dump(), "farClippingPlane");
         bad = minimal; bad["render"]["useShadowMaps"] = "true";
         Reject(bad.dump(), "useShadowMaps");
         bad = minimal; bad["objects"][0]["cubeMap"] = true;
@@ -383,6 +388,7 @@ int main(int argc, char** argv)
         live.time = 12;
         live.frame = 99;
         live.projectionData.screenWidth = 1920;
+        live.projectionData.farClippingPlane = 30.0f;
         live.view._41 = 7;
         live.mSceneBounds.Radius = 5;
         live.shadowTransform._42 = 3;
@@ -391,6 +397,7 @@ int main(int argc, char** argv)
         nextSettings.clearColor = DirectX::XMFLOAT4(0.2f, 0.3f, 0.4f, 1);
         nextSettings.numDirectionalLights = 0;
         nextSettings.numPointLights = 1;
+        nextSettings.farClippingPlane = 300.0f;
         nextSettings.dirLights[0].Diffuse = DirectX::XMFLOAT4(0.7f, 0.8f, 0.9f, 1);
         nextSettings.pointLights[0].Position = DirectX::XMFLOAT3(1, 2, 3);
         live.ApplySceneSettings(nextSettings);
@@ -399,6 +406,7 @@ int main(int argc, char** argv)
         Check(live.dirLights[0].Diffuse.z == 0.9f && live.pointLights[0].Position.z == 3, "scene lights were not applied");
         Check(live.time == 12 && live.frame == 99, "applying scene settings reset frame state");
         Check(live.projectionData.screenWidth == 1920 && live.view._41 == 7, "applying scene settings replaced camera state");
+        Check(live.projectionData.farClippingPlane == 300.0f, "scene far clipping plane was not applied");
         Check(live.mSceneBounds.Radius == 5 && live.shadowTransform._42 == 3, "applying scene settings replaced computed shadow state");
         Check(live.instanceData == reinterpret_cast<InstancedData*>(&resourceSentinel)
             && live.instanceBuffer == reinterpret_cast<D3DBuffer*>(&resourceSentinel), "instance resources were replaced");

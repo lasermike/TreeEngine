@@ -249,6 +249,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
     gameData.useAlphaBlendedRenderTarget = definition.useAlphaBlendedRenderTarget;
     gameData.clearColor = definition.clearColor;
     renderSettings.clearColor = definition.clearColor;
+    renderSettings.farClippingPlane = definition.farClippingPlane;
     auto& light = renderSettings.dirLights[0];
     light.Ambient = definition.light.ambient;
     light.Diffuse = definition.light.diffuse;

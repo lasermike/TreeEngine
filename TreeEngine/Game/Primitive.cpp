@@ -59,7 +59,10 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
     shaderMaterial.textureCoordScale.x *= _params->textureCoordScale.x;
     shaderMaterial.textureCoordScale.y *= _params->textureCoordScale.y;
     Material* newMaterial = nullptr;
-    renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, shaderMaterial, StockRenderState(), &newMaterial);
+    StockRenderState renderState;
+    if (_params->cubeMap)
+        renderState.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
+    renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, shaderMaterial, renderState, &newMaterial);
     newMaterial->m_isSkybox = _params->cubeMap;
 
     Mesh* newMesh = nullptr;

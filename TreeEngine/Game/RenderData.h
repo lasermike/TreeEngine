@@ -103,6 +103,7 @@ struct RenderData : SceneRenderSettings
     void ApplySceneSettings(const SceneRenderSettings& settings)
     {
         SceneRenderSettings::operator=(settings);
+        projectionData.farClippingPlane = settings.farClippingPlane;
     }
 
     // General

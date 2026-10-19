@@ -221,8 +221,13 @@ namespace SceneData
             {
                 const auto& render = root["render"];
                 auto path = sourceName + ".render";
-                Fields(render, path, { "clearColor", "useShadowMaps", "useAlphaBlendedRenderTarget" });
+                Fields(render, path, { "clearColor", "farClippingPlane", "useShadowMaps", "useAlphaBlendedRenderTarget" });
                 if (render.contains("clearColor")) scene.clearColor = Vector4(render["clearColor"], path + ".clearColor");
+                if (render.contains("farClippingPlane"))
+                {
+                    scene.farClippingPlane = Number(render["farClippingPlane"], path + ".farClippingPlane");
+                    if (scene.farClippingPlane <= 0.2f) Invalid(path + ".farClippingPlane", "must be greater than the 0.2-unit near clipping plane");
+                }
                 if (render.contains("useShadowMaps")) scene.useShadowMaps = Boolean(render["useShadowMaps"], path + ".useShadowMaps");
                 if (render.contains("useAlphaBlendedRenderTarget")) scene.useAlphaBlendedRenderTarget = Boolean(render["useAlphaBlendedRenderTarget"], path + ".useAlphaBlendedRenderTarget");
             }

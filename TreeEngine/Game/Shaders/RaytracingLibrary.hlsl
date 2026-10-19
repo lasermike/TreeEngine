@@ -128,8 +128,9 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
     ShaderMaterial mat = materialBuffer[geomIndex];
     DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
 
-    // Backface culling for single-sided geometry (not alpha-clipped/double-sided)
-    if (mat.flags.z == 0 && HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
+    // Alpha-blended glTF geometry already has mirrored back-facing triangles.
+    // Cull their back faces to avoid coplanar hits with opposite normals.
+    if ((mat.flags.z == 0 || mat.flags.x > 0) && HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
     {
         IgnoreHit();
         return;
