@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "pch.h"
 #include <directxmath.h>
@@ -41,17 +41,25 @@ struct ShaderMaterial
         Ambient = Diffuse = Specular = Reflect = XMFLOAT4(0,0,0, 1.0f);
         flags = XMFLOAT4(0,0,0,0);
         textureCoordScale = XMFLOAT4(1, 1, 1, 1);
+        specularParams = XMFLOAT4(0, 0, 1, 1);
+        specularColor = XMFLOAT4(1, 1, 1, 0);
+        specularTextures = XMFLOAT4(-1, -1, 0, 0);
+        normalTextures = XMFLOAT4(-1, 1, 0, 0);
     }
 
     XMFLOAT4 Ambient;
     XMFLOAT4 Diffuse;
-    XMFLOAT4 Specular; // w = SpecPower
+    XMFLOAT4 Specular; // legacy Phong specular tint; w = SpecPower
     XMFLOAT4 Reflect;
     XMFLOAT4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
     XMFLOAT4 textureCoordScale; // xy = UV scale; float4 keeps CPU/HLSL packing aligned.
+    XMFLOAT4 specularParams; // enabled, metallic, roughness, specularFactor
+    XMFLOAT4 specularColor; // linear RGB factor; w = base-color clamp
+    XMFLOAT4 specularTextures; // strength/color texture slots; z/w = clamp flags
+    XMFLOAT4 normalTextures; // normal texture slot, scale, clamp flag
 };
 
-static_assert(sizeof(ShaderMaterial) == 96, "ShaderMaterial must match Materials.fx");
+static_assert(sizeof(ShaderMaterial) == 160, "ShaderMaterial must match Materials.fx");
 
 struct CBMaterial
 {

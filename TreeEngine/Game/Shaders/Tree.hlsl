@@ -1,4 +1,4 @@
-
+﻿
 //--------------------------------------------------------------------------------------
 // File: Tree.hlsl
 //
@@ -19,6 +19,24 @@ SamplerState samLinear : register(s0);
 SamplerComparisonState samShadowCompState  : register(s1);
 SamplerState samPoint : register(s2);
 SamplerState samLinearWrap : register(s3);
+SamplerState samLinearClamp : register(s4);
+Texture2D txSpecular : register(t3);
+Texture2D txSpecularColor : register(t4);
+Texture2D txNormal : register(t5);
+
+ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
+{
+    if (material.specularParams.x > 0)
+    {
+        if (material.specularTextures.x >= 0)
+            material.specularParams.w *= material.specularTextures.z > 0
+                ? txSpecular.Sample(samLinearClamp, uv).a : txSpecular.Sample(samLinearWrap, uv).a;
+        if (material.specularTextures.y >= 0)
+            material.specularColor.rgb *= material.specularTextures.w > 0
+                ? txSpecularColor.Sample(samLinearClamp, uv).rgb : txSpecularColor.Sample(samLinearWrap, uv).rgb;
+    }
+    return material;
+}
 
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
@@ -219,7 +237,9 @@ float4 PS(PS_INPUT input) : SV_Target
     float4 textureColor;
     if (mat.flags.y > 0)  //use texture
     {
-        textureColor = txDiffuse.Sample(samLinearWrap, input.Tex * mat.textureCoordScale.xy);
+        textureColor = (mat.specularParams.x > 0 && mat.specularColor.w > 0
+            ? txDiffuse.Sample(samLinearClamp, input.Tex * mat.textureCoordScale.xy)
+            : txDiffuse.Sample(samLinearWrap, input.Tex * mat.textureCoordScale.xy));
 
         if (mat.flags.z > 0)  // clip alpha threshold
         {
@@ -232,6 +252,17 @@ float4 PS(PS_INPUT input) : SV_Target
     if (mat.flags.w > 0)
         return mat.Diffuse * textureColor;
 
+    float2 materialUv = input.Tex * mat.textureCoordScale.xy;
+    ShaderMaterial sampledMaterial = SampleSpecularMaterial(mat, materialUv);
+    if (mat.normalTextures.x >= 0)
+    {
+        float3 tangentNormal = (mat.normalTextures.z > 0
+            ? txNormal.Sample(samLinearClamp, materialUv)
+            : txNormal.Sample(samLinearWrap, materialUv)).xyz * 2.0f - 1.0f;
+        tangentNormal.xy *= mat.normalTextures.y;
+        float3x3 normalTbn = float3x3(normalize(input.T), normalize(input.B), normalize(input.N));
+        normal = normalize(mul(tangentNormal, normalTbn));
+    }
     // Only the first light casts a shadow.
     float3 shadow = float3(1.0f, 1.0f, 1.0f);
 
@@ -245,7 +276,7 @@ float4 PS(PS_INPUT input) : SV_Target
     for (int i = 0; i < numDirectionalLights; ++i)
     {
         float4 A, D, S;
-        ComputeDirectionalLight(mat, textureColor, light /*gDirLights[i]*/, normal, toEye, A, D, S);
+        ComputeDirectionalLight(sampledMaterial, textureColor, light /*gDirLights[i]*/, normal, toEye, A, D, S);
 
         ambient += A;
         diffuse += shadow[0] * D; // diffuse += D
@@ -300,7 +331,9 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
 {
     if (mat.flags.z > 0)  // clip alpha threshold
     {
-        float4 textureColor = txDiffuse.Sample(samLinearWrap, input.Tex * mat.textureCoordScale.xy);
+        float4 textureColor = (mat.specularParams.x > 0 && mat.specularColor.w > 0
+            ? txDiffuse.Sample(samLinearClamp, input.Tex * mat.textureCoordScale.xy)
+            : txDiffuse.Sample(samLinearWrap, input.Tex * mat.textureCoordScale.xy));
 
         // Don't write transparent pixels to the shadow map.
         clip(textureColor.a - mat.flags.z);

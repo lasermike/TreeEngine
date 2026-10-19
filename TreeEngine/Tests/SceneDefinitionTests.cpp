@@ -1,9 +1,10 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "GltfLoader.h"
 #include "SceneDefinition.h"
 #include "RenderData.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 
@@ -46,10 +47,109 @@ namespace
     }
 }
 
+void TestSpecularExtension()
+{
+    std::ifstream input(TestDataFilename("static-scene.gltf"));
+    Json fixture;
+    input >> fixture;
+    const std::string path = TestDataFilename("specular-generated-" + std::to_string(GetCurrentProcessId()) + ".gltf");
+    struct Cleanup { std::string path; ~Cleanup() { DeleteFileA(path.c_str()); } } cleanup{ path };
+    auto load = [&](const Json& source) {
+        std::ofstream out(path, std::ios::binary);
+        out << source.dump();
+        out.close();
+        Check(!out.fail(), "could not write specular test asset");
+        return LoadGltfAsset(path);
+    };
+    auto reject = [&](const Json& source, const char* expected) {
+        try { load(source); }
+        catch (const std::runtime_error& e) {
+            Check(std::string(e.what()).find(expected) != std::string::npos, "specular rejection lacks context");
+            return;
+        }
+        throw std::runtime_error("Invalid specular material was accepted");
+    };
+    auto legacy = load(fixture);
+    Check(legacy->materials[0].shaderMaterial.specularParams.x == 0, "legacy material enabled specular extension");
+    fixture["extensionsUsed"] = { "KHR_materials_specular" };
+    fixture["extensionsRequired"] = { "KHR_materials_specular" };
+    auto& material = fixture["materials"][0];
+    material["extensions"] = { { "KHR_materials_specular", Json::object() } };
+    auto defaults = load(fixture);
+    const auto& defaultMat = defaults->materials[0];
+    Check(defaultMat.shaderMaterial.specularParams.x == 1 && defaultMat.shaderMaterial.specularParams.w == 1,
+        "specular default strength or required extension import failed");
+    Check(defaultMat.shaderMaterial.specularColor.x == 1 && defaultMat.specularTextureIndex == -1,
+        "specular default color or missing texture changed");
+    auto& spec = material["extensions"]["KHR_materials_specular"];
+    spec["specularFactor"] = 0;
+    spec["specularColorFactor"] = { 2.0, 0.5, 0.25 };
+    auto authored = load(fixture);
+    Check(authored->materials[0].shaderMaterial.specularParams.w == 0, "zero specular strength was lost");
+    Check(authored->materials[0].shaderMaterial.specularColor.x == 2, "specular color above one was clamped at import");
+    material["pbrMetallicRoughness"]["metallicFactor"] = 1.0;
+    material["pbrMetallicRoughness"]["roughnessFactor"] = 0.3;
+    auto metal = load(fixture);
+    Check(metal->materials[0].shaderMaterial.specularParams.y == 1 &&
+        std::abs(metal->materials[0].shaderMaterial.specularParams.z - 0.3f) < 1e-6f, "PBR factors were lost");
+    material["normalTexture"] = { { "index", 0 }, { "scale", 0.35 } };
+    auto normalMapped = load(fixture);
+    Check(normalMapped->materials[0].normalTextureIndex >= 0, "normal texture was not imported");
+    Check(std::abs(normalMapped->materials[0].shaderMaterial.normalTextures.y - 0.35f) < 1e-6f, "normal texture scale was lost");
+    Check(normalMapped->textures[normalMapped->materials[0].normalTextureIndex].colorSpace == 1, "normal texture is not linear data");
+    spec["specularTexture"] = { { "index", 0 } };
+    spec["specularColorTexture"] = { { "index", 0 } };
+    auto textured = load(fixture);
+    const auto& tm = textured->materials[0];
+    Check(tm.specularTextureIndex >= 0 && tm.specularColorTextureIndex >= 0, "specular maps were not imported");
+    Check(tm.specularTextureIndex != tm.specularColorTextureIndex, "linear and sRGB texture roles were conflated");
+    Check(tm.textureIndex == tm.specularColorTextureIndex, "same sRGB texture was not deduplicated");
+    Check(textured->textures[tm.specularTextureIndex].colorSpace == 1 &&
+        textured->textures[tm.specularColorTextureIndex].colorSpace == 2, "specular texture color spaces are incorrect");
+    Check(textured->textures[tm.specularTextureIndex].IsMemoryBacked(), "external specular image bytes missing");
+    fixture["samplers"] = Json::array({ { { "wrapS", 33071 }, { "wrapT", 33071 } } });
+    fixture["textures"][0]["sampler"] = 0;
+    auto clamped = load(fixture);
+    Check(clamped->materials[0].shaderMaterial.specularTextures.z == 1 &&
+        clamped->materials[0].shaderMaterial.specularTextures.w == 1, "specular clamp modes lost");
+    auto bad = fixture;
+    bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularFactor"] = -0.1;
+    reject(bad, "specularFactor");
+    bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularFactor"] = 1.1;
+    reject(bad, "specularFactor");
+    bad = fixture;
+    bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularColorFactor"] = { 1, -1, 1 };
+    reject(bad, "specularColorFactor");
+    bad = fixture;
+    bad["materials"][0]["extensions"]["KHR_materials_unlit"] = Json::object();
+    reject(bad, "KHR_materials_unlit");
+    bad = fixture;
+    bad["materials"][0]["normalTexture"] = { { "index", 0 }, { "scale", -0.1 } };
+    reject(bad, "normalTexture.scale");
+    bad = fixture;
+    bad["materials"][0]["normalTexture"] = { { "index", 0 }, { "texCoord", 1 } };
+    reject(bad, "TEXCOORD_1");
+    bad = fixture;
+    bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularTexture"]["texCoord"] = 1;
+    reject(bad, "TEXCOORD_1");
+    bad = fixture;
+    bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularColorTexture"]["extensions"]["KHR_texture_transform"] = Json::object();
+    reject(bad, "KHR_texture_transform");
+    bad = fixture;
+    bad["extensionsRequired"].push_back("UNKNOWN_test_extension");
+    reject(bad, "UNKNOWN_test_extension");
+}
+
 int main(int argc, char** argv)
 {
     try
     {
+        TestSpecularExtension();
+        if (argc > 1 && std::string(argv[1]) == "--specular-only")
+        {
+            std::cout << checks << " specular extension checks passed\n";
+            return 0;
+        }
         const auto minimal = Json::parse(R"({"version":1,"name":"Example","objects":[{"id":"box","type":"primitive"}]})");
         auto defaults = SceneData::ParseScene(minimal.dump(), "test.scene.json");
         Check(defaults.objects.size() == 1, "default object missing");

@@ -122,6 +122,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
         }
     }
     m_textures.clear();
+    m_gltfTextureSlots.clear();
      
     for (auto m : m_materials)
     {
@@ -341,6 +342,31 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
     return S_OK;
 }
 
+HRESULT RenderManager::LoadGltfTexture(const GltfTextureSource& source, LoadedTexture** texture, int* textureSlot)
+{
+    auto existing = m_textures.find(source.key);
+    if (existing != m_textures.end())
+    {
+        *texture = existing->second;
+        if (textureSlot)
+        {
+            auto slot = m_gltfTextureSlots.find(source.key);
+            if (slot == m_gltfTextureSlots.end()) return E_UNEXPECTED;
+            *textureSlot = slot->second;
+        }
+        return S_OK;
+    }
+    if (!source.IsMemoryBacked()) return E_INVALIDARG;
+    if (m_textures.size() >= 8) return E_BOUNDS;
+    const int slot = static_cast<int>(m_textures.size());
+    HRR(GetPlatform()->LoadTextureFromMemory(source.key.c_str(), source.encodedData.data(),
+        source.encodedData.size(), slot, texture, source.colorSpace));
+    m_textures[source.key] = *texture;
+    m_gltfTextureSlots[source.key] = slot;
+    if (textureSlot) *textureSlot = slot;
+    return S_OK;
+}
+
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
     const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
     const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,
@@ -361,21 +387,7 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const GltfTextureSour
     }
 
     LoadedTexture* texture = nullptr;
-    auto existingTexture = m_textures.find(textureSource->key);
-    if (existingTexture == m_textures.end())
-    {
-        HRR(GetPlatform()->LoadTextureFromMemory(
-            textureSource->key.c_str(),
-            textureSource->encodedData.data(),
-            textureSource->encodedData.size(),
-            static_cast<int>(m_textures.size()),
-            &texture));
-        m_textures[textureSource->key] = texture;
-    }
-    else
-    {
-        texture = existingTexture->second;
-    }
+    HRR(LoadGltfTexture(*textureSource, &texture));
 
     VertexShader* vertexShader = nullptr;
     PixelShader* pixelShader = nullptr;

@@ -1,4 +1,4 @@
-//=============================================================================
+﻿//=============================================================================
 // Performs a separable Guassian blur with a blur radius up to 5 pixels.
 //=============================================================================
  
@@ -54,6 +54,10 @@ struct DrawRecord
     float4 matReflect;
     float4 matFlags;
     float4 matTextureCoordScale;
+    float4 matSpecularParams;
+    float4 matSpecularColor;
+    float4 matSpecularTextures;
+    float4 matNormalTextures;
     int textureIndex;
 };
 

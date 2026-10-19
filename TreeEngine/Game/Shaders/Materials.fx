@@ -1,4 +1,4 @@
-//***************************************************************************************
+﻿//***************************************************************************************
 // LightHelper.fx by Frank Luna (C) 2011 All Rights Reserved.
 //
 // Structures and functions for lighting calculations.
@@ -46,10 +46,14 @@ struct ShaderMaterial
 {
     float4 Ambient;
     float4 Diffuse;
-    float4 Specular; // w = SpecPower
+    float4 Specular; // legacy Phong specular tint; w = SpecPower
     float4 Reflect;
     float4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
     float4 textureCoordScale; // xy = UV scale
+    float4 specularParams; // enabled, metallic, roughness, specularFactor
+    float4 specularColor; // linear RGB factor; w = base-color clamp
+    float4 specularTextures; // strength/color slots; z/w = clamp flags
+    float4 normalTextures; // normal texture slot, scale, clamp flag
 };
 
 //---------------------------------------------------------------------------------------
@@ -57,6 +61,45 @@ struct ShaderMaterial
 // from a directional light.  We need to output the terms separately because
 // later we will modify the individual terms.
 //---------------------------------------------------------------------------------------
+// KHR_materials_specular dielectric Fresnel, with GGX and correlated Smith visibility.
+// Texture factors are applied to a local material before this shared raster/DXR function.
+void ComputeGltfSpecularLight(ShaderMaterial mat, float4 textureColor, DirectionalLight light,
+    float3 normal, float3 toEye, out float4 ambient, out float4 diffuse, out float4 spec)
+{
+    const float pi = 3.14159265359f;
+    float metallic = saturate(mat.specularParams.y);
+    float roughness = max(saturate(mat.specularParams.z), 0.045f);
+    float strength = saturate(mat.specularParams.w);
+    float3 baseColor = mat.Diffuse.rgb * textureColor.rgb;
+    float3 dielectricF0 = min(0.04f * mat.specularColor.rgb, 1.0f) * strength;
+    float3 f0 = lerp(dielectricF0, baseColor, metallic);
+    float f90 = lerp(strength, 1.0f, metallic);
+    float3 N = normalize(normal);
+    float3 V = normalize(toEye);
+    float3 L = normalize(-light.Direction);
+    float nl = saturate(dot(N, L));
+    float nv = saturate(dot(N, V));
+    float3 halfVector = L + V;
+    float3 H = halfVector * rsqrt(max(dot(halfVector, halfVector), 1e-8f));
+    float nh = saturate(dot(N, H));
+    float vh = saturate(dot(V, H));
+    float fresnelWeight = pow(1.0f - vh, 5.0f);
+    float3 F = lerp(f0, f90.xxx, fresnelWeight);
+    float3 dielectricF = lerp(dielectricF0, strength.xxx, fresnelWeight);
+    float diffuseWeight = (1.0f - max(dielectricF.r, max(dielectricF.g, dielectricF.b))) * (1.0f - metallic);
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    float denominator = nh * nh * (alpha2 - 1.0f) + 1.0f;
+    float D = alpha2 / (pi * denominator * denominator);
+    float visibility = 0.5f / max(
+        nl * sqrt(nv * nv * (1.0f - alpha2) + alpha2) +
+        nv * sqrt(nl * nl * (1.0f - alpha2) + alpha2), 1e-6f);
+    // Existing ambient light is an artistic approximation, not an environment BRDF.
+    ambient = float4(mat.Ambient.rgb * textureColor.rgb * light.Ambient.rgb * (1.0f - metallic), 1);
+    diffuse = float4(diffuseWeight * baseColor * light.Diffuse.rgb * (nl / pi), 0);
+    spec = float4(F * D * visibility * nl * light.Specular.rgb * (nv > 0 ? 1.0f : 0.0f), 0);
+}
+
 void ComputeDirectionalLight(ShaderMaterial mat, float4 textureColor, DirectionalLight L,
     float3 normal, float3 toEye,
     out float4 ambient,
@@ -67,6 +110,12 @@ void ComputeDirectionalLight(ShaderMaterial mat, float4 textureColor, Directiona
     ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
     diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
     spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+    if (mat.specularParams.x > 0)
+    {
+        ComputeGltfSpecularLight(mat, textureColor, L, normal, toEye, ambient, diffuse, spec);
+        return;
+    }
 
     // The light vector aims opposite the direction the light rays travel.
     float3 lightVec = -L.Direction;

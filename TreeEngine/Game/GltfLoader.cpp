@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "GltfLoader.h"
 
 #pragma warning(push)
@@ -294,14 +294,9 @@ namespace
 
     void ValidateRequiredExtensions(const std::string& filename, const cgltf_data& data)
     {
-        if (!data.extensions_required_count) return;
-        std::ostringstream message;
-        message << "required glTF extension";
-        if (data.extensions_required_count > 1) message << "s";
-        message << " not supported:";
         for (size_t i = 0; i < data.extensions_required_count; ++i)
-            message << (i ? ", " : " ") << data.extensions_required[i];
-        ImportError(filename, message.str());
+            if (strcmp(data.extensions_required[i], "KHR_materials_specular") != 0)
+                ImportError(filename, std::string("required glTF extension not supported: ") + data.extensions_required[i]);
     }
 
     GltfTextureSource ImportTexture(
@@ -366,7 +361,7 @@ namespace
         const cgltf_data& data,
         const cgltf_material* material,
         std::vector<GltfTextureSource>& textures,
-        std::map<const cgltf_texture*, size_t>& textureMap)
+        std::map<std::pair<const cgltf_texture*, int>, size_t>& textureMap)
     {
         GltfMaterialData result;
         result.shaderMaterial.Ambient = XMFLOAT4(.15f, .15f, .15f, 1);
@@ -378,12 +373,12 @@ namespace
         size_t materialIndex = PointerIndex(material, data.materials, sizeof(cgltf_material));
         std::string materialName = NameOrIndex(material->name, "material", materialIndex);
         if (material->has_pbr_specular_glossiness || material->has_clearcoat || material->has_transmission
-            || material->has_volume || material->has_ior || material->has_specular || material->has_sheen
+            || material->has_volume || material->has_ior || material->has_sheen
             || material->has_emissive_strength || material->has_iridescence || material->has_diffuse_transmission
             || material->has_anisotropy || material->has_dispersion)
             ImportError(filename, materialName + " uses an unsupported material extension");
-        if (material->normal_texture.texture || material->occlusion_texture.texture || material->emissive_texture.texture)
-            ImportError(filename, materialName + " uses unsupported normal, occlusion, or emissive textures");
+        if (material->occlusion_texture.texture || material->emissive_texture.texture)
+            ImportError(filename, materialName + " uses unsupported occlusion or emissive textures");
         if (material->emissive_factor[0] != 0 || material->emissive_factor[1] != 0 || material->emissive_factor[2] != 0)
             ImportError(filename, materialName + " uses unsupported emissive output");
 
@@ -409,41 +404,95 @@ namespace
         result.shaderMaterial.flags.w = material->unlit ? 1.0f : 0.0f;
         result.doubleSided = material->double_sided != 0;
 
-        const auto& textureView = pbr.base_color_texture;
-        if (textureView.texture)
+        if (material->has_specular)
         {
-            if (textureView.texcoord != 0)
-                ImportError(filename, materialName + " uses unsupported texture coordinate set TEXCOORD_" + std::to_string(textureView.texcoord));
-            if (textureView.has_transform)
-                ImportError(filename, materialName + " uses unsupported KHR_texture_transform");
-            const auto* texture = textureView.texture;
-            if (texture->sampler)
-            {
-                const auto& sampler = *texture->sampler;
-                if (sampler.wrap_s != sampler.wrap_t || sampler.wrap_s == cgltf_wrap_mode_mirrored_repeat)
-                    ImportError(filename, materialName + " uses unsupported texture wrapping");
-                if (sampler.mag_filter == cgltf_filter_type_nearest
-                    || sampler.min_filter == cgltf_filter_type_nearest
-                    || sampler.min_filter == cgltf_filter_type_nearest_mipmap_nearest
-                    || sampler.min_filter == cgltf_filter_type_nearest_mipmap_linear)
-                    ImportError(filename, materialName + " uses unsupported nearest-neighbor texture filtering");
-                result.wrapTexture = sampler.wrap_s != cgltf_wrap_mode_clamp_to_edge;
-            }
+            const auto& spec = material->specular;
+            if (material->unlit)
+                ImportError(filename, materialName + " combines KHR_materials_specular with KHR_materials_unlit");
+            if (!std::isfinite(spec.specular_factor) || spec.specular_factor < 0 || spec.specular_factor > 1)
+                ImportError(filename, materialName + " specularFactor must be in [0, 1]");
+            for (float component : spec.specular_color_factor)
+                if (!std::isfinite(component) || component < 0)
+                    ImportError(filename, materialName + " specularColorFactor must be finite and nonnegative");
+            result.shaderMaterial.specularParams = XMFLOAT4(1, metallic, roughness, spec.specular_factor);
+            result.shaderMaterial.specularColor = XMFLOAT4(spec.specular_color_factor[0],
+                spec.specular_color_factor[1], spec.specular_color_factor[2], 0);
+        }
 
-            auto existing = textureMap.find(texture);
-            if (existing == textureMap.end())
+        auto importView = [&](const cgltf_texture_view& textureView, int colorSpace, bool& wrap) -> int
+        {
+            if (textureView.texture)
             {
-                size_t index = textures.size();
-                textures.push_back(ImportTexture(filename, *texture,
-                    PointerIndex(texture, data.textures, sizeof(cgltf_texture))));
-                textureMap.emplace(texture, index);
-                result.textureIndex = static_cast<int>(index);
+                if (textureView.texcoord != 0)
+                    ImportError(filename, materialName + " uses unsupported texture coordinate set TEXCOORD_" + std::to_string(textureView.texcoord));
+                if (textureView.has_transform)
+                    ImportError(filename, materialName + " uses unsupported KHR_texture_transform");
+                const auto* texture = textureView.texture;
+                if (texture->sampler)
+                {
+                    const auto& sampler = *texture->sampler;
+                    if (sampler.wrap_s != sampler.wrap_t || sampler.wrap_s == cgltf_wrap_mode_mirrored_repeat)
+                        ImportError(filename, materialName + " uses unsupported texture wrapping");
+                    if (sampler.mag_filter == cgltf_filter_type_nearest
+                        || sampler.min_filter == cgltf_filter_type_nearest
+                        || sampler.min_filter == cgltf_filter_type_nearest_mipmap_nearest
+                        || sampler.min_filter == cgltf_filter_type_nearest_mipmap_linear)
+                        ImportError(filename, materialName + " uses unsupported nearest-neighbor texture filtering");
+                    wrap = sampler.wrap_s != cgltf_wrap_mode_clamp_to_edge;
+                }
+    
+                auto key = std::make_pair(texture, colorSpace);
+                auto existing = textureMap.find(key);
+                if (existing == textureMap.end())
+                {
+                    size_t index = textures.size();
+                    textures.push_back(ImportTexture(filename, *texture,
+                        PointerIndex(texture, data.textures, sizeof(cgltf_texture))));
+                    auto& source = textures.back();
+                    source.colorSpace = colorSpace;
+                    if (colorSpace)
+                    {
+                        // Core glTF images are PNG/JPEG. DDS remains supported on the legacy path.
+                        if (!source.IsMemoryBacked())
+                        {
+                            auto dot = source.filename.find_last_of(L'.');
+                            if (dot != std::wstring::npos && _wcsicmp(source.filename.c_str() + dot, L".dds") == 0)
+                                ImportError(filename, materialName + " material maps require PNG/JPEG images");
+                            std::ifstream input(source.filename.c_str(), std::ios::binary);
+                            source.encodedData.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+                            if (source.encodedData.empty()) ImportError(filename, materialName + " has an empty texture image");
+                        }
+                        source.key += colorSpace == 2 ? L"#srgb" : L"#linear";
+                    }
+                    textureMap.emplace(key, index);
+                    return static_cast<int>(index);
+                }
+                else
+                {
+                    return static_cast<int>(existing->second);
+                }
             }
-            else
-            {
-                result.textureIndex = static_cast<int>(existing->second);
-            }
-            result.shaderMaterial.flags.y = 1;
+            return -1;
+        };
+        result.textureIndex = importView(pbr.base_color_texture, material->has_specular ? 2 : 0, result.wrapTexture);
+        if (material->normal_texture.texture)
+        {
+            if (!std::isfinite(material->normal_texture.scale) || material->normal_texture.scale < 0)
+                ImportError(filename, materialName + " normalTexture.scale must be finite and nonnegative");
+            bool normalWrap = true;
+            result.normalTextureIndex = importView(material->normal_texture, 1, normalWrap);
+            result.shaderMaterial.normalTextures.y = material->normal_texture.scale;
+            result.shaderMaterial.normalTextures.z = normalWrap ? 0.0f : 1.0f;
+        }
+        result.shaderMaterial.flags.y = result.textureIndex >= 0 ? 1.0f : 0.0f;
+        if (material->has_specular)
+        {
+            bool strengthWrap = true, colorWrap = true;
+            result.specularTextureIndex = importView(material->specular.specular_texture, 1, strengthWrap);
+            result.specularColorTextureIndex = importView(material->specular.specular_color_texture, 2, colorWrap);
+            result.shaderMaterial.specularTextures.z = strengthWrap ? 0.0f : 1.0f;
+            result.shaderMaterial.specularTextures.w = colorWrap ? 0.0f : 1.0f;
+            result.shaderMaterial.specularColor.w = result.wrapTexture ? 0.0f : 1.0f;
         }
         return result;
     }
@@ -452,13 +501,15 @@ namespace
         const std::string& filename,
         const cgltf_primitive& source,
         bool mirrored,
-        bool doubleSided)
+        bool doubleSided,
+        bool requiresTexcoords)
     {
         const auto* positions = FindAttribute(source, cgltf_attribute_type_position, 0);
         const auto* normals = FindAttribute(source, cgltf_attribute_type_normal, 0);
         const auto* texcoords = FindAttribute(source, cgltf_attribute_type_texcoord, 0);
         const auto* tangents = FindAttribute(source, cgltf_attribute_type_tangent, 0);
         if (!positions) ImportError(filename, "mesh primitive is missing POSITION");
+        if (requiresTexcoords && !texcoords) ImportError(filename, "normal texture requires TEXCOORD_0");
         ValidateAccessor(filename, positions, "POSITION");
         ValidateAccessor(filename, normals, "NORMAL");
         ValidateAccessor(filename, texcoords, "TEXCOORD_0");
@@ -589,7 +640,7 @@ namespace
                 if (existing == primitiveMap.end())
                 {
                     importedPrimitiveIndex = asset->primitives.size();
-                    asset->primitives.push_back(ImportPrimitive(filename, primitive, mirrored, doubleSided));
+                    asset->primitives.push_back(ImportPrimitive(filename, primitive, mirrored, doubleSided, asset->materials[materialIndex].normalTextureIndex >= 0));
                     primitiveMap.emplace(key, importedPrimitiveIndex);
                 }
                 else
@@ -655,7 +706,7 @@ std::shared_ptr<GltfAsset> LoadGltfAsset(const std::string& inputFilename)
 
     auto asset = std::make_shared<GltfAsset>();
     asset->sourceFilename = filename;
-    std::map<const cgltf_texture*, size_t> textureMap;
+    std::map<std::pair<const cgltf_texture*, int>, size_t> textureMap;
     std::vector<size_t> materialIndices(data->materials_count);
     for (size_t i = 0; i < data->materials_count; ++i)
     {

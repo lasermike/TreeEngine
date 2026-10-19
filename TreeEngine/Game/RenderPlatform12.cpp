@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 
 #include "RenderPlatform.h"
 #include "Settings.h"
@@ -180,7 +180,7 @@ enum CbvSrvUavHeapOffsets
 const int numGlobalDescriptors = Material0_HeapOffset;
 
 const int numConstantBuffersPerMaterial = 1;
-const int numTexturesPerMaterial = 1;
+const int numTexturesPerMaterial = 4; // base color, specular strength/color, normal
 const int numDescriptorsPerMaterial = numConstantBuffersPerMaterial + numTexturesPerMaterial;
 
 enum RtvHeapOffsets
@@ -211,6 +211,7 @@ enum RootSignatureParams
     ChangesPerPassRootSignatureParam,
     ChangesEveryFrameRootSignatureParam,
     UavTableRootSignatureParam,
+    SpecularSrvTableRootSignatureParam,
 };
 
 const UINT maxWorldVertices = 600000;
@@ -354,13 +355,15 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     //   cbuffer cbChangesEveryFrame : register(b2)
     //   cbuffer cbMaterial : register (b3)
 
-    CD3DX12_DESCRIPTOR_RANGE ranges[4];
+    CD3DX12_DESCRIPTOR_RANGE ranges[5];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
-    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numTexturesPerMaterial, 0 /* t0 */);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0 /* t0 */);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 6, 0 /* u0 */);
 
-    CD3DX12_ROOT_PARAMETER rootParameters[7];
+    ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 3 /* t3-t5 */);
+    CD3DX12_ROOT_PARAMETER rootParameters[8];
+    rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[MaterialCbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[MaterialSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -369,7 +372,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
     rootParameters[UavTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_ALL);
 
-    D3D12_STATIC_SAMPLER_DESC sampler[4];
+    D3D12_STATIC_SAMPLER_DESC sampler[5];
     sampler[0] = D3D12_STATIC_SAMPLER_DESC();
     sampler[1] = D3D12_STATIC_SAMPLER_DESC();
     sampler[2] = D3D12_STATIC_SAMPLER_DESC();
@@ -427,6 +430,10 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     sampler[3].ShaderRegister = 3;
     sampler[3].RegisterSpace = 0;
     sampler[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    sampler[4] = sampler[3];
+    sampler[4].ShaderRegister = 4;
+    sampler[4].AddressU = sampler[4].AddressV = sampler[4].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 
     CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
     rootSignatureDesc.Init(_countof(rootParameters), rootParameters, _countof(sampler), sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -1288,8 +1295,10 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     GetCommandList()->SetGraphicsRootDescriptorTable(MaterialCbvTableRootSignatureParam, ru->m_material->m_cbvSrvHeapTable);
 
     // Set texture buffer view
-    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(ru->m_material->m_cbvSrvHeapTable, numTexturesPerMaterial, m_descriptorHeap.GetIncrementSize());
+    CD3DX12_GPU_DESCRIPTOR_HANDLE textureRange(ru->m_material->m_cbvSrvHeapTable, 1, m_descriptorHeap.GetIncrementSize());
     GetCommandList()->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, textureRange);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE specularRange(ru->m_material->m_cbvSrvHeapTable, 2, m_descriptorHeap.GetIncrementSize());
+    GetCommandList()->SetGraphicsRootDescriptorTable(SpecularSrvTableRootSignatureParam, specularRange);
 
     GetCommandList()->SetPipelineState(ru->m_pipelineStates[pass]);
 
@@ -1368,7 +1377,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 
 HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** texture)
 {
-    assert(textureIndex < maxTotalTexturesInScene);
+    if (textureIndex < 0 || textureIndex >= maxTotalTexturesInScene) return E_BOUNDS;
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_descriptorHeap.GetIncrementSize());
 
     ID3D12Resource* resource = nullptr;
@@ -1415,12 +1424,12 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
     return S_OK;
 }
 
-HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* /*name*/, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** texture)
+HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* /*name*/, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** texture, int colorSpace)
 {
 #if defined(TREE_XBOX)
     return E_NOTIMPL;
 #else
-    assert(textureIndex < maxTotalTexturesInScene);
+    if (textureIndex < 0 || textureIndex >= maxTotalTexturesInScene) return E_BOUNDS;
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(
         m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(),
         textureIndex,
@@ -1431,7 +1440,11 @@ HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* /*name*/, const u
     ResourceUploadBatch resourceUpload(GetDevice());
     resourceUpload.Begin();
     CComPtr<ID3D12Resource> wicTexture;
-    HRR(CreateWICTextureFromMemory(GetDevice(), resourceUpload, data, dataSize, &wicTexture, true));
+    WIC_LOADER_FLAGS flags = WIC_LOADER_MIP_AUTOGEN;
+    if (colorSpace == 1) flags |= WIC_LOADER_IGNORE_SRGB;
+    if (colorSpace == 2) flags |= WIC_LOADER_FORCE_SRGB;
+    HRR(CreateWICTextureFromMemoryEx(GetDevice(), resourceUpload, data, dataSize, 0,
+        D3D12_RESOURCE_FLAG_NONE, flags, &wicTexture));
     resourceUpload.Transition(
         wicTexture,
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
@@ -1570,6 +1583,27 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     {
         D3D12_CPU_DESCRIPTOR_HANDLE dest = m_descriptorHeap.hCPU(materialNum * numDescriptorsPerMaterial + Texture0Srv_HeapOffset);
         GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    const int slots[3] = { static_cast<int>(shaderMaterial.specularTextures.x), static_cast<int>(shaderMaterial.specularTextures.y), static_cast<int>(shaderMaterial.normalTextures.x) };
+    for (int i = 0; i < 3; ++i)
+    {
+        auto dest = m_descriptorHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset + 2 + i);
+        if (slots[i] >= 0)
+        {
+            CD3DX12_CPU_DESCRIPTOR_HANDLE source(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(),
+                slots[i], m_descriptorHeap.GetIncrementSize());
+            GetDevice()->CopyDescriptorsSimple(1, dest, source, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        }
+        else
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC nullView = {};
+            nullView.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            nullView.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            nullView.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            nullView.Texture2D.MipLevels = 1;
+            GetDevice()->CreateShaderResourceView(nullptr, &nullView, dest);
+        }
     }
 
     Material* newMat = new Material(name, texture, vs, ps, shadowVs, shadowPs,
@@ -3069,6 +3103,7 @@ HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
 
     D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
     GetCommandList()->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, textureHandle);
+    GetCommandList()->SetGraphicsRootDescriptorTable(SpecularSrvTableRootSignatureParam, m_descriptorHeap.hGPU(Material0_HeapOffset + 2));
 
     // Set root signature constant buffers
     GetCommandList()->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());

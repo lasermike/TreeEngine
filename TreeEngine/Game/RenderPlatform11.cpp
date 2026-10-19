@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 
 #include "RenderPlatform11.h"
 
@@ -649,12 +649,13 @@ HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instan
 
     // Set samplers
     const XSF::StockRenderStates& stockStates = XSF::StockRenderStates::GetStates();
-    ID3D11SamplerState* samplers[4] = { stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap),
+    ID3D11SamplerState* samplers[5] = { stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap),
         stockStates.GetSamplerState(StockSamplerStates::UseShadowMap),
         stockStates.GetSamplerState(StockSamplerStates::MinMagLinearMipPointUVWClamp),
-        stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap)
+        stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWWrap),
+        stockStates.GetSamplerState(StockSamplerStates::MinMagMipLinearUVWClamp)
     };
-    m_immediateContext->PSSetSamplers(0, 4, samplers);
+    m_immediateContext->PSSetSamplers(0, 5, samplers);
 
     // Set shaders
     if (pass == ShadowMapPass)
@@ -810,7 +811,7 @@ HRESULT RenderPlatform11::SetRenderPhase(RenderState state)
     return hr;
 }
 
-HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int /*textureIndex*/, LoadedTexture** loadedTexture)
+HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture, int colorSpace)
 {
     // Load the Texture
     ID3D11ShaderResourceView* tex = nullptr;
@@ -834,15 +835,21 @@ HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int /*text
     return S_OK;
 }
 
-HRESULT RenderPlatform11::LoadTextureFromMemory(const wchar_t* /*name*/, const uint8_t* data, size_t dataSize, int /*textureIndex*/, LoadedTexture** loadedTexture)
+HRESULT RenderPlatform11::LoadTextureFromMemory(const wchar_t* /*name*/, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture, int colorSpace)
 {
     TextureCOMScope com;
     HRR(com.Result());
     DirectX::ScratchImage image;
-    HRR(DirectX::LoadFromWICMemory(data, dataSize, DirectX::WIC_FLAGS_NONE, nullptr, image));
+    if (textureIndex < 0 || textureIndex >= 8) return E_BOUNDS;
+    HRR(DirectX::LoadFromWICMemory(data, dataSize,
+        colorSpace ? DirectX::WIC_FLAGS_IGNORE_SRGB : DirectX::WIC_FLAGS_NONE, nullptr, image));
+    if (colorSpace == 2)
+        image.OverrideFormat(DirectX::MakeSRGB(image.GetMetadata().format));
     ID3D11ShaderResourceView* texture = nullptr;
     HRR(DirectX::CreateShaderResourceView(GetDevice(), image.GetImages(), image.GetImageCount(), image.GetMetadata(), &texture));
     *loadedTexture = new LoadedTexture(texture);
+
+    m_specularTextureViews[textureIndex] = texture;
     return S_OK;
 }
 
@@ -921,6 +928,13 @@ HRESULT RenderPlatform11::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     }
 
     m_immediateContext->PSSetShaderResources(0, 1, &texture);
+    const auto& specular = ru->m_material->m_shaderMaterial.specularTextures;
+    ID3D11ShaderResourceView* maps[3] = {
+        specular.x >= 0 ? m_specularTextureViews[static_cast<int>(specular.x)] : nullptr,
+        specular.y >= 0 ? m_specularTextureViews[static_cast<int>(specular.y)] : nullptr,
+        ru->m_material->m_shaderMaterial.normalTextures.x >= 0 ? m_specularTextureViews[static_cast<int>(ru->m_material->m_shaderMaterial.normalTextures.x)] : nullptr
+    };
+    m_immediateContext->PSSetShaderResources(3, 3, maps);
 
 
     // Set up input assembler

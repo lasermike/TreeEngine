@@ -1,4 +1,4 @@
-//--------------------------------------------------------------------------------------
+﻿//--------------------------------------------------------------------------------------
 // RaytracingLibrary.hlsl
 //
 // Single HLSL file containing a Ray Generation, Miss, Any-Hit and Closest Hit Shader
@@ -28,6 +28,14 @@ Texture2D<float4> sceneTextures[8] : register(t9);
 TextureCube<float4> skyTexture : register(t17);
 
 SamplerState samLinear : register(s0);
+SamplerState samLinearClamp : register(s1);
+
+float4 SampleSpecularTexture(int slot, float2 uv, bool clampTexture)
+{
+    return clampTexture
+        ? sceneTextures[NonUniformResourceIndex(slot)].SampleLevel(samLinearClamp, uv, 0)
+        : sceneTextures[NonUniformResourceIndex(slot)].SampleLevel(samLinear, uv, 0);
+}
 
 cbuffer Params : register(b0)
 {
@@ -50,11 +58,13 @@ static const uint SIMPLE_VERTEX_STRIDE = 44;
 static const uint SKINNED_VERTEX_STRIDE = 56;
 static const uint NORMAL_OFFSET = 12;
 static const uint TEX_OFFSET = 24;
+static const uint TANGENT_OFFSET = 32;
 
 struct SimpleVertexData
 {
     float3 normal;
     float2 tex;
+    float3 tangent;
 };
 
 SimpleVertexData LoadSimpleVertex(uint vertexIndex)
@@ -68,6 +78,7 @@ SimpleVertexData LoadSimpleVertex(uint vertexIndex)
     v.tex = asfloat(uint2(
         originalVertexBuffer.Load(address + TEX_OFFSET),
         originalVertexBuffer.Load(address + TEX_OFFSET + 4)));
+    v.tangent = asfloat(uint3(originalVertexBuffer.Load(address + TANGENT_OFFSET), originalVertexBuffer.Load(address + TANGENT_OFFSET + 4), originalVertexBuffer.Load(address + TANGENT_OFFSET + 8)));
     return v;
 }
 
@@ -82,6 +93,7 @@ SimpleVertexData LoadSkinnedVertex(uint vertexIndex)
     v.tex = asfloat(uint2(
         skinnedVertexBuffer.Load(address + TEX_OFFSET),
         skinnedVertexBuffer.Load(address + TEX_OFFSET + 4)));
+    v.tangent = asfloat(uint3(skinnedVertexBuffer.Load(address + TANGENT_OFFSET), skinnedVertexBuffer.Load(address + TANGENT_OFFSET + 4), skinnedVertexBuffer.Load(address + TANGENT_OFFSET + 8)));
     return v;
 }
 
@@ -139,7 +151,7 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 
         float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
 
-        float4 textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord * mat.textureCoordScale.xy, 0);
+        float4 textureColor = SampleSpecularTexture(geoInfo.textureIndex, texCoord * mat.textureCoordScale.xy, mat.specularParams.x > 0 && mat.specularColor.w > 0);
 
         if (textureColor.a < mat.flags.z)
         {
@@ -171,12 +183,24 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     SimpleVertexData sv1 = LoadOriginalVertex(geoInfo.baseVertexLocation + i1, geoInfo.isSkinned);
     SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
     float3 normal = normalize(sv0.normal * bary.x + sv1.normal * bary.y + sv2.normal * bary.z);
+    float3 tangent = normalize(sv0.tangent * bary.x + sv1.tangent * bary.y + sv2.tangent * bary.z);
 
     float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
 
     // Transform object-space normal to world space using instance world matrix
     float4x4 worldMatrix = instanceDataBuffer[geoInfo.instanceIndex].World;
     normal = normalize(mul(normal, (float3x3)worldMatrix));
+    tangent = normalize(mul(tangent, (float3x3)worldMatrix));
+    tangent = normalize(tangent - normal * dot(normal, tangent));
+
+    if (mat.normalTextures.x >= 0)
+    {
+        float2 normalUv = texCoord * mat.textureCoordScale.xy;
+        float3 tangentNormal = SampleSpecularTexture((int)mat.normalTextures.x, normalUv, mat.normalTextures.z > 0).xyz * 2.0f - 1.0f;
+        tangentNormal.xy *= mat.normalTextures.y;
+        float3 binormal = normalize(cross(normal, tangent));
+        normal = normalize(tangentNormal.x * tangent + tangentNormal.y * binormal + tangentNormal.z * normal);
+    }
 
     // Compute view direction for lighting
     float3 toEye = normalize(-WorldRayDirection());
@@ -185,7 +209,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float4 textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
     if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
     {
-        textureColor = sceneTextures[geoInfo.textureIndex].SampleLevel(samLinear, texCoord * mat.textureCoordScale.xy, 0);
+        textureColor = SampleSpecularTexture(geoInfo.textureIndex, texCoord * mat.textureCoordScale.xy, mat.specularParams.x > 0 && mat.specularColor.w > 0);
     }
 
     if (mat.flags.w > 0)
@@ -216,6 +240,19 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
         ~0, 0, 0, shadowMissIndex, shadowRay, shadowPayload);
     shadowFactor = shadowPayload.color.x;
+
+    if (mat.specularParams.x > 0)
+    {
+        float2 uv = texCoord * mat.textureCoordScale.xy;
+        if (mat.specularTextures.x >= 0)
+            mat.specularParams.w *= SampleSpecularTexture((int)mat.specularTextures.x, uv, mat.specularTextures.z > 0).a;
+        if (mat.specularTextures.y >= 0)
+            mat.specularColor.rgb *= SampleSpecularTexture((int)mat.specularTextures.y, uv, mat.specularTextures.w > 0).rgb;
+        float4 A, D, S;
+        ComputeDirectionalLight(mat, textureColor, light, normal, toEye, A, D, S);
+        payload.color = float4((A + shadowFactor * (D + S)).rgb, 1);
+        return;
+    }
 
     // Compute lighting manually with shadow factor
     float3 L = lightDir;

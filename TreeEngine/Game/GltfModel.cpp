@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "GltfModel.h"
 #include "RenderManager.h"
 
@@ -40,6 +40,27 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
         }
         ShaderMaterial shaderMaterial = imported.shaderMaterial;
+        if (imported.specularTextureIndex >= 0)
+        {
+            LoadedTexture* map = nullptr;
+            int slot = -1;
+            HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.specularTextureIndex], &map, &slot));
+            shaderMaterial.specularTextures.x = static_cast<float>(slot);
+        }
+        if (imported.normalTextureIndex >= 0)
+        {
+            LoadedTexture* map = nullptr;
+            int slot = -1;
+            HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.normalTextureIndex], &map, &slot));
+            shaderMaterial.normalTextures.x = static_cast<float>(slot);
+        }
+        if (imported.specularColorTextureIndex >= 0)
+        {
+            LoadedTexture* map = nullptr;
+            int slot = -1;
+            HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.specularColorTextureIndex], &map, &slot));
+            shaderMaterial.specularTextures.y = static_cast<float>(slot);
+        }
         if (m_forceLit)
             shaderMaterial.flags.w = 0.0f;
         std::wstring name = assetName + L"#material" + std::to_wstring(i)

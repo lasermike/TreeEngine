@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "GeometryGenerator.h"
 #include "Materials.h"
@@ -13,6 +13,7 @@ struct GltfTextureSource
     std::wstring filename;
     std::vector<uint8_t> encodedData;
     std::string mimeType;
+    int colorSpace = 0; // 0 = existing behavior, 1 = linear data, 2 = sRGB color
 
     bool IsMemoryBacked() const { return !encodedData.empty(); }
 };
@@ -21,6 +22,9 @@ struct GltfMaterialData
 {
     ShaderMaterial shaderMaterial;
     int textureIndex = -1;
+    int specularTextureIndex = -1;
+    int specularColorTextureIndex = -1;
+    int normalTextureIndex = -1;
     bool doubleSided = false;
     bool alphaBlend = false;
     bool wrapTexture = true;

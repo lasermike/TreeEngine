@@ -49,6 +49,7 @@ class RenderManager : public IRenderFrame
     std::map<wstring, Material*>                    m_materials;
     std::map<wstring, Mesh>                         m_meshes;
     std::map<wstring, LoadedTexture*>               m_textures;
+    std::map<std::wstring, int> m_gltfTextureSlots;
 
     std::map<wstring, VertexShader*>                m_vertexShaders;
     std::map<wstring, PixelShader*>                 m_pixelShaders;
@@ -124,6 +125,7 @@ public:
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, 
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename, 
                            ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
+    HRESULT LoadGltfTexture(const GltfTextureSource& source, LoadedTexture** texture, int* textureSlot = nullptr);
     HRESULT CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,
