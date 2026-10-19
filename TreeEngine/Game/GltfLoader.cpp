@@ -368,6 +368,7 @@ namespace
         result.shaderMaterial.Diffuse = XMFLOAT4(1, 1, 1, 1);
         result.shaderMaterial.Specular = XMFLOAT4(.04f, .04f, .04f, 16);
         result.shaderMaterial.Reflect = XMFLOAT4(0, 0, 0, 1);
+        result.shaderMaterial.specularParams = XMFLOAT4(1, 1, 1, 1);
         if (!material) return result;
 
         size_t materialIndex = PointerIndex(material, data.materials, sizeof(cgltf_material));
@@ -383,10 +384,13 @@ namespace
             ImportError(filename, materialName + " uses unsupported emissive output");
 
         const auto& pbr = material->pbr_metallic_roughness;
-        if (pbr.metallic_roughness_texture.texture)
-            ImportError(filename, materialName + " uses an unsupported metallic-roughness texture");
         float metallic = pbr.metallic_factor;
         float roughness = pbr.roughness_factor;
+        if (!std::isfinite(metallic) || metallic < 0 || metallic > 1)
+            ImportError(filename, materialName + " metallicFactor must be in [0, 1]");
+        if (!std::isfinite(roughness) || roughness < 0 || roughness > 1)
+            ImportError(filename, materialName + " roughnessFactor must be in [0, 1]");
+        result.shaderMaterial.specularParams = XMFLOAT4(1, metallic, roughness, 1);
         const float* color = pbr.base_color_factor;
         result.shaderMaterial.Ambient = XMFLOAT4(color[0] * .15f, color[1] * .15f, color[2] * .15f, color[3]);
         result.shaderMaterial.Diffuse = XMFLOAT4(color[0], color[1], color[2], color[3]);
@@ -474,7 +478,11 @@ namespace
             }
             return -1;
         };
-        result.textureIndex = importView(pbr.base_color_texture, material->has_specular ? 2 : 0, result.wrapTexture);
+        result.textureIndex = importView(pbr.base_color_texture, 2, result.wrapTexture);
+        result.shaderMaterial.specularColor.w = result.wrapTexture ? 0.0f : 1.0f;
+        bool metallicRoughnessWrap = true;
+        result.metallicRoughnessTextureIndex = importView(pbr.metallic_roughness_texture, 1, metallicRoughnessWrap);
+        result.shaderMaterial.metallicRoughnessTextures.y = metallicRoughnessWrap ? 0.0f : 1.0f;
         if (material->normal_texture.texture)
         {
             if (!std::isfinite(material->normal_texture.scale) || material->normal_texture.scale < 0)

@@ -47,6 +47,13 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.specularTextureIndex], &map, &slot));
             shaderMaterial.specularTextures.x = static_cast<float>(slot);
         }
+        if (imported.metallicRoughnessTextureIndex >= 0)
+        {
+            LoadedTexture* map = nullptr;
+            int slot = -1;
+            HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.metallicRoughnessTextureIndex], &map, &slot));
+            shaderMaterial.metallicRoughnessTextures.x = static_cast<float>(slot);
+        }
         if (imported.normalTextureIndex >= 0)
         {
             LoadedTexture* map = nullptr;

@@ -929,12 +929,13 @@ HRESULT RenderPlatform11::SetRenderUnit(RenderUnit* ru, RenderPass pass)
 
     m_immediateContext->PSSetShaderResources(0, 1, &texture);
     const auto& specular = ru->m_material->m_shaderMaterial.specularTextures;
-    ID3D11ShaderResourceView* maps[3] = {
+    ID3D11ShaderResourceView* maps[4] = {
         specular.x >= 0 ? m_specularTextureViews[static_cast<int>(specular.x)] : nullptr,
         specular.y >= 0 ? m_specularTextureViews[static_cast<int>(specular.y)] : nullptr,
-        ru->m_material->m_shaderMaterial.normalTextures.x >= 0 ? m_specularTextureViews[static_cast<int>(ru->m_material->m_shaderMaterial.normalTextures.x)] : nullptr
+        ru->m_material->m_shaderMaterial.normalTextures.x >= 0 ? m_specularTextureViews[static_cast<int>(ru->m_material->m_shaderMaterial.normalTextures.x)] : nullptr,
+        ru->m_material->m_shaderMaterial.metallicRoughnessTextures.x >= 0 ? m_specularTextureViews[static_cast<int>(ru->m_material->m_shaderMaterial.metallicRoughnessTextures.x)] : nullptr
     };
-    m_immediateContext->PSSetShaderResources(3, 3, maps);
+    m_immediateContext->PSSetShaderResources(3, 4, maps);
 
 
     // Set up input assembler

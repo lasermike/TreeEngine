@@ -54,6 +54,7 @@ struct ShaderMaterial
     float4 specularColor; // linear RGB factor; w = base-color clamp
     float4 specularTextures; // strength/color slots; z/w = clamp flags
     float4 normalTextures; // normal texture slot, scale, clamp flag
+    float4 metallicRoughnessTextures; // texture slot, clamp flag
 };
 
 //---------------------------------------------------------------------------------------

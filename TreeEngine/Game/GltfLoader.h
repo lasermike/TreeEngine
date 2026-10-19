@@ -25,6 +25,7 @@ struct GltfMaterialData
     int specularTextureIndex = -1;
     int specularColorTextureIndex = -1;
     int normalTextureIndex = -1;
+    int metallicRoughnessTextureIndex = -1;
     bool doubleSided = false;
     bool alphaBlend = false;
     bool wrapTexture = true;

@@ -70,7 +70,9 @@ void TestSpecularExtension()
         throw std::runtime_error("Invalid specular material was accepted");
     };
     auto legacy = load(fixture);
-    Check(legacy->materials[0].shaderMaterial.specularParams.x == 0, "legacy material enabled specular extension");
+    Check(legacy->materials[0].shaderMaterial.specularParams.x == 1, "standard metallic-roughness material did not enable PBR shading");
+    Check(legacy->materials[0].shaderMaterial.specularParams.y == 0 &&
+        std::abs(legacy->materials[0].shaderMaterial.specularParams.z - 0.8f) < 1e-6f, "standard metallic-roughness factors were not imported");
     fixture["extensionsUsed"] = { "KHR_materials_specular" };
     fixture["extensionsRequired"] = { "KHR_materials_specular" };
     auto& material = fixture["materials"][0];
@@ -89,14 +91,27 @@ void TestSpecularExtension()
     Check(authored->materials[0].shaderMaterial.specularColor.x == 2, "specular color above one was clamped at import");
     material["pbrMetallicRoughness"]["metallicFactor"] = 1.0;
     material["pbrMetallicRoughness"]["roughnessFactor"] = 0.3;
+    Json bad;
     auto metal = load(fixture);
     Check(metal->materials[0].shaderMaterial.specularParams.y == 1 &&
         std::abs(metal->materials[0].shaderMaterial.specularParams.z - 0.3f) < 1e-6f, "PBR factors were lost");
+    bad = fixture;
+    bad["materials"][0]["pbrMetallicRoughness"]["metallicFactor"] = 1.1;
+    reject(bad, "metallicFactor");
+    bad = fixture;
+    bad["materials"][0]["pbrMetallicRoughness"]["roughnessFactor"] = -0.1;
+    reject(bad, "roughnessFactor");
     material["normalTexture"] = { { "index", 0 }, { "scale", 0.35 } };
     auto normalMapped = load(fixture);
     Check(normalMapped->materials[0].normalTextureIndex >= 0, "normal texture was not imported");
     Check(std::abs(normalMapped->materials[0].shaderMaterial.normalTextures.y - 0.35f) < 1e-6f, "normal texture scale was lost");
     Check(normalMapped->textures[normalMapped->materials[0].normalTextureIndex].colorSpace == 1, "normal texture is not linear data");
+    material["pbrMetallicRoughness"]["metallicRoughnessTexture"] = { { "index", 0 } };
+    auto mrTextured = load(fixture);
+    const auto& mrMaterial = mrTextured->materials[0];
+    Check(mrMaterial.metallicRoughnessTextureIndex >= 0, "metallic-roughness texture was not imported");
+    Check(mrTextured->textures[mrMaterial.metallicRoughnessTextureIndex].colorSpace == 1, "metallic-roughness texture is not linear data");
+    Check(mrMaterial.shaderMaterial.metallicRoughnessTextures.y == 0, "default metallic-roughness wrap mode changed");
     spec["specularTexture"] = { { "index", 0 } };
     spec["specularColorTexture"] = { { "index", 0 } };
     auto textured = load(fixture);
@@ -112,7 +127,8 @@ void TestSpecularExtension()
     auto clamped = load(fixture);
     Check(clamped->materials[0].shaderMaterial.specularTextures.z == 1 &&
         clamped->materials[0].shaderMaterial.specularTextures.w == 1, "specular clamp modes lost");
-    auto bad = fixture;
+    Check(clamped->materials[0].shaderMaterial.metallicRoughnessTextures.y == 1, "metallic-roughness clamp mode lost");
+    bad = fixture;
     bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularFactor"] = -0.1;
     reject(bad, "specularFactor");
     bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularFactor"] = 1.1;

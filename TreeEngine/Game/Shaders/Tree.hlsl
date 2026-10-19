@@ -23,6 +23,7 @@ SamplerState samLinearClamp : register(s4);
 Texture2D txSpecular : register(t3);
 Texture2D txSpecularColor : register(t4);
 Texture2D txNormal : register(t5);
+Texture2D txMetallicRoughness : register(t6);
 
 ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
 {
@@ -34,6 +35,14 @@ ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
         if (material.specularTextures.y >= 0)
             material.specularColor.rgb *= material.specularTextures.w > 0
                 ? txSpecularColor.Sample(samLinearClamp, uv).rgb : txSpecularColor.Sample(samLinearWrap, uv).rgb;
+    }
+    if (material.metallicRoughnessTextures.x >= 0)
+    {
+        float4 mr = (material.metallicRoughnessTextures.y > 0
+            ? txMetallicRoughness.Sample(samLinearClamp, uv)
+            : txMetallicRoughness.Sample(samLinearWrap, uv));
+        material.specularParams.y *= mr.b;
+        material.specularParams.z *= mr.g;
     }
     return material;
 }

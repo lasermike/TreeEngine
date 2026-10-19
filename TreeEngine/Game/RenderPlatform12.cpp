@@ -180,7 +180,7 @@ enum CbvSrvUavHeapOffsets
 const int numGlobalDescriptors = Material0_HeapOffset;
 
 const int numConstantBuffersPerMaterial = 1;
-const int numTexturesPerMaterial = 4; // base color, specular strength/color, normal
+const int numTexturesPerMaterial = 5; // base color, specular, normal, metallic-roughness
 const int numDescriptorsPerMaterial = numConstantBuffersPerMaterial + numTexturesPerMaterial;
 
 enum RtvHeapOffsets
@@ -361,7 +361,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0 /* t0 */);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 6, 0 /* u0 */);
 
-    ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 3 /* t3-t5 */);
+    ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 3 /* t3-t6 */);
     CD3DX12_ROOT_PARAMETER rootParameters[8];
     rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -1585,8 +1585,8 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
-    const int slots[3] = { static_cast<int>(shaderMaterial.specularTextures.x), static_cast<int>(shaderMaterial.specularTextures.y), static_cast<int>(shaderMaterial.normalTextures.x) };
-    for (int i = 0; i < 3; ++i)
+    const int slots[4] = { static_cast<int>(shaderMaterial.specularTextures.x), static_cast<int>(shaderMaterial.specularTextures.y), static_cast<int>(shaderMaterial.normalTextures.x), static_cast<int>(shaderMaterial.metallicRoughnessTextures.x) };
+    for (int i = 0; i < 4; ++i)
     {
         auto dest = m_descriptorHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset + 2 + i);
         if (slots[i] >= 0)

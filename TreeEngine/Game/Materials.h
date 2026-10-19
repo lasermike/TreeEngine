@@ -45,6 +45,7 @@ struct ShaderMaterial
         specularColor = XMFLOAT4(1, 1, 1, 0);
         specularTextures = XMFLOAT4(-1, -1, 0, 0);
         normalTextures = XMFLOAT4(-1, 1, 0, 0);
+        metallicRoughnessTextures = XMFLOAT4(-1, 0, 0, 0);
     }
 
     XMFLOAT4 Ambient;
@@ -57,9 +58,10 @@ struct ShaderMaterial
     XMFLOAT4 specularColor; // linear RGB factor; w = base-color clamp
     XMFLOAT4 specularTextures; // strength/color texture slots; z/w = clamp flags
     XMFLOAT4 normalTextures; // normal texture slot, scale, clamp flag
+    XMFLOAT4 metallicRoughnessTextures; // texture slot, clamp flag
 };
 
-static_assert(sizeof(ShaderMaterial) == 160, "ShaderMaterial must match Materials.fx");
+static_assert(sizeof(ShaderMaterial) == 176, "ShaderMaterial must match Materials.fx");
 
 struct CBMaterial
 {

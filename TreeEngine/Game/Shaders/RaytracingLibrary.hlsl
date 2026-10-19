@@ -248,6 +248,12 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
             mat.specularParams.w *= SampleSpecularTexture((int)mat.specularTextures.x, uv, mat.specularTextures.z > 0).a;
         if (mat.specularTextures.y >= 0)
             mat.specularColor.rgb *= SampleSpecularTexture((int)mat.specularTextures.y, uv, mat.specularTextures.w > 0).rgb;
+        if (mat.metallicRoughnessTextures.x >= 0)
+        {
+            float4 mr = SampleSpecularTexture((int)mat.metallicRoughnessTextures.x, uv, mat.metallicRoughnessTextures.y > 0);
+            mat.specularParams.y *= mr.b;
+            mat.specularParams.z *= mr.g;
+        }
         float4 A, D, S;
         ComputeDirectionalLight(mat, textureColor, light, normal, toEye, A, D, S);
         payload.color = float4((A + shadowFactor * (D + S)).rgb, 1);
