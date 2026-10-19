@@ -259,7 +259,12 @@ float4 PS(PS_INPUT input) : SV_Target
         textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
 
     if (mat.flags.w > 0)
-        return mat.Diffuse * textureColor;
+    {
+        float4 color = mat.Diffuse * textureColor;
+        if (mat.specularParams.x > 0)
+            color.rgb = EncodeGltfDisplayColor(color.rgb);
+        return color;
+    }
 
     float2 materialUv = input.Tex * mat.textureCoordScale.xy;
     ShaderMaterial sampledMaterial = SampleSpecularMaterial(mat, materialUv);
@@ -296,6 +301,8 @@ float4 PS(PS_INPUT input) : SV_Target
 
     if (mat.flags.x > 0)
         litColor.a = mat.Diffuse.a * textureColor.a;
+    if (mat.specularParams.x > 0)
+        litColor.rgb = EncodeGltfDisplayColor(litColor.rgb);
 
     return litColor;
 }

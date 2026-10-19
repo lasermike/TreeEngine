@@ -215,6 +215,8 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     if (mat.flags.w > 0)
     {
         payload.color = mat.Diffuse * textureColor;
+        if (mat.specularParams.x > 0)
+            payload.color.rgb = EncodeGltfDisplayColor(payload.color.rgb);
         payload.color.a = 1.0f;
         return;
     }
@@ -256,7 +258,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         }
         float4 A, D, S;
         ComputeDirectionalLight(mat, textureColor, light, normal, toEye, A, D, S);
-        payload.color = float4((A + shadowFactor * (D + S)).rgb, 1);
+        payload.color = float4(EncodeGltfDisplayColor((A + shadowFactor * (D + S)).rgb), 1);
         return;
     }
 

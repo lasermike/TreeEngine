@@ -57,10 +57,21 @@ struct ShaderMaterial
     float4 metallicRoughnessTextures; // texture slot, clamp flag
 };
 
+// Encode linear glTF lighting for the UNORM display targets.
+float EncodeGltfSrgbChannel(float linearColor)
+{
+    float value = max(linearColor, 0.0f);
+    return value <= 0.0031308f ? value * 12.92f : 1.055f * pow(value, 1.0f / 2.4f) - 0.055f;
+}
+
+float3 EncodeGltfDisplayColor(float3 linearColor)
+{
+    return float3(EncodeGltfSrgbChannel(linearColor.r),
+        EncodeGltfSrgbChannel(linearColor.g), EncodeGltfSrgbChannel(linearColor.b));
+}
+
 //---------------------------------------------------------------------------------------
-// Computes the ambient, diffuse, and specular terms in the lighting equation
-// from a directional light.  We need to output the terms separately because
-// later we will modify the individual terms.
+// Computes the ambient, diffuse, and specular terms for glTF directional lighting.
 //---------------------------------------------------------------------------------------
 // KHR_materials_specular dielectric Fresnel, with GGX and correlated Smith visibility.
 // Texture factors are applied to a local material before this shared raster/DXR function.

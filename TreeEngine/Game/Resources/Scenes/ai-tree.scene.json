@@ -38,10 +38,10 @@
       "texture": "grid3.png"
     },
     "sky": {
-      "ambient": [1, 1, 1, 1],
-      "diffuse": [0, 0, 9, 1],
+      "ambient": [0.5, 0.5, 0.5, 1],
+      "diffuse": [0, 0, 0, 1],
       "specular": [0, 0, 0, 0],
-      "texture": "cube.dds"
+      "texture": "stars.dds"
     },
     "axis-red": { "ambient": [1, 0, 0, 1] },
     "axis-green": { "ambient": [0, 0.5019608, 0, 1] },
@@ -115,11 +115,11 @@
     {
       "id": "embedded-glb",
       "type": "model",
-      "source": "Models/Gltf/pond_with_waterfalls.glb",
+      "source": "Models/Gltf/rocklandscape.glb",
       "forceLit": true,
       "transform": {
-        "position": [0, 0, 0],
-        "scale": [ 0.003, 0.003, 0.003 ]
+        "position": [ 0, 0, 0 ],
+        "scale": [ 100.0, 100.0, 100.0 ]
       }
     }
   ]

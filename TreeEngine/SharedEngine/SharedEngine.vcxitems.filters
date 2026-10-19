@@ -7,6 +7,36 @@
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\README.md" />
     <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\LICENSE" />
     <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\NOTICE.txt" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\ai-tree.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\curves.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\gltf-models.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\graph.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\sea.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\simple-box.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-block.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-tree.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\tree.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\trees.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Tree.cpp" />
@@ -38,5 +68,13 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{b0918a01-3692-4fb5-8927-c27c7d93ffdd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\Scenes">
+      <UniqueIdentifier>{c7f3ce54-f277-4df5-b96a-64013908acb8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

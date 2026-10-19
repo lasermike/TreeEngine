@@ -43,6 +43,16 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\ai-tree.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\curves.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\gltf-models.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\graph.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\sea.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\simple-box.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-block.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-tree.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\tree.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\trees.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\LICENSE" />
     <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\NOTICE.txt" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
