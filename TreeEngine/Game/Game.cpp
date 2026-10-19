@@ -387,6 +387,13 @@ void Game::Update(DX::StepTimer const& timer)
         XMVECTOR vec = XMLoadFloat3(&m_renderManager.GetRenderData().dirLights[0].Direction);
         vec = XMVector3Rotate(vec, quat);
         XMStoreFloat3(&m_renderManager.GetRenderData().dirLights[0].Direction, vec);
+        auto& renderData = m_renderManager.GetRenderData();
+        if (renderData.shadowLightPositionOverride)
+        {
+            XMVECTOR center = XMLoadFloat3(&renderData.mSceneBounds.Center);
+            XMVECTOR offset = XMLoadFloat3(&renderData.shadowLightPosition) - center;
+            XMStoreFloat3(&renderData.shadowLightPosition, center + XMVector3Rotate(offset, quat));
+        }
     }
 
     auto& profile = m_renderManager.GetRenderData().profile;
@@ -599,9 +606,46 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::PushItemWidth(200);
         ImGui::DragFloat3("Camera Position", (float*)m_player->GetEyePositionPtr(), ImGuiColorEditFlags_Float);
         ImGui::DragFloat3("Camera Orientation", (float*)m_player->GetEyeRotationPtr(), ImGuiColorEditFlags_Float);
+
+        auto& renderData = m_renderManager.GetRenderData();
+        auto& lightDirection = renderData.dirLights[0].Direction;
+        XMVECTOR sceneCenter = XMLoadFloat3(&renderData.mSceneBounds.Center);
+        XMFLOAT3 lightPosition = renderData.shadowLightPosition;
+        if (!renderData.shadowLightPositionOverride)
+            XMStoreFloat3(&lightPosition, -2.0f * renderData.mSceneBounds.Radius * XMLoadFloat3(&lightDirection));
+        if (ImGui::DragFloat3("Light Position", &lightPosition.x, 0.1f))
+        {
+            XMVECTOR towardCenter = sceneCenter - XMLoadFloat3(&lightPosition);
+            if (XMVectorGetX(XMVector3LengthSq(towardCenter)) > 1e-6f)
+            {
+                renderData.shadowLightPosition = lightPosition;
+                renderData.shadowLightPositionOverride = true;
+                XMStoreFloat3(&lightDirection, XMVector3Normalize(towardCenter));
+            }
+        }
+        XMFLOAT3 oldLightDirection = lightDirection;
+        if (ImGui::DragFloat3("Light Direction", &lightDirection.x, 0.01f))
+        {
+            XMVECTOR editedDirection = XMLoadFloat3(&lightDirection);
+            if (XMVectorGetX(XMVector3LengthSq(editedDirection)) > 1e-6f)
+            {
+                editedDirection = XMVector3Normalize(editedDirection);
+                XMStoreFloat3(&lightDirection, editedDirection);
+                if (renderData.shadowLightPositionOverride)
+                {
+                    float distance = XMVectorGetX(XMVector3Length(sceneCenter - XMLoadFloat3(&renderData.shadowLightPosition)));
+                    XMStoreFloat3(&renderData.shadowLightPosition, sceneCenter - distance * editedDirection);
+                }
+            }
+            else
+                lightDirection = oldLightDirection;
+        }
         ImGui::PopItemWidth();
 
-        // Options
+    }
+
+    if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen))
+    {
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
         ImGui::Checkbox("Enable Post Processing", &m_settings.m_enablePostProcessing);

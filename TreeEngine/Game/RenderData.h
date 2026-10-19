@@ -104,6 +104,7 @@ struct RenderData : SceneRenderSettings
     {
         SceneRenderSettings::operator=(settings);
         projectionData.farClippingPlane = settings.farClippingPlane;
+        shadowLightPositionOverride = false;
     }
 
     // General
@@ -131,6 +132,8 @@ struct RenderData : SceneRenderSettings
     static const int    SMapWidth = 2048;
     static const int    SMapHeight = 2048;
     BoundingSphere      mSceneBounds;
+    XMFLOAT3            shadowLightPosition = { 0, 0, 0 };
+    bool                shadowLightPositionOverride = false;
     ShadowMap*          pShadowMap;        // Owned by Game
     UavBuffer*          pDxrOutBuffer;     // Filled by hit/miss shaders.  Owned by Game.
     XMFLOAT4X4          lightView;

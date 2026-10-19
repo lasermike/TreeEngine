@@ -657,9 +657,13 @@ void RenderManager::BuildShadowTransform()
 {
     // Only the first "main" light casts a shadow.
     XMVECTOR lightDir = XMLoadFloat3(&GetRenderData().dirLights[0].Direction);
-    XMVECTOR lightPos = -2.0f * GetRenderData().mSceneBounds.Radius * lightDir;
     XMVECTOR targetPos = XMLoadFloat3(&GetRenderData().mSceneBounds.Center);
+    XMVECTOR lightPos = GetRenderData().shadowLightPositionOverride
+        ? XMLoadFloat3(&GetRenderData().shadowLightPosition)
+        : -2.0f * GetRenderData().mSceneBounds.Radius * lightDir;
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    if (fabsf(XMVectorGetX(XMVector3Dot(XMVector3Normalize(targetPos - lightPos), up))) > 0.99f)
+        up = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
     XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
 
