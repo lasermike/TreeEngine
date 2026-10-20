@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "SpecularTest",
+  "name": "Specular Test",
+  "camera": { "position": [0, 0, -9] },
+  "render": { "clearColor": [0.12, 0.17, 0.24, 1], "farClippingPlane": 100, "useShadowMaps": false },
+  "light": {
+    "ambient": [0.2, 0.2, 0.2, 1],
+    "diffuse": [0.9, 0.9, 0.9, 1],
+    "specular": [1, 1, 1, 1],
+    "direction": [0, 0, 1]
+  },
+  "objects": [
+    {
+      "id": "specular-test",
+      "type": "model",
+      "source": "Models/Gltf/SpecularTest.glb",
+      "transform": { "scale": [5, 5, 5] }
+    }
+  ]
+}

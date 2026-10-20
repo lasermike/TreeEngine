@@ -121,6 +121,8 @@ namespace SceneData
         Transform camera;
         DirectX::XMFLOAT4 clearColor = { 0.5294118f, 0.8078431f, 0.9215686f, 1 };
         float farClippingPlane = 30.0f;
+        std::string environmentDiffuse;
+        std::string environmentSpecular;
         bool useShadowMaps = true;
         bool useAlphaBlendedRenderTarget = true;
         int pointLightCount = 0;

@@ -49,6 +49,8 @@ class RenderManager : public IRenderFrame
     std::map<wstring, Material*>                    m_materials;
     std::map<wstring, Mesh>                         m_meshes;
     std::map<wstring, LoadedTexture*>               m_textures;
+    LoadedTexture*                                m_environmentDiffuse = nullptr;
+    LoadedTexture*                                m_environmentSpecular = nullptr;
     std::map<std::wstring, int> m_gltfTextureSlots;
 
     std::map<wstring, VertexShader*>                m_vertexShaders;

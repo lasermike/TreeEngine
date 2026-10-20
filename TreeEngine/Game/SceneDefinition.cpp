@@ -257,7 +257,18 @@ namespace SceneData
             {
                 const auto& render = root["render"];
                 auto path = sourceName + ".render";
-                Fields(render, path, { "clearColor", "farClippingPlane", "useShadowMaps", "useAlphaBlendedRenderTarget" });
+                Fields(render, path, { "clearColor", "farClippingPlane", "useShadowMaps", "useAlphaBlendedRenderTarget", "environment" });
+                if (render.contains("environment"))
+                {
+                    const auto& environment = render["environment"];
+                    Fields(environment, path + ".environment", { "diffuse", "specular" });
+                    if (!environment.contains("diffuse") || !environment.contains("specular"))
+                        Invalid(path + ".environment", "diffuse and specular cube maps are both required");
+                    scene.environmentDiffuse = String(environment["diffuse"], path + ".environment.diffuse");
+                    scene.environmentSpecular = String(environment["specular"], path + ".environment.specular");
+                    if (scene.environmentDiffuse.empty() || scene.environmentSpecular.empty())
+                        Invalid(path + ".environment", "cube map paths must be nonempty");
+                }
                 if (render.contains("clearColor")) scene.clearColor = Vector4(render["clearColor"], path + ".clearColor");
                 if (render.contains("farClippingPlane"))
                 {
@@ -449,6 +460,11 @@ namespace SceneData
                 { "range", scene.pointLight.range }, { "attenuation", VectorJson(scene.pointLight.attenuation) } } },
             { "objects", Json::array() } };
         if (!scene.id.empty()) root["id"] = scene.id;
+        if (scene.environmentDiffuse.empty() != scene.environmentSpecular.empty())
+            throw std::runtime_error("Scene environment needs both diffuse and specular cube maps");
+        if (!scene.environmentDiffuse.empty())
+            root["render"]["environment"] = { { "diffuse", scene.environmentDiffuse },
+                { "specular", scene.environmentSpecular } };
         if (scene.hasShadowLightPosition) root["light"]["shadowPosition"] = VectorJson(scene.shadowLightPosition);
         if (!scene.materials.empty())
             for (const auto& material : scene.materials) root["materials"][material.first] = MaterialJson(material.second);

@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 
 #include "RenderPlatform.h"
 #include "Settings.h"
@@ -169,11 +169,13 @@ enum CbvSrvUavHeapOffsets
     DxrTexture3_SrvHeapOffset = 29,
 
     DxrSky_SrvHeapOffset = 34, // Follows the eight DXR scene texture slots.
+    EnvironmentDiffuse_SrvHeapOffset = 35,
+    EnvironmentSpecular_SrvHeapOffset = 36,
 
     // Per-material descriptors
-    Material0_HeapOffset = 35,
+    Material0_HeapOffset = 37,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
-    Texture0Srv_HeapOffset = 36,
+    Texture0Srv_HeapOffset = Material0_HeapOffset + 1,
     Num_CbvSrvUavHeapOffsets
 };
  
@@ -212,16 +214,17 @@ enum RootSignatureParams
     ChangesEveryFrameRootSignatureParam,
     UavTableRootSignatureParam,
     SpecularSrvTableRootSignatureParam,
+    EnvironmentSrvTableRootSignatureParam,
 };
 
-const UINT maxWorldVertices = 600000;
+const UINT maxWorldVertices = 1200000; // Double-sided glTF sphere test expands to over one million vertices.
 const uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
 
 UINT skinnedIndexBufferSize = 0;
 UINT indexBufferSize = 0;
 
 const int maxTotalTexturesInScene = 8;
-const int maxNumMaterials = 64; // Allow separate trunk, twig, and leaf materials per tree.
+const int maxNumMaterials = 128; // Includes the 98 materials in the glTF textureless sphere test.
 
 int RenderUnit::s_nextId = 0;
 
@@ -369,14 +372,16 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     //   cbuffer cbChangesEveryFrame : register(b2)
     //   cbuffer cbMaterial : register (b3)
 
-    CD3DX12_DESCRIPTOR_RANGE ranges[5];
+    CD3DX12_DESCRIPTOR_RANGE ranges[6];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0 /* t0 */);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 6, 0 /* u0 */);
 
     ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 3 /* t3-t6 */);
-    CD3DX12_ROOT_PARAMETER rootParameters[8];
+    ranges[5].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 7 /* t7-t8 */);
+    CD3DX12_ROOT_PARAMETER rootParameters[9];
+    rootParameters[EnvironmentSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[5], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[MaterialCbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -1009,6 +1014,11 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     dxrNullSrvDesc.TextureCube.MipLevels = 1;
     GetDevice()->CreateShaderResourceView(nullptr, &dxrNullSrvDesc,
         m_descriptorHeap.hCPU(DxrSky_SrvHeapOffset));
+    dxrNullSrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    GetDevice()->CreateShaderResourceView(nullptr, &dxrNullSrvDesc,
+        m_descriptorHeap.hCPU(EnvironmentDiffuse_SrvHeapOffset));
+    GetDevice()->CreateShaderResourceView(nullptr, &dxrNullSrvDesc,
+        m_descriptorHeap.hCPU(EnvironmentSpecular_SrvHeapOffset));
 
 
 #endif
@@ -1391,7 +1401,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 
 HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** texture)
 {
-    if (textureIndex < 0 || textureIndex >= maxTotalTexturesInScene) return E_BOUNDS;
+    if (textureIndex < 0 || textureIndex >= maxTotalTexturesInScene + 2) return E_BOUNDS;
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_descriptorHeap.GetIncrementSize());
 
     ID3D12Resource* resource = nullptr;
@@ -1427,13 +1437,21 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
         HRR(CreateDDSTextureFromFile(this, textureFilename, 0 /*maxsize*/, false /*srgb*/, &resource, newDescriptor));
     }
 
+    if (textureIndex >= maxTotalTexturesInScene && resource->GetDesc().DepthOrArraySize != 6)
+    {
+        resource->Release();
+        return E_INVALIDARG; // Environment lighting requires a DDS cubemap.
+    }
     *texture = new LoadedTexture(resource, newDescriptor, (UINT)textureIndex);
 
     assert((*texture)->texture != nullptr);
 
     // Copy texture SRV to DXR contiguous texture slots for raytracing
-    D3D12_CPU_DESCRIPTOR_HANDLE dxrTextureDest = m_descriptorHeap.hCPU(DxrTexture0_SrvHeapOffset + textureIndex);
-    GetDevice()->CopyDescriptorsSimple(1, dxrTextureDest, newDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    if (textureIndex < maxTotalTexturesInScene)
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE dxrTextureDest = m_descriptorHeap.hCPU(DxrTexture0_SrvHeapOffset + textureIndex);
+        GetDevice()->CopyDescriptorsSimple(1, dxrTextureDest, newDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
 
     return S_OK;
 }
@@ -2008,7 +2026,7 @@ HRESULT RenderPlatform12::InitDevice()
     // Heap for loading textures
     // TODO: Move from device owned to scene owned
     D3D12_DESCRIPTOR_HEAP_DESC loadedTextureHeapDesc = {};
-    loadedTextureHeapDesc.NumDescriptors = maxTotalTexturesInScene;
+    loadedTextureHeapDesc.NumDescriptors = maxTotalTexturesInScene + 2; // Environment cubes.
     loadedTextureHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;;
     loadedTextureHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     HRR(GetDevice()->CreateDescriptorHeap(&loadedTextureHeapDesc, __uuidof(ID3D12DescriptorHeap), (void**)&m_loadTextureHeap));
@@ -3118,6 +3136,15 @@ HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
     D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
     GetCommandList()->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, textureHandle);
     GetCommandList()->SetGraphicsRootDescriptorTable(SpecularSrvTableRootSignatureParam, m_descriptorHeap.hGPU(Material0_HeapOffset + 2));
+    if (m_renderData->environmentDiffuseTexture && m_renderData->environmentSpecularTexture)
+    {
+        GetDevice()->CopyDescriptorsSimple(1, m_descriptorHeap.hCPU(EnvironmentDiffuse_SrvHeapOffset),
+            m_renderData->environmentDiffuseTexture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        GetDevice()->CopyDescriptorsSimple(1, m_descriptorHeap.hCPU(EnvironmentSpecular_SrvHeapOffset),
+            m_renderData->environmentSpecularTexture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+    GetCommandList()->SetGraphicsRootDescriptorTable(EnvironmentSrvTableRootSignatureParam,
+        m_descriptorHeap.hGPU(EnvironmentDiffuse_SrvHeapOffset));
 
     // Set root signature constant buffers
     GetCommandList()->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
@@ -3319,6 +3346,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         commandList->SetComputeRootShaderResourceView(12, m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress());
         commandList->SetComputeRootDescriptorTable(13, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
         commandList->SetComputeRootDescriptorTable(14, m_descriptorHeap.hGPU(DxrSky_SrvHeapOffset));
+        commandList->SetComputeRootDescriptorTable(15, m_descriptorHeap.hGPU(EnvironmentDiffuse_SrvHeapOffset));
 
         commandList->DispatchRays(&dispatchRaysDesc);
         ProfileTimestamp(ProfilePass::Rays, true);

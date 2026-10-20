@@ -26,6 +26,8 @@ StructuredBuffer<InstancedData> instanceDataBuffer : register(t7);
 ByteAddressBuffer skinnedIndexBuffer : register(t8); // Skinned index buffer
 Texture2D<float4> sceneTextures[8] : register(t9);
 TextureCube<float4> skyTexture : register(t17);
+TextureCube<float4> environmentDiffuse : register(t18);
+TextureCube<float4> environmentSpecular : register(t19);
 
 SamplerState samLinear : register(s0);
 SamplerState samLinearClamp : register(s1);
@@ -259,7 +261,16 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         }
         float4 A, D, S;
         ComputeDirectionalLight(mat, textureColor, light, normal, toEye, A, D, S);
-        payload.color = float4(EncodeGltfDisplayColor((A + shadowFactor * (D + S)).rgb), 1);
+        uint cubeWidth, cubeHeight, mipCount;
+        environmentSpecular.GetDimensions(0, cubeWidth, cubeHeight, mipCount);
+        float roughness = saturate(mat.specularParams.z);
+        float3 reflected = reflect(-toEye, normal);
+        float3 irradiance = environmentDiffuse.SampleLevel(samLinearClamp, normal, 0).rgb;
+        float3 prefiltered = environmentSpecular.SampleLevel(samLinearClamp, reflected,
+            roughness * (mipCount - 1)).rgb;
+        float3 ibl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
+            irradiance, prefiltered);
+        payload.color = float4(EncodeGltfDisplayColor((A + shadowFactor * (D + S)).rgb + ibl), 1);
         return;
     }
 

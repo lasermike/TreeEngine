@@ -112,6 +112,30 @@ void ComputeGltfSpecularLight(ShaderMaterial mat, float4 textureColor, Direction
     spec = float4(F * D * visibility * nl * light.Specular.rgb * (nv > 0 ? 1.0f : 0.0f), 0);
 }
 
+float3 ComputeGltfEnvironmentLight(ShaderMaterial mat, float4 textureColor,
+    float3 normal, float3 toEye, float3 irradiance, float3 prefiltered)
+{
+    float metallic = saturate(mat.specularParams.y);
+    float roughness = saturate(mat.specularParams.z);
+    float3 baseColor = mat.Diffuse.rgb * textureColor.rgb;
+    float strength = saturate(mat.specularParams.w);
+    float3 dielectricF0 = min(0.04f * mat.specularColor.rgb, 1.0f) * strength;
+    float3 f0 = lerp(dielectricF0, baseColor, metallic);
+    float f90 = lerp(strength, 1.0f, metallic);
+    float nv = saturate(dot(normalize(normal), normalize(toEye)));
+    float fresnelWeight = pow(1.0f - nv, 5.0f);
+    float3 dielectricF = lerp(dielectricF0, strength.xxx, fresnelWeight);
+    float diffuseWeight = (1.0f - max(dielectricF.r, max(dielectricF.g, dielectricF.b))) * (1.0f - metallic);
+
+    // Analytic split-sum BRDF approximation for the GGX-prefiltered environment.
+    float4 r = roughness * float4(-1.0f, -0.0275f, -0.572f, 0.022f)
+        + float4(1.0f, 0.0425f, 1.04f, -0.04f);
+    float a004 = min(r.x * r.x, exp2(-9.28f * nv)) * r.x + r.y;
+    float2 brdf = float2(-1.04f, 1.04f) * a004 + r.zw;
+    return irradiance * (diffuseWeight * baseColor)
+        + prefiltered * (f0 * brdf.x + f90 * brdf.y);
+}
+
 void ComputeDirectionalLight(ShaderMaterial mat, float4 textureColor, DirectionalLight L,
     float3 normal, float3 toEye,
     out float4 ambient,

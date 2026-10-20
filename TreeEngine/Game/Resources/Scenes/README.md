@@ -1,6 +1,6 @@
 # Scene definitions
 
-The ten built-in scenes are defined by `*.scene.json` files in this directory.
+The fourteen built-in scenes are defined by `*.scene.json` files in this directory.
 At startup, the engine discovers these files in `Scenes` and `UserScenes` beside
 the executable, without descending into subdirectories. Adding a scene requires
 no catalog-code or project-file change. Build TreeClassic to deploy source scenes
@@ -78,7 +78,7 @@ prompts, autosave, directory watcher, or asset packaging are provided.
 - `id`: optional stable scene identity, described above.
 - `name`: required nonempty display name.
 - `camera`: transform with optional `position`, `rotation`, and `scale`.
-- `render`: optional `clearColor`, `farClippingPlane`, `useShadowMaps`, and `useAlphaBlendedRenderTarget`. The far plane defaults to 30 and must exceed the 0.2-unit near plane.
+- `render`: optional `clearColor`, `farClippingPlane`, `useShadowMaps`, `useAlphaBlendedRenderTarget`, and `environment`. The far plane defaults to 30 and must exceed the 0.2-unit near plane. `environment` requires `diffuse` and `specular` paths to linear HDR DDS cube maps. The specular cube's mip levels run from smooth to rough; the environment lights glTF materials in both raster and DXR without changing the background.
 - `light`: optional directional-light `ambient`, `diffuse`, `specular`, `direction`, and `shadowPosition`. Omitting `shadowPosition` retains automatic shadow placement; supplying it preserves the authored light-position override.
 - `pointLightCount`: point-light activation, `0` or `1`.
 - `pointLight`: optional `ambient`, `diffuse`, `specular`, `position`, `range`, and `attenuation`. Range and attenuation components must be nonnegative.

@@ -550,7 +550,11 @@ namespace
             }
             if (tangents)
             {
-                auto tangent = ReadVector3(tangents, i, filename, "TANGENT");
+                cgltf_float tangentComponents[4] = {};
+                if (!cgltf_accessor_read_float(tangents, i, tangentComponents, 4))
+                    ImportError(filename, "cannot read TANGENT accessor element " + std::to_string(i));
+                // SimpleVertex currently has no place to retain tangentComponents[3] (handedness).
+                XMFLOAT3 tangent(tangentComponents[0], tangentComponents[1], tangentComponents[2]);
                 tangent.z = -tangent.z;
                 result.vertices[i].TangentU = NormalizeOr(tangent, XMFLOAT3(1, 0, 0));
             }

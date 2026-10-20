@@ -183,12 +183,18 @@ int main(int argc, char** argv)
 
         auto authored = minimal;
         authored["render"]["farClippingPlane"] = 300.0;
+        authored["render"]["environment"] = { { "diffuse", "Environment/diffuse.dds" },
+            { "specular", "Environment/specular.dds" } };
         authored["materials"]["grid"] = { { "texture", "grid.png" }, { "textureCoordScale", { 2, 3 } } };
         authored["objects"][0]["material"] = "grid";
         authored["objects"][0]["textureCoordScale"] = { 4, 5 };
         authored["objects"][0]["transform"] = { { "rotationDegrees", { 0, 0, 90 } }, { "scale", { -30, -30, -30 } } };
         auto named = SceneData::ParseScene(authored.dump(), "test.scene.json");
         Check(named.farClippingPlane == 300.0f, "authored far clipping plane was lost");
+        Check(named.environmentDiffuse == "Environment/diffuse.dds" &&
+            named.environmentSpecular == "Environment/specular.dds", "authored environment was lost");
+        Check(SceneData::ParseScene(SceneData::SerializeScene(named), "roundtrip").environmentSpecular ==
+            named.environmentSpecular, "environment did not round-trip");
         auto& ground = static_cast<SceneData::PrimitiveDefinition&>(*named.objects[0]);
         Check(ground.hasMaterial, "authored primitive material was marked as omitted");
         Check(ground.material.texture == "grid.png", "material reference did not resolve");

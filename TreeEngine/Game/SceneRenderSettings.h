@@ -1,11 +1,14 @@
 #pragma once
 #include "Materials.h"
+#include <string>
 
 // Scene-authored rendering values. No frame state or renderer-owned resources.
 struct SceneRenderSettings
 {
     XMFLOAT4 clearColor = { 0.5294118f, 0.8078431f, 0.9215686f, 1 };
     float farClippingPlane = 30.0f;
+    std::string environmentDiffuse;
+    std::string environmentSpecular;
     int numDirectionalLights = 1;
     int numPointLights = 0;
     DirectionalLight dirLights[1];

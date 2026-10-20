@@ -7,4 +7,4 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#define GlobalRootSignature  "RootFlags(0), SRV(t0), RootConstants(b0, num32bitconstants=8), DescriptorTable(UAV(u0)), CBV(b1), CBV(b2), SRV(t1), SRV(t2), SRV(t3), SRV(t4), SRV(t5), SRV(t6), SRV(t7), SRV(t8), DescriptorTable(SRV(t9, numDescriptors=8)), DescriptorTable(SRV(t17)), StaticSampler(s0, filter=FILTER_MIN_MAG_MIP_LINEAR), StaticSampler(s1, filter=FILTER_MIN_MAG_MIP_LINEAR, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP)"
+#define GlobalRootSignature  "RootFlags(0), SRV(t0), RootConstants(b0, num32bitconstants=8), DescriptorTable(UAV(u0)), CBV(b1), CBV(b2), SRV(t1), SRV(t2), SRV(t3), SRV(t4), SRV(t5), SRV(t6), SRV(t7), SRV(t8), DescriptorTable(SRV(t9, numDescriptors=8)), DescriptorTable(SRV(t17)), DescriptorTable(SRV(t18, numDescriptors=2)), StaticSampler(s0, filter=FILTER_MIN_MAG_MIP_LINEAR), StaticSampler(s1, filter=FILTER_MIN_MAG_MIP_LINEAR, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP)"

@@ -24,6 +24,8 @@ Texture2D txSpecular : register(t3);
 Texture2D txSpecularColor : register(t4);
 Texture2D txNormal : register(t5);
 Texture2D txMetallicRoughness : register(t6);
+TextureCube txEnvironmentDiffuse : register(t7);
+TextureCube txEnvironmentSpecular : register(t8);
 
 ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
 {
@@ -298,6 +300,18 @@ float4 PS(PS_INPUT input) : SV_Target
     }
 
     float4 litColor = ambient + diffuse + spec;
+    if (sampledMaterial.specularParams.x > 0)
+    {
+        uint cubeWidth, cubeHeight, mipCount;
+        txEnvironmentSpecular.GetDimensions(0, cubeWidth, cubeHeight, mipCount);
+        float roughness = saturate(sampledMaterial.specularParams.z);
+        float3 reflected = reflect(-toEye, normal);
+        float3 irradiance = txEnvironmentDiffuse.Sample(samLinearClamp, normal).rgb;
+        float3 prefiltered = txEnvironmentSpecular.SampleLevel(samLinearClamp, reflected,
+            roughness * (mipCount - 1)).rgb;
+        litColor.rgb += ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
+            normal, toEye, irradiance, prefiltered);
+    }
 
     if (mat.flags.x > 0)
         litColor.a = mat.Diffuse.a * textureColor.a;
