@@ -6,3 +6,11 @@ The files are uncompressed linear RGBA16F DDS cubes. Diffuse was averaged to
 64 pixels per face; specular levels 0-10 are spatially reduced and selected
 across the full smooth-to-rough range (256 pixels down to 1).
 No tone mapping or color conversion was applied.
+
+Helipad image-based lighting cubes derived from the Khronos glTF Sample Environments:
+https://github.com/KhronosGroup/glTF-Sample-Environments/tree/main/helipad
+
+Source: helipad/lambertian/diffuse.ktx2 and helipad/ggx/specular.ktx2.
+The same linear RGBA16F DDS conversion and roughness mip selection as neutral
+are used. Run convert_ktx2_ibl.py <directory> helipad after saving the two
+source KTX2 files there as diffuse.ktx2 and specular.ktx2.

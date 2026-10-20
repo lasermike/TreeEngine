@@ -34,6 +34,7 @@ def write(path,size,levels):
   for face in range(6):
    for mip in levels:f.write(mip[face])
 root=pathlib.Path(sys.argv[1])
+name=sys.argv[2] if len(sys.argv)>2 else "neutral"
 size,levels=read(root/"specular.ktx2")
 source_levels=(0,1,3,4,5,6,8,9,10)
 small=[]
@@ -42,8 +43,8 @@ for output_level,source_level in enumerate(source_levels):
  source=size>>source_level
  small.append([downsample(face,source,target) if source>target else face
                for face in levels[source_level]])
-write(root/"neutral-specular.dds",size>>2,small)
+write(root/f"{name}-specular.dds",size>>2,small)
 size,levels=read(root/"diffuse.ktx2")
-write(root/"neutral-diffuse.dds",64,[[downsample(face,size,64) for face in levels[0]]])
-for name in ("neutral-diffuse.dds","neutral-specular.dds"):
- print(name,(root/name).stat().st_size)
+write(root/f"{name}-diffuse.dds",64,[[downsample(face,size,64) for face in levels[0]]])
+for output in (f"{name}-diffuse.dds",f"{name}-specular.dds"):
+ print(output,(root/output).stat().st_size)

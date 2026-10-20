@@ -5,7 +5,7 @@
   "camera": { "position": [3, 2.4, -16] },
   "render": {
     "clearColor": [0.12, 0.17, 0.24, 1], "farClippingPlane": 100, "useShadowMaps": false,
-    "environment": { "diffuse": "Environment/neutral-diffuse.dds", "specular": "Environment/neutral-specular.dds" }
+    "environment": { "diffuse": "Environment/helipad-diffuse.dds", "specular": "Environment/helipad-specular.dds" }
   },
   "light": {
     "ambient": [0, 0, 0, 1],
