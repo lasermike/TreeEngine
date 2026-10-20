@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "LoadGraph",
   "name": "Graph",
   "camera": {
     "position": [5, 1.5, -8.2]

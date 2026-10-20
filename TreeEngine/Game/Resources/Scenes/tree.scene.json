@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "LoadTreeScene",
   "name": "Tree",
   "camera": {
     "position": [1.11395788, 0.711319208, 2.05959034],

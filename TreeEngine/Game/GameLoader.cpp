@@ -562,22 +562,7 @@ namespace
 {
     std::string SceneFilename(const std::string& filename)
     {
-        if (std::ifstream(filename)) return filename;
-        const std::string sourcePath = "Game/Resources/" + filename;
-        if (std::ifstream(sourcePath)) return sourcePath;
-        char executable[MAX_PATH] = {};
-        DWORD length = GetModuleFileNameA(nullptr, executable, MAX_PATH);
-        if (length && length < MAX_PATH)
-        {
-            std::string directory(executable);
-            auto slash = directory.find_last_of("/\\");
-            if (slash != std::string::npos)
-            {
-                const std::string deployedPath = directory.substr(0, slash + 1) + filename;
-                if (std::ifstream(deployedPath)) return deployedPath;
-            }
-        }
-        return filename; // ReadScene reports the missing file with its name.
+        return SceneData::ResolveSceneAsset(filename, {});
     }
 }
 
@@ -866,27 +851,7 @@ void GameLoader::Regenerate(SceneRoot* pScene)
 
 namespace
 {
-    struct SceneEntry
-    {
-        const char* id;
-        const char* name;
-        const char* filename;
-    };
-
-    const SceneEntry sceneCatalog[] = {
-        { "LoadTreeScene", "Tree", "Scenes/tree.scene.json" },
-        { "LoadTestTree", "Test Tree", "Scenes/test-tree.scene.json" },
-        { "LoadSeaScene", "Sea", "Scenes/sea.scene.json" },
-        { "LoadCurvesScene", "Curves", "Scenes/curves.scene.json" },
-        { "LoadTrees", "Trees", "Scenes/trees.scene.json" },
-        { "LoadTestBlock", "Test Block", "Scenes/test-block.scene.json" },
-        { "LoadGraph", "Graph", "Scenes/graph.scene.json" },
-        { "LoadSimpleBox", "Simple Box", "Scenes/simple-box.scene.json" },
-        { "LoadAITree", "AI Tree", "Scenes/ai-tree.scene.json" },
-        { "LoadGltfDemo", "glTF Models", "Scenes/gltf-models.scene.json" }
-    };
-
-    void LoadJsonScene(
+    SceneData::SceneDefinition LoadJsonScene(
         const char* filename,
         SceneRoot* scene,
         SceneRenderSettings* renderSettings,
@@ -895,29 +860,49 @@ namespace
     {
         auto definition = SceneData::ReadScene(SceneFilename(filename));
 #if ALT_POSITION
-        if (std::string(filename) == "Scenes/tree.scene.json"
-            || std::string(filename) == "Scenes/ai-tree.scene.json")
+        if (definition.id == "LoadTreeScene" || definition.id == "LoadAITree")
         {
             definition.camera.position = XMFLOAT3(0, 1.5f, -5);
             definition.camera.rotation = XMFLOAT4(0, 0, 0, 1);
         }
 #endif
-        InstantiateScene(definition, *scene, *renderSettings, *player, *gameData);
+        InstantiateScene(definition, *scene, *renderSettings, *player, *gameData, filename);
+        return definition;
     }
 }
 
 int GameLoader::GetNumScenes()
 {
-    return static_cast<int>(_countof(sceneCatalog));
+    return static_cast<int>(m_catalog.Entries().size());
 }
 
 const char* GameLoader::GetSceneName(int sceneNum) const
 {
-    return sceneNum >= 0 && sceneNum < static_cast<int>(_countof(sceneCatalog))
-        ? sceneCatalog[sceneNum].name : nullptr;
+    return sceneNum >= 0 && sceneNum < static_cast<int>(m_catalog.Entries().size())
+        ? m_catalog.Entries()[sceneNum].name.c_str() : nullptr;
 }
 
-HRESULT GameLoader::Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
+HRESULT GameLoader::InitializeScenes(const std::string& contentDirectory)
+{
+    m_catalog = SceneData::SceneCatalog(contentDirectory + "\\Scenes", contentDirectory + "\\UserScenes");
+    return RefreshScenes();
+}
+
+HRESULT GameLoader::RefreshScenes()
+{
+    m_lastError.clear();
+    m_catalog.Refresh();
+    if (m_catalog.Entries().empty())
+    {
+        m_lastError = "No valid scenes were found in Scenes or UserScenes beside the executable.";
+        OutputDebugStringA((m_lastError + "\n").c_str());
+        return E_FAIL;
+    }
+    return S_OK;
+}
+
+HRESULT GameLoader::Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData,
+    SceneData::SceneDefinition* definition, std::string* filename)
 {
     m_lastError.clear();
     if (sceneNum < 0 || sceneNum >= GetNumScenes())
@@ -925,28 +910,12 @@ HRESULT GameLoader::Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* re
         m_lastError = "Scene index is outside the catalog";
         return E_INVALIDARG;
     }
-    try
-    {
-        LoadJsonScene(sceneCatalog[sceneNum].filename, scene, renderSettings, player, gameData);
-        renderSettings->clearColor = gameData->clearColor;
-        return S_OK;
-    }
-    catch (const std::exception& error)
-    {
-        m_lastError = error.what();
-        OutputDebugStringA((m_lastError + "\n").c_str());
-        return E_FAIL;
-    }
+    return Load(m_catalog.Entries()[sceneNum].filename.c_str(), scene, renderSettings, player, gameData, definition, filename);
 }
 
-HRESULT GameLoader::Load(const char* name, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData)
+HRESULT GameLoader::Load(const char* name, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData,
+    SceneData::SceneDefinition* definition, std::string* filename)
 {
-    if (name)
-    {
-        for (int i = 0; i < GetNumScenes(); ++i)
-            if (std::string(name) == sceneCatalog[i].id || std::string(name) == sceneCatalog[i].name)
-                return Load(i, scene, renderSettings, player, gameData);
-    }
     m_lastError.clear();
     if (!name || !*name)
     {
@@ -955,7 +924,11 @@ HRESULT GameLoader::Load(const char* name, SceneRoot* scene, SceneRenderSettings
     }
     try
     {
-        LoadJsonScene(name, scene, renderSettings, player, gameData);
+        const int index = m_catalog.Find(name);
+        const auto source = index >= 0 ? m_catalog.Entries()[index].filename : SceneFilename(name);
+        auto parsed = LoadJsonScene(source.c_str(), scene, renderSettings, player, gameData);
+        if (definition) *definition = std::move(parsed);
+        if (filename) *filename = source;
         return S_OK;
     }
     catch (const std::exception& error)

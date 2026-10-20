@@ -56,12 +56,14 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TreeModelGenerator.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\WorldObject.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneCatalog.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GltfLoader.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneCatalog.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneRenderSettings.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfLoader.h" />

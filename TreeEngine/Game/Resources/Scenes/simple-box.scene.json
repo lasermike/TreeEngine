@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "LoadSimpleBox",
   "name": "Simple Box",
   "camera": {
     "position": [0, 1.5, -6]

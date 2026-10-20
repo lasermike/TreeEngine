@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "LoadCurvesScene",
   "name": "Curves",
   "camera": {
     "position": [0, 1.5, -6]

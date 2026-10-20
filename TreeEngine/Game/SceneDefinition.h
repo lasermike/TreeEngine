@@ -85,12 +85,18 @@ namespace SceneData
     {
         FixedTreeDefinition() : ObjectDefinition(ObjectKind::FixedTree) {}
         Shape trunkShape = Shape::SkinnedCylinder;
+        bool hasMaterials = false;
+        MaterialDefinition trunk;
+        MaterialDefinition leaf;
     };
 
     struct GraphDefinition : ObjectDefinition
     {
         GraphDefinition() : ObjectDefinition(ObjectKind::Graph) {}
         std::string dataFile;
+        bool hasMaterials = false;
+        MaterialDefinition trunk;
+        MaterialDefinition leaf;
     };
 
     struct ModelDefinition : ObjectDefinition
@@ -110,6 +116,7 @@ namespace SceneData
 
     struct SceneDefinition
     {
+        std::string id;
         std::string name;
         Transform camera;
         DirectX::XMFLOAT4 clearColor = { 0.5294118f, 0.8078431f, 0.9215686f, 1 };
@@ -118,6 +125,17 @@ namespace SceneData
         bool useAlphaBlendedRenderTarget = true;
         int pointLightCount = 0;
         DirectionalLightDefinition light;
+        bool hasShadowLightPosition = false;
+        DirectX::XMFLOAT3 shadowLightPosition = { 0, 0, 0 };
+        struct PointLightDefinition
+        {
+            DirectX::XMFLOAT4 ambient = {};
+            DirectX::XMFLOAT4 diffuse = {};
+            DirectX::XMFLOAT4 specular = {};
+            DirectX::XMFLOAT3 position = {};
+            float range = 0;
+            DirectX::XMFLOAT3 attenuation = {};
+        } pointLight;
         std::map<std::string, MaterialDefinition> materials;
         std::vector<std::unique_ptr<ObjectDefinition>> objects;
     };
@@ -125,4 +143,13 @@ namespace SceneData
     // Throw std::runtime_error with a filename/property path on invalid data.
     SceneDefinition ParseScene(const std::string& jsonText, const std::string& sourceName);
     SceneDefinition ReadScene(const std::string& filename);
+    std::string SerializeScene(const SceneDefinition& scene);
+    void WriteScene(const SceneDefinition& scene, const std::string& filename, bool overwrite = false);
+
+    std::wstring WidePath(const std::string& path);
+    std::string Utf8Path(const std::wstring& path);
+    std::string AbsolutePath(const std::string& path);
+    std::string ParentPath(const std::string& path);
+    // Scene-relative assets take precedence over the shared runtime resource roots.
+    std::string ResolveSceneAsset(const std::string& asset, const std::string& sceneFilename);
 }

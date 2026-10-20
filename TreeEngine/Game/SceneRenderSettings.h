@@ -10,4 +10,6 @@ struct SceneRenderSettings
     int numPointLights = 0;
     DirectionalLight dirLights[1];
     PointLight pointLights[1];
+    XMFLOAT3 shadowLightPosition = { 0, 0, 0 };
+    bool shadowLightPositionOverride = false;
 };

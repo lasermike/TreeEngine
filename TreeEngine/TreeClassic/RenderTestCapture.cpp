@@ -2,6 +2,7 @@
 #include "RenderTestCapture.h"
 #include "Game.h"
 #include "Player.h"
+#include "SceneDefinition.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <shellapi.h>
 #include <fstream>
@@ -22,6 +23,113 @@ namespace
         std::vector<wchar_t> buffer(count);
         MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.c_str(), -1, buffer.data(), count);
         return buffer.data();
+    }
+
+    void CheckPersistence(bool passed, const std::string& message)
+    {
+        if (!passed) throw std::runtime_error("Scene persistence: " + message);
+    }
+
+    void ValidateScenePersistence(Game& game)
+    {
+        const std::string stem = "persistence-test-" + std::to_string(GetCurrentProcessId()) + "-" + std::to_string(GetTickCount64());
+        const auto directory = SceneData::Utf8Path(GameCommon::GetContentFileRoot()) + "\\UserScenes";
+        const auto filename = directory + "\\" + stem + ".scene.json";
+        const bool directoryExisted = GetFileAttributesW(Wide(directory).c_str()) != INVALID_FILE_ATTRIBUTES;
+        struct Cleanup
+        {
+            std::string filename, directory;
+            bool directoryExisted;
+            ~Cleanup()
+            {
+                if (GetFileAttributesW(Wide(filename).c_str()) != INVALID_FILE_ATTRIBUTES && !DeleteFileW(Wide(filename).c_str()))
+                    OutputDebugStringA(("Cannot clean up persistence test scene: " + filename + "\n").c_str());
+                if (!directoryExisted && !RemoveDirectoryW(Wide(directory).c_str()))
+                    OutputDebugStringA(("Cannot clean up persistence test directory: " + directory + "\n").c_str());
+            }
+        } cleanup{ filename, directory, directoryExisted };
+        CheckPersistence(SUCCEEDED(game.LoadScene("builtin:LoadTestTree")), game.GetSceneError());
+        CheckPersistence(SUCCEEDED(game.RenderTestFrame(1)), "initial render failed");
+        auto& data = game.GetRenderManager().GetRenderData();
+        data.clearColor = { 0.1f, 0.2f, 0.3f, 1 };
+        data.shadowLightPositionOverride = true;
+        data.shadowLightPosition = { 7, 8, 9 };
+        data.numPointLights = 1;
+        data.pointLights[0].Position = { 2, 3, 4 };
+        data.pointLights[0].Range = 8;
+        data.pointLights[0].Att = { 1, 0.1f, 0 };
+        game.GetPlayer()->SetPosition(DirectX::XMVectorSet(2, 3, -8, 1));
+        std::string editedTree;
+        for (auto* object : game.GetScene().Children())
+        {
+            auto& params = object->GetParams();
+            if (params.generatorType != LSystemGeneratorType) continue;
+            editedTree = params.name;
+            object->SetPosition(DirectX::XMVectorSet(4, 5, 6, 1));
+            params.textureCoordScale = { 2, 3 };
+            params.materials.at(0).Diffuse = { 0.25f, 0.5f, 0.75f, 1 };
+            params.materials.at(0).textureCoordScale = { 4, 5, 1, 1 };
+            auto& generator = object->GetParams<LSystemParams>().GetGeneratorParameters();
+            generator._axiom = "F[+F]";
+            generator._rules = { Rule("F", 2, "FF") };
+            generator._numIterations = 2;
+            break;
+        }
+        CheckPersistence(!editedTree.empty(), "fixture has no editable tree");
+        auto* originalScene = &game.GetScene();
+        const float savedTime = data.time;
+        CheckPersistence(SUCCEEDED(game.SaveScene("Runtime round trip", stem)), game.GetSceneError());
+        CheckPersistence(&game.GetScene() == originalScene && data.time == savedTime, "saving reset the live scene");
+        const auto savedText = SceneData::SerializeScene(SceneData::ReadScene(filename));
+        auto saved = SceneData::ReadScene(filename);
+        CheckPersistence(saved.camera.position.x == 2 && saved.clearColor.y == 0.2f &&
+            saved.hasShadowLightPosition && saved.shadowLightPosition.z == 9 && saved.pointLight.range == 8,
+            "camera or lighting edits were lost");
+        bool foundTree = false;
+        for (const auto& object : saved.objects)
+            if (object->id == editedTree)
+            {
+                const auto& tree = dynamic_cast<const SceneData::TreeDefinition&>(*object);
+                CheckPersistence(tree.transform.position.x == 4 && tree.textureCoordScale.x == 2 &&
+                    tree.trunk.textureCoordScale.x == 4 && tree.trunk.diffuse.x == 0.25f &&
+                    tree.generator.axiom == "F[+F]" && tree.generator.rules.at(0).iterations == 2,
+                    "object, material, UV or rule edits were lost");
+                foundTree = true;
+            }
+        CheckPersistence(foundTree, "saved tree was omitted");
+        CheckPersistence(SUCCEEDED(game.LoadScene("user:" + stem)), game.GetSceneError());
+        CheckPersistence(DirectX::XMVectorGetX(game.GetPlayer()->GetPosition()) == 2 &&
+            data.shadowLightPositionOverride && data.shadowLightPosition.z == 9, "reloading did not restore authored settings");
+        originalScene = &game.GetScene();
+        CheckPersistence(FAILED(game.LoadScene(filename + ".missing")) && &game.GetScene() == originalScene &&
+            DirectX::XMVectorGetX(game.GetPlayer()->GetPosition()) == 2, "failed load replaced the active scene");
+        CheckPersistence(FAILED(game.SaveScene()) && SceneData::SerializeScene(SceneData::ReadScene(filename)) == savedText,
+            "unconfirmed overwrite changed the saved scene");
+        CheckPersistence(SUCCEEDED(game.SaveScene({}, {}, true)), game.GetSceneError());
+        for (auto* object : game.GetScene().Children())
+            if (object->GetParams().name == editedTree)
+            {
+                auto& iterations = object->GetParams<LSystemParams>().GetGeneratorParameters()._numIterations;
+                iterations = 21;
+                CheckPersistence(FAILED(game.SaveScene({}, {}, true)), "invalid live state was saved");
+                iterations = 2;
+            }
+        CheckPersistence(SceneData::ReadScene(filename).name == "Runtime round trip", "failed save damaged the target");
+        CheckPersistence(SUCCEEDED(game.LoadScene(request->scene)), game.GetSceneError());
+        game.ConfigureRenderTest(request->scene, request->mode == "raytracing", request->postProcessing);
+        srand(request->seed);
+        const auto before = request->report + L".before.png";
+        const auto after = request->report + L".after.png";
+        for (int frame = 0; frame < 3; ++frame)
+            CheckPersistence(SUCCEEDED(game.RenderTestFrame(1, frame == 2 ? before : std::wstring())), "original scene render failed");
+        CheckPersistence(SUCCEEDED(game.SaveScene("No-edit round trip", stem, true)), game.GetSceneError());
+        SceneData::WriteScene(SceneData::ReadScene(filename), SceneData::Utf8Path(request->report) + ".scene.json");
+        CheckPersistence(SUCCEEDED(game.LoadScene("user:" + stem)), game.GetSceneError());
+        srand(request->seed);
+        for (int frame = 0; frame < 3; ++frame)
+            CheckPersistence(SUCCEEDED(game.RenderTestFrame(1, frame == 2 ? after : std::wstring())), "saved scene render failed");
+        CheckPersistence(SUCCEEDED(game.LoadScene(request->scene)), game.GetSceneError());
+        std::cerr << "Runtime scene persistence checks passed\n";
     }
 }
 
@@ -51,6 +159,7 @@ void ParseRenderTestCommandLine()
     parsed->benchmarkFrames = json.value("benchmarkFrames", 0);
     parsed->benchmarkTimeStep = json.value("benchmarkTimeStep", 0.0);
     parsed->postProcessing = json.value("postProcessing", true);
+    parsed->validateScenePersistence = json.value("validateScenePersistence", false);
     parsed->report = Wide(json.at("report").get<std::string>());
     if (parsed->scene.empty() || (parsed->mode != "raster" && parsed->mode != "raytracing")
         || parsed->width < 32 || parsed->width > 2048 || parsed->height < 32 || parsed->height > 2048
@@ -92,6 +201,12 @@ int RunRenderTestCapture(Game& game)
     DirectX::XMStoreFloat3(&originalCamera, game.GetPlayer()->GetPosition());
     try
     {
+        if (request->validateScenePersistence)
+        {
+            ValidateScenePersistence(game);
+            DirectX::XMStoreFloat3(&originalCamera, game.GetPlayer()->GetPosition());
+            report["scenePersistenceValidated"] = true;
+        }
         for (const auto& point : request->captures)
         {
             game.ConfigureRenderTest(request->scene, point.mode == "raytracing", request->postProcessing,

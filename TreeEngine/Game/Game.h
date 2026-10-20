@@ -55,6 +55,7 @@ public:
     RenderManager& GetRenderManager() { return m_renderManager; }
 
     Player* GetPlayer() { return m_player; }
+    SceneRoot& GetScene() { return *m_pScene; }
 
     // Allow SSE members
     void* operator new(size_t size) 
@@ -69,6 +70,11 @@ public:
     HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {});
 
     HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
+    // Call between frames, as the UI's deferred scene operations do.
+    HRESULT LoadScene(const std::string& name);
+    HRESULT RefreshScenes();
+    HRESULT SaveScene(const std::string& displayName = {}, const std::string& filenameStem = {}, bool overwrite = false);
+    const std::string& GetSceneError() const { return m_sceneError; }
 
     bool DebugUIKeyCaptured()
     {
@@ -124,6 +130,23 @@ private:
     double                               m_timeStart;
     double                               m_timeCurrent;
     int                                  m_currentScene;
+    SceneData::SceneDefinition m_sceneDefinition;
+    std::string m_sceneFilename;
+    bool m_sceneIsUser = false;
+    std::string m_sceneError;
+    std::string m_sceneStatus;
+    std::string m_sceneSelection;
+    std::string m_sceneLoadRequest;
+    bool m_sceneRefreshRequested = false;
+    bool m_sceneSaveRequested = false;
+    bool m_sceneSaveAs = false;
+    bool m_sceneSaveOverwrite = false;
+    bool m_sceneConfirmSave = false;
+    std::string m_pendingSaveName;
+    std::string m_pendingSaveStem;
+    std::string m_pendingSavePath;
+    char m_saveSceneName[256] = {};
+    char m_saveSceneStem[256] = {};
     bool                                 m_advanceScene;
     int                                  m_advanceSceneAmount;
     bool                                 m_reloadDevice;

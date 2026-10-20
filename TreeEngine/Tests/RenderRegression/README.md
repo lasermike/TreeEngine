@@ -26,6 +26,10 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Copies the deployed runtime into the ignored test artifacts directory.
 .\Tests\RenderRegression\test-tree-skinning.ps1 -Capacity
 
+# Edit, save, reload, restart, and compare scene appearance in both modes.
+# Uses an isolated runtime copy; never modifies the deployment's UserScenes.
+.\Tests\RenderRegression\test-scene-persistence.ps1
+
 # Sample 120 warmed-up frames per capture without timing PNG readback/encoding.
 .\Tests\RenderRegression\run-render-tests.ps1 -Scenes test-tree,trees -BenchmarkFrames 120
 ```
@@ -50,8 +54,27 @@ inspection and separate approval of the exact generated subdirectories.
 `scenes.json` lists ten scenes, both rendering modes, and captures at 0, 1,
 and 5 seconds (60 images). It also specifies resolution, random seed,
 postprocessing, warmup frames, and tolerances. Scene IDs refer to this manifest;
-names select the existing GameLoader entry points, including the JSON AI Tree.
-No additional scene conversions are needed to run these tests.
+names select the legacy built-in IDs discovered from each scene's JSON metadata.
+User scenes cannot override these IDs. Catalog display order does not affect
+regression selection.
+
+`test-scene-persistence.ps1` covers primitives, L-system/fixed trees, graphs,
+and glTF assets in raster and DXR modes, using the same 0.002 RMS tolerance.
+It copies the deployed runtime (excluding existing UserScenes) into a uniquely
+named ignored artifact directory and runs from a different working directory.
+It checks live camera, lighting, material, transform, and rule edits; Save As
+without resetting time; reload; declined/confirmed overwrites; invalid captured
+state; and failed loads retaining the active scene. It also compares no-edit
+save/reload images and restarts a worker to discover/load the saved user file.
+Use `-Scenes LoadGraph,LoadGltfDemo`, `-Modes raster`, or `-Executable` to narrow
+or select another build. Artifacts include before/after/restart images, diffs,
+serialized scenes, requests, and worker reports.
+
+The native capture request enables these opt-in runtime checks with
+`"validateScenePersistence": true`; success adds `scenePersistenceValidated`
+to its report. Alongside the normal report it writes `.before.png`, `.after.png`,
+and `.scene.json` sidecars. The check temporarily creates a uniquely named user
+scene and cleans up only its own file; run through the isolated script above.
 
 Each scene/mode runs in a separate hidden game process with the scene's initial
 camera and lights, no input or debug UI, and synchronous object updates. The

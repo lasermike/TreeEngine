@@ -8,6 +8,7 @@
 #include <set>
 #include <stdexcept>
 #include <sstream>
+#include <algorithm>
 
 namespace SceneData
 {
@@ -201,6 +202,18 @@ namespace SceneData
             if (result.animationSpeed < 0) Invalid(path + ".animationSpeed", "must be nonnegative");
             if (value.contains("depthLOD")) result.depthLOD = Integer(value["depthLOD"], path + ".depthLOD", -1, 20);
         }
+
+        template<class T>
+        void ReadTreeMaterials(const Json& value, const std::string& path, const SceneDefinition& scene, T& object)
+        {
+            if (!value.contains("materials")) return;
+            object.hasMaterials = true;
+            Fields(value["materials"], path + ".materials", { "trunk", "leaf" });
+            if (value["materials"].contains("trunk"))
+                object.trunk = MaterialReference(value["materials"]["trunk"], path + ".materials.trunk", scene);
+            if (value["materials"].contains("leaf"))
+                object.leaf = MaterialReference(value["materials"]["leaf"], path + ".materials.leaf", scene);
+        }
     }
 
     SceneDefinition ParseScene(const std::string& jsonText, const std::string& sourceName)
@@ -208,15 +221,38 @@ namespace SceneData
         try
         {
             const auto root = Json::parse(jsonText);
-            Fields(root, sourceName, { "version", "name", "camera", "render", "light", "pointLightCount", "materials", "objects" });
+            Fields(root, sourceName, { "version", "id", "name", "camera", "render", "light", "pointLightCount", "pointLight", "materials", "objects" });
             if (!root.contains("version") || Integer(root["version"], sourceName + ".version", 1, 1) != 1)
                 Invalid(sourceName + ".version", "expected schema version 1");
             SceneDefinition scene;
+            if (root.contains("id"))
+            {
+                scene.id = String(root["id"], sourceName + ".id");
+                if (scene.id.empty()) Invalid(sourceName + ".id", "must not be empty");
+                for (unsigned char character : scene.id)
+                    if (character < 32 || character == 127 || character == ':' || character == '/' || character == '\\')
+                        Invalid(sourceName + ".id", "must not contain control characters, colons, or path separators");
+            }
             if (!root.contains("name")) Invalid(sourceName + ".name", "required property");
             scene.name = String(root["name"], sourceName + ".name");
             if (scene.name.empty()) Invalid(sourceName + ".name", "must not be empty");
             if (root.contains("camera")) scene.camera = ReadTransform(root["camera"], sourceName + ".camera");
             if (root.contains("pointLightCount")) scene.pointLightCount = Integer(root["pointLightCount"], sourceName + ".pointLightCount", 0, 1);
+            if (root.contains("pointLight"))
+            {
+                const auto& light = root["pointLight"];
+                const auto path = sourceName + ".pointLight";
+                Fields(light, path, { "ambient", "diffuse", "specular", "position", "range", "attenuation" });
+                if (light.contains("ambient")) scene.pointLight.ambient = Vector4(light["ambient"], path + ".ambient");
+                if (light.contains("diffuse")) scene.pointLight.diffuse = Vector4(light["diffuse"], path + ".diffuse");
+                if (light.contains("specular")) scene.pointLight.specular = Vector4(light["specular"], path + ".specular");
+                if (light.contains("position")) scene.pointLight.position = Vector3(light["position"], path + ".position");
+                if (light.contains("range")) scene.pointLight.range = Number(light["range"], path + ".range");
+                if (light.contains("attenuation")) scene.pointLight.attenuation = Vector3(light["attenuation"], path + ".attenuation");
+                if (scene.pointLight.range < 0 || scene.pointLight.attenuation.x < 0 ||
+                    scene.pointLight.attenuation.y < 0 || scene.pointLight.attenuation.z < 0)
+                    Invalid(path, "range and attenuation must be nonnegative");
+            }
             if (root.contains("render"))
             {
                 const auto& render = root["render"];
@@ -235,7 +271,12 @@ namespace SceneData
             {
                 const auto& light = root["light"];
                 auto path = sourceName + ".light";
-                Fields(light, path, { "ambient", "diffuse", "specular", "direction" });
+                Fields(light, path, { "ambient", "diffuse", "specular", "direction", "shadowPosition" });
+                if (light.contains("shadowPosition"))
+                {
+                    scene.hasShadowLightPosition = true;
+                    scene.shadowLightPosition = Vector3(light["shadowPosition"], path + ".shadowPosition");
+                }
                 if (light.contains("ambient")) scene.light.ambient = Vector4(light["ambient"], path + ".ambient");
                 if (light.contains("diffuse")) scene.light.diffuse = Vector4(light["diffuse"], path + ".diffuse");
                 if (light.contains("specular")) scene.light.specular = Vector4(light["specular"], path + ".specular");
@@ -287,33 +328,29 @@ namespace SceneData
                     if (value.contains("trunkShape")) tree->trunkShape = ReadShape(value["trunkShape"], path + ".trunkShape");
                     if (tree->trunkShape != Shape::Cylinder && tree->trunkShape != Shape::SkinnedCylinder)
                         Invalid(path + ".trunkShape", "expected cylinder or skinnedCylinder");
-                    if (value.contains("materials"))
-                    {
-                        tree->hasMaterials = true;
-                        Fields(value["materials"], path + ".materials", { "trunk", "leaf" });
-                        if (value["materials"].contains("trunk")) tree->trunk = MaterialReference(value["materials"]["trunk"], path + ".materials.trunk", scene);
-                        if (value["materials"].contains("leaf")) tree->leaf = MaterialReference(value["materials"]["leaf"], path + ".materials.leaf", scene);
-                    }
+                    ReadTreeMaterials(value, path, scene, *tree);
                     if (!value.contains("generator")) Invalid(path + ".generator", "required property");
                     tree->generator = ReadGenerator(value["generator"], path + ".generator");
                     object = std::move(tree);
                 }
                 else if (type == "fixedTree")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape" });
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape", "materials" });
                     auto tree = std::make_unique<FixedTreeDefinition>();
                     if (value.contains("trunkShape")) tree->trunkShape = ReadShape(value["trunkShape"], path + ".trunkShape");
                     if (tree->trunkShape != Shape::Cylinder && tree->trunkShape != Shape::SkinnedCylinder)
                         Invalid(path + ".trunkShape", "expected cylinder or skinnedCylinder");
+                    ReadTreeMaterials(value, path, scene, *tree);
                     object = std::move(tree);
                 }
                 else if (type == "graph")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "dataFile" });
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "dataFile", "materials" });
                     auto graph = std::make_unique<GraphDefinition>();
                     if (!value.contains("dataFile")) Invalid(path + ".dataFile", "required property");
                     graph->dataFile = String(value["dataFile"], path + ".dataFile");
                     if (graph->dataFile.empty()) Invalid(path + ".dataFile", "must not be empty");
+                    ReadTreeMaterials(value, path, scene, *graph);
                     object = std::move(graph);
                 }
                 else if (type == "model")
@@ -350,10 +387,242 @@ namespace SceneData
 
     SceneDefinition ReadScene(const std::string& filename)
     {
-        std::ifstream input(filename, std::ios::binary);
+        std::ifstream input(WidePath(filename).c_str(), std::ios::binary);
         if (!input) throw std::runtime_error(filename + ": cannot open scene file");
         std::ostringstream text;
         text << input.rdbuf();
+        if (input.bad()) throw std::runtime_error(filename + ": cannot read scene file");
         return ParseScene(text.str(), filename);
+    }
+
+    namespace
+    {
+        Json VectorJson(const DirectX::XMFLOAT2& v) { return Json::array({ v.x, v.y }); }
+        Json VectorJson(const DirectX::XMFLOAT3& v) { return Json::array({ v.x, v.y, v.z }); }
+        Json VectorJson(const DirectX::XMFLOAT4& v) { return Json::array({ v.x, v.y, v.z, v.w }); }
+        Json TransformJson(const Transform& t)
+        {
+            return { { "position", VectorJson(t.position) }, { "rotation", VectorJson(t.rotation) }, { "scale", VectorJson(t.scale) } };
+        }
+        Json MaterialJson(const MaterialDefinition& m)
+        {
+            return { { "ambient", VectorJson(m.ambient) }, { "diffuse", VectorJson(m.diffuse) },
+                { "specular", VectorJson(m.specular) }, { "reflect", VectorJson(m.reflect) },
+                { "texture", m.texture }, { "textureCoordScale", VectorJson(m.textureCoordScale) },
+                { "alphaClipThreshold", m.alphaClipThreshold } };
+        }
+        const char* ShapeName(Shape shape)
+        {
+            switch (shape)
+            {
+            case Shape::Box: return "box";
+            case Shape::Cylinder: return "cylinder";
+            case Shape::CylinderLD: return "cylinderLD";
+            case Shape::CylinderHD: return "cylinderHD";
+            case Shape::SkinnedCylinder: return "skinnedCylinder";
+            case Shape::Sprite: return "sprite";
+            }
+            throw std::runtime_error("Cannot serialize unsupported shape");
+        }
+        template<class T>
+        void TreeMaterialsJson(Json& value, const T& tree)
+        {
+            if (tree.hasMaterials)
+                value["materials"] = { { "trunk", MaterialJson(tree.trunk) }, { "leaf", MaterialJson(tree.leaf) } };
+        }
+        [[noreturn]] void FileError(const std::string& filename, const char* action, DWORD error = GetLastError())
+        {
+            throw std::runtime_error(filename + ": " + action + " (Windows error " + std::to_string(error) + ")");
+        }
+    }
+
+    std::string SerializeScene(const SceneDefinition& scene)
+    {
+        Json root = { { "version", 1 }, { "name", scene.name }, { "camera", TransformJson(scene.camera) },
+            { "render", { { "clearColor", VectorJson(scene.clearColor) }, { "farClippingPlane", scene.farClippingPlane },
+                { "useShadowMaps", scene.useShadowMaps }, { "useAlphaBlendedRenderTarget", scene.useAlphaBlendedRenderTarget } } },
+            { "light", { { "ambient", VectorJson(scene.light.ambient) }, { "diffuse", VectorJson(scene.light.diffuse) },
+                { "specular", VectorJson(scene.light.specular) }, { "direction", VectorJson(scene.light.direction) } } },
+            { "pointLightCount", scene.pointLightCount }, { "pointLight", {
+                { "ambient", VectorJson(scene.pointLight.ambient) }, { "diffuse", VectorJson(scene.pointLight.diffuse) },
+                { "specular", VectorJson(scene.pointLight.specular) }, { "position", VectorJson(scene.pointLight.position) },
+                { "range", scene.pointLight.range }, { "attenuation", VectorJson(scene.pointLight.attenuation) } } },
+            { "objects", Json::array() } };
+        if (!scene.id.empty()) root["id"] = scene.id;
+        if (scene.hasShadowLightPosition) root["light"]["shadowPosition"] = VectorJson(scene.shadowLightPosition);
+        if (!scene.materials.empty())
+            for (const auto& material : scene.materials) root["materials"][material.first] = MaterialJson(material.second);
+        for (const auto& object : scene.objects)
+        {
+            if (!object) throw std::runtime_error("Cannot serialize a null scene object");
+            Json value = { { "id", object->id }, { "transform", TransformJson(object->transform) } };
+            if (object->kind != ObjectKind::Model)
+            {
+                value["textureCoordScale"] = VectorJson(object->textureCoordScale);
+                value["animationSpeed"] = object->animationSpeed;
+                value["depthLOD"] = object->depthLOD;
+            }
+            switch (object->kind)
+            {
+            case ObjectKind::Primitive:
+            {
+                const auto& primitive = dynamic_cast<const PrimitiveDefinition&>(*object);
+                value["type"] = "primitive";
+                value["shape"] = ShapeName(primitive.shape);
+                value["cubeMap"] = primitive.cubeMap;
+                if (primitive.hasMaterial) value["material"] = MaterialJson(primitive.material);
+                break;
+            }
+            case ObjectKind::Tree:
+            {
+                const auto& tree = dynamic_cast<const TreeDefinition&>(*object);
+                value["type"] = "tree";
+                value["trunkShape"] = ShapeName(tree.trunkShape);
+                TreeMaterialsJson(value, tree);
+                const auto& g = tree.generator;
+                if (g.segmentLengthBehavior != SegmentLengthBehavior::Constant && g.segmentLengthBehavior != SegmentLengthBehavior::RandomAddition)
+                    throw std::runtime_error("Cannot serialize unsupported segment-length behavior");
+                value["generator"] = { { "axiom", g.axiom }, { "constants", g.constants }, { "iterations", g.iterations },
+                    { "angle", g.angle }, { "segmentLength", g.segmentLength }, { "thickness", g.thickness },
+                    { "initialDirection", VectorJson(g.initialDirection) },
+                    { "segmentLengthBehavior", g.segmentLengthBehavior == SegmentLengthBehavior::Constant ? "constant" : "randomAddition" },
+                    { "rules", Json::array() } };
+                for (const auto& rule : g.rules)
+                    value["generator"]["rules"].push_back({ { "input", rule.input }, { "output", rule.output }, { "iterations", rule.iterations } });
+                break;
+            }
+            case ObjectKind::FixedTree:
+            {
+                const auto& tree = dynamic_cast<const FixedTreeDefinition&>(*object);
+                value["type"] = "fixedTree";
+                value["trunkShape"] = ShapeName(tree.trunkShape);
+                TreeMaterialsJson(value, tree);
+                break;
+            }
+            case ObjectKind::Graph:
+            {
+                const auto& graph = dynamic_cast<const GraphDefinition&>(*object);
+                value["type"] = "graph";
+                value["dataFile"] = graph.dataFile;
+                TreeMaterialsJson(value, graph);
+                break;
+            }
+            case ObjectKind::Model:
+            {
+                const auto& model = dynamic_cast<const ModelDefinition&>(*object);
+                value["type"] = "model";
+                value["source"] = model.source;
+                value["forceLit"] = model.forceLit;
+                break;
+            }
+            default: throw std::runtime_error("Cannot serialize unsupported scene object");
+            }
+            root["objects"].push_back(std::move(value));
+        }
+        const auto text = root.dump(2) + "\n";
+        ParseScene(text, "Scene being saved");
+        return text;
+    }
+
+    std::wstring WidePath(const std::string& path)
+    {
+        if (path.empty()) return {};
+        if (path.find('\0') != std::string::npos) throw std::runtime_error("Path contains an embedded NUL");
+        int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.c_str(), -1, nullptr, 0);
+        if (!count) throw std::runtime_error("Path is not valid UTF-8");
+        std::vector<wchar_t> buffer(count);
+        if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.c_str(), -1, buffer.data(), count))
+            FileError(path, "cannot convert path");
+        return buffer.data();
+    }
+
+    std::string Utf8Path(const std::wstring& path)
+    {
+        if (path.empty()) return {};
+        int count = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (!count) throw std::runtime_error("Path is not valid Unicode");
+        std::vector<char> buffer(count);
+        if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.c_str(), -1, buffer.data(), count, nullptr, nullptr))
+            throw std::runtime_error("Cannot convert Unicode path");
+        return buffer.data();
+    }
+
+    std::string AbsolutePath(const std::string& path)
+    {
+        const auto wide = WidePath(path);
+        DWORD count = GetFullPathNameW(wide.c_str(), 0, nullptr, nullptr);
+        if (!count) FileError(path, "cannot resolve path");
+        std::vector<wchar_t> buffer(count);
+        DWORD length = GetFullPathNameW(wide.c_str(), count, buffer.data(), nullptr);
+        if (!length || length >= count) FileError(path, "cannot resolve path");
+        return Utf8Path(buffer.data());
+    }
+
+    std::string ParentPath(const std::string& path)
+    {
+        const auto slash = path.find_last_of("/\\");
+        return slash == std::string::npos ? std::string() : path.substr(0, slash + 1);
+    }
+
+    std::string ResolveSceneAsset(const std::string& asset, const std::string& sceneFilename)
+    {
+        if (asset.empty()) return {};
+        std::vector<wchar_t> executable(32768);
+        DWORD size = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+        if (!size || size >= executable.size()) FileError(asset, "cannot locate runtime resources");
+        std::vector<std::string> candidates;
+        const bool absolute = asset.size() > 1 && (asset[1] == ':' || asset[0] == '\\' || asset[0] == '/');
+        if (!absolute && !sceneFilename.empty()) candidates.push_back(ParentPath(sceneFilename) + asset);
+        candidates.push_back(asset);
+        candidates.push_back(ParentPath(Utf8Path(executable.data())) + asset);
+        candidates.push_back("Game\\Resources\\" + asset);
+        candidates.push_back("Game\\" + asset);
+        for (const auto& candidate : candidates)
+        {
+            DWORD attributes = GetFileAttributesW(WidePath(candidate).c_str());
+            if (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY))
+                return AbsolutePath(candidate);
+        }
+        throw std::runtime_error(sceneFilename + ": asset '" + asset + "' was not found");
+    }
+
+    void WriteScene(const SceneDefinition& scene, const std::string& filename, bool overwrite)
+    {
+        const auto text = SerializeScene(scene);
+        if (text.size() > MAXDWORD) throw std::runtime_error(filename + ": scene file is too large");
+        static LONG sequence = 0;
+        struct TemporaryFile
+        {
+            HANDLE handle = INVALID_HANDLE_VALUE;
+            std::wstring path;
+            ~TemporaryFile()
+            {
+                if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
+                if (!path.empty() && !DeleteFileW(path.c_str()))
+                    OutputDebugStringW((L"Cannot clean up scene save temporary file: " + path + L"\n").c_str());
+            }
+        } temporary;
+        for (int attempt = 0; attempt < 16; ++attempt)
+        {
+            temporary.path = WidePath(filename + ".tmp." + std::to_string(GetCurrentProcessId()) + "." +
+                std::to_string(InterlockedIncrement(&sequence)));
+            temporary.handle = CreateFileW(temporary.path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (temporary.handle != INVALID_HANDLE_VALUE) break;
+            DWORD error = GetLastError();
+            temporary.path.clear();
+            if (error != ERROR_FILE_EXISTS && error != ERROR_ALREADY_EXISTS) FileError(filename, "cannot create temporary scene file", error);
+        }
+        if (temporary.handle == INVALID_HANDLE_VALUE) FileError(filename, "cannot create unique temporary scene file", ERROR_FILE_EXISTS);
+        DWORD written = 0;
+        if (!WriteFile(temporary.handle, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) || written != text.size())
+            FileError(filename, "cannot write scene file");
+        if (!FlushFileBuffers(temporary.handle)) FileError(filename, "cannot flush scene file");
+        const HANDLE handle = temporary.handle;
+        temporary.handle = INVALID_HANDLE_VALUE;
+        if (!CloseHandle(handle)) FileError(filename, "cannot close scene file");
+        if (!MoveFileExW(temporary.path.c_str(), WidePath(filename).c_str(),
+            MOVEFILE_WRITE_THROUGH | (overwrite ? MOVEFILE_REPLACE_EXISTING : 0)))
+            FileError(filename, "cannot publish scene file");
+        temporary.path.clear();
     }
 }

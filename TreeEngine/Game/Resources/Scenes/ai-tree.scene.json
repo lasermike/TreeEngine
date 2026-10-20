@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "LoadAITree",
   "name": "AI Tree",
   "camera": {
     "position": [ 30.515, -0.401, -29.176 ],

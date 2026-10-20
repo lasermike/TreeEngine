@@ -9,7 +9,9 @@
 #include "RenderManager.h"
 #include "InputManager.h"
 #include "ThreadPool.h"
+#include "SceneInstantiation.h"
 #include <cmath>
+#include <stdexcept>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -105,20 +107,29 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
 
     HRR(ReloadDevice());
 
-    if (!m_renderTestMode) m_currentScene = 8; // LoadAITree
-    //m_currentScene = 2;  // SeaScene
-    //m_currentScene = 1; // Test tree
-    //m_currentScene = 7; // simple box and cylindar
+    HRR(m_loader.InitializeScenes(SceneData::Utf8Path(GameCommon::GetContentFileRoot())));
+    m_currentScene = m_loader.Catalog().Find("builtin:LoadAITree");
+    if (m_currentScene < 0)
+    {
+        m_currentScene = 0;
+        m_sceneStatus = "AI Tree was not found; selected the first available scene.";
+        OutputDebugStringA((m_sceneStatus + "\n").c_str());
+    }
 
     SceneRenderSettings sceneSettings = m_renderManager.GetSceneSettings();
     if (m_renderTestMode)
     {
-        HRR(m_loader.Load(m_renderTestScene.c_str(), m_pScene, &sceneSettings, m_player, &m_gameData));
+        HRR(m_loader.Load(m_renderTestScene.c_str(), m_pScene, &sceneSettings, m_player, &m_gameData,
+            &m_sceneDefinition, &m_sceneFilename));
     }
     else
     {
-        HRR(m_loader.Load(m_currentScene, m_pScene, &sceneSettings, m_player, &m_gameData));
+        HRR(m_loader.Load(m_currentScene, m_pScene, &sceneSettings, m_player, &m_gameData,
+            &m_sceneDefinition, &m_sceneFilename));
     }
+    m_currentScene = m_loader.Catalog().FindPath(m_sceneFilename);
+    m_sceneIsUser = m_currentScene >= 0 && m_loader.Catalog().Entries()[m_currentScene].user;
+    m_sceneSelection = m_sceneFilename;
     m_renderManager.ApplySceneSettings(sceneSettings);
 
     m_needsResize = true;
@@ -130,6 +141,104 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_threadPool = new ThreadPool(m_renderTestMode ? 1 : (concurentThreadsSupported ? concurentThreadsSupported : 1));
 
     return S_OK;
+}
+
+HRESULT Game::RefreshScenes()
+{
+    const HRESULT hr = m_loader.RefreshScenes();
+    m_currentScene = m_sceneFilename.empty() ? -1 : m_loader.Catalog().FindPath(m_sceneFilename);
+    if (FAILED(hr)) m_sceneError = m_loader.GetLastError();
+    else m_sceneError.clear();
+    return hr;
+}
+
+HRESULT Game::LoadScene(const std::string& name)
+{
+    auto nextScene = std::make_unique<SceneRoot>();
+    SceneRenderSettings nextSettings = m_renderManager.GetSceneSettings();
+    GameData nextData;
+    SceneData::SceneDefinition nextDefinition;
+    std::string nextFilename;
+    const auto oldPosition = m_player->GetPosition();
+    const auto oldRotation = m_player->GetRotation();
+    const HRESULT hr = m_loader.Load(name.c_str(), nextScene.get(), &nextSettings, m_player, &nextData,
+        &nextDefinition, &nextFilename);
+    if (FAILED(hr))
+    {
+        m_player->SetPosition(oldPosition);
+        m_player->SetRotation(oldRotation);
+        m_sceneError = m_loader.GetLastError();
+        return hr;
+    }
+    m_pScene->DeleteAllChildren();
+    m_renderManager.UninitGameLevelGraphics();
+    delete m_pScene;
+    m_pScene = nextScene.release();
+    m_sceneDefinition = std::move(nextDefinition);
+    m_sceneFilename = std::move(nextFilename);
+    m_currentScene = m_loader.Catalog().FindPath(m_sceneFilename);
+    m_sceneSelection = m_sceneFilename;
+    m_sceneIsUser = m_currentScene >= 0 && m_loader.Catalog().Entries()[m_currentScene].user;
+    m_gameData = nextData;
+    m_renderManager.ApplySceneSettings(nextSettings);
+    m_renderManager.GetRenderData().time = 0;
+    m_timeStart = 0;
+    m_timeCurrent = 0;
+    m_settings.m_buffersInUse = 0;
+    m_resetTree = true;
+    m_needsResize = true;
+    m_sceneError.clear();
+    m_sceneStatus = "Loaded " + m_sceneFilename.substr(m_sceneFilename.find_last_of("\\/") + 1);
+    return S_OK;
+}
+
+HRESULT Game::SaveScene(const std::string& displayName, const std::string& filenameStem, bool overwrite)
+{
+#if defined(TREENGINE_WIN32)
+    try
+    {
+        const bool saveAs = !displayName.empty() || !filenameStem.empty();
+        if (saveAs && (displayName.empty() || filenameStem.empty()))
+            throw std::runtime_error("Save As requires both a display name and a filename");
+        if (!saveAs && !m_sceneIsUser)
+            throw std::runtime_error("Built-in or external scenes must be saved with Save As");
+        const auto target = saveAs ? m_loader.Catalog().UserFilename(filenameStem) : m_sceneFilename;
+        auto captured = CaptureScene(m_sceneDefinition, *m_pScene, m_renderManager.GetSceneSettings(),
+            *m_player, m_gameData, m_sceneFilename, target);
+        if (saveAs)
+        {
+            captured.name = displayName;
+            captured.id = filenameStem;
+        }
+        SceneData::SerializeScene(captured);
+        m_loader.Catalog().CheckUserIdentity(captured.id, target);
+        m_loader.Catalog().EnsureUserDirectory();
+        SceneData::WriteScene(captured, target, overwrite);
+        m_sceneDefinition = std::move(captured);
+        m_sceneFilename = target;
+        m_sceneIsUser = true;
+        const HRESULT refresh = RefreshScenes();
+        m_sceneSelection = target;
+        m_sceneStatus = "Saved " + target.substr(target.find_last_of("\\/") + 1);
+        if (FAILED(refresh) || m_currentScene < 0)
+        {
+            m_sceneError = "Scene was saved to " + target + ", but could not be rediscovered. Check the discovery diagnostics.";
+            OutputDebugStringA((m_sceneError + "\n").c_str());
+            return S_FALSE;
+        }
+        return S_OK;
+    }
+    catch (const std::exception& error)
+    {
+        m_sceneError = error.what();
+        OutputDebugStringA((m_sceneError + "\n").c_str());
+        return E_FAIL;
+    }
+#else
+    m_sceneError = "Scene saving is supported by the desktop application only.";
+    OutputDebugStringA((m_sceneError + "\n").c_str());
+    return E_NOTIMPL;
+#endif
 }
 
 
@@ -321,42 +430,34 @@ void Game::Update(DX::StepTimer const& timer)
         m_needsResize = false;
     }
 
+    if (m_sceneRefreshRequested)
+    {
+        RefreshScenes();
+        m_sceneRefreshRequested = false;
+    }
+    if (!m_sceneLoadRequest.empty())
+    {
+        LoadScene(m_sceneLoadRequest);
+        m_sceneLoadRequest.clear();
+    }
+    if (m_sceneSaveRequested)
+    {
+        SaveScene(m_sceneSaveAs ? m_pendingSaveName : std::string(),
+            m_sceneSaveAs ? m_pendingSaveStem : std::string(), m_sceneSaveOverwrite);
+        m_sceneSaveRequested = false;
+    }
     if (m_advanceScene)
     {
-        int nextSceneIndex = (m_currentScene + m_advanceSceneAmount) % m_loader.GetNumScenes();
-        if (nextSceneIndex < 0)
+        const int count = m_loader.GetNumScenes();
+        if (count > 0)
         {
-            nextSceneIndex += m_loader.GetNumScenes();
+            int nextSceneIndex = (m_currentScene + m_advanceSceneAmount) % count;
+            if (nextSceneIndex < 0) nextSceneIndex += count;
+            LoadScene(m_loader.Catalog().Entries()[nextSceneIndex].Key());
         }
+        else m_sceneError = "No valid scenes are available. Refresh after adding a scene file.";
         m_advanceScene = false;
         m_advanceSceneAmount = 0;
-
-        // Validate and build the next scene before discarding the current one.
-        auto nextScene = std::make_unique<SceneRoot>();
-        SceneRenderSettings nextSceneSettings = m_renderManager.GetSceneSettings();
-        GameData nextGameData;
-        const XMVECTOR oldPosition = m_player->GetPosition();
-        const XMVECTOR oldRotation = m_player->GetRotation();
-        if (SUCCEEDED(m_loader.Load(nextSceneIndex, nextScene.get(), &nextSceneSettings, m_player, &nextGameData)))
-        {
-            m_pScene->DeleteAllChildren();
-            m_renderManager.UninitGameLevelGraphics();
-            delete m_pScene;
-            m_pScene = nextScene.release();
-            m_currentScene = nextSceneIndex;
-            m_gameData = nextGameData;
-            m_renderManager.ApplySceneSettings(nextSceneSettings);
-            m_renderManager.GetRenderData().time = 0;
-            m_timeStart = 0;
-            m_settings.m_buffersInUse = 0;
-            m_resetTree = true;
-            m_needsResize = true;
-        }
-        else
-        {
-            m_player->SetPosition(oldPosition);
-            m_player->SetRotation(oldRotation);
-        }
     }
 
     // Rebuild tree if necessary
@@ -657,9 +758,93 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     if (ImGui::CollapsingHeader("Scene", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::Text("%s", m_loader.GetSceneName(m_currentScene));
-        if (!m_loader.GetLastError().empty())
-            ImGui::TextWrapped("Scene load failed: %s", m_loader.GetLastError().c_str());
+        ImGui::Text("%s", m_sceneDefinition.name.c_str());
+        ImGui::TextWrapped("%s", m_sceneFilename.c_str());
+        const int selected = m_sceneSelection.empty() ? -1 : m_loader.Catalog().FindPath(m_sceneSelection);
+        const auto selectionLabel = selected >= 0 ? m_loader.Catalog().Entries()[selected].Label() : m_sceneSelection;
+        if (ImGui::BeginCombo("Available scenes", selectionLabel.c_str()))
+        {
+            for (const auto& entry : m_loader.Catalog().Entries())
+                if (ImGui::Selectable(entry.Label().c_str(), entry.filename == m_sceneSelection))
+                    m_sceneSelection = entry.filename;
+            ImGui::EndCombo();
+        }
+        ImGui::BeginDisabled(m_sceneSelection.empty());
+        if (ImGui::Button("Load")) m_sceneLoadRequest = m_sceneSelection;
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Reload")) m_sceneLoadRequest = m_sceneFilename;
+        ImGui::SameLine();
+        if (ImGui::Button("Refresh")) m_sceneRefreshRequested = true;
+#if defined(TREENGINE_WIN32)
+        ImGui::BeginDisabled(!m_sceneIsUser);
+        if (ImGui::Button("Save"))
+        {
+            m_sceneSaveAs = false;
+            m_pendingSavePath = m_sceneFilename;
+            m_sceneConfirmSave = true;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Save As"))
+        {
+            snprintf(m_saveSceneName, sizeof(m_saveSceneName), "%s", m_sceneDefinition.name.c_str());
+            m_saveSceneStem[0] = 0;
+            ImGui::OpenPopup("Save scene as");
+        }
+        if (ImGui::BeginPopupModal("Save scene as", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::InputText("Display name", m_saveSceneName, sizeof(m_saveSceneName));
+            ImGui::InputText("Filename (without .scene.json)", m_saveSceneStem, sizeof(m_saveSceneStem));
+            ImGui::TextWrapped("Directory: %s", m_loader.Catalog().UserDirectory().c_str());
+            if (ImGui::Button("Save file"))
+            {
+                try
+                {
+                    if (!m_saveSceneName[0]) throw std::runtime_error("A display name is required");
+                    m_pendingSavePath = m_loader.Catalog().UserFilename(m_saveSceneStem);
+                    m_pendingSaveName = m_saveSceneName;
+                    m_pendingSaveStem = m_saveSceneStem;
+                    m_sceneSaveAs = true;
+                    m_sceneSaveOverwrite = false;
+                    if (GetFileAttributesW(SceneData::WidePath(m_pendingSavePath).c_str()) != INVALID_FILE_ATTRIBUTES)
+                        m_sceneConfirmSave = true;
+                    else m_sceneSaveRequested = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                catch (const std::runtime_error& error)
+                {
+                    m_sceneError = error.what();
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+            if (!m_sceneError.empty()) ImGui::TextWrapped("%s", m_sceneError.c_str());
+            ImGui::EndPopup();
+        }
+        if (m_sceneConfirmSave)
+        {
+            ImGui::OpenPopup("Overwrite scene?");
+            m_sceneConfirmSave = false;
+        }
+        if (ImGui::BeginPopupModal("Overwrite scene?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::TextWrapped("Replace %s?", m_pendingSavePath.c_str());
+            if (ImGui::Button("Overwrite"))
+            {
+                m_sceneSaveOverwrite = true;
+                m_sceneSaveRequested = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+#endif
+        if (!m_sceneError.empty()) ImGui::TextWrapped("Scene operation failed: %s", m_sceneError.c_str());
+        else if (!m_sceneStatus.empty()) ImGui::TextWrapped("%s", m_sceneStatus.c_str());
+        for (const auto& diagnostic : m_loader.Catalog().Diagnostics())
+            ImGui::TextWrapped("Discovery: %s", diagnostic.c_str());
         for (WorldObject* obj : m_pScene->Children())
         {
             WorldObjectParams& params = obj->GetParams();

@@ -26,6 +26,7 @@ struct RenderTestRequest
     int benchmarkFrames = 0;
     double benchmarkTimeStep = 0;
     bool postProcessing = true;
+    bool validateScenePersistence = false;
     std::wstring report;
     std::vector<RenderTestPoint> captures;
 };

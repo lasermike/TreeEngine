@@ -1,4 +1,6 @@
 #pragma once
+#include "SceneCatalog.h"
+#include "SceneDefinition.h"
 
 class SceneRoot;
 struct SceneRenderSettings;
@@ -25,8 +27,13 @@ class GameLoader
 public:
     GameLoader();
 
-    HRESULT Load(const char* name, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData);
-    HRESULT Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData);
+    HRESULT InitializeScenes(const std::string& contentDirectory);
+    HRESULT RefreshScenes();
+    const SceneData::SceneCatalog& Catalog() const { return m_catalog; }
+    HRESULT Load(const char* name, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData,
+        SceneData::SceneDefinition* definition = nullptr, std::string* filename = nullptr);
+    HRESULT Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData,
+        SceneData::SceneDefinition* definition = nullptr, std::string* filename = nullptr);
     void Regenerate(SceneRoot* pScene);
 
     int _currentSeed;
@@ -36,4 +43,5 @@ public:
 
 private:
     std::string m_lastError;
+    SceneData::SceneCatalog m_catalog;
 };

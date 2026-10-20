@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "LoadTestBlock",
   "name": "Test Block",
   "camera": {
     "position": [-4, 1.5, -4],

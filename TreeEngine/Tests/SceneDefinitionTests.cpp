@@ -156,10 +156,14 @@ void TestSpecularExtension()
     reject(bad, "UNKNOWN_test_extension");
 }
 
+int RunScenePersistenceTests();
+
 int main(int argc, char** argv)
 {
     try
     {
+        RunScenePersistenceTests();
+        if (argc > 1 && std::string(argv[1]) == "--persistence-only") return 0;
         TestSpecularExtension();
         if (argc > 1 && std::string(argv[1]) == "--specular-only")
         {

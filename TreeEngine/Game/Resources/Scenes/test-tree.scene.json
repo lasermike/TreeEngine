@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "LoadTestTree",
   "name": "Test Tree",
   "camera": {
     "position": [0, 1.5, -6]
