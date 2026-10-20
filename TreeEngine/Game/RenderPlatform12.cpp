@@ -212,7 +212,6 @@ enum RootSignatureParams
     BranchDataRootSignatureParam,
     ChangesPerPassRootSignatureParam,
     ChangesEveryFrameRootSignatureParam,
-    UavTableRootSignatureParam,
     SpecularSrvTableRootSignatureParam,
     EnvironmentSrvTableRootSignatureParam,
 };
@@ -366,30 +365,26 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     //   3  SRV descriptor                      BranchDataCbv_HeapOffset,
     //   4  Constant buffer descriptor          ChangesPerPassCbv_HeapOffset,
     //   5  Constant buffer descriptor          ChangesEveryFrame_HeapOffset,
-    //   6  DXR buffers descriptor table
     //   cbuffer cbBranchData : register( b0 )
     //   cbuffer cbChangesPerPass : register(b1)
     //   cbuffer cbChangesEveryFrame : register(b2)
     //   cbuffer cbMaterial : register (b3)
 
-    CD3DX12_DESCRIPTOR_RANGE ranges[6];
+    CD3DX12_DESCRIPTOR_RANGE ranges[5];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0 /* t0 */);
-    ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 6, 0 /* u0 */);
-
-    ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 3 /* t3-t6 */);
-    ranges[5].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 7 /* t7-t8 */);
-    CD3DX12_ROOT_PARAMETER rootParameters[9];
-    rootParameters[EnvironmentSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[5], D3D12_SHADER_VISIBILITY_PIXEL);
-    rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
+    ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 3 /* t3-t6 */);
+    ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 7 /* t7-t8 */);
+    CD3DX12_ROOT_PARAMETER rootParameters[8];
+    rootParameters[EnvironmentSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[MaterialCbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[MaterialSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[BranchDataRootSignatureParam].InitAsShaderResourceView(BranchDataRootSignatureShaderSlot);
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
-    rootParameters[UavTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_ALL);
 
     D3D12_STATIC_SAMPLER_DESC sampler[5];
     sampler[0] = D3D12_STATIC_SAMPLER_DESC();
@@ -1451,6 +1446,13 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
     {
         D3D12_CPU_DESCRIPTOR_HANDLE dxrTextureDest = m_descriptorHeap.hCPU(DxrTexture0_SrvHeapOffset + textureIndex);
         GetDevice()->CopyDescriptorsSimple(1, dxrTextureDest, newDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+    else
+    {
+        // Scene initialization waits for prior GPU work, so install static cube descriptors once.
+        GetDevice()->CopyDescriptorsSimple(1,
+            m_descriptorHeap.hCPU(EnvironmentDiffuse_SrvHeapOffset + textureIndex - maxTotalTexturesInScene),
+            newDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     return S_OK;
@@ -2909,6 +2911,21 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     SetDebugName(m_offscreenBuffer1, L"offscreenBuffer1");
     SetDebugName(m_offscreenBuffer2, L"offscreenBuffer2");
 
+#if defined(DXR_ENABLED)
+    // The ray output must match the resized render target used by CopyResource.
+    if (m_renderData->pDxrOutBuffer)
+    {
+        SafeDelete(&m_renderData->pDxrOutBuffer);
+        m_renderData->pDxrOutBuffer = new UavBuffer(GetDevice(),
+            m_swapChainFormat,
+            m_descriptorHeap.hCPU(DxrOut_SrvHeapOffset),
+            m_descriptorHeap.hGPU(DxrOut_SrvHeapOffset),
+            m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
+            m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
+            windowWidth, windowHeight);
+    }
+#endif
+
     // UI
     if (imGuiInitialized)
     {
@@ -3136,13 +3153,6 @@ HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
     D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = m_descriptorHeap.hGPU(Texture0Srv_HeapOffset);;
     GetCommandList()->SetGraphicsRootDescriptorTable(MaterialSrvTableRootSignatureParam, textureHandle);
     GetCommandList()->SetGraphicsRootDescriptorTable(SpecularSrvTableRootSignatureParam, m_descriptorHeap.hGPU(Material0_HeapOffset + 2));
-    if (m_renderData->environmentDiffuseTexture && m_renderData->environmentSpecularTexture)
-    {
-        GetDevice()->CopyDescriptorsSimple(1, m_descriptorHeap.hCPU(EnvironmentDiffuse_SrvHeapOffset),
-            m_renderData->environmentDiffuseTexture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        GetDevice()->CopyDescriptorsSimple(1, m_descriptorHeap.hCPU(EnvironmentSpecular_SrvHeapOffset),
-            m_renderData->environmentSpecularTexture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    }
     GetCommandList()->SetGraphicsRootDescriptorTable(EnvironmentSrvTableRootSignatureParam,
         m_descriptorHeap.hGPU(EnvironmentDiffuse_SrvHeapOffset));
 
@@ -3150,9 +3160,6 @@ HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
     GetCommandList()->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
     GetCommandList()->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
     GetCommandList()->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
-
-    // Set output buffers for DXR vertices
-    GetCommandList()->SetGraphicsRootDescriptorTable(UavTableRootSignatureParam, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
 
     GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     GetCommandList()->IASetVertexBuffers(0, 1, &m_VBView);

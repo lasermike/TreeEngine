@@ -66,7 +66,7 @@ public:
 
     HRESULT Initialize(bool renderToSharedTexture);
 
-    void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile = false);
+    void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile = false, bool showShadowBuffer = false);
     HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {});
 
     HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
@@ -86,6 +86,8 @@ public:
     {
         m_hwnd = hwnd;
     }
+
+    HWND GetWindow() const { return m_hwnd; }
 
     HRESULT Initialize();
 

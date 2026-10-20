@@ -134,8 +134,6 @@ struct RenderData : SceneRenderSettings
     BoundingSphere      mSceneBounds;
     ShadowMap*          pShadowMap;        // Owned by Game
     UavBuffer*          pDxrOutBuffer;     // Filled by hit/miss shaders.  Owned by Game.
-    LoadedTexture*      environmentDiffuseTexture = nullptr;
-    LoadedTexture*      environmentSpecularTexture = nullptr;
     XMFLOAT4X4          lightView;
     XMFLOAT4X4          lightProj;
     XMFLOAT4X4          shadowTransform;

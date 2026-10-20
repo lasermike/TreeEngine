@@ -94,8 +94,6 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
             8, &m_environmentDiffuse));
         HRR(GetPlatform()->LoadTexture(SceneData::WidePath(m_renderData.environmentSpecular).c_str(),
             9, &m_environmentSpecular));
-        m_renderData.environmentDiffuseTexture = m_environmentDiffuse;
-        m_renderData.environmentSpecularTexture = m_environmentSpecular;
     }
 
     if (maxInstances > 0)
@@ -145,8 +143,6 @@ HRESULT RenderManager::UninitGameLevelGraphics()
         delete m_environmentSpecular;
         m_environmentSpecular = nullptr;
     }
-    m_renderData.environmentDiffuseTexture = nullptr;
-    m_renderData.environmentSpecularTexture = nullptr;
      
     for (auto m : m_materials)
     {

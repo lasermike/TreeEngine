@@ -171,7 +171,14 @@ void ParseRenderTestCommandLine()
     {
         RenderTestPoint point = { value.at("time").get<double>(), Wide(value.at("filename").get<std::string>()) };
         point.mode = value.value("mode", parsed->mode);
+        if (value.contains("width") != value.contains("height"))
+            throw std::runtime_error("Capture width and height must be specified together");
+        point.width = value.value("width", parsed->width);
+        point.height = value.value("height", parsed->height);
+        if (point.width < 32 || point.width > 2048 || point.height < 32 || point.height > 2048)
+            throw std::runtime_error("Invalid capture dimensions");
         point.poseCache = value.value("poseCache", true);
+        point.showShadowBuffer = value.value("showShadowBuffer", false);
         if (value.contains("cameraPosition"))
         {
             point.cameraPosition = value.at("cameraPosition").get<std::array<float, 3>>();
@@ -197,6 +204,8 @@ int RunRenderTestCapture(Game& game)
         { "width", request->width }, { "height", request->height }, { "seed", request->seed },
         { "captures", nlohmann::json::array() }, { "success", false } };
     int exitCode = 0;
+    unsigned currentWidth = request->width;
+    unsigned currentHeight = request->height;
     DirectX::XMFLOAT3 originalCamera;
     DirectX::XMStoreFloat3(&originalCamera, game.GetPlayer()->GetPosition());
     try
@@ -209,8 +218,19 @@ int RunRenderTestCapture(Game& game)
         }
         for (const auto& point : request->captures)
         {
+            if (point.width != currentWidth || point.height != currentHeight)
+            {
+                HWND window = game.GetWindow();
+                RECT dimensions = { 0, 0, static_cast<LONG>(point.width), static_cast<LONG>(point.height) };
+                if (!AdjustWindowRect(&dimensions, static_cast<DWORD>(GetWindowLongPtr(window, GWL_STYLE)), FALSE) ||
+                    !SetWindowPos(window, nullptr, 0, 0, dimensions.right - dimensions.left,
+                        dimensions.bottom - dimensions.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
+                    throw std::runtime_error("Cannot resize render test window");
+                currentWidth = point.width;
+                currentHeight = point.height;
+            }
             game.ConfigureRenderTest(request->scene, point.mode == "raytracing", request->postProcessing,
-                request->benchmarkFrames > 0);
+                request->benchmarkFrames > 0, point.showShadowBuffer);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             game.GetPlayer()->SetPosition(point.overrideCamera
                 ? DirectX::XMVectorSet(point.cameraPosition[0], point.cameraPosition[1], point.cameraPosition[2], 1)
@@ -262,7 +282,11 @@ int RunRenderTestCapture(Game& game)
                     report["adapter"] = adapter;
                 }
             }
-            report["captures"].push_back({ { "time", point.time }, { "mode", point.mode }, { "success", true },
+            const auto& projection = game.GetRenderManager().GetRenderData().projectionData;
+            if (projection.screenWidth != point.width || projection.screenHeight != point.height)
+                throw std::runtime_error("Render target did not follow the window size");
+            report["captures"].push_back({ { "time", point.time }, { "mode", point.mode },
+                { "width", point.width }, { "height", point.height }, { "success", true },
                 { "poseCache", point.poseCache }, { "samples", samples } });
         }
         report["gpuPasses"] = { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays" };

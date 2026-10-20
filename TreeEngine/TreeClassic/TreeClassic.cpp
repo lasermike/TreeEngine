@@ -520,11 +520,6 @@ HRESULT ConfigOculusDevice()
 
 void OnWindowSizeChanged()
 {
-    if (GetRenderTestRequest() && g_game)
-    {
-        g_game->OnResize(GetRenderTestRequest()->width, GetRenderTestRequest()->height);
-        return;
-    }
     ASSERT(m_hWnd);
 
     RECT rect = {0};

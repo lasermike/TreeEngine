@@ -10,7 +10,10 @@ struct RenderTestPoint
     double time;
     std::wstring filename;
     std::string mode;
+    unsigned width = 0;
+    unsigned height = 0;
     bool poseCache = true;
+    bool showShadowBuffer = false;
     bool overrideCamera = false;
     std::array<float, 3> cameraPosition = {};
 };

@@ -19,6 +19,12 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Verify DXR on/off/on in one process, with and without postprocessing.
 .\Tests\RenderRegression\test-dxr-toggle.ps1
 
+# Resize the live window in raster and DXR, with and without postprocessing.
+.\Tests\RenderRegression\test-window-resize.ps1
+
+# Toggle the shadow-map preview off/on/off in both rendering modes.
+.\Tests\RenderRegression\test-shadow-buffer-toggle.ps1
+
 # Exact cached/recomputed image parity through growth, mature time, LOD, and rewind.
 .\Tests\RenderRegression\test-tree-skinning.ps1
 
@@ -152,10 +158,14 @@ The native `--render-test <request.json>` request also accepts:
 - `benchmarkTimeStep`: finite nonnegative seconds, default 0. Warmup holds the
   requested time; timed frames advance from that time by this step. The final
   screenshot returns to the original requested time and is not a timed sample.
+- Per-capture `showShadowBuffer`: default false. Shows the shadow-map preview for that capture.
 - Per-capture `poseCache`: default true. False forces the CPU reference pose to
   be recomputed, allowing same-process A/B comparisons.
 - Per-capture `cameraPosition`: three finite coordinates. If omitted, the
   scene's original camera position is restored; orientation is unchanged.
+- Per-capture `width` and `height`: both must be present, from 32 to 2048.
+  The hidden test window and renderer resize before that capture; omitted sizes
+  use the request's initial dimensions.
 
 Example request fields (alongside the normal scene, seed, size, report, etc.):
 

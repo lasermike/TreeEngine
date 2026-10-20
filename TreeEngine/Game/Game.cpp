@@ -351,7 +351,7 @@ HRESULT Game::Regenerate()
     return S_OK;
 }
 
-void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile)
+void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile, bool showShadowBuffer)
 {
     m_renderTestMode = true;
     m_renderManager.GetRenderData().profile.enabled = profile;
@@ -360,7 +360,7 @@ void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bo
     m_settings.m_enablePostProcessing = postProcessing;
     m_settings.m_showDebugUI = false;
     m_settings.m_showPerfGraph = false;
-    m_settings.m_showShadowBuffer = false;
+    m_settings.m_showShadowBuffer = showShadowBuffer;
     m_settings.m_wireframe = false;
     m_rotateLights = false;
     m_showHelp = false;
