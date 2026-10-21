@@ -207,7 +207,7 @@
     <Touch Files="$(IntDir)CopyResources.stamp" AlwaysCreate="true" />
   </Target>
   <Target Name="CopyDesktopGameResourcesWhenChanged"
-          AfterTargets="Link"
+          AfterTargets="Build"
           Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')"
           Inputs="@(GameResource)"
           Outputs="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')">
