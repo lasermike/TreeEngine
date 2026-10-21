@@ -29,6 +29,15 @@ using namespace Windows::Graphics::Display;
 
 extern Game* g_game;
 
+std::wstring Wide(const std::string& value)
+{
+    int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.c_str(), -1, nullptr, 0);
+    if (!count) throw std::runtime_error("Invalid UTF-8 path in render test request");
+    std::vector<wchar_t> buffer(count);
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.c_str(), -1, buffer.data(), count);
+    return buffer.data();
+}
+
 
 Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
 {
@@ -131,6 +140,10 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_sceneSelection = m_sceneFilename;
     m_renderManager.ApplySceneSettings(sceneSettings);
 
+#if defined(TREENGINE_WIN32)
+    SetWindowText(m_hwnd, Wide(m_sceneDefinition.name).c_str());
+#endif
+
     m_needsResize = true;
 
     // Create thread pool
@@ -188,6 +201,11 @@ HRESULT Game::LoadScene(const std::string& name)
     m_needsResize = true;
     m_sceneError.clear();
     m_sceneStatus = "Loaded " + m_sceneFilename.substr(m_sceneFilename.find_last_of("\\/") + 1);
+
+#if defined(TREENGINE_WIN32)
+    SetWindowText(m_hwnd, Wide(m_sceneDefinition.name).c_str());
+#endif
+
     return S_OK;
 }
 

@@ -3,7 +3,18 @@
   "id": "NormalTangentMirrorTest",
   "name": "Normal-Tangent Mirror Test",
   "camera": { "position": [0, 0, -9] },
-  "render": { "clearColor": [0.12, 0.17, 0.24, 1], "farClippingPlane": 100, "useShadowMaps": false },
+  "render": {
+    "clearColor": [ 0.12, 0.17, 0.24, 1 ],
+    "enablePostProcessing": false,
+    "blurAmount": 0.0,
+    "farClippingPlane": 100,
+    "useShadowMaps": false,
+    "environment": {
+      "diffuse": "Environment/helipad-diffuse.dds",
+      "specular": "Environment/helipad-specular.dds",
+      "rotationDegrees": 90
+    }
+  },
   "light": {
     "ambient": [0.2, 0.2, 0.2, 1],
     "diffuse": [0.9, 0.9, 0.9, 1],
