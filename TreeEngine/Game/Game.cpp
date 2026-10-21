@@ -677,24 +677,6 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        // Scene select
-        ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
-        if (ImGui::ArrowButton("##left", ImGuiDir_Left))
-        {
-            m_advanceScene = true;
-            m_advanceSceneAmount = -1;
-        }
-        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-        if (ImGui::ArrowButton("##right", ImGuiDir_Right))
-        {
-            m_advanceScene = true;
-            m_advanceSceneAmount = 1;
-        }
-        ImGui::PopItemFlag();
-        ImGui::SetNextItemWidth(24);
-        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-        ImGui::LabelText("Scene", "%d", m_currentScene);
-
         //Pause
         ImGui::Checkbox("Pause", &m_settings.m_paused);
 
@@ -759,8 +741,26 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     if (ImGui::CollapsingHeader("Scene", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::Text("%s", m_sceneDefinition.name.c_str());
-        ImGui::TextWrapped("%s", m_sceneFilename.c_str());
+        // Scene select
+        if (ImGui::ArrowButton("##previousScene", ImGuiDir_Left))
+        {
+            m_advanceScene = true;
+            m_advanceSceneAmount = -1;
+        }
+        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+        if (ImGui::ArrowButton("##nextScene", ImGuiDir_Right))
+        {
+            m_advanceScene = true;
+            m_advanceSceneAmount = 1;
+        }
+        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+        ImGui::Text("Scene %d - %s", m_currentScene, m_sceneDefinition.name.c_str());
+
+        const auto filenameStart = m_sceneFilename.find_last_of("\\/");
+        const auto parentStart = filenameStart == std::string::npos || filenameStart == 0
+            ? std::string::npos : m_sceneFilename.find_last_of("\\/", filenameStart - 1);
+        const auto shortPath = m_sceneFilename.substr(parentStart == std::string::npos ? 0 : parentStart + 1);
+        ImGui::TextWrapped("%s", shortPath.c_str());
         const int selected = m_sceneSelection.empty() ? -1 : m_loader.Catalog().FindPath(m_sceneSelection);
         const auto selectionLabel = selected >= 0 ? m_loader.Catalog().Entries()[selected].Label() : m_sceneSelection;
         if (ImGui::BeginCombo("Available scenes", selectionLabel.c_str()))
