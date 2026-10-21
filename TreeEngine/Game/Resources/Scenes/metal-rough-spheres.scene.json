@@ -2,6 +2,7 @@
   "version": 1,
   "id": "MetalRoughSpheres",
   "name": "Metal-Rough Spheres (Textures)",
+  "priority": 1,
   "camera": { "position": [ 0, 0, -14 ] },
   "render": {
     "clearColor": [ 0.12, 0.17, 0.24, 1 ],

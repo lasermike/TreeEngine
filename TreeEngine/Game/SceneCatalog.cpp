@@ -57,7 +57,7 @@ namespace SceneData
                     if (id.empty())
                         throw std::runtime_error(filename + ": filename has no scene ID; provide an explicit 'id'");
                 }
-                m_entries.push_back({ id, scene.name, filename, user });
+                m_entries.push_back({ id, scene.name, filename, user, scene.priority });
             }
             catch (const std::runtime_error& error)
             {
@@ -87,6 +87,7 @@ namespace SceneData
             return true;
         }), m_entries.end());
         std::sort(m_entries.begin(), m_entries.end(), [](const SceneEntry& a, const SceneEntry& b) {
+            if (a.priority != b.priority) return a.priority < b.priority;
             const auto an = Lower(a.name), bn = Lower(b.name);
             if (an != bn) return an < bn;
             if (a.user != b.user) return a.user < b.user;

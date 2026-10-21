@@ -2,6 +2,7 @@
   "version": 1,
   "id": "LoadTreeScene",
   "name": "Tree",
+  "priority": 1,
   "camera": {
     "position": [1.11395788, 0.711319208, 2.05959034],
     "rotation": [0.00989040267, 0.978999615, 0.0489907376, 0]

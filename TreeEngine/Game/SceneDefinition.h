@@ -118,6 +118,7 @@ namespace SceneData
     {
         std::string id;
         std::string name;
+        int priority = 0;
         Transform camera;
         DirectX::XMFLOAT4 clearColor = { 0.5294118f, 0.8078431f, 0.9215686f, 1 };
         float farClippingPlane = 30.0f;

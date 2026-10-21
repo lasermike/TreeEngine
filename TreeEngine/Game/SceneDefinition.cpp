@@ -221,7 +221,7 @@ namespace SceneData
         try
         {
             const auto root = Json::parse(jsonText);
-            Fields(root, sourceName, { "version", "id", "name", "camera", "render", "light", "pointLightCount", "pointLight", "materials", "objects" });
+            Fields(root, sourceName, { "version", "id", "name", "priority", "camera", "render", "light", "pointLightCount", "pointLight", "materials", "objects" });
             if (!root.contains("version") || Integer(root["version"], sourceName + ".version", 1, 1) != 1)
                 Invalid(sourceName + ".version", "expected schema version 1");
             SceneDefinition scene;
@@ -236,6 +236,8 @@ namespace SceneData
             if (!root.contains("name")) Invalid(sourceName + ".name", "required property");
             scene.name = String(root["name"], sourceName + ".name");
             if (scene.name.empty()) Invalid(sourceName + ".name", "must not be empty");
+            if (root.contains("priority"))
+                scene.priority = Integer(root["priority"], sourceName + ".priority", 0, std::numeric_limits<int>::max());
             if (root.contains("camera")) scene.camera = ReadTransform(root["camera"], sourceName + ".camera");
             if (root.contains("pointLightCount")) scene.pointLightCount = Integer(root["pointLightCount"], sourceName + ".pointLightCount", 0, 1);
             if (root.contains("pointLight"))
@@ -460,7 +462,8 @@ namespace SceneData
 
     std::string SerializeScene(const SceneDefinition& scene)
     {
-        Json root = { { "version", 1 }, { "name", scene.name }, { "camera", TransformJson(scene.camera) },
+        Json root = { { "version", 1 }, { "name", scene.name }, { "priority", scene.priority },
+            { "camera", TransformJson(scene.camera) },
             { "render", { { "clearColor", VectorJson(scene.clearColor) }, { "farClippingPlane", scene.farClippingPlane },
                 { "useShadowMaps", scene.useShadowMaps }, { "useAlphaBlendedRenderTarget", scene.useAlphaBlendedRenderTarget },
                 { "enablePostProcessing", scene.enablePostProcessing }, { "blurAmount", scene.blurAmount } } },

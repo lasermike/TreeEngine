@@ -2,6 +2,7 @@
   "version": 1,
   "id": "LoadGltfDemo",
   "name": "glTF Models",
+  "priority": 1,
   "camera": {
     "position": [0.5, 2.25, -7]
   },

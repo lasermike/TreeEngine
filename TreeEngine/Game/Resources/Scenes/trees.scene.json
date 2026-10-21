@@ -2,6 +2,7 @@
   "version": 1,
   "id": "LoadTrees",
   "name": "Trees",
+  "priority": 1,
   "camera": {
     "position": [-4, 1.5, -4],
     "rotationDegrees": [0, 45, 0]

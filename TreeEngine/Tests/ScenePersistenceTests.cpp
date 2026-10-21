@@ -68,6 +68,16 @@ int RunScenePersistenceTests()
             {"type":"model","id":"model","source":"..\\Models\\tree.glb","forceLit":true}
         ]})";
     auto scene = ParseScene(allKinds, "roundtrip fixture");
+    check(scene.priority == 0, "Omitted scene priority should default to zero");
+    scene.priority = 2;
+    check(ParseScene(SerializeScene(scene), "ranked fixture").priority == 2, "Scene priority did not round-trip");
+    scene.priority = 0;
+    for (const auto& invalidPriority : { Json(-1), Json(1.5), Json("1") })
+    {
+        auto invalid = Json::parse(allKinds);
+        invalid["priority"] = invalidPriority;
+        reject([&] { ParseScene(invalid.dump(), "invalid priority"); });
+    }
     for (const auto& id : { "user:collision", "path/id", "path\\id", "control\nid" })
     {
         auto invalidId = Json::parse(allKinds);
@@ -159,6 +169,15 @@ int RunScenePersistenceTests()
     WriteScene(scene, extra);
     catalog.Refresh();
     check(catalog.Entries().size() == 4 && catalog.Entries()[1].id == "new", "New scene was not discovered in sorted order");
+    auto rankedUserScene = ReadScene(unicodeFile);
+    rankedUserScene.priority = 1;
+    WriteScene(rankedUserScene, unicodeFile, true);
+    catalog.Refresh();
+    check(catalog.Entries().back().filename == unicodeFile && catalog.Entries().back().priority == 1,
+        "Priority did not take precedence over scene name");
+    rankedUserScene.priority = 0;
+    WriteScene(rankedUserScene, unicodeFile, true);
+    catalog.Refresh();
     std::vector<std::string> order;
     for (const auto& entry : catalog.Entries()) order.push_back(entry.filename);
     catalog.Refresh();
@@ -195,6 +214,7 @@ int RunScenePersistenceTests()
     check(!deployed.Entries().empty() && deployed.Diagnostics().empty(), "Deployed built-in scene fixtures are missing or invalid");
     for (const auto& entry : deployed.Entries())
     {
+        check(entry.priority == 1, "Built-in scene priority was not deployed");
         const auto serialized = SerializeScene(ReadScene(entry.filename));
         check(SerializeScene(ParseScene(serialized, entry.filename)) == serialized,
             "Built-in scene did not survive a semantic serialization round trip");

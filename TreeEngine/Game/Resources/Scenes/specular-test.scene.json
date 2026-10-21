@@ -2,6 +2,7 @@
   "version": 1,
   "id": "SpecularTest",
   "name": "Specular Test",
+  "priority": 1,
   "camera": { "position": [0, 0, -9] },
   "render": { "clearColor": [0.12, 0.17, 0.24, 1], "farClippingPlane": 100, "useShadowMaps": false },
   "light": {

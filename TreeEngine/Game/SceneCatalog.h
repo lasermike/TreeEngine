@@ -11,6 +11,7 @@ namespace SceneData
         std::string name;
         std::string filename;
         bool user = false;
+        int priority = 0;
 
         std::string Key() const { return (user ? "user:" : "builtin:") + id; }
         std::string Label() const;

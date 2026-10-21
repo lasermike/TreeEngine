@@ -2,6 +2,7 @@
   "version": 1,
   "id": "LoadAITree",
   "name": "AI Tree",
+  "priority": 1,
   "camera": {
     "position": [ 30.515, -0.401, -29.176 ],
     "rotation": [ 0.004, -0.451, 0.013, 1]
