@@ -265,8 +265,8 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         environmentSpecular.GetDimensions(0, cubeWidth, cubeHeight, mipCount);
         float roughness = saturate(mat.specularParams.z);
         float3 reflected = reflect(-toEye, normal);
-        float3 irradiance = environmentDiffuse.SampleLevel(samLinearClamp, normal, 0).rgb;
-        float3 prefiltered = environmentSpecular.SampleLevel(samLinearClamp, reflected,
+        float3 irradiance = environmentDiffuse.SampleLevel(samLinearClamp, RotateEnvironmentDirection(normal), 0).rgb;
+        float3 prefiltered = environmentSpecular.SampleLevel(samLinearClamp, RotateEnvironmentDirection(reflected),
             roughness * (mipCount - 1)).rgb;
         float3 ibl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
             irradiance, prefiltered);

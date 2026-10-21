@@ -227,6 +227,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
         SceneData::ResolveSceneAsset(definition.environmentDiffuse, sceneFilename);
     renderSettings.environmentSpecular = definition.environmentSpecular.empty() ? std::string() :
         SceneData::ResolveSceneAsset(definition.environmentSpecular, sceneFilename);
+    renderSettings.environmentRotationDegrees = definition.environmentRotationDegrees;
     auto& light = renderSettings.dirLights[0];
     light.Ambient = definition.light.ambient;
     light.Diffuse = definition.light.diffuse;
@@ -425,6 +426,7 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
     result.farClippingPlane = settings.farClippingPlane;
     result.environmentDiffuse = RebaseAsset(settings.environmentDiffuse, sourceFilename, destinationFilename);
     result.environmentSpecular = RebaseAsset(settings.environmentSpecular, sourceFilename, destinationFilename);
+    result.environmentRotationDegrees = settings.environmentRotationDegrees;
     result.useShadowMaps = gameData.useShadowMaps;
     result.useAlphaBlendedRenderTarget = gameData.useAlphaBlendedRenderTarget;
     if (settings.numDirectionalLights != 1 || settings.numPointLights < 0 || settings.numPointLights > 1)

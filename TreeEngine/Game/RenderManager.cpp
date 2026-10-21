@@ -584,6 +584,8 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
     cb.light = m_renderData.dirLights[0];
     cb.numDirectionalLights = m_renderData.numDirectionalLights;
     cb.numPointLights = 0;
+    XMScalarSinCos(&cb.environmentRotationSin, &cb.environmentRotationCos,
+        XMConvertToRadians(m_renderData.environmentRotationDegrees));
     assert(m_renderData.numDirectionalLights < 2);
 
     XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);

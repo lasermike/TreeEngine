@@ -9,6 +9,7 @@ struct SceneRenderSettings
     float farClippingPlane = 30.0f;
     std::string environmentDiffuse;
     std::string environmentSpecular;
+    float environmentRotationDegrees = 0;
     int numDirectionalLights = 1;
     int numPointLights = 0;
     DirectionalLight dirLights[1];

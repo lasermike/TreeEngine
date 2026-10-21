@@ -34,5 +34,15 @@ cbuffer cbChangesEveryFrame : register(b2)
     uint globalFlags;  // bit 0 = use shadow maps
     int numDirectionalLights;
     int numPointLights;
+    float environmentRotationCos;
+    float environmentRotationSin;
 };
+
+float3 RotateEnvironmentDirection(float3 direction)
+{
+    return float3(
+        environmentRotationCos * direction.x + environmentRotationSin * direction.z,
+        direction.y,
+        -environmentRotationSin * direction.x + environmentRotationCos * direction.z);
+}
 

@@ -123,6 +123,7 @@ namespace SceneData
         float farClippingPlane = 30.0f;
         std::string environmentDiffuse;
         std::string environmentSpecular;
+        float environmentRotationDegrees = 0;
         bool useShadowMaps = true;
         bool useAlphaBlendedRenderTarget = true;
         int pointLightCount = 0;

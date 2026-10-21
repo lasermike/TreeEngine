@@ -34,6 +34,8 @@ struct CBChangesEveryFrame
     UINT globalFlags;
     int numDirectionalLights;
     int numPointLights;
+    float environmentRotationCos;
+    float environmentRotationSin;
 };
 
 

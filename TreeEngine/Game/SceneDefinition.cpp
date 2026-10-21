@@ -261,11 +261,13 @@ namespace SceneData
                 if (render.contains("environment"))
                 {
                     const auto& environment = render["environment"];
-                    Fields(environment, path + ".environment", { "diffuse", "specular" });
+                    Fields(environment, path + ".environment", { "diffuse", "specular", "rotationDegrees" });
                     if (!environment.contains("diffuse") || !environment.contains("specular"))
                         Invalid(path + ".environment", "diffuse and specular cube maps are both required");
                     scene.environmentDiffuse = String(environment["diffuse"], path + ".environment.diffuse");
                     scene.environmentSpecular = String(environment["specular"], path + ".environment.specular");
+                    if (environment.contains("rotationDegrees"))
+                        scene.environmentRotationDegrees = Number(environment["rotationDegrees"], path + ".environment.rotationDegrees");
                     if (scene.environmentDiffuse.empty() || scene.environmentSpecular.empty())
                         Invalid(path + ".environment", "cube map paths must be nonempty");
                 }
@@ -463,8 +465,12 @@ namespace SceneData
         if (scene.environmentDiffuse.empty() != scene.environmentSpecular.empty())
             throw std::runtime_error("Scene environment needs both diffuse and specular cube maps");
         if (!scene.environmentDiffuse.empty())
+        {
             root["render"]["environment"] = { { "diffuse", scene.environmentDiffuse },
                 { "specular", scene.environmentSpecular } };
+            if (scene.environmentRotationDegrees != 0)
+                root["render"]["environment"]["rotationDegrees"] = scene.environmentRotationDegrees;
+        }
         if (scene.hasShadowLightPosition) root["light"]["shadowPosition"] = VectorJson(scene.shadowLightPosition);
         if (!scene.materials.empty())
             for (const auto& material : scene.materials) root["materials"][material.first] = MaterialJson(material.second);

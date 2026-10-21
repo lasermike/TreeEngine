@@ -180,11 +180,12 @@ int main(int argc, char** argv)
         Check(primitive.material.textureCoordScale.x == 1 && primitive.material.textureCoordScale.y == 1, "material UV default is not identity");
         Check(defaults.useShadowMaps && defaults.useAlphaBlendedRenderTarget, "render defaults changed");
         Check(defaults.farClippingPlane == 30.0f, "far clipping default changed");
+        Check(defaults.environmentRotationDegrees == 0, "environment rotation default changed");
 
         auto authored = minimal;
         authored["render"]["farClippingPlane"] = 300.0;
         authored["render"]["environment"] = { { "diffuse", "Environment/diffuse.dds" },
-            { "specular", "Environment/specular.dds" } };
+            { "specular", "Environment/specular.dds" }, { "rotationDegrees", 90.0 } };
         authored["materials"]["grid"] = { { "texture", "grid.png" }, { "textureCoordScale", { 2, 3 } } };
         authored["objects"][0]["material"] = "grid";
         authored["objects"][0]["textureCoordScale"] = { 4, 5 };
@@ -195,6 +196,9 @@ int main(int argc, char** argv)
             named.environmentSpecular == "Environment/specular.dds", "authored environment was lost");
         Check(SceneData::ParseScene(SceneData::SerializeScene(named), "roundtrip").environmentSpecular ==
             named.environmentSpecular, "environment did not round-trip");
+        Check(named.environmentRotationDegrees == 90.0f &&
+            SceneData::ParseScene(SceneData::SerializeScene(named), "roundtrip").environmentRotationDegrees == 90.0f,
+            "environment rotation did not round-trip");
         auto& ground = static_cast<SceneData::PrimitiveDefinition&>(*named.objects[0]);
         Check(ground.hasMaterial, "authored primitive material was marked as omitted");
         Check(ground.material.texture == "grid.png", "material reference did not resolve");
