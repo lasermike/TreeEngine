@@ -7,6 +7,8 @@ struct SceneRenderSettings
 {
     XMFLOAT4 clearColor = { 0.5294118f, 0.8078431f, 0.9215686f, 1 };
     float farClippingPlane = 30.0f;
+    bool enablePostProcessing = true;
+    float blurAmount = 1.3f; // Gaussian sigma in pixels, 0-2.5.
     std::string environmentDiffuse;
     std::string environmentSpecular;
     float environmentRotationDegrees = 0;

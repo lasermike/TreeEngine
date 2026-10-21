@@ -13,7 +13,6 @@ public:
     bool m_dxrEnabled;
     bool m_showShadowBuffer;
     bool m_wireframe;
-    bool m_enablePostProcessing;
     bool m_showDebugUI;
     bool m_showPerfGraph;
 

@@ -26,7 +26,7 @@ cbuffer cbSettings : register(b0)
     float w10;
 };
 
-static const int gMaxBlurRadius = 3;
+static const int gMaxBlurRadius = 5;
 
 // Compute Root Sig (Blur)
 Texture2D gInput            : register(t0);

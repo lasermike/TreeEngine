@@ -257,7 +257,8 @@ namespace SceneData
             {
                 const auto& render = root["render"];
                 auto path = sourceName + ".render";
-                Fields(render, path, { "clearColor", "farClippingPlane", "useShadowMaps", "useAlphaBlendedRenderTarget", "environment" });
+                Fields(render, path, { "clearColor", "farClippingPlane", "useShadowMaps", "useAlphaBlendedRenderTarget",
+                    "enablePostProcessing", "blurAmount", "environment" });
                 if (render.contains("environment"))
                 {
                     const auto& environment = render["environment"];
@@ -276,6 +277,14 @@ namespace SceneData
                 {
                     scene.farClippingPlane = Number(render["farClippingPlane"], path + ".farClippingPlane");
                     if (scene.farClippingPlane <= 0.2f) Invalid(path + ".farClippingPlane", "must be greater than the 0.2-unit near clipping plane");
+                }
+                if (render.contains("enablePostProcessing"))
+                    scene.enablePostProcessing = Boolean(render["enablePostProcessing"], path + ".enablePostProcessing");
+                if (render.contains("blurAmount"))
+                {
+                    scene.blurAmount = Number(render["blurAmount"], path + ".blurAmount");
+                    if (scene.blurAmount < 0 || scene.blurAmount > 2.5f)
+                        Invalid(path + ".blurAmount", "must be between 0 and 2.5");
                 }
                 if (render.contains("useShadowMaps")) scene.useShadowMaps = Boolean(render["useShadowMaps"], path + ".useShadowMaps");
                 if (render.contains("useAlphaBlendedRenderTarget")) scene.useAlphaBlendedRenderTarget = Boolean(render["useAlphaBlendedRenderTarget"], path + ".useAlphaBlendedRenderTarget");
@@ -453,7 +462,8 @@ namespace SceneData
     {
         Json root = { { "version", 1 }, { "name", scene.name }, { "camera", TransformJson(scene.camera) },
             { "render", { { "clearColor", VectorJson(scene.clearColor) }, { "farClippingPlane", scene.farClippingPlane },
-                { "useShadowMaps", scene.useShadowMaps }, { "useAlphaBlendedRenderTarget", scene.useAlphaBlendedRenderTarget } } },
+                { "useShadowMaps", scene.useShadowMaps }, { "useAlphaBlendedRenderTarget", scene.useAlphaBlendedRenderTarget },
+                { "enablePostProcessing", scene.enablePostProcessing }, { "blurAmount", scene.blurAmount } } },
             { "light", { { "ambient", VectorJson(scene.light.ambient) }, { "diffuse", VectorJson(scene.light.diffuse) },
                 { "specular", VectorJson(scene.light.specular) }, { "direction", VectorJson(scene.light.direction) } } },
             { "pointLightCount", scene.pointLightCount }, { "pointLight", {

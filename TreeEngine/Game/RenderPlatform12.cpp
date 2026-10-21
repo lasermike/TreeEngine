@@ -3197,7 +3197,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle;
 
     //TODO NEXT: use compute to copy offscreen1 to rtv
-    if (m_settings->m_enablePostProcessing)
+    if (m_renderData->enablePostProcessing)
     {
         // Render scene to m_offscreenBuffer1
         rtvHandle = m_rtvHeap.hCPU(FrameCount);
@@ -3263,6 +3263,8 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
 // TODO: make a post processing system
 std::vector<float> CalcGaussWeights(float sigma)
 {
+    if (sigma <= 0.0f) return { 1.0f };
+
     float twoSigma2 = 2.0f*sigma*sigma;
 
     // Estimate the blur radius based on sigma since sigma controls the "width" of the bell curve.
@@ -3359,7 +3361,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         ProfileTimestamp(ProfilePass::Rays, true);
 
         // Replace the main image before blur/UI; the DXR texture matches the target size and format.
-        ID3D12Resource* colorTarget = m_settings->m_enablePostProcessing
+        ID3D12Resource* colorTarget = m_renderData->enablePostProcessing
             ? static_cast<ID3D12Resource*>(m_offscreenBuffer1)
             : static_cast<ID3D12Resource*>(m_renderTargets[m_frameIndex]);
         ID3D12Resource* dxrOutput = m_renderData->pDxrOutBuffer->uavOutput;
@@ -3391,7 +3393,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
     //   Stage 1 - read from m_offscreenBuffer1 and write to m_offscreenBuffer2
     //   Stage 2 - read from m_offscreenBuffer2 and write to m_offscreenBuffer1
     //   Stage 3 - copy from m_offscreenBuffer1 to m_renderTargets[m_frameIndex]
-    if (m_settings->m_enablePostProcessing)
+    if (m_renderData->enablePostProcessing)
     {
         PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing Blur");
 
@@ -3405,7 +3407,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
         // blur stuff
-        auto weights = CalcGaussWeights(1.3f);
+        auto weights = CalcGaussWeights(m_renderData->blurAmount);
         int blurRadius = (int)weights.size() / 2;
 
         GetCommandList()->SetComputeRootSignature(m_computeRootSignature);

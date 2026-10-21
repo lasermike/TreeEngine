@@ -44,7 +44,6 @@ Game::Game(IInputManager* inputMgr) : m_inputMgr(inputMgr)
     m_timeStart = 0;
     m_resetTree = true;
     m_settings.m_showShadowBuffer = false;
-    m_settings.m_enablePostProcessing = true;
     m_settings.m_showPerfGraph = false;
     m_settings.m_showDebugUI = false;
     m_advanceScene = 0;
@@ -357,7 +356,7 @@ void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bo
     m_renderManager.GetRenderData().profile.enabled = profile;
     m_renderTestScene = sceneName;
     m_settings.m_dxrEnabled = rayTracing;
-    m_settings.m_enablePostProcessing = postProcessing;
+    m_renderManager.GetRenderData().enablePostProcessing = postProcessing;
     m_settings.m_showDebugUI = false;
     m_settings.m_showPerfGraph = false;
     m_settings.m_showShadowBuffer = showShadowBuffer;
@@ -749,7 +748,9 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
     {
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
-        ImGui::Checkbox("Enable Post Processing", &m_settings.m_enablePostProcessing);
+        auto& sceneRenderSettings = m_renderManager.GetRenderData();
+        ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
+        ImGui::SliderFloat("Blur Amount", &sceneRenderSettings.blurAmount, 0.0f, 2.5f, "%.2f");
         ImGui::Checkbox("Enable DXR", &m_settings.m_dxrEnabled);
         ImGui::Checkbox("Show Performance Graphs", &m_settings.m_showPerfGraph);
     }

@@ -180,10 +180,14 @@ int main(int argc, char** argv)
         Check(primitive.material.textureCoordScale.x == 1 && primitive.material.textureCoordScale.y == 1, "material UV default is not identity");
         Check(defaults.useShadowMaps && defaults.useAlphaBlendedRenderTarget, "render defaults changed");
         Check(defaults.farClippingPlane == 30.0f, "far clipping default changed");
+        Check(defaults.enablePostProcessing && defaults.blurAmount == 1.3f,
+            "post-processing defaults changed");
         Check(defaults.environmentRotationDegrees == 0, "environment rotation default changed");
 
         auto authored = minimal;
         authored["render"]["farClippingPlane"] = 300.0;
+        authored["render"]["enablePostProcessing"] = false;
+        authored["render"]["blurAmount"] = 2.5;
         authored["render"]["environment"] = { { "diffuse", "Environment/diffuse.dds" },
             { "specular", "Environment/specular.dds" }, { "rotationDegrees", 90.0 } };
         authored["materials"]["grid"] = { { "texture", "grid.png" }, { "textureCoordScale", { 2, 3 } } };
@@ -192,6 +196,11 @@ int main(int argc, char** argv)
         authored["objects"][0]["transform"] = { { "rotationDegrees", { 0, 0, 90 } }, { "scale", { -30, -30, -30 } } };
         auto named = SceneData::ParseScene(authored.dump(), "test.scene.json");
         Check(named.farClippingPlane == 300.0f, "authored far clipping plane was lost");
+        Check(!named.enablePostProcessing && named.blurAmount == 2.5f,
+            "authored post-processing settings were lost");
+        auto roundTrip = SceneData::ParseScene(SceneData::SerializeScene(named), "roundtrip");
+        Check(!roundTrip.enablePostProcessing && roundTrip.blurAmount == 2.5f,
+            "post-processing settings did not round-trip");
         Check(named.environmentDiffuse == "Environment/diffuse.dds" &&
             named.environmentSpecular == "Environment/specular.dds", "authored environment was lost");
         Check(SceneData::ParseScene(SceneData::SerializeScene(named), "roundtrip").environmentSpecular ==
@@ -292,6 +301,10 @@ int main(int argc, char** argv)
         Reject(bad.dump(), "forceLit");
         bad = modelJson; bad["objects"][0]["textureCoordScale"] = { 2, 2 };
         Reject(bad.dump(), "textureCoordScale");
+        bad = authored; bad["render"]["blurAmount"] = -0.1;
+        Reject(bad.dump(), "blurAmount");
+        bad = authored; bad["render"]["blurAmount"] = 2.6;
+        Reject(bad.dump(), "blurAmount");
 
         auto externalGltf = LoadGltfAsset(TestDataFilename("static-scene.gltf"));
         Check(externalGltf->renderParts.size() == 2, "glTF hierarchy instances were not imported");
