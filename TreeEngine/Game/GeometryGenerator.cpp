@@ -7,6 +7,13 @@
 #include "GeometryGenerator.h"
 #include <algorithm>
 
+namespace
+{
+    XMFLOAT4 TangentWithDefaultSign(const XMFLOAT3& tangent)
+    {
+        return XMFLOAT4(tangent.x, tangent.y, tangent.z, 1.0f);
+    }
+}
 
 void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 {
@@ -119,7 +126,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = box.Vertices[i].Position;
         data.vertices[k].Normal = box.Vertices[i].Normal;
         data.vertices[k].Tex = box.Vertices[i].TexC;
-        data.vertices[k].TangentU = box.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(box.Vertices[i].TangentU);
         //data.vertices[k].InstanceWeights = box.Vertices[i].InstanceWeights;
     }
 
@@ -128,12 +135,12 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = cylinder.Vertices[i].Position;
         data.vertices[k].Normal = cylinder.Vertices[i].Normal;
         data.vertices[k].Tex = cylinder.Vertices[i].TexC;
-        data.vertices[k].TangentU = cylinder.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(cylinder.Vertices[i].TangentU);
 
         data.skinnedVertices[i].Pos = cylinder.Vertices[i].Position;
         data.skinnedVertices[i].Normal = cylinder.Vertices[i].Normal;
         data.skinnedVertices[i].Tex = cylinder.Vertices[i].TexC;
-        data.skinnedVertices[i].TangentU = cylinder.Vertices[i].TangentU;
+        data.skinnedVertices[i].TangentU = TangentWithDefaultSign(cylinder.Vertices[i].TangentU);
         data.skinnedVertices[i].InstanceWeights = cylinder.Vertices[i].InstanceWeights;
     }
 
@@ -142,7 +149,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = cylinderLD.Vertices[i].Position;
         data.vertices[k].Normal = cylinderLD.Vertices[i].Normal;
         data.vertices[k].Tex = cylinderLD.Vertices[i].TexC;
-        data.vertices[k].TangentU = cylinderLD.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(cylinderLD.Vertices[i].TangentU);
         //data.vertices[k].InstanceWeights = cylinderLD.Vertices[i].InstanceWeights;
     }
 
@@ -151,7 +158,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = cylinderHD.Vertices[i].Position;
         data.vertices[k].Normal = cylinderHD.Vertices[i].Normal;
         data.vertices[k].Tex = cylinderHD.Vertices[i].TexC;
-        data.vertices[k].TangentU = cylinderHD.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(cylinderHD.Vertices[i].TangentU);
         //data.vertices[k].InstanceWeights = cylinderHD.Vertices[i].InstanceWeights;
     }
 
@@ -160,7 +167,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = fsQuad.Vertices[i].Position;
         data.vertices[k].Normal = fsQuad.Vertices[i].Normal;
         data.vertices[k].Tex = fsQuad.Vertices[i].TexC;
-        data.vertices[k].TangentU = fsQuad.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(fsQuad.Vertices[i].TangentU);
         //data.vertices[k].InstanceWeights = fsQuad.Vertices[i].InstanceWeights;
     }
 
@@ -169,7 +176,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = sprite.Vertices[i].Position;
         data.vertices[k].Normal = sprite.Vertices[i].Normal;
         data.vertices[k].Tex = sprite.Vertices[i].TexC;
-        data.vertices[k].TangentU = sprite.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(sprite.Vertices[i].TangentU);
     }
 
     //

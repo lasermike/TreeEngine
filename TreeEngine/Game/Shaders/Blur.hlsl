@@ -67,7 +67,7 @@ struct SimpleVertex
     float3 Pos;
     float3 Normal;
     float2 Tex;
-    float3 TangentU;
+    float4 TangentU;
 };
 
 struct SkinnedVertex
@@ -75,7 +75,7 @@ struct SkinnedVertex
     float3 Pos : POSITION;
     float3 NormalL : NORMAL;
     float2 Tex : TEXCOORD0;
-    float3 TangentL : TANGENT;
+    float4 TangentL : TANGENT;
     float  InstanceWeight1 : BLENDWEIGHT0;
     float  InstanceWeight2 : BLENDWEIGHT1;
     float  InstanceWeight3 : BLENDWEIGHT2;

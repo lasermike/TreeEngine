@@ -36,7 +36,7 @@ struct SimpleVertex
     XMFLOAT3 Pos;
     XMFLOAT3 Normal;
     XMFLOAT2 Tex;
-    XMFLOAT3 TangentU;
+    XMFLOAT4 TangentU;
 };
 
 struct SkinnedVertex
@@ -44,9 +44,11 @@ struct SkinnedVertex
     XMFLOAT3 Pos;
     XMFLOAT3 Normal;
     XMFLOAT2 Tex;
-    XMFLOAT3 TangentU;
+    XMFLOAT4 TangentU;
     XMFLOAT3 InstanceWeights;
 };
+
+static_assert(sizeof(SimpleVertex) == 48 && sizeof(SkinnedVertex) == 60, "Vertex layout must match DXR shaders");
 
 struct GeometryBufferData
 {

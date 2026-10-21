@@ -1742,6 +1742,8 @@ HRESULT RenderPlatform12::BuildScreenQuadGeometryBuffers()
         vertices[i].Pos = quad.Vertices[i].Position;
         vertices[i].Normal = quad.Vertices[i].Normal;
         vertices[i].Tex = quad.Vertices[i].TexC;
+        const auto& tangent = quad.Vertices[i].TangentU;
+        vertices[i].TangentU = XMFLOAT4(tangent.x, tangent.y, tangent.z, 1.0f);
     }
 
     const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);

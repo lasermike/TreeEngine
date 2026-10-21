@@ -64,7 +64,7 @@ struct VS_INPUT
     float3 Pos : POSITION;
     float3 NormalL : NORMAL;
     float2 Tex : TEXCOORD0;
-    float3 TangentL : TANGENT;
+    float4 TangentL : TANGENT;
     float4x4 World  : WORLD;
     uint  VertexID : SV_VertexID;
 };
@@ -75,7 +75,7 @@ struct VS_SKINNED_INPUT
     float3 Pos : POSITION;
     float3 NormalL : NORMAL;
     float2 Tex : TEXCOORD0;
-    float3 TangentL : TANGENT;
+    float4 TangentL : TANGENT;
     float  InstanceWeight1 : BLENDWEIGHT0;
     float  InstanceWeight2 : BLENDWEIGHT1;
     float  InstanceWeight3 : BLENDWEIGHT2;
@@ -177,12 +177,10 @@ PS_INPUT VS(VS_INPUT input)
     float3 worldNormal = mul(input.NormalL, (float3x3) world);
     output.N = normalize(worldNormal);
 
-    float3 worldTangent = mul(input.TangentL, (float3x3) world);
+    float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
     output.T = normalize(worldTangent);
 
-    float3 worldBinormal = normalize(cross(output.N, output.T));
-    worldBinormal = mul(worldBinormal, (float3x3) world);
-    output.B = worldBinormal;
+    output.B = normalize(cross(output.N, output.T)) * input.TangentL.w;
 
     // Generate projective tex-coords to project shadow map onto scene.
     output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
@@ -213,12 +211,10 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     float3 worldNormal = mul(input.NormalL, (float3x3) world);
     output.N = normalize(worldNormal);
 
-    float3 worldTangent = mul(input.TangentL, (float3x3) world);
+    float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
     output.T = normalize(worldTangent);
 
-    float3 worldBinormal = normalize(cross(output.N, output.T));
-    worldBinormal = mul(worldBinormal, (float3x3) world);
-    output.B = worldBinormal;
+    output.B = normalize(cross(output.N, output.T)) * input.TangentL.w;
 
     // Generate projective tex-coords to project shadow map onto scene.
     output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);

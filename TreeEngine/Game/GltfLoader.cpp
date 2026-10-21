@@ -228,6 +228,7 @@ namespace
     void GenerateTangents(GltfPrimitiveData& primitive)
     {
         std::vector<XMVECTOR> sums(primitive.vertices.size(), XMVectorZero());
+        std::vector<XMVECTOR> bitangentSums(primitive.vertices.size(), XMVectorZero());
         for (size_t i = 0; i + 2 < primitive.indices.size(); i += 3)
         {
             UINT i0 = primitive.indices[i];
@@ -257,6 +258,14 @@ namespace
             sums[i0] += tangent;
             sums[i1] += tangent;
             sums[i2] += tangent;
+            XMVECTOR bitangent = XMVectorSet(
+                (s1 * x2 - s2 * x1) * inverse,
+                (s1 * y2 - s2 * y1) * inverse,
+                (s1 * z2 - s2 * z1) * inverse,
+                0);
+            bitangentSums[i0] += bitangent;
+            bitangentSums[i1] += bitangent;
+            bitangentSums[i2] += bitangent;
         }
         for (size_t i = 0; i < primitive.vertices.size(); ++i)
         {
@@ -275,7 +284,11 @@ namespace
             {
                 tangentValue = NormalizeOr(tangentValue, XMFLOAT3(1, 0, 0));
             }
-            primitive.vertices[i].TangentU = tangentValue;
+            float tangentSign = 1.0f;
+            XMVECTOR bitangent = bitangentSums[i];
+            if (XMVectorGetX(XMVector3LengthSq(bitangent)) >= 1e-12f)
+                tangentSign = XMVectorGetX(XMVector3Dot(XMVector3Cross(normal, XMLoadFloat3(&tangentValue)), bitangent)) < 0 ? -1.0f : 1.0f;
+            primitive.vertices[i].TangentU = XMFLOAT4(tangentValue.x, tangentValue.y, tangentValue.z, tangentSign);
         }
     }
 
@@ -553,10 +566,13 @@ namespace
                 cgltf_float tangentComponents[4] = {};
                 if (!cgltf_accessor_read_float(tangents, i, tangentComponents, 4))
                     ImportError(filename, "cannot read TANGENT accessor element " + std::to_string(i));
-                // SimpleVertex currently has no place to retain tangentComponents[3] (handedness).
+                if (tangentComponents[3] != -1.0f && tangentComponents[3] != 1.0f)
+                    ImportError(filename, "TANGENT.w must be +1 or -1");
+                // Flipping glTF Z reverses the tangent frame handedness.
                 XMFLOAT3 tangent(tangentComponents[0], tangentComponents[1], tangentComponents[2]);
                 tangent.z = -tangent.z;
-                result.vertices[i].TangentU = NormalizeOr(tangent, XMFLOAT3(1, 0, 0));
+                tangent = NormalizeOr(tangent, XMFLOAT3(1, 0, 0));
+                result.vertices[i].TangentU = XMFLOAT4(tangent.x, tangent.y, tangent.z, -tangentComponents[3]);
             }
         }
 

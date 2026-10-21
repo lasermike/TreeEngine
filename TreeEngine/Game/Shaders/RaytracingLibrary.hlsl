@@ -20,8 +20,8 @@ StructuredBuffer<ShaderMaterial> materialBuffer : register(t1);
 StructuredBuffer<DxrGeometryInfo> geometryInfoBuffer : register(t2);
 ByteAddressBuffer vertexBuffer : register(t3);   // VBWorld (float4 per vertex)
 ByteAddressBuffer indexBuffer : register(t4);    // Basic index buffer
-ByteAddressBuffer originalVertexBuffer : register(t5); // SimpleVertex (44 bytes per vertex)
-ByteAddressBuffer skinnedVertexBuffer : register(t6); // SkinnedVertex (56 bytes per vertex)
+ByteAddressBuffer originalVertexBuffer : register(t5); // SimpleVertex (48 bytes per vertex)
+ByteAddressBuffer skinnedVertexBuffer : register(t6); // SkinnedVertex (60 bytes per vertex)
 StructuredBuffer<InstancedData> instanceDataBuffer : register(t7);
 ByteAddressBuffer skinnedIndexBuffer : register(t8); // Skinned index buffer
 Texture2D<float4> sceneTextures[8] : register(t9);
@@ -53,11 +53,11 @@ struct RayPayload
     float4 color;
 };
 
-// SimpleVertex: Position(float3=12), Normal(float3=12), Tex(float2=8), Tangent(float3=12) = 44 bytes
-// SkinnedVertex: Position(float3=12), Normal(float3=12), Tex(float2=8), Tangent(float3=12), Weights(float3=12) = 56 bytes
+// SimpleVertex: Position(float3=12), Normal(float3=12), Tex(float2=8), Tangent(float4=16) = 48 bytes
+// SkinnedVertex: Position(float3=12), Normal(float3=12), Tex(float2=8), Tangent(float4=16), Weights(float3=12) = 60 bytes
 // Normal offset = 12, Tex offset = 24 — same for both layouts
-static const uint SIMPLE_VERTEX_STRIDE = 44;
-static const uint SKINNED_VERTEX_STRIDE = 56;
+static const uint SIMPLE_VERTEX_STRIDE = 48;
+static const uint SKINNED_VERTEX_STRIDE = 60;
 static const uint NORMAL_OFFSET = 12;
 static const uint TEX_OFFSET = 24;
 static const uint TANGENT_OFFSET = 32;
@@ -66,7 +66,7 @@ struct SimpleVertexData
 {
     float3 normal;
     float2 tex;
-    float3 tangent;
+    float4 tangent;
 };
 
 SimpleVertexData LoadSimpleVertex(uint vertexIndex)
@@ -80,7 +80,7 @@ SimpleVertexData LoadSimpleVertex(uint vertexIndex)
     v.tex = asfloat(uint2(
         originalVertexBuffer.Load(address + TEX_OFFSET),
         originalVertexBuffer.Load(address + TEX_OFFSET + 4)));
-    v.tangent = asfloat(uint3(originalVertexBuffer.Load(address + TANGENT_OFFSET), originalVertexBuffer.Load(address + TANGENT_OFFSET + 4), originalVertexBuffer.Load(address + TANGENT_OFFSET + 8)));
+    v.tangent = asfloat(originalVertexBuffer.Load4(address + TANGENT_OFFSET));
     return v;
 }
 
@@ -95,7 +95,7 @@ SimpleVertexData LoadSkinnedVertex(uint vertexIndex)
     v.tex = asfloat(uint2(
         skinnedVertexBuffer.Load(address + TEX_OFFSET),
         skinnedVertexBuffer.Load(address + TEX_OFFSET + 4)));
-    v.tangent = asfloat(uint3(skinnedVertexBuffer.Load(address + TANGENT_OFFSET), skinnedVertexBuffer.Load(address + TANGENT_OFFSET + 4), skinnedVertexBuffer.Load(address + TANGENT_OFFSET + 8)));
+    v.tangent = asfloat(skinnedVertexBuffer.Load4(address + TANGENT_OFFSET));
     return v;
 }
 
@@ -186,7 +186,8 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     SimpleVertexData sv1 = LoadOriginalVertex(geoInfo.baseVertexLocation + i1, geoInfo.isSkinned);
     SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
     float3 normal = normalize(sv0.normal * bary.x + sv1.normal * bary.y + sv2.normal * bary.z);
-    float3 tangent = normalize(sv0.tangent * bary.x + sv1.tangent * bary.y + sv2.tangent * bary.z);
+    float4 tangentData = sv0.tangent * bary.x + sv1.tangent * bary.y + sv2.tangent * bary.z;
+    float3 tangent = normalize(tangentData.xyz);
 
     float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
 
@@ -201,7 +202,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         float2 normalUv = texCoord * mat.textureCoordScale.xy;
         float3 tangentNormal = SampleSpecularTexture((int)mat.normalTextures.x, normalUv, mat.normalTextures.z > 0).xyz * 2.0f - 1.0f;
         tangentNormal.xy *= mat.normalTextures.y;
-        float3 binormal = normalize(cross(normal, tangent));
+        float3 binormal = normalize(cross(normal, tangent)) * (tangentData.w < 0 ? -1.0f : 1.0f);
         normal = normalize(tangentNormal.x * tangent + tangentNormal.y * binormal + tangentNormal.z * normal);
     }
 
