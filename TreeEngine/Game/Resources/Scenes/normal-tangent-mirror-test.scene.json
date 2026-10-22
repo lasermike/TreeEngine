@@ -24,7 +24,7 @@
   },
   "objects": [
     {
-      "id": "normal-tangent-mirror-test",
+      "id": "normal-tangent-mirror-test", 
       "type": "model",
       "source": "Models/Gltf/NormalTangentMirrorTest.glb",
       "transform": { "scale": [2, 2, 2] }

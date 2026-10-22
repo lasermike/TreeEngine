@@ -116,13 +116,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     HRR(ReloadDevice());
 
     HRR(m_loader.InitializeScenes(SceneData::Utf8Path(GameCommon::GetContentFileRoot())));
-    m_currentScene = m_loader.Catalog().Find("builtin:LoadAITree");
-    if (m_currentScene < 0)
-    {
-        m_currentScene = 0;
-        m_sceneStatus = "AI Tree was not found; selected the first available scene.";
-        OutputDebugStringA((m_sceneStatus + "\n").c_str());
-    }
+    m_currentScene = 0;
 
     SceneRenderSettings sceneSettings = m_renderManager.GetSceneSettings();
     if (m_renderTestMode)
@@ -785,13 +779,13 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         {
             for (const auto& entry : m_loader.Catalog().Entries())
                 if (ImGui::Selectable(entry.Label().c_str(), entry.filename == m_sceneSelection))
+                {
                     m_sceneSelection = entry.filename;
+                    if (m_sceneSelection != m_sceneFilename)
+                        m_sceneLoadRequest = m_sceneSelection;
+                }
             ImGui::EndCombo();
         }
-        ImGui::BeginDisabled(m_sceneSelection.empty());
-        if (ImGui::Button("Load")) m_sceneLoadRequest = m_sceneSelection;
-        ImGui::EndDisabled();
-        ImGui::SameLine();
         if (ImGui::Button("Reload")) m_sceneLoadRequest = m_sceneFilename;
         ImGui::SameLine();
         if (ImGui::Button("Refresh")) m_sceneRefreshRequested = true;

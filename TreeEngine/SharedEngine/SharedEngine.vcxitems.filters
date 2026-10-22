@@ -37,6 +37,15 @@
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\trees.scene.json">
       <Filter>Resources\Scenes</Filter>
     </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\normal-tangent-mirror-test.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\metal-rough-spheres.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\metal-rough-spheres-no-textures.scene.json">
+      <Filter>Resources\Scenes</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Tree.cpp" />

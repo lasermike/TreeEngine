@@ -49,6 +49,9 @@
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\curves.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\gltf-models.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\graph.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\metal-rough-spheres-no-textures.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\metal-rough-spheres.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\normal-tangent-mirror-test.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\sea.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\simple-box.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-block.scene.json" />
