@@ -2,16 +2,20 @@
   "version": 1,
   "id": "LoadAITree",
   "name": "AI Tree",
-  "priority": 1,
+  "priority": 0,
   "camera": {
     "position": [ 30.515, -0.401, -29.176 ],
     "rotation": [ 0.004, -0.451, 0.013, 1]
   },
   "render": {
-    "clearColor": [0, 0, 0.5019608, 1],
+    "clearColor": [ 0, 0, 0.5019608, 1 ],
     "useShadowMaps": true,
     "useAlphaBlendedRenderTarget": true,
-    "farClippingPlane": 300
+    "farClippingPlane": 300,
+    "environment": {
+      "diffuse": "Environment/helipad-diffuse.dds",
+      "specular": "Environment/helipad-specular.dds"
+    }
   },
   "light": {
     "ambient": [0.6, 0.6, 0.6, 1],
@@ -41,10 +45,10 @@
       "texture": "grid3.png"
     },
     "sky": {
-      "ambient": [0.5, 0.5, 0.5, 1],
-      "diffuse": [0, 0, 0, 1],
-      "specular": [0, 0, 0, 0],
-      "texture": "stars.dds"
+      "ambient": [ 1.0, 1.0, 1.0, 1 ],
+      "diffuse": [ 1, 1, 1, 1 ],
+      "specular": [ 0, 0, 0, 1 ],
+      "texture": "kiara_3_morning_4k-skybox.dds"
     },
     "axis-red": { "ambient": [1, 0, 0, 1] },
     "axis-green": { "ambient": [0, 0.5019608, 0, 1] },
