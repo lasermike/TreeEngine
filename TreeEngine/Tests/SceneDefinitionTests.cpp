@@ -178,6 +178,22 @@ int main(int argc, char** argv)
         auto& primitive = static_cast<SceneData::PrimitiveDefinition&>(*defaults.objects[0]);
         Check(!primitive.hasMaterial, "omitted primitive material was marked as authored");
         Check(primitive.material.textureCoordScale.x == 1 && primitive.material.textureCoordScale.y == 1, "material UV default is not identity");
+        auto flagged = minimal;
+        flagged["materials"]["sky"] = { { "texture", "sky.dds" }, { "flags", { 0, 0, 0, 1 } } };
+        flagged["objects"][0]["material"] = "sky";
+        auto flaggedScene = SceneData::ParseScene(flagged.dump(), "test.scene.json");
+        const auto& sky = static_cast<const SceneData::PrimitiveDefinition&>(*flaggedScene.objects[0]).material;
+        Check(sky.hasFlags && sky.flags.y == 0 && sky.flags.w == 1, "material flags were not parsed");
+        auto flaggedRoundTrip = SceneData::ParseScene(SceneData::SerializeScene(flaggedScene), "roundtrip");
+        const auto& savedSky = static_cast<const SceneData::PrimitiveDefinition&>(*flaggedRoundTrip.objects[0]).material;
+        Check(savedSky.hasFlags && savedSky.flags.y == 0 && savedSky.flags.w == 1 && savedSky.texture == "sky.dds",
+            "material flags or texture did not round-trip");
+        auto invalidFlags = flagged;
+        invalidFlags["materials"]["sky"]["flags"] = { 0, 0, 0 };
+        Reject(invalidFlags.dump(), ".materials.sky.flags");
+        invalidFlags = flagged;
+        invalidFlags["materials"]["sky"]["alphaClipThreshold"] = 0.5;
+        Reject(invalidFlags.dump(), ".materials.sky");
         Check(defaults.useShadowMaps && defaults.useAlphaBlendedRenderTarget, "render defaults changed");
         Check(defaults.farClippingPlane == 30.0f, "far clipping default changed");
         Check(defaults.enablePostProcessing && defaults.blurAmount == 1.3f,

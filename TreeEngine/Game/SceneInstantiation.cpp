@@ -37,8 +37,12 @@ namespace
         result.Diffuse = definition.diffuse;
         result.Specular = definition.specular;
         result.Reflect = definition.reflect;
-        result.flags.y = definition.texture.empty() ? 0.0f : 1.0f;
-        result.flags.z = definition.alphaClipThreshold;
+        if (definition.hasFlags) result.flags = definition.flags;
+        else
+        {
+            result.flags.y = definition.texture.empty() ? 0.0f : 1.0f;
+            result.flags.z = definition.alphaClipThreshold;
+        }
         result.textureCoordScale = XMFLOAT4(definition.textureCoordScale.x, definition.textureCoordScale.y, 1, 1);
         return result;
     } 
@@ -310,14 +314,16 @@ namespace
         result.reflect = material.Reflect;
         result.textureCoordScale = { material.textureCoordScale.x, material.textureCoordScale.y };
         result.alphaClipThreshold = material.flags.z;
-        if (material.flags.y != 0)
-        {
-            if (slot >= params.textureFilename.size() || params.textureFilename[slot].empty())
-                throw std::runtime_error("Object '" + params.name + "': textured material has no texture");
+        const bool hasTexture = slot < params.textureFilename.size() && !params.textureFilename[slot].empty();
+        if (material.flags.y != 0 && !hasTexture)
+            throw std::runtime_error("Object '" + params.name + "': textured material has no texture");
+        if (hasTexture)
             result.texture = RebaseAsset(SceneData::Utf8Path(params.textureFilename[slot]), source, destination);
-        }
-        if (material.flags.x != 0 || material.flags.w != 0 || material.specularParams.x != 0)
-            throw std::runtime_error("Object '" + params.name + "': unsupported authored material flags");
+        result.hasFlags = material.flags.x != 0 || material.flags.w != 0 ||
+            material.flags.y != (hasTexture ? 1.0f : 0.0f);
+        if (result.hasFlags) result.flags = material.flags;
+        if (material.specularParams.x != 0)
+            throw std::runtime_error("Object '" + params.name + "': unsupported authored PBR material");
         return result;
     }
 

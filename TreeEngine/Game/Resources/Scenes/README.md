@@ -125,7 +125,7 @@ or an inline definition. Trees use the same convention for their named slots.
 References are resolved to independent values before runtime construction.
 
 Materials support `ambient`, `diffuse`, `specular`, `reflect`, `texture`,
-`textureCoordScale`, and `alphaClipThreshold`. The fourth `specular` component
+`textureCoordScale`, `alphaClipThreshold`, and `flags`. The fourth `specular` component
 is the specular exponent. Color defaults match `ShaderMaterial`: `[0,0,0,1]`.
 An omitted texture means untextured shading. Asset references resolve relative
 to the scene file first, with existing current-directory, executable-directory,
@@ -134,6 +134,14 @@ model sources. Missing assets report the object ID without replacing the active
 scene. Saves rebase references relative to the destination scene; resources are
 not copied or packaged. Cross-drive/share references that cannot be made relative
 are rejected. Keep shared runtime resources available when moving user scenes.
+
+`flags` is an optional `[alphaBlend, useTexture, alphaClipThreshold, unlit]`
+array. The first, second, and fourth elements must be `0` or `1`; the third
+must be between `0` and `1`. When omitted, `useTexture` follows the presence
+of `texture`, alpha clip uses `alphaClipThreshold`, and the other flags are `0`.
+If both `flags` and `alphaClipThreshold` are given, their threshold values
+must agree. A texture may be present even when `useTexture` is `0`, as with
+a skybox that samples its cube map directly.
 
 Alpha clip defaults to `0` and must be between `0` and `1`. UV scale defaults to
 `[1,1]`. Object and material UV scales multiply; `[4,4]` repeats the texture four

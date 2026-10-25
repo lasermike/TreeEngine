@@ -24,6 +24,8 @@ namespace SceneData
         std::string texture;
         DirectX::XMFLOAT2 textureCoordScale = { 1, 1 };
         float alphaClipThreshold = 0;
+        DirectX::XMFLOAT4 flags = { 0, 0, 0, 0 };
+        bool hasFlags = false;
     };
 
     enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite };

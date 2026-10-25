@@ -113,7 +113,7 @@ namespace SceneData
 
         MaterialDefinition ReadMaterial(const Json& value, const std::string& path)
         {
-            Fields(value, path, { "ambient", "diffuse", "specular", "reflect", "texture", "textureCoordScale", "alphaClipThreshold" });
+            Fields(value, path, { "ambient", "diffuse", "specular", "reflect", "texture", "textureCoordScale", "alphaClipThreshold", "flags" });
             MaterialDefinition result;
             if (value.contains("ambient")) result.ambient = Vector4(value["ambient"], path + ".ambient");
             if (value.contains("diffuse")) result.diffuse = Vector4(value["diffuse"], path + ".diffuse");
@@ -124,6 +124,20 @@ namespace SceneData
             if (value.contains("alphaClipThreshold")) result.alphaClipThreshold = Number(value["alphaClipThreshold"], path + ".alphaClipThreshold");
             if (result.alphaClipThreshold < 0 || result.alphaClipThreshold > 1)
                 Invalid(path + ".alphaClipThreshold", "expected a value between 0 and 1");
+            if (value.contains("flags"))
+            {
+                result.flags = Vector4(value["flags"], path + ".flags");
+                result.hasFlags = true;
+                if ((result.flags.x != 0 && result.flags.x != 1) ||
+                    (result.flags.y != 0 && result.flags.y != 1) ||
+                    (result.flags.w != 0 && result.flags.w != 1))
+                    Invalid(path + ".flags", "x, y, and w must be 0 or 1");
+                if (result.flags.z < 0 || result.flags.z > 1)
+                    Invalid(path + ".flags[2]", "expected a value between 0 and 1");
+                if (value.contains("alphaClipThreshold") && result.alphaClipThreshold != result.flags.z)
+                    Invalid(path, "flags[2] and alphaClipThreshold disagree");
+                result.alphaClipThreshold = result.flags.z;
+            }
             return result;
         }
 
@@ -430,10 +444,12 @@ namespace SceneData
         }
         Json MaterialJson(const MaterialDefinition& m)
         {
-            return { { "ambient", VectorJson(m.ambient) }, { "diffuse", VectorJson(m.diffuse) },
+            Json result = { { "ambient", VectorJson(m.ambient) }, { "diffuse", VectorJson(m.diffuse) },
                 { "specular", VectorJson(m.specular) }, { "reflect", VectorJson(m.reflect) },
-                { "texture", m.texture }, { "textureCoordScale", VectorJson(m.textureCoordScale) },
-                { "alphaClipThreshold", m.alphaClipThreshold } };
+                { "texture", m.texture }, { "textureCoordScale", VectorJson(m.textureCoordScale) } };
+            if (m.hasFlags) result["flags"] = VectorJson(m.flags);
+            else result["alphaClipThreshold"] = m.alphaClipThreshold;
+            return result;
         }
         const char* ShapeName(Shape shape)
         {

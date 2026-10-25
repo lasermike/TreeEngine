@@ -45,10 +45,8 @@
       "texture": "grid3.png"
     },
     "sky": {
-      "ambient": [ 1.0, 1.0, 1.0, 1 ],
-      "diffuse": [ 1, 1, 1, 1 ],
-      "specular": [ 0, 0, 0, 1 ],
-      "texture": "kiara_3_morning_4k-skybox.dds"
+      "texture": "kiara_3_morning_4k-skybox.dds",
+      "flags": [0,0,0,1]
     },
     "axis-red": { "ambient": [1, 0, 0, 1] },
     "axis-green": { "ambient": [0, 0.5019608, 0, 1] },
