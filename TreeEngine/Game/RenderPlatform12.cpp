@@ -133,6 +133,33 @@ struct ExampleDescriptorHeapAllocator
 
 static ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
 static ExampleDescriptorHeapAllocator g_pd3dSrvDescHeapAlloc;
+static std::map<const LoadedTexture*, std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>> g_debugTexturePreviews;
+static ImGuiStyle g_debugBaseStyle;
+static ImFont* g_debugFonts[4] = {};
+static int g_appliedDebugScale = -1;
+static std::string g_debugIniPath;
+
+HRESULT RenderPlatform12::GetDebugTexturePreview(const LoadedTexture* texture, uint64_t* id, UINT* width, UINT* height)
+{
+    if (!texture || !texture->texture || !id || !width || !height || !imGuiInitialized || !g_pd3dSrvDescHeap)
+        return E_INVALIDARG;
+    const auto desc = texture->texture->GetDesc();
+    if (desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D) return E_INVALIDARG;
+    auto found = g_debugTexturePreviews.find(texture);
+    if (found == g_debugTexturePreviews.end())
+    {
+        if (g_pd3dSrvDescHeapAlloc.FreeIndices.empty()) return E_OUTOFMEMORY;
+        D3D12_CPU_DESCRIPTOR_HANDLE cpu = {};
+        D3D12_GPU_DESCRIPTOR_HANDLE gpu = {};
+        g_pd3dSrvDescHeapAlloc.Alloc(&cpu, &gpu);
+        GetDevice()->CopyDescriptorsSimple(1, cpu, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        found = g_debugTexturePreviews.emplace(texture, std::make_pair(cpu, gpu)).first;
+    }
+    *id = found->second.second.ptr;
+    *width = static_cast<UINT>(desc.Width);
+    *height = desc.Height;
+    return S_OK;
+}
 
 enum CbvSrvUavHeapOffsets
 {
@@ -843,12 +870,40 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         ImPlot::CreateContext();
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
         io.ConfigDebugHighlightIdConflicts = false;
 
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
+        g_debugBaseStyle = ImGui::GetStyle();
+        const float scales[] = { 1.0f, 1.25f, 1.5f, 2.0f };
+        for (int i = 0; i < 4; ++i)
+        {
+            ImFontConfig fontConfig;
+            fontConfig.SizePixels = 13.0f * scales[i];
+            g_debugFonts[i] = io.Fonts->AddFontDefault(&fontConfig);
+        }
+        g_appliedDebugScale = -1;
+#if !defined(TREE_XBOX)
+        wchar_t localAppData[32768] = {};
+        const DWORD appDataLength = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, _countof(localAppData));
+        if (appDataLength && appDataLength < _countof(localAppData))
+        {
+            const std::wstring folder = std::wstring(localAppData) + L"\\TreeEngine";
+            CreateDirectoryW(folder.c_str(), nullptr);
+            const std::wstring iniPath = folder + L"\\imgui.ini";
+            const int bytes = WideCharToMultiByte(CP_UTF8, 0, iniPath.c_str(), -1, nullptr, 0, nullptr, nullptr);
+            if (bytes > 0)
+            {
+                g_debugIniPath.resize(bytes);
+                WideCharToMultiByte(CP_UTF8, 0, iniPath.c_str(), -1, &g_debugIniPath[0], bytes, nullptr, nullptr);
+                g_debugIniPath.resize(bytes - 1);
+                io.IniFilename = g_debugIniPath.c_str();
+            }
+        }
+#endif
         //ImGui::StyleColorsClassic();
 
         // Setup Platform/Renderer bindings
@@ -1178,6 +1233,15 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
     WaitForGPUWork();
+    if (imGuiInitialized)
+    {
+        const char* iniFilename = ImGui::GetIO().IniFilename;
+        if (iniFilename) ImGui::SaveIniSettingsToDisk(iniFilename);
+        ImGui::DestroyPlatformWindows();
+    }
+    for (const auto& preview : g_debugTexturePreviews)
+        g_pd3dSrvDescHeapAlloc.Free(preview.second.first, preview.second.second);
+    g_debugTexturePreviews.clear();
 
     if (imGuiInitialized)
     {
@@ -2692,11 +2756,8 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     WaitForGPUWork();
 #endif
 
-    if (imGuiInitialized)
-    {
-        ImGui_ImplDX12_InvalidateDeviceObjects();
-    }
-
+    // ImGui device objects are independent of the swap-chain dimensions. Recreating
+    // them here frees the font SRV descriptor, which material previews may then reuse.
     m_scissorRect.left = 0;
     m_scissorRect.top = 0;
     m_scissorRect.right = static_cast<LONG>(windowWidth);
@@ -2928,11 +2989,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     }
 #endif
 
-    // UI
-    if (imGuiInitialized)
-    {
-        ImGui_ImplDX12_CreateDeviceObjects();
-    }
+    // ImGui device objects remain valid across resize.
 
     ////
     // Validation
@@ -3492,6 +3549,16 @@ HRESULT RenderPlatform12::RenderDebugUI()
     {
         PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Setup IM GUI");
 
+        const int scaleIndex = std::max(0, std::min(3, m_settings->m_debugUIScale));
+        if (g_appliedDebugScale != scaleIndex)
+        {
+            const float scales[] = { 1.0f, 1.25f, 1.5f, 2.0f };
+            ImGui::GetStyle() = g_debugBaseStyle;
+            ImGui::GetStyle().ScaleAllSizes(scales[scaleIndex]);
+            ImGui::GetIO().FontDefault = g_debugFonts[scaleIndex];
+            g_appliedDebugScale = scaleIndex;
+        }
+
         ImGui_ImplDX12_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
@@ -3531,6 +3598,12 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
     }
     HRR(ExecuteCurrentCommandList(true));
     HRR(ResolveProfileFrame());
+
+    if (imGuiInitialized)
+    {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+    }
 
     // Present the frame.
     if (!m_settings->m_captureFilename.empty())

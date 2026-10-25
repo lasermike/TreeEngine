@@ -13,6 +13,7 @@
 #include "GltfModel.h"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <set>
 #include <stdexcept>
 
@@ -39,6 +40,108 @@ std::wstring Wide(const std::string& value)
     std::vector<wchar_t> buffer(count);
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.c_str(), -1, buffer.data(), count);
     return buffer.data();
+}
+
+namespace
+{
+    std::wstring DebugUIFolder()
+    {
+        wchar_t path[32768] = {};
+        DWORD count = GetEnvironmentVariableW(L"LOCALAPPDATA", path, _countof(path));
+        if (!count || count >= _countof(path)) return {};
+        std::wstring folder(path);
+        folder += L"\\TreeEngine";
+        CreateDirectoryW(folder.c_str(), nullptr);
+        return folder;
+    }
+
+    void LoadDebugUIPreferences(Settings& settings)
+    {
+        const auto folder = DebugUIFolder();
+        if (folder.empty()) return;
+        std::ifstream file(folder + L"\\debug-ui.txt");
+        int scale = 0, separate = 0;
+        if (file >> scale >> separate && scale >= 0 && scale < 4 && (separate == 0 || separate == 1))
+        {
+            settings.m_debugUIScale = scale;
+            settings.m_debugUISeparateWindow = separate != 0;
+            auto readPlacement = [&file](Settings::DebugUIWindowPlacement& placement) {
+                if (file >> placement.x >> placement.y >> placement.width >> placement.height)
+                    placement.valid = placement.width >= 200 && placement.height >= 150;
+            };
+            readPlacement(settings.m_debugUIOverlayPlacement);
+            readPlacement(settings.m_debugUISeparatePlacement);
+        }
+    }
+
+    void SaveDebugUIPreferences(const Settings& settings)
+    {
+        const auto folder = DebugUIFolder();
+        if (folder.empty()) return;
+        std::ofstream file(folder + L"\\debug-ui.txt", std::ios::trunc);
+        const auto& overlay = settings.m_debugUIOverlayPlacement;
+        const auto& separateWindow = settings.m_debugUISeparatePlacement;
+        file << settings.m_debugUIScale << ' ' << (settings.m_debugUISeparateWindow ? 1 : 0) << '\n'
+            << overlay.x << ' ' << overlay.y << ' ' << overlay.width << ' ' << overlay.height << '\n'
+            << separateWindow.x << ' ' << separateWindow.y << ' ' << separateWindow.width << ' ' << separateWindow.height << '\n';
+    }
+
+    std::string DebugRelativePath(const std::wstring& filename)
+    {
+        if (filename.empty()) return {};
+        wchar_t executable[32768] = {};
+        if (!GetModuleFileNameW(nullptr, executable, _countof(executable))) return SceneData::Utf8Path(filename);
+        std::wstring root(executable);
+        root.resize(root.find_last_of(L"\\/") + 1);
+        wchar_t full[32768] = {};
+        DWORD count = GetFullPathNameW(filename.c_str(), _countof(full), full, nullptr);
+        if (!count || count >= _countof(full)) return SceneData::Utf8Path(filename);
+        std::wstring absolute(full);
+        for (auto& c : absolute) if (c == L'/') c = L'\\';
+        for (auto& c : root) if (c == L'/') c = L'\\';
+        if (_wcsnicmp(absolute.c_str(), root.c_str(), root.size()) == 0)
+            return SceneData::Utf8Path(absolute.substr(root.size()));
+        auto split = [](const std::wstring& value) {
+            std::vector<std::wstring> parts;
+            size_t start = 0;
+            for (size_t i = 0; i <= value.size(); ++i)
+                if (i == value.size() || value[i] == L'\\')
+                {
+                    if (i > start) parts.push_back(value.substr(start, i - start));
+                    start = i + 1;
+                }
+            return parts;
+        };
+        const auto from = split(root), to = split(absolute);
+        if (from.empty() || to.empty() || _wcsicmp(from[0].c_str(), to[0].c_str()) != 0)
+            return SceneData::Utf8Path(to.empty() ? absolute : to.back());
+        size_t common = 0;
+        while (common < from.size() && common < to.size() && _wcsicmp(from[common].c_str(), to[common].c_str()) == 0)
+            ++common;
+        std::wstring relative;
+        for (size_t i = common; i < from.size(); ++i) relative += L"..\\";
+        for (size_t i = common; i < to.size(); ++i)
+        {
+            if (i > common) relative += L'\\';
+            relative += to[i];
+        }
+        return SceneData::Utf8Path(relative);
+    }
+
+    std::string DebugRelativePath(const std::string& filename) { return DebugRelativePath(Wide(filename)); }
+
+    ImVec2 DefaultSeparateUIPosition(const ImGuiViewport& main, float windowWidth)
+    {
+        const int left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        const int right = left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        float x = main.Pos.x + main.Size.x + 24.0f;
+        if (x + windowWidth > right)
+        {
+            const float toLeft = main.Pos.x - windowWidth - 24.0f;
+            x = toLeft >= left ? toLeft : std::max(static_cast<float>(left), static_cast<float>(right) - windowWidth);
+        }
+        return ImVec2(x, main.Pos.y + 40.0f);
+    }
 }
 
 
@@ -90,6 +193,11 @@ Game::~Game()
 HRESULT Game::Initialize(bool renderToSharedTexture)
 {
     m_renderToSharedTexture = renderToSharedTexture;
+    LoadDebugUIPreferences(m_settings);
+    const auto& placement = m_settings.m_debugUISeparateWindow
+        ? m_settings.m_debugUISeparatePlacement : m_settings.m_debugUIOverlayPlacement;
+    m_settings.m_debugUIResetLayout = !placement.valid;
+    m_settings.m_debugUIApplySavedPlacement = placement.valid;
 
 
     // Rendering defaults
@@ -258,6 +366,7 @@ HRESULT Game::SaveScene(const std::string& displayName, const std::string& filen
 
 HRESULT Game::Cleanup()
 {
+    if (!m_renderTestMode) SaveDebugUIPreferences(m_settings);
     if (m_pScene)
     {
         m_pScene->CleanUpDeviceObjects();
@@ -267,6 +376,18 @@ HRESULT Game::Cleanup()
     m_renderManager.UninitDevice();
 
     return S_OK;
+}
+
+void Game::ResetDebugUI()
+{
+    m_settings.m_debugUIScale = 0;
+    m_settings.m_debugUISeparateWindow = false;
+    m_settings.m_debugUIResetLayout = true;
+    m_settings.m_debugUIApplySavedPlacement = false;
+    m_settings.m_debugUIOverlayPlacement = {};
+    m_settings.m_debugUISeparatePlacement = {};
+    m_settings.m_showDebugUI = true;
+    SaveDebugUIPreferences(m_settings);
 }
 
 HRESULT Game::ReloadDevice()
@@ -567,23 +688,288 @@ const char* GeneratorTypeName(GeneratorType type)
 
 void ShowMaterialVector(const char* label, const XMFLOAT4& value)
 {
-    ImGui::Text("%s: (%.3f, %.3f, %.3f, %.3f)",
-        label, value.x, value.y, value.z, value.w);
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::TextUnformatted(label);
+    ImGui::TableSetColumnIndex(1);
+    ImGui::Text("(%.3f, %.3f, %.3f, %.3f)", value.x, value.y, value.z, value.w);
+}
+
+void ShowProperty(const char* label, const std::string& value)
+{
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::TextUnformatted(label);
+    ImGui::TableSetColumnIndex(1);
+    ImGui::TextWrapped("%s", value.c_str());
 }
 
 void ShowShaderMaterialDetails(const ShaderMaterial& material)
 {
+    if (!ImGui::BeginTable("Shader material", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) return;
+    ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthFixed, 190);
+    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
     ShowMaterialVector("Ambient", material.Ambient);
     ShowMaterialVector("Diffuse", material.Diffuse);
     ShowMaterialVector("Specular (w = exponent)", material.Specular);
     ShowMaterialVector("Reflect", material.Reflect);
     ShowMaterialVector("Flags (blend, texture, clip, unlit)", material.flags);
-    ImGui::Text("UV scale: (%.3f, %.3f)", material.textureCoordScale.x, material.textureCoordScale.y);
+    ShowProperty("UV scale", std::to_string(material.textureCoordScale.x) + ", " + std::to_string(material.textureCoordScale.y));
     ShowMaterialVector("PBR (enabled, metal, rough, specular)", material.specularParams);
     ShowMaterialVector("Specular color", material.specularColor);
     ShowMaterialVector("Specular textures", material.specularTextures);
     ShowMaterialVector("Normal texture and scale", material.normalTextures);
     ShowMaterialVector("Metallic-roughness texture", material.metallicRoughnessTextures);
+    ImGui::EndTable();
+}
+
+float ScrollingTableHeight(size_t rows)
+{
+    const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    return lineHeight * static_cast<float>(std::min<size_t>(rows + 1, 8))
+        + ImGui::GetStyle().ScrollbarSize + 8.0f;
+}
+
+void ShowGltfInspector(const GltfAsset& asset, RenderManager& renderer)
+{
+    ImGuiStorage* selection = ImGui::GetStateStorage();
+    const ImGuiID meshSelection = ImGui::GetID("Selected glTF mesh");
+    const ImGuiID partSelection = ImGui::GetID("Selected glTF part");
+    const ImGuiID materialSelection = ImGui::GetID("Selected glTF material");
+    if (ImGui::BeginTable("glTF overview", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg))
+    {
+        ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthFixed, 180);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+        ShowProperty("Source", DebugRelativePath(asset.sourceFilename));
+        ShowProperty("Rendered parts", std::to_string(asset.renderParts.size()));
+        ShowProperty("Source meshes", std::to_string(asset.meshes.size()));
+        ShowProperty("Textures", std::to_string(asset.textures.size()));
+        char bounds[180] = {};
+        snprintf(bounds, sizeof(bounds), "(%.3f, %.3f, %.3f) to (%.3f, %.3f, %.3f)",
+            asset.boundsMin.x, asset.boundsMin.y, asset.boundsMin.z,
+            asset.boundsMax.x, asset.boundsMax.y, asset.boundsMax.z);
+        ShowProperty("Model bounds", bounds);
+        ImGui::EndTable();
+    }
+    if (ImGui::TreeNode("Meshes"))
+    {
+        size_t selectedMesh = static_cast<size_t>(selection->GetInt(meshSelection, 0));
+        size_t selectedPart = static_cast<size_t>(selection->GetInt(partSelection, 0));
+        if (ImGui::BeginTable("Mesh list", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit,
+            ImVec2(0, ScrollingTableHeight(asset.meshes.size()))))
+        {
+            ImGui::TableSetupColumn("Source mesh");
+            ImGui::TableSetupColumn("Primitives");
+            ImGui::TableSetupColumn("Instances");
+            ImGui::TableSetupColumn("Source vertices");
+            ImGui::TableSetupColumn("Source triangles");
+            ImGui::TableHeadersRow();
+            for (const auto& mesh : asset.meshes)
+            {
+                if (mesh.name.empty()) continue;
+                std::set<size_t> nodes;
+                std::set<size_t> sourcePrimitives;
+                size_t vertices = 0, triangles = 0;
+                for (const auto& part : asset.renderParts)
+                    if (part.meshIndex == mesh.sourceIndex)
+                    {
+                        nodes.insert(part.nodeIndex);
+                        if (sourcePrimitives.insert(part.sourcePrimitiveIndex).second)
+                        {
+                            const auto& primitive = asset.primitives[part.primitiveIndex];
+                            vertices += primitive.sourceVertexCount;
+                            triangles += primitive.sourceIndexCount / 3;
+                        }
+                    }
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::PushID(static_cast<int>(mesh.sourceIndex));
+                if (ImGui::Selectable(mesh.name.c_str(), selectedMesh == mesh.sourceIndex, ImGuiSelectableFlags_SpanAllColumns))
+                {
+                    selectedMesh = mesh.sourceIndex;
+                    selection->SetInt(meshSelection, static_cast<int>(selectedMesh));
+                }
+                ImGui::PopID();
+                ImGui::TableSetColumnIndex(1); ImGui::Text("%zu", sourcePrimitives.size());
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%zu", nodes.size());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("%zu", vertices);
+                ImGui::TableSetColumnIndex(4); ImGui::Text("%zu", triangles);
+            }
+            ImGui::EndTable();
+        }
+        if (selectedMesh >= asset.meshes.size() || asset.meshes[selectedMesh].name.empty())
+            for (size_t i = 0; i < asset.meshes.size(); ++i)
+                if (!asset.meshes[i].name.empty()) { selectedMesh = i; break; }
+        if (selectedMesh < asset.meshes.size() && !asset.meshes[selectedMesh].name.empty())
+        {
+            ImGui::Text("%s: primitives and placed instances", asset.meshes[selectedMesh].name.c_str());
+            const size_t partRows = static_cast<size_t>(std::count_if(asset.renderParts.begin(), asset.renderParts.end(),
+                [selectedMesh](const GltfRenderPart& part) { return part.meshIndex == selectedMesh; }));
+            if (ImGui::BeginTable("Mesh details", 9, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit,
+                ImVec2(0, ScrollingTableHeight(partRows))))
+            {
+                const char* headings[] = { "Primitive", "Node", "Material", "Attributes", "Source V/I/T", "Rendered V/I/T", "Vertex offset", "Index offset", "Node translation" };
+                for (const char* heading : headings) ImGui::TableSetupColumn(heading);
+                ImGui::TableHeadersRow();
+                for (size_t partIndex = 0; partIndex < asset.renderParts.size(); ++partIndex)
+                {
+                    const auto& part = asset.renderParts[partIndex];
+                    if (part.meshIndex != selectedMesh) continue;
+                    const auto& primitive = asset.primitives[part.primitiveIndex];
+                    const auto& offsets = primitive.bufferOffsets;
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0); ImGui::Text("%zu", part.sourcePrimitiveIndex);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::PushID(static_cast<int>(partIndex));
+                    if (ImGui::Selectable(part.nodeName.c_str(), selectedPart == partIndex))
+                    {
+                        selectedPart = partIndex;
+                        selection->SetInt(partSelection, static_cast<int>(selectedPart));
+                    }
+                    ImGui::PopID();
+                    ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(asset.materials[part.materialIndex].name.c_str());
+                    ImGui::TableSetColumnIndex(3); ImGui::Text("P %s %s %s", primitive.hasNormals ? "N" : "N*", primitive.hasTexcoords ? "UV" : "UV*", primitive.hasTangents ? "T" : "T*");
+                    ImGui::TableSetColumnIndex(4); ImGui::Text("%zu / %zu / %zu", primitive.sourceVertexCount, primitive.sourceIndexCount, primitive.sourceIndexCount / 3);
+                    ImGui::TableSetColumnIndex(5); ImGui::Text("%zu / %zu / %zu", primitive.vertices.size(), primitive.indices.size(), primitive.indices.size() / 3);
+                    ImGui::TableSetColumnIndex(6); ImGui::Text("%u", offsets.VertexOffset);
+                    ImGui::TableSetColumnIndex(7); ImGui::Text("%u", offsets.IndexOffset);
+                    ImGui::TableSetColumnIndex(8); ImGui::Text("(%.2f, %.2f, %.2f)", part.transform._41, part.transform._42, part.transform._43);
+                }
+                ImGui::EndTable();
+            }
+            if (selectedPart < asset.renderParts.size() && asset.renderParts[selectedPart].meshIndex == selectedMesh)
+            {
+                const auto& transform = asset.renderParts[selectedPart].transform;
+                ImGui::Text("%s: converted node transform", asset.renderParts[selectedPart].nodeName.c_str());
+                if (ImGui::BeginTable("Node transform", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+                {
+                    const float* values = &transform._11;
+                    for (int row = 0; row < 4; ++row)
+                    {
+                        ImGui::TableNextRow();
+                        for (int column = 0; column < 4; ++column)
+                        {
+                            ImGui::TableSetColumnIndex(column);
+                            ImGui::Text("%.4f", values[row * 4 + column]);
+                        }
+                    }
+                    ImGui::EndTable();
+                }
+            }
+            ImGui::TextDisabled("* generated or absent in source. Node translation uses the converted glTF transform.");
+        }
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Materials"))
+    {
+        size_t selectedMaterial = static_cast<size_t>(selection->GetInt(materialSelection, 0));
+        if (selectedMaterial >= asset.materials.size()) selectedMaterial = 0;
+        if (ImGui::BeginTable("Material list", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit,
+            ImVec2(0, ScrollingTableHeight(asset.materials.size()))))
+        {
+            const char* headings[] = { "Material", "Base color", "Metallic", "Roughness", "Specular", "Alpha" };
+            for (const char* heading : headings) ImGui::TableSetupColumn(heading);
+            ImGui::TableHeadersRow();
+            for (size_t i = 0; i < asset.materials.size(); ++i)
+            {
+                const auto& material = asset.materials[i];
+                const auto& shader = material.shaderMaterial;
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::PushID(static_cast<int>(i));
+                if (ImGui::Selectable(material.name.c_str(), selectedMaterial == i, ImGuiSelectableFlags_SpanAllColumns))
+                {
+                    selectedMaterial = i;
+                    selection->SetInt(materialSelection, static_cast<int>(i));
+                }
+                ImGui::PopID();
+                ImGui::TableSetColumnIndex(1); ImGui::Text("%.2f, %.2f, %.2f, %.2f", shader.Diffuse.x, shader.Diffuse.y, shader.Diffuse.z, shader.Diffuse.w);
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.3f", shader.specularParams.y);
+                ImGui::TableSetColumnIndex(3); ImGui::Text("%.3f", shader.specularParams.z);
+                ImGui::TableSetColumnIndex(4); ImGui::Text("%.3f", shader.specularParams.w);
+                ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(material.alphaBlend ? "Blend" : material.alphaMask ? "Mask" : "Opaque");
+            }
+            ImGui::EndTable();
+        }
+        if (!asset.materials.empty())
+        {
+            const auto& material = asset.materials[selectedMaterial];
+            const auto& shader = material.shaderMaterial;
+            ImGui::Text("%s: properties", material.name.c_str());
+            if (ImGui::BeginTable("Material properties", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg))
+            {
+                ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthFixed, 180);
+                ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+                ShowMaterialVector("Base color", shader.Diffuse);
+                ShowProperty("Metallic factor", std::to_string(shader.specularParams.y));
+                ShowProperty("Roughness factor", std::to_string(shader.specularParams.z));
+                ShowProperty("Specular factor", std::to_string(shader.specularParams.w));
+                ShowMaterialVector("Specular color", shader.specularColor);
+                ShowProperty("Normal scale", std::to_string(shader.normalTextures.y));
+                ShowProperty("Alpha mode", material.alphaBlend ? "Blend" : material.alphaMask ? "Mask" : "Opaque");
+                if (material.alphaMask) ShowProperty("Alpha cutoff", std::to_string(material.alphaCutoff));
+                ShowProperty("Double sided", material.doubleSided ? "Yes" : "No");
+                ShowProperty("Unlit", material.unlit ? "Yes" : "No");
+                ImGui::EndTable();
+            }
+            struct TextureRole { const char* name; int index; bool wrap; };
+            const TextureRole roles[] = {
+                { "Base color", material.textureIndex, material.wrapTexture },
+                { "Metallic-roughness", material.metallicRoughnessTextureIndex, shader.metallicRoughnessTextures.y == 0 },
+                { "Normal", material.normalTextureIndex, shader.normalTextures.z == 0 },
+                { "Specular strength", material.specularTextureIndex, shader.specularTextures.z == 0 },
+                { "Specular color", material.specularColorTextureIndex, shader.specularTextures.w == 0 }
+            };
+            size_t textureRows = 0, previewRows = 0;
+            for (const auto& role : roles)
+                if (role.index >= 0)
+                {
+                    ++textureRows;
+                    if (asset.textures[role.index].origin != GltfTextureSource::Origin::ExternalFile)
+                        ++previewRows;
+                }
+            const float textureHeight = ScrollingTableHeight(textureRows) + 72.0f * previewRows;
+            if (ImGui::BeginTable("Material textures", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_SizingFixedFit,
+                ImVec2(0, textureHeight)))
+            {
+                const char* headings[] = { "Role", "Image", "Source", "MIME", "Color space", "Sampler" };
+                for (const char* heading : headings) ImGui::TableSetupColumn(heading);
+                ImGui::TableHeadersRow();
+                for (const auto& role : roles)
+                {
+                    if (role.index < 0) continue;
+                    const auto& texture = asset.textures[role.index];
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(role.name);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(texture.name.c_str());
+                    if (texture.origin != GltfTextureSource::Origin::ExternalFile)
+                    {
+                        LoadedTexture* loaded = renderer.FindLoadedGltfTexture(texture);
+                        uint64_t previewId = 0;
+                        UINT width = 0, height = 0;
+                        if (loaded && SUCCEEDED(renderer.GetPlatform()->GetDebugTexturePreview(loaded, &previewId, &width, &height)))
+                        {
+                            const float thumbnailScale = 72.0f / static_cast<float>(std::max(width, height));
+                            ImGui::Image(previewId, ImVec2(width * thumbnailScale, height * thumbnailScale));
+                            ImGui::Text("%u x %u", width, height);
+                        }
+                    }
+                    ImGui::TableSetColumnIndex(2);
+                    const char* origin = texture.origin == GltfTextureSource::Origin::DataUri ? "Data URI" : texture.origin == GltfTextureSource::Origin::BufferView ? "GLB buffer" : "External";
+                    ImGui::TextUnformatted(origin);
+                    if (texture.origin == GltfTextureSource::Origin::ExternalFile)
+                        ImGui::TextWrapped("%s", DebugRelativePath(texture.filename).c_str());
+                    ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(texture.mimeType.empty() ? "-" : texture.mimeType.c_str());
+                    ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(texture.colorSpace == 2 ? "sRGB" : "Linear");
+                    ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(role.wrap ? "Repeat / linear" : "Clamp / linear");
+                }
+                ImGui::EndTable();
+            }
+        }
+        ImGui::TreePop();
+    }
 }
 
 int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
@@ -649,15 +1035,75 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     // Debug Settings 
     bool bOpen = true;
-    if (!ImGui::Begin("Debug UI", &bOpen, ImGuiWindowFlags_NoFocusOnAppearing))
+    ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+    const float uiScales[] = { 1.0f, 1.25f, 1.5f, 2.0f };
+    const float uiScale = uiScales[std::max(0, std::min(3, m_settings.m_debugUIScale))];
+    const float defaultWidth = std::min(1100.0f, 600.0f * uiScale);
+    auto& placement = m_settings.m_debugUISeparateWindow
+        ? m_settings.m_debugUISeparatePlacement : m_settings.m_debugUIOverlayPlacement;
+    if (!m_settings.m_debugUISeparateWindow)
+        ImGui::SetNextWindowViewport(mainViewport->ID);
+    else
     {
-        //ImGui::End();
+        ImGuiWindowClass windowClass;
+        windowClass.ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge;
+        ImGui::SetNextWindowClass(&windowClass);
+    }
+    if (m_settings.m_debugUIResetLayout)
+    {
+        ImGui::SetNextWindowPos(m_settings.m_debugUISeparateWindow
+            ? DefaultSeparateUIPosition(*mainViewport, defaultWidth)
+            : ImVec2(mainViewport->Pos.x + 25, mainViewport->Pos.y + 50), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(defaultWidth, std::max(250.0f, std::min(800.0f, mainViewport->Size.y - 80.0f))), ImGuiCond_Always);
+        m_settings.m_debugUIResetLayout = false;
+    }
+    else if (placement.valid)
+    {
+        const ImGuiCond condition = m_settings.m_debugUIApplySavedPlacement ? ImGuiCond_Always : ImGuiCond_Once;
+        ImGui::SetNextWindowPos(ImVec2(static_cast<float>(placement.x), static_cast<float>(placement.y)), condition);
+        ImGui::SetNextWindowSize(ImVec2(static_cast<float>(placement.width), static_cast<float>(placement.height)), condition);
+    }
+    m_settings.m_debugUIApplySavedPlacement = false;
+    if (!ImGui::Begin("Debug UI", &bOpen, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoSavedSettings))
+    {
+        if (!bOpen) m_settings.m_showDebugUI = false;
+        ImGui::End();
         return S_FALSE;
     }
+    if (!bOpen) m_settings.m_showDebugUI = false;
+
+    const ImVec2 windowPos = ImGui::GetWindowPos(), windowSize = ImGui::GetWindowSize();
+    placement.x = static_cast<int>(windowPos.x);
+    placement.y = static_cast<int>(windowPos.y);
+    placement.width = static_cast<int>(windowSize.x);
+    placement.height = static_cast<int>(windowSize.y);
+    placement.valid = true;
 
     ImGuiIO& io = ImGui::GetIO();
 
     m_bDebugUIKeyCaptured = io.WantCaptureKeyboard;
+
+    const char* scaleLabels[] = { "100%", "125%", "150%", "200%" };
+    ImGui::SetNextItemWidth(88);
+    if (ImGui::Combo("UI Scale", &m_settings.m_debugUIScale, scaleLabels, 4))
+        SaveDebugUIPreferences(m_settings);
+    ImGui::SameLine();
+    const char* modes[] = { "Overlay", "Separate window" };
+    int mode = m_settings.m_debugUISeparateWindow ? 1 : 0;
+    ImGui::SetNextItemWidth(155);
+    if (ImGui::Combo("Display", &mode, modes, 2))
+    {
+        m_settings.m_debugUISeparateWindow = mode != 0;
+        const auto& nextPlacement = m_settings.m_debugUISeparateWindow
+            ? m_settings.m_debugUISeparatePlacement : m_settings.m_debugUIOverlayPlacement;
+        m_settings.m_debugUIResetLayout = !nextPlacement.valid;
+        m_settings.m_debugUIApplySavedPlacement = nextPlacement.valid;
+        SaveDebugUIPreferences(m_settings);
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Reset UI"))
+        ResetDebugUI();
+    ImGui::Separator();
 
     if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen))
     {
@@ -808,11 +1254,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
         ImGui::Text("Scene %d - %s", m_currentScene, m_sceneDefinition.name.c_str());
 
-        const auto filenameStart = m_sceneFilename.find_last_of("\\/");
-        const auto parentStart = filenameStart == std::string::npos || filenameStart == 0
-            ? std::string::npos : m_sceneFilename.find_last_of("\\/", filenameStart - 1);
-        const auto shortPath = m_sceneFilename.substr(parentStart == std::string::npos ? 0 : parentStart + 1);
-        ImGui::TextWrapped("%s", shortPath.c_str());
+        ImGui::TextWrapped("%s", DebugRelativePath(m_sceneFilename).c_str());
         const int selected = m_sceneSelection.empty() ? -1 : m_loader.Catalog().FindPath(m_sceneSelection);
         const auto selectionLabel = selected >= 0 ? m_loader.Catalog().Entries()[selected].Label() : m_sceneSelection;
         if (ImGui::BeginCombo("Available scenes", selectionLabel.c_str()))
@@ -849,7 +1291,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         {
             ImGui::InputText("Display name", m_saveSceneName, sizeof(m_saveSceneName));
             ImGui::InputText("Filename (without .scene.json)", m_saveSceneStem, sizeof(m_saveSceneStem));
-            ImGui::TextWrapped("Directory: %s", m_loader.Catalog().UserDirectory().c_str());
+            ImGui::TextWrapped("Directory: %s", DebugRelativePath(m_loader.Catalog().UserDirectory()).c_str());
             if (ImGui::Button("Save file"))
             {
                 try
@@ -882,7 +1324,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         }
         if (ImGui::BeginPopupModal("Overwrite scene?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         {
-            ImGui::TextWrapped("Replace %s?", m_pendingSavePath.c_str());
+            ImGui::TextWrapped("Replace %s?", DebugRelativePath(m_pendingSavePath).c_str());
             if (ImGui::Button("Overwrite"))
             {
                 m_sceneSaveOverwrite = true;
@@ -930,9 +1372,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                         ImGui::Text("Force lit: %s", model.forceLit ? "yes" : "no");
                         if (model.asset)
                         {
-                            ImGui::TextWrapped("Source: %s", model.asset->sourceFilename.c_str());
-                            ImGui::Text("glTF parts: %zu; meshes: %zu; textures: %zu",
-                                model.asset->renderParts.size(), model.asset->primitives.size(), model.asset->textures.size());
+                            ShowGltfInspector(*model.asset, m_renderManager);
                         }
                     }
 
@@ -945,41 +1385,23 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                                 continue;
                             const Material* material = unit->m_material;
                             if (!material || !shown.insert(material).second) continue;
-                            const std::string name = SceneData::Utf8Path(material->m_name);
+                            const std::string name = DebugRelativePath(material->m_name);
                             if (ImGui::TreeNodeEx(material, ImGuiTreeNodeFlags_None, "%s",
                                 name.empty() ? "Unnamed material" : name.c_str()))
                             {
-                                ImGui::Text("Skybox: %s; base texture bound: %s",
-                                    material->m_isSkybox ? "yes" : "no", material->m_texture ? "yes" : "no");
+                                if (ImGui::BeginTable("Binding", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg))
+                                {
+                                    ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthFixed, 180);
+                                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+                                    ShowProperty("Skybox", material->m_isSkybox ? "Yes" : "No");
+                                    ShowProperty("Base texture bound", material->m_texture ? "Yes" : "No");
+                                    ImGui::EndTable();
+                                }
                                 ShowShaderMaterialDetails(material->m_shaderMaterial);
                                 ImGui::TreePop();
                             }
                         }
                         if (shown.empty()) ImGui::TextUnformatted("No renderer-bound materials");
-                        ImGui::TreePop();
-                    }
-
-                    if (ImGui::TreeNode("Editable material parameters"))
-                    {
-                        for (size_t m = 0; m < params.materials.size(); ++m)
-                        {
-                            auto& mat = params.materials[m];
-                            ImGui::PushID(static_cast<int>(m));
-                            ImGui::Text("Material %zu", m);
-                            ImGui::PushItemWidth(200);
-                            ImGui::ColorEdit4("Diffuse", (float*)&mat.Diffuse, ImGuiColorEditFlags_Float);
-                            ImGui::ColorEdit4("Specular", (float*)&mat.Specular, ImGuiColorEditFlags_Float);
-                            ImGui::ColorEdit4("Ambient", (float*)&mat.Ambient, ImGuiColorEditFlags_Float);
-                            ImGui::ColorEdit4("Reflect", (float*)&mat.Reflect, ImGuiColorEditFlags_Float);
-                            ImGui::PopItemWidth();
-                            ImGui::PopID();
-                        }
-
-                        for (size_t t = 0; t < params.textureFilename.size(); ++t)
-                        {
-                            const std::string path = SceneData::Utf8Path(params.textureFilename[t]);
-                            ImGui::TextWrapped("Texture %zu: %s", t, path.c_str());
-                        }
                         ImGui::TreePop();
                     }
 

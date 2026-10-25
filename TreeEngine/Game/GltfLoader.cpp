@@ -324,6 +324,7 @@ namespace
 
         const auto& image = *texture.image;
         GltfTextureSource result;
+        result.name = image.name && *image.name ? image.name : NameOrIndex(nullptr, "image", textureIndex);
         if (image.uri)
         {
             if (StartsWith(image.uri, "data:"))
@@ -335,6 +336,7 @@ namespace
                 if (result.mimeType != "image/png" && result.mimeType != "image/jpeg")
                     ImportError(filename, "texture[" + std::to_string(textureIndex) + "] uses unsupported MIME type '" + result.mimeType + "'");
                 result.encodedData = DecodeBase64(filename, comma + 1);
+                result.origin = GltfTextureSource::Origin::DataUri;
                 result.key = Wide(filename + "#texture" + std::to_string(textureIndex));
             }
             else
@@ -346,6 +348,7 @@ namespace
                 std::ifstream exists(resolved, std::ios::binary);
                 if (!exists) ImportError(filename, "texture[" + std::to_string(textureIndex) + "] image '" + resolved + "' was not found");
                 result.filename = Wide(resolved);
+                result.mimeType = extension == ".png" ? "image/png" : extension == ".dds" ? "image/vnd-ms.dds" : "image/jpeg";
                 result.key = result.filename;
             }
         }
@@ -359,6 +362,7 @@ namespace
                 ImportError(filename, "texture[" + std::to_string(textureIndex) + "] embedded image exceeds its buffer");
             const auto* bytes = static_cast<const uint8_t*>(image.buffer_view->buffer->data) + image.buffer_view->offset;
             result.encodedData.assign(bytes, bytes + image.buffer_view->size);
+            result.origin = GltfTextureSource::Origin::BufferView;
             result.mimeType = image.mime_type;
             result.key = Wide(filename + "#texture" + std::to_string(textureIndex));
         }
@@ -377,6 +381,9 @@ namespace
         std::map<std::pair<const cgltf_texture*, int>, size_t>& textureMap)
     {
         GltfMaterialData result;
+        result.name = material
+            ? (material->name && *material->name ? material->name : NameOrIndex(nullptr, "material", PointerIndex(material, data.materials, sizeof(cgltf_material))))
+            : "Default material";
         result.shaderMaterial.Ambient = XMFLOAT4(.15f, .15f, .15f, 1);
         result.shaderMaterial.Diffuse = XMFLOAT4(1, 1, 1, 1);
         result.shaderMaterial.Specular = XMFLOAT4(.04f, .04f, .04f, 16);
@@ -414,6 +421,9 @@ namespace
             std::max(1.0f, (1.0f - roughness) * 128.0f));
         result.shaderMaterial.Reflect = XMFLOAT4(color[0] * metallic, color[1] * metallic, color[2] * metallic, 1);
         result.alphaBlend = material->alpha_mode == cgltf_alpha_mode_blend;
+        result.alphaMask = material->alpha_mode == cgltf_alpha_mode_mask;
+        result.alphaCutoff = material->alpha_cutoff;
+        result.unlit = material->unlit != 0;
         result.shaderMaterial.flags.x = result.alphaBlend ? 1.0f : 0.0f;
         result.shaderMaterial.flags.z = material->alpha_mode == cgltf_alpha_mode_mask
             ? material->alpha_cutoff
@@ -548,6 +558,11 @@ namespace
             ImportError(filename, "mesh primitive has too many vertices");
 
         GltfPrimitiveData result;
+        result.sourceVertexCount = positions->count;
+        result.sourceIndexCount = source.indices ? source.indices->count : positions->count;
+        result.hasNormals = normals != nullptr;
+        result.hasTexcoords = texcoords != nullptr;
+        result.hasTangents = tangents != nullptr;
         result.vertices.resize(positions->count);
         for (size_t i = 0; i < positions->count; ++i)
         {
@@ -645,6 +660,9 @@ namespace
         if (node.mesh)
         {
             size_t meshIndex = PointerIndex(node.mesh, data.meshes, sizeof(cgltf_mesh));
+            if (asset->meshes.size() < data.meshes_count)
+                asset->meshes.resize(data.meshes_count);
+            asset->meshes[meshIndex] = { node.mesh->name && *node.mesh->name ? node.mesh->name : NameOrIndex(nullptr, "mesh", meshIndex), meshIndex };
             for (size_t primitiveIndex = 0; primitiveIndex < node.mesh->primitives_count; ++primitiveIndex)
             {
                 const auto& primitive = node.mesh->primitives[primitiveIndex];
@@ -677,6 +695,10 @@ namespace
                 }
 
                 GltfRenderPart part;
+                part.meshIndex = meshIndex;
+                part.nodeIndex = nodeIndex;
+                part.sourcePrimitiveIndex = primitiveIndex;
+                part.nodeName = node.name && *node.name ? node.name : nodeName;
                 part.primitiveIndex = importedPrimitiveIndex;
                 part.materialIndex = materialIndex;
                 XMStoreFloat4x4(&part.transform, transform);

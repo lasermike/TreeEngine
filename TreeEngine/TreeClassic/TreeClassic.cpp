@@ -575,6 +575,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 input.key[wParam] = false;
             }
         }
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    case WM_CONTEXTMENU:
+    {
+        if (!g_game) return DefWindowProc(hWnd, message, wParam, lParam);
+        POINT point = { static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam)) };
+        if (point.x == -1 && point.y == -1)
+        {
+            RECT client = {};
+            GetClientRect(hWnd, &client);
+            point.x = (client.left + client.right) / 2;
+            point.y = (client.top + client.bottom) / 2;
+            ClientToScreen(hWnd, &point);
+        }
+        HMENU menu = CreatePopupMenu();
+        if (menu)
+        {
+            AppendMenuW(menu, MF_STRING, IDM_RESET_DEBUG_UI, L"Reset Debug UI");
+            TrackPopupMenu(menu, TPM_RIGHTBUTTON, point.x, point.y, 0, hWnd, nullptr);
+            DestroyMenu(menu);
+        }
+        return 0;
     }
     case WM_COMMAND:
         wmId    = LOWORD(wParam);
@@ -582,6 +604,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Parse the menu selections:
         switch (wmId)
         {
+        case IDM_RESET_DEBUG_UI:
+            if (g_game) g_game->ResetDebugUI();
+            break;
         case IDM_ABOUT:
             DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
             break;

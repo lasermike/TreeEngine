@@ -4,6 +4,15 @@
 class Settings
 {
 public:
+    struct DebugUIWindowPlacement
+    {
+        int x = 0;
+        int y = 0;
+        int width = 0;
+        int height = 0;
+        bool valid = false;
+    };
+
     // TODO: Tracking for these is a mess
     static const int ruleTextBufferSize = 2048;
     char m_ruleTextEditBuffers[10][ruleTextBufferSize];
@@ -15,6 +24,12 @@ public:
     bool m_wireframe;
     bool m_showDebugUI;
     bool m_showPerfGraph;
+    int m_debugUIScale = 0; // 100, 125, 150, or 200 percent
+    bool m_debugUISeparateWindow = false;
+    bool m_debugUIResetLayout = false;
+    bool m_debugUIApplySavedPlacement = false;
+    DebugUIWindowPlacement m_debugUIOverlayPlacement;
+    DebugUIWindowPlacement m_debugUISeparatePlacement;
 
     // Automated capture request, consumed by the renderer before Present.
     std::wstring m_captureFilename;

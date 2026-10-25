@@ -68,6 +68,7 @@ RENDERPLATFORM_API D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer);
 RENDERPLATFORM_API D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer);
 
 RENDERPLATFORM_API HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext);
+RENDERPLATFORM_API HRESULT GetDebugTexturePreview(const LoadedTexture* texture, uint64_t* id, UINT* width, UINT* height);
 
 RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport);
 

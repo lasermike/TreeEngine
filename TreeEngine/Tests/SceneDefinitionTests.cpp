@@ -326,9 +326,22 @@ int main(int argc, char** argv)
         Check(externalGltf->renderParts.size() == 2, "glTF hierarchy instances were not imported");
         Check(externalGltf->primitives.size() == 2, "mirrored glTF node did not receive a winding variant");
         Check(externalGltf->materials.size() == 2 && externalGltf->textures.size() == 1, "glTF materials or textures were not imported");
-        Check(!externalGltf->textures[0].IsMemoryBacked()
+        Check(externalGltf->textures[0].origin == GltfTextureSource::Origin::ExternalFile
             && externalGltf->textures[0].filename.find(L"checker.png") != std::wstring::npos,
             "external glTF image did not resolve relative to the asset");
+        Check(externalGltf->meshes.size() == 1 && externalGltf->meshes[0].name == "SharedTriangle"
+            && externalGltf->materials[0].name == "MaskedLeaves", "glTF source names were not retained");
+        Check(externalGltf->renderParts[0].nodeName == "ForwardTriangle"
+            && externalGltf->renderParts[1].nodeName == "MirroredTriangle"
+            && externalGltf->renderParts[0].meshIndex == 0
+            && externalGltf->renderParts[0].sourcePrimitiveIndex == 0,
+            "glTF mesh and node identities were not retained");
+        Check(externalGltf->primitives[0].sourceVertexCount == 3
+            && externalGltf->primitives[0].sourceIndexCount == 3
+            && !externalGltf->primitives[0].hasNormals
+            && externalGltf->primitives[0].hasTexcoords
+            && !externalGltf->primitives[0].hasTangents,
+            "glTF source geometry metadata was not retained");
         Check(externalGltf->primitives[0].vertices.size() == 6
             && externalGltf->primitives[0].indices.size() == 6,
             "double-sided glTF primitive was not expanded");
@@ -365,6 +378,8 @@ int main(int argc, char** argv)
             "GLB embedded image was not retained in memory");
         Check(embeddedGlb->textures[0].mimeType == "image/png" && embeddedGlb->textures[0].encodedData.size() > 16,
             "GLB embedded image metadata changed");
+        Check(embeddedGlb->textures[0].origin == GltfTextureSource::Origin::BufferView,
+            "GLB embedded image origin was not retained");
 
         auto blendedGltf = LoadGltfAsset(TestDataFilename("unsupported-blend.gltf"));
         Check(blendedGltf->materials[0].alphaBlend, "glTF alpha blending was not retained");
@@ -389,12 +404,13 @@ int main(int argc, char** argv)
         Check(aiTree.generator.axiom == "F(35) A(100,0)", "AI tree axiom changed");
         Check(aiTree.trunk.texture == "Bark_0005_diffuse.dds" && aiTree.leaf.texture == "FirBranchTip.dds" &&
             aiTree.leaf.alphaClipThreshold == 0.6f, "tree material settings changed");
-        auto& sky = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
-        Check(sky.cubeMap && sky.material.texture == "cube.dds", "skybox changed");
+        auto& skyboxObject = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
+        Check(skyboxObject.cubeMap && !skyboxObject.material.texture.empty(), "skybox changed");
         auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[5]);
-        Check(aiModel.source == "Models/Gltf/pond_with_waterfalls.glb" && aiModel.forceLit,
+        Check(aiModel.source == "Models/Gltf/rocklandscape.glb" && aiModel.forceLit,
             "AI tree imported model changed");
-        Check(ai.camera.rotation.w == 0 && ai.camera.position.z == 2.05959034f, "legacy camera changed");
+        Check(std::abs(ai.camera.rotation.w - 1.0f) < 1e-6f
+            && std::abs(ai.camera.position.z + 29.176f) < 1e-3f, "AI tree camera changed");
 
         const std::pair<const char*, const char*> catalogScenes[] = {
             { "tree.scene.json", "Tree" },

@@ -70,6 +70,7 @@ public:
     HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {});
 
     HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
+    void ResetDebugUI();
     // Call between frames, as the UI's deferred scene operations do.
     HRESULT LoadScene(const std::string& name);
     HRESULT RefreshScenes();

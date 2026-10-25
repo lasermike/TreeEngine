@@ -387,6 +387,12 @@ HRESULT RenderManager::LoadGltfTexture(const GltfTextureSource& source, LoadedTe
     return S_OK;
 }
 
+LoadedTexture* RenderManager::FindLoadedGltfTexture(const GltfTextureSource& source) const
+{
+    auto found = m_textures.find(source.key);
+    return found == m_textures.end() ? nullptr : found->second;
+}
+
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
     const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
     const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,
@@ -786,6 +792,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data, Settings*
     ASSIGN_FUNC(GetVertexBuffer);
     ASSIGN_FUNC(GetIndexBuffer);
     ASSIGN_FUNC(GetImGuiContext);
+    ASSIGN_FUNC(GetDebugTexturePreview);
 
     ASSIGN_FUNC(Gui_WndProcHandler);
 

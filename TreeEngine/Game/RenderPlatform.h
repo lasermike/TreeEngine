@@ -701,6 +701,7 @@ public:
     virtual D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) = 0;
 
     virtual HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext) = 0;
+    virtual HRESULT GetDebugTexturePreview(const LoadedTexture*, uint64_t*, UINT*, UINT*) { return E_NOTIMPL; }
 
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) = 0;
@@ -953,6 +954,7 @@ public:
     }
 
     HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext);
+    HRESULT GetDebugTexturePreview(const LoadedTexture* texture, uint64_t* id, UINT* width, UINT* height);
 
     // TODO: Do we like this platform specific call?
     virtual LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -1276,6 +1278,7 @@ typedef void (*SetFrameSceneDataFunc)(CBChangesEveryFrame* cb);
 typedef D3DBuffer* (*GetVertexBufferFunc)(GeometryBuffer geometryBuffer);
 typedef D3DBuffer* (*GetIndexBufferFunc)(GeometryBuffer geometryBuffer);
 typedef HRESULT (*GetImGuiContextFunc)(ImGuiContext** imguiContext, ImPlotContext** implotContext);
+typedef HRESULT (*GetDebugTexturePreviewFunc)(const LoadedTexture*, uint64_t*, UINT*, UINT*);
 
 typedef LRESULT (*Gui_WndProcHandlerFunc)(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -1334,6 +1337,7 @@ class RenderPlatformDLL : public RenderPlatform
     GetIndexBufferFunc GetIndexBufferFuncPtr;
 
     GetImGuiContextFunc GetImGuiContextFuncPtr;
+    GetDebugTexturePreviewFunc GetDebugTexturePreviewFuncPtr;
 
     Gui_WndProcHandlerFunc Gui_WndProcHandlerFuncPtr;
 
@@ -1434,6 +1438,8 @@ public:
     D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer) { return GetIndexBufferFuncPtr(geometryBuffer); }
 
     HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext) { return GetImGuiContextFuncPtr(imguiContext, implotContext); }
+    HRESULT GetDebugTexturePreview(const LoadedTexture* texture, uint64_t* id, UINT* width, UINT* height) override
+    { return GetDebugTexturePreviewFuncPtr ? GetDebugTexturePreviewFuncPtr(texture, id, width, height) : E_NOTIMPL; }
 
     LRESULT Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {

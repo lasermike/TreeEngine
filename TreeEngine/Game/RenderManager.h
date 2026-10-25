@@ -129,6 +129,7 @@ public:
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename, 
                            ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
     HRESULT LoadGltfTexture(const GltfTextureSource& source, LoadedTexture** texture, int* textureSlot = nullptr);
+    LoadedTexture* FindLoadedGltfTexture(const GltfTextureSource& source) const;
     HRESULT CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,

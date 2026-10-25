@@ -214,8 +214,9 @@ int RunScenePersistenceTests()
     check(!deployed.Entries().empty() && deployed.Diagnostics().empty(), "Deployed built-in scene fixtures are missing or invalid");
     for (const auto& entry : deployed.Entries())
     {
-        check(entry.priority == 1, "Built-in scene priority was not deployed");
-        const auto serialized = SerializeScene(ReadScene(entry.filename));
+        const auto loaded = ReadScene(entry.filename);
+        check(entry.priority == loaded.priority, "Deployed scene priority differs from the catalog");
+        const auto serialized = SerializeScene(loaded);
         check(SerializeScene(ParseScene(serialized, entry.filename)) == serialized,
             "Built-in scene did not survive a semantic serialization round trip");
     }
