@@ -110,6 +110,7 @@ public:
 
     RenderData& GetRenderData() { return m_renderData; }
     const SceneRenderSettings& GetSceneSettings() const { return m_renderData; }
+    const std::list<RenderUnit*>& GetRenderUnits() const { return m_renderUnits; }
     void ApplySceneSettings(const SceneRenderSettings& settings);
 
     RenderPlatform* GetPlatform() { return (RenderPlatform*)m_platform; }

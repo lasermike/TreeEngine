@@ -10,7 +10,10 @@
 #include "InputManager.h"
 #include "ThreadPool.h"
 #include "SceneInstantiation.h"
+#include "GltfModel.h"
+#include <algorithm>
 #include <cmath>
+#include <set>
 #include <stdexcept>
 
 #include "imgui.h"
@@ -533,6 +536,7 @@ const char s_szObjectTypeNames[ObjectType_MAX + 1][32] =
     STR(ObjectType_Primitive),
     STR(ObjectType_Tree),
     STR(ObjectType_Graph),
+    STR(ObjectType_Model),
 };
 
 const char s_szPrimitiveTypeNames[PrimitiveType_MAX + 1][32] =
@@ -545,6 +549,42 @@ const char s_szPrimitiveTypeNames[PrimitiveType_MAX + 1][32] =
     STR(PrimitiveType_SkinnedCylinder),
     STR(PrimitiveType_Sprite),
 };
+
+const char* GeneratorTypeName(GeneratorType type)
+{
+    switch (type)
+    {
+    case NullGeneratorType: return "None";
+    case PrimitiveGeneratorType: return "Primitive";
+    case FixedTreeGeneratorType: return "Fixed tree";
+    case LSystemGeneratorType: return "L-system";
+    case GraphGeneratorType: return "Graph";
+    case FSGraphGeneratorType: return "Full-screen graph";
+    case ModelGeneratorType: return "glTF model";
+    }
+    return "Unknown";
+}
+
+void ShowMaterialVector(const char* label, const XMFLOAT4& value)
+{
+    ImGui::Text("%s: (%.3f, %.3f, %.3f, %.3f)",
+        label, value.x, value.y, value.z, value.w);
+}
+
+void ShowShaderMaterialDetails(const ShaderMaterial& material)
+{
+    ShowMaterialVector("Ambient", material.Ambient);
+    ShowMaterialVector("Diffuse", material.Diffuse);
+    ShowMaterialVector("Specular (w = exponent)", material.Specular);
+    ShowMaterialVector("Reflect", material.Reflect);
+    ShowMaterialVector("Flags (blend, texture, clip, unlit)", material.flags);
+    ImGui::Text("UV scale: (%.3f, %.3f)", material.textureCoordScale.x, material.textureCoordScale.y);
+    ShowMaterialVector("PBR (enabled, metal, rough, specular)", material.specularParams);
+    ShowMaterialVector("Specular color", material.specularColor);
+    ShowMaterialVector("Specular textures", material.specularTextures);
+    ShowMaterialVector("Normal texture and scale", material.normalTextures);
+    ShowMaterialVector("Metallic-roughness texture", material.metallicRoughnessTextures);
+}
 
 int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
 {
@@ -858,121 +898,179 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         else if (!m_sceneStatus.empty()) ImGui::TextWrapped("%s", m_sceneStatus.c_str());
         for (const auto& diagnostic : m_loader.Catalog().Diagnostics())
             ImGui::TextWrapped("Discovery: %s", diagnostic.c_str());
-        for (WorldObject* obj : m_pScene->Children())
+        if (ImGui::TreeNodeEx("Objects", ImGuiTreeNodeFlags_DefaultOpen,
+            "Objects (%zu)", m_pScene->Children().size()))
         {
-            WorldObjectParams& params = obj->GetParams();
-            ImGui::PushID(obj);
-
-            ImGui::SeparatorText(params.name.empty() ? s_szObjectTypeNames[obj->GetObjectType()] : params.name.c_str());
-            ImGui::Text("Primitive type: %s", s_szPrimitiveTypeNames[params.primitiveType]);
-
-            if (ImGui::TreeNode("Materials"))
+            for (WorldObject* obj : m_pScene->Children())
             {
-                for (int m = 0; m < params.materials.size(); m++)
+                WorldObjectParams& params = obj->GetParams();
+                ImGui::PushID(obj);
+                const char* objectName = params.name.empty()
+                    ? s_szObjectTypeNames[obj->GetObjectType()] : params.name.c_str();
+                if (ImGui::TreeNodeEx("Object", ImGuiTreeNodeFlags_None, "%s", objectName))
                 {
-                    auto& mat = params.materials[m];
-                    ImGui::Text("Material %d", m);
-                    ImGui::PushItemWidth(200);
-                    ImGui::ColorEdit4("Diffuse##2f", (float*)&mat.Diffuse, ImGuiColorEditFlags_Float);
-                    ImGui::ColorEdit4("Specular##2f", (float*)&mat.Specular, ImGuiColorEditFlags_Float);
-                    ImGui::ColorEdit4("Ambient##2f", (float*)&mat.Ambient, ImGuiColorEditFlags_Float);
-                    ImGui::PopItemWidth();
-                }
-
-                for (int t = 0; t < params.textureFilename.size(); t++)
-                {
-                    char path[MAX_PATH];
-                    if (WideCharToMultiByte(CP_UTF8, 0, params.textureFilename[t].c_str(), -1, path, MAX_PATH, nullptr, nullptr))
+                    ImGui::Text("Object type: %s", s_szObjectTypeNames[obj->GetObjectType()]);
+                    ImGui::Text("Generator: %s", GeneratorTypeName(params.generatorType));
+                    if (params.generatorType == PrimitiveGeneratorType)
+                        ImGui::Text("Primitive: %s", s_szPrimitiveTypeNames[params.primitiveType]);
+                    ImGui::Text("Instances: %u (maximum %u)", obj->GetNumInstances(), obj->GetMaxInstances());
+                    ImGui::Text("Position: (%.3f, %.3f, %.3f)", params.position.x, params.position.y, params.position.z);
+                    ImGui::Text("Rotation quaternion: (%.3f, %.3f, %.3f, %.3f)",
+                        params.rotation.x, params.rotation.y, params.rotation.z, params.rotation.w);
+                    ImGui::Text("Scale: (%.3f, %.3f, %.3f)", params.scale.x, params.scale.y, params.scale.z);
+                    ImGui::Text("UV scale: (%.3f, %.3f)", params.textureCoordScale.x, params.textureCoordScale.y);
+                    ImGui::Text("Animation speed: %.3f; depth LOD: %d", params._animationSpeed, params.depthLOD);
+                    ImGui::Text("Cube map: %s", params.cubeMap ? "yes" : "no");
+                    const auto* bounds = obj->GetBoundingBox();
+                    ImGui::Text("Bounds: (%.3f, %.3f, %.3f) to (%.3f, %.3f, %.3f)",
+                        bounds[0].x, bounds[0].y, bounds[0].z, bounds[1].x, bounds[1].y, bounds[1].z);
+                    if (params.generatorType == ModelGeneratorType)
                     {
-                        ImGui::Text("Texture %d: %s", t, path);
-                    }
-                }
-                ImGui::TreePop();
-            }
-
-            if (params.generatorType == LSystemGeneratorType)
-            {
-                if (ImGui::TreeNodeEx("L System", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
-                    const auto& generator = lsystemParams.GetGeneratorParameters();
-                    const int remainingBuffers = static_cast<int>(_countof(m_settings.m_ruleTextEditBuffers)) - nextInputBuffer;
-                    bool canEdit = remainingBuffers > 0
-                        && generator._rules.size() <= static_cast<size_t>((remainingBuffers - 1) / 2)
-                        && generator._axiom.size() < m_settings.ruleTextBufferSize;
-                    for (const auto& rule : generator._rules)
-                        canEdit = canEdit && rule.input.size() < m_settings.ruleTextBufferSize
-                            && rule.output.size() < m_settings.ruleTextBufferSize;
-                    if (!canEdit)
-                    {
-                        ImGui::TextWrapped("These rules exceed the live editor's capacity. Edit the scene JSON to change them.");
-                        ImGui::TreePop();
-                        ImGui::PopID();
-                        continue;
-                    }
-
-                    // Iterations - TODO: make this is common code
-                    ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
-                    if (ImGui::ArrowButton("left", ImGuiDir_Left) &&
-                        lsystemParams.GetGeneratorParameters()._numIterations > 0)
-                    {
-                        lsystemParams.GetGeneratorParameters()._numIterations--;
-                        m_resetTree = true;
-                    }
-                    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-                    if (ImGui::ArrowButton("right", ImGuiDir_Right))
-                    {
-                        lsystemParams.GetGeneratorParameters()._numIterations++;
-                        m_resetTree = true;
-                    }
-                    ImGui::PopItemFlag();
-                    ImGui::SetNextItemWidth(24);
-                    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-                    ImGui::LabelText("Iterations", "%d", lsystemParams.GetGeneratorParameters()._numIterations);
-
-                    // Axiom and rules
-                    strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
-                    ImGui::InputText("Axiom", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
-                        ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &lsystemParams.GetGeneratorParameters()._axiom);
-
-                    for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
-                    {
-                        Rule& rule = lsystemParams.GetGeneratorParameters()._rules[r];
-                        ImGui::PushID(r);
-
-                        if (ImGui::TreeNodeEx("Rule", ImGuiTreeNodeFlags_DefaultOpen))
+                        const auto& model = static_cast<const GltfModelParams&>(params);
+                        ImGui::Text("Force lit: %s", model.forceLit ? "yes" : "no");
+                        if (model.asset)
                         {
-                            // Rule input
-                            if (!m_settings.isInUse(nextInputBuffer))
+                            ImGui::TextWrapped("Source: %s", model.asset->sourceFilename.c_str());
+                            ImGui::Text("glTF parts: %zu; meshes: %zu; textures: %zu",
+                                model.asset->renderParts.size(), model.asset->primitives.size(), model.asset->textures.size());
+                        }
+                    }
+
+                    if (ImGui::TreeNode("Render materials"))
+                    {
+                        std::set<const Material*> shown;
+                        for (const RenderUnit* unit : m_renderManager.GetRenderUnits())
+                        {
+                            if (std::find(unit->reservations.begin(), unit->reservations.end(), obj) == unit->reservations.end())
+                                continue;
+                            const Material* material = unit->m_material;
+                            if (!material || !shown.insert(material).second) continue;
+                            const std::string name = SceneData::Utf8Path(material->m_name);
+                            if (ImGui::TreeNodeEx(material, ImGuiTreeNodeFlags_None, "%s",
+                                name.empty() ? "Unnamed material" : name.c_str()))
                             {
-                                strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], rule.input.c_str());
+                                ImGui::Text("Skybox: %s; base texture bound: %s",
+                                    material->m_isSkybox ? "yes" : "no", material->m_texture ? "yes" : "no");
+                                ShowShaderMaterialDetails(material->m_shaderMaterial);
+                                ImGui::TreePop();
+                            }
+                        }
+                        if (shown.empty()) ImGui::TextUnformatted("No renderer-bound materials");
+                        ImGui::TreePop();
+                    }
+
+                    if (ImGui::TreeNode("Editable material parameters"))
+                    {
+                        for (size_t m = 0; m < params.materials.size(); ++m)
+                        {
+                            auto& mat = params.materials[m];
+                            ImGui::PushID(static_cast<int>(m));
+                            ImGui::Text("Material %zu", m);
+                            ImGui::PushItemWidth(200);
+                            ImGui::ColorEdit4("Diffuse", (float*)&mat.Diffuse, ImGuiColorEditFlags_Float);
+                            ImGui::ColorEdit4("Specular", (float*)&mat.Specular, ImGuiColorEditFlags_Float);
+                            ImGui::ColorEdit4("Ambient", (float*)&mat.Ambient, ImGuiColorEditFlags_Float);
+                            ImGui::ColorEdit4("Reflect", (float*)&mat.Reflect, ImGuiColorEditFlags_Float);
+                            ImGui::PopItemWidth();
+                            ImGui::PopID();
+                        }
+
+                        for (size_t t = 0; t < params.textureFilename.size(); ++t)
+                        {
+                            const std::string path = SceneData::Utf8Path(params.textureFilename[t]);
+                            ImGui::TextWrapped("Texture %zu: %s", t, path.c_str());
+                        }
+                        ImGui::TreePop();
+                    }
+
+                    if (params.generatorType == LSystemGeneratorType)
+                    {
+                        if (ImGui::TreeNodeEx("L System", ImGuiTreeNodeFlags_DefaultOpen))
+                        {
+                            WorldObjectParameters<LSystemParams>& lsystemParams = obj->GetParams<LSystemParams>();
+                            const auto& generator = lsystemParams.GetGeneratorParameters();
+                            const int remainingBuffers = static_cast<int>(_countof(m_settings.m_ruleTextEditBuffers)) - nextInputBuffer;
+                            bool canEdit = remainingBuffers > 0
+                                && generator._rules.size() <= static_cast<size_t>((remainingBuffers - 1) / 2)
+                                && generator._axiom.size() < m_settings.ruleTextBufferSize;
+                            for (const auto& rule : generator._rules)
+                                canEdit = canEdit && rule.input.size() < m_settings.ruleTextBufferSize
+                                    && rule.output.size() < m_settings.ruleTextBufferSize;
+                            if (!canEdit)
+                            {
+                                ImGui::TextWrapped("These rules exceed the live editor's capacity. Edit the scene JSON to change them.");
+                                ImGui::TreePop();
+                                ImGui::TreePop();
+                                ImGui::PopID();
+                                continue;
                             }
 
-                            ImGui::InputText("Input", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
-                                ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.input);
-
-                            // Rule output
-                            if (!m_settings.isInUse(nextInputBuffer))
+                            // Iterations - TODO: make this is common code
+                            ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
+                            if (ImGui::ArrowButton("left", ImGuiDir_Left) &&
+                                lsystemParams.GetGeneratorParameters()._numIterations > 0)
                             {
-                                strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], rule.output.c_str());
+                                lsystemParams.GetGeneratorParameters()._numIterations--;
+                                m_resetTree = true;
                             }
+                            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+                            if (ImGui::ArrowButton("right", ImGuiDir_Right))
+                            {
+                                lsystemParams.GetGeneratorParameters()._numIterations++;
+                                m_resetTree = true;
+                            }
+                            ImGui::PopItemFlag();
+                            ImGui::SetNextItemWidth(24);
+                            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+                            ImGui::LabelText("Iterations", "%d", lsystemParams.GetGeneratorParameters()._numIterations);
 
-                            ImGui::InputText("Output", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
-                                ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.output);
+                            // Axiom and rules
+                            strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], lsystemParams.GetGeneratorParameters()._axiom.c_str());
+                            ImGui::InputText("Axiom", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
+                                ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &lsystemParams.GetGeneratorParameters()._axiom);
 
-                            //ImGui::InputTextMultiline("Output", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
-                            //    ImVec2(0, 60), ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.output);
+                            for (int r = 0; r < lsystemParams.GetGeneratorParameters()._rules.size(); r++)
+                            {
+                                Rule& rule = lsystemParams.GetGeneratorParameters()._rules[r];
+                                ImGui::PushID(r);
 
-                            //ImGui::InputInt("Iterations", &rule.numIterations); TODO: Fix this!
+                                if (ImGui::TreeNodeEx("Rule", ImGuiTreeNodeFlags_DefaultOpen))
+                                {
+                                    // Rule input
+                                    if (!m_settings.isInUse(nextInputBuffer))
+                                    {
+                                        strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], rule.input.c_str());
+                                    }
 
+                                    ImGui::InputText("Input", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
+                                        ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.input);
+
+                                    // Rule output
+                                    if (!m_settings.isInUse(nextInputBuffer))
+                                    {
+                                        strcpy(m_settings.m_ruleTextEditBuffers[nextInputBuffer], rule.output.c_str());
+                                    }
+
+                                    ImGui::InputText("Output", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
+                                        ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.output);
+
+                                    //ImGui::InputTextMultiline("Output", m_settings.m_ruleTextEditBuffers[nextInputBuffer++], m_settings.ruleTextBufferSize,
+                                    //    ImVec2(0, 60), ImGuiInputTextFlags_CallbackEdit, RuleTextEditCallback, &rule.output);
+
+                                    //ImGui::InputInt("Iterations", &rule.numIterations); TODO: Fix this!
+
+                                    ImGui::TreePop();
+                                }
+                                ImGui::PopID();
+                            }
                             ImGui::TreePop();
                         }
-                        ImGui::PopID();
                     }
                     ImGui::TreePop();
                 }
+                ImGui::PopID();
             }
-            ImGui::PopID();
+            ImGui::TreePop();
         }
 
         m_settings.m_buffersInUse = nextInputBuffer;
