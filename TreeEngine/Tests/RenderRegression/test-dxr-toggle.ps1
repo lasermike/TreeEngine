@@ -14,7 +14,7 @@ $directory = Join-Path $PSScriptRoot ('Artifacts\toggle-' + [Guid]::NewGuid().To
 New-Item -ItemType Directory -Path $directory -Force | Out-Null
 $utf8 = New-Object Text.UTF8Encoding($false)
 foreach ($postProcessing in @($true, $false)) {
-  foreach ($scene in @('LoadSimpleBox', 'LoadAITree')) {
+  foreach ($scene in @('LoadSimpleBox', 'LoadTreeScene')) {
     $jobDirectory = Join-Path $directory "$scene-postprocessing-$postProcessing"
     New-Item -ItemType Directory -Path $jobDirectory -Force | Out-Null
     $first = Join-Path $jobDirectory 'dxr-before.png'
@@ -49,8 +49,8 @@ foreach ($postProcessing in @($true, $false)) {
         $rasterMatch = [TreeRenderTests.ImageComparison]::Compare($gold, $raster, (Join-Path $jobDirectory 'raster-diff.png'))
         if (-not $rasterMatch.SameDimensions -or $rasterMatch.Rms -gt 0.002) { throw 'Disabled DXR output differs from the raster baseline.' }
     }
-    if ($scene -in @('LoadAITree', 'LoadSimpleBox')) {
-        # The top strip contains only the skybox or scene clear color.
+    if ($scene -in @('LoadTreeScene', 'LoadSimpleBox')) {
+        # The top strip of the Tree scene contains the skybox; Simple Box uses the clear color.
         $dxrImage = New-Object Drawing.Bitmap($first)
         $rasterImage = New-Object Drawing.Bitmap($raster)
         try {
@@ -71,7 +71,7 @@ foreach ($postProcessing in @($true, $false)) {
             if ($skyRms -gt 0.002) {
                 throw "DXR background differs from raster: RMS=$skyRms."
             }
-            if ($scene -eq 'LoadAITree' -and $maxRed - $minRed -lt 10) {
+            if ($scene -eq 'LoadTreeScene' -and $maxRed - $minRed -lt 10) {
                 throw 'DXR skybox is missing.'
             }
             if ($scene -eq 'LoadSimpleBox' -and $maxRed - $minRed -gt 1) {

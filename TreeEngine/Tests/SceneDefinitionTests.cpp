@@ -485,10 +485,10 @@ int main(int argc, char** argv)
         auto& skyboxObject = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
         Check(skyboxObject.cubeMap && !skyboxObject.material.texture.empty(), "skybox changed");
         auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[5]);
-        Check(aiModel.source == "Models/Gltf/rocklandscape.glb" && aiModel.forceLit,
+        Check(aiModel.source == "Models/Gltf/terra.glb" && aiModel.forceLit,
             "AI tree imported model changed");
         Check(std::abs(ai.camera.rotation.w - 1.0f) < 1e-6f
-            && std::abs(ai.camera.position.z + 29.176f) < 1e-3f, "AI tree camera changed");
+            && std::abs(ai.camera.position.z + 77.0f) < 1e-3f, "AI tree camera changed");
 
         const std::pair<const char*, const char*> catalogScenes[] = {
             { "tree.scene.json", "Tree" },

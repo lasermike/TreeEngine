@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Executable, [switch]$Capacity)
+param([string]$Executable, [string]$CapacityExecutable, [switch]$Capacity)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -79,27 +79,55 @@ foreach ($scene in @('LoadTestTree', 'LoadTrees')) {
     }
 }
 if ($Capacity) {
+    # The expected overflow is a normal error in Release; Debug's HRR macro opens an assertion dialog.
+    if (-not $CapacityExecutable) {
+        $CapacityExecutable = Join-Path $PSScriptRoot '..\..\TreeClassic\bin\x64\Release\TreeClassic.exe'
+    }
+    $CapacityExecutable = (Resolve-Path -LiteralPath $CapacityExecutable).Path
     $runtime = Join-Path $directory 'capacity-runtime'
     New-Item -ItemType Directory -Path $runtime -Force | Out-Null
-    Copy-Item -Path (Join-Path (Split-Path $Executable) '*') -Destination $runtime -Recurse
-    $rules = @()
-    foreach ($pair in @(@('A', 'B'), @('B', 'C'), @('C', 'D'), @('D', 'F'))) {
-        $rules += @{ input = $pair[0]; output = (('[' + $pair[1] + ']') * 10) }
-    }
-    foreach ($count in @(10000, 10001)) {
-        $axiom = if ($count -eq 10000) { 'A' } else { 'A[F]' }
+    Copy-Item -Path (Join-Path (Split-Path $CapacityExecutable) '*') -Destination $runtime -Recurse
+    $modelDirectory = Join-Path $runtime 'Models\Gltf'
+    New-Item -ItemType Directory -Path $modelDirectory -Force | Out-Null
+    $vertexCapacity = 1200000
+    foreach ($count in @($vertexCapacity, ($vertexCapacity + 1))) {
+        # One indexed triangle and unused positions exercise the world-vertex boundary with one draw record.
+        $positionBytes = $count * 12
+        $bufferPath = Join-Path $modelDirectory 'capacity.bin'
+        $stream = [IO.File]::Open($bufferPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
+        $writer = New-Object IO.BinaryWriter($stream)
+        try {
+            $stream.SetLength($positionBytes + 6)
+            foreach ($coordinate in @(-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 0.0, 1.0, 0.0)) {
+                $writer.Write([single]$coordinate)
+            }
+            $stream.Position = $positionBytes
+            foreach ($index in @(0, 1, 2)) { $writer.Write([uint16]$index) }
+        } finally { $writer.Dispose() }
+        $model = @{
+            asset = @{ version = '2.0' }
+            buffers = @(@{ uri = 'capacity.bin'; byteLength = ($positionBytes + 6) })
+            bufferViews = @(
+                @{ buffer = 0; byteOffset = 0; byteLength = $positionBytes },
+                @{ buffer = 0; byteOffset = $positionBytes; byteLength = 6 })
+            accessors = @(
+                @{ bufferView = 0; componentType = 5126; count = $count; type = 'VEC3'; min = @(-1, -1, 0); max = @(1, 1, 0) },
+                @{ bufferView = 1; componentType = 5123; count = 3; type = 'SCALAR' })
+            meshes = @(@{ primitives = @(@{ attributes = @{ POSITION = 0 }; indices = 1; mode = 4 }) })
+            nodes = @(@{ mesh = 0 })
+            scenes = @(@{ nodes = @(0) })
+            scene = 0
+        }
+        [IO.File]::WriteAllText((Join-Path $modelDirectory 'capacity.gltf'), ($model | ConvertTo-Json -Depth 12), $utf8)
         $scene = @{
-            version = 1; name = 'Skinning capacity'; camera = @{ position = @(0, 1.5, -6) }
-            objects = @(@{
-                id = 'capacity-tree'; type = 'tree'; transform = @{ position = @(0, 0.5, 0) }
-                animationSpeed = 15; depthLOD = 20; trunkShape = 'skinnedCylinder'
-                generator = @{ axiom = $axiom; iterations = 1; segmentLength = 0.1; thickness = 0.01; rules = $rules }
-            })
+            version = 1; id = 'LoadTestTree'; name = 'DXR vertex capacity'
+            camera = @{ position = @(0, 0, -6) }
+            objects = @(@{ id = 'capacity-model'; type = 'model'; source = 'Models/Gltf/capacity.gltf' })
         }
         [IO.File]::WriteAllText((Join-Path $runtime 'Scenes\test-tree.scene.json'), ($scene | ConvertTo-Json -Depth 9), $utf8)
         $reportPath = Join-Path $runtime "$count-report.json"
         $request = @{
-            scene = 'LoadTestTree'; mode = 'raytracing'; seed = 12345; width = 32; height = 32
+            scene = 'LoadTestTree'; mode = 'raytracing'; seed = 12345; width = 640; height = 480
             warmupFrames = 0; benchmarkFrames = 1; postProcessing = $false; report = $reportPath
             captures = @(@{ time = 5; filename = (Join-Path $runtime "$count.png") })
         }
@@ -108,18 +136,18 @@ if ($Capacity) {
         $process = Start-Process -FilePath (Join-Path $runtime 'TreeClassic.exe') -ArgumentList @('--render-test', ('"' + $requestPath + '"')) -WorkingDirectory $runtime -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $runtime "$count-stderr.log")
         [void]$process.Handle
         if (-not $process.WaitForExit(120000)) {
-            $process.Kill(); $process.WaitForExit(); throw "Capacity test timed out: $count branches"
+            $process.Kill(); $process.WaitForExit(); throw "Capacity test timed out: $count vertices"
         }
-        if (-not (Test-Path -LiteralPath $reportPath)) { throw "Capacity worker crashed: $count branches" }
+        if (-not (Test-Path -LiteralPath $reportPath)) { throw "Capacity worker crashed: $count vertices" }
         $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
-        if ($count -eq 10000) {
-            if ($process.ExitCode -ne 0 -or -not $report.success -or $report.captures[0].samples[0].worldVertices -ne 600000) {
-                throw 'Exact 600,000-vertex capacity case failed.'
+        if ($count -eq $vertexCapacity) {
+            if ($process.ExitCode -ne 0 -or -not $report.success -or $report.captures[0].samples[0].worldVertices -ne $vertexCapacity) {
+                throw 'Exact 1,200,000-vertex capacity case failed.'
             }
         } elseif ($process.ExitCode -ne 3 -or $report.success -or $report.error -notmatch '2147942522') {
             throw 'Capacity overflow did not report ERROR_INSUFFICIENT_BUFFER.'
         }
     }
-    Write-Host 'Exact 600,000-vertex capacity and explicit overflow rejection passed.'
+    Write-Host 'Exact 1,200,000-vertex capacity and explicit overflow rejection passed.'
 }
 Write-Host "Skinning captures: $directory"

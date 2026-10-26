@@ -28,7 +28,8 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Exact cached/recomputed image parity through growth, mature time, LOD, and rewind.
 .\Tests\RenderRegression\test-tree-skinning.ps1
 
-# Also test exactly 600,000 DXR vertices and explicit overflow failure.
+# Also test exactly 1,200,000 DXR vertices and explicit overflow failure.
+# Requires a Release build for the expected overflow case.
 # Copies the deployed runtime into the ignored test artifacts directory.
 .\Tests\RenderRegression\test-tree-skinning.ps1 -Capacity
 
@@ -121,13 +122,14 @@ on the existing command list; it no longer creates a full-capacity temporary
 upload and waits for a separate upload batch every frame. Existing frame fences
 protect upload-buffer reuse. Deformation dispatches 128-thread groups with one
 writer per unique instance/vertex, rather than repeatedly transforming index
-entries. Capacity checks fail explicitly instead of clipping content.
+entries. Capacity checks use one generated glTF mesh at the 1,200,000-vertex limit and one vertex over.
+The expected overflow is tested in Release to avoid a headless Debug assertion dialog.
 
 The native capture request also accepts an optional `mode` on each capture
 point, overriding the request mode. `test-dxr-toggle.ps1` uses this to switch
 raytracing/raster/raytracing in the same process at a fixed time, checks that the
 two DXR images match, and verifies that disabling DXR restores raster output.
-It covers scenes with and without a skybox, and compares the AI Tree skybox
+It covers scenes with and without a skybox, and compares the Tree scene skybox
 region against raster output to verify its texture and orientation.
 For scenes without a skybox, DXR ray misses use the scene's clear color. The
 toggle test also checks that this background matches raster output.
