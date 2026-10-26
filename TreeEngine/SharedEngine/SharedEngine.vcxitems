@@ -45,6 +45,16 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\MetalRoughSpheres.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\MetalRoughSpheresNoTextures.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\NormalTangentMirrorTest.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\pond_with_waterfalls.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\rocklandscape.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\SpecularTest.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\static-scene.bin" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\static-scene.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\static-scene.gltf" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\terra.glb" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\ai-tree.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\curves.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\gltf-models.scene.json" />

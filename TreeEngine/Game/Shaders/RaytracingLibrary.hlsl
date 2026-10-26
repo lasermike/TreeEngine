@@ -398,7 +398,7 @@ void RayGenerationShader()
     ray.Origin = origin;
     ray.Direction = direction;
     ray.TMin = 0.001;
-    ray.TMax = 100.0;
+    ray.TMax = 200.0;
     RayPayload payload = { float4(0, 0, 0, 1), 0, 0 };
 
     uint missShaderIndex = 1;
