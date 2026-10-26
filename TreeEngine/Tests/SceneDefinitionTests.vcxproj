@@ -40,9 +40,10 @@
     <GltfAsset Include="Assets\Gltf\*.*" />
     <None Include="@(SceneJson)" />
     <None Include="@(GltfAsset)" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <Import Project="..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets" />
+  <Import Project="..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" />
   <Target Name="CopySceneTestData" AfterTargets="Build">
     <Copy SourceFiles="@(SceneJson)"
           DestinationFolder="$(OutDir)TestData\"
