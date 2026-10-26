@@ -83,6 +83,31 @@ void TestSpecularExtension()
         "specular default strength or required extension import failed");
     Check(defaultMat.shaderMaterial.specularColor.x == 1 && defaultMat.specularTextureIndex == -1,
         "specular default color or missing texture changed");
+    Check(defaultMat.shaderMaterial.uvTransformRow0[BaseColorTextureRole].x == 1.0f
+        && defaultMat.shaderMaterial.uvTransformRow1[NormalTextureRole].y == 1.0f,
+        "default texture transforms are not identity");
+    auto iorFixture = fixture;
+    iorFixture["extensionsUsed"].push_back("KHR_materials_ior");
+    iorFixture["extensionsRequired"].push_back("KHR_materials_ior");
+    iorFixture["materials"][0]["extensions"]["KHR_materials_ior"] = { { "ior", 1.3333 } };
+    auto water = load(iorFixture);
+    Check(std::abs(water->materials[0].shaderMaterial.opticalParams.x - 1.3333f) < 1e-4f, "IOR was not imported");
+    iorFixture["materials"][0]["extensions"]["KHR_materials_ior"] = Json::object();
+    auto defaultIor = load(iorFixture);
+    Check(defaultIor->materials[0].shaderMaterial.opticalParams.x == 1.5f, "default IOR changed");
+    iorFixture["materials"][0]["extensions"]["KHR_materials_ior"]["ior"] = 0.0;
+    Check(load(iorFixture)->materials[0].shaderMaterial.opticalParams.x == 0.0f, "zero IOR compatibility mode was lost");
+    iorFixture["materials"][0]["extensions"]["KHR_materials_ior"]["ior"] = 0.5;
+    reject(iorFixture, "KHR_materials_ior.ior");
+    iorFixture["materials"][0]["extensions"]["KHR_materials_ior"]["ior"] = 1.3333;
+    iorFixture["extensionsUsed"].push_back("KHR_materials_transmission");
+    iorFixture["extensionsRequired"].push_back("KHR_materials_transmission");
+    iorFixture["materials"][0]["extensions"]["KHR_materials_transmission"] = { { "transmissionFactor", 1.0 } };
+    auto transmissive = load(iorFixture);
+    Check(transmissive->materials[0].alphaBlend && transmissive->materials[0].shaderMaterial.opticalParams.y == 1.0f,
+        "transmission factor did not enable the raster fallback");
+    iorFixture["materials"][0]["extensions"]["KHR_materials_transmission"]["transmissionFactor"] = 1.1;
+    reject(iorFixture, "transmissionFactor");
     auto& spec = material["extensions"]["KHR_materials_specular"];
     spec["specularFactor"] = 0;
     spec["specularColorFactor"] = { 2.0, 0.5, 0.25 };
@@ -128,6 +153,51 @@ void TestSpecularExtension()
     Check(clamped->materials[0].shaderMaterial.specularTextures.z == 1 &&
         clamped->materials[0].shaderMaterial.specularTextures.w == 1, "specular clamp modes lost");
     Check(clamped->materials[0].shaderMaterial.metallicRoughnessTextures.y == 1, "metallic-roughness clamp mode lost");
+    auto transformedFixture = fixture;
+    transformedFixture["extensionsUsed"].push_back("KHR_texture_transform");
+    transformedFixture["extensionsRequired"].push_back("KHR_texture_transform");
+    auto& transformedMaterial = transformedFixture["materials"][0];
+    transformedMaterial["pbrMetallicRoughness"]["baseColorTexture"]["extensions"]["KHR_texture_transform"] =
+        { { "offset", { 0.25, 0.5 } }, { "rotation", 1.5707963267948966 }, { "scale", { 2.0, 3.0 } } };
+    transformedMaterial["pbrMetallicRoughness"]["metallicRoughnessTexture"]["extensions"]["KHR_texture_transform"] =
+        { { "scale", { 4.0, 5.0 } } };
+    transformedMaterial["normalTexture"]["extensions"]["KHR_texture_transform"] =
+        { { "offset", { 0.0, -9.0 } }, { "scale", { 10.0, 10.0 } } };
+    transformedMaterial["extensions"]["KHR_materials_specular"]["specularTexture"]["extensions"]["KHR_texture_transform"] =
+        { { "offset", { 0.1, 0.2 } } };
+    transformedMaterial["extensions"]["KHR_materials_specular"]["specularColorTexture"]["texCoord"] = 1;
+    transformedMaterial["extensions"]["KHR_materials_specular"]["specularColorTexture"]["extensions"]["KHR_texture_transform"] =
+        { { "scale", { -1.0, 1.0 } }, { "offset", { 1.0, 0.0 } }, { "texCoord", 0 } };
+    auto transformed = load(transformedFixture);
+    const auto& uv = transformed->materials[0].shaderMaterial;
+    Check(std::abs(uv.uvTransformRow0[BaseColorTextureRole].x) < 1e-5f
+        && std::abs(uv.uvTransformRow0[BaseColorTextureRole].y + 3.0f) < 1e-5f
+        && std::abs(uv.uvTransformRow0[BaseColorTextureRole].z - 0.25f) < 1e-5f
+        && std::abs(uv.uvTransformRow1[BaseColorTextureRole].x - 2.0f) < 1e-5f
+        && std::abs(uv.uvTransformRow1[BaseColorTextureRole].z - 0.5f) < 1e-5f,
+        "base-color UV rotation, scale, or offset was imported incorrectly");
+    Check(uv.uvTransformRow0[MetallicRoughnessTextureRole].x == 4.0f
+        && uv.uvTransformRow1[MetallicRoughnessTextureRole].y == 5.0f
+        && uv.uvTransformRow0[NormalTextureRole].x == 10.0f
+        && uv.uvTransformRow1[NormalTextureRole].z == -9.0f,
+        "independent metallic-roughness or normal UV transform was lost");
+    Check(std::abs(uv.uvTransformRow0[SpecularStrengthTextureRole].z - 0.1f) < 1e-6f
+        && uv.uvTransformRow0[SpecularColorTextureRole].x == -1.0f
+        && uv.uvTransformRow0[SpecularColorTextureRole].z == 1.0f,
+        "specular texture transform or texCoord override was lost");
+    ShaderMaterial legacyScale;
+    legacyScale.ApplyTextureCoordScale(2.0f, 3.0f);
+    Check(legacyScale.uvTransformRow0[BaseColorTextureRole].x == 2.0f
+        && legacyScale.uvTransformRow1[BaseColorTextureRole].y == 3.0f
+        && legacyScale.uvTransformRow0[NormalTextureRole].x == 2.0f,
+        "legacy UV scale was not folded into every texture row");
+    ShaderMaterial composed = uv;
+    composed.ApplyTextureCoordScale(2.0f, 3.0f);
+    Check(std::abs(composed.uvTransformRow0[BaseColorTextureRole].y + 9.0f) < 1e-5f
+        && std::abs(composed.uvTransformRow1[BaseColorTextureRole].x - 4.0f) < 1e-5f
+        && std::abs(composed.uvTransformRow0[BaseColorTextureRole].z - 0.25f) < 1e-5f
+        && composed.uvTransformRow0[NormalTextureRole].x == 20.0f,
+        "shared scale was not composed before the authored texture transform");
     bad = fixture;
     bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularFactor"] = -0.1;
     reject(bad, "specularFactor");
@@ -148,9 +218,9 @@ void TestSpecularExtension()
     bad = fixture;
     bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularTexture"]["texCoord"] = 1;
     reject(bad, "TEXCOORD_1");
-    bad = fixture;
-    bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularColorTexture"]["extensions"]["KHR_texture_transform"] = Json::object();
-    reject(bad, "KHR_texture_transform");
+    bad = transformedFixture;
+    bad["materials"][0]["extensions"]["KHR_materials_specular"]["specularColorTexture"]["extensions"]["KHR_texture_transform"]["texCoord"] = 1;
+    reject(bad, "TEXCOORD_1");
     bad = fixture;
     bad["extensionsRequired"].push_back("UNKNOWN_test_extension");
     reject(bad, "UNKNOWN_test_extension");
@@ -162,6 +232,14 @@ int main(int argc, char** argv)
 {
     try
     {
+        if (argc == 3 && std::string(argv[1]) == "--gltf-only")
+        {
+            auto asset = LoadGltfAsset(argv[2]);
+            Check(!asset->materials.empty() && !asset->renderParts.empty(), "glTF model has no renderable material");
+            std::cout << "Imported " << asset->materials.size() << " materials and "
+                << asset->renderParts.size() << " render parts\n";
+            return 0;
+        }
         RunScenePersistenceTests();
         if (argc > 1 && std::string(argv[1]) == "--persistence-only") return 0;
         TestSpecularExtension();

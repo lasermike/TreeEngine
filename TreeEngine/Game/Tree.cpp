@@ -81,8 +81,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     auto shaderMaterials = _params->materials;
     for (auto& material : shaderMaterials)
     {
-        material.textureCoordScale.x *= _params->textureCoordScale.x;
-        material.textureCoordScale.y *= _params->textureCoordScale.y;
+        material.ApplyTextureCoordScale(_params->textureCoordScale.x, _params->textureCoordScale.y);
     }
     const std::wstring branchLOD0MaterialName = L"BranchLOD0_" + std::to_wstring(_id);
     const std::wstring branchLOD1MaterialName = L"BranchLOD1_" + std::to_wstring(_id);

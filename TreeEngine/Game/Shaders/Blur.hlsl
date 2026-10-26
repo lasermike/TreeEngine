@@ -53,12 +53,14 @@ struct DrawRecord
     float4 matSpecular;
     float4 matReflect;
     float4 matFlags;
-    float4 matTextureCoordScale;
     float4 matSpecularParams;
     float4 matSpecularColor;
     float4 matSpecularTextures;
     float4 matNormalTextures;
     float4 matMetallicRoughnessTextures;
+    float4 matOpticalParams;
+    float4 matUvTransformRow0[5];
+    float4 matUvTransformRow1[5];
     int textureIndex;
 };
 

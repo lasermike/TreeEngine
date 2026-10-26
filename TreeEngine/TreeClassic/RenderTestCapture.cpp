@@ -68,7 +68,7 @@ namespace
             object->SetPosition(DirectX::XMVectorSet(4, 5, 6, 1));
             params.textureCoordScale = { 2, 3 };
             params.materials.at(0).Diffuse = { 0.25f, 0.5f, 0.75f, 1 };
-            params.materials.at(0).textureCoordScale = { 4, 5, 1, 1 };
+            params.materials.at(0).ApplyTextureCoordScale(4, 5);
             auto& generator = object->GetParams<LSystemParams>().GetGeneratorParameters();
             generator._axiom = "F[+F]";
             generator._rules = { Rule("F", 2, "FF") };

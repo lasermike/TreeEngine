@@ -56,8 +56,7 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 
     // Create material, mesh, and reserve render unit
     ShaderMaterial shaderMaterial = _params->materials[0];
-    shaderMaterial.textureCoordScale.x *= _params->textureCoordScale.x;
-    shaderMaterial.textureCoordScale.y *= _params->textureCoordScale.y;
+    shaderMaterial.ApplyTextureCoordScale(_params->textureCoordScale.x, _params->textureCoordScale.y);
     Material* newMaterial = nullptr;
     StockRenderState renderState;
     if (_params->cubeMap)

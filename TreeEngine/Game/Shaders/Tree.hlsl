@@ -32,17 +32,24 @@ ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
     if (material.specularParams.x > 0)
     {
         if (material.specularTextures.x >= 0)
+        {
+            float2 strengthUv = TransformMaterialUv(material, uv, SpecularStrengthTextureRole);
             material.specularParams.w *= material.specularTextures.z > 0
-                ? txSpecular.Sample(samLinearClamp, uv).a : txSpecular.Sample(samLinearWrap, uv).a;
+                ? txSpecular.Sample(samLinearClamp, strengthUv).a : txSpecular.Sample(samLinearWrap, strengthUv).a;
+        }
         if (material.specularTextures.y >= 0)
+        {
+            float2 colorUv = TransformMaterialUv(material, uv, SpecularColorTextureRole);
             material.specularColor.rgb *= material.specularTextures.w > 0
-                ? txSpecularColor.Sample(samLinearClamp, uv).rgb : txSpecularColor.Sample(samLinearWrap, uv).rgb;
+                ? txSpecularColor.Sample(samLinearClamp, colorUv).rgb : txSpecularColor.Sample(samLinearWrap, colorUv).rgb;
+        }
     }
     if (material.metallicRoughnessTextures.x >= 0)
     {
+        float2 metallicRoughnessUv = TransformMaterialUv(material, uv, MetallicRoughnessTextureRole);
         float4 mr = (material.metallicRoughnessTextures.y > 0
-            ? txMetallicRoughness.Sample(samLinearClamp, uv)
-            : txMetallicRoughness.Sample(samLinearWrap, uv));
+            ? txMetallicRoughness.Sample(samLinearClamp, metallicRoughnessUv)
+            : txMetallicRoughness.Sample(samLinearWrap, metallicRoughnessUv));
         material.specularParams.y *= mr.b;
         material.specularParams.z *= mr.g;
     }
@@ -244,9 +251,10 @@ float4 PS(PS_INPUT input) : SV_Target
     float4 textureColor;
     if (mat.flags.y > 0)  //use texture
     {
+        float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
         textureColor = (mat.specularParams.x > 0 && mat.specularColor.w > 0
-            ? txDiffuse.Sample(samLinearClamp, input.Tex * mat.textureCoordScale.xy)
-            : txDiffuse.Sample(samLinearWrap, input.Tex * mat.textureCoordScale.xy));
+            ? txDiffuse.Sample(samLinearClamp, baseColorUv)
+            : txDiffuse.Sample(samLinearWrap, baseColorUv));
 
         if (mat.flags.z > 0)  // clip alpha threshold
         {
@@ -264,15 +272,18 @@ float4 PS(PS_INPUT input) : SV_Target
         return color;
     }
 
-    float2 materialUv = input.Tex * mat.textureCoordScale.xy;
-    ShaderMaterial sampledMaterial = SampleSpecularMaterial(mat, materialUv);
+    ShaderMaterial sampledMaterial = SampleSpecularMaterial(mat, input.Tex);
     if (mat.normalTextures.x >= 0)
     {
+        float2 normalUv = TransformMaterialUv(mat, input.Tex, NormalTextureRole);
         float3 tangentNormal = (mat.normalTextures.z > 0
-            ? txNormal.Sample(samLinearClamp, materialUv)
-            : txNormal.Sample(samLinearWrap, materialUv)).xyz * 2.0f - 1.0f;
+            ? txNormal.Sample(samLinearClamp, normalUv)
+            : txNormal.Sample(samLinearWrap, normalUv)).xyz * 2.0f - 1.0f;
         tangentNormal.xy *= mat.normalTextures.y;
-        float3x3 normalTbn = float3x3(normalize(input.T), normalize(input.B), normalize(input.N));
+        float3 tangent = normalize(input.T);
+        float3 bitangent = normalize(input.B);
+        TransformNormalBasis(mat, tangent, bitangent);
+        float3x3 normalTbn = float3x3(tangent, bitangent, normalize(input.N));
         normal = normalize(mul(tangentNormal, normalTbn));
     }
     // Only the first light casts a shadow.
@@ -296,6 +307,7 @@ float4 PS(PS_INPUT input) : SV_Target
     }
 
     float4 litColor = ambient + diffuse + spec;
+    float3 specularIbl = 0.0f;
     if (sampledMaterial.specularParams.x > 0)
     {
         uint cubeWidth, cubeHeight, mipCount;
@@ -307,12 +319,24 @@ float4 PS(PS_INPUT input) : SV_Target
             roughness * (mipCount - 1)).rgb;
         litColor.rgb += ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
             normal, toEye, irradiance, prefiltered);
+        if (mat.opticalParams.y > 0.0f)
+            specularIbl = ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
+                normal, toEye, 0.0f, prefiltered);
     }
 
     if (mat.flags.x > 0)
         litColor.a = mat.Diffuse.a * textureColor.a;
     if (mat.specularParams.x > 0)
         litColor.rgb = EncodeGltfDisplayColor(litColor.rgb);
+    if (mat.opticalParams.y > 0.0f)
+    {
+        // Alpha blend fallback for transmission: keep reflected light while
+        // displaying opaque scene geometry through the surface.
+        float opacity = 1.0f - 0.9f * saturate(mat.opticalParams.y);
+        float3 reflection = EncodeGltfDisplayColor(spec.rgb + specularIbl);
+        litColor.rgb = lerp(litColor.rgb, reflection / opacity, mat.opticalParams.y);
+        litColor.a *= opacity;
+    }
 
     return litColor;
 }
@@ -357,9 +381,10 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
 {
     if (mat.flags.z > 0)  // clip alpha threshold
     {
+        float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
         float4 textureColor = (mat.specularParams.x > 0 && mat.specularColor.w > 0
-            ? txDiffuse.Sample(samLinearClamp, input.Tex * mat.textureCoordScale.xy)
-            : txDiffuse.Sample(samLinearWrap, input.Tex * mat.textureCoordScale.xy));
+            ? txDiffuse.Sample(samLinearClamp, baseColorUv)
+            : txDiffuse.Sample(samLinearWrap, baseColorUv));
 
         // Don't write transparent pixels to the shadow map.
         clip(textureColor.a - mat.flags.z);

@@ -208,7 +208,8 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 
     for (auto object : ru->reservations)
     {
-        if (pass == ShadowMapPass && object->GetObjectType() == ObjectType_Primitive)
+        if (pass == ShadowMapPass && (object->GetObjectType() == ObjectType_Primitive
+            || ru->m_material->m_shaderMaterial.opticalParams.y > 0.0f))
             continue;
 
         UINT startInstance = m_perFrameInstanceData[ru][object].first;

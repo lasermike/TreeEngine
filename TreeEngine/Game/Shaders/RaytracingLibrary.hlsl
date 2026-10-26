@@ -51,6 +51,8 @@ cbuffer Params : register(b0)
 struct RayPayload
 {
     float4 color;
+    uint depth;
+    uint isShadow;
 };
 
 // SimpleVertex: Position(float3=12), Normal(float3=12), Tex(float2=8), Tangent(float4=16) = 48 bytes
@@ -130,6 +132,12 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
     ShaderMaterial mat = materialBuffer[geomIndex];
     DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
 
+    if (payload.isShadow != 0 && mat.opticalParams.y > 0.0f)
+    {
+        IgnoreHit();
+        return;
+    }
+
     // Alpha-blended glTF geometry already has mirrored back-facing triangles.
     // Cull their back faces to avoid coplanar hits with opposite normals.
     if ((mat.flags.z == 0 || mat.flags.x > 0) && HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
@@ -154,7 +162,7 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 
         float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
 
-        float4 textureColor = SampleSpecularTexture(geoInfo.textureIndex, texCoord * mat.textureCoordScale.xy, mat.specularParams.x > 0 && mat.specularColor.w > 0);
+        float4 textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularParams.x > 0 && mat.specularColor.w > 0);
 
         if (textureColor.a < mat.flags.z)
         {
@@ -199,10 +207,11 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 
     if (mat.normalTextures.x >= 0)
     {
-        float2 normalUv = texCoord * mat.textureCoordScale.xy;
+        float2 normalUv = TransformMaterialUv(mat, texCoord, NormalTextureRole);
         float3 tangentNormal = SampleSpecularTexture((int)mat.normalTextures.x, normalUv, mat.normalTextures.z > 0).xyz * 2.0f - 1.0f;
         tangentNormal.xy *= mat.normalTextures.y;
         float3 binormal = normalize(cross(normal, tangent)) * (tangentData.w < 0 ? -1.0f : 1.0f);
+        TransformNormalBasis(mat, tangent, binormal);
         normal = normalize(tangentNormal.x * tangent + tangentNormal.y * binormal + tangentNormal.z * normal);
     }
 
@@ -213,7 +222,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float4 textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
     if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
     {
-        textureColor = SampleSpecularTexture(geoInfo.textureIndex, texCoord * mat.textureCoordScale.xy, mat.specularParams.x > 0 && mat.specularColor.w > 0);
+        textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularParams.x > 0 && mat.specularColor.w > 0);
     }
 
     if (mat.flags.w > 0)
@@ -240,7 +249,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     // If the ray misses all geometry, ShadowMissShader sets it to 1 (lit).
     // RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH + RAY_FLAG_SKIP_CLOSEST_HIT_SHADER
     // makes the shadow ray stop at the first blocker and skip ClosestHit.
-    RayPayload shadowPayload = { float4(0, 0, 0, 0) };
+    RayPayload shadowPayload = { float4(0, 0, 0, 0), payload.depth + 1, 1 };
     uint shadowMissIndex = 0;
     TraceRay(Scene,
         RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
@@ -249,14 +258,20 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 
     if (mat.specularParams.x > 0)
     {
-        float2 uv = texCoord * mat.textureCoordScale.xy;
         if (mat.specularTextures.x >= 0)
-            mat.specularParams.w *= SampleSpecularTexture((int)mat.specularTextures.x, uv, mat.specularTextures.z > 0).a;
+        {
+            float2 strengthUv = TransformMaterialUv(mat, texCoord, SpecularStrengthTextureRole);
+            mat.specularParams.w *= SampleSpecularTexture((int)mat.specularTextures.x, strengthUv, mat.specularTextures.z > 0).a;
+        }
         if (mat.specularTextures.y >= 0)
-            mat.specularColor.rgb *= SampleSpecularTexture((int)mat.specularTextures.y, uv, mat.specularTextures.w > 0).rgb;
+        {
+            float2 colorUv = TransformMaterialUv(mat, texCoord, SpecularColorTextureRole);
+            mat.specularColor.rgb *= SampleSpecularTexture((int)mat.specularTextures.y, colorUv, mat.specularTextures.w > 0).rgb;
+        }
         if (mat.metallicRoughnessTextures.x >= 0)
         {
-            float4 mr = SampleSpecularTexture((int)mat.metallicRoughnessTextures.x, uv, mat.metallicRoughnessTextures.y > 0);
+            float2 metallicRoughnessUv = TransformMaterialUv(mat, texCoord, MetallicRoughnessTextureRole);
+            float4 mr = SampleSpecularTexture((int)mat.metallicRoughnessTextures.x, metallicRoughnessUv, mat.metallicRoughnessTextures.y > 0);
             mat.specularParams.y *= mr.b;
             mat.specularParams.z *= mr.g;
         }
@@ -271,7 +286,36 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
             roughness * (mipCount - 1)).rgb;
         float3 ibl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
             irradiance, prefiltered);
-        payload.color = float4(EncodeGltfDisplayColor((A + shadowFactor * (D + S)).rgb + ibl), 1);
+        float3 surfaceColor = (A + shadowFactor * (D + S)).rgb + ibl;
+        if (mat.opticalParams.y > 0.0f && payload.depth == 0)
+        {
+            // Trace once through the thin surface to reveal opaque scene geometry.
+            // The exit interface and multiple transmissive layers remain approximated.
+            float3 incident = normalize(WorldRayDirection());
+            bool entering = dot(incident, normal) < 0.0f;
+            float3 faceNormal = entering ? normal : -normal;
+            float ior = max(mat.opticalParams.x, 1.0f);
+            float3 direction = refract(incident, faceNormal, entering ? 1.0f / ior : ior);
+            if (dot(direction, direction) < 1e-8f)
+                direction = reflect(incident, faceNormal);
+            RayDesc transmittedRay;
+            transmittedRay.Origin = hitPos + direction * 0.001f;
+            transmittedRay.Direction = direction;
+            transmittedRay.TMin = 0.001f;
+            transmittedRay.TMax = 100.0f;
+            RayPayload transmitted = { float4(0, 0, 0, 1), payload.depth + 1, 0 };
+            TraceRay(Scene, rayFlags, ~0, 0, 0, 1, transmittedRay, transmitted);
+            float3 specularIbl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
+                float3(0, 0, 0), prefiltered);
+            float3 reflection = EncodeGltfDisplayColor((shadowFactor * S).rgb + specularIbl);
+            float f0 = ComputeDielectricF0(mat.opticalParams.x);
+            float fresnel = f0 + (1.0f - f0) * pow(1.0f - saturate(dot(normal, toEye)), 5.0f);
+            float3 throughColor = transmitted.color.rgb * mat.Diffuse.rgb * textureColor.rgb * (1.0f - fresnel);
+            payload.color = float4(lerp(EncodeGltfDisplayColor(surfaceColor), reflection + throughColor,
+                saturate(mat.opticalParams.y)), 1);
+        }
+        else
+            payload.color = float4(EncodeGltfDisplayColor(surfaceColor), 1);
         return;
     }
 
@@ -355,7 +399,7 @@ void RayGenerationShader()
     ray.Direction = direction;
     ray.TMin = 0.001;
     ray.TMax = 100.0;
-    RayPayload payload = { float4(0, 0, 0, 1) };
+    RayPayload payload = { float4(0, 0, 0, 1), 0, 0 };
 
     uint missShaderIndex = 1;
     TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, ray, payload);

@@ -308,7 +308,10 @@ namespace
     void ValidateRequiredExtensions(const std::string& filename, const cgltf_data& data)
     {
         for (size_t i = 0; i < data.extensions_required_count; ++i)
-            if (strcmp(data.extensions_required[i], "KHR_materials_specular") != 0)
+            if (strcmp(data.extensions_required[i], "KHR_materials_specular") != 0
+                && strcmp(data.extensions_required[i], "KHR_materials_ior") != 0
+                && strcmp(data.extensions_required[i], "KHR_materials_transmission") != 0
+                && strcmp(data.extensions_required[i], "KHR_texture_transform") != 0)
                 ImportError(filename, std::string("required glTF extension not supported: ") + data.extensions_required[i]);
     }
 
@@ -393,8 +396,8 @@ namespace
 
         size_t materialIndex = PointerIndex(material, data.materials, sizeof(cgltf_material));
         std::string materialName = NameOrIndex(material->name, "material", materialIndex);
-        if (material->has_pbr_specular_glossiness || material->has_clearcoat || material->has_transmission
-            || material->has_volume || material->has_ior || material->has_sheen
+        if (material->has_pbr_specular_glossiness || material->has_clearcoat
+            || material->has_volume || material->has_sheen
             || material->has_emissive_strength || material->has_iridescence || material->has_diffuse_transmission
             || material->has_anisotropy || material->has_dispersion)
             ImportError(filename, materialName + " uses an unsupported material extension");
@@ -431,6 +434,34 @@ namespace
         result.shaderMaterial.flags.w = material->unlit ? 1.0f : 0.0f;
         result.doubleSided = material->double_sided != 0;
 
+        if (material->has_ior)
+        {
+            const float ior = material->ior.ior;
+            if (material->unlit)
+                ImportError(filename, materialName + " combines KHR_materials_ior with KHR_materials_unlit");
+            if (!std::isfinite(ior) || (ior != 0.0f && ior < 1.0f))
+                ImportError(filename, materialName + " KHR_materials_ior.ior must be zero or at least one");
+            result.shaderMaterial.opticalParams.x = ior;
+        }
+
+        if (material->has_transmission)
+        {
+            const auto& transmission = material->transmission;
+            if (material->unlit)
+                ImportError(filename, materialName + " combines KHR_materials_transmission with KHR_materials_unlit");
+            if (!std::isfinite(transmission.transmission_factor) || transmission.transmission_factor < 0.0f
+                || transmission.transmission_factor > 1.0f)
+                ImportError(filename, materialName + " transmissionFactor must be in [0, 1]");
+            if (transmission.transmission_texture.texture)
+                ImportError(filename, materialName + " uses unsupported transmissionTexture");
+            result.shaderMaterial.opticalParams.y = transmission.transmission_factor;
+            if (transmission.transmission_factor > 0.0f)
+            {
+                result.alphaBlend = true; // Raster fallback: display opaque geometry through the surface.
+                result.shaderMaterial.flags.x = 1.0f;
+            }
+        }
+
         if (material->has_specular)
         {
             const auto& spec = material->specular;
@@ -446,14 +477,29 @@ namespace
                 spec.specular_color_factor[1], spec.specular_color_factor[2], 0);
         }
 
-        auto importView = [&](const cgltf_texture_view& textureView, int colorSpace, bool& wrap) -> int
+        auto importView = [&](const cgltf_texture_view& textureView, int colorSpace, bool& wrap,
+            MaterialTextureRole role) -> int
         {
             if (textureView.texture)
             {
-                if (textureView.texcoord != 0)
-                    ImportError(filename, materialName + " uses unsupported texture coordinate set TEXCOORD_" + std::to_string(textureView.texcoord));
+                const int texcoord = textureView.has_transform && textureView.transform.has_texcoord
+                    ? textureView.transform.texcoord : textureView.texcoord;
+                if (texcoord != 0)
+                    ImportError(filename, materialName + " uses unsupported texture coordinate set TEXCOORD_" + std::to_string(texcoord));
                 if (textureView.has_transform)
-                    ImportError(filename, materialName + " uses unsupported KHR_texture_transform");
+                {
+                    const auto& transform = textureView.transform;
+                    if (!std::isfinite(transform.offset[0]) || !std::isfinite(transform.offset[1])
+                        || !std::isfinite(transform.rotation)
+                        || !std::isfinite(transform.scale[0]) || !std::isfinite(transform.scale[1]))
+                        ImportError(filename, materialName + " KHR_texture_transform values must be finite");
+                    const float cosine = std::cos(transform.rotation);
+                    const float sine = std::sin(transform.rotation);
+                    result.shaderMaterial.uvTransformRow0[role] = XMFLOAT4(
+                        cosine * transform.scale[0], -sine * transform.scale[1], transform.offset[0], 0);
+                    result.shaderMaterial.uvTransformRow1[role] = XMFLOAT4(
+                        sine * transform.scale[0], cosine * transform.scale[1], transform.offset[1], 0);
+                }
                 const auto* texture = textureView.texture;
                 if (texture->sampler)
                 {
@@ -501,17 +547,17 @@ namespace
             }
             return -1;
         };
-        result.textureIndex = importView(pbr.base_color_texture, 2, result.wrapTexture);
+        result.textureIndex = importView(pbr.base_color_texture, 2, result.wrapTexture, BaseColorTextureRole);
         result.shaderMaterial.specularColor.w = result.wrapTexture ? 0.0f : 1.0f;
         bool metallicRoughnessWrap = true;
-        result.metallicRoughnessTextureIndex = importView(pbr.metallic_roughness_texture, 1, metallicRoughnessWrap);
+        result.metallicRoughnessTextureIndex = importView(pbr.metallic_roughness_texture, 1, metallicRoughnessWrap, MetallicRoughnessTextureRole);
         result.shaderMaterial.metallicRoughnessTextures.y = metallicRoughnessWrap ? 0.0f : 1.0f;
         if (material->normal_texture.texture)
         {
             if (!std::isfinite(material->normal_texture.scale) || material->normal_texture.scale < 0)
                 ImportError(filename, materialName + " normalTexture.scale must be finite and nonnegative");
             bool normalWrap = true;
-            result.normalTextureIndex = importView(material->normal_texture, 1, normalWrap);
+            result.normalTextureIndex = importView(material->normal_texture, 1, normalWrap, NormalTextureRole);
             result.shaderMaterial.normalTextures.y = material->normal_texture.scale;
             result.shaderMaterial.normalTextures.z = normalWrap ? 0.0f : 1.0f;
         }
@@ -519,8 +565,8 @@ namespace
         if (material->has_specular)
         {
             bool strengthWrap = true, colorWrap = true;
-            result.specularTextureIndex = importView(material->specular.specular_texture, 1, strengthWrap);
-            result.specularColorTextureIndex = importView(material->specular.specular_color_texture, 2, colorWrap);
+            result.specularTextureIndex = importView(material->specular.specular_texture, 1, strengthWrap, SpecularStrengthTextureRole);
+            result.specularColorTextureIndex = importView(material->specular.specular_color_texture, 2, colorWrap, SpecularColorTextureRole);
             result.shaderMaterial.specularTextures.z = strengthWrap ? 0.0f : 1.0f;
             result.shaderMaterial.specularTextures.w = colorWrap ? 0.0f : 1.0f;
             result.shaderMaterial.specularColor.w = result.wrapTexture ? 0.0f : 1.0f;

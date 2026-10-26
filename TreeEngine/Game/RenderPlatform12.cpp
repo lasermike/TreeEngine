@@ -2226,10 +2226,10 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
     // Configure the shaders and pipeline
     {
         auto shaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-        shaderConfig->Config(sizeof(float) * 4, 8);  // maximum payload size (float4 color = 16 bytes), and the maximum attribute size (both in bytes).
+        shaderConfig->Config(sizeof(float) * 4 + sizeof(UINT) * 2, 8);  // RayPayload color, depth, and shadow flag.
 
         auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-        UINT maxRecursionDepth = 2;  // Primary ray + shadow ray
+        UINT maxRecursionDepth = 3;  // Primary, transmitted, and shadow rays
         pipelineConfig->Config(maxRecursionDepth);
     }
 

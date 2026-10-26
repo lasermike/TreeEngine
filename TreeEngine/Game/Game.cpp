@@ -714,7 +714,8 @@ void ShowShaderMaterialDetails(const ShaderMaterial& material)
     ShowMaterialVector("Specular (w = exponent)", material.Specular);
     ShowMaterialVector("Reflect", material.Reflect);
     ShowMaterialVector("Flags (blend, texture, clip, unlit)", material.flags);
-    ShowProperty("UV scale", std::to_string(material.textureCoordScale.x) + ", " + std::to_string(material.textureCoordScale.y));
+    ShowMaterialVector("Base UV matrix row 0", material.uvTransformRow0[BaseColorTextureRole]);
+    ShowMaterialVector("Base UV matrix row 1", material.uvTransformRow1[BaseColorTextureRole]);
     ShowMaterialVector("PBR (enabled, metal, rough, specular)", material.specularParams);
     ShowMaterialVector("Specular color", material.specularColor);
     ShowMaterialVector("Specular textures", material.specularTextures);
@@ -905,6 +906,8 @@ void ShowGltfInspector(const GltfAsset& asset, RenderManager& renderer)
                 ShowProperty("Metallic factor", std::to_string(shader.specularParams.y));
                 ShowProperty("Roughness factor", std::to_string(shader.specularParams.z));
                 ShowProperty("Specular factor", std::to_string(shader.specularParams.w));
+                ShowProperty("IOR", std::to_string(shader.opticalParams.x));
+                ShowProperty("Transmission factor", std::to_string(shader.opticalParams.y));
                 ShowMaterialVector("Specular color", shader.specularColor);
                 ShowProperty("Normal scale", std::to_string(shader.normalTextures.y));
                 ShowProperty("Alpha mode", material.alphaBlend ? "Blend" : material.alphaMask ? "Mask" : "Opaque");

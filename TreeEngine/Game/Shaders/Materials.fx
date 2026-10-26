@@ -49,13 +49,43 @@ struct ShaderMaterial
     float4 Specular; // legacy Phong specular tint; w = SpecPower
     float4 Reflect;
     float4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
-    float4 textureCoordScale; // xy = UV scale
     float4 specularParams; // enabled, metallic, roughness, specularFactor
     float4 specularColor; // linear RGB factor; w = base-color clamp
     float4 specularTextures; // strength/color slots; z/w = clamp flags
     float4 normalTextures; // normal texture slot, scale, clamp flag
     float4 metallicRoughnessTextures; // texture slot, clamp flag
+    float4 opticalParams; // x = IOR; y = transmission factor
+    float4 uvTransformRow0[5];
+    float4 uvTransformRow1[5];
 };
+
+static const uint BaseColorTextureRole = 0;
+static const uint MetallicRoughnessTextureRole = 1;
+static const uint NormalTextureRole = 2;
+static const uint SpecularStrengthTextureRole = 3;
+static const uint SpecularColorTextureRole = 4;
+
+float2 TransformMaterialUv(ShaderMaterial mat, float2 uv, uint role)
+{
+    float3 coordinate = float3(uv, 1.0f);
+    return float2(dot(coordinate, mat.uvTransformRow0[role].xyz),
+        dot(coordinate, mat.uvTransformRow1[role].xyz));
+}
+
+void TransformNormalBasis(ShaderMaterial mat, inout float3 tangent, inout float3 bitangent)
+{
+    float2 row0 = mat.uvTransformRow0[NormalTextureRole].xy;
+    float2 row1 = mat.uvTransformRow1[NormalTextureRole].xy;
+    float determinant = row0.x * row1.y - row0.y * row1.x;
+    if (abs(determinant) > 1e-8f)
+    {
+        float orientation = determinant < 0.0f ? -1.0f : 1.0f;
+        float3 transformedTangent = normalize(row1.y * tangent - row1.x * bitangent) * orientation;
+        float3 transformedBitangent = normalize(-row0.y * tangent + row0.x * bitangent) * orientation;
+        tangent = transformedTangent;
+        bitangent = transformedBitangent;
+    }
+}
 
 // Encode linear glTF lighting for the UNORM display targets.
 float EncodeGltfSrgbChannel(float linearColor)
@@ -73,8 +103,15 @@ float3 EncodeGltfDisplayColor(float3 linearColor)
 //---------------------------------------------------------------------------------------
 // Computes the ambient, diffuse, and specular terms for glTF directional lighting.
 //---------------------------------------------------------------------------------------
-// KHR_materials_specular dielectric Fresnel, with GGX and correlated Smith visibility.
+// KHR_materials_ior and KHR_materials_specular dielectric Fresnel, with GGX and correlated Smith visibility.
 // Texture factors are applied to a local material before this shared raster/DXR function.
+float ComputeDielectricF0(float ior)
+{
+    if (ior == 0.0f) return 1.0f; // KHR_materials_ior compatibility mode.
+    float ratio = (ior - 1.0f) / (ior + 1.0f);
+    return ratio * ratio;
+}
+
 void ComputeGltfSpecularLight(ShaderMaterial mat, float4 textureColor, DirectionalLight light,
     float3 normal, float3 toEye, out float4 ambient, out float4 diffuse, out float4 spec)
 {
@@ -83,7 +120,7 @@ void ComputeGltfSpecularLight(ShaderMaterial mat, float4 textureColor, Direction
     float roughness = max(saturate(mat.specularParams.z), 0.045f);
     float strength = saturate(mat.specularParams.w);
     float3 baseColor = mat.Diffuse.rgb * textureColor.rgb;
-    float3 dielectricF0 = min(0.04f * mat.specularColor.rgb, 1.0f) * strength;
+    float3 dielectricF0 = min(ComputeDielectricF0(mat.opticalParams.x) * mat.specularColor.rgb, 1.0f) * strength;
     float3 f0 = lerp(dielectricF0, baseColor, metallic);
     float f90 = lerp(strength, 1.0f, metallic);
     float3 N = normalize(normal);
@@ -119,7 +156,7 @@ float3 ComputeGltfEnvironmentLight(ShaderMaterial mat, float4 textureColor,
     float roughness = saturate(mat.specularParams.z);
     float3 baseColor = mat.Diffuse.rgb * textureColor.rgb;
     float strength = saturate(mat.specularParams.w);
-    float3 dielectricF0 = min(0.04f * mat.specularColor.rgb, 1.0f) * strength;
+    float3 dielectricF0 = min(ComputeDielectricF0(mat.opticalParams.x) * mat.specularColor.rgb, 1.0f) * strength;
     float3 f0 = lerp(dielectricF0, baseColor, metallic);
     float f90 = lerp(strength, 1.0f, metallic);
     float nv = saturate(dot(normalize(normal), normalize(toEye)));

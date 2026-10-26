@@ -43,7 +43,7 @@ namespace
             result.flags.y = definition.texture.empty() ? 0.0f : 1.0f;
             result.flags.z = definition.alphaClipThreshold;
         }
-        result.textureCoordScale = XMFLOAT4(definition.textureCoordScale.x, definition.textureCoordScale.y, 1, 1);
+        result.ApplyTextureCoordScale(definition.textureCoordScale.x, definition.textureCoordScale.y);
         return result;
     } 
 
@@ -312,7 +312,8 @@ namespace
         result.diffuse = material.Diffuse;
         result.specular = material.Specular;
         result.reflect = material.Reflect;
-        result.textureCoordScale = { material.textureCoordScale.x, material.textureCoordScale.y };
+        result.textureCoordScale = { material.uvTransformRow0[BaseColorTextureRole].x,
+            material.uvTransformRow1[BaseColorTextureRole].y };
         result.alphaClipThreshold = material.flags.z;
         const bool hasTexture = slot < params.textureFilename.size() && !params.textureFilename[slot].empty();
         if (material.flags.y != 0 && !hasTexture)
