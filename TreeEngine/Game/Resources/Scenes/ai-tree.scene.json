@@ -21,7 +21,7 @@
     "ambient": [0.6, 0.6, 0.6, 1],
     "diffuse": [1, 1, 1, 1],
     "specular": [0.6, 0.6, 0.6, 1],
-    "direction": [-0.7, -0.7, 0.7]
+    "direction": [-0.57, -0.57, -0.57]
   },
   "pointLightCount": 1,
   "materials": {
@@ -93,7 +93,7 @@
       "type": "primitive",
       "shape": "box",
       "cubeMap": true,
-      "transform": { "scale": [30, 30, 30], "rotationDegrees": [180, 0, 0] },
+      "transform": { "scale": [30, -30, 30], "rotationDegrees": [0, 180, 0] },
       "material": "sky"
     },
     {
@@ -121,7 +121,6 @@
       "id": "embedded-glb",
       "type": "model",
       "source": "Models/Gltf/terra.glb",
-      "forceLit": true,
       "transform": {
         "position": [ 0, 0, 0 ],
         "scale": [ 50.0, 50.0, 50.0 ]
