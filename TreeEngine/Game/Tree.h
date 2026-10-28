@@ -62,10 +62,10 @@ private:
     std::array<RenderUnit*, TreeSegmentCount> m_segmentRenderUnits = {};
     std::array<int, TreeSegmentCount> m_numInstancesPerSegment = {};
 
-    struct TreeFrame
+    struct BranchInstance
     {
         Branch* branch;
-        TreeFrame* parentFrame;
+        BranchInstance* parent;
         XMFLOAT3 startPosition;
         XMFLOAT3 endPosition;
         XMFLOAT3 scale;
@@ -74,8 +74,8 @@ private:
         int instanceOffsetPrev;
     };
 
-    int m_numTreeFrames;
-    std::vector<TreeFrame> m_treeFrames;
+    int m_numBranchInstances;
+    std::vector<BranchInstance> m_treeFrames;
     struct BranchPose
     {
         XMFLOAT4X4 world;
@@ -94,13 +94,13 @@ private:
     UINT m_cachedLeafCount = 0;
     UINT m_cachedStickCount = 0;
 
-    HRESULT ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderData);
-    HRESULT ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* pRenderData, int startInstance);
+    HRESULT ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRenderData);
+    HRESULT ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderData* pRenderData, int startInstance);
 
-    TreeSegment SelectSegmentType(TreeFrame& frame, RenderData* pRenderData) const;
+    TreeSegment SelectSegmentType(BranchInstance& frame, RenderData* pRenderData) const;
 
-    HRESULT ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, TreeFrame& frame);
-    HRESULT ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFrame& frame);
+    HRESULT ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, BranchInstance& frame);
+    HRESULT ComputeTransformationsManual(XMMATRIX* computedTransform, BranchInstance& frame);
 
 public:
     Tree(WorldObjectParams* pParams);

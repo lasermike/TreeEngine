@@ -116,8 +116,8 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 void Tree::AccumulateProfile(RenderProfile& profile) const
 {
     profile.poseCacheBytes += m_branchPoses.capacity() * sizeof(BranchPose);
-    if (m_reusePose) profile.reusedPoseBranches += m_numTreeFrames;
-    else profile.rebuiltPoseBranches += m_numTreeFrames;
+    if (m_reusePose) profile.reusedPoseBranches += m_numBranchInstances;
+    else profile.rebuiltPoseBranches += m_numBranchInstances;
 }
 
 HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
@@ -166,14 +166,14 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         if (!m_reusePose)
         {
             m_poseValid = false;
-            TreeFrame firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), -1, 0, 0 };
+            BranchInstance firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), -1, 0, 0 };
             m_treeFrames[0] = firstFrame;
-            m_numTreeFrames = 1;
+            m_numBranchInstances = 1;
         }
 
-        for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
+        for (int currentFrame = 0; currentFrame < m_numBranchInstances; currentFrame++)
         {
-            TreeFrame& frame = m_treeFrames[currentFrame];
+            BranchInstance& frame = m_treeFrames[currentFrame];
             if (!m_reusePose)
             {
                 HRR(ComputeBranchVectorAtTime(frame, &renderData));
@@ -186,9 +186,9 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
             frame.instanceOffset = -1;
         }
 
-        for (int currentFrame = 0; currentFrame < m_numTreeFrames; currentFrame++)
+        for (int currentFrame = 0; currentFrame < m_numBranchInstances; currentFrame++)
         {
-            TreeFrame& frame = m_treeFrames[currentFrame];
+            BranchInstance& frame = m_treeFrames[currentFrame];
             HRR(ComputeBranchInstanceSkinningMatrix(frame, &renderData, startInstance));
         }
         m_lastPoseTime = poseTime;
@@ -204,7 +204,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         renderData.frameStats[NUM_LEAVES_STAT].stat += m_cachedLeafCount;
         renderData.frameStats[NUM_STICKS_STAT].stat += m_cachedStickCount;
     }
-    renderData.frameStats[WORLD_MATRIX_COMPUTED_STAT].stat = m_numTreeFrames;
+    renderData.frameStats[WORLD_MATRIX_COMPUTED_STAT].stat = m_numBranchInstances;
 
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Compute Constants memcpy");
@@ -227,7 +227,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     return S_OK;
 }
 
-HRESULT Tree::ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderData)
+HRESULT Tree::ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRenderData)
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeBranchVectorAtTime");
 
@@ -257,7 +257,7 @@ HRESULT Tree::ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderDat
         {
             if (c == 0)
             {
-                frame.instanceOffsetNext = m_numTreeFrames;
+                frame.instanceOffsetNext = m_numBranchInstances;
             }
 
             Branch* child = &_treeModel->treeData.pBranches[frame.branch->Child(c)];
@@ -265,8 +265,8 @@ HRESULT Tree::ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderDat
             XMFLOAT3 childStart;
             XMStoreFloat3(&childStart, vChildStart);
 
-            TreeFrame childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), -1, -1, frame.instanceOffset };
-            m_treeFrames[m_numTreeFrames++] = childFrame;
+            BranchInstance childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), -1, -1, frame.instanceOffset };
+            m_treeFrames[m_numBranchInstances++] = childFrame;
         }
     }
 
@@ -275,7 +275,7 @@ HRESULT Tree::ComputeBranchVectorAtTime(TreeFrame& frame, RenderData* pRenderDat
     return S_OK;
 }
 
-TreeSegment Tree::SelectSegmentType(TreeFrame& frame, RenderData* pRenderData) const
+TreeSegment Tree::SelectSegmentType(BranchInstance& frame, RenderData* pRenderData) const
 {
     if (frame.branch->geometryType == Leaf)
     {
@@ -289,7 +289,7 @@ TreeSegment Tree::SelectSegmentType(TreeFrame& frame, RenderData* pRenderData) c
     return useBranchLOD0 ? TreeSegment::BranchLOD0 : TreeSegment::BranchLOD1;
 }
 
-HRESULT Tree::ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* pRenderData, int startInstance)
+HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderData* pRenderData, int startInstance)
 {
     if (frame.branch->id < 0 || static_cast<size_t>(frame.branch->id) >= m_branchPoses.size())
         return E_UNEXPECTED;
@@ -322,9 +322,9 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(TreeFrame& frame, RenderData* 
     instanceOffset += m_segmentInstanceData[segmentIndex].size();
 
     data.InstanceOffset = instanceOffset;
-    if (frame.parentFrame && frame.parentFrame->instanceOffset != 0xFFFFFFFF)
+    if (frame.parent && frame.parent->instanceOffset != 0xFFFFFFFF)
     {
-        data.InstanceOffsetPrev = frame.parentFrame->instanceOffset;
+        data.InstanceOffsetPrev = frame.parent->instanceOffset;
     }
     else
     {
@@ -468,7 +468,7 @@ __inline XMMATRIX TEMatrixTransformation
 }
 
 
-HRESULT Tree::ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, TreeFrame& frame)
+HRESULT Tree::ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, BranchInstance& frame)
 {
     float animScaleFactor = 1.0f;
     if (time - 5 < frame.branch->depth)
@@ -512,7 +512,7 @@ HRESULT Tree::ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, Tr
     return S_OK;
 }
 
-HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, TreeFrame& frame)
+HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, BranchInstance& frame)
 {
     XMVECTOR vStart = XMLoadFloat3(&frame.startPosition);
     XMVECTOR vEnd = XMLoadFloat3(&frame.endPosition);

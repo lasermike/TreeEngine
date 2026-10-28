@@ -1,5 +1,7 @@
 # Copilot Instructions for TreeEngine
 
+For a higher-level overview (key interfaces, active vs. inactive projects, external dependencies), see `ARCHITECTURE.md` at the repo root.
+
 ## Build
 
 TreeEngine uses MSBuild via Visual Studio 2022. Open `TreeEngine/TreeEngine.sln` for the main engine solution.
