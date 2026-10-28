@@ -28,7 +28,8 @@ enum PrimitiveType
     PrimitiveType_FSQuad,
     PrimitiveType_SkinnedCylinder,
     PrimitiveType_Sprite,
-    PrimitiveType_MAX = PrimitiveType_Sprite
+    PrimitiveType_Sphere,
+    PrimitiveType_MAX = PrimitiveType_Sphere
 };
 
 struct SimpleVertex
@@ -67,6 +68,7 @@ struct GeometryBufferData
     BufferOffsets fsQuadIndices;
     BufferOffsets skinnedCylinderIndices;
     BufferOffsets spriteIndices;
+    BufferOffsets sphereIndices;
 
     std::vector<SimpleVertex> vertices;
     std::vector<UINT> indices;
@@ -82,6 +84,7 @@ struct GeometryBufferData
         ZeroMemory(&cylinderIndices, sizeof(BufferOffsets));
         ZeroMemory(&cylinderLDIndices, sizeof(BufferOffsets));
         ZeroMemory(&fsQuadIndices, sizeof(BufferOffsets));
+        ZeroMemory(&sphereIndices, sizeof(BufferOffsets));
     }
 
     void Release()
@@ -112,6 +115,9 @@ struct GeometryBufferData
             break;
         case PrimitiveType_Sprite:
             pBufferOffsets = &this->spriteIndices;
+            break;
+        case PrimitiveType_Sphere:
+            pBufferOffsets = &this->sphereIndices;
             break;
         case PrimitiveType_SkinnedCylinder:
             pBufferOffsets = &this->skinnedCylinderIndices;

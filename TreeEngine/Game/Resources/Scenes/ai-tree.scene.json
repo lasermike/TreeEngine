@@ -48,6 +48,9 @@
       "texture": "kiara_3_morning_4k-skybox.dds",
       "flags": [0,0,0,1]
     },
+    "chrome": {
+      "pbr": { "baseColor": [0.95, 0.95, 0.95, 1], "metallic": 1, "roughness": 0.05 }
+    },
     "axis-red": { "ambient": [1, 0, 0, 1] },
     "axis-green": { "ambient": [0, 0.5019608, 0, 1] },
     "axis-blue": { "ambient": [0, 0, 1, 1] }
@@ -116,6 +119,13 @@
       "shape": "cylinderHD",
       "transform": { "position": [-4, 0, 0.5], "scale": [0.1, 1, 0.1], "rotationDegrees": [90, 0, 0] },
       "material": "axis-blue"
+    },
+    {
+      "id": "shiny-sphere",
+      "type": "primitive",
+      "shape": "sphere",
+      "transform": { "position": [6, 6.5, -72], "scale": [1.5, 1.5, 1.5] },
+      "material": "chrome"
     },
     {
       "id": "embedded-glb",

@@ -8,6 +8,7 @@ class WorldObject;
 class Settings;
 class SceneRoot;
 struct GltfTextureSource;
+struct MaterialTextureSources;
 
 enum DisplayMode
 {
@@ -130,6 +131,9 @@ public:
                            ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
     HRESULT LoadGltfTexture(const GltfTextureSource& source, LoadedTexture** texture, int* textureSlot = nullptr);
     LoadedTexture* FindLoadedGltfTexture(const GltfTextureSource& source) const;
+    // Loads a non-base-color material map and stores its slot in the shader material.
+    HRESULT BindMaterialTexture(const GltfTextureSource& source, MaterialTextureRole role, ShaderMaterial& shaderMaterial);
+    HRESULT BindMaterialTextures(const MaterialTextureSources& sources, ShaderMaterial& shaderMaterial);
     HRESULT CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,

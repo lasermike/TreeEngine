@@ -86,15 +86,25 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     const std::wstring branchLOD0MaterialName = L"BranchLOD0_" + std::to_wstring(_id);
     const std::wstring branchLOD1MaterialName = L"BranchLOD1_" + std::to_wstring(_id);
     const std::wstring leafLOD0MaterialName = L"LeafLOD0_" + std::to_wstring(_id);
+    auto createMaterial = [&](const std::wstring& name, size_t slot, const wchar_t* textureFilename,
+        const wchar_t* vs, const wchar_t* shadowVs, StockRenderState state, Material** material) -> HRESULT
+    {
+        ApplyPbrRenderState(shaderMaterials[slot], state);
+        const auto* maps = _params->MaterialTextures(slot);
+        if (!maps || maps->Empty())
+            return renderManager.CreateMaterial(name.c_str(), textureFilename, vs, nullptr, shadowVs, nullptr, shaderMaterials[slot], state, material);
+        HRR(renderManager.BindMaterialTextures(*maps, shaderMaterials[slot]));
+        return renderManager.CreateMaterial(name.c_str(), maps->roles[BaseColorTextureRole].get(), vs, nullptr, shadowVs, nullptr, shaderMaterials[slot], state, material);
+    };
     Material* pBranchLOD0 = nullptr;
-    renderManager.CreateMaterial(branchLOD0MaterialName.c_str(), _params->textureFilename[0].c_str(), vsFilename.c_str(), nullptr, shadowVsFilename.c_str(), nullptr, shaderMaterials[0], StockRenderState(), &pBranchLOD0);
+    HRR(createMaterial(branchLOD0MaterialName, 0, _params->textureFilename[0].c_str(), vsFilename.c_str(), shadowVsFilename.c_str(), StockRenderState(), &pBranchLOD0));
     Mesh* pNewMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_params->meshes[0]);
     renderManager.CreateMesh(L"BranchLOD0", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, inputLayout, &pNewMesh);
     renderManager.ReserveRenderUnit(pBranchLOD0, pNewMesh, this, &m_segmentRenderUnits[TreeSegmentIndex(TreeSegment::BranchLOD0)]);
 
     Material* pBranchLOD1 = nullptr;
-    renderManager.CreateMaterial(branchLOD1MaterialName.c_str(), _params->textureFilename[0].c_str(), nullptr, nullptr, nullptr, nullptr, shaderMaterials[0], StockRenderState(), &pBranchLOD1);
+    HRR(createMaterial(branchLOD1MaterialName, 0, _params->textureFilename[0].c_str(), nullptr, nullptr, StockRenderState(), &pBranchLOD1));
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
     renderManager.CreateMesh(L"BranchLOD1", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
@@ -104,7 +114,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     leafLOD0State.blendState = StockBlendStates::Overwrite;
     Material* pLeafLOD0 = nullptr;
     const wchar_t* leafLOD0Texture = _params->textureFilename.size() > 1 ? _params->textureFilename[1].c_str() : nullptr;
-    renderManager.CreateMaterial(leafLOD0MaterialName.c_str(), leafLOD0Texture, nullptr, nullptr, nullptr, nullptr, shaderMaterials[1], leafLOD0State, &pLeafLOD0);
+    HRR(createMaterial(leafLOD0MaterialName, 1, leafLOD0Texture, nullptr, nullptr, leafLOD0State, &pLeafLOD0));
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Sprite);
     renderManager.CreateMesh(L"LeafLOD0", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);

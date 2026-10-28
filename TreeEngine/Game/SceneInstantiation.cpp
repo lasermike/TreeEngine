@@ -9,6 +9,7 @@
 #include "GltfModel.h"
 #include "LSystemModelGenerator.h"
 #include "Player.h"
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -26,12 +27,80 @@ namespace
         case SceneData::Shape::CylinderHD: return PrimitiveType_CylinderHD;
         case SceneData::Shape::SkinnedCylinder: return PrimitiveType_SkinnedCylinder;
         case SceneData::Shape::Sprite: return PrimitiveType_Sprite;
+        case SceneData::Shape::Sphere: return PrimitiveType_Sphere;
         }
         throw std::runtime_error("Unsupported scene shape");
     }
 
+    // Texture maps of a PBR material with their roles and color spaces (2 = sRGB, 1 = linear).
+    struct PbrTextureMap
+    {
+        const SceneData::TextureMapDefinition* map;
+        MaterialTextureRole role;
+        int colorSpace;
+    };
+
+    std::vector<PbrTextureMap> PbrTextureMaps(const SceneData::PbrMaterialDefinition& pbr)
+    {
+        return {
+            { &pbr.baseColorTexture, BaseColorTextureRole, 2 },
+            { &pbr.metallicRoughnessTexture, MetallicRoughnessTextureRole, 1 },
+            { &pbr.normalTexture, NormalTextureRole, 1 },
+            { &pbr.specularTexture, SpecularStrengthTextureRole, 1 },
+            { &pbr.specularColorTexture, SpecularColorTextureRole, 2 } };
+    }
+
+    // The component of a role's clamp vector that holds its clamp flag (see ShaderMaterial).
+    float& ClampFlag(ShaderMaterial& material, MaterialTextureRole role)
+    {
+        switch (role)
+        {
+        case BaseColorTextureRole: return material.specularColor.w;
+        case MetallicRoughnessTextureRole: return material.metallicRoughnessTextures.y;
+        case NormalTextureRole: return material.normalTextures.z;
+        case SpecularStrengthTextureRole: return material.specularTextures.z;
+        case SpecularColorTextureRole: return material.specularTextures.w;
+        default: throw std::runtime_error("Unsupported material texture role");
+        }
+    }
+
+    ShaderMaterial RuntimePbrMaterial(const SceneData::PbrMaterialDefinition& pbr)
+    {
+        PbrMaterialFactors factors;
+        factors.baseColor = pbr.baseColor;
+        factors.metallic = pbr.metallic;
+        factors.roughness = pbr.roughness;
+        factors.specular = pbr.specular;
+        factors.specularColor = pbr.specularColor;
+        factors.ior = pbr.ior;
+        factors.transmission = pbr.transmission;
+        factors.alphaMode = pbr.alphaMode == SceneData::AlphaMode::Mask ? PbrAlphaMode::Mask
+            : pbr.alphaMode == SceneData::AlphaMode::Blend ? PbrAlphaMode::Blend
+            : PbrAlphaMode::Opaque;
+        factors.alphaCutoff = pbr.alphaCutoff;
+        factors.unlit = pbr.unlit;
+        bool alphaBlend = false;
+        ShaderMaterial result = BuildPbrShaderMaterial(factors, alphaBlend);
+        for (const auto& entry : PbrTextureMaps(pbr))
+        {
+            const auto& map = *entry.map;
+            if (map.source.empty()) continue;
+            if (map.hasTransform) SetMaterialUvTransform(result, entry.role, map.offset, map.rotation, map.scale);
+            ClampFlag(result, entry.role) = map.wrap ? 0.0f : 1.0f;
+        }
+        if (!pbr.normalTexture.source.empty()) result.normalTextures.y = pbr.normalScale;
+        result.flags.y = pbr.baseColorTexture.source.empty() ? 0.0f : 1.0f;
+        return result;
+    }
+
     ShaderMaterial RuntimeMaterial(const SceneData::MaterialDefinition& definition)
     {
+        if (definition.hasPbr)
+        {
+            ShaderMaterial result = RuntimePbrMaterial(definition.pbr);
+            result.ApplyTextureCoordScale(definition.textureCoordScale.x, definition.textureCoordScale.y);
+            return result;
+        }
         ShaderMaterial result;
         result.Ambient = definition.ambient;
         result.Diffuse = definition.diffuse;
@@ -55,6 +124,28 @@ namespace
         {
             throw std::runtime_error("Object '" + objectId + "': " + error.what());
         }
+    }
+
+    MaterialTextureSources RuntimeMaterialTextures(const SceneData::MaterialDefinition& definition,
+        const std::string& objectId, const std::string& sceneFilename)
+    {
+        MaterialTextureSources result;
+        if (!definition.hasPbr) return result;
+        for (const auto& entry : PbrTextureMaps(definition.pbr))
+        {
+            if (entry.map->source.empty()) continue;
+            const auto filename = RuntimeTexture(entry.map->source, objectId, sceneFilename);
+            try
+            {
+                result.roles[entry.role] = std::make_shared<GltfTextureSource>(
+                    LoadMaterialTextureFile(filename, entry.colorSpace));
+            }
+            catch (const std::runtime_error& error)
+            {
+                throw std::runtime_error("Object '" + objectId + "': " + error.what());
+            }
+        }
+        return result;
     }
 
     std::string RuntimeDataFile(const std::string& filename, const std::string& objectId, const std::string& sceneFilename)
@@ -134,6 +225,8 @@ namespace
         parameters.textureFilename.push_back(RuntimeTexture(tree.leaf.texture, tree.id, sceneFilename));
         parameters.materials.push_back(RuntimeMaterial(tree.trunk));
         parameters.materials.push_back(RuntimeMaterial(tree.leaf));
+        parameters.materialTextures.push_back(RuntimeMaterialTextures(tree.trunk, tree.id, sceneFilename));
+        parameters.materialTextures.push_back(RuntimeMaterialTextures(tree.leaf, tree.id, sceneFilename));
     }
 }
 
@@ -154,6 +247,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             {
                 parameters->textureFilename.push_back(RuntimeTexture(primitive.material.texture, primitive.id, sceneFilename));
                 parameters->materials.push_back(RuntimeMaterial(primitive.material));
+                parameters->materialTextures.push_back(RuntimeMaterialTextures(primitive.material, primitive.id, sceneFilename));
             }
             auto runtime = std::make_unique<Primitive>(parameters.get());
             parameters.release();
@@ -266,6 +360,7 @@ namespace
         case PrimitiveType_CylinderHD: return SceneData::Shape::CylinderHD;
         case PrimitiveType_SkinnedCylinder: return SceneData::Shape::SkinnedCylinder;
         case PrimitiveType_Sprite: return SceneData::Shape::Sprite;
+        case PrimitiveType_Sphere: return SceneData::Shape::Sphere;
         default: throw std::runtime_error("Cannot save unsupported primitive shape");
         }
     }
@@ -303,10 +398,77 @@ namespace
         return SceneData::Utf8Path(relative);
     }
 
+    SceneData::TextureMapDefinition& PbrMapForRole(SceneData::PbrMaterialDefinition& pbr, MaterialTextureRole role)
+    {
+        switch (role)
+        {
+        case BaseColorTextureRole: return pbr.baseColorTexture;
+        case MetallicRoughnessTextureRole: return pbr.metallicRoughnessTexture;
+        case NormalTextureRole: return pbr.normalTexture;
+        case SpecularStrengthTextureRole: return pbr.specularTexture;
+        case SpecularColorTextureRole: return pbr.specularColorTexture;
+        default: throw std::runtime_error("Unsupported material texture role");
+        }
+    }
+
+    // Reverses RuntimePbrMaterial. Material UV scale is folded into each map's transform.
+    SceneData::MaterialDefinition CapturePbrMaterial(const WorldObjectParams& params, size_t slot,
+        const std::string& source, const std::string& destination)
+    {
+        auto material = params.materials.at(slot);
+        SceneData::MaterialDefinition result;
+        result.hasPbr = true;
+        auto& pbr = result.pbr;
+        pbr.baseColor = material.Diffuse;
+        pbr.metallic = material.specularParams.y;
+        pbr.roughness = material.specularParams.z;
+        pbr.specular = material.specularParams.w;
+        pbr.specularColor = { material.specularColor.x, material.specularColor.y, material.specularColor.z };
+        pbr.ior = material.opticalParams.x;
+        pbr.transmission = material.opticalParams.y;
+        pbr.unlit = material.flags.w != 0;
+        if (material.flags.x != 0 && material.flags.z == 1.0f / 255.0f) pbr.alphaMode = SceneData::AlphaMode::Blend;
+        else if (material.flags.z > 0)
+        {
+            pbr.alphaMode = SceneData::AlphaMode::Mask;
+            pbr.alphaCutoff = material.flags.z;
+        }
+
+        const auto* maps = params.MaterialTextures(slot);
+        const bool hasMaps = maps && !maps->Empty();
+        if (!hasMaps)
+        {
+            result.textureCoordScale = { material.uvTransformRow0[BaseColorTextureRole].x,
+                material.uvTransformRow1[BaseColorTextureRole].y };
+            return result;
+        }
+        for (int role = 0; role < MaterialTextureRoleCount; ++role)
+        {
+            const auto& texture = maps->roles[role];
+            if (!texture) continue;
+            auto& map = PbrMapForRole(pbr, static_cast<MaterialTextureRole>(role));
+            map.source = RebaseAsset(SceneData::Utf8Path(texture->filename), source, destination);
+            map.wrap = ClampFlag(material, static_cast<MaterialTextureRole>(role)) == 0;
+            const auto& row0 = material.uvTransformRow0[role];
+            const auto& row1 = material.uvTransformRow1[role];
+            map.hasTransform = row0.x != 1 || row0.y != 0 || row0.z != 0 || row1.x != 0 || row1.y != 1 || row1.z != 0;
+            if (map.hasTransform)
+            {
+                map.rotation = std::atan2(row1.x, row0.x);
+                const float cosine = std::cos(map.rotation), sine = std::sin(map.rotation);
+                map.scale = { std::sqrt(row0.x * row0.x + row1.x * row1.x), cosine * row1.y - sine * row0.y };
+                map.offset = { row0.z, row1.z };
+            }
+        }
+        if (maps->roles[NormalTextureRole]) pbr.normalScale = material.normalTextures.y;
+        return result;
+    }
+
     SceneData::MaterialDefinition CaptureMaterial(const WorldObjectParams& params, size_t slot,
         const std::string& source, const std::string& destination)
     {
         const auto& material = params.materials.at(slot);
+        if (material.specularParams.x != 0) return CapturePbrMaterial(params, slot, source, destination);
         SceneData::MaterialDefinition result;
         result.ambient = material.Ambient;
         result.diffuse = material.Diffuse;
@@ -323,8 +485,6 @@ namespace
         result.hasFlags = material.flags.x != 0 || material.flags.w != 0 ||
             material.flags.y != (hasTexture ? 1.0f : 0.0f);
         if (result.hasFlags) result.flags = material.flags;
-        if (material.specularParams.x != 0)
-            throw std::runtime_error("Object '" + params.name + "': unsupported authored PBR material");
         return result;
     }
 

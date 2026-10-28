@@ -106,9 +106,19 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     data.spriteIndices.IndexOffset = data.fsQuadIndices.IndexOffset + data.fsQuadIndices.IndexCount;
     data.spriteIndices.IndexCount = (UINT)sprite.Indices.size();
 
+    // Sphere (unit diameter, like the box and cylinders)
+    GeometryGenerator::MeshData sphere;
+    geoGen.CreateSphere(0.5f, 48, 32, sphere);
+
+    data.sphereIndices.VertexCount = (UINT)sphere.Vertices.size();
+    data.sphereIndices.VertexOffset = (UINT)(data.spriteIndices.VertexOffset + sprite.Vertices.size());
+    data.sphereIndices.IndexOffset = data.spriteIndices.IndexOffset + data.spriteIndices.IndexCount;
+    data.sphereIndices.IndexCount = (UINT)sphere.Indices.size();
+
     // Finalize everything
-    UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size() + cylinderLD.Vertices.size() + 
-                                    cylinderHD.Vertices.size() + fsQuad.Vertices.size() + sprite.Vertices.size());
+    UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size() + cylinderLD.Vertices.size() +
+                                    cylinderHD.Vertices.size() + fsQuad.Vertices.size() + sprite.Vertices.size() +
+                                    sphere.Vertices.size());
 
     // Extract the vertex elements we are interested in and pack the
     // vertices of all the meshes into one vertex buffer.
@@ -179,6 +189,14 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].TangentU = TangentWithDefaultSign(sprite.Vertices[i].TangentU);
     }
 
+    for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
+    {
+        data.vertices[k].Pos = sphere.Vertices[i].Position;
+        data.vertices[k].Normal = sphere.Vertices[i].Normal;
+        data.vertices[k].Tex = sphere.Vertices[i].TexC;
+        data.vertices[k].TangentU = TangentWithDefaultSign(sphere.Vertices[i].TangentU);
+    }
+
     //
     // Pack the indices of all the meshes into one index buffer.
     //
@@ -189,6 +207,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     data.indices.insert(data.indices.end(), cylinderHD.Indices.begin(), cylinderHD.Indices.end());
     data.indices.insert(data.indices.end(), fsQuad.Indices.begin(), fsQuad.Indices.end());
     data.indices.insert(data.indices.end(), sprite.Indices.begin(), sprite.Indices.end());
+    data.indices.insert(data.indices.end(), sphere.Indices.begin(), sphere.Indices.end());
 
     data.skinnedIndices.insert(data.skinnedIndices.end(), cylinder.Indices.begin(), cylinder.Indices.end());
 }

@@ -47,7 +47,7 @@ TreeEngine is a plant and tree growth simulator.  Plants are defined by L-System
 
 The main simulation loop is in `Game.cpp` (`Game::Update()`), which updates the scene graph, runs procedural generation, and handles input.
 
-A number of pre-defined scenes are used for testing.  The scenes are defined in the GameLoader.cpp file as methods prefixed with "Load".  Scene objects are intitialized with a set of parameters.  For plants and trees, an axiom and a set of production rules are defined.  The L-System generator then iteratively applies the production rules to grow the plant over time.  The product rules are loosely based on the research paper "The Algorithmic Beauty of Plants" by Przemyslaw Prusinkiewicz and Aristid Lindenmayer.
+A number of pre-defined scenes are used for testing.  The scenes are defined as JSON files in `TreeEngine/Game/Resources/Scenes/*.scene.json` (schema in that folder's `README.md`); their IDs keep the old `Load*` loader names.  Scene objects are intitialized with a set of parameters, and materials can use either legacy Phong values or a glTF-style `pbr` block.  For plants and trees, an axiom and a set of production rules are defined.  The L-System generator then iteratively applies the production rules to grow the plant over time.  The product rules are loosely based on the research paper "The Algorithmic Beauty of Plants" by Przemyslaw Prusinkiewicz and Aristid Lindenmayer.
 
 ## Architecture
 

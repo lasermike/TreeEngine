@@ -226,6 +226,121 @@ void TestSpecularExtension()
     reject(bad, "UNKNOWN_test_extension");
 }
 
+void TestPbrSceneMaterials()
+{
+    // The shared factor mapping must reproduce what glTF import produces.
+    std::ifstream input(TestDataFilename("static-scene.gltf"));
+    Json fixture;
+    input >> fixture;
+    const auto& source = fixture["materials"][0];
+    PbrMaterialFactors factors;
+    const auto& pbrJson = source["pbrMetallicRoughness"];
+    if (pbrJson.contains("baseColorFactor"))
+    {
+        const auto& color = pbrJson["baseColorFactor"];
+        factors.baseColor = { color[0].get<float>(), color[1].get<float>(), color[2].get<float>(), color[3].get<float>() };
+    }
+    if (pbrJson.contains("metallicFactor")) factors.metallic = pbrJson["metallicFactor"].get<float>();
+    if (pbrJson.contains("roughnessFactor")) factors.roughness = pbrJson["roughnessFactor"].get<float>();
+    const std::string mode = source.value("alphaMode", "OPAQUE");
+    factors.alphaMode = mode == "MASK" ? PbrAlphaMode::Mask : mode == "BLEND" ? PbrAlphaMode::Blend : PbrAlphaMode::Opaque;
+    factors.alphaCutoff = source.value("alphaCutoff", 0.5f);
+    bool alphaBlend = false;
+    const auto built = BuildPbrShaderMaterial(factors, alphaBlend);
+    const auto imported = LoadGltfAsset(TestDataFilename("static-scene.gltf"))->materials[0];
+    auto same = [](const XMFLOAT4& a, const XMFLOAT4& b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; };
+    Check(same(built.Ambient, imported.shaderMaterial.Ambient) && same(built.Diffuse, imported.shaderMaterial.Diffuse)
+        && same(built.Specular, imported.shaderMaterial.Specular) && same(built.Reflect, imported.shaderMaterial.Reflect)
+        && same(built.specularParams, imported.shaderMaterial.specularParams)
+        && same(built.opticalParams, imported.shaderMaterial.opticalParams)
+        && built.flags.x == imported.shaderMaterial.flags.x && built.flags.z == imported.shaderMaterial.flags.z
+        && built.flags.w == imported.shaderMaterial.flags.w && alphaBlend == imported.alphaBlend,
+        "shared PBR mapping differs from glTF import");
+    PbrMaterialFactors glass;
+    glass.transmission = 0.5f;
+    glass.ior = 1.33f;
+    const auto glassMaterial = BuildPbrShaderMaterial(glass, alphaBlend);
+    Check(alphaBlend && glassMaterial.flags.x == 1 && glassMaterial.flags.z == 0 && glassMaterial.opticalParams.y == 0.5f
+        && glassMaterial.opticalParams.x == 1.33f, "transmission did not force the raster blend fallback");
+
+    // Material maps load as memory-backed PNG/JPEG with role-specific color spaces.
+    const auto checkerAsset = LoadGltfAsset(TestDataFilename("static-scene.gltf"));
+    const std::wstring checker = checkerAsset->textures.at(0).filename;
+    const auto linear = LoadMaterialTextureFile(checker, 1);
+    const auto srgb = LoadMaterialTextureFile(checker, 2);
+    Check(linear.IsMemoryBacked() && linear.colorSpace == 1 && srgb.colorSpace == 2 && linear.key != srgb.key,
+        "scene material maps were not loaded by color space");
+    bool ddsRejected = false;
+    try { LoadMaterialTextureFile(L"bark.dds", 2); }
+    catch (const std::runtime_error& e) { ddsRejected = std::string(e.what()).find("PNG or JPEG") != std::string::npos; }
+    Check(ddsRejected, "DDS material map was accepted");
+
+    // Scene schema: every glTF BRDF property on primitives and on both tree slots.
+    auto scene = Json::parse(R"({"version":1,"name":"PBR","objects":[{"id":"ball","type":"primitive","shape":"sphere"}]})");
+    scene["materials"]["chrome"] = { { "textureCoordScale", { 2, 2 } }, { "pbr", {
+        { "baseColor", { 0.9, 0.8, 0.7, 1 } }, { "metallic", 1 }, { "roughness", 0.05 },
+        { "specular", 0.5 }, { "specularColor", { 1, 0.5, 2 } }, { "ior", 1.4 }, { "transmission", 0.25 },
+        { "alphaMode", "mask" }, { "alphaCutoff", 0.3 },
+        { "baseColorTexture", { { "source", "base.png" }, { "wrap", false },
+            { "transform", { { "offset", { 0.25, 0.5 } }, { "rotation", 1.5 }, { "scale", { 2, 3 } } } } } },
+        { "metallicRoughnessTexture", { { "source", "mr.png" } } },
+        { "normalTexture", { { "source", "normal.png" }, { "scale", 0.35 } } },
+        { "specularTexture", { { "source", "spec.png" } } },
+        { "specularColorTexture", { { "source", "specColor.jpg" } } } } } };
+    scene["objects"][0]["material"] = "chrome";
+    scene["objects"].push_back(Json::parse(R"({"id":"tree","type":"tree","generator":{"axiom":"F"},
+        "materials":{"trunk":"chrome","leaf":{"pbr":{"baseColor":[0,1,0,1],"alphaMode":"blend","unlit":true}}}})"));
+    auto parsed = SceneData::ParseScene(scene.dump(), "pbr.scene.json");
+    auto checkChrome = [](const SceneData::MaterialDefinition& m, const char* description) {
+        const auto& p = m.pbr;
+        Check(m.hasPbr && m.textureCoordScale.x == 2 && p.baseColor.y == 0.8f && p.metallic == 1 && p.roughness == 0.05f
+            && p.specular == 0.5f && p.specularColor.z == 2 && p.ior == 1.4f && p.transmission == 0.25f
+            && p.alphaMode == SceneData::AlphaMode::Mask && p.alphaCutoff == 0.3f && !p.unlit
+            && p.baseColorTexture.source == "base.png" && !p.baseColorTexture.wrap && p.baseColorTexture.hasTransform
+            && p.baseColorTexture.offset.y == 0.5f && p.baseColorTexture.rotation == 1.5f && p.baseColorTexture.scale.y == 3
+            && p.metallicRoughnessTexture.source == "mr.png" && p.metallicRoughnessTexture.wrap
+            && !p.metallicRoughnessTexture.hasTransform && p.normalTexture.source == "normal.png" && p.normalScale == 0.35f
+            && p.specularTexture.source == "spec.png" && p.specularColorTexture.source == "specColor.jpg", description);
+    };
+    auto checkScene = [&](const SceneData::SceneDefinition& s, const char* description) {
+        const auto& ball = static_cast<const SceneData::PrimitiveDefinition&>(*s.objects[0]);
+        Check(ball.shape == SceneData::Shape::Sphere && ball.hasMaterial, "sphere primitive was not parsed");
+        checkChrome(ball.material, description);
+        const auto& pbrTree = static_cast<const SceneData::TreeDefinition&>(*s.objects[1]);
+        checkChrome(pbrTree.trunk, description);
+        Check(pbrTree.leaf.hasPbr && pbrTree.leaf.pbr.unlit && pbrTree.leaf.pbr.alphaMode == SceneData::AlphaMode::Blend
+            && pbrTree.leaf.pbr.baseColor.y == 1 && pbrTree.leaf.pbr.metallic == 1, "PBR leaf material was not parsed");
+    };
+    checkScene(parsed, "PBR material was not parsed");
+    checkScene(SceneData::ParseScene(SceneData::SerializeScene(parsed), "roundtrip"), "PBR material did not round-trip");
+
+    auto rejectPbr = [&](const char* field, const Json& value, const std::string& expectedPath) {
+        auto bad = scene;
+        bad["materials"]["chrome"]["pbr"][field] = value;
+        Reject(bad.dump(), expectedPath);
+    };
+    rejectPbr("metallic", 1.5, "chrome.pbr.metallic");
+    rejectPbr("roughness", -0.1, "chrome.pbr.roughness");
+    rejectPbr("specular", 2, "chrome.pbr.specular");
+    rejectPbr("specularColor", Json::array({ 1, -1, 1 }), "chrome.pbr.specularColor");
+    rejectPbr("ior", 0.5, "chrome.pbr.ior");
+    rejectPbr("transmission", 1.1, "chrome.pbr.transmission");
+    rejectPbr("alphaMode", "MASK", "chrome.pbr.alphaMode");
+    rejectPbr("alphaCutoff", 2, "chrome.pbr.alphaCutoff");
+    rejectPbr("emissive", Json::array({ 1, 1, 1 }), "chrome.pbr.emissive");
+    rejectPbr("normalTexture", { { "source", "n.png" }, { "scale", -1 } }, "normalTexture.scale");
+    rejectPbr("specularTexture", { { "source", "s.png" }, { "scale", 1 } }, "specularTexture.scale");
+    rejectPbr("baseColorTexture", { { "wrap", true } }, "baseColorTexture.source");
+    rejectPbr("baseColorTexture", { { "source", "b.png" }, { "transform", { { "skew", 1 } } } }, "transform.skew");
+    rejectPbr("unlit", true, "chrome.pbr.");
+    auto bad = scene;
+    bad["materials"]["chrome"]["diffuse"] = { 1, 1, 1, 1 };
+    Reject(bad.dump(), "chrome.diffuse");
+    bad = scene;
+    bad["materials"]["chrome"]["flags"] = { 0, 0, 0, 1 };
+    Reject(bad.dump(), "chrome.flags");
+}
+
 int RunScenePersistenceTests();
 
 int main(int argc, char** argv)
@@ -248,6 +363,7 @@ int main(int argc, char** argv)
             std::cout << checks << " specular extension checks passed\n";
             return 0;
         }
+        TestPbrSceneMaterials();
         const auto minimal = Json::parse(R"({"version":1,"name":"Example","objects":[{"id":"box","type":"primitive"}]})");
         auto defaults = SceneData::ParseScene(minimal.dump(), "test.scene.json");
         Check(defaults.objects.size() == 1, "default object missing");
@@ -476,7 +592,7 @@ int main(int argc, char** argv)
 
         const std::string filename = argc > 1 ? argv[1] : TestDataFilename("ai-tree.scene.json");
         auto ai = SceneData::ReadScene(filename);
-        Check(ai.name == "AI Tree" && ai.objects.size() == 6, "AI tree scene topology changed");
+        Check(ai.name == "AI Tree" && ai.objects.size() == 7, "AI tree scene topology changed");
         auto& aiTree = static_cast<SceneData::TreeDefinition&>(*ai.objects[0]);
         Check(aiTree.generator.iterations == 11 && aiTree.generator.rules.size() == 4, "AI tree generator changed");
         Check(aiTree.generator.axiom == "F(35) A(100,0)", "AI tree axiom changed");
@@ -484,8 +600,12 @@ int main(int argc, char** argv)
             aiTree.leaf.alphaClipThreshold == 0.6f, "tree material settings changed");
         auto& skyboxObject = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
         Check(skyboxObject.cubeMap && !skyboxObject.material.texture.empty(), "skybox changed");
-        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[5]);
-        Check(aiModel.source == "Models/Gltf/terra.glb" && aiModel.forceLit,
+        auto& aiSphere = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[5]);
+        Check(aiSphere.id == "shiny-sphere" && aiSphere.shape == SceneData::Shape::Sphere && aiSphere.material.hasPbr
+            && aiSphere.material.pbr.metallic == 1 && aiSphere.material.pbr.roughness == 0.05f,
+            "AI tree shiny sphere changed");
+        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[6]);
+        Check(aiModel.source == "Models/Gltf/terra.glb" && !aiModel.forceLit,
             "AI tree imported model changed");
         Check(std::abs(ai.camera.rotation.w - 1.0f) < 1e-6f
             && std::abs(ai.camera.position.z + 77.0f) < 1e-3f, "AI tree camera changed");

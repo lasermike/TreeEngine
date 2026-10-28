@@ -66,7 +66,9 @@ User scenes cannot override these IDs. Catalog display order does not affect
 regression selection.
 
 `test-scene-persistence.ps1` covers primitives, L-system/fixed trees, graphs,
-and glTF assets in raster and DXR modes, using the same 0.002 RMS tolerance.
+glTF assets, and scene-authored PBR materials (`PbrMaterials`: a mapped sphere
+and a tree with PBR trunk/leaf slots) in raster and DXR modes, using the same
+0.002 RMS tolerance.
 It copies the deployed runtime (excluding existing UserScenes) into a uniquely
 named ignored artifact directory and runs from a different working directory.
 It checks live camera, lighting, material, transform, and rule edits; Save As
@@ -248,17 +250,9 @@ remain **deferred**, not implemented. Remaining measured DXR deformation is
 representative forest workload and target to justify it. No quality defaults
 were changed and no forest-scale or normal asynchronous CPU result is claimed.
 
-### Known baseline limitations
+### Baseline status
 
-The full Debug manifest currently passes 54 of 60 images. All six AI Tree gold
-comparisons already failed on the original pipeline after an earlier scene
-change. All six AI Tree captures are pixel-identical against the captured
-pre-optimization reference; repository gold has not been replaced.
-
-`test-dxr-toggle.ps1` also has a pre-existing AI Tree failure: its hardcoded
-top-100-row "sky only" region now contains scene geometry. Original and optimized
-pipelines produce the same approximately 0.007985 RMS for that assertion.
-Independent SimpleBox and AI Tree checks with postprocessing disabled pass
-on/off/on repeat equality (RMS 0) and actual mode changes. Do not interpret
-these checks or the unchanged sky-region failure as a successful full
-toggle-suite run.
+The full Debug manifest passes all 60 images. The six AI Tree gold images were
+regenerated when the scene gained its environment-lit skybox and the chrome
+PBR sphere; the earlier gold predated the environment and had been failing.
+`test-dxr-toggle.ps1` covers SimpleBox and Tree only.

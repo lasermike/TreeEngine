@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Executable,
-    [string[]]$Scenes = @('LoadSimpleBox', 'LoadSeaScene', 'LoadTrees', 'LoadGraph', 'LoadGltfDemo'),
+    [string[]]$Scenes = @('LoadSimpleBox', 'LoadSeaScene', 'LoadTrees', 'LoadGraph', 'LoadGltfDemo', 'PbrMaterials'),
     [string[]]$Modes = @('raster', 'raytracing')
 )
 

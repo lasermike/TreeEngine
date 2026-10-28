@@ -1,6 +1,6 @@
 # Scene definitions
 
-The fourteen built-in scenes are defined by `*.scene.json` files in this directory.
+The fifteen built-in scenes are defined by `*.scene.json` files in this directory.
 At startup, the engine discovers these files in `Scenes` and `UserScenes` beside
 the executable, without descending into subdirectories. Adding a scene requires
 no catalog-code or project-file change. Build TreeClassic to deploy source scenes
@@ -100,8 +100,9 @@ Use `rotationDegrees: [pitch,yaw,roll]` for convenient Euler authoring, or
 as authored, including the existing AI Tree camera rotation.
 
 A `primitive` supports `shape`, `cubeMap`, and `material`. Supported shapes are
-`box`, `cylinder`, `cylinderLD`, `cylinderHD`, `skinnedCylinder`, and `sprite`.
-The default shape is `box`. Cube maps require a DDS texture.
+`box`, `cylinder`, `cylinderLD`, `cylinderHD`, `skinnedCylinder`, `sprite`, and
+`sphere` (unit diameter, like the box and cylinders). The default shape is `box`.
+Cube maps require a DDS texture.
 
 A `tree` supports `trunkShape` (`skinnedCylinder` by default, or `cylinder`),
 named `materials.trunk` and `materials.leaf`, and a required `generator`.
@@ -148,6 +149,45 @@ Alpha clip defaults to `0` and must be between `0` and `1`. UV scale defaults to
 times in each axis using the existing wrap sampler. Negative UV scale mirrors.
 Runtime material creation uses copies so rebuilding does not compound UV scales.
 
+### PBR materials
+
+A material can instead contain a `pbr` object with the same metallic-roughness
+BRDF that glTF models use, in both raster and DXR. It works on primitives and on
+tree, fixed-tree, and graph `trunk`/`leaf` slots, and through named references.
+`pbr` cannot be combined with `ambient`, `diffuse`, `specular`, `reflect`,
+`texture`, `alphaClipThreshold`, or `flags`; `textureCoordScale` still applies.
+The `PBR Materials` scene uses every property.
+
+```json
+"chrome": {
+  "pbr": { "baseColor": [0.95, 0.95, 0.95, 1], "metallic": 1, "roughness": 0.05 }
+}
+```
+
+| Property | glTF source | Default | Range |
+|---|---|---|---|
+| `baseColor` | `baseColorFactor` | `[1,1,1,1]` | RGBA |
+| `metallic`, `roughness` | `metallicFactor`, `roughnessFactor` | `1`, `1` | 0–1 |
+| `specular`, `specularColor` | `KHR_materials_specular` | `1`, `[1,1,1]` | 0–1, nonnegative RGB |
+| `ior` | `KHR_materials_ior` | `1.5` | `0` or ≥ 1 |
+| `transmission` | `KHR_materials_transmission` | `0` | 0–1; above 0 alpha blends in raster |
+| `alphaMode`, `alphaCutoff` | `alphaMode`, `alphaCutoff` | `opaque`, `0.5` | `opaque`, `mask`, `blend`; 0–1 |
+| `unlit` | `KHR_materials_unlit` | `false` | cannot be combined with specular, IOR, transmission, or non-base maps |
+
+Optional maps are `baseColorTexture`, `metallicRoughnessTexture`, `normalTexture`,
+`specularTexture`, and `specularColorTexture`. Each has a required `source` and
+optional `wrap` (default `true`; `false` clamps) and `transform` (`offset`,
+`rotation` in radians, and `scale`, as in `KHR_texture_transform`).
+`normalTexture` also takes `scale` (default `1`, nonnegative). Maps must be PNG or
+JPEG, as for glTF; base-color and specular-color maps are sRGB, and the others
+are linear. They resolve like other scene assets. The renderer has eight material
+texture slots shared by every texture in a scene, so heavily mapped scenes can
+fail to load with `E_BOUNDS`. Emissive, occlusion, and other glTF extensions
+are not supported, as for models.
+
+Saving writes PBR materials back as `pbr` objects. A material UV scale is folded
+into each map's `transform`.
+
 ## L-systems
 
 `generator` requires a nonempty `axiom`. It supports `constants`, `rules`,
@@ -178,13 +218,12 @@ Build through `TreeEngine\TreeEngine.sln` from the Git checkout root with MSBuil
 Its intermediates are under `Tests\obj\x64\Debug` relative to the solution
 directory; the old `Tests\build` directory is no longer used.
 The tests exercise defaults, references, transforms, rule settings, malformed
-input, material omission semantics, fixed trees, graphs, every catalog scene,
+input, material omission semantics, PBR material parsing/validation/round trips,
+the shared glTF material mapping, fixed trees, graphs, every catalog scene,
 and preservation of the AI Tree scene data.
 
 Use `SceneDefinitionTests.exe --persistence-only` to run just the CPU serialization,
 atomic writing, Unicode-path, discovery, identity-conflict, and overwrite checks.
-The full executable currently has an independent, pre-existing external-glTF-image
-assertion failure; this selector keeps persistence checks independently runnable.
 For live capture/save/reload/restart and rendered-appearance checks, use
 `Tests\RenderRegression\test-scene-persistence.ps1` from the solution directory;
 see the render regression README.

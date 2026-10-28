@@ -669,6 +669,7 @@ const char s_szPrimitiveTypeNames[PrimitiveType_MAX + 1][32] =
     STR(PrimitiveType_FSQuad),
     STR(PrimitiveType_SkinnedCylinder),
     STR(PrimitiveType_Sprite),
+    STR(PrimitiveType_Sphere),
 };
 
 const char* GeneratorTypeName(GeneratorType type)

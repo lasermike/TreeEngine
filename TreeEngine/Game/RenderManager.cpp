@@ -394,6 +394,30 @@ LoadedTexture* RenderManager::FindLoadedGltfTexture(const GltfTextureSource& sou
     return found == m_textures.end() ? nullptr : found->second;
 }
 
+HRESULT RenderManager::BindMaterialTexture(const GltfTextureSource& source, MaterialTextureRole role, ShaderMaterial& shaderMaterial)
+{
+    LoadedTexture* map = nullptr;
+    int slot = -1;
+    HRR(LoadGltfTexture(source, &map, &slot));
+    switch (role)
+    {
+    case SpecularStrengthTextureRole: shaderMaterial.specularTextures.x = static_cast<float>(slot); break;
+    case SpecularColorTextureRole: shaderMaterial.specularTextures.y = static_cast<float>(slot); break;
+    case NormalTextureRole: shaderMaterial.normalTextures.x = static_cast<float>(slot); break;
+    case MetallicRoughnessTextureRole: shaderMaterial.metallicRoughnessTextures.x = static_cast<float>(slot); break;
+    default: return E_INVALIDARG; // Base color is bound by CreateMaterial.
+    }
+    return S_OK;
+}
+
+HRESULT RenderManager::BindMaterialTextures(const MaterialTextureSources& sources, ShaderMaterial& shaderMaterial)
+{
+    for (int role = 0; role < MaterialTextureRoleCount; ++role)
+        if (role != BaseColorTextureRole && sources.roles[role])
+            HRR(BindMaterialTexture(*sources.roles[role], static_cast<MaterialTextureRole>(role), shaderMaterial));
+    return S_OK;
+}
+
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
     const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
     const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,

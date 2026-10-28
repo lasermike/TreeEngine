@@ -21,6 +21,49 @@ struct GltfTextureSource
     bool IsMemoryBacked() const { return !encodedData.empty(); }
 };
 
+enum class PbrAlphaMode { Opaque, Mask, Blend };
+
+// Metallic-roughness factors shared by glTF import and scene-authored materials.
+// Defaults match the glTF specification.
+struct PbrMaterialFactors
+{
+    XMFLOAT4 baseColor = { 1, 1, 1, 1 };
+    float metallic = 1;
+    float roughness = 1;
+    float specular = 1;                      // KHR_materials_specular
+    XMFLOAT3 specularColor = { 1, 1, 1 };
+    float ior = 1.5f;                        // KHR_materials_ior
+    float transmission = 0;                  // KHR_materials_transmission
+    PbrAlphaMode alphaMode = PbrAlphaMode::Opaque;
+    float alphaCutoff = 0.5f;
+    bool unlit = false;                      // KHR_materials_unlit
+};
+
+// Builds the factor portion of a shader material. Texture slots, clamp flags, and
+// flags.y (base-color texture use) are left for the caller. Returns whether the
+// material must be alpha blended (blend mode or transmission).
+ShaderMaterial BuildPbrShaderMaterial(const PbrMaterialFactors& factors, bool& alphaBlend);
+
+// Sets a KHR_texture_transform-style UV transform for one texture role.
+void SetMaterialUvTransform(ShaderMaterial& material, MaterialTextureRole role,
+    XMFLOAT2 offset, float rotation, XMFLOAT2 scale);
+
+// Reads a PNG/JPEG material map into a memory-backed texture source.
+// colorSpace: 1 = linear data, 2 = sRGB color.
+GltfTextureSource LoadMaterialTextureFile(const std::wstring& filename, int colorSpace);
+
+// Per-material texture maps for scene-authored materials, indexed by MaterialTextureRole.
+struct MaterialTextureSources
+{
+    std::shared_ptr<const GltfTextureSource> roles[MaterialTextureRoleCount];
+
+    bool Empty() const
+    {
+        for (const auto& role : roles) if (role) return false;
+        return true;
+    }
+};
+
 struct GltfMaterialData
 {
     std::string name;

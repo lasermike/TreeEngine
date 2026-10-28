@@ -111,10 +111,99 @@ namespace SceneData
             return result;
         }
 
+        float UnitNumber(const Json& value, const std::string& path)
+        {
+            float result = Number(value, path);
+            if (result < 0 || result > 1) Invalid(path, "expected a value between 0 and 1");
+            return result;
+        }
+
+        TextureMapDefinition ReadTextureMap(const Json& value, const std::string& path, float* normalScale)
+        {
+            if (normalScale) Fields(value, path, { "source", "wrap", "transform", "scale" });
+            else Fields(value, path, { "source", "wrap", "transform" });
+            TextureMapDefinition result;
+            if (!value.contains("source")) Invalid(path + ".source", "required property");
+            result.source = String(value["source"], path + ".source");
+            if (result.source.empty()) Invalid(path + ".source", "must not be empty");
+            if (value.contains("wrap")) result.wrap = Boolean(value["wrap"], path + ".wrap");
+            if (value.contains("transform"))
+            {
+                const auto& transform = value["transform"];
+                const auto transformPath = path + ".transform";
+                Fields(transform, transformPath, { "offset", "rotation", "scale" });
+                result.hasTransform = true;
+                if (transform.contains("offset")) result.offset = Vector2(transform["offset"], transformPath + ".offset");
+                if (transform.contains("rotation")) result.rotation = Number(transform["rotation"], transformPath + ".rotation");
+                if (transform.contains("scale")) result.scale = Vector2(transform["scale"], transformPath + ".scale");
+            }
+            if (normalScale && value.contains("scale"))
+            {
+                *normalScale = Number(value["scale"], path + ".scale");
+                if (*normalScale < 0) Invalid(path + ".scale", "must be nonnegative");
+            }
+            return result;
+        }
+
+        PbrMaterialDefinition ReadPbr(const Json& value, const std::string& path)
+        {
+            Fields(value, path, { "baseColor", "metallic", "roughness", "specular", "specularColor", "ior", "transmission",
+                "alphaMode", "alphaCutoff", "unlit", "baseColorTexture", "metallicRoughnessTexture", "normalTexture",
+                "specularTexture", "specularColorTexture" });
+            PbrMaterialDefinition result;
+            if (value.contains("baseColor")) result.baseColor = Vector4(value["baseColor"], path + ".baseColor");
+            if (value.contains("metallic")) result.metallic = UnitNumber(value["metallic"], path + ".metallic");
+            if (value.contains("roughness")) result.roughness = UnitNumber(value["roughness"], path + ".roughness");
+            if (value.contains("specular")) result.specular = UnitNumber(value["specular"], path + ".specular");
+            if (value.contains("specularColor"))
+            {
+                result.specularColor = Vector3(value["specularColor"], path + ".specularColor");
+                if (result.specularColor.x < 0 || result.specularColor.y < 0 || result.specularColor.z < 0)
+                    Invalid(path + ".specularColor", "components must be nonnegative");
+            }
+            if (value.contains("ior"))
+            {
+                result.ior = Number(value["ior"], path + ".ior");
+                if (result.ior != 0 && result.ior < 1) Invalid(path + ".ior", "must be zero or at least one");
+            }
+            if (value.contains("transmission")) result.transmission = UnitNumber(value["transmission"], path + ".transmission");
+            if (value.contains("alphaMode"))
+            {
+                auto mode = String(value["alphaMode"], path + ".alphaMode");
+                if (mode == "mask") result.alphaMode = AlphaMode::Mask;
+                else if (mode == "blend") result.alphaMode = AlphaMode::Blend;
+                else if (mode != "opaque") Invalid(path + ".alphaMode", "expected opaque, mask, or blend");
+            }
+            if (value.contains("alphaCutoff")) result.alphaCutoff = UnitNumber(value["alphaCutoff"], path + ".alphaCutoff");
+            if (value.contains("unlit")) result.unlit = Boolean(value["unlit"], path + ".unlit");
+            if (result.unlit)
+                for (auto field : { "specular", "specularColor", "ior", "transmission", "metallicRoughnessTexture",
+                    "normalTexture", "specularTexture", "specularColorTexture" })
+                    if (value.contains(field)) Invalid(path + "." + field, "cannot be combined with unlit");
+            if (value.contains("baseColorTexture"))
+                result.baseColorTexture = ReadTextureMap(value["baseColorTexture"], path + ".baseColorTexture", nullptr);
+            if (value.contains("metallicRoughnessTexture"))
+                result.metallicRoughnessTexture = ReadTextureMap(value["metallicRoughnessTexture"], path + ".metallicRoughnessTexture", nullptr);
+            if (value.contains("normalTexture"))
+                result.normalTexture = ReadTextureMap(value["normalTexture"], path + ".normalTexture", &result.normalScale);
+            if (value.contains("specularTexture"))
+                result.specularTexture = ReadTextureMap(value["specularTexture"], path + ".specularTexture", nullptr);
+            if (value.contains("specularColorTexture"))
+                result.specularColorTexture = ReadTextureMap(value["specularColorTexture"], path + ".specularColorTexture", nullptr);
+            return result;
+        }
+
         MaterialDefinition ReadMaterial(const Json& value, const std::string& path)
         {
-            Fields(value, path, { "ambient", "diffuse", "specular", "reflect", "texture", "textureCoordScale", "alphaClipThreshold", "flags" });
+            Fields(value, path, { "ambient", "diffuse", "specular", "reflect", "texture", "textureCoordScale", "alphaClipThreshold", "flags", "pbr" });
             MaterialDefinition result;
+            if (value.contains("pbr"))
+            {
+                for (auto field : { "ambient", "diffuse", "specular", "reflect", "texture", "alphaClipThreshold", "flags" })
+                    if (value.contains(field)) Invalid(path + "." + field, "cannot be combined with pbr");
+                result.hasPbr = true;
+                result.pbr = ReadPbr(value["pbr"], path + ".pbr");
+            }
             if (value.contains("ambient")) result.ambient = Vector4(value["ambient"], path + ".ambient");
             if (value.contains("diffuse")) result.diffuse = Vector4(value["diffuse"], path + ".diffuse");
             if (value.contains("specular")) result.specular = Vector4(value["specular"], path + ".specular");
@@ -159,6 +248,7 @@ namespace SceneData
             if (name == "cylinderHD") return Shape::CylinderHD;
             if (name == "skinnedCylinder") return Shape::SkinnedCylinder;
             if (name == "sprite") return Shape::Sprite;
+            if (name == "sphere") return Shape::Sphere;
             Invalid(path, "unknown shape '" + name + "'");
         }
 
@@ -442,8 +532,40 @@ namespace SceneData
         {
             return { { "position", VectorJson(t.position) }, { "rotation", VectorJson(t.rotation) }, { "scale", VectorJson(t.scale) } };
         }
+        Json TextureMapJson(const TextureMapDefinition& map)
+        {
+            Json result = { { "source", map.source }, { "wrap", map.wrap } };
+            if (map.hasTransform)
+                result["transform"] = { { "offset", VectorJson(map.offset) }, { "rotation", map.rotation }, { "scale", VectorJson(map.scale) } };
+            return result;
+        }
+        Json PbrJson(const PbrMaterialDefinition& p)
+        {
+            Json result = { { "baseColor", VectorJson(p.baseColor) }, { "metallic", p.metallic }, { "roughness", p.roughness },
+                { "alphaMode", p.alphaMode == AlphaMode::Mask ? "mask" : p.alphaMode == AlphaMode::Blend ? "blend" : "opaque" },
+                { "alphaCutoff", p.alphaCutoff }, { "unlit", p.unlit } };
+            if (!p.unlit)
+            {
+                result["specular"] = p.specular;
+                result["specularColor"] = VectorJson(p.specularColor);
+                result["ior"] = p.ior;
+                result["transmission"] = p.transmission;
+            }
+            if (!p.baseColorTexture.source.empty()) result["baseColorTexture"] = TextureMapJson(p.baseColorTexture);
+            if (!p.metallicRoughnessTexture.source.empty()) result["metallicRoughnessTexture"] = TextureMapJson(p.metallicRoughnessTexture);
+            if (!p.normalTexture.source.empty())
+            {
+                result["normalTexture"] = TextureMapJson(p.normalTexture);
+                result["normalTexture"]["scale"] = p.normalScale;
+            }
+            if (!p.specularTexture.source.empty()) result["specularTexture"] = TextureMapJson(p.specularTexture);
+            if (!p.specularColorTexture.source.empty()) result["specularColorTexture"] = TextureMapJson(p.specularColorTexture);
+            return result;
+        }
         Json MaterialJson(const MaterialDefinition& m)
         {
+            if (m.hasPbr)
+                return { { "pbr", PbrJson(m.pbr) }, { "textureCoordScale", VectorJson(m.textureCoordScale) } };
             Json result = { { "ambient", VectorJson(m.ambient) }, { "diffuse", VectorJson(m.diffuse) },
                 { "specular", VectorJson(m.specular) }, { "reflect", VectorJson(m.reflect) },
                 { "texture", m.texture }, { "textureCoordScale", VectorJson(m.textureCoordScale) } };
@@ -461,6 +583,7 @@ namespace SceneData
             case Shape::CylinderHD: return "cylinderHD";
             case Shape::SkinnedCylinder: return "skinnedCylinder";
             case Shape::Sprite: return "sprite";
+            case Shape::Sphere: return "sphere";
             }
             throw std::runtime_error("Cannot serialize unsupported shape");
         }

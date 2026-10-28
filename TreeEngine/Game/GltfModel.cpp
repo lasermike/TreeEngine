@@ -40,34 +40,14 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
         }
         ShaderMaterial shaderMaterial = imported.shaderMaterial;
-        if (imported.specularTextureIndex >= 0)
-        {
-            LoadedTexture* map = nullptr;
-            int slot = -1;
-            HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.specularTextureIndex], &map, &slot));
-            shaderMaterial.specularTextures.x = static_cast<float>(slot);
-        }
-        if (imported.metallicRoughnessTextureIndex >= 0)
-        {
-            LoadedTexture* map = nullptr;
-            int slot = -1;
-            HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.metallicRoughnessTextureIndex], &map, &slot));
-            shaderMaterial.metallicRoughnessTextures.x = static_cast<float>(slot);
-        }
-        if (imported.normalTextureIndex >= 0)
-        {
-            LoadedTexture* map = nullptr;
-            int slot = -1;
-            HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.normalTextureIndex], &map, &slot));
-            shaderMaterial.normalTextures.x = static_cast<float>(slot);
-        }
-        if (imported.specularColorTextureIndex >= 0)
-        {
-            LoadedTexture* map = nullptr;
-            int slot = -1;
-            HRR(renderManager.LoadGltfTexture(m_asset->textures[imported.specularColorTextureIndex], &map, &slot));
-            shaderMaterial.specularTextures.y = static_cast<float>(slot);
-        }
+        const std::pair<int, MaterialTextureRole> maps[] = {
+            { imported.specularTextureIndex, SpecularStrengthTextureRole },
+            { imported.metallicRoughnessTextureIndex, MetallicRoughnessTextureRole },
+            { imported.normalTextureIndex, NormalTextureRole },
+            { imported.specularColorTextureIndex, SpecularColorTextureRole } };
+        for (const auto& map : maps)
+            if (map.first >= 0)
+                HRR(renderManager.BindMaterialTexture(m_asset->textures[map.first], map.second, shaderMaterial));
         if (m_forceLit)
             shaderMaterial.flags.w = 0.0f;
         std::wstring name = assetName + L"#material" + std::to_wstring(i)

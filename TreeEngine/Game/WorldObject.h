@@ -3,6 +3,8 @@
 #include "Model.h"
 #include "RenderData.h"
 #include <GeometryGenerator.h>
+#include "GltfLoader.h"
+#include "StockRenderStates.h"
 #include <memory>
 
 class RenderManager;
@@ -70,8 +72,29 @@ public:
     bool cubeMap;
     std::vector<std::wstring> textureFilename;
     std::vector<ShaderMaterial> materials;
+    std::vector<MaterialTextureSources> materialTextures; // Optional PBR maps, parallel to materials.
     std::vector<PrimitiveType> meshes;
+
+    const MaterialTextureSources* MaterialTextures(size_t slot) const
+    {
+        return slot < materialTextures.size() ? &materialTextures[slot] : nullptr;
+    }
 };
+
+// Render state for a material slot: PBR materials choose blending and base-color
+// sampling like imported glTF materials; legacy materials keep the caller's defaults.
+inline void ApplyPbrRenderState(const ShaderMaterial& material, StockRenderState& state)
+{
+    if (material.specularParams.x == 0) return;
+    state.samplerState = material.specularColor.w > 0
+        ? StockSamplerStates::MinMagMipLinearUVWClamp
+        : StockSamplerStates::MinMagMipLinearUVWWrap;
+    if (material.flags.x != 0)
+    {
+        state.blendState = StockBlendStates::AlphaBlend;
+        state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
+    }
+}
 
 template<typename T>
 class WorldObjectParameters : public WorldObjectParams

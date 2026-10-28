@@ -407,31 +407,23 @@ namespace
             ImportError(filename, materialName + " uses unsupported emissive output");
 
         const auto& pbr = material->pbr_metallic_roughness;
-        float metallic = pbr.metallic_factor;
-        float roughness = pbr.roughness_factor;
-        if (!std::isfinite(metallic) || metallic < 0 || metallic > 1)
+        PbrMaterialFactors factors;
+        factors.metallic = pbr.metallic_factor;
+        factors.roughness = pbr.roughness_factor;
+        if (!std::isfinite(factors.metallic) || factors.metallic < 0 || factors.metallic > 1)
             ImportError(filename, materialName + " metallicFactor must be in [0, 1]");
-        if (!std::isfinite(roughness) || roughness < 0 || roughness > 1)
+        if (!std::isfinite(factors.roughness) || factors.roughness < 0 || factors.roughness > 1)
             ImportError(filename, materialName + " roughnessFactor must be in [0, 1]");
-        result.shaderMaterial.specularParams = XMFLOAT4(1, metallic, roughness, 1);
         const float* color = pbr.base_color_factor;
-        result.shaderMaterial.Ambient = XMFLOAT4(color[0] * .15f, color[1] * .15f, color[2] * .15f, color[3]);
-        result.shaderMaterial.Diffuse = XMFLOAT4(color[0], color[1], color[2], color[3]);
-        result.shaderMaterial.Specular = XMFLOAT4(
-            .04f + (color[0] - .04f) * metallic,
-            .04f + (color[1] - .04f) * metallic,
-            .04f + (color[2] - .04f) * metallic,
-            std::max(1.0f, (1.0f - roughness) * 128.0f));
-        result.shaderMaterial.Reflect = XMFLOAT4(color[0] * metallic, color[1] * metallic, color[2] * metallic, 1);
-        result.alphaBlend = material->alpha_mode == cgltf_alpha_mode_blend;
-        result.alphaMask = material->alpha_mode == cgltf_alpha_mode_mask;
+        factors.baseColor = XMFLOAT4(color[0], color[1], color[2], color[3]);
+        factors.alphaMode = material->alpha_mode == cgltf_alpha_mode_blend ? PbrAlphaMode::Blend
+            : material->alpha_mode == cgltf_alpha_mode_mask ? PbrAlphaMode::Mask
+            : PbrAlphaMode::Opaque;
+        factors.alphaCutoff = material->alpha_cutoff;
+        factors.unlit = material->unlit != 0;
+        result.alphaMask = factors.alphaMode == PbrAlphaMode::Mask;
         result.alphaCutoff = material->alpha_cutoff;
-        result.unlit = material->unlit != 0;
-        result.shaderMaterial.flags.x = result.alphaBlend ? 1.0f : 0.0f;
-        result.shaderMaterial.flags.z = material->alpha_mode == cgltf_alpha_mode_mask
-            ? material->alpha_cutoff
-            : (result.alphaBlend ? 1.0f / 255.0f : 0.0f);
-        result.shaderMaterial.flags.w = material->unlit ? 1.0f : 0.0f;
+        result.unlit = factors.unlit;
         result.doubleSided = material->double_sided != 0;
 
         if (material->has_ior)
@@ -441,7 +433,7 @@ namespace
                 ImportError(filename, materialName + " combines KHR_materials_ior with KHR_materials_unlit");
             if (!std::isfinite(ior) || (ior != 0.0f && ior < 1.0f))
                 ImportError(filename, materialName + " KHR_materials_ior.ior must be zero or at least one");
-            result.shaderMaterial.opticalParams.x = ior;
+            factors.ior = ior;
         }
 
         if (material->has_transmission)
@@ -454,12 +446,7 @@ namespace
                 ImportError(filename, materialName + " transmissionFactor must be in [0, 1]");
             if (transmission.transmission_texture.texture)
                 ImportError(filename, materialName + " uses unsupported transmissionTexture");
-            result.shaderMaterial.opticalParams.y = transmission.transmission_factor;
-            if (transmission.transmission_factor > 0.0f)
-            {
-                result.alphaBlend = true; // Raster fallback: display opaque geometry through the surface.
-                result.shaderMaterial.flags.x = 1.0f;
-            }
+            factors.transmission = transmission.transmission_factor;
         }
 
         if (material->has_specular)
@@ -472,10 +459,11 @@ namespace
             for (float component : spec.specular_color_factor)
                 if (!std::isfinite(component) || component < 0)
                     ImportError(filename, materialName + " specularColorFactor must be finite and nonnegative");
-            result.shaderMaterial.specularParams = XMFLOAT4(1, metallic, roughness, spec.specular_factor);
-            result.shaderMaterial.specularColor = XMFLOAT4(spec.specular_color_factor[0],
-                spec.specular_color_factor[1], spec.specular_color_factor[2], 0);
+            factors.specular = spec.specular_factor;
+            factors.specularColor = XMFLOAT3(spec.specular_color_factor[0],
+                spec.specular_color_factor[1], spec.specular_color_factor[2]);
         }
+        result.shaderMaterial = BuildPbrShaderMaterial(factors, result.alphaBlend);
 
         auto importView = [&](const cgltf_texture_view& textureView, int colorSpace, bool& wrap,
             MaterialTextureRole role) -> int
@@ -493,12 +481,9 @@ namespace
                         || !std::isfinite(transform.rotation)
                         || !std::isfinite(transform.scale[0]) || !std::isfinite(transform.scale[1]))
                         ImportError(filename, materialName + " KHR_texture_transform values must be finite");
-                    const float cosine = std::cos(transform.rotation);
-                    const float sine = std::sin(transform.rotation);
-                    result.shaderMaterial.uvTransformRow0[role] = XMFLOAT4(
-                        cosine * transform.scale[0], -sine * transform.scale[1], transform.offset[0], 0);
-                    result.shaderMaterial.uvTransformRow1[role] = XMFLOAT4(
-                        sine * transform.scale[0], cosine * transform.scale[1], transform.offset[1], 0);
+                    SetMaterialUvTransform(result.shaderMaterial, role,
+                        XMFLOAT2(transform.offset[0], transform.offset[1]), transform.rotation,
+                        XMFLOAT2(transform.scale[0], transform.scale[1]));
                 }
                 const auto* texture = textureView.texture;
                 if (texture->sampler)
@@ -756,6 +741,69 @@ namespace
             VisitNode(filename, data, *node.children[i], asset, primitiveMap, materialIndices, defaultMaterialIndex, active);
         active.erase(&node);
     }
+}
+
+ShaderMaterial BuildPbrShaderMaterial(const PbrMaterialFactors& factors, bool& alphaBlend)
+{
+    ShaderMaterial result;
+    const XMFLOAT4& color = factors.baseColor;
+    const float metallic = factors.metallic;
+    result.specularParams = XMFLOAT4(1, metallic, factors.roughness, factors.specular);
+    result.specularColor = XMFLOAT4(factors.specularColor.x, factors.specularColor.y, factors.specularColor.z, 0);
+    result.opticalParams.x = factors.ior;
+    result.opticalParams.y = factors.transmission;
+    // Legacy Phong terms approximate the BRDF for paths that do not evaluate it.
+    result.Ambient = XMFLOAT4(color.x * .15f, color.y * .15f, color.z * .15f, color.w);
+    result.Diffuse = color;
+    result.Specular = XMFLOAT4(
+        .04f + (color.x - .04f) * metallic,
+        .04f + (color.y - .04f) * metallic,
+        .04f + (color.z - .04f) * metallic,
+        std::max(1.0f, (1.0f - factors.roughness) * 128.0f));
+    result.Reflect = XMFLOAT4(color.x * metallic, color.y * metallic, color.z * metallic, 1);
+    alphaBlend = factors.alphaMode == PbrAlphaMode::Blend;
+    result.flags.z = factors.alphaMode == PbrAlphaMode::Mask
+        ? factors.alphaCutoff
+        : (alphaBlend ? 1.0f / 255.0f : 0.0f);
+    result.flags.w = factors.unlit ? 1.0f : 0.0f;
+    if (factors.transmission > 0.0f)
+        alphaBlend = true; // Raster fallback: display opaque geometry through the surface.
+    result.flags.x = alphaBlend ? 1.0f : 0.0f;
+    return result;
+}
+
+void SetMaterialUvTransform(ShaderMaterial& material, MaterialTextureRole role,
+    XMFLOAT2 offset, float rotation, XMFLOAT2 scale)
+{
+    const float cosine = std::cos(rotation);
+    const float sine = std::sin(rotation);
+    material.uvTransformRow0[role] = XMFLOAT4(cosine * scale.x, -sine * scale.y, offset.x, 0);
+    material.uvTransformRow1[role] = XMFLOAT4(sine * scale.x, cosine * scale.y, offset.y, 0);
+}
+
+GltfTextureSource LoadMaterialTextureFile(const std::wstring& filename, int colorSpace)
+{
+    std::string narrow;
+    if (int size = WideCharToMultiByte(CP_UTF8, 0, filename.c_str(), -1, nullptr, 0, nullptr, nullptr))
+    {
+        std::vector<char> buffer(size);
+        WideCharToMultiByte(CP_UTF8, 0, filename.c_str(), -1, buffer.data(), size, nullptr, nullptr);
+        narrow = buffer.data();
+    }
+    auto extension = LowerExtension(narrow);
+    if (extension != ".png" && extension != ".jpg" && extension != ".jpeg")
+        throw std::runtime_error("material map '" + narrow + "' must be a PNG or JPEG image");
+    GltfTextureSource result;
+    result.filename = filename;
+    result.name = narrow;
+    result.mimeType = extension == ".png" ? "image/png" : "image/jpeg";
+    result.colorSpace = colorSpace;
+    std::ifstream input(filename.c_str(), std::ios::binary);
+    if (!input) throw std::runtime_error("material map '" + narrow + "' was not found");
+    result.encodedData.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    if (result.encodedData.empty()) throw std::runtime_error("material map '" + narrow + "' is empty");
+    result.key = filename + (colorSpace == 2 ? L"#srgb" : L"#linear");
+    return result;
 }
 
 void GltfAsset::AppendGeometry(GeometryBufferData& geometryData)

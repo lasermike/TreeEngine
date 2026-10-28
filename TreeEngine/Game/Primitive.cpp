@@ -61,7 +61,15 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
     StockRenderState renderState;
     if (_params->cubeMap)
         renderState.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
-    renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, shaderMaterial, renderState, &newMaterial);
+    ApplyPbrRenderState(shaderMaterial, renderState);
+    const auto* maps = _params->MaterialTextures(0);
+    if (maps && !maps->Empty())
+    {
+        HRR(renderManager.BindMaterialTextures(*maps, shaderMaterial));
+        HRR(renderManager.CreateMaterial(resourceName, maps->roles[BaseColorTextureRole].get(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, shaderMaterial, renderState, &newMaterial));
+    }
+    else
+        renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, shaderMaterial, renderState, &newMaterial);
     newMaterial->m_isSkybox = _params->cubeMap;
 
     Mesh* newMesh = nullptr;

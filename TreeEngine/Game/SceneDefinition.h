@@ -15,6 +15,39 @@ namespace SceneData
         DirectX::XMFLOAT3 scale = { 1, 1, 1 };
     };
 
+    struct TextureMapDefinition
+    {
+        std::string source; // Empty means no map.
+        bool wrap = true;
+        bool hasTransform = false;
+        DirectX::XMFLOAT2 offset = { 0, 0 };
+        float rotation = 0; // Radians, as in KHR_texture_transform.
+        DirectX::XMFLOAT2 scale = { 1, 1 };
+    };
+
+    enum class AlphaMode { Opaque, Mask, Blend };
+
+    // glTF metallic-roughness material with the extensions the renderer supports.
+    struct PbrMaterialDefinition
+    {
+        DirectX::XMFLOAT4 baseColor = { 1, 1, 1, 1 };
+        float metallic = 1;
+        float roughness = 1;
+        float specular = 1;
+        DirectX::XMFLOAT3 specularColor = { 1, 1, 1 };
+        float ior = 1.5f;
+        float transmission = 0;
+        AlphaMode alphaMode = AlphaMode::Opaque;
+        float alphaCutoff = 0.5f;
+        bool unlit = false;
+        float normalScale = 1;
+        TextureMapDefinition baseColorTexture;
+        TextureMapDefinition metallicRoughnessTexture;
+        TextureMapDefinition normalTexture;
+        TextureMapDefinition specularTexture;
+        TextureMapDefinition specularColorTexture;
+    };
+
     struct MaterialDefinition
     {
         DirectX::XMFLOAT4 ambient = { 0, 0, 0, 1 };
@@ -26,9 +59,12 @@ namespace SceneData
         float alphaClipThreshold = 0;
         DirectX::XMFLOAT4 flags = { 0, 0, 0, 0 };
         bool hasFlags = false;
+        // When set, the material uses pbr instead of the legacy Phong/flags fields.
+        bool hasPbr = false;
+        PbrMaterialDefinition pbr;
     };
 
-    enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite };
+    enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite, Sphere };
     enum class ObjectKind { Primitive, Tree, FixedTree, Graph, Model };
     enum class SegmentLengthBehavior { Constant, RandomAddition };
 
