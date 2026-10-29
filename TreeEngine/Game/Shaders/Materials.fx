@@ -46,10 +46,10 @@ struct ShaderMaterial
 {
     float4 Ambient;
     float4 Diffuse;
-    float4 Specular; // legacy Phong specular tint; w = SpecPower
-    float4 Reflect;
+    float4 Specular; // unused by lighting; kept for the shared C++ layout
+    float4 Reflect; // unused by lighting; kept for the shared C++ layout
     float4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
-    float4 specularParams; // enabled, metallic, roughness, specularFactor
+    float4 specularParams; // x unused, metallic, roughness, specularFactor
     float4 specularColor; // linear RGB factor; w = base-color clamp
     float4 specularTextures; // strength/color slots; z/w = clamp flags
     float4 normalTextures; // normal texture slot, scale, clamp flag
@@ -112,7 +112,7 @@ float ComputeDielectricF0(float ior)
     return ratio * ratio;
 }
 
-void ComputeGltfSpecularLight(ShaderMaterial mat, float4 textureColor, DirectionalLight light,
+void ComputeDirectionalLight(ShaderMaterial mat, float4 textureColor, DirectionalLight light,
     float3 normal, float3 toEye, out float4 ambient, out float4 diffuse, out float4 spec)
 {
     const float pi = 3.14159265359f;
@@ -172,155 +172,6 @@ float3 ComputeGltfEnvironmentLight(ShaderMaterial mat, float4 textureColor,
     return irradiance * (diffuseWeight * baseColor)
         + prefiltered * (f0 * brdf.x + f90 * brdf.y);
 }
-
-void ComputeDirectionalLight(ShaderMaterial mat, float4 textureColor, DirectionalLight L,
-    float3 normal, float3 toEye,
-    out float4 ambient,
-    out float4 diffuse,
-    out float4 spec)
-{
-    // Initialize outputs.
-    ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
-
-    if (mat.specularParams.x > 0)
-    {
-        ComputeGltfSpecularLight(mat, textureColor, L, normal, toEye, ambient, diffuse, spec);
-        return;
-    }
-
-    // The light vector aims opposite the direction the light rays travel.
-    float3 lightVec = -L.Direction;
-
-    // Add ambient term.
-    ambient = mat.Ambient * L.Ambient * textureColor;
-
-    // Add diffuse and specular term, provided the surface is in 
-    // the line of site of the light.
-
-    float diffuseFactor = dot(lightVec, normal);
-
-    // Flatten to avoid dynamic branching.
-    [flatten]
-    if (diffuseFactor > 0.0f)
-    {
-        float3 v = reflect(-lightVec, normal);
-        float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
-
-        diffuse = diffuseFactor * mat.Diffuse * L.Diffuse * textureColor;
-        spec = specFactor * mat.Specular * L.Specular * textureColor;
-    }
-}
-
-//---------------------------------------------------------------------------------------
-// Computes the ambient, diffuse, and specular terms in the lighting equation
-// from a point light.  We need to output the terms separately because
-// later we will modify the individual terms.
-//---------------------------------------------------------------------------------------
-void ComputePointLight(ShaderMaterial mat, PointLight L, float3 pos, float3 normal, float3 toEye,
-    out float4 ambient, out float4 diffuse, out float4 spec)
-{
-    // Initialize outputs.
-    ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
-
-    // The vector from the surface to the light.
-    float3 lightVec = L.Position - pos;
-
-    // The distance from surface to light.
-    float d = length(lightVec);
-
-    // Range test.
-    if (d > L.Range)
-        return;
-
-    // Normalize the light vector.
-    lightVec /= d;
-
-    // Ambient term.
-    ambient = mat.Ambient * L.Ambient;
-
-    // Add diffuse and specular term, provided the surface is in 
-    // the line of site of the light.
-
-    float diffuseFactor = dot(lightVec, normal);
-
-    // Flatten to avoid dynamic branching.
-    [flatten]
-    if (diffuseFactor > 0.0f)
-    {
-        float3 v = reflect(-lightVec, normal);
-        float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
-
-        diffuse = diffuseFactor * mat.Diffuse * L.Diffuse;
-        spec = specFactor * mat.Specular * L.Specular;
-    }
-
-    // Attenuate
-    float att = 1.0f / dot(L.Att, float3(1.0f, d, d*d));
-
-    diffuse *= att;
-    spec *= att;
-}
-
-//---------------------------------------------------------------------------------------
-// Computes the ambient, diffuse, and specular terms in the lighting equation
-// from a spotlight.  We need to output the terms separately because
-// later we will modify the individual terms.
-//---------------------------------------------------------------------------------------
-void ComputeSpotLight(ShaderMaterial mat, SpotLight L, float3 pos, float3 normal, float3 toEye,
-    out float4 ambient, out float4 diffuse, out float4 spec)
-{
-    // Initialize outputs.
-    ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
-
-    // The vector from the surface to the light.
-    float3 lightVec = L.Position - pos;
-
-    // The distance from surface to light.
-    float d = length(lightVec);
-
-    // Range test.
-    if (d > L.Range)
-        return;
-
-    // Normalize the light vector.
-    lightVec /= d;
-
-    // Ambient term.
-    ambient = mat.Ambient * L.Ambient;
-
-    // Add diffuse and specular term, provided the surface is in 
-    // the line of site of the light.
-
-    float diffuseFactor = dot(lightVec, normal);
-
-    // Flatten to avoid dynamic branching.
-    [flatten]
-    if (diffuseFactor > 0.0f)
-    {
-        float3 v = reflect(-lightVec, normal);
-        float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
-
-        diffuse = diffuseFactor * mat.Diffuse * L.Diffuse;
-        spec = specFactor * mat.Specular * L.Specular;
-    }
-
-    // Scale by spotlight factor and attenuate.
-    float spot = pow(max(dot(-lightVec, L.Direction), 0.0f), L.Spot);
-
-    // Scale by spotlight factor and attenuate.
-    float att = spot / dot(L.Att, float3(1.0f, d, d*d));
-
-    ambient *= spot;
-    diffuse *= att;
-    spec *= att;
-}
-
 
 //---------------------------------------------------------------------------------------
 // Performs shadowmap test to determine if a pixel is in shadow.

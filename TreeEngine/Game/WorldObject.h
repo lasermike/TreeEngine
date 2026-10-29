@@ -18,7 +18,6 @@ enum GeneratorType
     FixedTreeGeneratorType,
     LSystemGeneratorType,
     GraphGeneratorType,
-    FSGraphGeneratorType,
     ModelGeneratorType,
 };
 

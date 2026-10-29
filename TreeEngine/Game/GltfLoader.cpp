@@ -389,8 +389,6 @@ namespace
             : "Default material";
         result.shaderMaterial.Ambient = XMFLOAT4(.15f, .15f, .15f, 1);
         result.shaderMaterial.Diffuse = XMFLOAT4(1, 1, 1, 1);
-        result.shaderMaterial.Specular = XMFLOAT4(.04f, .04f, .04f, 16);
-        result.shaderMaterial.Reflect = XMFLOAT4(0, 0, 0, 1);
         result.shaderMaterial.specularParams = XMFLOAT4(1, 1, 1, 1);
         if (!material) return result;
 
@@ -752,15 +750,9 @@ ShaderMaterial BuildPbrShaderMaterial(const PbrMaterialFactors& factors, bool& a
     result.specularColor = XMFLOAT4(factors.specularColor.x, factors.specularColor.y, factors.specularColor.z, 0);
     result.opticalParams.x = factors.ior;
     result.opticalParams.y = factors.transmission;
-    // Legacy Phong terms approximate the BRDF for paths that do not evaluate it.
+    // Ambient is the scene ambient's artistic 0.15 x base-color approximation.
     result.Ambient = XMFLOAT4(color.x * .15f, color.y * .15f, color.z * .15f, color.w);
     result.Diffuse = color;
-    result.Specular = XMFLOAT4(
-        .04f + (color.x - .04f) * metallic,
-        .04f + (color.y - .04f) * metallic,
-        .04f + (color.z - .04f) * metallic,
-        std::max(1.0f, (1.0f - factors.roughness) * 128.0f));
-    result.Reflect = XMFLOAT4(color.x * metallic, color.y * metallic, color.z * metallic, 1);
     alphaBlend = factors.alphaMode == PbrAlphaMode::Blend;
     result.flags.z = factors.alphaMode == PbrAlphaMode::Mask
         ? factors.alphaCutoff

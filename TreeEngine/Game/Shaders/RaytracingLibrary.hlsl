@@ -162,7 +162,7 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 
         float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
 
-        float4 textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularParams.x > 0 && mat.specularColor.w > 0);
+        float4 textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularColor.w > 0);
 
         if (textureColor.a < mat.flags.z)
         {
@@ -222,14 +222,13 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float4 textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
     if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
     {
-        textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularParams.x > 0 && mat.specularColor.w > 0);
+        textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularColor.w > 0);
     }
 
     if (mat.flags.w > 0)
     {
         payload.color = mat.Diffuse * textureColor;
-        if (mat.specularParams.x > 0)
-            payload.color.rgb = EncodeGltfDisplayColor(payload.color.rgb);
+        payload.color.rgb = EncodeGltfDisplayColor(payload.color.rgb);
         payload.color.a = 1.0f;
         return;
     }
@@ -256,86 +255,64 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         ~0, 0, 0, shadowMissIndex, shadowRay, shadowPayload);
     shadowFactor = shadowPayload.color.x;
 
-    if (mat.specularParams.x > 0)
+    if (mat.specularTextures.x >= 0)
     {
-        if (mat.specularTextures.x >= 0)
-        {
-            float2 strengthUv = TransformMaterialUv(mat, texCoord, SpecularStrengthTextureRole);
-            mat.specularParams.w *= SampleSpecularTexture((int)mat.specularTextures.x, strengthUv, mat.specularTextures.z > 0).a;
-        }
-        if (mat.specularTextures.y >= 0)
-        {
-            float2 colorUv = TransformMaterialUv(mat, texCoord, SpecularColorTextureRole);
-            mat.specularColor.rgb *= SampleSpecularTexture((int)mat.specularTextures.y, colorUv, mat.specularTextures.w > 0).rgb;
-        }
-        if (mat.metallicRoughnessTextures.x >= 0)
-        {
-            float2 metallicRoughnessUv = TransformMaterialUv(mat, texCoord, MetallicRoughnessTextureRole);
-            float4 mr = SampleSpecularTexture((int)mat.metallicRoughnessTextures.x, metallicRoughnessUv, mat.metallicRoughnessTextures.y > 0);
-            mat.specularParams.y *= mr.b;
-            mat.specularParams.z *= mr.g;
-        }
-        float4 A, D, S;
-        ComputeDirectionalLight(mat, textureColor, light, normal, toEye, A, D, S);
-        uint cubeWidth, cubeHeight, mipCount;
-        environmentSpecular.GetDimensions(0, cubeWidth, cubeHeight, mipCount);
-        float roughness = saturate(mat.specularParams.z);
-        float3 reflected = reflect(-toEye, normal);
-        float3 irradiance = environmentDiffuse.SampleLevel(samLinearClamp, RotateEnvironmentDirection(normal), 0).rgb;
-        float3 prefiltered = environmentSpecular.SampleLevel(samLinearClamp, RotateEnvironmentDirection(reflected),
-            roughness * (mipCount - 1)).rgb;
-        float3 ibl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
-            irradiance, prefiltered);
-        float3 surfaceColor = (A + shadowFactor * (D + S)).rgb + ibl;
-        if (mat.opticalParams.y > 0.0f && payload.depth == 0)
-        {
-            // Trace once through the thin surface to reveal opaque scene geometry.
-            // The exit interface and multiple transmissive layers remain approximated.
-            float3 incident = normalize(WorldRayDirection());
-            bool entering = dot(incident, normal) < 0.0f;
-            float3 faceNormal = entering ? normal : -normal;
-            float ior = max(mat.opticalParams.x, 1.0f);
-            float3 direction = refract(incident, faceNormal, entering ? 1.0f / ior : ior);
-            if (dot(direction, direction) < 1e-8f)
-                direction = reflect(incident, faceNormal);
-            RayDesc transmittedRay;
-            transmittedRay.Origin = hitPos + direction * 0.001f;
-            transmittedRay.Direction = direction;
-            transmittedRay.TMin = 0.001f;
-            transmittedRay.TMax = 100.0f;
-            RayPayload transmitted = { float4(0, 0, 0, 1), payload.depth + 1, 0 };
-            TraceRay(Scene, rayFlags, ~0, 0, 0, 1, transmittedRay, transmitted);
-            float3 specularIbl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
-                float3(0, 0, 0), prefiltered);
-            float3 reflection = EncodeGltfDisplayColor((shadowFactor * S).rgb + specularIbl);
-            float f0 = ComputeDielectricF0(mat.opticalParams.x);
-            float fresnel = f0 + (1.0f - f0) * pow(1.0f - saturate(dot(normal, toEye)), 5.0f);
-            float3 throughColor = transmitted.color.rgb * mat.Diffuse.rgb * textureColor.rgb * (1.0f - fresnel);
-            payload.color = float4(lerp(EncodeGltfDisplayColor(surfaceColor), reflection + throughColor,
-                saturate(mat.opticalParams.y)), 1);
-        }
-        else
-            payload.color = float4(EncodeGltfDisplayColor(surfaceColor), 1);
-        return;
+        float2 strengthUv = TransformMaterialUv(mat, texCoord, SpecularStrengthTextureRole);
+        mat.specularParams.w *= SampleSpecularTexture((int)mat.specularTextures.x, strengthUv, mat.specularTextures.z > 0).a;
     }
-
-    // Compute lighting manually with shadow factor
-    float3 L = lightDir;
-    float4 ambient = mat.Ambient * light.Ambient * textureColor;
-
-    float diffuseFactor = max(dot(L, normal), 0.0f);
-    float4 diffuse = diffuseFactor * mat.Diffuse * light.Diffuse * textureColor * shadowFactor;
-    
-    float4 spec = float4(0, 0, 0, 0);
-    if (diffuseFactor > 0.0f)
+    if (mat.specularTextures.y >= 0)
     {
-        float3 v = reflect(-L, normal);
-        float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
-        spec = specFactor * mat.Specular * light.Specular * textureColor * shadowFactor;
+        float2 colorUv = TransformMaterialUv(mat, texCoord, SpecularColorTextureRole);
+        mat.specularColor.rgb *= SampleSpecularTexture((int)mat.specularTextures.y, colorUv, mat.specularTextures.w > 0).rgb;
     }
-
-    payload.color = ambient + diffuse + spec;
-    payload.color.a = 1.0f;
+    if (mat.metallicRoughnessTextures.x >= 0)
+    {
+        float2 metallicRoughnessUv = TransformMaterialUv(mat, texCoord, MetallicRoughnessTextureRole);
+        float4 mr = SampleSpecularTexture((int)mat.metallicRoughnessTextures.x, metallicRoughnessUv, mat.metallicRoughnessTextures.y > 0);
+        mat.specularParams.y *= mr.b;
+        mat.specularParams.z *= mr.g;
+    }
+    float4 A, D, S;
+    ComputeDirectionalLight(mat, textureColor, light, normal, toEye, A, D, S);
+    uint cubeWidth, cubeHeight, mipCount;
+    environmentSpecular.GetDimensions(0, cubeWidth, cubeHeight, mipCount);
+    float roughness = saturate(mat.specularParams.z);
+    float3 reflected = reflect(-toEye, normal);
+    float3 irradiance = environmentDiffuse.SampleLevel(samLinearClamp, RotateEnvironmentDirection(normal), 0).rgb;
+    float3 prefiltered = environmentSpecular.SampleLevel(samLinearClamp, RotateEnvironmentDirection(reflected),
+        roughness * (mipCount - 1)).rgb;
+    float3 ibl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
+        irradiance, prefiltered);
+    float3 surfaceColor = (A + shadowFactor * (D + S)).rgb + ibl;
+    if (mat.opticalParams.y > 0.0f && payload.depth == 0)
+    {
+        // Trace once through the thin surface to reveal opaque scene geometry.
+        // The exit interface and multiple transmissive layers remain approximated.
+        float3 incident = normalize(WorldRayDirection());
+        bool entering = dot(incident, normal) < 0.0f;
+        float3 faceNormal = entering ? normal : -normal;
+        float ior = max(mat.opticalParams.x, 1.0f);
+        float3 direction = refract(incident, faceNormal, entering ? 1.0f / ior : ior);
+        if (dot(direction, direction) < 1e-8f)
+            direction = reflect(incident, faceNormal);
+        RayDesc transmittedRay;
+        transmittedRay.Origin = hitPos + direction * 0.001f;
+        transmittedRay.Direction = direction;
+        transmittedRay.TMin = 0.001f;
+        transmittedRay.TMax = 100.0f;
+        RayPayload transmitted = { float4(0, 0, 0, 1), payload.depth + 1, 0 };
+        TraceRay(Scene, rayFlags, ~0, 0, 0, 1, transmittedRay, transmitted);
+        float3 specularIbl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
+            float3(0, 0, 0), prefiltered);
+        float3 reflection = EncodeGltfDisplayColor((shadowFactor * S).rgb + specularIbl);
+        float f0 = ComputeDielectricF0(mat.opticalParams.x);
+        float fresnel = f0 + (1.0f - f0) * pow(1.0f - saturate(dot(normal, toEye)), 5.0f);
+        float3 throughColor = transmitted.color.rgb * mat.Diffuse.rgb * textureColor.rgb * (1.0f - fresnel);
+        payload.color = float4(lerp(EncodeGltfDisplayColor(surfaceColor), reflection + throughColor,
+            saturate(mat.opticalParams.y)), 1);
+    }
+    else
+        payload.color = float4(EncodeGltfDisplayColor(surfaceColor), 1);
 }
 
 [shader("miss")]

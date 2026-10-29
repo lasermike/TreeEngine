@@ -29,20 +29,17 @@ TextureCube txEnvironmentSpecular : register(t8);
 
 ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
 {
-    if (material.specularParams.x > 0)
+    if (material.specularTextures.x >= 0)
     {
-        if (material.specularTextures.x >= 0)
-        {
-            float2 strengthUv = TransformMaterialUv(material, uv, SpecularStrengthTextureRole);
-            material.specularParams.w *= material.specularTextures.z > 0
-                ? txSpecular.Sample(samLinearClamp, strengthUv).a : txSpecular.Sample(samLinearWrap, strengthUv).a;
-        }
-        if (material.specularTextures.y >= 0)
-        {
-            float2 colorUv = TransformMaterialUv(material, uv, SpecularColorTextureRole);
-            material.specularColor.rgb *= material.specularTextures.w > 0
-                ? txSpecularColor.Sample(samLinearClamp, colorUv).rgb : txSpecularColor.Sample(samLinearWrap, colorUv).rgb;
-        }
+        float2 strengthUv = TransformMaterialUv(material, uv, SpecularStrengthTextureRole);
+        material.specularParams.w *= material.specularTextures.z > 0
+            ? txSpecular.Sample(samLinearClamp, strengthUv).a : txSpecular.Sample(samLinearWrap, strengthUv).a;
+    }
+    if (material.specularTextures.y >= 0)
+    {
+        float2 colorUv = TransformMaterialUv(material, uv, SpecularColorTextureRole);
+        material.specularColor.rgb *= material.specularTextures.w > 0
+            ? txSpecularColor.Sample(samLinearClamp, colorUv).rgb : txSpecularColor.Sample(samLinearWrap, colorUv).rgb;
     }
     if (material.metallicRoughnessTextures.x >= 0)
     {
@@ -252,7 +249,7 @@ float4 PS(PS_INPUT input) : SV_Target
     if (mat.flags.y > 0)  //use texture
     {
         float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
-        textureColor = (mat.specularParams.x > 0 && mat.specularColor.w > 0
+        textureColor = (mat.specularColor.w > 0
             ? txDiffuse.Sample(samLinearClamp, baseColorUv)
             : txDiffuse.Sample(samLinearWrap, baseColorUv));
 
@@ -267,8 +264,7 @@ float4 PS(PS_INPUT input) : SV_Target
     if (mat.flags.w > 0)
     {
         float4 color = mat.Diffuse * textureColor;
-        if (mat.specularParams.x > 0)
-            color.rgb = EncodeGltfDisplayColor(color.rgb);
+        color.rgb = EncodeGltfDisplayColor(color.rgb);
         return color;
     }
 
@@ -307,27 +303,23 @@ float4 PS(PS_INPUT input) : SV_Target
     }
 
     float4 litColor = ambient + diffuse + spec;
+    uint cubeWidth, cubeHeight, mipCount;
+    txEnvironmentSpecular.GetDimensions(0, cubeWidth, cubeHeight, mipCount);
+    float roughness = saturate(sampledMaterial.specularParams.z);
+    float3 reflected = reflect(-toEye, normal);
+    float3 irradiance = txEnvironmentDiffuse.Sample(samLinearClamp, RotateEnvironmentDirection(normal)).rgb;
+    float3 prefiltered = txEnvironmentSpecular.SampleLevel(samLinearClamp, RotateEnvironmentDirection(reflected),
+        roughness * (mipCount - 1)).rgb;
+    litColor.rgb += ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
+        normal, toEye, irradiance, prefiltered);
     float3 specularIbl = 0.0f;
-    if (sampledMaterial.specularParams.x > 0)
-    {
-        uint cubeWidth, cubeHeight, mipCount;
-        txEnvironmentSpecular.GetDimensions(0, cubeWidth, cubeHeight, mipCount);
-        float roughness = saturate(sampledMaterial.specularParams.z);
-        float3 reflected = reflect(-toEye, normal);
-        float3 irradiance = txEnvironmentDiffuse.Sample(samLinearClamp, RotateEnvironmentDirection(normal)).rgb;
-        float3 prefiltered = txEnvironmentSpecular.SampleLevel(samLinearClamp, RotateEnvironmentDirection(reflected),
-            roughness * (mipCount - 1)).rgb;
-        litColor.rgb += ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
-            normal, toEye, irradiance, prefiltered);
-        if (mat.opticalParams.y > 0.0f)
-            specularIbl = ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
-                normal, toEye, 0.0f, prefiltered);
-    }
+    if (mat.opticalParams.y > 0.0f)
+        specularIbl = ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
+            normal, toEye, 0.0f, prefiltered);
 
     if (mat.flags.x > 0)
         litColor.a = mat.Diffuse.a * textureColor.a;
-    if (mat.specularParams.x > 0)
-        litColor.rgb = EncodeGltfDisplayColor(litColor.rgb);
+    litColor.rgb = EncodeGltfDisplayColor(litColor.rgb);
     if (mat.opticalParams.y > 0.0f)
     {
         // Alpha blend fallback for transmission: keep reflected light while
@@ -342,7 +334,7 @@ float4 PS(PS_INPUT input) : SV_Target
 }
 
 /////////////////////////////////////////////////////////
-/********* FS GRAPH ********/
+/********* Shadow map ********/
 
 struct ShadowMapVertexOut
 {
@@ -382,7 +374,7 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
     if (mat.flags.z > 0)  // clip alpha threshold
     {
         float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
-        float4 textureColor = (mat.specularParams.x > 0 && mat.specularColor.w > 0
+        float4 textureColor = (mat.specularColor.w > 0
             ? txDiffuse.Sample(samLinearClamp, baseColorUv)
             : txDiffuse.Sample(samLinearWrap, baseColorUv));
 
@@ -392,7 +384,7 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
 }
 
 /////////////////////////////////////////////////////////
-/********* FS GRAPH ********/
+/********* Debug screen quads ********/
 
 struct DSVertexIn
 {
@@ -453,109 +445,6 @@ float4 DrawRGBScreenQuadPS(DSVertexOut input) : SV_Target
 
     return float4(c.rgb, 1);
 }
-
-/////////////////////////////////////////////////////////
-/********* FS GRAPH ********/
-
-PS_INPUT FSGraphVS(VS_INPUT input)
-{
-    PS_INPUT output = (PS_INPUT)0;
-
-    output.Pos = float4(input.Pos, 1);
-    output.Tex = input.Tex;
-
-    return output;
-}
-
-float segdist(float2 p1, float2 p2, float2 a)
-{
-    float d = max(1e-10, dot(p2 - p1, p2 - p1));
-    float t = clamp(dot(a - p1, p2 - p1) / d, 0.0, 1.0);
-    return distance(a, lerp(p1, p2, t));
-}
-
-static float4 lineColors[12] =
-{
-    { 1,0,0,1 },
-    { 0,1,0,1 },
-    { 0,0,1,1 },
-    { 1,1,0,1 },
-    { 1,1,0,1 },
-    { .5,0,1,1 },
-    { 1,0,1,1 },
-    { 0,1,1,1 },
-    { 0.5,0,1,1 },
-    { 1,0.5,0,1 },
-    { 0,1,.5,1 },
-    { 0.5,0,1,1 }
-};
-
-float4 CalcFrag(PS_INPUT input, float columnIndex, float4 lineColor)
-{
-    float srcWidth = 21.0;
-    float srcHeight = 857.0;
-    float dot_size = 2.0;
-    float4 delta = float4(1.0 / srcHeight, 0.0, 2.0 / srcHeight, 0.0);
-
-    float2 p = float2(input.Pos.x, input.Pos.y);
-    float2 srcTC = float2(columnIndex, input.Tex.x);
-    float4 lineHeights;
-
-    float2 coord1 = float2(srcTC - delta.yx).xy;
-    float2 coord2 = float2(srcTC).xy;
-    float2 coord3 = float2(srcTC + delta.yx).xy;
-    float2 coord4 = float2(srcTC + delta.wz).xy;
-
-    lineHeights[0] = txDiffuse.Sample(samPoint, coord1).x;
-    lineHeights[1] = txDiffuse.Sample(samPoint, coord2).x;
-    lineHeights[2] = txDiffuse.Sample(samPoint, coord3).x;
-    lineHeights[3] = txDiffuse.Sample(samPoint, coord4).x;
-
-    float2 srcPos0 = float2((input.Tex.x - delta.x), lineHeights[0]);
-    float2 srcPos1 = float2(input.Tex.x, lineHeights[1]);
-    float2 srcPos2 = float2((input.Tex.x + delta.x), lineHeights[2]);
-    float2 srcPos3 = float2(input.Tex.x + delta.z, lineHeights[3]);
-    float2 destPos = float2(input.Tex.x, 1 - input.Tex.y);
-
-    /* Compute distance to segments */
-    float dist = segdist(srcPos0, srcPos1, destPos);
-    dist = min(dist, segdist(srcPos1, srcPos2, destPos));
-    dist = min(dist, segdist(srcPos2, srcPos3, destPos));
-    dist = min(dist, segdist(srcPos2, srcPos3, destPos));
-
-    /* Add line width */
-    float line_width = delta.x;
-    float lineLum = clamp(line_width - dist, 0.0, 1.0);
-    lineLum = lineLum / delta.x;
-
-    float4 retval;
-    retval = float4(lineColor.xyz, lineLum);
-    return retval;
-}
-
-float4 blend(float4 A, float4 B)
-{
-    float4 C;
-    C.a = A.a + (1 - A.a) * B.a;
-    C.rgb = (1 / C.a) * (A.a * A.rgb + (1 - A.a) * B.a * B.rgb);
-    return C;
-}
-
-float4 FSGraphPS(PS_INPUT input) : SV_Target
-{
-    float srcWidth = 21.0;
-
-    float4 result = 0;
-
-    [unroll]
-    for (int i = 2; i < 14; i++)
-    {
-        float columnIndex = i * (1 / srcWidth);
-        result = blend(result, CalcFrag(input, columnIndex, lineColors[i - 2]));
-    }
-    return result;
-}
-
 
 /*
 matrix MatrixTransformation

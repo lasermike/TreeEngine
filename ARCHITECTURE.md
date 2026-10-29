@@ -51,7 +51,7 @@ Its implementations are `RenderPlatform12`, `RenderPlatform11` and `RenderPlatfo
 
 **Structs shared between C++ and HLSL.** These must stay byte-for-byte in sync with their shader counterparts:
 - `DrawRecord` (`RenderPlatform.h`) ↔ `Shaders/Blur.hlsl`
-- `ShaderMaterial` (`Materials.h`) ↔ `Shaders/Materials.fx`
+- `ShaderMaterial` (`Materials.h`) ↔ `Shaders/Materials.fx` (lighting is PBR-only; the `Specular`/`Reflect` fields and `specularParams.x` are unused but kept for the shared layout)
 - `DxrGeometryInfo` (`RenderPlatform.h`) ↔ `Shaders/SharedTypes.hlsli`
 - `CBChangesPerPass`, `CBChangesEveryFrame` and `InstancedData` (`ConstBufferDefinitions.h`) ↔ `Shaders/SharedTypes.hlsli`
 

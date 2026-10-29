@@ -681,7 +681,6 @@ const char* GeneratorTypeName(GeneratorType type)
     case FixedTreeGeneratorType: return "Fixed tree";
     case LSystemGeneratorType: return "L-system";
     case GraphGeneratorType: return "Graph";
-    case FSGraphGeneratorType: return "Full-screen graph";
     case ModelGeneratorType: return "glTF model";
     }
     return "Unknown";
@@ -710,14 +709,12 @@ void ShowShaderMaterialDetails(const ShaderMaterial& material)
     if (!ImGui::BeginTable("Shader material", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) return;
     ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthFixed, 190);
     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-    ShowMaterialVector("Ambient", material.Ambient);
-    ShowMaterialVector("Diffuse", material.Diffuse);
-    ShowMaterialVector("Specular (w = exponent)", material.Specular);
-    ShowMaterialVector("Reflect", material.Reflect);
+    ShowMaterialVector("Ambient (0.15 x base color)", material.Ambient);
+    ShowMaterialVector("Base color", material.Diffuse);
     ShowMaterialVector("Flags (blend, texture, clip, unlit)", material.flags);
     ShowMaterialVector("Base UV matrix row 0", material.uvTransformRow0[BaseColorTextureRole]);
     ShowMaterialVector("Base UV matrix row 1", material.uvTransformRow1[BaseColorTextureRole]);
-    ShowMaterialVector("PBR (enabled, metal, rough, specular)", material.specularParams);
+    ShowMaterialVector("Unused, metallic, roughness, specular", material.specularParams);
     ShowMaterialVector("Specular color", material.specularColor);
     ShowMaterialVector("Specular textures", material.specularTextures);
     ShowMaterialVector("Normal texture and scale", material.normalTextures);
