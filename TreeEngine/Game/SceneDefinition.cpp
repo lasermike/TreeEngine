@@ -364,7 +364,19 @@ namespace SceneData
                 const auto& render = root["render"];
                 auto path = sourceName + ".render";
                 Fields(render, path, { "clearColor", "farClippingPlane", "useShadowMaps", "useAlphaBlendedRenderTarget",
-                    "enablePostProcessing", "blurAmount", "environment" });
+                    "enablePostProcessing", "blurAmount", "environment", "sky" });
+                if (render.contains("sky"))
+                {
+                    const auto& sky = render["sky"];
+                    Fields(sky, path + ".sky", { "cubeMap", "rotationDegrees" });
+                    if (!sky.contains("cubeMap")) Invalid(path + ".sky.cubeMap", "required property");
+                    scene.skyCubeMap = String(sky["cubeMap"], path + ".sky.cubeMap");
+                    std::string ext = scene.skyCubeMap.size() >= 4 ? scene.skyCubeMap.substr(scene.skyCubeMap.size() - 4) : "";
+                    for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    if (ext != ".dds") Invalid(path + ".sky.cubeMap", "expected a DDS cube map");
+                    if (sky.contains("rotationDegrees"))
+                        scene.skyRotationDegrees = Number(sky["rotationDegrees"], path + ".sky.rotationDegrees");
+                }
                 if (render.contains("environment"))
                 {
                     const auto& environment = render["environment"];
@@ -431,21 +443,15 @@ namespace SceneData
                 std::unique_ptr<ObjectDefinition> object;
                 if (type == "primitive")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "shape", "cubeMap", "material" });
+                    if (value.contains("cubeMap"))
+                        Invalid(path + ".cubeMap", "skybox primitives are no longer supported; use render.sky");
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "shape", "material" });
                     auto primitive = std::make_unique<PrimitiveDefinition>();
                     if (value.contains("shape")) primitive->shape = ReadShape(value["shape"], path + ".shape");
-                    if (value.contains("cubeMap")) primitive->cubeMap = Boolean(value["cubeMap"], path + ".cubeMap");
                     if (value.contains("material"))
                     {
                         primitive->hasMaterial = true;
                         primitive->material = MaterialReference(value["material"], path + ".material", scene);
-                    }
-                    if (primitive->cubeMap && primitive->material.texture.empty()) Invalid(path + ".material.texture", "cube maps require a DDS texture");
-                    if (primitive->cubeMap)
-                    {
-                        std::string ext = primitive->material.texture.size() >= 4 ? primitive->material.texture.substr(primitive->material.texture.size() - 4) : "";
-                        for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                        if (ext != ".dds") Invalid(path + ".material.texture", "cube maps require a DDS texture");
                     }
                     object = std::move(primitive);
                 }
@@ -623,6 +629,12 @@ namespace SceneData
             if (scene.environmentRotationDegrees != 0)
                 root["render"]["environment"]["rotationDegrees"] = scene.environmentRotationDegrees;
         }
+        if (!scene.skyCubeMap.empty())
+        {
+            root["render"]["sky"] = { { "cubeMap", scene.skyCubeMap } };
+            if (scene.skyRotationDegrees != 0)
+                root["render"]["sky"]["rotationDegrees"] = scene.skyRotationDegrees;
+        }
         if (scene.hasShadowLightPosition) root["light"]["shadowPosition"] = VectorJson(scene.shadowLightPosition);
         if (!scene.materials.empty())
             for (const auto& material : scene.materials) root["materials"][material.first] = MaterialJson(material.second);
@@ -643,7 +655,6 @@ namespace SceneData
                 const auto& primitive = dynamic_cast<const PrimitiveDefinition&>(*object);
                 value["type"] = "primitive";
                 value["shape"] = ShapeName(primitive.shape);
-                value["cubeMap"] = primitive.cubeMap;
                 if (primitive.hasMaterial) value["material"] = MaterialJson(primitive.material);
                 break;
             }

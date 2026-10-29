@@ -84,7 +84,6 @@ namespace SceneData
     {
         PrimitiveDefinition() : ObjectDefinition(ObjectKind::Primitive) {}
         Shape shape = Shape::Box;
-        bool cubeMap = false;
         bool hasMaterial = false;
         MaterialDefinition material;
     };
@@ -165,6 +164,8 @@ namespace SceneData
         std::string environmentDiffuse;
         std::string environmentSpecular;
         float environmentRotationDegrees = 0;
+        std::string skyCubeMap; // DDS cube map drawn behind the scene and used as the ray-miss background.
+        float skyRotationDegrees = 0;
         bool useShadowMaps = true;
         bool useAlphaBlendedRenderTarget = true;
         int pointLightCount = 0;

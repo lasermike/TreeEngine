@@ -78,7 +78,7 @@ prompts, autosave, directory watcher, or asset packaging are provided.
 - `id`: optional stable scene identity, described above.
 - `name`: required nonempty display name.
 - `camera`: transform with optional `position`, `rotation`, and `scale`.
-- `render`: optional `clearColor`, `farClippingPlane`, `useShadowMaps`, `useAlphaBlendedRenderTarget`, and `environment`. The far plane defaults to 30 and must exceed the 0.2-unit near plane. `environment` requires `diffuse` and `specular` paths to linear HDR DDS cube maps. The specular cube's mip levels run from smooth to rough; the environment lights glTF materials in both raster and DXR without changing the background.
+- `render`: optional `clearColor`, `farClippingPlane`, `useShadowMaps`, `useAlphaBlendedRenderTarget`, `environment`, and `sky`. The far plane defaults to 30 and must exceed the 0.2-unit near plane. `environment` requires `diffuse` and `specular` paths to linear HDR DDS cube maps. The specular cube's mip levels run from smooth to rough; the environment lights glTF materials in both raster and DXR without changing the background. `sky` draws a background: `cubeMap` (required) is a DDS cube map, and `rotationDegrees` (default `0`) is a yaw about +Y. The sky follows the camera, is drawn behind all objects, and supplies the DXR ray-miss color; without it the background is `clearColor`. Skies are not objects and have no material.
 - `light`: optional directional-light `ambient`, `diffuse`, `specular`, `direction`, and `shadowPosition`. Omitting `shadowPosition` retains automatic shadow placement; supplying it preserves the authored light-position override.
 - `pointLightCount`: point-light activation, `0` or `1`.
 - `pointLight`: optional `ambient`, `diffuse`, `specular`, `position`, `range`, and `attenuation`. Range and attenuation components must be nonnegative.
@@ -87,7 +87,7 @@ prompts, autosave, directory watcher, or asset packaging are provided.
 
 Unknown properties are errors, including typos. Errors name the source file and
 property path. Colors are RGBA arrays and may contain HDR values. Vector values
-must be finite. Object scales must be nonzero; negative scale supports skyboxes.
+must be finite. Object scales must be nonzero; negative scale mirrors.
 
 ## Objects and transforms
 
@@ -99,10 +99,9 @@ Use `rotationDegrees: [pitch,yaw,roll]` for convenient Euler authoring, or
 `rotation: [x,y,z,w]` for a quaternion. Specify only one. Quaternions are preserved
 as authored, including the existing AI Tree camera rotation.
 
-A `primitive` supports `shape`, `cubeMap`, and `material`. Supported shapes are
+A `primitive` supports `shape` and `material`. Supported shapes are
 `box`, `cylinder`, `cylinderLD`, `cylinderHD`, `skinnedCylinder`, `sprite`, and
 `sphere` (unit diameter, like the box and cylinders). The default shape is `box`.
-Cube maps require a DDS texture.
 
 A `tree` supports `trunkShape` (`skinnedCylinder` by default, or `cylinder`),
 named `materials.trunk` and `materials.leaf`, and a required `generator`.
@@ -141,8 +140,7 @@ array. The first, second, and fourth elements must be `0` or `1`; the third
 must be between `0` and `1`. When omitted, `useTexture` follows the presence
 of `texture`, alpha clip uses `alphaClipThreshold`, and the other flags are `0`.
 If both `flags` and `alphaClipThreshold` are given, their threshold values
-must agree. A texture may be present even when `useTexture` is `0`, as with
-a skybox that samples its cube map directly.
+must agree. A texture may be present even when `useTexture` is `0`.
 
 Alpha clip defaults to `0` and must be between `0` and `1`. UV scale defaults to
 `[1,1]`. Object and material UV scales multiply; `[4,4]` repeats the texture four
@@ -191,8 +189,7 @@ into each map's `transform`.
 
 Primitives and trees authored without materials get PBR defaults: a rough green
 primitive over `snow.dds`, and a red-tinted `Bark_0005_diffuse.dds` trunk with
-dark green leaves. All built-in scenes use PBR; only the skyboxes still use the
-legacy fields, because cube maps draw with their own shader.
+dark green leaves. All built-in scenes use PBR.
 
 ### Converting Phong materials
 

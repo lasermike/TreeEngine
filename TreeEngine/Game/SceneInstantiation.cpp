@@ -17,6 +17,8 @@
 
 namespace
 {
+    const char* const SkyObjectName = "sky";
+
     PrimitiveType RuntimeShape(SceneData::Shape shape)
     {
         switch (shape)
@@ -234,6 +236,24 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
     SceneRenderSettings& renderSettings, Player& player, GameData& gameData, const std::string& sceneFilename)
 {
     std::vector<std::unique_ptr<WorldObject>> objects;
+    if (!definition.skyCubeMap.empty())
+    {
+        // The sky is drawn as a camera-centered cube first so later geometry covers it.
+        // Its inverted scale matches how the cube map faces are authored.
+        auto parameters = std::make_unique<WorldObjectParams>(PrimitiveGeneratorType);
+        parameters->name = SkyObjectName;
+        parameters->scale = XMFLOAT3(30, -30, 30);
+        XMStoreFloat4(&parameters->rotation, XMQuaternionRotationRollPitchYaw(0, XMConvertToRadians(definition.skyRotationDegrees), 0));
+        parameters->primitiveType = PrimitiveType_Box;
+        parameters->cubeMap = true;
+        ShaderMaterial material;
+        material.flags = XMFLOAT4(0, 0, 0, 1);
+        parameters->materials.push_back(material);
+        parameters->textureFilename.push_back(RuntimeTexture(definition.skyCubeMap, "render.sky", sceneFilename));
+        auto runtime = std::make_unique<Primitive>(parameters.get());
+        parameters.release();
+        objects.push_back(std::move(runtime));
+    }
     for (const auto& object : definition.objects)
     {
         if (object->kind == SceneData::ObjectKind::Primitive)
@@ -242,7 +262,6 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             auto parameters = std::make_unique<WorldObjectParams>(PrimitiveGeneratorType);
             CommonParameters(primitive, *parameters);
             parameters->primitiveType = RuntimeShape(primitive.shape);
-            parameters->cubeMap = primitive.cubeMap;
             if (primitive.hasMaterial)
             {
                 parameters->textureFilename.push_back(RuntimeTexture(primitive.material.texture, primitive.id, sceneFilename));
@@ -506,8 +525,11 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
     auto result = SceneData::ParseScene(SceneData::SerializeScene(authored), sourceFilename);
     std::map<std::string, WorldObject*> objects;
     for (auto* object : scene.Children())
+    {
+        if (object->GetParams().cubeMap) continue; // The sky is saved as render.sky, not as an object.
         if (object->GetParams().name.empty() || !objects.emplace(object->GetParams().name, object).second)
             throw std::runtime_error("Cannot save objects without unique authored IDs");
+    }
     if (objects.size() != result.objects.size()) throw std::runtime_error("Cannot save a scene with untracked objects");
     for (auto& definition : result.objects)
     {
@@ -528,7 +550,6 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             if (params.generatorType != PrimitiveGeneratorType) throw std::runtime_error("Object generator type changed");
             auto& primitive = static_cast<SceneData::PrimitiveDefinition&>(*definition);
             primitive.shape = AuthoredShape(params.primitiveType);
-            primitive.cubeMap = params.cubeMap;
             if (params.materials.size() > 1) throw std::runtime_error("Primitive has unsupported additional materials");
             if (!params.materials.empty())
             {
@@ -598,6 +619,7 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
     result.environmentDiffuse = RebaseAsset(settings.environmentDiffuse, sourceFilename, destinationFilename);
     result.environmentSpecular = RebaseAsset(settings.environmentSpecular, sourceFilename, destinationFilename);
     result.environmentRotationDegrees = settings.environmentRotationDegrees;
+    result.skyCubeMap = RebaseAsset(authored.skyCubeMap, sourceFilename, destinationFilename);
     result.useShadowMaps = gameData.useShadowMaps;
     result.useAlphaBlendedRenderTarget = gameData.useAlphaBlendedRenderTarget;
     if (settings.numDirectionalLights != 1 || settings.numPointLights < 0 || settings.numPointLights > 1)

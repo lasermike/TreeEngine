@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Executable,
-    [string[]]$Scenes = @('LoadSimpleBox', 'LoadSeaScene', 'LoadTrees', 'LoadGraph', 'LoadGltfDemo', 'PbrMaterials'),
+    [string[]]$Scenes = @('LoadSimpleBox', 'LoadSeaScene', 'LoadTrees', 'LoadGraph', 'LoadGltfDemo', 'PbrMaterials', 'LoadTreeScene'),
     [string[]]$Modes = @('raster', 'raytracing')
 )
 
@@ -64,6 +64,12 @@ foreach ($scene in $Scenes) {
         Copy-Item -LiteralPath "$report.scene.json" -Destination $restartedScene
         try {
             $saved = Get-Content -LiteralPath $restartedScene -Raw | ConvertFrom-Json
+            if ($saved.objects | Where-Object { $_.PSObject.Properties['cubeMap'] }) {
+                throw "Saved scene contains a skybox object instead of render.sky: $scene / $mode"
+            }
+            if ($scene -eq 'LoadTreeScene' -and -not $saved.render.sky.cubeMap) {
+                throw "Saved scene lost render.sky: $scene / $mode"
+            }
             $restartJob = Join-Path $job 'restart'
             [void](Invoke-Capture ("user:" + $saved.id) $mode $restartJob $false)
             $restartMatch = [TreeRenderTests.ImageComparison]::Compare("$report.after.png", (Join-Path $restartJob 'capture.png'), "$report.restart-diff.png")

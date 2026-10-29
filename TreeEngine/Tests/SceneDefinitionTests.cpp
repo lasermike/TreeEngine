@@ -462,8 +462,23 @@ int main(int argc, char** argv)
         bad = minimal; bad["render"]["useShadowMaps"] = "true";
         Reject(bad.dump(), "useShadowMaps");
         bad = minimal; bad["objects"][0]["cubeMap"] = true;
-        bad["objects"][0]["material"] = { { "texture", "sky.png" } };
-        Reject(bad.dump(), "material.texture");
+        Reject(bad.dump(), "render.sky");
+        bad = minimal; bad["render"]["sky"] = { { "cubeMap", "sky.png" } };
+        Reject(bad.dump(), "render.sky.cubeMap");
+        bad = minimal; bad["render"]["sky"] = { { "rotationDegrees", 90 } };
+        Reject(bad.dump(), "render.sky.cubeMap");
+        bad = minimal; bad["render"]["sky"] = { { "cubeMap", "sky.dds" }, { "scale", 2 } };
+        Reject(bad.dump(), "render.sky");
+
+        auto skyJson = minimal;
+        skyJson["render"]["sky"] = { { "cubeMap", "Sky/sky.DDS" }, { "rotationDegrees", 135 } };
+        auto skyScene = SceneData::ParseScene(skyJson.dump(), "test.scene.json");
+        Check(skyScene.skyCubeMap == "Sky/sky.DDS" && skyScene.skyRotationDegrees == 135.0f, "render.sky was not parsed");
+        auto skyRoundTrip = SceneData::ParseScene(SceneData::SerializeScene(skyScene), "roundtrip");
+        Check(skyRoundTrip.skyCubeMap == skyScene.skyCubeMap && skyRoundTrip.skyRotationDegrees == 135.0f,
+            "render.sky did not round-trip");
+        Check(defaults.skyCubeMap.empty() && defaults.skyRotationDegrees == 0, "sky defaults changed");
+        Check(SceneData::SerializeScene(defaults).find("\"sky\"") == std::string::npos, "absent sky was serialized");
         Reject("{broken", "test.scene.json");
 
         auto treeJson = minimal;
@@ -596,7 +611,7 @@ int main(int argc, char** argv)
 
         const std::string filename = argc > 1 ? argv[1] : TestDataFilename("ai-tree.scene.json");
         auto ai = SceneData::ReadScene(filename);
-        Check(ai.name == "AI Tree" && ai.objects.size() == 7, "AI tree scene topology changed");
+        Check(ai.name == "AI Tree" && ai.objects.size() == 6, "AI tree scene topology changed");
         auto& aiTree = static_cast<SceneData::TreeDefinition&>(*ai.objects[0]);
         Check(aiTree.generator.iterations == 11 && aiTree.generator.rules.size() == 4, "AI tree generator changed");
         Check(aiTree.generator.axiom == "F(35) A(100,0)", "AI tree axiom changed");
@@ -604,13 +619,12 @@ int main(int argc, char** argv)
             && aiTree.leaf.hasPbr && aiTree.leaf.pbr.baseColorTexture.source == "FirBranchTip.dds"
             && aiTree.leaf.pbr.alphaMode == SceneData::AlphaMode::Mask && aiTree.leaf.pbr.alphaCutoff == 0.6f,
             "tree material settings changed");
-        auto& skyboxObject = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
-        Check(skyboxObject.cubeMap && !skyboxObject.material.texture.empty(), "skybox changed");
-        auto& aiSphere = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[5]);
+        Check(ai.skyCubeMap == "kiara_3_morning_4k-skybox.dds" && ai.skyRotationDegrees == 180.0f, "AI tree sky changed");
+        auto& aiSphere = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[4]);
         Check(aiSphere.id == "shiny-sphere" && aiSphere.shape == SceneData::Shape::Sphere && aiSphere.material.hasPbr
             && aiSphere.material.pbr.metallic == 1 && aiSphere.material.pbr.roughness == 0.05f,
             "AI tree shiny sphere changed");
-        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[6]);
+        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[5]);
         Check(aiModel.source == "Models/Gltf/terra.glb" && !aiModel.forceLit,
             "AI tree imported model changed");
         Check(std::abs(ai.camera.rotation.w - 1.0f) < 1e-6f
