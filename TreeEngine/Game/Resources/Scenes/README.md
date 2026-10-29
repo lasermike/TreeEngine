@@ -178,15 +178,40 @@ Optional maps are `baseColorTexture`, `metallicRoughnessTexture`, `normalTexture
 `specularTexture`, and `specularColorTexture`. Each has a required `source` and
 optional `wrap` (default `true`; `false` clamps) and `transform` (`offset`,
 `rotation` in radians, and `scale`, as in `KHR_texture_transform`).
-`normalTexture` also takes `scale` (default `1`, nonnegative). Maps must be PNG or
-JPEG, as for glTF; base-color and specular-color maps are sRGB, and the others
-are linear. They resolve like other scene assets. The renderer has eight material
+`normalTexture` also takes `scale` (default `1`, nonnegative). Maps may be PNG,
+JPEG, or DDS (glTF assets themselves remain PNG/JPEG only); base-color and
+specular-color maps are sRGB, and the others are linear. They resolve like other
+scene assets. The renderer has eight material
 texture slots shared by every texture in a scene, so heavily mapped scenes can
 fail to load with `E_BOUNDS`. Emissive, occlusion, and other glTF extensions
 are not supported, as for models.
 
 Saving writes PBR materials back as `pbr` objects. A material UV scale is folded
 into each map's `transform`.
+
+Primitives and trees authored without materials get PBR defaults: a rough green
+primitive over `snow.dds`, and a red-tinted `Bark_0005_diffuse.dds` trunk with
+dark green leaves. All built-in scenes use PBR; only the skyboxes still use the
+legacy fields, because cube maps draw with their own shader.
+
+### Converting Phong materials
+
+PBR lighting runs in linear space and divides direct diffuse light by π, so a
+literal conversion looks darker. The built-in scenes were converted this way:
+
+- `diffuse` becomes `baseColor`, converted from display to linear values
+  (for example `0.5` becomes about `0.22`). `metallic` is `0`.
+- The specular exponent (`specular[3]`) maps to roughness: `1` → `0.8`, `4` → `0.6`.
+- `texture` becomes `baseColorTexture`; `alphaClipThreshold` becomes
+  `alphaMode: "mask"` with that `alphaCutoff`.
+- Ambient-only materials, such as axis gizmos, become `unlit` with the color.
+- When every lit object in a scene is PBR, multiply the scene light's `diffuse`
+  by π. Scenes that also contain glTF models keep their light, because the models
+  were already lit physically.
+- PBR ambient is `0.15 × baseColor × light ambient`. A Phong material with a high
+  `ambient` needs a brighter scene ambient instead (Curves uses `4`).
+- Colored Phong highlights (`specular` tints) have no PBR equivalent; tint
+  `baseColor` instead.
 
 ## L-systems
 

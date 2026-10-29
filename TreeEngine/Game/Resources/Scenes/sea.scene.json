@@ -9,26 +9,19 @@
   },
   "light": {
     "ambient": [0.5, 0.5, 0.5, 1],
-    "diffuse": [1, 1, 1, 1],
+    "diffuse": [3.14159, 3.14159, 3.14159, 1],
     "specular": [0.6, 0.6, 0.6, 1],
     "direction": [0, -0.7, 0.7]
   },
   "materials": {
     "urchin": {
-      "ambient": [0.3, 0.3, 0.3, 1],
-      "diffuse": [1, 1, 1, 1],
-      "specular": [0.1, 0.1, 0.1, 1],
-      "texture": "urchinskin.dds"
+      "pbr": { "metallic": 0, "roughness": 0.8, "baseColorTexture": { "source": "urchinskin.dds" } }
     },
     "leaf": {
-      "diffuse": [0, 0.5019608, 0, 1],
-      "specular": [0, 0.3, 0.1, 1]
+      "pbr": { "baseColor": [0, 0.2158605, 0, 1], "metallic": 0, "roughness": 0.8 }
     },
     "seafloor": {
-      "ambient": [0.3, 0.3, 0.3, 1],
-      "diffuse": [1, 1, 1, 1],
-      "specular": [0.3, 0.3, 0.3, 4],
-      "texture": "undersea.dds"
+      "pbr": { "metallic": 0, "roughness": 0.6, "baseColorTexture": { "source": "undersea.dds" } }
     }
   },
   "objects": [

@@ -48,7 +48,7 @@ ShaderMaterial BuildPbrShaderMaterial(const PbrMaterialFactors& factors, bool& a
 void SetMaterialUvTransform(ShaderMaterial& material, MaterialTextureRole role,
     XMFLOAT2 offset, float rotation, XMFLOAT2 scale);
 
-// Reads a PNG/JPEG material map into a memory-backed texture source.
+// Reads a PNG/JPEG/DDS material map into a memory-backed texture source.
 // colorSpace: 1 = linear data, 2 = sRGB color.
 GltfTextureSource LoadMaterialTextureFile(const std::wstring& filename, int colorSpace);
 

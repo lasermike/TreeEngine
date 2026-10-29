@@ -791,12 +791,12 @@ GltfTextureSource LoadMaterialTextureFile(const std::wstring& filename, int colo
         narrow = buffer.data();
     }
     auto extension = LowerExtension(narrow);
-    if (extension != ".png" && extension != ".jpg" && extension != ".jpeg")
-        throw std::runtime_error("material map '" + narrow + "' must be a PNG or JPEG image");
+    if (extension != ".png" && extension != ".jpg" && extension != ".jpeg" && extension != ".dds")
+        throw std::runtime_error("material map '" + narrow + "' must be a PNG, JPEG, or DDS image");
     GltfTextureSource result;
     result.filename = filename;
     result.name = narrow;
-    result.mimeType = extension == ".png" ? "image/png" : "image/jpeg";
+    result.mimeType = extension == ".png" ? "image/png" : extension == ".dds" ? "image/vnd-ms.dds" : "image/jpeg";
     result.colorSpace = colorSpace;
     std::ifstream input(filename.c_str(), std::ios::binary);
     if (!input) throw std::runtime_error("material map '" + narrow + "' was not found");

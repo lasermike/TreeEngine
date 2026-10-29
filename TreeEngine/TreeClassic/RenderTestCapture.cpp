@@ -90,8 +90,9 @@ namespace
             if (object->id == editedTree)
             {
                 const auto& tree = dynamic_cast<const SceneData::TreeDefinition&>(*object);
+                const float trunkColor = tree.trunk.hasPbr ? tree.trunk.pbr.baseColor.x : tree.trunk.diffuse.x;
                 CheckPersistence(tree.transform.position.x == 4 && tree.textureCoordScale.x == 2 &&
-                    tree.trunk.textureCoordScale.x == 4 && tree.trunk.diffuse.x == 0.25f &&
+                    tree.trunk.textureCoordScale.x == 4 && trunkColor == 0.25f &&
                     tree.generator.axiom == "F[+F]" && tree.generator.rules.at(0).iterations == 2,
                     "object, material, UV or rule edits were lost");
                 foundTree = true;

@@ -270,10 +270,14 @@ void TestPbrSceneMaterials()
     const auto srgb = LoadMaterialTextureFile(checker, 2);
     Check(linear.IsMemoryBacked() && linear.colorSpace == 1 && srgb.colorSpace == 2 && linear.key != srgb.key,
         "scene material maps were not loaded by color space");
-    bool ddsRejected = false;
-    try { LoadMaterialTextureFile(L"bark.dds", 2); }
-    catch (const std::runtime_error& e) { ddsRejected = std::string(e.what()).find("PNG or JPEG") != std::string::npos; }
-    Check(ddsRejected, "DDS material map was accepted");
+    bool bitmapRejected = false;
+    try { LoadMaterialTextureFile(L"bark.bmp", 2); }
+    catch (const std::runtime_error& e) { bitmapRejected = std::string(e.what()).find("PNG, JPEG, or DDS") != std::string::npos; }
+    Check(bitmapRejected, "unsupported material map format was accepted");
+    bool missingDdsReported = false;
+    try { LoadMaterialTextureFile(L"missing-bark.dds", 2); }
+    catch (const std::runtime_error& e) { missingDdsReported = std::string(e.what()).find("was not found") != std::string::npos; }
+    Check(missingDdsReported, "DDS material map was not accepted as a format");
 
     // Scene schema: every glTF BRDF property on primitives and on both tree slots.
     auto scene = Json::parse(R"({"version":1,"name":"PBR","objects":[{"id":"ball","type":"primitive","shape":"sphere"}]})");
@@ -596,8 +600,10 @@ int main(int argc, char** argv)
         auto& aiTree = static_cast<SceneData::TreeDefinition&>(*ai.objects[0]);
         Check(aiTree.generator.iterations == 11 && aiTree.generator.rules.size() == 4, "AI tree generator changed");
         Check(aiTree.generator.axiom == "F(35) A(100,0)", "AI tree axiom changed");
-        Check(aiTree.trunk.texture == "Bark_0005_diffuse.dds" && aiTree.leaf.texture == "FirBranchTip.dds" &&
-            aiTree.leaf.alphaClipThreshold == 0.6f, "tree material settings changed");
+        Check(aiTree.trunk.hasPbr && aiTree.trunk.pbr.baseColorTexture.source == "Bark_0005_diffuse.dds"
+            && aiTree.leaf.hasPbr && aiTree.leaf.pbr.baseColorTexture.source == "FirBranchTip.dds"
+            && aiTree.leaf.pbr.alphaMode == SceneData::AlphaMode::Mask && aiTree.leaf.pbr.alphaCutoff == 0.6f,
+            "tree material settings changed");
         auto& skyboxObject = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[1]);
         Check(skyboxObject.cubeMap && !skyboxObject.material.texture.empty(), "skybox changed");
         auto& aiSphere = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[5]);

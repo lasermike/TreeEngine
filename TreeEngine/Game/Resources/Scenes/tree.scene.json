@@ -12,30 +12,36 @@
   },
   "light": {
     "ambient": [0.6, 0.6, 0.6, 1],
-    "diffuse": [1, 1, 1, 1],
+    "diffuse": [3.14159, 3.14159, 3.14159, 1],
     "specular": [0.6, 0.6, 0.6, 1],
     "direction": [-0.7, -0.7, 0.7]
   },
   "pointLightCount": 1,
   "materials": {
     "bark": {
-      "ambient": [0.3, 0.3, 0.3, 1],
-      "diffuse": [0.87058824, 0.72156864, 0.5294118, 1],
-      "specular": [0.1, 0.1, 0.1, 1],
-      "texture": "Bark_0005_diffuse.dds"
+      "pbr": {
+        "baseColor": [0.73, 0.48, 0.24, 1],
+        "metallic": 0,
+        "roughness": 0.8,
+        "baseColorTexture": { "source": "Bark_0005_diffuse.dds" }
+      }
     },
     "needles": {
-      "ambient": [0.5, 0.5, 0.5, 1],
-      "diffuse": [1, 1, 1, 1],
-      "specular": [0, 0.5, 0.1, 1],
-      "texture": "FirBranchWithNeedles.dds",
-      "alphaClipThreshold": 1
+      "pbr": {
+        "metallic": 0,
+        "roughness": 0.8,
+        "alphaMode": "mask",
+        "alphaCutoff": 1,
+        "baseColorTexture": { "source": "FirBranchWithNeedles.dds" }
+      }
     },
     "ground": {
-      "ambient": [0.3, 0.3, 0.3, 1],
-      "diffuse": [0.8, 0.8, 0.8, 1],
-      "specular": [0.3, 0.3, 0.3, 4],
-      "texture": "snow.dds"
+      "pbr": {
+        "baseColor": [0.6, 0.6, 0.6, 1],
+        "metallic": 0,
+        "roughness": 0.6,
+        "baseColorTexture": { "source": "snow.dds" }
+      }
     },
     "sky": {
       "ambient": [1, 1, 1, 1],
@@ -43,9 +49,9 @@
       "specular": [0, 0, 0, 0],
       "texture": "cube.dds"
     },
-    "axis-red": { "ambient": [1, 0, 0, 1] },
-    "axis-green": { "ambient": [0, 0.5019608, 0, 1] },
-    "axis-blue": { "ambient": [0, 0, 1, 1] }
+    "axis-red": { "pbr": { "baseColor": [1, 0, 0, 1], "unlit": true } },
+    "axis-green": { "pbr": { "baseColor": [0, 0.2158605, 0, 1], "unlit": true } },
+    "axis-blue": { "pbr": { "baseColor": [0, 0, 1, 1], "unlit": true } }
   },
   "objects": [
     {

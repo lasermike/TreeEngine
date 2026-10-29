@@ -45,21 +45,13 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 
     if (_params->materials.size() < 1)
     {
-        ShaderMaterial trunkMaterial;
-        trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
-        trunkMaterial.Diffuse = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
-        trunkMaterial.Specular = XMFLOAT4(0, .1f, .1f, 1.0);
-        trunkMaterial.flags.y = 1; //useTextures  TODO
-        _params->materials.push_back(trunkMaterial);
-
-        ShaderMaterial leafMaterial;
-        XMStoreFloat4(&leafMaterial.Diffuse, Colors::Green);
-        leafMaterial.Specular = XMFLOAT4(0, .3f, .1f, 1.0);
-        leafMaterial.flags.y = false; //useTextures  TODO
-        _params->materials.push_back(leafMaterial);
+        // Default: red-tinted bark trunk and untextured dark green leaves (linear colors).
+        // The trunk's green/blue reproduce the former Phong default's specular wash.
+        HRR(AddDefaultPbrMaterial(*_params, XMFLOAT4(1, 0.17f, 0.17f, 1), 0.8f, L"Bark_0005_diffuse.dds"));
+        HRR(AddDefaultPbrMaterial(*_params, XMFLOAT4(0, 0.2158605f, 0, 1), 0.8f, nullptr));
     }
 
-    // Default textures
+    // Default texture for programmatically supplied legacy materials
     if (_params->textureFilename.size() < 1)
     {
         _params->textureFilename.push_back(L"Bark_0005_diffuse.dds");

@@ -26,16 +26,12 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 
     if (_params->materials.size() < 1)
     {
-        ShaderMaterial mat;
-        mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
-        mat.Diffuse = XMFLOAT4(0, 1.0f, 0, 1);
-        mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
-        mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-        mat.flags.y = 1; //1 for textured; 
-        _params->materials.push_back(mat);
+        // Default: rough green PBR material over the snow texture. The small red/blue
+        // components reproduce the former Phong default's white specular wash.
+        HRR(AddDefaultPbrMaterial(*_params, XMFLOAT4(0.076f, 1, 0.076f, 1), 0.6f, L"snow.dds"));
     }
 
-    // Default textures
+    // Default texture for programmatically supplied legacy materials
     if (_params->textureFilename.size() < 1)
     {
         _params->textureFilename.push_back(L"snow.dds");

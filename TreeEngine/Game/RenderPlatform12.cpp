@@ -1533,6 +1533,18 @@ HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* /*name*/, const u
         textureIndex,
         m_descriptorHeap.GetIncrementSize());
 
+    // Scene-authored material maps may be DDS; sRGB maps load with an sRGB view.
+    if (dataSize >= 4 && memcmp(data, "DDS ", 4) == 0)
+    {
+        ID3D12Resource* ddsResource = nullptr;
+        HRR(CreateDDSTextureFromMemory(this, data, dataSize, 0 /*maxsize*/, colorSpace == 2,
+            &ddsResource, newDescriptor, nullptr));
+        *texture = new LoadedTexture(ddsResource, newDescriptor, static_cast<UINT>(textureIndex));
+        GetDevice()->CopyDescriptorsSimple(1, m_descriptorHeap.hCPU(DxrTexture0_SrvHeapOffset + textureIndex),
+            newDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        return S_OK;
+    }
+
     TextureCOMScope com;
     HRR(com.Result());
     ResourceUploadBatch resourceUpload(GetDevice());

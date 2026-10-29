@@ -81,6 +81,10 @@ public:
     }
 };
 
+// Appends a dielectric PBR material slot, used for objects authored without materials.
+// baseColor is linear; baseColorTexture is an optional sRGB map.
+HRESULT AddDefaultPbrMaterial(WorldObjectParams& params, XMFLOAT4 baseColor, float roughness, const wchar_t* baseColorTexture);
+
 // Render state for a material slot: PBR materials choose blending and base-color
 // sampling like imported glTF materials; legacy materials keep the caller's defaults.
 inline void ApplyPbrRenderState(const ShaderMaterial& material, StockRenderState& state)

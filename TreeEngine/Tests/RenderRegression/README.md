@@ -252,7 +252,7 @@ were changed and no forest-scale or normal asynchronous CPU result is claimed.
 
 ### Baseline status
 
-The full Debug manifest passes all 60 images. The six AI Tree gold images were
-regenerated when the scene gained its environment-lit skybox and the chrome
-PBR sphere; the earlier gold predated the environment and had been failing.
+The full Debug manifest passes all 60 images. All gold images were regenerated
+when the built-in scenes moved from Phong to PBR materials; see the Scenes README
+for how materials and lights were converted.
 `test-dxr-toggle.ps1` covers SimpleBox and Tree only.

@@ -3,6 +3,36 @@
 
 static int WorldObject_nextId = 0;
 
+HRESULT AddDefaultPbrMaterial(WorldObjectParams& params, XMFLOAT4 baseColor, float roughness, const wchar_t* baseColorTexture)
+{
+    PbrMaterialFactors factors;
+    factors.baseColor = baseColor;
+    factors.metallic = 0;
+    factors.roughness = roughness;
+    bool alphaBlend = false;
+    ShaderMaterial material = BuildPbrShaderMaterial(factors, alphaBlend);
+    MaterialTextureSources maps;
+    if (baseColorTexture)
+    {
+        try
+        {
+            maps.roles[BaseColorTextureRole] = std::make_shared<GltfTextureSource>(LoadMaterialTextureFile(baseColorTexture, 2));
+        }
+        catch (const std::runtime_error&)
+        {
+            return HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
+        }
+        material.flags.y = 1;
+    }
+    // Keep the slot vectors parallel to materials.
+    params.textureFilename.resize(params.materials.size());
+    params.materialTextures.resize(params.materials.size());
+    params.materials.push_back(material);
+    params.textureFilename.push_back(L"");
+    params.materialTextures.push_back(maps);
+    return S_OK;
+}
+
 
 WorldObject::WorldObject(WorldObjectParams* pParams) : _params(pParams), _drawInstanced(true)
 {
