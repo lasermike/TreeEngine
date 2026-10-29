@@ -16,7 +16,7 @@ HRESULT AddDefaultPbrMaterial(WorldObjectParams& params, XMFLOAT4 baseColor, flo
     {
         try
         {
-            maps.roles[BaseColorTextureRole] = std::make_shared<GltfTextureSource>(LoadMaterialTextureFile(baseColorTexture, 2));
+            maps.roles[BaseColorTextureRole] = LoadSharedMaterialTextureFile(baseColorTexture, 2);
         }
         catch (const std::runtime_error&)
         {

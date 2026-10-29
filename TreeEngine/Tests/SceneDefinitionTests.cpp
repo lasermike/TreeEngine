@@ -349,6 +349,63 @@ void TestPbrSceneMaterials()
     Reject(bad.dump(), "the pbr block was removed");
 }
 
+void TestInstancing()
+{
+    // Instances copy everything from an earlier object except their ID, transform, and overridden materials.
+    const auto scene = Json::parse(R"({"version":1,"name":"Instances","materials":{"red":{"baseColor":[1,0,0,1]}},"objects":[
+        {"id":"ball","type":"primitive","shape":"sphere","textureCoordScale":[2,2],"material":{"baseColor":[0,0,1,1]}},
+        {"id":"tree","type":"tree","depthLOD":2,"materials":{"trunk":"red","leaf":"red"},"generator":{"axiom":"F"}},
+        {"id":"bare","type":"tree","generator":{"axiom":"FF"}},
+        {"id":"model","type":"model","source":"Models/a.glb"},
+        {"id":"ball-2","instanceOf":"ball","transform":{"position":[1,2,3]},"material":"red"},
+        {"id":"tree-2","instanceOf":"tree","transform":{"scale":[2,2,2]},"materials":{"leaf":{"baseColor":[0,1,0,1]}}},
+        {"id":"tree-3","instanceOf":"tree-2"},
+        {"id":"model-2","instanceOf":"model"}]})");
+    auto checkScene = [](const SceneData::SceneDefinition& s, const char* description) {
+        Check(s.objects.size() == 8, description);
+        const auto& ball = static_cast<const SceneData::PrimitiveDefinition&>(*s.objects[4]);
+        Check(ball.kind == SceneData::ObjectKind::Primitive && ball.instanceOf == "ball" && ball.shape == SceneData::Shape::Sphere
+            && ball.textureCoordScale.x == 2 && ball.transform.position.y == 2 && ball.overridesMaterial
+            && ball.material.baseColor.x == 1 && ball.material.baseColor.z == 0, description);
+        const auto& tree = static_cast<const SceneData::TreeDefinition&>(*s.objects[5]);
+        Check(tree.kind == SceneData::ObjectKind::Tree && tree.instanceOf == "tree" && tree.depthLOD == 2
+            && tree.generator.axiom == "F" && tree.transform.scale.y == 2 && tree.trunk.baseColor.x == 1
+            && !tree.overridesMaterial && tree.overridesLeafMaterial && tree.leaf.baseColor.y == 1, description);
+        const auto& nested = static_cast<const SceneData::TreeDefinition&>(*s.objects[6]);
+        Check(nested.instanceOf == "tree-2" && nested.leaf.baseColor.y == 1 && !nested.overridesMaterial
+            && !nested.overridesLeafMaterial && nested.transform.scale.y == 1, description);
+        const auto& model = static_cast<const SceneData::ModelDefinition&>(*s.objects[7]);
+        Check(model.instanceOf == "model" && model.source == "Models/a.glb", description);
+    };
+    const auto parsed = SceneData::ParseScene(scene.dump(), "instances.scene.json");
+    checkScene(parsed, "instance was not resolved from its source");
+    const auto saved = Json::parse(SceneData::SerializeScene(parsed));
+    Check(!saved["objects"][4].contains("type") && !saved["objects"][4].contains("shape") && saved["objects"][4].contains("material")
+        && saved["objects"][5]["materials"].contains("leaf") && !saved["objects"][5]["materials"].contains("trunk")
+        && !saved["objects"][6].contains("materials") && saved["objects"][7].size() == 3,
+        "instances were not saved in compact form");
+    checkScene(SceneData::ParseScene(saved.dump(), "roundtrip"), "instance did not round-trip");
+
+    auto rejectInstance = [&](const Json& instance, const std::string& expected) {
+        auto bad = scene;
+        bad["objects"].push_back(instance);
+        Reject(bad.dump(), expected);
+    };
+    rejectInstance({ { "id", "x" }, { "instanceOf", "missing" } }, "unknown object 'missing'");
+    rejectInstance({ { "id", "x" }, { "instanceOf", "x" } }, "cannot be an instance of itself");
+    rejectInstance({ { "id", "x" }, { "instanceOf", "tree" }, { "type", "tree" } }, "objects[8].type");
+    rejectInstance({ { "id", "x" }, { "instanceOf", "tree" }, { "depthLOD", 3 } }, "objects[8].depthLOD");
+    rejectInstance({ { "id", "x" }, { "instanceOf", "tree" }, { "generator", Json::object() } }, "objects[8].generator");
+    rejectInstance({ { "id", "x" }, { "instanceOf", "tree" }, { "material", "red" } }, "only primitive instances take a material");
+    rejectInstance({ { "id", "x" }, { "instanceOf", "ball" }, { "materials", { { "trunk", "red" } } } }, "only tree, fixedTree, and graph");
+    rejectInstance({ { "id", "x" }, { "instanceOf", "model" }, { "material", "red" } }, "model's own materials");
+    rejectInstance({ { "id", "x" }, { "instanceOf", "bare" }, { "materials", { { "leaf", "red" } } } }, "specify both trunk and leaf");
+    rejectInstance({ { "id", "ball" }, { "instanceOf", "tree" } }, "duplicate object ID 'ball'");
+    auto forward = scene;
+    forward["objects"].insert(forward["objects"].begin(), Json{ { "id", "early" }, { "instanceOf", "ball" } });
+    Reject(forward.dump(), "instances must follow the object they copy");
+}
+
 int RunScenePersistenceTests();
 
 int main(int argc, char** argv)
@@ -372,6 +429,7 @@ int main(int argc, char** argv)
             return 0;
         }
         TestPbrSceneMaterials();
+        TestInstancing();
         const auto minimal = Json::parse(R"({"version":1,"name":"Example","objects":[{"id":"box","type":"primitive"}]})");
         auto defaults = SceneData::ParseScene(minimal.dump(), "test.scene.json");
         Check(defaults.objects.size() == 1, "default object missing");
@@ -635,7 +693,8 @@ int main(int argc, char** argv)
             { "graph.scene.json", "Graph" },
             { "simple-box.scene.json", "Simple Box" },
             { "ai-tree.scene.json", "AI Tree" },
-            { "gltf-models.scene.json", "glTF Models" }
+            { "gltf-models.scene.json", "glTF Models" },
+            { "instancing.scene.json", "Instancing" }
         };
         for (const auto& catalogScene : catalogScenes)
         {

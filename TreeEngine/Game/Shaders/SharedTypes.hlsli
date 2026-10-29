@@ -7,6 +7,9 @@ struct InstancedData
     uint InstanceOffsetNext;
 };
 
+// Object-transform slot meaning "no per-draw object transform" (matches UINT_MAX on the CPU).
+static const uint NoObjectTransform = 0xFFFFFFFF;
+
 struct DxrGeometryInfo
 {
     uint vertexBufferOffset;
@@ -16,7 +19,7 @@ struct DxrGeometryInfo
     int  textureIndex;          // index into DXR texture array (-1 = no texture)
     uint isSkinned;             // 1 if skinned vertex buffer, 0 if simple
     uint instanceIndex;         // index into instance buffer for world matrix
-    uint pad;
+    uint objectTransformSlot;   // instance-buffer slot of a per-draw object transform (NoObjectTransform = identity)
 };
 
 cbuffer cbChangesPerPass : register(b1)

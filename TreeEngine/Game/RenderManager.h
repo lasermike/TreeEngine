@@ -34,7 +34,10 @@ enum ShaderType
 
 interface IRenderFrame
 {
-    virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
+    // objectTransformSlot is the instance-buffer slot of a transform applied on the GPU after each instance's World;
+    // UINT_MAX means identity.
+    virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+        UINT objectTransformSlot = UINT_MAX) = 0;
     virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
     virtual RenderData& GetRenderData() = 0;
 };
@@ -62,7 +65,13 @@ class RenderManager : public IRenderFrame
     UINT                                            m_nextInstanceBufferOffset;		 // Used during initialization
 
     // Filled in each frame by each world object via SetInstances()
-    std::map<RenderUnit*, std::map<WorldObject*, std::pair<UINT, UINT>>> m_perFrameInstanceData;
+    struct InstanceRange
+    {
+        UINT start = 0;
+        UINT count = 0;
+        UINT objectTransformSlot = UINT_MAX;
+    };
+    std::map<RenderUnit*, std::map<WorldObject*, InstanceRange>> m_perFrameInstanceData;
 
     RenderData                                      m_renderData;
 
@@ -142,7 +151,8 @@ public:
         const GeometryBufferData::BufferOffsets* bufferIndices, InputLayouts inputLayout, Mesh** newMesh);
 
     HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
-    HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
+    HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+        UINT objectTransformSlot = UINT_MAX);
     HRESULT GetInstanceIndex(WorldObject* object, UINT&);
 
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, SceneRoot& scene);

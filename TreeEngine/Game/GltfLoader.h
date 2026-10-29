@@ -52,6 +52,9 @@ void SetMaterialUvTransform(ShaderMaterial& material, MaterialTextureRole role,
 // colorSpace: 1 = linear data, 2 = sRGB color.
 GltfTextureSource LoadMaterialTextureFile(const std::wstring& filename, int colorSpace);
 
+// LoadMaterialTextureFile, shared: objects using the same map and color space get one copy.
+std::shared_ptr<const GltfTextureSource> LoadSharedMaterialTextureFile(const std::wstring& filename, int colorSpace);
+
 // Per-material texture maps for scene-authored materials, indexed by MaterialTextureRole.
 struct MaterialTextureSources
 {

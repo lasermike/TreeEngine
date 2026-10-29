@@ -42,6 +42,11 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 {
     HRR(CleanUpDeviceObjects());
     m_poseValid = false;
+    m_instanceLayoutsValid = false;
+
+    // Instances are never generated; they draw the source's meshes (set when the source was created).
+    if (IsInstance())
+        _params->meshes = InstanceSource()->GetParams().meshes;
 
     if (_params->materials.size() < 1)
     {
@@ -117,6 +122,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 
 void Tree::AccumulateProfile(RenderProfile& profile) const
 {
+    if (_params->instanceSource) return; // Instances reuse the source's pose.
     profile.poseCacheBytes += m_branchPoses.capacity() * sizeof(BranchPose);
     if (m_reusePose) profile.reusedPoseBranches += m_numBranchInstances;
     else profile.rebuiltPoseBranches += m_numBranchInstances;
@@ -127,6 +133,9 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     // 2 passes
     // 1st pass - animate bones and determine number of model groups
     // 2nd pass - build world matrix for each bone
+
+    if (IsInstance())
+        return ComputeInstanceConstants(pFrameConfig);
 
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants");
 
@@ -222,6 +231,20 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 
         pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, segmentOffset, (UINT)instanceData.size());
         segmentOffset += (UINT)instanceData.size();
+    }
+
+    if (m_instanceCount > 0)
+    {
+        // The layouts depend only on the pose and depth LOD, so they are rebuilt only when those change.
+        if (!m_reusePose || !m_instanceLayoutsValid || m_instanceLayoutDepthLOD != _params->depthLOD)
+            BuildInstanceLayouts(startInstance);
+        for (auto& layout : m_instanceLayouts)
+            for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+            {
+                InstanceDataArray& instanceData = layout.segments[segmentIndex];
+                if (instanceData.size() > 0)
+                    memcpy(dataView + layout.start[segmentIndex], &instanceData[0], instanceData.size() * sizeof(InstancedData));
+            }
     }
 
     PIXEndEvent();
@@ -589,17 +612,25 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, BranchIn
 
 unsigned int Tree::GetMaxInstances()
 {
-    if (_treeModel)
-    {
-        return _treeModel->treeData.numBranches;
-    }
-    else
+    if (_params->instanceSource)
+        return 1; // The per-draw object transform.
+    if (!_treeModel)
         return 0;
+    const unsigned int branches = _treeModel->treeData.numBranches;
+    return m_instanceCount > 0 ? branches * (1 + InstanceLayoutCount) : branches;
+}
 
+unsigned int Tree::GetMaxDrawnInstances()
+{
+    if (_params->instanceSource)
+        return InstanceSource()->GetMaxDrawnInstances();
+    return _treeModel ? _treeModel->treeData.numBranches : 0;
 }
 
 unsigned int Tree::GetNumInstances()
 {
+    if (_params->instanceSource)
+        return 1;
     if (_treeModel)
     {
         unsigned int numInstances = 0;
@@ -613,4 +644,125 @@ unsigned int Tree::GetNumInstances()
     }
     else
         return 0;
+}
+
+TreeSegment Tree::SelectLayoutSegment(const BranchInstance& frame, InstanceLayoutKind layout) const
+{
+    if (frame.branch->geometryType == Leaf)
+        return TreeSegment::LeafLOD0;
+    if (_params->depthLOD == -1)
+        return TreeSegment::BranchLOD1;
+    // Matches SelectSegmentType with every branch beyond (far) or within (near) the 10-unit detail distance.
+    return layout == NearLayout || frame.branch->depth < _params->depthLOD ? TreeSegment::BranchLOD0 : TreeSegment::BranchLOD1;
+}
+
+void Tree::BuildInstanceLayouts(UINT startInstance)
+{
+    const UINT branches = _treeModel->treeData.numBranches;
+    if (m_layoutOffsets.size() < static_cast<size_t>(m_numBranchInstances))
+        m_layoutOffsets.resize(m_numBranchInstances);
+
+    for (int kind = 0; kind < InstanceLayoutCount; ++kind)
+    {
+        InstanceLayout& layout = m_instanceLayouts[kind];
+        const auto layoutKind = static_cast<InstanceLayoutKind>(kind);
+
+        // Count per segment so each segment's range is contiguous.
+        std::array<UINT, TreeSegmentCount> counts = {};
+        for (int i = 0; i < m_numBranchInstances; ++i)
+        {
+            const BranchInstance& frame = m_treeFrames[i];
+            if (m_branchPoses[frame.branch->id].renderable)
+                counts[TreeSegmentIndex(SelectLayoutSegment(frame, layoutKind))]++;
+        }
+        UINT next = startInstance + branches * (1 + kind);
+        for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+        {
+            layout.start[segmentIndex] = next;
+            next += counts[segmentIndex];
+            layout.segments[segmentIndex].clear();
+        }
+
+        // Emit with skinning links into this layout's own slots. Parents precede their children.
+        layout.leafCount = layout.stickCount = 0;
+        for (int i = 0; i < m_numBranchInstances; ++i)
+        {
+            const BranchInstance& frame = m_treeFrames[i];
+            m_layoutOffsets[i] = -1;
+            const BranchPose& pose = m_branchPoses[frame.branch->id];
+            if (!pose.renderable)
+                continue;
+            const TreeSegment segment = SelectLayoutSegment(frame, layoutKind);
+            const size_t segmentIndex = TreeSegmentIndex(segment);
+            const UINT offset = layout.start[segmentIndex] + layout.segments[segmentIndex].size();
+            const int parent = frame.parent ? static_cast<int>(frame.parent - &m_treeFrames[0]) : -1;
+
+            InstancedData data = {};
+            data.World = pose.world;
+            data.InstanceOffset = offset;
+            data.InstanceOffsetPrev = parent >= 0 && m_layoutOffsets[parent] >= 0 ? m_layoutOffsets[parent] : offset;
+            if (segment == TreeSegment::BranchLOD0)
+                data.InstanceOffsetNext = frame.instanceOffsetNext;
+            layout.segments[segmentIndex].push_back(data);
+            m_layoutOffsets[i] = static_cast<int>(offset);
+
+            if (frame.branch->geometryType == Leaf) layout.leafCount++;
+            else if (frame.branch->geometryType == Stick) layout.stickCount++;
+        }
+    }
+    m_instanceLayoutsValid = true;
+    m_instanceLayoutDepthLOD = _params->depthLOD;
+}
+
+HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
+{
+    Tree& source = *InstanceSource();
+    UINT transformSlot = 0;
+    HRR(pFrameConfig->GetInstanceIndex(this, transformSlot));
+    RenderData& renderData = pFrameConfig->GetRenderData();
+
+    // The source's branch matrices bake in its pose position and then its rotation.
+    // Rel maps them onto this instance: inverse(T(sourcePosition) * R(sourceRotation)) * S * R * T.
+    const XMMATRIX sourceFrame = XMMatrixMultiply(XMMatrixTranslationFromVector(XMLoadFloat3(&source.m_lastPosePosition)),
+        XMMatrixRotationQuaternion(XMLoadFloat4(&source.m_lastPoseRotation)));
+    const XMMATRIX instanceWorld = XMMatrixAffineTransformation(XMLoadFloat3(&_scale), g_XMZero,
+        XMLoadFloat4(&_rotation), XMLoadFloat3(&_position));
+    const XMMATRIX rel = XMMatrixMultiply(XMMatrixInverse(nullptr, sourceFrame), instanceWorld);
+
+    InstancedData data = {};
+    XMStoreFloat4x4(&data.World, rel);
+    data.InstanceOffset = data.InstanceOffsetPrev = transformSlot;
+    renderData.instanceData[transformSlot] = data;
+
+    if (!source.m_instanceLayoutsValid)
+    {
+        for (RenderUnit* unit : m_segmentRenderUnits)
+            pFrameConfig->SetInstances(unit, this, 0, 0, transformSlot);
+        return S_OK;
+    }
+
+    // Bounding box: the source's box carried through Rel.
+    XMVECTOR boxMin = g_XMFltMax, boxMax = -g_XMFltMax.v;
+    for (int corner = 0; corner < 8; ++corner)
+    {
+        const XMVECTOR point = XMVector3Transform(XMVectorSet(
+            source._boundingBox[corner & 1].x, source._boundingBox[(corner >> 1) & 1].y, source._boundingBox[corner >> 2].z, 1), rel);
+        boxMin = XMVectorMin(boxMin, point);
+        boxMax = XMVectorMax(boxMax, point);
+    }
+    XMStoreFloat3(&_boundingBox[0], boxMin);
+    XMStoreFloat3(&_boundingBox[1], boxMax);
+
+    // Whole-instance LOD: full detail when any part of the box is within the 10-unit detail distance.
+    const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, boxMin, boxMax);
+    const bool nearCamera = XMVectorGetX(XMVector3LengthSq(nearest - renderData.eyePos)) < 100.0f;
+    InstanceLayout& layout = source.m_instanceLayouts[nearCamera ? NearLayout : FarLayout];
+    for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+    {
+        pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, layout.start[segmentIndex],
+            static_cast<UINT>(layout.segments[segmentIndex].size()), transformSlot);
+    }
+    renderData.frameStats[NUM_LEAVES_STAT].stat += layout.leafCount;
+    renderData.frameStats[NUM_STICKS_STAT].stat += layout.stickCount;
+    return S_OK;
 }

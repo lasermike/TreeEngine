@@ -677,7 +677,7 @@ public:
     virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
     virtual HRESULT SetRenderPhase(RenderState state) = 0;
 
-    virtual HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation) = 0;
+    virtual HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot) = 0;
 
     virtual HRESULT BeginDrawText() = 0;
     virtual HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText) = 0;
@@ -917,7 +917,7 @@ public:
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
 
-    HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
+    HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -1005,7 +1005,7 @@ public:
         INT  textureIndex;          // index into DXR texture array (-1 = no texture)
         UINT isSkinned;             // 1 if skinned vertex buffer, 0 if simple
         UINT instanceIndex;         // index into instance buffer for world matrix
-        UINT pad;
+        UINT objectTransformSlot;   // instance-buffer slot of a per-draw object transform (UINT_MAX = identity)
     };
     UploadBuffer<DxrGeometryInfo>* m_dxrGeometryInfoBuffer;
 
@@ -1022,7 +1022,7 @@ public:
 
     struct DrawRecord
     {
-        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices, Mesh* thisMesh, ShaderMaterial shaderMat, INT texIndex)
+        DrawRecord(UINT startIndexLocation, UINT indexCountPerInstance, UINT startInstance, UINT numberInstances, UINT baseVertexLoc, UINT nextVbWorldStart, UINT numVertices, Mesh* thisMesh, ShaderMaterial shaderMat, INT texIndex, UINT transformSlot)
         {
             startingInstance = startInstance;
             numInstances = numberInstances;
@@ -1034,6 +1034,7 @@ public:
             inputLayout = thisMesh->m_inputLayout;
             material = shaderMat;
             textureIndex = texIndex;
+            objectTransformSlot = transformSlot;
         }
 
         UINT startingInstance;
@@ -1050,12 +1051,13 @@ public:
 
         ShaderMaterial material;
         INT textureIndex;           // index into DXR texture array (-1 = no texture)
+        UINT objectTransformSlot;   // instance-buffer slot of a per-draw object transform (UINT_MAX = identity)
 
         bool operator==(const DrawRecord&) const;
     };
 
     UINT m_nextVbWorldStart = 0;
-    static_assert(sizeof(DrawRecord) == 340, "DrawRecord must match Blur.hlsl");
+    static_assert(sizeof(DrawRecord) == 344, "DrawRecord must match Blur.hlsl");
     std::vector<DrawRecord> m_drawRecords;
     size_t m_previousDrawRecordHash;
 
@@ -1175,7 +1177,7 @@ public:
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
 
-    HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
+    HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(float sx, float sy, DWORD dwColor, const WCHAR* strText);
@@ -1254,7 +1256,7 @@ typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool render
 typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
 typedef HRESULT (*SetRenderPhaseFunc)(RenderState state);
 
-typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
+typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
 
 typedef HRESULT (*BeginDrawTextFunc)();
 typedef HRESULT (*DrawText2Func)(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -1381,9 +1383,9 @@ public:
     HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
     HRESULT SetRenderPhase(RenderState state) { return SetRenderPhaseFuncPtr(state); }
 
-    HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation)
+    HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot)
     {
-        return DrawIndexedInstancedFuncPtr(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+        return DrawIndexedInstancedFuncPtr(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation, ObjectTransformSlot);
     }
 
     HRESULT BeginDrawText() { return BeginDrawTextFuncPtr(); }

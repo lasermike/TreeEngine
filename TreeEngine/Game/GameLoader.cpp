@@ -46,6 +46,10 @@ void GameLoader::Regenerate(SceneRoot* pScene)
     {
         treeNum++;
 
+        // Instances reuse their source's model.
+        if (obj->IsInstance())
+            continue;
+
         GeneratorType genType = obj->GetParams().generatorType;
         if (genType == LSystemGeneratorType)
         {

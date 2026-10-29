@@ -13,12 +13,25 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <set>
 #include <sstream>
 #include <stdexcept>
 
 namespace
 {
+    // Reads a whole file in one block. Returns false if it cannot be opened.
+    bool ReadFileBytes(const std::wstring& filename, std::vector<uint8_t>& bytes)
+    {
+        std::ifstream input(filename.c_str(), std::ios::binary | std::ios::ate);
+        if (!input) return false;
+        const std::streamoff size = input.tellg();
+        bytes.resize(size > 0 ? static_cast<size_t>(size) : 0);
+        input.seekg(0);
+        if (!bytes.empty() && !input.read(reinterpret_cast<char*>(bytes.data()), bytes.size())) bytes.clear();
+        return true;
+    }
+
     struct PrimitiveKey
     {
         const cgltf_primitive* primitive;
@@ -514,8 +527,7 @@ namespace
                             auto dot = source.filename.find_last_of(L'.');
                             if (dot != std::wstring::npos && _wcsicmp(source.filename.c_str() + dot, L".dds") == 0)
                                 ImportError(filename, materialName + " material maps require PNG/JPEG images");
-                            std::ifstream input(source.filename.c_str(), std::ios::binary);
-                            source.encodedData.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+                            ReadFileBytes(source.filename, source.encodedData);
                             if (source.encodedData.empty()) ImportError(filename, materialName + " has an empty texture image");
                         }
                         source.key += colorSpace == 2 ? L"#srgb" : L"#linear";
@@ -790,12 +802,47 @@ GltfTextureSource LoadMaterialTextureFile(const std::wstring& filename, int colo
     result.name = narrow;
     result.mimeType = extension == ".png" ? "image/png" : extension == ".dds" ? "image/vnd-ms.dds" : "image/jpeg";
     result.colorSpace = colorSpace;
-    std::ifstream input(filename.c_str(), std::ios::binary);
-    if (!input) throw std::runtime_error("material map '" + narrow + "' was not found");
-    result.encodedData.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    if (!ReadFileBytes(filename, result.encodedData)) throw std::runtime_error("material map '" + narrow + "' was not found");
     if (result.encodedData.empty()) throw std::runtime_error("material map '" + narrow + "' is empty");
     result.key = filename + (colorSpace == 2 ? L"#srgb" : L"#linear");
     return result;
+}
+
+std::shared_ptr<const GltfTextureSource> LoadSharedMaterialTextureFile(const std::wstring& filename, int colorSpace)
+{
+    // Objects sharing a map share its bytes, so a texture used by many objects is read
+    // once. Entries live while any object holds them and are reread if the file changes.
+    struct CacheEntry
+    {
+        std::weak_ptr<const GltfTextureSource> source;
+        FILETIME lastWrite;
+        ULARGE_INTEGER size;
+    };
+    static std::mutex cacheMutex;
+    static std::map<std::wstring, CacheEntry> cache;
+
+    WIN32_FILE_ATTRIBUTE_DATA attributes = {};
+    const bool exists = GetFileAttributesExW(filename.c_str(), GetFileExInfoStandard, &attributes) != 0;
+    ULARGE_INTEGER size;
+    size.LowPart = attributes.nFileSizeLow;
+    size.HighPart = attributes.nFileSizeHigh;
+    const std::wstring key = filename + (colorSpace == 2 ? L"#srgb" : L"#linear");
+
+    std::lock_guard<std::mutex> lock(cacheMutex);
+    if (exists)
+    {
+        auto found = cache.find(key);
+        if (found != cache.end() && CompareFileTime(&found->second.lastWrite, &attributes.ftLastWriteTime) == 0 &&
+            found->second.size.QuadPart == size.QuadPart)
+        {
+            if (auto shared = found->second.source.lock()) return shared;
+        }
+    }
+    auto loaded = std::make_shared<const GltfTextureSource>(LoadMaterialTextureFile(filename, colorSpace));
+    for (auto it = cache.begin(); it != cache.end();)
+        it = it->second.source.expired() ? cache.erase(it) : std::next(it);
+    cache[key] = { loaded, attributes.ftLastWriteTime, size };
+    return loaded;
 }
 
 void GltfAsset::AppendGeometry(GeometryBufferData& geometryData)

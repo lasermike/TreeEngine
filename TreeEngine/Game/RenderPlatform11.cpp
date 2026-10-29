@@ -777,7 +777,8 @@ HRESULT RenderPlatform11::DrawIndexedInstanced(
     UINT InstanceCount,
     UINT StartIndexLocation,
     INT BaseVertexLocation,
-    UINT StartInstanceLocation)
+    UINT StartInstanceLocation,
+    UINT /*ObjectTransformSlot*/)
 {
     m_immediateContext->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
     return S_OK;

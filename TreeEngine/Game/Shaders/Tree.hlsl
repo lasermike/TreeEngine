@@ -56,6 +56,23 @@ ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
 
+// Per-draw object transform for instanced objects: an instance-buffer slot whose World is
+// applied after each instance's own World. NoObjectTransform leaves the vertex untouched.
+cbuffer cbObjectTransform : register(b4)
+{
+    uint objectTransformSlot;
+};
+
+void ApplyObjectTransform(inout float3 position, inout float3 normal, inout float3 tangent)
+{
+    if (objectTransformSlot == NoObjectTransform)
+        return;
+    float4x4 objectTransform = InstanceBuffer[objectTransformSlot].World;
+    position = mul(float4(position, 1.0f), objectTransform).xyz;
+    normal = mul(normal, (float3x3) objectTransform);
+    tangent = mul(tangent, (float3x3) objectTransform);
+}
+
 cbuffer cbMaterial : register (b3)
 {
     ShaderMaterial mat;
@@ -163,12 +180,10 @@ PS_INPUT VS(VS_INPUT input)
     float4x4 world = input.World;
 
     float3 out0 = mul(float4(input.Pos, 1.0f), world).xyz;
+    float3 worldNormal = mul(input.NormalL, (float3x3) world);
+    float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
+    ApplyObjectTransform(out0, worldNormal, worldTangent);
     output.PosW = out0;
-
-    // Write transformed vertex for DXR
-    //outputVertices.Append(out0);
-    //outputIndices.Append(input.VertexID);
-    //
 
     output.Pos = mul(float4(output.PosW, 1.0f), View);
     output.Pos = mul(output.Pos, Projection);
@@ -178,10 +193,7 @@ PS_INPUT VS(VS_INPUT input)
     output.ViewDirection = normalize(eyePos.xyz - output.PosW);
 
     // TBN vectors for tangent space
-    float3 worldNormal = mul(input.NormalL, (float3x3) world);
     output.N = normalize(worldNormal);
-
-    float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
     output.T = normalize(worldTangent);
 
     output.B = normalize(cross(output.N, output.T)) * input.TangentL.w;
@@ -197,12 +209,11 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     PS_INPUT output = (PS_INPUT)0;
 
     float4x3 world = (float4x3) input.World;
-    output.PosW = SkinVertexPosition(input);
-
-    // Write transformed vertex for DXR
-    //outputVertices.Append(out0);
-    //outputIndices.Append(input.VertexID);
-    //
+    float3 skinnedPosition = SkinVertexPosition(input);
+    float3 worldNormal = mul(input.NormalL, (float3x3) world);
+    float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
+    ApplyObjectTransform(skinnedPosition, worldNormal, worldTangent);
+    output.PosW = skinnedPosition;
 
     output.Pos = mul(float4(output.PosW, 1.0f), View);
     output.Pos = mul(output.Pos, Projection);
@@ -212,10 +223,7 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     output.ViewDirection = normalize(eyePos.xyz - output.PosW);
 
     // TBN vectors for tangent space
-    float3 worldNormal = mul(input.NormalL, (float3x3) world);
     output.N = normalize(worldNormal);
-
-    float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
     output.T = normalize(worldTangent);
 
     output.B = normalize(cross(output.N, output.T)) * input.TangentL.w;
@@ -346,8 +354,10 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 {
     ShadowMapVertexOut output;
 
-    float4 pos = mul(float4(input.Pos, 1.0f), input.World);
-    pos = mul(pos, View);
+    float3 position = mul(float4(input.Pos, 1.0f), input.World).xyz;
+    float3 unusedNormal = 0, unusedTangent = 0;
+    ApplyObjectTransform(position, unusedNormal, unusedTangent);
+    float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
 
@@ -358,8 +368,10 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
 { 
     ShadowMapVertexOut output;
 
-    float4 pos = float4(SkinVertexPosition(input), 1.0f);
-    pos = mul(pos, View);
+    float3 position = SkinVertexPosition(input);
+    float3 unusedNormal = 0, unusedTangent = 0;
+    ApplyObjectTransform(position, unusedNormal, unusedTangent);
+    float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
 

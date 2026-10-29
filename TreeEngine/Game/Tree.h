@@ -74,7 +74,7 @@ private:
         int instanceOffsetPrev;
     };
 
-    int m_numBranchInstances;
+    int m_numBranchInstances = 0;
     std::vector<BranchInstance> m_treeFrames;
     struct BranchPose
     {
@@ -93,6 +93,28 @@ private:
     UINT m_lastInstanceStart = 0;
     UINT m_cachedLeafCount = 0;
     UINT m_cachedStickCount = 0;
+
+    // Instancing. A source tree with instances publishes two camera-independent branch layouts after its own:
+    // far (depth-only LOD) and near (every stick at full detail). Each instance draws one of them with its own
+    // object transform, so instances need no per-branch CPU work.
+    enum InstanceLayoutKind { FarLayout, NearLayout, InstanceLayoutCount };
+    struct InstanceLayout
+    {
+        std::array<InstanceDataArray, TreeSegmentCount> segments;
+        std::array<UINT, TreeSegmentCount> start = {};
+        UINT leafCount = 0;
+        UINT stickCount = 0;
+    };
+    std::array<InstanceLayout, InstanceLayoutCount> m_instanceLayouts;
+    std::vector<int> m_layoutOffsets; // Scratch: each branch frame's slot in the layout being built.
+    int m_instanceCount = 0;
+    bool m_instanceLayoutsValid = false;
+    int m_instanceLayoutDepthLOD = 0;
+
+    Tree* InstanceSource() const { return static_cast<Tree*>(_params->instanceSource); }
+    TreeSegment SelectLayoutSegment(const BranchInstance& frame, InstanceLayoutKind layout) const;
+    void BuildInstanceLayouts(UINT startInstance);
+    HRESULT ComputeInstanceConstants(IRenderFrame* pFrameConfig);
 
     HRESULT ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRenderData);
     HRESULT ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderData* pRenderData, int startInstance);
@@ -116,4 +138,8 @@ public:
     void AccumulateProfile(RenderProfile& profile) const;
     virtual unsigned int GetNumInstances();
     virtual unsigned int GetMaxInstances();
+    unsigned int GetMaxDrawnInstances() override;
+
+    // Called once per instance before graphics are initialized; reserves the instance layouts.
+    void RegisterInstance() { ++m_instanceCount; }
 };

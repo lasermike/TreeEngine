@@ -63,6 +63,14 @@ namespace SceneData
         DirectX::XMFLOAT2 textureCoordScale = { 1, 1 };
         float animationSpeed = 1;
         int depthLOD = 4;
+
+        // Instances: the ID of an earlier object this one copies. The parser fills every other field from that
+        // object; an instance only authors its ID, transform, and the materials flagged below.
+        std::string instanceOf;
+        bool overridesMaterial = false;     // Primitive material, or tree/fixed-tree/graph trunk.
+        bool overridesLeafMaterial = false; // Tree/fixed-tree/graph leaf.
+
+        virtual std::unique_ptr<ObjectDefinition> Clone() const = 0;
     };
 
     struct PrimitiveDefinition : ObjectDefinition
@@ -71,6 +79,7 @@ namespace SceneData
         Shape shape = Shape::Box;
         bool hasMaterial = false;
         MaterialDefinition material;
+        std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<PrimitiveDefinition>(*this); }
     };
 
     struct RuleDefinition
@@ -101,6 +110,7 @@ namespace SceneData
         MaterialDefinition trunk;
         MaterialDefinition leaf;
         LSystemDefinition generator;
+        std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TreeDefinition>(*this); }
     };
 
     struct FixedTreeDefinition : ObjectDefinition
@@ -110,6 +120,7 @@ namespace SceneData
         bool hasMaterials = false;
         MaterialDefinition trunk;
         MaterialDefinition leaf;
+        std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<FixedTreeDefinition>(*this); }
     };
 
     struct GraphDefinition : ObjectDefinition
@@ -119,6 +130,7 @@ namespace SceneData
         bool hasMaterials = false;
         MaterialDefinition trunk;
         MaterialDefinition leaf;
+        std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<GraphDefinition>(*this); }
     };
 
     struct ModelDefinition : ObjectDefinition
@@ -126,6 +138,7 @@ namespace SceneData
         ModelDefinition() : ObjectDefinition(ObjectKind::Model) {}
         std::string source;
         bool forceLit = false;
+        std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<ModelDefinition>(*this); }
     };
 
     struct DirectionalLightDefinition

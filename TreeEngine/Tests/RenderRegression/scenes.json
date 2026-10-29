@@ -19,6 +19,7 @@
     { "id": "graph", "name": "LoadGraph" },
     { "id": "simple-box", "name": "LoadSimpleBox" },
     { "id": "ai-tree", "name": "LoadAITree" },
-    { "id": "gltf-models", "name": "LoadGltfDemo" }
+    { "id": "gltf-models", "name": "LoadGltfDemo" },
+    { "id": "instancing", "name": "Instancing" }
   ]
 }

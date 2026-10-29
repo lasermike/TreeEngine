@@ -8,6 +8,7 @@
 #include <memory>
 
 class RenderManager;
+class WorldObject;
 
 interface IRenderFrame;
 
@@ -73,6 +74,8 @@ public:
     std::vector<ShaderMaterial> materials;
     std::vector<MaterialTextureSources> materialTextures; // Optional PBR maps, parallel to materials.
     std::vector<PrimitiveType> meshes;
+    // Set for instances: the object whose model (and, for trees, branch poses) this object reuses.
+    WorldObject* instanceSource = nullptr;
 
     const MaterialTextureSources* MaterialTextures(size_t slot) const
     {
@@ -154,6 +157,9 @@ public:
     virtual HRESULT ComputeConstants(IRenderFrame* pFrame);
     virtual unsigned int GetNumInstances() { return 0; }
     virtual unsigned int GetMaxInstances() { return 0; }
+    // Instances drawn per frame, which can exceed the instance-buffer slots an instanced object reserves.
+    virtual unsigned int GetMaxDrawnInstances() { return GetMaxInstances(); }
+    bool IsInstance() const { return _params->instanceSource != nullptr; }
     XMFLOAT3* GetBoundingBox() { return _boundingBox; }
     XMVECTOR GetExtents(Extent extent);
     XMVECTOR GetPosition() { return XMLoadFloat3(&_position); }

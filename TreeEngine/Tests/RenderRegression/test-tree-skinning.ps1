@@ -24,7 +24,8 @@ $states = @(
     @{ time = 1; camera = @(0, 1.5, -6) },
     @{ time = 0; camera = @(0, 1.5, -60) }
 )
-foreach ($scene in @('LoadTestTree', 'LoadTrees')) {
+$instancedPoseWork = $null
+foreach ($scene in @('LoadTestTree', 'LoadTrees', 'Instancing')) {
     foreach ($mode in @('raster', 'raytracing')) {
         $job = Join-Path $directory "$scene-$mode"
         New-Item -ItemType Directory -Path $job -Force | Out-Null
@@ -75,9 +76,41 @@ foreach ($scene in @('LoadTestTree', 'LoadTrees')) {
                 throw "Growth/rewind did not invalidate the pose: $scene / $mode / state $i"
             }
         }
+        if ($scene -eq 'Instancing' -and $mode -eq 'raster') {
+            # State 2 (time 5) recomputed without the pose cache.
+            $instancedPoseWork = $report.captures[5].samples[0].rebuiltPoseBranches
+        }
         Write-Host "Skinning growth, mature-time reuse, LOD movement, and rewind passed: $scene / $mode"
     }
 }
+if ($null -eq $instancedPoseWork) { throw 'Instancing pose work was not measured.' }
+# Instances must not add pose work: the same scene with its instances removed rebuilds exactly as many branches.
+$runtime = Join-Path $directory 'instancing-runtime'
+New-Item -ItemType Directory -Path $runtime -Force | Out-Null
+Copy-Item -Path (Join-Path (Split-Path $Executable) '*') -Destination $runtime -Recurse -Exclude '*.pdb', 'UserScenes', 'imgui.ini'
+$scenePath = Join-Path $runtime 'Scenes\instancing.scene.json'
+$sourceOnly = Get-Content -LiteralPath $scenePath -Raw | ConvertFrom-Json
+$sourceOnly.objects = @($sourceOnly.objects | Where-Object { -not $_.PSObject.Properties['instanceOf'] })
+[IO.File]::WriteAllText($scenePath, ($sourceOnly | ConvertTo-Json -Depth 20), $utf8)
+$reportPath = Join-Path $runtime 'source-only-report.json'
+$request = @{
+    scene = 'Instancing'; mode = 'raster'; seed = 12345; width = 640; height = 480
+    warmupFrames = 0; benchmarkFrames = 1; postProcessing = $true; report = $reportPath
+    captures = @(@{ time = 5; poseCache = $false; cameraPosition = @(0, 1.5, -6); filename = (Join-Path $runtime 'source-only.png') })
+}
+$requestPath = Join-Path $runtime 'source-only-request.json'
+[IO.File]::WriteAllText($requestPath, ($request | ConvertTo-Json -Depth 8), $utf8)
+$process = Start-Process -FilePath (Join-Path $runtime 'TreeClassic.exe') -ArgumentList @('--render-test', ('"' + $requestPath + '"')) -WorkingDirectory $runtime -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $runtime 'source-only-stderr.log')
+[void]$process.Handle
+if (-not $process.WaitForExit(120000)) {
+    $process.Kill(); $process.WaitForExit(); throw 'Source-only instancing capture timed out.'
+}
+if ($process.ExitCode -ne 0) { throw "Source-only instancing capture failed: $($process.ExitCode). See $runtime." }
+$sourceOnlyWork = (Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json).captures[0].samples[0].rebuiltPoseBranches
+if ($sourceOnlyWork -le 0 -or $instancedPoseWork -ne $sourceOnlyWork) {
+    throw "Instances added pose work: $instancedPoseWork branches rebuilt with instances, $sourceOnlyWork without."
+}
+Write-Host "Instances add no pose work: $instancedPoseWork branches rebuilt with or without instances."
 if ($Capacity) {
     # The expected overflow is a normal error in Release; Debug's HRR macro opens an assertion dialog.
     if (-not $CapacityExecutable) {

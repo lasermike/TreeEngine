@@ -60,6 +60,7 @@ struct DrawRecord
     float4 matUvTransformRow0[5];
     float4 matUvTransformRow1[5];
     int textureIndex;
+    uint objectTransformSlot;
 };
 
 struct SimpleVertex
@@ -114,6 +115,8 @@ void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_Di
         float4x3 world = (float4x3) InstanceBuffer[inputInstance].World;
 
         float3 out0 = mul(float4(vertex, 1.0f), world);
+        if (drawRecord.objectTransformSlot != NoObjectTransform)
+            out0 = mul(float4(out0, 1.0f), InstanceBuffer[drawRecord.objectTransformSlot].World).xyz;
 
         uint vbOutIndex = drawRecord.vbWorldStart + dispatchThreadID.x;
         outputVertices[vbOutIndex] = float4(out0, 1);
@@ -148,6 +151,8 @@ void VSasCSSkinned(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID 
 
             out0 = lerp(outPrev, out0, vertex.InstanceWeight1);
         }
+        if (drawRecord.objectTransformSlot != NoObjectTransform)
+            out0 = mul(float4(out0, 1.0f), InstanceBuffer[drawRecord.objectTransformSlot].World).xyz;
 
         uint vbOutIndex = drawRecord.vbWorldStart + dispatchThreadID.x;
         outputVertices[vbOutIndex] = float4(out0, 1);

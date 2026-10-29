@@ -116,8 +116,7 @@ namespace
             const auto filename = RuntimeTexture(entry.map->source, objectId, sceneFilename);
             try
             {
-                result.roles[entry.role] = std::make_shared<GltfTextureSource>(
-                    LoadMaterialTextureFile(filename, entry.colorSpace));
+                result.roles[entry.role] = LoadSharedMaterialTextureFile(filename, entry.colorSpace);
             }
             catch (const std::runtime_error& error)
             {
@@ -231,6 +230,17 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
         parameters.release();
         objects.push_back(std::move(runtime));
     }
+    // Tree-kind instances share their root source's model and branch poses; primitive and model instances are
+    // ordinary objects built from the definition the parser copied.
+    std::map<std::string, WorldObject*> runtimeById;
+    auto linkTreeInstance = [&](const SceneData::ObjectDefinition& object, WorldObjectParams& parameters)
+    {
+        if (object.instanceOf.empty()) return;
+        WorldObject* source = runtimeById.at(object.instanceOf);
+        if (source->IsInstance()) source = source->GetParams().instanceSource;
+        parameters.instanceSource = source;
+        static_cast<Tree*>(source)->RegisterInstance();
+    };
     for (const auto& object : definition.objects)
     {
         if (object->kind == SceneData::ObjectKind::Primitive)
@@ -268,6 +278,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                 generator.SegmentLength = RandomSegmentLength;
             for (const auto& rule : tree.generator.rules)
                 generator._rules.emplace_back(rule.input.c_str(), rule.iterations, rule.output.c_str());
+            linkTreeInstance(tree, *parameters);
             auto runtime = std::make_unique<Tree>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));
@@ -279,6 +290,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             CommonParameters(tree, *parameters);
             parameters->meshes.push_back(RuntimeShape(tree.trunkShape));
             ApplyTreeMaterials(tree, *parameters, sceneFilename);
+            linkTreeInstance(tree, *parameters);
             auto runtime = std::make_unique<Tree>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));
@@ -288,8 +300,10 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             const auto& graph = static_cast<const SceneData::GraphDefinition&>(*object);
             auto parameters = std::make_unique<WorldObjectParameters<GraphParams>>(GraphGeneratorType);
             CommonParameters(graph, *parameters);
-            parameters->GetGeneratorParameters().points = LoadGraphPoints(graph.dataFile, graph.id, sceneFilename);
+            if (graph.instanceOf.empty())
+                parameters->GetGeneratorParameters().points = LoadGraphPoints(graph.dataFile, graph.id, sceneFilename);
             ApplyTreeMaterials(graph, *parameters, sceneFilename);
+            linkTreeInstance(graph, *parameters);
             auto runtime = std::make_unique<Tree>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));
@@ -305,6 +319,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             parameters.release();
             objects.push_back(std::move(runtime));
         }
+        runtimeById[object->id] = objects.back().get();
     }
 
     for (auto& object : objects)
@@ -493,6 +508,42 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
         XMStoreFloat3(&definition->transform.position, runtime.GetPosition());
         XMStoreFloat4(&definition->transform.rotation, runtime.GetRotation());
         XMStoreFloat3(&definition->transform.scale, runtime.GetScale());
+        if (!definition->instanceOf.empty())
+        {
+            // Instances save their transform and overridden materials; everything else comes from the source.
+            auto captureSlot = [&](size_t slot) { return CaptureMaterial(params, slot, sourceFilename, destinationFilename); };
+            switch (definition->kind)
+            {
+            case SceneData::ObjectKind::Primitive:
+                if (definition->overridesMaterial)
+                    static_cast<SceneData::PrimitiveDefinition&>(*definition).material = captureSlot(0);
+                break;
+            case SceneData::ObjectKind::Tree:
+            {
+                auto& tree = static_cast<SceneData::TreeDefinition&>(*definition);
+                if (tree.overridesMaterial) tree.trunk = captureSlot(0);
+                if (tree.overridesLeafMaterial) tree.leaf = captureSlot(1);
+                break;
+            }
+            case SceneData::ObjectKind::FixedTree:
+            {
+                auto& tree = static_cast<SceneData::FixedTreeDefinition&>(*definition);
+                if (tree.overridesMaterial) tree.trunk = captureSlot(0);
+                if (tree.overridesLeafMaterial) tree.leaf = captureSlot(1);
+                break;
+            }
+            case SceneData::ObjectKind::Graph:
+            {
+                auto& graph = static_cast<SceneData::GraphDefinition&>(*definition);
+                if (graph.overridesMaterial) graph.trunk = captureSlot(0);
+                if (graph.overridesLeafMaterial) graph.leaf = captureSlot(1);
+                break;
+            }
+            default:
+                break;
+            }
+            continue;
+        }
         definition->textureCoordScale = params.textureCoordScale;
         definition->animationSpeed = params._animationSpeed;
         definition->depthLOD = params.depthLOD;

@@ -241,6 +241,7 @@ enum RootSignatureParams
     ChangesEveryFrameRootSignatureParam,
     SpecularSrvTableRootSignatureParam,
     EnvironmentSrvTableRootSignatureParam,
+    ObjectTransformRootSignatureParam,
 };
 
 const UINT maxWorldVertices = 1200000; // Double-sided glTF sphere test expands to over one million vertices.
@@ -396,6 +397,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     //   cbuffer cbChangesPerPass : register(b1)
     //   cbuffer cbChangesEveryFrame : register(b2)
     //   cbuffer cbMaterial : register (b3)
+    //   cbuffer cbObjectTransform : register(b4) - one root constant per draw
 
     CD3DX12_DESCRIPTOR_RANGE ranges[5];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
@@ -403,7 +405,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0 /* t0 */);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 3 /* t3-t6 */);
     ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 7 /* t7-t8 */);
-    CD3DX12_ROOT_PARAMETER rootParameters[8];
+    CD3DX12_ROOT_PARAMETER rootParameters[9];
     rootParameters[EnvironmentSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -412,6 +414,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     rootParameters[BranchDataRootSignatureParam].InitAsShaderResourceView(BranchDataRootSignatureShaderSlot);
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
+    rootParameters[ObjectTransformRootSignatureParam].InitAsConstants(1, 4 /* b4 */, 0, D3D12_SHADER_VISIBILITY_VERTEX);
 
     D3D12_STATIC_SAMPLER_DESC sampler[5];
     sampler[0] = D3D12_STATIC_SAMPLER_DESC();
@@ -1405,8 +1408,11 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     UINT InstanceCount,
     UINT StartIndexLocation,
     INT BaseVertexLocation,
-    UINT StartInstanceLocation) 
+    UINT StartInstanceLocation,
+    UINT ObjectTransformSlot)
 {
+    // UINT_MAX selects the identity transform; instanced trees pass their transform's instance-buffer slot.
+    GetCommandList()->SetGraphicsRoot32BitConstant(ObjectTransformRootSignatureParam, ObjectTransformSlot, 0);
 #if defined(DXR_ENABLED)
     if (m_dxrEnabledThisFrame
         && m_renderData->currentPass == RegularPass)
@@ -1448,7 +1454,8 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
             m_currentMesh->m_bufferOffsets.VertexCount,
             m_currentMesh,
             m_currentMaterial ? m_currentMaterial->m_shaderMaterial : ShaderMaterial(),
-            texIdx));
+            texIdx,
+            ObjectTransformSlot));
 
         m_nextVbWorldStart += static_cast<UINT>(vertexCount);
     }
@@ -2420,6 +2427,7 @@ struct std::hash<RenderPlatform12::DrawRecord>
         h = hash_combine(h, std::hash<UINT>{}(d.vbWorldStart));
         h = hash_combine(h, std::hash<UINT>{}(d.baseVertexLocation));
         h = hash_combine(h, std::hash<UINT>{}(d.vertexCount));
+        h = hash_combine(h, std::hash<UINT>{}(d.objectTransformSlot));
 
         /* If InputLayouts is an enum class, hash its underlying value.
            If it�s a struct, ensure there�s std::hash<InputLayouts>. */
@@ -2446,7 +2454,8 @@ bool RenderPlatform12::DrawRecord::operator==(const DrawRecord& dr) const
             vbWorldStart == dr.vbWorldStart &&
             baseVertexLocation == dr.baseVertexLocation &&
             vertexCount == dr.vertexCount &&
-            inputLayout == dr.inputLayout;
+            inputLayout == dr.inputLayout &&
+            objectTransformSlot == dr.objectTransformSlot;
 }
 
 
@@ -2527,6 +2536,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             geoInfo.textureIndex = dr.textureIndex;
             geoInfo.isSkinned = (dr.inputLayout == SKINNED_INPUT_LAYOUT) ? 1 : 0;
             geoInfo.instanceIndex = dr.startingInstance + instanceIndex;
+            geoInfo.objectTransformSlot = dr.objectTransformSlot;
             m_dxrGeometryInfoBuffer->CopyData(geometryDescIndex, geoInfo);
 
             geometryDescIndex++;

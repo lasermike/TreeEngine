@@ -87,7 +87,9 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     GeometryGenerator::BuildGeometryBuffers(m_geometryData);
     scene.AppendGeometry(m_geometryData);
 
-    HRR(GetPlatform()->InitGameLevelGraphics(maxInstances, useShadowMaps, m_geometryData));
+    // The platform sizes its ray-tracing geometry from instances drawn per frame, which instanced objects can make larger
+    // than the instance-buffer slots they reserve.
+    HRR(GetPlatform()->InitGameLevelGraphics(std::max(maxInstances, scene.GetMaxDrawnInstances()), useShadowMaps, m_geometryData));
     if (!m_renderData.environmentDiffuse.empty())
     {
         HRR(GetPlatform()->LoadTexture(SceneData::WidePath(m_renderData.environmentDiffuse).c_str(),
@@ -212,13 +214,14 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
             || ru->m_material->m_shaderMaterial.opticalParams.y > 0.0f))
             continue;
 
-        UINT startInstance = m_perFrameInstanceData[ru][object].first;
-        UINT numInstances = m_perFrameInstanceData[ru][object].second;
+        const InstanceRange& range = m_perFrameInstanceData[ru][object];
+        UINT startInstance = range.start;
+        UINT numInstances = range.count;
 
         if (numInstances > 0)
         {
             HRR(GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets.IndexCount, numInstances, ru->m_mesh->m_bufferOffsets.IndexOffset,
-                ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance));
+                ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance, range.objectTransformSlot));
         }
     }
     return S_OK;
@@ -513,18 +516,21 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
 
     // Add per frame reservation
     ASSERT(m_perFrameInstanceData[unit].find(object) == m_perFrameInstanceData[unit].end());
-    m_perFrameInstanceData[unit][object].first = 0;
-    m_perFrameInstanceData[unit][object].second = 0;
+    m_perFrameInstanceData[unit][object] = InstanceRange();
 
     *ppRenderUnit = unit;
 
     return S_OK;
 }
 
-HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances)
+HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+    UINT objectTransformSlot)
 {
-    m_perFrameInstanceData[renderUnit][object].first = startInstance;
-    m_perFrameInstanceData[renderUnit][object].second = numInstances;
+    // Keys are reserved up front, so concurrent ComputeConstants calls only write existing entries.
+    InstanceRange& range = m_perFrameInstanceData[renderUnit][object];
+    range.start = startInstance;
+    range.count = numInstances;
+    range.objectTransformSlot = objectTransformSlot;
     return S_OK;
 }
 

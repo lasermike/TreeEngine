@@ -292,6 +292,73 @@ namespace SceneData
             if (value["materials"].contains("leaf"))
                 object.leaf = MaterialReference(value["materials"]["leaf"], path + ".materials.leaf", scene);
         }
+
+        // Applies an instance's trunk/leaf overrides on top of the materials copied from its source.
+        template<class T>
+        void ReadInstanceTreeMaterials(const Json& value, const std::string& path, const SceneDefinition& scene, T& object)
+        {
+            if (!value.contains("materials")) return;
+            const auto& materials = value["materials"];
+            Fields(materials, path + ".materials", { "trunk", "leaf" });
+            if (!object.hasMaterials && !(materials.contains("trunk") && materials.contains("leaf")))
+                Invalid(path + ".materials", "the instanced object uses default materials, so specify both trunk and leaf");
+            object.hasMaterials = true;
+            if (materials.contains("trunk"))
+            {
+                object.trunk = MaterialReference(materials["trunk"], path + ".materials.trunk", scene);
+                object.overridesMaterial = true;
+            }
+            if (materials.contains("leaf"))
+            {
+                object.leaf = MaterialReference(materials["leaf"], path + ".materials.leaf", scene);
+                object.overridesLeafMaterial = true;
+            }
+        }
+
+        std::unique_ptr<ObjectDefinition> ReadInstance(const Json& value, const std::string& path, const SceneDefinition& scene)
+        {
+            if (value.contains("type")) Invalid(path + ".type", "is inherited from instanceOf; remove it");
+            for (auto field : { "textureCoordScale", "animationSpeed", "depthLOD", "shape", "trunkShape", "generator", "dataFile", "source", "forceLit" })
+                if (value.contains(field)) Invalid(path + "." + field, "is inherited from instanceOf; an instance sets only transform and materials");
+            Fields(value, path, { "id", "instanceOf", "transform", "material", "materials" });
+            if (!value.contains("id")) Invalid(path + ".id", "required property");
+            const std::string id = String(value["id"], path + ".id");
+            if (id.empty()) Invalid(path + ".id", "must not be empty");
+            const std::string sourceId = String(value["instanceOf"], path + ".instanceOf");
+            if (sourceId == id) Invalid(path + ".instanceOf", "an object cannot be an instance of itself");
+            const ObjectDefinition* source = nullptr;
+            for (const auto& existing : scene.objects)
+                if (existing->id == sourceId) source = existing.get();
+            if (!source) Invalid(path + ".instanceOf", "unknown object '" + sourceId + "'; instances must follow the object they copy");
+
+            auto result = source->Clone();
+            result->id = id;
+            result->instanceOf = sourceId;
+            result->overridesMaterial = result->overridesLeafMaterial = false;
+            result->transform = value.contains("transform") ? ReadTransform(value["transform"], path + ".transform") : Transform();
+            if (result->kind == ObjectKind::Model && (value.contains("material") || value.contains("materials")))
+                Invalid(path, "glTF model instances use the model's own materials");
+            if (value.contains("material"))
+            {
+                if (result->kind != ObjectKind::Primitive)
+                    Invalid(path + ".material", "only primitive instances take a material; trees use materials.trunk/leaf");
+                auto& primitive = static_cast<PrimitiveDefinition&>(*result);
+                primitive.material = MaterialReference(value["material"], path + ".material", scene);
+                primitive.hasMaterial = true;
+                primitive.overridesMaterial = true;
+            }
+            if (value.contains("materials"))
+            {
+                switch (result->kind)
+                {
+                case ObjectKind::Tree: ReadInstanceTreeMaterials(value, path, scene, static_cast<TreeDefinition&>(*result)); break;
+                case ObjectKind::FixedTree: ReadInstanceTreeMaterials(value, path, scene, static_cast<FixedTreeDefinition&>(*result)); break;
+                case ObjectKind::Graph: ReadInstanceTreeMaterials(value, path, scene, static_cast<GraphDefinition&>(*result)); break;
+                default: Invalid(path + ".materials", "only tree, fixedTree, and graph instances take trunk/leaf materials");
+                }
+            }
+            return result;
+        }
     }
 
     SceneDefinition ParseScene(const std::string& jsonText, const std::string& sourceName)
@@ -412,6 +479,13 @@ namespace SceneData
             {
                 const auto& value = root["objects"][i];
                 auto path = sourceName + ".objects[" + std::to_string(i) + "]";
+                if (value.is_object() && value.contains("instanceOf"))
+                {
+                    auto instance = ReadInstance(value, path, scene);
+                    if (!ids.insert(instance->id).second) Invalid(path + ".id", "duplicate object ID '" + instance->id + "'");
+                    scene.objects.push_back(std::move(instance));
+                    continue;
+                }
                 if (!value.is_object() || !value.contains("type")) Invalid(path + ".type", "required property");
                 std::string type = String(value["type"], path + ".type");
                 std::unique_ptr<ObjectDefinition> object;
@@ -604,6 +678,35 @@ namespace SceneData
         for (const auto& object : scene.objects)
         {
             if (!object) throw std::runtime_error("Cannot serialize a null scene object");
+            if (!object->instanceOf.empty())
+            {
+                Json instance = { { "id", object->id }, { "instanceOf", object->instanceOf },
+                    { "transform", TransformJson(object->transform) } };
+                if (object->kind == ObjectKind::Primitive && object->overridesMaterial)
+                    instance["material"] = MaterialJson(dynamic_cast<const PrimitiveDefinition&>(*object).material);
+                auto treeMaterials = [&](const MaterialDefinition& trunk, const MaterialDefinition& leaf)
+                {
+                    if (object->overridesMaterial) instance["materials"]["trunk"] = MaterialJson(trunk);
+                    if (object->overridesLeafMaterial) instance["materials"]["leaf"] = MaterialJson(leaf);
+                };
+                if (object->kind == ObjectKind::Tree)
+                {
+                    const auto& tree = dynamic_cast<const TreeDefinition&>(*object);
+                    treeMaterials(tree.trunk, tree.leaf);
+                }
+                else if (object->kind == ObjectKind::FixedTree)
+                {
+                    const auto& tree = dynamic_cast<const FixedTreeDefinition&>(*object);
+                    treeMaterials(tree.trunk, tree.leaf);
+                }
+                else if (object->kind == ObjectKind::Graph)
+                {
+                    const auto& graph = dynamic_cast<const GraphDefinition&>(*object);
+                    treeMaterials(graph.trunk, graph.leaf);
+                }
+                root["objects"].push_back(std::move(instance));
+                continue;
+            }
             Json value = { { "id", object->id }, { "transform", TransformJson(object->transform) } };
             if (object->kind != ObjectKind::Model)
             {

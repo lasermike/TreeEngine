@@ -201,6 +201,8 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 
     // Transform object-space normal to world space using instance world matrix
     float4x4 worldMatrix = instanceDataBuffer[geoInfo.instanceIndex].World;
+    if (geoInfo.objectTransformSlot != NoObjectTransform)
+        worldMatrix = mul(worldMatrix, instanceDataBuffer[geoInfo.objectTransformSlot].World);
     normal = normalize(mul(normal, (float3x3)worldMatrix));
     tangent = normalize(mul(tangent, (float3x3)worldMatrix));
     tangent = normalize(tangent - normal * dot(normal, tangent));

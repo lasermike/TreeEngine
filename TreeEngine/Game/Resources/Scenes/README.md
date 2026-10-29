@@ -118,6 +118,38 @@ It also supports optional `materials.trunk`/`materials.leaf` slots.
 A `model` requires `source`, a `.gltf` or `.glb` file, and supports optional
 `forceLit` plus its transform. Its asset owns its geometry and materials.
 
+### Instancing
+
+An object with `instanceOf` copies an earlier object by ID. It sets only `id`,
+`transform`, and optionally its own materials; everything else, including the
+type, shape, generator, UV scale, animation speed, and depth LOD, comes from the
+referenced object. An omitted transform is the identity, as for other objects.
+
+```json
+{ "id": "tree-2", "instanceOf": "tree", "transform": { "position": [4, 0, -1], "rotationDegrees": [0, 90, 0] },
+  "materials": { "leaf": "autumn-needles" } }
+```
+
+- Primitive instances may set `material`. Tree, fixed-tree, and graph instances
+  may set `materials.trunk` and/or `materials.leaf`; slots they omit keep the
+  source's material. If the source has no materials, give both slots. glTF model
+  instances use the model's own materials.
+- `instanceOf` must name an object earlier in the file, and not the instance
+  itself. An instance of an instance resolves to the original object. Any other
+  property, including `type`, is an error naming that property.
+- Tree-kind instances reuse the source tree's generated model and per-frame
+  branch transforms. Each instance costs one transform and a few draw calls on
+  the CPU, regardless of branch count, and grows with the source. The GPU applies
+  the instance's transform to the source's branch data in raster, shadow, and
+  ray-tracing passes. An instance chooses its LOD as a whole: full-detail sticks
+  when its bounding box comes within 10 units of the camera, otherwise the
+  depth-only `depthLOD` rule. The source tree keeps its per-branch LOD.
+- Primitive and model instances are ordinary objects built from the copied
+  definition.
+- Saving writes instances back in this compact form, including only the
+  materials they override.
+
+The `Instancing` scene shows tree, primitive, and model instances.
 ## Materials
 
 A material property can be a named reference such as `"material": "ground"`

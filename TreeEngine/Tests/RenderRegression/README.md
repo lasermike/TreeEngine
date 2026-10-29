@@ -58,8 +58,8 @@ External Binaries/Intermediates directories are no longer used by the maintained
 desktop builds. Do not remove shared legacy outputs; any cleanup requires
 inspection and separate approval of the exact generated subdirectories.
 
-`scenes.json` lists ten scenes, both rendering modes, and captures at 0, 1,
-and 5 seconds (60 images). It also specifies resolution, random seed,
+`scenes.json` lists eleven scenes, both rendering modes, and captures at 0, 1,
+and 5 seconds (66 images). It also specifies resolution, random seed,
 postprocessing, warmup frames, and tolerances. Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
@@ -67,7 +67,8 @@ regression selection.
 
 `test-scene-persistence.ps1` covers primitives, L-system/fixed trees, graphs,
 glTF assets, and scene-authored PBR materials (`PbrMaterials`: a mapped sphere
-and a tree with PBR trunk/leaf slots) in raster and DXR modes, using the same
+and a tree with PBR trunk/leaf slots), and instancing (`Instancing`, which must
+save back in `instanceOf` form) in raster and DXR modes, using the same
 0.002 RMS tolerance.
 It copies the deployed runtime (excluding existing UserScenes) into a uniquely
 named ignored artifact directory and runs from a different working directory.
@@ -203,12 +204,15 @@ instances and parent offsets. This does not remove normal instance uploads or
 move procedural growth to the GPU.
 
 `test-tree-skinning.ps1` compares cached and recomputed output pixel-for-pixel:
-two tree scenes, both modes, nine states, 72 captures. It checks growth and
+three tree scenes (including `Instancing`), both modes, nine states, 108 captures. It checks growth and
 rewind invalidation, mature reuse while time advances, and near/far camera
 movement across LODs. Optional `-Capacity` uses a compact grammar to produce
 10,000 skinned cylinders (600,000 vertices), then 10,001 (600,060). The first
 must render; the second must report `ERROR_INSUFFICIENT_BUFFER` (HRESULT
 2147942522), not crash or succeed with missing geometry.
+
+It also checks that instances add no CPU pose work: `Instancing` must rebuild
+exactly as many branch poses as the same scene with its instances removed.
 
 ### Measured scope and remaining work
 
@@ -252,7 +256,7 @@ were changed and no forest-scale or normal asynchronous CPU result is claimed.
 
 ### Baseline status
 
-The full Debug manifest passes all 60 images. All gold images were regenerated
+The full Debug manifest passes all 66 images. All gold images were regenerated
 when the built-in scenes moved from Phong to PBR materials; see the Scenes README
 for how materials and lights were converted.
 `test-dxr-toggle.ps1` covers SimpleBox and Tree only.

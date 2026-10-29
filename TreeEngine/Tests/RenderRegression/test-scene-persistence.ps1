@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Executable,
-    [string[]]$Scenes = @('LoadSimpleBox', 'LoadSeaScene', 'LoadTrees', 'LoadGraph', 'LoadGltfDemo', 'PbrMaterials', 'LoadTreeScene'),
+    [string[]]$Scenes = @('LoadSimpleBox', 'LoadSeaScene', 'LoadTrees', 'LoadGraph', 'LoadGltfDemo', 'PbrMaterials', 'LoadTreeScene', 'Instancing'),
     [string[]]$Modes = @('raster', 'raytracing')
 )
 
@@ -69,6 +69,12 @@ foreach ($scene in $Scenes) {
             }
             if ($scene -eq 'LoadTreeScene' -and -not $saved.render.sky.cubeMap) {
                 throw "Saved scene lost render.sky: $scene / $mode"
+            }
+            if ($scene -eq 'Instancing') {
+                $instances = @($saved.objects | Where-Object { $_.PSObject.Properties['instanceOf'] })
+                if ($instances.Count -ne 6 -or @($instances | Where-Object { $_.PSObject.Properties['type'] }).Count -ne 0) {
+                    throw "Saved scene did not keep instances in instanceOf form: $scene / $mode"
+                }
             }
             $restartJob = Join-Path $job 'restart'
             [void](Invoke-Capture ("user:" + $saved.id) $mode $restartJob $false)

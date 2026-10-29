@@ -52,6 +52,7 @@ Its implementations are `RenderPlatform12`, `RenderPlatform11` and `RenderPlatfo
 **Structs shared between C++ and HLSL.** These must stay byte-for-byte in sync with their shader counterparts:
 - `DrawRecord` (`RenderPlatform.h`) ↔ `Shaders/Blur.hlsl`
 - `ShaderMaterial` (`Materials.h`) ↔ `Shaders/Materials.fx` (PBR-only; mirrored in `Blur.hlsl`'s `DrawRecord`, with size checks in `Materials.h` and `RenderPlatform.h`)
+- Per-draw object transform: `IRenderFrame::SetInstances` takes an optional instance-buffer slot whose `World` the GPU applies after each instance's own (root constant `b4` in `Tree.hlsl`, `DrawRecord.objectTransformSlot` for DXR skinning in `Blur.hlsl`, `DxrGeometryInfo.objectTransformSlot` in the hit shader). Tree instances (`instanceOf`) use it to draw their source tree's branch layouts; a source with instances reserves its own layout plus far/near layouts in the instance buffer, and `SceneRoot::Update` computes sources before instances.
 - `DxrGeometryInfo` (`RenderPlatform.h`) ↔ `Shaders/SharedTypes.hlsli`
 - `CBChangesPerPass`, `CBChangesEveryFrame` and `InstancedData` (`ConstBufferDefinitions.h`) ↔ `Shaders/SharedTypes.hlsli`
 
