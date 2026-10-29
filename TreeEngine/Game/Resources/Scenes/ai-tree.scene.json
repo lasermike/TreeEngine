@@ -27,37 +27,29 @@
   "pointLightCount": 1,
   "materials": {
     "bark": {
-      "pbr": {
-        "baseColor": [0.73, 0.48, 0.24, 1],
-        "metallic": 0,
-        "roughness": 0.8,
-        "baseColorTexture": { "source": "Bark_0005_diffuse.dds" }
-      }
+      "baseColor": [0.73, 0.48, 0.24, 1],
+      "metallic": 0,
+      "roughness": 0.8,
+      "baseColorTexture": { "source": "Bark_0005_diffuse.dds" }
     },
     "needles": {
-      "pbr": {
-        "baseColor": [0.5, 0.8, 0.35, 1],
-        "metallic": 0,
-        "roughness": 0.8,
-        "alphaMode": "mask",
-        "alphaCutoff": 0.6,
-        "baseColorTexture": { "source": "FirBranchTip.dds" }
-      }
+      "baseColor": [0.5, 0.8, 0.35, 1],
+      "metallic": 0,
+      "roughness": 0.8,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.6,
+      "baseColorTexture": { "source": "FirBranchTip.dds" }
     },
     "ground": {
-      "pbr": {
-        "baseColor": [0.6, 0.6, 0.6, 1],
-        "metallic": 0,
-        "roughness": 0.6,
-        "baseColorTexture": { "source": "grid3.png" }
-      }
+      "baseColor": [0.6, 0.6, 0.6, 1],
+      "metallic": 0,
+      "roughness": 0.6,
+      "baseColorTexture": { "source": "grid3.png" }
     },
-    "chrome": {
-      "pbr": { "baseColor": [0.95, 0.95, 0.95, 1], "metallic": 1, "roughness": 0.05 }
-    },
-    "axis-red": { "pbr": { "baseColor": [1, 0, 0, 1], "unlit": true } },
-    "axis-green": { "pbr": { "baseColor": [0, 0.2158605, 0, 1], "unlit": true } },
-    "axis-blue": { "pbr": { "baseColor": [0, 0, 1, 1], "unlit": true } }
+    "chrome": { "baseColor": [0.95, 0.95, 0.95, 1], "metallic": 1, "roughness": 0.05 },
+    "axis-red": { "baseColor": [1, 0, 0, 1], "unlit": true },
+    "axis-green": { "baseColor": [0, 0.2158605, 0, 1], "unlit": true },
+    "axis-blue": { "baseColor": [0, 0, 1, 1], "unlit": true }
   },
   "objects": [
     {

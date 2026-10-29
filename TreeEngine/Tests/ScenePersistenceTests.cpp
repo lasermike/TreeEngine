@@ -55,7 +55,7 @@ int RunScenePersistenceTests()
         "camera":{"position":[2,3,4],"rotation":[0.1,0.2,0.3,1]},
         "light":{"direction":[0,-1,0],"shadowPosition":[4,5,6]},
         "pointLightCount":1,"pointLight":{"position":[1,2,3],"range":8,"attenuation":[1,0.1,0]},
-        "materials":{"shared":{"diffuse":[0.2,0.3,0.4,1],"textureCoordScale":[3,4]}},
+        "materials":{"shared":{"baseColor":[0.2,0.3,0.4,1],"textureCoordScale":[3,4]}},
         "objects":[
             {"type":"primitive","id":"default"},
             {"type":"primitive","id":"box","shape":"cylinderHD","material":"shared","textureCoordScale":[2,3]},
@@ -98,15 +98,15 @@ int RunScenePersistenceTests()
     check(json["objects"][5]["forceLit"] == true && decoded.hasShadowLightPosition &&
         decoded.pointLight.range == 8 && decoded.camera.rotation.w == 1, "Camera, model or lighting values changed");
     auto& material = static_cast<PrimitiveDefinition&>(*decoded.objects[1]).material;
-    material.diffuse.x = 0.9f;
+    material.baseColor.x = 0.9f;
     decoded.camera.position.z = 17;
     static_cast<TreeDefinition&>(*decoded.objects[2]).generator.rules[0].output = "F[+F]";
     auto edited = ParseScene(SerializeScene(decoded), "edited fixture");
-    check(static_cast<TreeDefinition&>(*edited.objects[2]).trunk.diffuse.x == 0.2f &&
-        static_cast<PrimitiveDefinition&>(*edited.objects[1]).material.diffuse.x == 0.9f, "Independent material edits leaked or were lost");
+    check(static_cast<TreeDefinition&>(*edited.objects[2]).trunk.baseColor.x == 0.2f &&
+        static_cast<PrimitiveDefinition&>(*edited.objects[1]).material.baseColor.x == 0.9f, "Independent material edits leaked or were lost");
     check(edited.camera.position.z == 17 && static_cast<TreeDefinition&>(*edited.objects[2]).generator.rules[0].output == "F[+F]",
         "Edited camera/rules did not persist");
-    material.diffuse.x = std::numeric_limits<float>::quiet_NaN();
+    material.baseColor.x = std::numeric_limits<float>::quiet_NaN();
     reject([&] { SerializeScene(decoded); });
 
     const auto filename = path(builtin, "roundtrip.scene.json");

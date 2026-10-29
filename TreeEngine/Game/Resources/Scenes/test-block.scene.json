@@ -15,12 +15,10 @@
   },
   "materials": {
     "undersea-default": {
-      "pbr": {
-        "baseColor": [0, 1, 0, 1],
-        "metallic": 0,
-        "roughness": 0.6,
-        "baseColorTexture": { "source": "undersea.dds" }
-      }
+      "baseColor": [0, 1, 0, 1],
+      "metallic": 0,
+      "roughness": 0.6,
+      "baseColorTexture": { "source": "undersea.dds" }
     }
   },
   "objects": [

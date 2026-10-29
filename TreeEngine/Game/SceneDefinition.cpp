@@ -145,12 +145,23 @@ namespace SceneData
             return result;
         }
 
-        PbrMaterialDefinition ReadPbr(const Json& value, const std::string& path)
+        MaterialDefinition ReadMaterial(const Json& value, const std::string& path)
         {
+            if (value.is_object())
+            {
+                if (value.contains("pbr"))
+                    Invalid(path + ".pbr", "the pbr block was removed; move its properties into the material");
+                for (auto field : { "ambient", "diffuse", "reflect", "texture", "alphaClipThreshold", "flags" })
+                    if (value.contains(field))
+                        Invalid(path + "." + field, "Phong materials are no longer supported; see \"Converting Phong materials\" in the scenes README");
+                if (value.contains("specular") && value["specular"].is_array())
+                    Invalid(path + ".specular", "Phong specular colors are no longer supported; use roughness and specularColor");
+            }
             Fields(value, path, { "baseColor", "metallic", "roughness", "specular", "specularColor", "ior", "transmission",
                 "alphaMode", "alphaCutoff", "unlit", "baseColorTexture", "metallicRoughnessTexture", "normalTexture",
-                "specularTexture", "specularColorTexture" });
-            PbrMaterialDefinition result;
+                "specularTexture", "specularColorTexture", "textureCoordScale" });
+            MaterialDefinition result;
+            if (value.contains("textureCoordScale")) result.textureCoordScale = Vector2(value["textureCoordScale"], path + ".textureCoordScale");
             if (value.contains("baseColor")) result.baseColor = Vector4(value["baseColor"], path + ".baseColor");
             if (value.contains("metallic")) result.metallic = UnitNumber(value["metallic"], path + ".metallic");
             if (value.contains("roughness")) result.roughness = UnitNumber(value["roughness"], path + ".roughness");
@@ -190,43 +201,6 @@ namespace SceneData
                 result.specularTexture = ReadTextureMap(value["specularTexture"], path + ".specularTexture", nullptr);
             if (value.contains("specularColorTexture"))
                 result.specularColorTexture = ReadTextureMap(value["specularColorTexture"], path + ".specularColorTexture", nullptr);
-            return result;
-        }
-
-        MaterialDefinition ReadMaterial(const Json& value, const std::string& path)
-        {
-            Fields(value, path, { "ambient", "diffuse", "specular", "reflect", "texture", "textureCoordScale", "alphaClipThreshold", "flags", "pbr" });
-            MaterialDefinition result;
-            if (value.contains("pbr"))
-            {
-                for (auto field : { "ambient", "diffuse", "specular", "reflect", "texture", "alphaClipThreshold", "flags" })
-                    if (value.contains(field)) Invalid(path + "." + field, "cannot be combined with pbr");
-                result.hasPbr = true;
-                result.pbr = ReadPbr(value["pbr"], path + ".pbr");
-            }
-            if (value.contains("ambient")) result.ambient = Vector4(value["ambient"], path + ".ambient");
-            if (value.contains("diffuse")) result.diffuse = Vector4(value["diffuse"], path + ".diffuse");
-            if (value.contains("specular")) result.specular = Vector4(value["specular"], path + ".specular");
-            if (value.contains("reflect")) result.reflect = Vector4(value["reflect"], path + ".reflect");
-            if (value.contains("texture")) result.texture = String(value["texture"], path + ".texture");
-            if (value.contains("textureCoordScale")) result.textureCoordScale = Vector2(value["textureCoordScale"], path + ".textureCoordScale");
-            if (value.contains("alphaClipThreshold")) result.alphaClipThreshold = Number(value["alphaClipThreshold"], path + ".alphaClipThreshold");
-            if (result.alphaClipThreshold < 0 || result.alphaClipThreshold > 1)
-                Invalid(path + ".alphaClipThreshold", "expected a value between 0 and 1");
-            if (value.contains("flags"))
-            {
-                result.flags = Vector4(value["flags"], path + ".flags");
-                result.hasFlags = true;
-                if ((result.flags.x != 0 && result.flags.x != 1) ||
-                    (result.flags.y != 0 && result.flags.y != 1) ||
-                    (result.flags.w != 0 && result.flags.w != 1))
-                    Invalid(path + ".flags", "x, y, and w must be 0 or 1");
-                if (result.flags.z < 0 || result.flags.z > 1)
-                    Invalid(path + ".flags[2]", "expected a value between 0 and 1");
-                if (value.contains("alphaClipThreshold") && result.alphaClipThreshold != result.flags.z)
-                    Invalid(path, "flags[2] and alphaClipThreshold disagree");
-                result.alphaClipThreshold = result.flags.z;
-            }
             return result;
         }
 
@@ -545,11 +519,11 @@ namespace SceneData
                 result["transform"] = { { "offset", VectorJson(map.offset) }, { "rotation", map.rotation }, { "scale", VectorJson(map.scale) } };
             return result;
         }
-        Json PbrJson(const PbrMaterialDefinition& p)
+        Json MaterialJson(const MaterialDefinition& p)
         {
             Json result = { { "baseColor", VectorJson(p.baseColor) }, { "metallic", p.metallic }, { "roughness", p.roughness },
                 { "alphaMode", p.alphaMode == AlphaMode::Mask ? "mask" : p.alphaMode == AlphaMode::Blend ? "blend" : "opaque" },
-                { "alphaCutoff", p.alphaCutoff }, { "unlit", p.unlit } };
+                { "alphaCutoff", p.alphaCutoff }, { "unlit", p.unlit }, { "textureCoordScale", VectorJson(p.textureCoordScale) } };
             if (!p.unlit)
             {
                 result["specular"] = p.specular;
@@ -566,17 +540,6 @@ namespace SceneData
             }
             if (!p.specularTexture.source.empty()) result["specularTexture"] = TextureMapJson(p.specularTexture);
             if (!p.specularColorTexture.source.empty()) result["specularColorTexture"] = TextureMapJson(p.specularColorTexture);
-            return result;
-        }
-        Json MaterialJson(const MaterialDefinition& m)
-        {
-            if (m.hasPbr)
-                return { { "pbr", PbrJson(m.pbr) }, { "textureCoordScale", VectorJson(m.textureCoordScale) } };
-            Json result = { { "ambient", VectorJson(m.ambient) }, { "diffuse", VectorJson(m.diffuse) },
-                { "specular", VectorJson(m.specular) }, { "reflect", VectorJson(m.reflect) },
-                { "texture", m.texture }, { "textureCoordScale", VectorJson(m.textureCoordScale) } };
-            if (m.hasFlags) result["flags"] = VectorJson(m.flags);
-            else result["alphaClipThreshold"] = m.alphaClipThreshold;
             return result;
         }
         const char* ShapeName(Shape shape)

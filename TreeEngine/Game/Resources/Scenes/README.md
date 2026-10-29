@@ -124,42 +124,13 @@ A material property can be a named reference such as `"material": "ground"`
 or an inline definition. Trees use the same convention for their named slots.
 References are resolved to independent values before runtime construction.
 
-Materials support `ambient`, `diffuse`, `specular`, `reflect`, `texture`,
-`textureCoordScale`, `alphaClipThreshold`, and `flags`. The fourth `specular` component
-is the specular exponent. Color defaults match `ShaderMaterial`: `[0,0,0,1]`.
-An omitted texture means untextured shading. Asset references resolve relative
-to the scene file first, with existing current-directory, executable-directory,
-and development-resource fallbacks. This applies to textures, graph data, and
-model sources. Missing assets report the object ID without replacing the active
-scene. Saves rebase references relative to the destination scene; resources are
-not copied or packaged. Cross-drive/share references that cannot be made relative
-are rejected. Keep shared runtime resources available when moving user scenes.
-
-`flags` is an optional `[alphaBlend, useTexture, alphaClipThreshold, unlit]`
-array. The first, second, and fourth elements must be `0` or `1`; the third
-must be between `0` and `1`. When omitted, `useTexture` follows the presence
-of `texture`, alpha clip uses `alphaClipThreshold`, and the other flags are `0`.
-If both `flags` and `alphaClipThreshold` are given, their threshold values
-must agree. A texture may be present even when `useTexture` is `0`.
-
-Alpha clip defaults to `0` and must be between `0` and `1`. UV scale defaults to
-`[1,1]`. Object and material UV scales multiply; `[4,4]` repeats the texture four
-times in each axis using the existing wrap sampler. Negative UV scale mirrors.
-Runtime material creation uses copies so rebuilding does not compound UV scales.
-
-### PBR materials
-
-A material can instead contain a `pbr` object with the same metallic-roughness
-BRDF that glTF models use, in both raster and DXR. It works on primitives and on
-tree, fixed-tree, and graph `trunk`/`leaf` slots, and through named references.
-`pbr` cannot be combined with `ambient`, `diffuse`, `specular`, `reflect`,
-`texture`, `alphaClipThreshold`, or `flags`; `textureCoordScale` still applies.
-The `PBR Materials` scene uses every property.
+Materials use the same metallic-roughness BRDF that glTF models use, in both
+raster and DXR. They work on primitives, on tree, fixed-tree, and graph
+`trunk`/`leaf` slots, and through named references. The `PBR Materials` scene
+uses every property.
 
 ```json
-"chrome": {
-  "pbr": { "baseColor": [0.95, 0.95, 0.95, 1], "metallic": 1, "roughness": 0.05 }
-}
+"chrome": { "baseColor": [0.95, 0.95, 0.95, 1], "metallic": 1, "roughness": 0.05 }
 ```
 
 | Property | glTF source | Default | Range |
@@ -171,6 +142,10 @@ The `PBR Materials` scene uses every property.
 | `transmission` | `KHR_materials_transmission` | `0` | 0–1; above 0 alpha blends in raster |
 | `alphaMode`, `alphaCutoff` | `alphaMode`, `alphaCutoff` | `opaque`, `0.5` | `opaque`, `mask`, `blend`; 0–1 |
 | `unlit` | `KHR_materials_unlit` | `false` | cannot be combined with specular, IOR, transmission, or non-base maps |
+| `textureCoordScale` | — | `[1,1]` | UV scale |
+
+Defaults follow glTF, so an empty material is a rough white metal; set
+`metallic: 0` for most surfaces.
 
 Optional maps are `baseColorTexture`, `metallicRoughnessTexture`, `normalTexture`,
 `specularTexture`, and `specularColorTexture`. Each has a required `source` and
@@ -178,23 +153,36 @@ optional `wrap` (default `true`; `false` clamps) and `transform` (`offset`,
 `rotation` in radians, and `scale`, as in `KHR_texture_transform`).
 `normalTexture` also takes `scale` (default `1`, nonnegative). Maps may be PNG,
 JPEG, or DDS (glTF assets themselves remain PNG/JPEG only); base-color and
-specular-color maps are sRGB, and the others are linear. They resolve like other
-scene assets. The renderer has eight material
-texture slots shared by every texture in a scene, so heavily mapped scenes can
-fail to load with `E_BOUNDS`. Emissive, occlusion, and other glTF extensions
-are not supported, as for models.
+specular-color maps are sRGB, and the others are linear. The renderer has eight
+material texture slots shared by every texture in a scene, so heavily mapped
+scenes can fail to load with `E_BOUNDS`. Emissive, occlusion, and other glTF
+extensions are not supported, as for models.
 
-Saving writes PBR materials back as `pbr` objects. A material UV scale is folded
-into each map's `transform`.
+Asset references resolve relative to the scene file first, with existing
+current-directory, executable-directory, and development-resource fallbacks.
+This applies to texture maps, graph data, and model sources. Missing assets
+report the object ID without replacing the active scene. Saves rebase references
+relative to the destination scene; resources are not copied or packaged.
+Cross-drive/share references that cannot be made relative are rejected. Keep
+shared runtime resources available when moving user scenes.
 
-Primitives and trees authored without materials get PBR defaults: a rough green
+Object and material UV scales multiply; `[4,4]` repeats the texture four times in
+each axis. Negative UV scale mirrors. Runtime material creation uses copies so
+rebuilding does not compound UV scales. Saving folds a material UV scale into
+each map's `transform`.
+
+Primitives and trees authored without materials get defaults: a rough green
 primitive over `snow.dds`, and a red-tinted `Bark_0005_diffuse.dds` trunk with
-dark green leaves. All built-in scenes use PBR.
+dark green leaves.
 
 ### Converting Phong materials
 
-PBR lighting runs in linear space and divides direct diffuse light by π, so a
-literal conversion looks darker. The built-in scenes were converted this way:
+Older scene files used Phong fields (`ambient`, `diffuse`, a `specular` color,
+`reflect`, `texture`, `alphaClipThreshold`, `flags`) and later a nested `pbr`
+block. Both are rejected with an error naming the field. For a `pbr` block, move
+its properties up into the material. For Phong materials, PBR lighting runs in
+linear space and divides direct diffuse light by π, so a literal conversion
+looks darker. The built-in scenes were converted this way:
 
 - `diffuse` becomes `baseColor`, converted from display to linear values
   (for example `0.5` becomes about `0.22`). `metallic` is `0`.

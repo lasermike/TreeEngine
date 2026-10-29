@@ -16,15 +16,9 @@
     "direction": [-0.7, -0.7, 0.7]
   },
   "materials": {
-    "curve": {
-      "pbr": { "metallic": 0, "roughness": 0.8, "baseColorTexture": { "source": "urchinskin.dds" } }
-    },
-    "leaf": {
-      "pbr": { "baseColor": [0, 0.2158605, 0, 1], "metallic": 0, "roughness": 0.8 }
-    },
-    "ground": {
-      "pbr": { "metallic": 0, "roughness": 0.6 }
-    }
+    "curve": { "metallic": 0, "roughness": 0.8, "baseColorTexture": { "source": "urchinskin.dds" } },
+    "leaf": { "baseColor": [0, 0.2158605, 0, 1], "metallic": 0, "roughness": 0.8 },
+    "ground": { "metallic": 0, "roughness": 0.6 }
   },
   "objects": [
     {

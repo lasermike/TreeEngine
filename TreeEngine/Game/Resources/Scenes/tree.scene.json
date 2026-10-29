@@ -20,33 +20,27 @@
   "pointLightCount": 1,
   "materials": {
     "bark": {
-      "pbr": {
-        "baseColor": [0.73, 0.48, 0.24, 1],
-        "metallic": 0,
-        "roughness": 0.8,
-        "baseColorTexture": { "source": "Bark_0005_diffuse.dds" }
-      }
+      "baseColor": [0.73, 0.48, 0.24, 1],
+      "metallic": 0,
+      "roughness": 0.8,
+      "baseColorTexture": { "source": "Bark_0005_diffuse.dds" }
     },
     "needles": {
-      "pbr": {
-        "metallic": 0,
-        "roughness": 0.8,
-        "alphaMode": "mask",
-        "alphaCutoff": 1,
-        "baseColorTexture": { "source": "FirBranchWithNeedles.dds" }
-      }
+      "metallic": 0,
+      "roughness": 0.8,
+      "alphaMode": "mask",
+      "alphaCutoff": 1,
+      "baseColorTexture": { "source": "FirBranchWithNeedles.dds" }
     },
     "ground": {
-      "pbr": {
-        "baseColor": [0.6, 0.6, 0.6, 1],
-        "metallic": 0,
-        "roughness": 0.6,
-        "baseColorTexture": { "source": "snow.dds" }
-      }
+      "baseColor": [0.6, 0.6, 0.6, 1],
+      "metallic": 0,
+      "roughness": 0.6,
+      "baseColorTexture": { "source": "snow.dds" }
     },
-    "axis-red": { "pbr": { "baseColor": [1, 0, 0, 1], "unlit": true } },
-    "axis-green": { "pbr": { "baseColor": [0, 0.2158605, 0, 1], "unlit": true } },
-    "axis-blue": { "pbr": { "baseColor": [0, 0, 1, 1], "unlit": true } }
+    "axis-red": { "baseColor": [1, 0, 0, 1], "unlit": true },
+    "axis-green": { "baseColor": [0, 0.2158605, 0, 1], "unlit": true },
+    "axis-blue": { "baseColor": [0, 0, 1, 1], "unlit": true }
   },
   "objects": [
     {

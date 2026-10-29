@@ -21,40 +21,34 @@
   },
   "materials": {
     "textured-metal": {
-      "pbr": {
-        "baseColor": [1, 1, 1, 1],
-        "metallic": 0.8,
-        "roughness": 0.4,
-        "specular": 0.9,
-        "specularColor": [1, 0.9, 0.8],
-        "ior": 1.6,
-        "baseColorTexture": {
-          "source": "grid3.png",
-          "transform": { "offset": [0.25, 0], "rotation": 0.5, "scale": [2, 2] }
-        },
-        "metallicRoughnessTexture": { "source": "grid1.png" },
-        "normalTexture": { "source": "grid1.png", "scale": 0.5 },
-        "specularTexture": { "source": "grid3.png", "wrap": false },
-        "specularColorTexture": { "source": "grid1.png" }
-      }
+      "baseColor": [1, 1, 1, 1],
+      "metallic": 0.8,
+      "roughness": 0.4,
+      "specular": 0.9,
+      "specularColor": [1, 0.9, 0.8],
+      "ior": 1.6,
+      "baseColorTexture": {
+        "source": "grid3.png",
+        "transform": { "offset": [0.25, 0], "rotation": 0.5, "scale": [2, 2] }
+      },
+      "metallicRoughnessTexture": { "source": "grid1.png" },
+      "normalTexture": { "source": "grid1.png", "scale": 0.5 },
+      "specularTexture": { "source": "grid3.png", "wrap": false },
+      "specularColorTexture": { "source": "grid1.png" }
     },
     "bark": {
-      "pbr": {
-        "baseColor": [0.55, 0.4, 0.25, 1],
-        "metallic": 0,
-        "roughness": 0.9,
-        "baseColorTexture": { "source": "grid3.png" }
-      }
+      "baseColor": [0.55, 0.4, 0.25, 1],
+      "metallic": 0,
+      "roughness": 0.9,
+      "baseColorTexture": { "source": "grid3.png" }
     },
     "needles": {
-      "pbr": {
-        "baseColor": [0.6, 1, 0.6, 1],
-        "metallic": 0,
-        "roughness": 0.6,
-        "alphaMode": "mask",
-        "alphaCutoff": 0.6,
-        "baseColorTexture": { "source": "FirBranchTip_mip0.png" }
-      }
+      "baseColor": [0.6, 1, 0.6, 1],
+      "metallic": 0,
+      "roughness": 0.6,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.6,
+      "baseColorTexture": { "source": "FirBranchTip_mip0.png" }
     }
   },
   "objects": [

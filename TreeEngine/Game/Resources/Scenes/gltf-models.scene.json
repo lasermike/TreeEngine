@@ -16,9 +16,7 @@
     "direction": [-0.57735, -0.57735, 0.57735]
   },
   "materials": {
-    "ground": {
-      "pbr": { "baseColor": [0.0844, 0.1195, 0.0640, 1], "metallic": 0, "roughness": 0.8 }
-    }
+    "ground": { "baseColor": [0.0844, 0.1195, 0.0640, 1], "metallic": 0, "roughness": 0.8 }
   },
   "objects": [
     {

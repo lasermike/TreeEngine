@@ -44,7 +44,7 @@ Its implementations are `RenderPlatform12`, `RenderPlatform11` and `RenderPlatfo
   - `SceneCatalog` lists the available scenes.
   - `SceneInstantiation` turns a definition into a live `SceneRoot`, and `CaptureScene` turns live objects back into a definition for saving.
   - Built-in scenes are `Game/Resources/Scenes/*.scene.json`; the schema is documented in that folder's `README.md`. Their IDs (e.g. `LoadAITree`) keep the names of the old `Load*` loader functions.
-  - Materials are either legacy Phong values or a `pbr` block. The `pbr` block uses the same glTF metallic-roughness BRDF as models: `BuildPbrShaderMaterial` in `GltfLoader.cpp` maps factors to `ShaderMaterial` for both, and `RenderManager::BindMaterialTexture` binds the maps.
+  - Materials use glTF metallic-roughness properties (`baseColor`, `metallic`, `roughness`, maps) and the same BRDF as models; legacy Phong fields are rejected: `BuildPbrShaderMaterial` in `GltfLoader.cpp` maps factors to `ShaderMaterial` for both, and `RenderManager::BindMaterialTexture` binds the maps.
 - **Procedural generation:** `ModelGenerator` → `TreeModelGenerator` (`virtual TreeModel* Create() = 0`), plus `FixedTreeModelGenerator`, `PlaneModelGenerator` and `LSystemModelGenerator`. Their output becomes `TreeModel`/`TreeSegment` and then `TreeGeometry`. Trees use a skinned cylinder mesh and a pose cache.
 - **Input:** `IInputManager::GetFrameInput(frame)` (`Game/InputManager.h`), with a separate implementation per platform.
 - **Utilities:** `ThreadPool`, `DynamicProperties`, `Settings`, `StepTimer`, `GltfLoader`/`GltfModel`.

@@ -28,7 +28,7 @@ namespace SceneData
     enum class AlphaMode { Opaque, Mask, Blend };
 
     // glTF metallic-roughness material with the extensions the renderer supports.
-    struct PbrMaterialDefinition
+    struct MaterialDefinition
     {
         DirectX::XMFLOAT4 baseColor = { 1, 1, 1, 1 };
         float metallic = 1;
@@ -46,22 +46,7 @@ namespace SceneData
         TextureMapDefinition normalTexture;
         TextureMapDefinition specularTexture;
         TextureMapDefinition specularColorTexture;
-    };
-
-    struct MaterialDefinition
-    {
-        DirectX::XMFLOAT4 ambient = { 0, 0, 0, 1 };
-        DirectX::XMFLOAT4 diffuse = { 0, 0, 0, 1 };
-        DirectX::XMFLOAT4 specular = { 0, 0, 0, 1 };
-        DirectX::XMFLOAT4 reflect = { 0, 0, 0, 1 };
-        std::string texture;
         DirectX::XMFLOAT2 textureCoordScale = { 1, 1 };
-        float alphaClipThreshold = 0;
-        DirectX::XMFLOAT4 flags = { 0, 0, 0, 0 };
-        bool hasFlags = false;
-        // When set, the material uses pbr instead of the legacy Phong/flags fields.
-        bool hasPbr = false;
-        PbrMaterialDefinition pbr;
     };
 
     enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite, Sphere };
