@@ -46,10 +46,8 @@ struct ShaderMaterial
 {
     float4 Ambient;
     float4 Diffuse;
-    float4 Specular; // unused by lighting; kept for the shared C++ layout
-    float4 Reflect; // unused by lighting; kept for the shared C++ layout
     float4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
-    float4 specularParams; // x unused, metallic, roughness, specularFactor
+    float4 specularParams; // x = C++ PBR marker (unused here), metallic, roughness, specularFactor
     float4 specularColor; // linear RGB factor; w = base-color clamp
     float4 specularTextures; // strength/color slots; z/w = clamp flags
     float4 normalTextures; // normal texture slot, scale, clamp flag

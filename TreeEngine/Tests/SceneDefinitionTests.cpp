@@ -250,7 +250,6 @@ void TestPbrSceneMaterials()
     const auto imported = LoadGltfAsset(TestDataFilename("static-scene.gltf"))->materials[0];
     auto same = [](const XMFLOAT4& a, const XMFLOAT4& b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; };
     Check(same(built.Ambient, imported.shaderMaterial.Ambient) && same(built.Diffuse, imported.shaderMaterial.Diffuse)
-        && same(built.Specular, imported.shaderMaterial.Specular) && same(built.Reflect, imported.shaderMaterial.Reflect)
         && same(built.specularParams, imported.shaderMaterial.specularParams)
         && same(built.opticalParams, imported.shaderMaterial.opticalParams)
         && built.flags.x == imported.shaderMaterial.flags.x && built.flags.z == imported.shaderMaterial.flags.z

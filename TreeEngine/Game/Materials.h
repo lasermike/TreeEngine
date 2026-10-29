@@ -48,7 +48,7 @@ struct ShaderMaterial
 {
     ShaderMaterial() 
     { 
-        Ambient = Diffuse = Specular = Reflect = XMFLOAT4(0,0,0, 1.0f);
+        Ambient = Diffuse = XMFLOAT4(0,0,0, 1.0f);
         flags = XMFLOAT4(0,0,0,0);
         specularParams = XMFLOAT4(0, 0, 1, 1);
         specularColor = XMFLOAT4(1, 1, 1, 0);
@@ -76,10 +76,8 @@ struct ShaderMaterial
 
     XMFLOAT4 Ambient;
     XMFLOAT4 Diffuse;
-    XMFLOAT4 Specular; // legacy Phong specular tint; w = SpecPower
-    XMFLOAT4 Reflect;
     XMFLOAT4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
-    XMFLOAT4 specularParams; // enabled, metallic, roughness, specularFactor
+    XMFLOAT4 specularParams; // x = 1 when built as PBR (C++ only), metallic, roughness, specularFactor
     XMFLOAT4 specularColor; // linear RGB factor; w = base-color clamp
     XMFLOAT4 specularTextures; // strength/color texture slots; z/w = clamp flags
     XMFLOAT4 normalTextures; // normal texture slot, scale, clamp flag
@@ -89,7 +87,7 @@ struct ShaderMaterial
     XMFLOAT4 uvTransformRow1[MaterialTextureRoleCount]; // xy = UV matrix row, z = V offset
 };
 
-static_assert(sizeof(ShaderMaterial) == 336, "ShaderMaterial must match Materials.fx");
+static_assert(sizeof(ShaderMaterial) == 304, "ShaderMaterial must match Materials.fx");
 
 struct CBMaterial
 {
