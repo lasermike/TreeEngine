@@ -167,6 +167,22 @@ void ParseRenderTestCommandLine()
         || parsed->benchmarkFrames < 0 || parsed->benchmarkFrames > 10000
         || !std::isfinite(parsed->benchmarkTimeStep) || parsed->benchmarkTimeStep < 0)
         throw std::runtime_error("Invalid render test settings");
+    if (json.contains("performance"))
+    {
+        const auto& performance = json.at("performance");
+        parsed->performance = true;
+        parsed->performanceFrames = performance.value("frames", 20);
+        parsed->performanceFrameTimeStep = performance.value("frameTimeStep", 1.0 / 60.0);
+        parsed->performanceStartTime = performance.value("startTime", 5.0);
+        if (parsed->performanceFrames < 1 || parsed->performanceFrames > 10000
+            || !std::isfinite(parsed->performanceFrameTimeStep) || parsed->performanceFrameTimeStep < 0
+            || !std::isfinite(parsed->performanceStartTime) || parsed->performanceStartTime < 0)
+            throw std::runtime_error("Invalid performance settings");
+        if (json.contains("captures") || parsed->validateScenePersistence)
+            throw std::runtime_error("Performance runs do not capture images or validate persistence");
+        request = std::move(parsed);
+        return;
+    }
     for (const auto& value : json.at("captures"))
     {
         RenderTestPoint point = { value.at("time").get<double>(), Wide(value.at("filename").get<std::string>()) };
@@ -198,8 +214,89 @@ void ParseRenderTestCommandLine()
 
 const RenderTestRequest* GetRenderTestRequest() { return request.get(); }
 
+namespace
+{
+    std::string Utf8(const std::wstring& value)
+    {
+        const int bytes = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (!bytes) throw std::runtime_error("Cannot encode text as UTF-8");
+        std::string result(bytes, '\0');
+        if (!WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, &result[0], bytes, nullptr, nullptr))
+            throw std::runtime_error("Cannot encode text as UTF-8");
+        result.pop_back(); // Remove the terminator written by WideCharToMultiByte.
+        return result;
+    }
+
+    // Renders the requested frames with profiling on and reports every frame's timings and counters.
+    int RunPerformanceCapture(Game& game)
+    {
+        nlohmann::json report = { { "scene", request->scene }, { "mode", request->mode },
+            { "width", request->width }, { "height", request->height }, { "seed", request->seed },
+            { "frames", request->performanceFrames }, { "frameTimeStep", request->performanceFrameTimeStep },
+            { "startTime", request->performanceStartTime },
+            { "workerThreads", game.GetWorkerThreadCount() },
+            { "gpuPasses", { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays" } },
+            { "samples", nlohmann::json::array() }, { "success", false } };
+        int exitCode = 0;
+        try
+        {
+            game.ConfigureRenderTest(request->scene, request->mode == "raytracing", request->postProcessing, true);
+            for (int frame = 0; frame < request->performanceFrames; ++frame)
+            {
+                MSG message;
+                while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
+                {
+                    if (message.message == WM_QUIT) throw std::runtime_error("Performance test window was closed");
+                    TranslateMessage(&message);
+                    DispatchMessage(&message);
+                }
+                const double simulationTime = request->performanceStartTime + frame * request->performanceFrameTimeStep;
+                const auto start = std::chrono::steady_clock::now();
+                const HRESULT result = game.RenderTestFrame(simulationTime);
+                const double frameMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+                if (FAILED(result)) throw std::runtime_error("Rendering failed, HRESULT=" + std::to_string(static_cast<unsigned>(result)));
+                const auto& profile = game.GetRenderManager().GetRenderData().profile;
+                if (!profile.valid) throw std::runtime_error("GPU profiling did not complete");
+                if (frame == 0)
+                {
+                    // Frame 0 finishes the load: generation and GPU setup run before it renders.
+                    const auto& load = game.GetSceneLoadTiming();
+                    if (!load.complete) throw std::runtime_error("Scene load timing is incomplete");
+                    report["sceneLoad"] = { { "totalMs", load.TotalMs() }, { "definitionMs", load.definitionMs },
+                        { "generationMs", load.generationMs }, { "graphicsMs", load.graphicsMs } };
+                    report["adapter"] = Utf8(profile.adapter);
+                }
+                report["samples"].push_back({
+                    { "frame", frame }, { "simulationTime", simulationTime }, { "frameMs", frameMs },
+                    { "sceneUpdateMs", profile.sceneUpdateMs }, { "drawUploadMs", profile.drawUploadMs },
+                    { "gpuMs", profile.gpuMs }, { "drawRecords", profile.drawRecords },
+                    { "worldVertices", profile.worldVertices }, { "skinnedVertices", profile.skinnedVertices },
+                    { "indexEntries", profile.indexEntries }, { "dispatchGroups", profile.dispatchGroups },
+                    { "rebuiltPoseBranches", profile.rebuiltPoseBranches }, { "reusedPoseBranches", profile.reusedPoseBranches },
+                    { "poseCacheBytes", profile.poseCacheBytes }, { "drawUploadBytes", profile.drawUploadBytes },
+                    { "accelerationStructureBytes", profile.accelerationStructureBytes },
+                    { "rebuiltBLAS", profile.rebuiltBLAS } });
+            }
+            std::cerr << "Profiled " << request->scene << " / " << request->mode << ", "
+                << request->performanceFrames << " frames" << std::endl;
+            report["success"] = true;
+        }
+        catch (const std::exception& error)
+        {
+            report["error"] = error.what();
+            std::cerr << error.what() << '\n';
+            exitCode = 3;
+        }
+        std::ofstream output(request->report.c_str());
+        if (!output) return 4;
+        output << report.dump(2);
+        return exitCode;
+    }
+}
+
 int RunRenderTestCapture(Game& game)
 {
+    if (request->performance) return RunPerformanceCapture(game);
     nlohmann::json report = { { "scene", request->scene }, { "mode", request->mode },
         { "width", request->width }, { "height", request->height }, { "seed", request->seed },
         { "captures", nlohmann::json::array() }, { "success", false } };

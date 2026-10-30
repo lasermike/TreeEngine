@@ -65,7 +65,7 @@ Shaders live in `Game/Shaders/`, including a DXR library (`RaytracingLibrary.hls
 | **TreeClassic** | Win32 desktop app, ImGui/ImPlot debug UI, render-test capture | **Active**: the main target (`Debug\|x64`, `Release\|x64`) |
 | **RenderPlatform12** | D3D12 + DXR renderer DLL (sources mostly in `Game/`) | **Active** |
 | **Game/** + **SharedEngine** | Engine core (~110 source files) | **Active**: most commits since 2025 |
-| **SceneDefinitionTests** (`Tests/`) | Scene definition/persistence unit tests; `RenderRegression/` holds PowerShell-driven GPU image tests (DXR toggle, resize, skinning, shadow buffer) and C# image comparison | **Active**, Debug-only, no CI |
+| **SceneDefinitionTests** (`Tests/`) | Scene definition/persistence unit tests; `RenderRegression/` holds PowerShell-driven GPU image tests (DXR toggle, resize, skinning, shadow buffer) and C# image comparison; `Performance/` profiles scenes tagged `"testPass": "performance"` and commits the results | **Active**, Debug-only, no CI |
 | **ImGui**, **nvapi**, **ThirdParty** | Vendored libraries | Kept up to date |
 | **TreePC** | UWP app | Inactive: in the solution but not built or tested; planned for deprecation |
 | **RenderPlatform12UWP**, **RenderPlatform11UWP** | UWP renderers (D3D12, D3D11 fallback) | Inactive: last changed Feb 2023; `TREE3D11` is slated for removal |
@@ -101,4 +101,4 @@ The future plan in `.github/copilot-instructions.md` is to drop UWP and D3D11 an
 
 **No package manager beyond NuGet:** no vcpkg, CMake or CI pipeline.
 
-See also: `.github/copilot-instructions.md` (build commands, conventions, DPI/window handling) and `TreeEngine/Tests/RenderRegression/README.md` (render tests).
+See also: `.github/copilot-instructions.md` (build commands, conventions, DPI/window handling) and `TreeEngine/Tests/RenderRegression/README.md` (render tests), and `TreeEngine/Tests/Performance/README.md` (performance pass).

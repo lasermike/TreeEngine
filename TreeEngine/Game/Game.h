@@ -24,6 +24,17 @@ interface IGameInputReading;
 struct ImGuiInputTextCallbackData;
 
 
+// Wall-clock cost of the most recent scene load, measured on the CPU.
+struct SceneLoadTiming
+{
+    double definitionMs = 0; // Read the scene file and build its objects, textures, and models.
+    double generationMs = 0; // Generate trees and other procedural geometry (GameLoader::Regenerate).
+    double graphicsMs = 0;   // Release the old level and create GPU buffers, materials, and pipelines.
+    bool complete = false;   // Generation and graphics have run since the load.
+
+    double TotalMs() const { return definitionMs + generationMs + graphicsMs; }
+};
+
 class Game : public IDebugUI
 {
 public:
@@ -68,6 +79,11 @@ public:
 
     void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile = false, bool showShadowBuffer = false);
     HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {});
+    // Render tests update objects on one thread for repeatable images; performance runs use every core.
+    // Call before Initialize.
+    void SetRenderTestUsesAllCores(bool allCores) { m_renderTestAllCores = allCores; }
+    unsigned GetWorkerThreadCount() const { return m_workerThreadCount; }
+    const SceneLoadTiming& GetSceneLoadTiming() const { return m_sceneLoadTiming; }
 
     HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
     void ResetDebugUI();
@@ -169,7 +185,10 @@ private:
     bool                                m_rotateLights;
     GameData                            m_gameData;
     bool m_renderTestMode = false;
+    bool m_renderTestAllCores = false;
+    unsigned m_workerThreadCount = 0;
     std::string m_renderTestScene;
+    SceneLoadTiming m_sceneLoadTiming;
     bool m_profilingEnabled = false;
     RenderProfile m_lastProfile;
 

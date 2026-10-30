@@ -71,6 +71,26 @@ namespace SceneData
             for (size_t i = 0; i < count; ++i) output[i] = Number(value[i], path + "[" + std::to_string(i) + "]");
         }
 
+        // A pass name or an array of them; names are lowercase words joined by hyphens.
+        std::vector<std::string> ReadTestPasses(const Json& value, const std::string& path)
+        {
+            if (!value.is_string() && (!value.is_array() || value.empty()))
+                Invalid(path, "expected a test pass name or a non-empty array of names");
+            std::vector<std::string> result;
+            for (size_t i = 0; i < (value.is_array() ? value.size() : 1); ++i)
+            {
+                const auto itemPath = value.is_array() ? path + "[" + std::to_string(i) + "]" : path;
+                auto name = String(value.is_array() ? value[i] : value, itemPath);
+                bool valid = !name.empty() && name[0] >= 'a' && name[0] <= 'z';
+                for (char character : name)
+                    valid = valid && ((character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') || character == '-');
+                if (!valid) Invalid(itemPath, "test pass names use lowercase letters, digits, and hyphens, starting with a letter");
+                if (std::find(result.begin(), result.end(), name) != result.end()) Invalid(itemPath, "duplicate test pass '" + name + "'");
+                result.push_back(std::move(name));
+            }
+            return result;
+        }
+
         XMFLOAT2 Vector2(const Json& value, const std::string& path)
         {
             float v[2]; Vector(value, path, v, 2); return XMFLOAT2(v[0], v[1]);
@@ -366,7 +386,7 @@ namespace SceneData
         try
         {
             const auto root = Json::parse(jsonText);
-            Fields(root, sourceName, { "version", "id", "name", "priority", "camera", "render", "light", "pointLightCount", "pointLight", "materials", "objects" });
+            Fields(root, sourceName, { "version", "id", "name", "priority", "testPass", "camera", "render", "light", "pointLightCount", "pointLight", "materials", "objects" });
             if (!root.contains("version") || Integer(root["version"], sourceName + ".version", 1, 1) != 1)
                 Invalid(sourceName + ".version", "expected schema version 1");
             SceneDefinition scene;
@@ -383,6 +403,7 @@ namespace SceneData
             if (scene.name.empty()) Invalid(sourceName + ".name", "must not be empty");
             if (root.contains("priority"))
                 scene.priority = Integer(root["priority"], sourceName + ".priority", 0, std::numeric_limits<int>::max());
+            if (root.contains("testPass")) scene.testPasses = ReadTestPasses(root["testPass"], sourceName + ".testPass");
             if (root.contains("camera")) scene.camera = ReadTransform(root["camera"], sourceName + ".camera");
             if (root.contains("pointLightCount")) scene.pointLightCount = Integer(root["pointLightCount"], sourceName + ".pointLightCount", 0, 1);
             if (root.contains("pointLight"))
@@ -657,6 +678,8 @@ namespace SceneData
                 { "range", scene.pointLight.range }, { "attenuation", VectorJson(scene.pointLight.attenuation) } } },
             { "objects", Json::array() } };
         if (!scene.id.empty()) root["id"] = scene.id;
+        if (scene.testPasses.size() == 1) root["testPass"] = scene.testPasses[0];
+        else if (!scene.testPasses.empty()) root["testPass"] = scene.testPasses;
         if (scene.environmentDiffuse.empty() != scene.environmentSpecular.empty())
             throw std::runtime_error("Scene environment needs both diffuse and specular cube maps");
         if (!scene.environmentDiffuse.empty())

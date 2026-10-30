@@ -157,6 +157,10 @@ deterministic **synchronous** scene updates, not the normal asynchronous update
 path. `frameMs` includes the renderer's existing frame fence/presentation
 overhead; it is not isolated GPU time. GPU timestamps are read after the
 existing completion fence; profiling introduces no additional per-frame wait.
+For repeatable measurements across commits, use the performance pass in
+`Tests/Performance` instead. It sends a `performance` request (frames,
+`frameTimeStep`, `startTime`), which profiles every frame with all worker
+threads, writes no images, and also reports scene load time.
 
 The native `--render-test <request.json>` request also accepts:
 

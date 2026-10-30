@@ -384,8 +384,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
     g_game = new Game(&g_inputManager);
     if (GetRenderTestRequest())
+    {
         g_game->ConfigureRenderTest(GetRenderTestRequest()->scene,
             GetRenderTestRequest()->mode == "raytracing", GetRenderTestRequest()->postProcessing);
+        g_game->SetRenderTestUsesAllCores(GetRenderTestRequest()->performance);
+    }
     g_game->SetWindow(m_hWnd);
     OnWindowSizeChanged();
     g_game->GetRenderManager().GetRenderData().inputManager = &g_inputManager;

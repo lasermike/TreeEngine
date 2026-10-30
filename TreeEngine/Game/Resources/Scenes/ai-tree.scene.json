@@ -2,6 +2,7 @@
   "version": 1,
   "id": "LoadAITree",
   "name": "AI Tree",
+  "testPass": "performance",
   "priority": 0,
   "camera": {
     "position": [ 2, 7, -77 ],

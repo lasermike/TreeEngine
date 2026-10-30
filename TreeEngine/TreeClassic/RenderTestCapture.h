@@ -30,6 +30,11 @@ struct RenderTestRequest
     double benchmarkTimeStep = 0;
     bool postProcessing = true;
     bool validateScenePersistence = false;
+    // Performance run: profile every frame instead of capturing images.
+    bool performance = false;
+    int performanceFrames = 20;
+    double performanceFrameTimeStep = 1.0 / 60.0;
+    double performanceStartTime = 5; // Simulation time of frame 0, after the trees have grown.
     std::wstring report;
     std::vector<RenderTestPoint> captures;
 };

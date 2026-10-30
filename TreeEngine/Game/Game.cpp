@@ -12,6 +12,7 @@
 #include "SceneInstantiation.h"
 #include "GltfModel.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <set>
@@ -44,6 +45,11 @@ std::wstring Wide(const std::string& value)
 
 namespace
 {
+    double ElapsedMs(std::chrono::steady_clock::time_point start)
+    {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    }
+
     std::wstring DebugUIFolder()
     {
         wchar_t path[32768] = {};
@@ -230,6 +236,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_currentScene = 0;
 
     SceneRenderSettings sceneSettings = m_renderManager.GetSceneSettings();
+    const auto loadStart = std::chrono::steady_clock::now();
     if (m_renderTestMode)
     {
         HRR(m_loader.Load(m_renderTestScene.c_str(), m_pScene, &sceneSettings, m_player, &m_gameData,
@@ -240,6 +247,8 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
         HRR(m_loader.Load(m_currentScene, m_pScene, &sceneSettings, m_player, &m_gameData,
             &m_sceneDefinition, &m_sceneFilename));
     }
+    m_sceneLoadTiming = {};
+    m_sceneLoadTiming.definitionMs = ElapsedMs(loadStart);
     m_currentScene = m_loader.Catalog().FindPath(m_sceneFilename);
     m_sceneIsUser = m_currentScene >= 0 && m_loader.Catalog().Entries()[m_currentScene].user;
     m_sceneSelection = m_sceneFilename;
@@ -254,8 +263,10 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     // Create thread pool
     //may return 0 when not able to detect
     unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
-    // Keep render-test object updates ordered so shared instance data is repeatable.
-    m_threadPool = new ThreadPool(m_renderTestMode ? 1 : (concurentThreadsSupported ? concurentThreadsSupported : 1));
+    // Keep render-test object updates ordered so shared instance data is repeatable;
+    // performance runs measure with every core.
+    m_workerThreadCount = m_renderTestMode && !m_renderTestAllCores ? 1 : (concurentThreadsSupported ? concurentThreadsSupported : 1);
+    m_threadPool = new ThreadPool(m_workerThreadCount);
 
     return S_OK;
 }
@@ -278,8 +289,10 @@ HRESULT Game::LoadScene(const std::string& name)
     std::string nextFilename;
     const auto oldPosition = m_player->GetPosition();
     const auto oldRotation = m_player->GetRotation();
+    const auto loadStart = std::chrono::steady_clock::now();
     const HRESULT hr = m_loader.Load(name.c_str(), nextScene.get(), &nextSettings, m_player, &nextData,
         &nextDefinition, &nextFilename);
+    const double definitionMs = ElapsedMs(loadStart);
     if (FAILED(hr))
     {
         m_player->SetPosition(oldPosition);
@@ -297,6 +310,8 @@ HRESULT Game::LoadScene(const std::string& name)
     m_sceneSelection = m_sceneFilename;
     m_sceneIsUser = m_currentScene >= 0 && m_loader.Catalog().Entries()[m_currentScene].user;
     m_gameData = nextData;
+    m_sceneLoadTiming = {};
+    m_sceneLoadTiming.definitionMs = definitionMs;
     m_renderManager.ApplySceneSettings(nextSettings);
     m_renderManager.GetRenderData().time = 0;
     m_timeStart = 0;
@@ -473,16 +488,30 @@ HRESULT Game::Regenerate()
     HRESULT hr = S_OK;
 
     // Clear old stuff
+    auto start = std::chrono::steady_clock::now();
     m_pScene->CleanUpDeviceObjects();
     m_renderManager.UninitGameLevelGraphics();
+    double graphicsMs = ElapsedMs(start);
 
+    start = std::chrono::steady_clock::now();
     m_loader.Regenerate(m_pScene);
+    const double generationMs = ElapsedMs(start);
 
     // Init render manager
+    start = std::chrono::steady_clock::now();
     HRR(m_renderManager.InitGameLevelGraphics(m_pScene->GetMaxInstances(), m_gameData.useShadowMaps, *m_pScene));
 
     // Init new stuff
     HRR(m_pScene->InitGraphics(m_renderManager));
+    graphicsMs += ElapsedMs(start);
+
+    // The first regenerate after a load completes it; later ones (edits, device reloads) are not loads.
+    if (!m_sceneLoadTiming.complete)
+    {
+        m_sceneLoadTiming.generationMs = generationMs;
+        m_sceneLoadTiming.graphicsMs = graphicsMs;
+        m_sceneLoadTiming.complete = true;
+    }
     return S_OK;
 }
 
@@ -1126,6 +1155,10 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         if (ImGui::Checkbox("Enable profiling", &m_profilingEnabled))
             m_lastProfile.valid = false;
         ImGui::TextWrapped("Applies next frame. CPU timers and GPU timestamp queries add profiling overhead; no extra GPU wait is added.");
+        if (m_sceneLoadTiming.complete)
+            ImGui::Text("Last scene load: %.0f ms (definition %.0f, generation %.0f, graphics %.0f)",
+                m_sceneLoadTiming.TotalMs(), m_sceneLoadTiming.definitionMs,
+                m_sceneLoadTiming.generationMs, m_sceneLoadTiming.graphicsMs);
         if (!m_profilingEnabled)
         {
             ImGui::TextDisabled("Profiling disabled.");

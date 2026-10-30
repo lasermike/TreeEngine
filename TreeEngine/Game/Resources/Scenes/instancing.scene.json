@@ -2,6 +2,7 @@
   "version": 1,
   "id": "Instancing",
   "name": "Instancing",
+  "testPass": "performance",
   "priority": 1,
   "camera": {
     "position": [0, 2.2, -7]
