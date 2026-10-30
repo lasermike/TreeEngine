@@ -36,7 +36,8 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             : StockSamplerStates::MinMagMipLinearUVWClamp;
         if (imported.alphaBlend)
         {
-            state.blendState = StockBlendStates::AlphaBlend;
+            // This template uses SRC_ALPHA; the glTF pixel shader returns straight color.
+            state.blendState = StockBlendStates::PremultipliedAlphaBlend;
             state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
         }
         ShaderMaterial shaderMaterial = imported.shaderMaterial;

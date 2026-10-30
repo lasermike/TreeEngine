@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "id": "LoadTerra",
+  "testPass": "performance",
+  "priority": 0,
+  "name": "Terra - Blender lighting comparison",
+  "camera": {
+    "position": [
+      15,
+      13.5,
+      -79
+    ],
+    "rotationDegrees": [
+      -0.223,
+      -9.43,
+      0
+    ]
+  },
+  "render": {
+    "clearColor": [
+      0.48,
+      0.54,
+      0.58,
+      1
+    ],
+    "useShadowMaps": true,
+    "useAlphaBlendedRenderTarget": true,
+    "farClippingPlane": 800,
+    "enablePostProcessing": false,
+    "blurAmount": 0,
+    "environment": {
+      "diffuse": "Environment/terra-world-diffuse.dds",
+      "specular": "Environment/terra-world-specular.dds"
+    }
+  },
+  "light": {
+    "ambient": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "diffuse": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "specular": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "direction": [
+      0.6259292648824133,
+      -0.7141802822623909,
+      0.3133034947002239
+    ]
+  },
+  "pointLightCount": 0,
+  "objects": [
+    {
+      "id": "canyon",
+      "type": "model",
+      "source": "Models/Gltf/terra.glb",
+      "transform": {
+        "scale": [
+          50,
+          50,
+          50
+        ]
+      }
+    }
+  ]
+}

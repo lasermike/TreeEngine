@@ -195,10 +195,17 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
 {
     HRR(GetPlatform()->RenderSceneSetup(pass, &m_instancedBuffer));
 
-    // Render each unit
-    for (RenderUnit* ru : m_renderUnits)
+    // Opaque geometry must populate color and depth before transparent surfaces.
+    // Keep the shadow pass ordering unchanged.
+    for (int phase = 0; phase < (pass == RegularPass ? 2 : 1); ++phase)
     {
-        HRR(Render(ru, pass));
+        for (RenderUnit* ru : m_renderUnits)
+        {
+            const bool blended = ru->m_material->m_renderState.blendState != StockBlendStates::Overwrite;
+            if (pass == RegularPass && blended != (phase == 1))
+                continue;
+            HRR(Render(ru, pass));
+        }
     }
 
     return S_OK;
