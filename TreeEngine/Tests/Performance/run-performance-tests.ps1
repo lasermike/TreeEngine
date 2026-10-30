@@ -210,4 +210,5 @@ $rows | Export-Csv -LiteralPath (Join-Path $runDirectory 'summary.csv') -NoTypeI
 & (Join-Path $PSScriptRoot 'update-performance-index.ps1') -Results $resultsPath
 
 Write-Host "$($jobs.Count) jobs; $failures failed. Results: $runDirectory"
+Write-Host 'Run show-dashboard.ps1 to see the results over time.'
 if ($failures) { exit 1 }

@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TreeEngine Performance</title>
+<!-- Data comes from dashboard-data.js, which show-dashboard.ps1 generates from Artifacts. -->
+<script src="dashboard-data.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --wash: rgba(11, 11, 11, 0.04);
+  --good-text: #006300;
+  --critical: #d03b3b;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --wash: rgba(255, 255, 255, 0.05);
+    --good-text: #0ca30c;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --wash: rgba(255, 255, 255, 0.05);
+  --good-text: #0ca30c;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text-primary);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1400px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0; }
+h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+.subtitle, .note { color: var(--text-secondary); margin: 4px 0 0; }
+.note { font-size: 13px; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; margin: 20px 0 12px; }
+.filters label { display: flex; flex-direction: column; gap: 4px; color: var(--text-secondary); font-size: 12px; }
+.filters label.check { flex-direction: row; align-items: center; gap: 6px; font-size: 13px; padding-bottom: 6px; }
+select {
+  font: inherit; color: var(--text-primary); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; min-width: 140px; max-width: 100%;
+}
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.segmented button {
+  font: inherit; color: var(--text-secondary); background: var(--surface); border: 0; padding: 5px 12px; cursor: pointer;
+}
+.segmented button + button { border-left: 1px solid var(--border); }
+.segmented button[aria-pressed="true"] { color: var(--text-primary); background: var(--wash); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0 0 20px; }
+.legend button {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; color: var(--text-primary);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px 3px 6px; cursor: pointer;
+}
+.legend button[aria-pressed="false"] { color: var(--text-muted); }
+.legend button[aria-pressed="false"] svg { opacity: 0.3; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+section { margin-bottom: 24px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+.chart { position: relative; }
+.chart .sub { color: var(--text-secondary); font-size: 12px; margin: 0 0 8px; }
+.chart svg.plot { display: block; width: 100%; height: 220px; overflow: visible; outline: none; }
+.chart svg.plot:focus-visible { outline: 2px solid var(--s1); outline-offset: 4px; border-radius: 4px; }
+.tooltip {
+  position: absolute; pointer-events: none; z-index: 2; min-width: 180px; max-width: 280px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); font-size: 12px;
+}
+.tooltip .head { font-weight: 600; }
+.tooltip .meta { color: var(--text-secondary); margin-bottom: 6px; }
+.tooltip .row { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.tooltip .row strong { font-variant-numeric: tabular-nums; }
+.tooltip .row .range { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tooltip .row .name { color: var(--text-secondary); margin-left: auto; padding-left: 8px; }
+details { margin-top: 8px; font-size: 12px; }
+summary { cursor: pointer; color: var(--text-secondary); }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { color: var(--text-secondary); font-weight: 600; }
+th:first-child, td:first-child { text-align: left; }
+td .delta { display: block; font-size: 12px; color: var(--text-muted); }
+td .delta.slower { color: var(--critical); }
+td .delta.faster { color: var(--good-text); }
+.empty { color: var(--text-secondary); padding: 32px 0; }
+code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>TreeEngine performance</h1>
+    <p class="subtitle" id="subtitle"></p>
+  </header>
+
+  <div id="content" hidden>
+    <div class="filters" role="group" aria-label="Filters">
+      <label>Machine <select id="machine"></select></label>
+      <label>Branch <select id="branch"></select></label>
+      <label>Mode
+        <span class="segmented" id="mode">
+          <button type="button" data-mode="raster">Raster</button>
+          <button type="button" data-mode="raytracing">Ray tracing</button>
+        </span>
+      </label>
+      <label>Frames <select id="window"></select></label>
+      <label class="check"><input type="checkbox" id="dirty" checked> Include runs with uncommitted changes</label>
+    </div>
+    <div class="legend" id="legend" aria-label="Scenes (click to hide or show)"></div>
+
+    <section class="card">
+      <h2>Latest run compared with the previous run</h2>
+      <p class="note" id="compare-note"></p>
+      <div class="table-wrap" id="compare"></div>
+    </section>
+
+    <section>
+      <div class="grid" id="charts"></div>
+    </section>
+  </div>
+  <p class="empty" id="empty" hidden></p>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var data = window.PERF_DATA;
+  var subtitle = document.getElementById('subtitle');
+  var empty = document.getElementById('empty');
+  if (!data || !data.runs || !data.runs.length) {
+    empty.hidden = false;
+    empty.textContent = data
+      ? 'No runs yet. Run run-performance-tests.ps1, then show-dashboard.ps1.'
+      : 'dashboard-data.js was not found. Run show-dashboard.ps1 to generate it and open this page.';
+    return;
+  }
+
+  // Every chartable metric. Charts whose values are all zero in the chosen mode are hidden,
+  // so the ray-tracing-only passes appear only for ray tracing.
+  var METRICS = [
+    { key: 'loadTotalMs', title: 'Scene load', sub: 'Definition, generation and graphics; frame range does not apply' },
+    { key: 'frameMs', title: 'CPU frame', sub: 'Wall time of the whole frame, including the wait for the GPU' },
+    { key: 'sceneUpdateMs', title: 'CPU scene update', sub: 'Includes the wait for worker threads' },
+    { key: 'drawUploadMs', title: 'CPU DXR draw upload', sub: '' },
+    { key: 'gpu_frameMs', title: 'GPU frame', sub: '' },
+    { key: 'gpu_shadowMs', title: 'GPU shadow', sub: '' },
+    { key: 'gpu_mainMs', title: 'GPU main', sub: '' },
+    { key: 'gpu_deformationMs', title: 'GPU deformation', sub: '' },
+    { key: 'gpu_blasMs', title: 'GPU BLAS build', sub: '' },
+    { key: 'gpu_tlasMs', title: 'GPU TLAS build', sub: '' },
+    { key: 'gpu_raysMs', title: 'GPU rays', sub: '' },
+    { key: 'loadDefinitionMs', title: 'Scene load: definition', sub: 'Read the scene file and build objects, textures and models' },
+    { key: 'loadGenerationMs', title: 'Scene load: generation', sub: 'Generate trees and other procedural geometry' },
+    { key: 'loadGraphicsMs', title: 'Scene load: graphics', sub: 'Create GPU buffers, materials and pipelines' }
+  ];
+  var COMPARE = ['loadTotalMs', 'frameMs', 'sceneUpdateMs', 'gpu_frameMs'];
+  var WINDOWS = { frames10to20: 'Frames 10–19', frames5to10: 'Frames 5–9' };
+  var SHAPES = ['circle', 'square', 'triangle', 'diamond', 'triangleDown', 'circle', 'square', 'triangle'];
+  var THRESHOLD = 0.10;
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  var col = {};
+  data.columns.forEach(function (name, i) { col[name] = i; });
+  function metricTitle(key) { for (var i = 0; i < METRICS.length; i++) if (METRICS[i].key === key) return METRICS[i].title; return key; }
+
+  // Runs in commit order, so a rebuilt history still plots left to right.
+  var runs = data.runs.slice().sort(function (a, b) {
+    var ka = (a.commitDate ? new Date(a.commitDate).getTime() : 0), kb = (b.commitDate ? new Date(b.commitDate).getTime() : 0);
+    if (ka !== kb) return ka - kb;
+    return String(a.startedUtc).localeCompare(String(b.startedUtc));
+  });
+
+  // Scene colors and shapes follow the scene, not the filter, so they never change between views.
+  var sceneSet = {};
+  runs.forEach(function (run) { run.rows.forEach(function (row) { sceneSet[row[col.scene]] = true; }); });
+  function sceneName(id) { return (data.sceneNames && data.sceneNames[id]) || id; }
+  var scenes = Object.keys(sceneSet).sort(function (a, b) { return sceneName(a).localeCompare(sceneName(b)); }).slice(0, 8);
+  var sceneStyle = {};
+  scenes.forEach(function (id, i) { sceneStyle[id] = { color: 'var(--s' + (i + 1) + ')', shape: SHAPES[i] }; });
+  var hidden = {};
+
+  // Mean of the per-repeat window means, with the min and max across repeats.
+  var aggregateCache = {};
+  function aggregate(run, mode, windowName) {
+    var key = run.directory + '|' + mode + '|' + windowName;
+    if (aggregateCache[key]) return aggregateCache[key];
+    var result = {};
+    run.rows.forEach(function (row) {
+      if (row[col.mode] !== mode || row[col.window] !== windowName) return;
+      var scene = row[col.scene];
+      var entry = result[scene] || (result[scene] = {});
+      METRICS.forEach(function (m) {
+        var v = row[col[m.key]];
+        if (v === null || v === undefined) return;
+        var s = entry[m.key] || (entry[m.key] = { sum: 0, n: 0, min: Infinity, max: -Infinity });
+        s.sum += v; s.n++; s.min = Math.min(s.min, v); s.max = Math.max(s.max, v);
+      });
+    });
+    Object.keys(result).forEach(function (scene) {
+      Object.keys(result[scene]).forEach(function (k) { var s = result[scene][k]; s.mean = s.sum / s.n; });
+    });
+    return (aggregateCache[key] = result);
+  }
+
+  function fmt(v) {
+    if (v === null || v === undefined || !isFinite(v)) return '—';
+    var a = Math.abs(v);
+    var digits = a >= 100 ? 0 : a >= 10 ? 1 : 2;
+    return v.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  }
+  function shortCommit(run) { return run.commit ? run.commit.substring(0, 7) : ''; }
+  function runDate(run) {
+    var d = new Date(run.startedUtc);
+    return isNaN(d) ? '' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  }
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function svg(tag, attrs) {
+    var e = document.createElementNS(SVGNS, tag);
+    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
+  function marker(shape, x, y, color, size) {
+    var r = size / 2, attrs = { fill: color, stroke: 'var(--surface)', 'stroke-width': 2 };
+    if (shape === 'circle') { attrs.cx = x; attrs.cy = y; attrs.r = r; return svg('circle', attrs); }
+    var p;
+    if (shape === 'square') { r *= 0.9; p = [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]]; }
+    else if (shape === 'triangle') { r *= 1.2; p = [[x, y - r], [x + r, y + r * 0.8], [x - r, y + r * 0.8]]; }
+    else if (shape === 'triangleDown') { r *= 1.2; p = [[x, y + r], [x + r, y - r * 0.8], [x - r, y - r * 0.8]]; }
+    else { r *= 1.25; p = [[x, y - r], [x + r, y], [x, y + r], [x - r, y]]; }
+    attrs.d = 'M' + p.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join('L') + 'Z';
+    return svg('path', attrs);
+  }
+  function key(scene, width) {
+    var s = svg('svg', { width: width, height: 12, viewBox: '0 0 ' + width + ' 12', 'aria-hidden': 'true' });
+    s.appendChild(svg('line', { x1: 1, y1: 6, x2: width - 1, y2: 6, stroke: sceneStyle[scene].color, 'stroke-width': 2, 'stroke-linecap': 'round' }));
+    s.appendChild(marker(sceneStyle[scene].shape, width / 2, 6, sceneStyle[scene].color, 8));
+    return s;
+  }
+  function niceTicks(max) {
+    if (!(max > 0)) max = 1;
+    var raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+    var step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+    var ticks = [];
+    for (var t = 0; t <= max + step * 0.001; t += step) ticks.push(t);
+    if (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
+    return ticks;
+  }
+
+  // ---- Filters -------------------------------------------------------------------------
+  var state = { machine: runs[runs.length - 1].machine, branch: '', mode: 'raster', window: 'frames10to20', dirty: true };
+  function fillSelect(select, values, labels, selected) {
+    select.textContent = '';
+    values.forEach(function (v, i) {
+      var o = el('option', { value: v }, labels[i]);
+      if (v === selected) o.selected = true;
+      select.appendChild(o);
+    });
+  }
+  var machines = []; runs.forEach(function (r) { if (machines.indexOf(r.machine) < 0) machines.push(r.machine); });
+  fillSelect(document.getElementById('machine'), machines, machines, state.machine);
+  function refreshBranches() {
+    var branches = [];
+    runs.forEach(function (r) { if (r.machine === state.machine && branches.indexOf(r.branch) < 0) branches.push(r.branch); });
+    if (state.branch && branches.indexOf(state.branch) < 0) state.branch = '';
+    fillSelect(document.getElementById('branch'), [''].concat(branches), ['All branches'].concat(branches), state.branch);
+  }
+  refreshBranches();
+  fillSelect(document.getElementById('window'), Object.keys(WINDOWS), Object.keys(WINDOWS).map(function (k) { return WINDOWS[k]; }), state.window);
+
+  document.getElementById('machine').addEventListener('change', function (e) { state.machine = e.target.value; refreshBranches(); render(); });
+  document.getElementById('branch').addEventListener('change', function (e) { state.branch = e.target.value; render(); });
+  document.getElementById('window').addEventListener('change', function (e) { state.window = e.target.value; render(); });
+  document.getElementById('dirty').addEventListener('change', function (e) { state.dirty = e.target.checked; render(); });
+  var modeButtons = document.querySelectorAll('#mode button');
+  Array.prototype.forEach.call(modeButtons, function (b) {
+    b.addEventListener('click', function () { state.mode = b.getAttribute('data-mode'); render(); });
+  });
+
+  var legend = document.getElementById('legend');
+  scenes.forEach(function (scene) {
+    var b = el('button', { type: 'button', 'aria-pressed': 'true' });
+    b.appendChild(key(scene, 22));
+    b.appendChild(document.createTextNode(sceneName(scene)));
+    b.addEventListener('click', function () {
+      hidden[scene] = !hidden[scene];
+      b.setAttribute('aria-pressed', hidden[scene] ? 'false' : 'true');
+      render();
+    });
+    legend.appendChild(b);
+  });
+
+  function filteredRuns() {
+    return runs.filter(function (r) {
+      return r.machine === state.machine && (!state.branch || r.branch === state.branch) && (state.dirty || !r.dirty);
+    });
+  }
+  function runTitle(run) { return run.label + (run.label === shortCommit(run) ? '' : ' (' + shortCommit(run) + ')') + (run.dirty ? ' • uncommitted changes' : ''); }
+
+  // ---- Comparison table -----------------------------------------------------------------
+  function renderCompare(list) {
+    var note = document.getElementById('compare-note');
+    var wrap = document.getElementById('compare');
+    wrap.textContent = '';
+    var latest = list[list.length - 1], previous = list.length > 1 ? list[list.length - 2] : null;
+    note.textContent = 'Latest: ' + runTitle(latest) + ', ' + (latest.commitSubject || '') + ' — ' + runDate(latest) +
+      (previous ? '. Previous: ' + runTitle(previous) + '. Changes beyond ±' + (THRESHOLD * 100) + '% are flagged; repeats of the same commit vary by several percent.'
+                : '. There is no previous run to compare with yet.');
+    var cur = aggregate(latest, state.mode, state.window), prev = previous ? aggregate(previous, state.mode, state.window) : null;
+    var table = el('table'), head = el('tr');
+    head.appendChild(el('th', null, 'Scene'));
+    COMPARE.forEach(function (k) { head.appendChild(el('th', null, metricTitle(k) + ' (ms)')); });
+    var thead = el('thead'); thead.appendChild(head); table.appendChild(thead);
+    var tbody = el('tbody');
+    scenes.forEach(function (scene) {
+      if (hidden[scene] || !cur[scene]) return;
+      var tr = el('tr');
+      tr.appendChild(el('td', null, sceneName(scene)));
+      COMPARE.forEach(function (k) {
+        var td = el('td'), now = cur[scene][k], before = prev && prev[scene] && prev[scene][k];
+        td.appendChild(document.createTextNode(fmt(now && now.mean)));
+        if (now && before && before.mean > 0) {
+          var change = (now.mean - before.mean) / before.mean;
+          var cls = change > THRESHOLD ? 'slower' : change < -THRESHOLD ? 'faster' : '';
+          var text = Math.abs(change) < 0.0005 ? 'no change'
+            : (change > 0 ? '▲ ' : '▼ ') + Math.abs(change * 100).toFixed(1) + '% ' + (change > 0 ? 'slower' : 'faster');
+          td.appendChild(el('span', { 'class': 'delta ' + cls }, text));
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+  }
+
+  // ---- Charts ------------------------------------------------------------------------------
+  function renderChart(container, metric, list, aggs) {
+    var card = el('div', { 'class': 'card chart' });
+    card.appendChild(el('h2', null, metric.title + ' (ms)'));
+    card.appendChild(el('p', { 'class': 'sub' }, (metric.sub ? metric.sub + '. ' : '') + 'Mean of each run’s repeats; hover for the range.'));
+    container.appendChild(card);
+
+    var width = Math.max(card.clientWidth - 32, 240), height = 220;
+    var m = { l: 48, r: 12, t: 10, b: 30 };
+    var plotW = width - m.l - m.r, plotH = height - m.t - m.b;
+    var visible = scenes.filter(function (s) { return !hidden[s]; });
+    var max = 0;
+    // Scale to the plotted means; one slow repeat would otherwise flatten every line. The range is in the tooltip.
+    aggs.forEach(function (a) { visible.forEach(function (s) { var v = a[s] && a[s][metric.key]; if (v) max = Math.max(max, v.mean); }); });
+    var ticks = niceTicks(max), top = ticks[ticks.length - 1];
+    var tickDigits = Math.max(0, Math.min(3, -Math.floor(Math.log10(ticks[1] - ticks[0]) + 1e-9)));
+    if (((ticks[1] - ticks[0]) * Math.pow(10, tickDigits) + 1e-9) % 1 > 1e-6) tickDigits++;  // steps like 2.5 or 0.025
+    var step = plotW / list.length;
+    function x(i) { return m.l + step * (i + 0.5); }
+    function y(v) { return m.t + plotH - (v / top) * plotH; }
+
+    var plot = svg('svg', { 'class': 'plot', viewBox: '0 0 ' + width + ' ' + height, tabindex: '0', role: 'img',
+      'aria-label': metric.title + ' by run. Use the arrow keys to read values.' });
+    ticks.forEach(function (t) {
+      plot.appendChild(svg('line', { x1: m.l, x2: width - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }));
+      var label = svg('text', { x: m.l - 8, y: y(t) + 4, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 11, 'style': 'font-variant-numeric: tabular-nums' });
+      label.textContent = t.toLocaleString(undefined, { minimumFractionDigits: tickDigits, maximumFractionDigits: tickDigits });
+      plot.appendChild(label);
+    });
+    var every = Math.max(1, Math.ceil(list.length / Math.max(1, Math.floor(plotW / 80))));
+    list.forEach(function (run, i) {
+      if ((list.length - 1 - i) % every !== 0) return;
+      var text = run.label.length > 12 ? run.label.substring(0, 11) + '…' : run.label;
+      var label = svg('text', { x: x(i), y: height - 8, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 11 });
+      label.textContent = text;
+      plot.appendChild(label);
+    });
+    var crosshair = svg('line', { y1: m.t, y2: m.t + plotH, stroke: 'var(--axis)', 'stroke-width': 1, visibility: 'hidden' });
+    plot.appendChild(crosshair);
+
+    visible.forEach(function (scene) {
+      var style = sceneStyle[scene], d = '', pen = false;
+      aggs.forEach(function (a, i) {
+        var v = a[scene] && a[scene][metric.key];
+        if (!v) { pen = false; return; }
+        d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v.mean).toFixed(1);
+        pen = true;
+      });
+      if (d) plot.appendChild(svg('path', { d: d, fill: 'none', stroke: style.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    });
+    visible.forEach(function (scene) {
+      aggs.forEach(function (a, i) {
+        var v = a[scene] && a[scene][metric.key];
+        if (v) plot.appendChild(marker(sceneStyle[scene].shape, x(i), y(v.mean), sceneStyle[scene].color, 9));
+      });
+    });
+    card.appendChild(plot);
+
+    // Crosshair and tooltip: snap to the nearest run; arrow keys do the same from the keyboard.
+    var tooltip = el('div', { 'class': 'tooltip', role: 'status' });
+    tooltip.hidden = true;
+    card.appendChild(tooltip);
+    var current = -1;
+    function show(i) {
+      current = i;
+      var run = list[i], a = aggs[i];
+      crosshair.setAttribute('x1', x(i)); crosshair.setAttribute('x2', x(i)); crosshair.setAttribute('visibility', 'visible');
+      tooltip.textContent = '';
+      tooltip.appendChild(el('div', { 'class': 'head' }, runTitle(run)));
+      tooltip.appendChild(el('div', { 'class': 'meta' }, (run.commitSubject ? run.commitSubject + ' — ' : '') + runDate(run)));
+      var rows = visible.filter(function (s) { return a[s] && a[s][metric.key]; })
+        .sort(function (p, q) { return a[q][metric.key].mean - a[p][metric.key].mean; });
+      if (!rows.length) tooltip.appendChild(el('div', { 'class': 'meta' }, 'No data for this run.'));
+      rows.forEach(function (s) {
+        var v = a[s][metric.key], row = el('div', { 'class': 'row' });
+        row.appendChild(key(s, 16));
+        row.appendChild(el('strong', null, fmt(v.mean)));
+        if (v.n > 1) row.appendChild(el('span', { 'class': 'range' }, fmt(v.min) + '–' + fmt(v.max)));
+        row.appendChild(el('span', { 'class': 'name' }, sceneName(s)));
+        tooltip.appendChild(row);
+      });
+      tooltip.hidden = false;
+      // SVG elements have no offsetLeft, so position from the bounding rectangles.
+      var plotRect = plot.getBoundingClientRect(), cardRect = card.getBoundingClientRect();
+      var px = plotRect.left - cardRect.left + x(i) * plotRect.width / width;
+      var left = px + 12;
+      if (left + tooltip.offsetWidth > card.clientWidth) left = px - tooltip.offsetWidth - 12;
+      tooltip.style.left = Math.max(0, left) + 'px';
+      tooltip.style.top = (plotRect.top - cardRect.top + 8) + 'px';
+    }
+    function hide() { current = -1; tooltip.hidden = true; crosshair.setAttribute('visibility', 'hidden'); }
+    plot.addEventListener('pointermove', function (e) {
+      var rect = plot.getBoundingClientRect();
+      var px = (e.clientX - rect.left) * width / rect.width;
+      show(Math.min(list.length - 1, Math.max(0, Math.floor((px - m.l) / step))));
+    });
+    plot.addEventListener('pointerleave', hide);
+    plot.addEventListener('blur', hide);
+    plot.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        show(current < 0 ? list.length - 1 : Math.min(list.length - 1, Math.max(0, current + (e.key === 'ArrowRight' ? 1 : -1))));
+      } else if (e.key === 'Escape') hide();
+    });
+    plot.addEventListener('focus', function () { show(list.length - 1); });
+
+    // The same values as a table.
+    var details = el('details');
+    details.appendChild(el('summary', null, 'Show as table'));
+    var wrap = el('div', { 'class': 'table-wrap' }), table = el('table'), head = el('tr');
+    head.appendChild(el('th', null, 'Run'));
+    visible.forEach(function (s) { head.appendChild(el('th', null, sceneName(s))); });
+    var thead = el('thead'); thead.appendChild(head); table.appendChild(thead);
+    var tbody = el('tbody');
+    list.slice().reverse().forEach(function (run, r) {
+      var a = aggs[list.length - 1 - r], tr = el('tr');
+      tr.appendChild(el('td', null, runTitle(run)));
+      visible.forEach(function (s) { var v = a[s] && a[s][metric.key]; tr.appendChild(el('td', null, fmt(v && v.mean))); });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody); wrap.appendChild(table); details.appendChild(wrap);
+    card.appendChild(details);
+  }
+
+  function render() {
+    Array.prototype.forEach.call(modeButtons, function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-mode') === state.mode ? 'true' : 'false'); });
+    var list = filteredRuns();
+    var charts = document.getElementById('charts');
+    charts.textContent = '';
+    var compare = document.getElementById('compare');
+    if (!list.length) {
+      document.getElementById('compare-note').textContent = 'No runs match these filters.';
+      compare.textContent = '';
+      return;
+    }
+    renderCompare(list);
+    var aggs = list.map(function (run) { return aggregate(run, state.mode, state.window); });
+    METRICS.forEach(function (metric) {
+      var any = aggs.some(function (a) { return Object.keys(a).some(function (s) { var v = a[s][metric.key]; return v && v.max > 0; }); });
+      if (any) renderChart(charts, metric, list, aggs);
+    });
+  }
+
+  subtitle.textContent = runs.length + (runs.length === 1 ? ' run' : ' runs') + ' on ' + machines.join(', ') +
+    '. Data generated ' + new Date(data.generatedUtc).toLocaleString() + ' by show-dashboard.ps1.';
+  document.getElementById('content').hidden = false;
+  render();
+
+  var width = document.getElementById('charts').clientWidth, pending = false;
+  window.addEventListener('resize', function () {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () {
+      pending = false;
+      var w = document.getElementById('charts').clientWidth;
+      if (w !== width) { width = w; render(); }
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -99,6 +99,24 @@ roughly 30 MB to the repository. A database such as SQLite, if a dashboard needs
 built from these files and not committed: a binary file that changes on every run can't be
 merged, and git stores a full new copy of it each time.
 
+## Dashboard
+
+```powershell
+.\show-dashboard.ps1
+```
+
+This gathers `index.json` and each run's `summary.csv` into `dashboard-data.js` (generated and not
+committed) and opens `dashboard.html` in the browser. It works from the local file; no server is needed.
+Run it again after new runs.
+
+- **Filters:** machine, branch, raster or ray tracing, the frame range, and whether to include runs
+  with uncommitted changes. Click a scene in the legend to hide or show it.
+- **Latest run compared with the previous run:** scene load, CPU frame, CPU scene update and GPU frame
+  per scene, with changes beyond ±10% flagged as slower or faster.
+- **Charts:** one per metric, with runs in commit order on the x-axis and a line per scene. Each point
+  is the mean of the run's repeats; hover, or focus a chart and use the arrow keys, to see the range.
+  Charts for passes that don't run in the chosen mode are hidden. Each chart has a table view.
+
 ## Adding a scene
 
 Add `"testPass": "performance"` to a scene in `Game/Resources/Scenes`; the scene must have an `id`.
