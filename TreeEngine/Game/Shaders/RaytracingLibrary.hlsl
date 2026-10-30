@@ -125,6 +125,57 @@ float3 LoadVertexPosition(uint vertexIndex)
     return pos.xyz;
 }
 
+
+// Estimate a pixel footprint by intersecting neighboring camera rays with the
+// hit triangle plane. Secondary transmission uses this camera footprint as an
+// approximation; full refracted ray differentials are not propagated yet.
+void ComputeTextureFootprint(DxrGeometryInfo geometry, uint3 indices,
+    float2 uv0, float2 uv1, float2 uv2, out float2 uvDx, out float2 uvDy)
+{
+    uvDx = uvDy = 0.0f;
+    float3 p0 = LoadVertexPosition(geometry.vertexBufferOffset + indices.x);
+    float3 edge1 = LoadVertexPosition(geometry.vertexBufferOffset + indices.y) - p0;
+    float3 edge2 = LoadVertexPosition(geometry.vertexBufferOffset + indices.z) - p0;
+    float3 planeNormal = cross(edge1, edge2);
+    float areaSquared = dot(planeNormal, planeNormal);
+    if (areaSquared < 1e-16f)
+        return;
+
+    float3 hit = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+    float4 projected = mul(mul(float4(hit, 1), View), Projection);
+    if (projected.w <= 1e-6f)
+        return;
+    float2 ndc = projected.xy / projected.w;
+    float2 pixelStep = 2.0f / float2(DispatchRaysDimensions().xy);
+    float4 worldX = mul(float4(ndc + float2(pixelStep.x, 0), 0, 1), InverseViewProjection);
+    float4 worldY = mul(float4(ndc + float2(0, -pixelStep.y), 0, 1), InverseViewProjection);
+    float3 directionX = worldX.xyz / worldX.w - eyePos.xyz;
+    float3 directionY = worldY.xyz / worldY.w - eyePos.xyz;
+    float denominatorX = dot(planeNormal, directionX);
+    float denominatorY = dot(planeNormal, directionY);
+    if (abs(denominatorX) < 1e-8f || abs(denominatorY) < 1e-8f)
+        return;
+    float planeDistance = dot(planeNormal, hit - eyePos.xyz);
+    float3 deltaX = eyePos.xyz + directionX * (planeDistance / denominatorX) - hit;
+    float3 deltaY = eyePos.xyz + directionY * (planeDistance / denominatorY) - hit;
+    float3 dual1 = cross(edge2, planeNormal) / areaSquared;
+    float3 dual2 = cross(planeNormal, edge1) / areaSquared;
+    uvDx = dot(deltaX, dual1) * (uv1 - uv0) + dot(deltaX, dual2) * (uv2 - uv0);
+    uvDy = dot(deltaY, dual1) * (uv1 - uv0) + dot(deltaY, dual2) * (uv2 - uv0);
+}
+
+float4 SampleFilteredMaterialTexture(int slot, float2 uv, bool clampTexture,
+    ShaderMaterial material, uint role, float2 uvDx, float2 uvDy)
+{
+    float2 dx = float2(dot(material.uvTransformRow0[role].xy, uvDx),
+        dot(material.uvTransformRow1[role].xy, uvDx));
+    float2 dy = float2(dot(material.uvTransformRow0[role].xy, uvDy),
+        dot(material.uvTransformRow1[role].xy, uvDy));
+    return clampTexture
+        ? sceneTextures[NonUniformResourceIndex(slot)].SampleGrad(samLinearClamp, uv, dx, dy)
+        : sceneTextures[NonUniformResourceIndex(slot)].SampleGrad(samLinear, uv, dx, dy);
+}
+
 [shader("anyhit")]
 void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
@@ -198,6 +249,10 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float3 tangent = normalize(tangentData.xyz);
 
     float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
+    float2 uvDx, uvDy;
+    ComputeTextureFootprint(geoInfo, uint3(i0, i1, i2),
+        sv0.tex, sv1.tex, sv2.tex, uvDx, uvDy);
+
 
     // Transform object-space normal to world space using instance world matrix
     float4x4 worldMatrix = instanceDataBuffer[geoInfo.instanceIndex].World;
@@ -210,7 +265,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     if (mat.normalTextures.x >= 0)
     {
         float2 normalUv = TransformMaterialUv(mat, texCoord, NormalTextureRole);
-        float3 tangentNormal = SampleSpecularTexture((int)mat.normalTextures.x, normalUv, mat.normalTextures.z > 0).xyz * 2.0f - 1.0f;
+        float3 tangentNormal = SampleFilteredMaterialTexture((int)mat.normalTextures.x, normalUv, mat.normalTextures.z > 0, mat, NormalTextureRole, uvDx, uvDy).xyz * 2.0f - 1.0f;
         tangentNormal.xy *= mat.normalTextures.y;
         float3 binormal = normalize(cross(normal, tangent)) * (tangentData.w < 0 ? -1.0f : 1.0f);
         TransformNormalBasis(mat, tangent, binormal);
@@ -224,7 +279,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float4 textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
     if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
     {
-        textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularColor.w > 0);
+        textureColor = SampleFilteredMaterialTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularColor.w > 0, mat, BaseColorTextureRole, uvDx, uvDy);
     }
 
     if (mat.flags.w > 0)
@@ -260,17 +315,17 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     if (mat.specularTextures.x >= 0)
     {
         float2 strengthUv = TransformMaterialUv(mat, texCoord, SpecularStrengthTextureRole);
-        mat.specularParams.w *= SampleSpecularTexture((int)mat.specularTextures.x, strengthUv, mat.specularTextures.z > 0).a;
+        mat.specularParams.w *= SampleFilteredMaterialTexture((int)mat.specularTextures.x, strengthUv, mat.specularTextures.z > 0, mat, SpecularStrengthTextureRole, uvDx, uvDy).a;
     }
     if (mat.specularTextures.y >= 0)
     {
         float2 colorUv = TransformMaterialUv(mat, texCoord, SpecularColorTextureRole);
-        mat.specularColor.rgb *= SampleSpecularTexture((int)mat.specularTextures.y, colorUv, mat.specularTextures.w > 0).rgb;
+        mat.specularColor.rgb *= SampleFilteredMaterialTexture((int)mat.specularTextures.y, colorUv, mat.specularTextures.w > 0, mat, SpecularColorTextureRole, uvDx, uvDy).rgb;
     }
     if (mat.metallicRoughnessTextures.x >= 0)
     {
         float2 metallicRoughnessUv = TransformMaterialUv(mat, texCoord, MetallicRoughnessTextureRole);
-        float4 mr = SampleSpecularTexture((int)mat.metallicRoughnessTextures.x, metallicRoughnessUv, mat.metallicRoughnessTextures.y > 0);
+        float4 mr = SampleFilteredMaterialTexture((int)mat.metallicRoughnessTextures.x, metallicRoughnessUv, mat.metallicRoughnessTextures.y > 0, mat, MetallicRoughnessTextureRole, uvDx, uvDy);
         mat.specularParams.y *= mr.b;
         mat.specularParams.z *= mr.g;
     }
