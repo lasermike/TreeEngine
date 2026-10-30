@@ -163,6 +163,8 @@ namespace SceneData
         std::string environmentDiffuse;
         std::string environmentSpecular;
         float environmentRotationDegrees = 0;
+        float ambientOcclusionRadius = 0; // World units; zero disables DXR contact shading.
+        float ambientOcclusionStrength = 1;
         std::string skyCubeMap; // DDS cube map drawn behind the scene and used as the ray-miss background.
         float skyRotationDegrees = 0;
         bool useShadowMaps = true;

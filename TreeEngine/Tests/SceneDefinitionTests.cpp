@@ -439,10 +439,34 @@ void TestTestPasses()
 
 int RunScenePersistenceTests();
 
+
+void TestAmbientOcclusionSettings()
+{
+    auto disabled = SceneData::ParseScene(R"({"version":1,"name":"AO defaults","objects":[{"id":"box","type":"primitive","shape":"box"}]})", "ao");
+    Check(disabled.ambientOcclusionRadius == 0 && disabled.ambientOcclusionStrength == 1,
+        "AO must be disabled by default");
+    auto input = Json::parse(SceneData::SerializeScene(disabled));
+    input["render"]["ambientOcclusion"] = { {"radius", 1.25}, {"strength", 0.65} };
+    auto configured = SceneData::ParseScene(input.dump(), "ao");
+    auto roundtrip = SceneData::ParseScene(SceneData::SerializeScene(configured), "ao saved");
+    Check(roundtrip.ambientOcclusionRadius == 1.25f && roundtrip.ambientOcclusionStrength == 0.65f,
+        "AO settings were lost during scene serialization");
+    input["render"]["ambientOcclusion"]["radius"] = -1;
+    Reject(input.dump(), ".ambientOcclusion.radius");
+    input["render"]["ambientOcclusion"]["radius"] = 0;
+    input["render"]["ambientOcclusion"]["strength"] = 1.1;
+    Reject(input.dump(), ".ambientOcclusion.strength");
+    input["render"]["ambientOcclusion"]["strength"] = -0.1;
+    Reject(input.dump(), ".ambientOcclusion.strength");
+    input["render"]["ambientOcclusion"] = { {"raduis", 1} };
+    Reject(input.dump(), ".ambientOcclusion.raduis");
+}
+
 int main(int argc, char** argv)
 {
     try
     {
+        TestAmbientOcclusionSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

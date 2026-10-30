@@ -334,6 +334,8 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
     renderSettings.farClippingPlane = definition.farClippingPlane;
     renderSettings.enablePostProcessing = definition.enablePostProcessing;
     renderSettings.blurAmount = definition.blurAmount;
+    renderSettings.ambientOcclusionRadius = definition.ambientOcclusionRadius;
+    renderSettings.ambientOcclusionStrength = definition.ambientOcclusionStrength;
     renderSettings.environmentDiffuse = definition.environmentDiffuse.empty() ? std::string() :
         SceneData::ResolveSceneAsset(definition.environmentDiffuse, sceneFilename);
     renderSettings.environmentSpecular = definition.environmentSpecular.empty() ? std::string() :
@@ -620,6 +622,8 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
     result.farClippingPlane = settings.farClippingPlane;
     result.enablePostProcessing = settings.enablePostProcessing;
     result.blurAmount = settings.blurAmount;
+    result.ambientOcclusionRadius = settings.ambientOcclusionRadius;
+    result.ambientOcclusionStrength = settings.ambientOcclusionStrength;
     result.environmentDiffuse = RebaseAsset(settings.environmentDiffuse, sourceFilename, destinationFilename);
     result.environmentSpecular = RebaseAsset(settings.environmentSpecular, sourceFilename, destinationFilename);
     result.environmentRotationDegrees = settings.environmentRotationDegrees;

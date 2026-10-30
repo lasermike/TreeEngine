@@ -12,6 +12,8 @@ struct SceneRenderSettings
     std::string environmentDiffuse;
     std::string environmentSpecular;
     float environmentRotationDegrees = 0;
+    float ambientOcclusionRadius = 0; // World units; zero disables DXR contact shading.
+    float ambientOcclusionStrength = 1;
     int numDirectionalLights = 1;
     int numPointLights = 0;
     DirectionalLight dirLights[1];

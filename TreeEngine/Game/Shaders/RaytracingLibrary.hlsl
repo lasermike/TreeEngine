@@ -1,4 +1,4 @@
-﻿//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
 // RaytracingLibrary.hlsl
 //
 // Single HLSL file containing a Ray Generation, Miss, Any-Hit and Closest Hit Shader
@@ -221,6 +221,42 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
             return;
         }
     }
+    if (payload.isShadow == 2)
+        payload.color.x = min(payload.color.x, RayTCurrent() / ambientOcclusionRadius);
+}
+
+// Local diffuse visibility with distance falloff and stable cosine-weighted probes.
+float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometricNormal)
+{
+    const uint sampleCount = 16;
+    float3 tangent = normalize(cross(abs(surfaceNormal.y) < 0.99f
+        ? float3(0, 1, 0) : float3(1, 0, 0), surfaceNormal));
+    float3 bitangent = cross(surfaceNormal, tangent);
+    float visibility = 0;
+    float bias = min(0.002f, ambientOcclusionRadius * 0.01f);
+    for (uint i = 0; i < sampleCount; ++i)
+    {
+        float diskRadiusSquared = (i + 0.5f) / sampleCount;
+        float angle = i * 2.39996323f;
+        float2 disk = sqrt(diskRadiusSquared) * float2(cos(angle), sin(angle));
+        float3 direction = disk.x * tangent + disk.y * bitangent
+            + sqrt(1.0f - diskRadiusSquared) * surfaceNormal;
+        // Interpolated normals can point below the actual triangle plane.
+        if (dot(direction, geometricNormal) <= 0)
+        {
+            visibility += 1;
+            continue;
+        }
+        RayDesc ray;
+        ray.Origin = hit + geometricNormal * bias;
+        ray.Direction = direction;
+        ray.TMin = bias;
+        ray.TMax = ambientOcclusionRadius;
+        RayPayload probe = { float4(1, 1, 1, 1), 0, 2 };
+        TraceRay(Scene, RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, ~0, 0, 0, 0, ray, probe);
+        visibility += smoothstep(0.0f, 1.0f, probe.color.x);
+    }
+    return lerp(1.0f, visibility / sampleCount, ambientOcclusionStrength);
 }
 
 [shader("closesthit")]
@@ -261,6 +297,8 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     normal = normalize(mul(normal, (float3x3)worldMatrix));
     tangent = normalize(mul(tangent, (float3x3)worldMatrix));
     tangent = normalize(tangent - normal * dot(normal, tangent));
+    float3 surfaceNormal = normal; // Keep texture normals out of the AO hemisphere.
+
 
     if (mat.normalTextures.x >= 0)
     {
@@ -340,7 +378,21 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         roughness * (mipCount - 1)).rgb;
     float3 ibl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
         irradiance, prefiltered);
-    float3 surfaceColor = (A + shadowFactor * (D + S)).rgb + ibl;
+    float contactVisibility = 1;
+    if (ambientOcclusionRadius > 0 && ambientOcclusionStrength > 0 && mat.opticalParams.y == 0)
+    {
+        float3 p0 = LoadVertexPosition(geoInfo.vertexBufferOffset + i0);
+        float3 p1 = LoadVertexPosition(geoInfo.vertexBufferOffset + i1);
+        float3 p2 = LoadVertexPosition(geoInfo.vertexBufferOffset + i2);
+        float3 geometricNormal = normalize(cross(p1 - p0, p2 - p0));
+        if (dot(geometricNormal, surfaceNormal) < 0)
+            geometricNormal = -geometricNormal;
+        contactVisibility = ComputeContactVisibility(hitPos, surfaceNormal, geometricNormal);
+    }
+    // Block ambient diffuse lighting while preserving the sun and reflections.
+    float3 diffuseIbl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye, irradiance, 0);
+    float3 surfaceColor = (A + shadowFactor * (D + S)).rgb + ibl
+        - (1.0f - contactVisibility) * (A.rgb + diffuseIbl);
     if (mat.opticalParams.y > 0.0f && payload.depth == 0)
     {
         // Trace once through the thin surface to reveal opaque scene geometry.

@@ -31,6 +31,10 @@
     "environment": {
       "diffuse": "Environment/terra-world-diffuse.dds",
       "specular": "Environment/terra-world-specular.dds"
+    },
+    "ambientOcclusion": {
+      "radius": 1.25,
+      "strength": 0.65
     }
   },
   "light": {

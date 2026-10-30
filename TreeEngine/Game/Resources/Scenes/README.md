@@ -273,3 +273,14 @@ see the render regression README.
 
 The JSON parser is the vendored nlohmann/json 3.11.3 single header under
 `Game/ThirdParty/nlohmann`, with its MIT license.
+
+## DXR contact shading
+
+The optional render.ambientOcclusion object accepts radius (nonnegative world
+distance, default 0, disabled) and strength (0 to 1, default 1). Nearby opaque
+geometry blocks ambient diffuse light, preserving direct sun and specular
+reflections. Transmissive surfaces do not receive the effect. Raster ignores it.
+Sixteen deterministic hemisphere probes per opaque hit add GPU cost; use a radius
+near the size of stones or crevices. Settings survive scene save/reload.
+
+Example: "ambientOcclusion": { "radius": 1.25, "strength": 0.65 }

@@ -39,6 +39,9 @@ cbuffer cbChangesEveryFrame : register(b2)
     int numPointLights;
     float environmentRotationCos;
     float environmentRotationSin;
+    float ambientOcclusionRadius;
+    float ambientOcclusionStrength;
+    float ambientOcclusionPadding;
 };
 
 float3 RotateEnvironmentDirection(float3 direction)

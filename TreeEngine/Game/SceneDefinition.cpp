@@ -426,7 +426,21 @@ namespace SceneData
                 const auto& render = root["render"];
                 auto path = sourceName + ".render";
                 Fields(render, path, { "clearColor", "farClippingPlane", "useShadowMaps", "useAlphaBlendedRenderTarget",
-                    "enablePostProcessing", "blurAmount", "environment", "sky" });
+                    "enablePostProcessing", "blurAmount", "environment", "sky", "ambientOcclusion" });
+                if (render.contains("ambientOcclusion"))
+                {
+                    const auto& ao = render["ambientOcclusion"];
+                    const auto aoPath = path + ".ambientOcclusion";
+                    Fields(ao, aoPath, { "radius", "strength" });
+                    if (ao.contains("radius"))
+                    {
+                        scene.ambientOcclusionRadius = Number(ao["radius"], aoPath + ".radius");
+                        if (scene.ambientOcclusionRadius < 0)
+                            Invalid(aoPath + ".radius", "must be nonnegative");
+                    }
+                    if (ao.contains("strength"))
+                        scene.ambientOcclusionStrength = UnitNumber(ao["strength"], aoPath + ".strength");
+                }
                 if (render.contains("sky"))
                 {
                     const auto& sky = render["sky"];
@@ -682,6 +696,9 @@ namespace SceneData
         else if (!scene.testPasses.empty()) root["testPass"] = scene.testPasses;
         if (scene.environmentDiffuse.empty() != scene.environmentSpecular.empty())
             throw std::runtime_error("Scene environment needs both diffuse and specular cube maps");
+        if (scene.ambientOcclusionRadius != 0 || scene.ambientOcclusionStrength != 1)
+            root["render"]["ambientOcclusion"] = { { "radius", scene.ambientOcclusionRadius },
+                { "strength", scene.ambientOcclusionStrength } };
         if (!scene.environmentDiffuse.empty())
         {
             root["render"]["environment"] = { { "diffuse", scene.environmentDiffuse },

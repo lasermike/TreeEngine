@@ -36,6 +36,9 @@ struct CBChangesEveryFrame
     int numPointLights;
     float environmentRotationCos;
     float environmentRotationSin;
+    float ambientOcclusionRadius;
+    float ambientOcclusionStrength;
+    float ambientOcclusionPadding;
 };
 
 
