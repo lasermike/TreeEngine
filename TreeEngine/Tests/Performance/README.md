@@ -13,7 +13,7 @@ committed, so a dashboard can compare runs across commits and machines.
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| label (first argument) | required | Commit hash or note, used in the directory name and recorded in `results.json`. |
+| label (first argument) | required | Commit hash or note, used in the directory name and recorded in `results.json`. The commit itself is recorded either way. |
 | `-Configuration` | `Release` | Which `TreeClassic.exe` to measure. A Debug build prints a warning. |
 | `-Build` | off | Build TreeClassic in that configuration first. |
 | `-Executable` | | Measure a specific build, such as one from another worktree. |
@@ -52,13 +52,19 @@ The script also times each whole process (`processMs`), which includes startup a
 
 ## Output
 
-Each pass creates `Artifacts/<label>-<COMPUTERNAME>-<yyyyMMdd-HHmm>/`. The label is
-sanitized for file names. If the directory already exists, a `-2`, `-3`, … suffix is added.
+Each pass creates `Artifacts/<yyyyMMdd-HHmm>Z_<COMPUTERNAME>_<label>/`, for example
+`20261030-0346Z_LEVEE_c15f51a`. The time is the UTC start, so directories sort in run order.
+Underscores separate the parts; the machine name and label are sanitized for file names and
+never contain one. If the directory already exists, a `-2`, `-3`, … suffix is added.
 
-- **`results.json`:** everything, for the dashboard (`schemaVersion` 1).
+Tools should read the fields in `results.json` or `index.json`, not parse directory names.
+
+- **`results.json`:** everything, for the dashboard (`schemaVersion` 2), written as compact JSON.
   - **Run information:**
     - `label`, `machine`, `startedUtc`, `finishedUtc`
-    - `commit`, `branch`, `dirty` (uncommitted changes when measured)
+    - `commit`, `commitDate`, `commitSubject`, `branch`, `dirty` (uncommitted changes when measured).
+      A rebase changes commit hashes, so order runs by `commitDate` and use the subject to find
+      a commit whose hash no longer exists.
     - `configuration`, `cpu`, `logicalProcessors`, `os`, `adapter`, `workerThreads`
     - `width`, `height`, `frames`, `startTime`, `frameTimeStep`, `runs`, `modes`, `scenes`
     - `gpuPasses`
@@ -69,8 +75,29 @@ sanitized for file names. If the directory already exists, a `-2`, `-3`, … suf
     - `windows.<name>.<metric>`, the `{ mean, min, max }` of `frameMs`, `sceneUpdateMs`, `drawUploadMs` and `gpu_<pass>Ms`
 - **`summary.csv`:** one row per job and window, with load times and window means. Open it in Excel for a quick look.
 - **`jobs/<scene>-<mode>-run<N>/`:** the raw `request.json`, the app's `report.json`, and logs.
+  These are for local debugging and are not committed (see `.gitignore`); `results.json` has every sample.
 
 A failed job is recorded with its `error` and the pass continues. The script then exits with code 1.
+
+### Index
+
+`Artifacts/index.json` lists every run, one per line, oldest first: `directory`, `startedUtc`,
+`machine`, `label`, the commit fields, `configuration`, `adapter`, `scenes`, `modes`, `runs`,
+`jobs` and `failures`. A dashboard reads it to list runs, then loads a run's `results.json`
+when needed. Each pass adds its own line. After merging runs from another machine, or if the
+file has a merge conflict, rebuild it from the run directories:
+
+```powershell
+.\update-performance-index.ps1
+```
+
+### Storage
+
+The run directories and `index.json` are the permanent record and are committed. Each run's
+`results.json` is about 300 KB, and about 30 KB once git compresses it, so a thousand runs add
+roughly 30 MB to the repository. A database such as SQLite, if a dashboard needs one, should be
+built from these files and not committed: a binary file that changes on every run can't be
+merged, and git stores a full new copy of it each time.
 
 ## Adding a scene
 

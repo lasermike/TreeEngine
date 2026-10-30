@@ -1,0 +1,2 @@
+# Per-job requests, reports, and logs are for local debugging; results.json has every sample.
+Artifacts/*/jobs/

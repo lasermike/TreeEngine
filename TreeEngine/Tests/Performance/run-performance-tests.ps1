@@ -14,7 +14,7 @@ param(
 )
 
 # Measures every scene whose definition has "testPass": "performance" and writes the results to
-# Tests\Performance\Artifacts\<label>-<machine>-<yyyyMMdd-HHmm>. See README.md for the result format.
+# Tests\Performance\Artifacts\<yyyyMMdd-HHmm>Z_<machine>_<label>. See README.md for the result format.
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -57,12 +57,14 @@ if ($Scenes.Count) {
 }
 if (-not $selected.Count) { throw "No scenes in $sceneDirectory have `"testPass`": `"performance`"." }
 
-# Run directory: <label>-<machine>-<yyyyMMdd-HHmm>, with a numeric suffix if it already exists.
+# Run directory: <yyyyMMdd-HHmm>Z_<machine>_<label> in UTC, so directories sort by time. Underscores only
+# separate the parts. A numeric suffix is added if the directory already exists.
 $started = Get-Date
-$safeLabel = ($Label.Trim() -replace '[^A-Za-z0-9._-]+', '-').Trim('-', '.')
+function Get-SafeName([string]$Value) { return ($Value.Trim() -replace '[^A-Za-z0-9.-]+', '-').Trim('-', '.') }
+$safeLabel = Get-SafeName $Label
 if (-not $safeLabel) { throw 'The label must contain at least one letter or digit.' }
 $artifactRoot = Join-Path $PSScriptRoot 'Artifacts'
-$baseName = '{0}-{1}-{2}' -f $safeLabel, $env:COMPUTERNAME, $started.ToString('yyyyMMdd-HHmm')
+$baseName = '{0}Z_{1}_{2}' -f $started.ToUniversalTime().ToString('yyyyMMdd-HHmm'), (Get-SafeName $env:COMPUTERNAME), $safeLabel
 $runDirectory = Join-Path $artifactRoot $baseName
 for ($suffix = 2; Test-Path -LiteralPath $runDirectory; $suffix++) { $runDirectory = Join-Path $artifactRoot "$baseName-$suffix" }
 New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
@@ -156,12 +158,15 @@ for ($run = 1; $run -le $Runs; $run++) {
 }
 
 $results = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     label = $Label
     machine = $env:COMPUTERNAME
     startedUtc = $started.ToUniversalTime().ToString('o')
     finishedUtc = (Get-Date).ToUniversalTime().ToString('o')
     commit = Get-GitValue @('rev-parse', 'HEAD')
+    # The date and subject still identify the commit if a rebase changes its hash.
+    commitDate = Get-GitValue @('show', '-s', '--format=%cI', 'HEAD')
+    commitSubject = Get-GitValue @('show', '-s', '--format=%s', 'HEAD')
     branch = Get-GitValue @('rev-parse', '--abbrev-ref', 'HEAD')
     dirty = [bool]$status
     configuration = $(if ($Executable -match '\\Debug\\') { 'Debug' } else { $Configuration })
@@ -183,7 +188,9 @@ $results = [ordered]@{
     windows = $windows
     jobs = $jobs
 }
-[IO.File]::WriteAllText((Join-Path $runDirectory 'results.json'), ($results | ConvertTo-Json -Depth 12), $utf8)
+# Compact JSON: indentation made the file four times larger.
+$resultsPath = Join-Path $runDirectory 'results.json'
+[IO.File]::WriteAllText($resultsPath, ($results | ConvertTo-Json -Depth 12 -Compress), $utf8)
 
 # One row per scene, mode, run, and window with load times and window means.
 $rows = foreach ($job in $jobs) {
@@ -200,6 +207,7 @@ $rows = foreach ($job in $jobs) {
     }
 }
 $rows | Export-Csv -LiteralPath (Join-Path $runDirectory 'summary.csv') -NoTypeInformation -Encoding UTF8
+& (Join-Path $PSScriptRoot 'update-performance-index.ps1') -Results $resultsPath
 
 Write-Host "$($jobs.Count) jobs; $failures failed. Results: $runDirectory"
 if ($failures) { exit 1 }

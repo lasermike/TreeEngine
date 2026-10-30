@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "runs": [
+    {"directory":"20261030-0346Z_LEVEE_c15f51a","startedUtc":"2026-10-30T03:46:20.2823170Z","machine":"LEVEE","label":"c15f51a","commit":"c15f51aa27545bb8b7f07590267dddb632ae278d","commitDate":"2026-10-29T20:46:15-07:00","commitSubject":"Add performance test pass for scenes tagged testPass","branch":"aitree","dirty":false,"configuration":"Release","adapter":"NVIDIA GeForce RTX 5080","scenes":["LoadAITree","LoadGltfDemo","Instancing","LoadTreeScene","LoadTrees"],"modes":["raster","raytracing"],"runs":3,"jobs":30,"failures":0}
+  ]
+}
