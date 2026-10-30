@@ -10,7 +10,11 @@ param(
     [ValidateSet('raster', 'raytracing')][string[]]$Modes = @('raster', 'raytracing'),
     [string[]]$Scenes = @(),
     [ValidateRange(0, 1000)][double]$StartTime = 5,
-    [ValidateRange(1, 1800)][int]$TimeoutSeconds = 180
+    [ValidateRange(1, 1800)][int]$TimeoutSeconds = 180,
+    # The commit -Executable was built from, when it isn't this checkout's HEAD.
+    [string]$SourceCommit,
+    # -Executable is an older commit with this harness's capture code added, to backfill history.
+    [switch]$BackportedHarness
 )
 
 # Measures every scene whose definition has "testPass": "performance" and writes the results to
@@ -74,7 +78,13 @@ function Get-GitValue([string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { return $null }
     return ($value -join "`n").Trim()
 }
+$commitRef = 'HEAD'
 $status = Get-GitValue @('status', '--porcelain')
+if ($SourceCommit) {
+    $commitRef = Get-GitValue @('rev-parse', '--verify', "$SourceCommit^{commit}")
+    if (-not $commitRef) { throw "Unknown commit: $SourceCommit" }
+    $status = $null   # The build came from that commit, not from this checkout.
+}
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
 $os = Get-CimInstance Win32_OperatingSystem
 
@@ -163,12 +173,13 @@ $results = [ordered]@{
     machine = $env:COMPUTERNAME
     startedUtc = $started.ToUniversalTime().ToString('o')
     finishedUtc = (Get-Date).ToUniversalTime().ToString('o')
-    commit = Get-GitValue @('rev-parse', 'HEAD')
+    commit = Get-GitValue @('rev-parse', $commitRef)
     # The date and subject still identify the commit if a rebase changes its hash.
-    commitDate = Get-GitValue @('show', '-s', '--format=%cI', 'HEAD')
-    commitSubject = Get-GitValue @('show', '-s', '--format=%s', 'HEAD')
+    commitDate = Get-GitValue @('show', '-s', '--format=%cI', $commitRef)
+    commitSubject = Get-GitValue @('show', '-s', '--format=%s', $commitRef)
     branch = Get-GitValue @('rev-parse', '--abbrev-ref', 'HEAD')
     dirty = [bool]$status
+    backportedHarness = [bool]$BackportedHarness
     configuration = $(if ($Executable -match '\\Debug\\') { 'Debug' } else { $Configuration })
     executable = $Executable
     cpu = $cpu.Name.Trim()

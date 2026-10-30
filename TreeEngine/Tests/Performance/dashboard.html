@@ -332,7 +332,10 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
       return r.machine === state.machine && (!state.branch || r.branch === state.branch) && (state.dirty || !r.dirty);
     });
   }
-  function runTitle(run) { return run.label + (run.label === shortCommit(run) ? '' : ' (' + shortCommit(run) + ')') + (run.dirty ? ' • uncommitted changes' : ''); }
+  function runTitle(run) {
+    return run.label + (run.label === shortCommit(run) ? '' : ' (' + shortCommit(run) + ')') +
+      (run.dirty ? ' • uncommitted changes' : '') + (run.backportedHarness ? ' • measuring code backported' : '');
+  }
 
   // ---- Comparison table -----------------------------------------------------------------
   function renderCompare(list) {

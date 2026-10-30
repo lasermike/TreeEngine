@@ -26,6 +26,7 @@ function Get-IndexEntry([string]$Path) {
         commitSubject = $run.commitSubject
         branch = $run.branch
         dirty = $run.dirty
+        backportedHarness = [bool]($run.PSObject.Properties.Name -contains 'backportedHarness' -and $run.backportedHarness)
         configuration = $run.configuration
         adapter = $run.adapter
         scenes = @($run.scenes | ForEach-Object { $_.id })
