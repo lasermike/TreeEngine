@@ -151,6 +151,8 @@ namespace SceneData
         DirectX::XMFLOAT4 diffuse = { 1, 1, 1, 1 };
         DirectX::XMFLOAT4 specular = { 0.6f, 0.6f, 0.6f, 1 };
         DirectX::XMFLOAT3 direction = { -0.57735f, -0.57735f, 0.57735f };
+        float angularDiameterDegrees = 0; // Zero keeps the existing hard shadow.
+        int shadowSamples = 8;
     };
 
     struct SceneDefinition

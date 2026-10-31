@@ -60,7 +60,9 @@
       0.6259292648824133,
       -0.7141802822623909,
       0.3133034947002239
-    ]
+    ],
+    "angularDiameterDegrees": 2,
+    "shadowSamples": 8
   },
   "pointLightCount": 0,
   "objects": [

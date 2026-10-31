@@ -489,10 +489,31 @@ void TestModelNormalAnimation()
     Reject(bad.dump(), ".normalAnimation.material");
 }
 
+
+void TestSunShadowSettings()
+{
+    const std::string json = R"({"version":1,"name":"Sun","light":{"angularDiameterDegrees":2,"shadowSamples":8},"objects":[{"id":"box","type":"primitive","shape":"box"}]})";
+    auto scene = SceneData::ParseScene(json, "sun");
+    auto saved = SceneData::ParseScene(SceneData::SerializeScene(scene), "saved-sun");
+    Check(saved.light.angularDiameterDegrees == 2 && saved.light.shadowSamples == 8,
+        "sun shadow settings did not round-trip");
+    auto bad = Json::parse(json);
+    bad["light"]["angularDiameterDegrees"] = -1;
+    Reject(bad.dump(), ".light.angularDiameterDegrees");
+    bad["light"]["angularDiameterDegrees"] = 11;
+    Reject(bad.dump(), ".light.angularDiameterDegrees");
+    bad["light"]["angularDiameterDegrees"] = 2;
+    bad["light"]["shadowSamples"] = 0;
+    Reject(bad.dump(), ".light.shadowSamples");
+    bad["light"]["shadowSamples"] = 33;
+    Reject(bad.dump(), ".light.shadowSamples");
+}
+
 int main(int argc, char** argv)
 {
     try
     {
+        TestSunShadowSettings();
         TestModelNormalAnimation();
         TestAmbientOcclusionSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")

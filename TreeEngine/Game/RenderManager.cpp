@@ -633,6 +633,8 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
     cb.ambientOcclusionRadius = m_renderData.ambientOcclusionRadius;
     cb.ambientOcclusionStrength = m_renderData.ambientOcclusionStrength;
     cb.sceneTime = XMFLOAT4(m_renderData.normalAnimationTime, 0, 0, 0);
+    cb.sunShadowParams = XMFLOAT4(tanf(XMConvertToRadians(m_renderData.sunAngularDiameterDegrees) * 0.5f),
+        static_cast<float>(m_renderData.sunShadowSamples), 0, 0);
     const int reflectionRays = m_settings->m_waterReflectionRays;
     cb.reflectionRayCount = m_settings->m_waterReflections
         ? static_cast<UINT>(reflectionRays < 1 ? 1 : reflectionRays > 32 ? 32 : reflectionRays)

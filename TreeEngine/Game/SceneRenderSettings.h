@@ -14,6 +14,8 @@ struct SceneRenderSettings
     float environmentRotationDegrees = 0;
     float ambientOcclusionRadius = 0; // World units; zero disables DXR contact shading.
     float ambientOcclusionStrength = 1;
+    float sunAngularDiameterDegrees = 0;
+    int sunShadowSamples = 8;
     int numDirectionalLights = 1;
     int numPointLights = 0;
     DirectionalLight dirLights[1];

@@ -337,7 +337,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 
     // Cast shadow ray toward the light
     float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-    float3 lightDir = -light.Direction;
+    float3 lightDir = normalize(-light.Direction);
     float shadowFactor = 0.0f;
 
     RayDesc shadowRay;
@@ -350,12 +350,26 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     // If the ray misses all geometry, ShadowMissShader sets it to 1 (lit).
     // RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH + RAY_FLAG_SKIP_CLOSEST_HIT_SHADER
     // makes the shadow ray stop at the first blocker and skip ClosestHit.
-    RayPayload shadowPayload = { float4(0, 0, 0, 0), payload.depth + 1, 1 };
-    uint shadowMissIndex = 0;
-    TraceRay(Scene,
-        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
-        ~0, 0, 0, shadowMissIndex, shadowRay, shadowPayload);
-    shadowFactor = shadowPayload.color.x;
+    uint sampleCount = (payload.depth == 0 && sunShadowParams.x > 0) ? clamp((uint)sunShadowParams.y, 1u, 32u) : 1u;
+    float3 reference = abs(lightDir.y) < 0.99f ? float3(0, 1, 0) : float3(1, 0, 0);
+    float3 sunTangent = normalize(cross(reference, lightDir));
+    float3 sunBitangent = cross(lightDir, sunTangent);
+    for (uint i = 0; i < sampleCount; ++i)
+    {
+        if (sampleCount > 1)
+        {
+            // Uniform disk samples across the apparent sun; fixed positions are stable over time.
+            float r = sqrt((i + 0.5f) / sampleCount) * sunShadowParams.x;
+            float phi = i * 2.39996323f;
+            shadowRay.Direction = normalize(lightDir + r * (cos(phi) * sunTangent + sin(phi) * sunBitangent));
+        }
+        RayPayload shadowPayload = { float4(0, 0, 0, 0), payload.depth + 1, 1 };
+        TraceRay(Scene,
+            RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+            ~0, 0, 0, 0, shadowRay, shadowPayload);
+        shadowFactor += shadowPayload.color.x;
+    }
+    shadowFactor /= sampleCount;
 
     if (mat.specularTextures.x >= 0)
     {

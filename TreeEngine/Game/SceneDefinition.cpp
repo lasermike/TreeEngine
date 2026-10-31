@@ -487,7 +487,7 @@ namespace SceneData
             {
                 const auto& light = root["light"];
                 auto path = sourceName + ".light";
-                Fields(light, path, { "ambient", "diffuse", "specular", "direction", "shadowPosition" });
+                Fields(light, path, { "ambient", "diffuse", "specular", "direction", "shadowPosition", "angularDiameterDegrees", "shadowSamples" });
                 if (light.contains("shadowPosition"))
                 {
                     scene.hasShadowLightPosition = true;
@@ -497,6 +497,14 @@ namespace SceneData
                 if (light.contains("diffuse")) scene.light.diffuse = Vector4(light["diffuse"], path + ".diffuse");
                 if (light.contains("specular")) scene.light.specular = Vector4(light["specular"], path + ".specular");
                 if (light.contains("direction")) scene.light.direction = Vector3(light["direction"], path + ".direction");
+                if (light.contains("angularDiameterDegrees"))
+                {
+                    scene.light.angularDiameterDegrees = Number(light["angularDiameterDegrees"], path + ".angularDiameterDegrees");
+                    if (scene.light.angularDiameterDegrees < 0 || scene.light.angularDiameterDegrees > 10)
+                        Invalid(path + ".angularDiameterDegrees", "must be between 0 and 10");
+                }
+                if (light.contains("shadowSamples"))
+                    scene.light.shadowSamples = Integer(light["shadowSamples"], path + ".shadowSamples", 1, 32);
                 const auto& d = scene.light.direction;
                 if (d.x == 0 && d.y == 0 && d.z == 0) Invalid(path + ".direction", "must be nonzero");
             }
@@ -731,6 +739,10 @@ namespace SceneData
                 root["render"]["sky"]["rotationDegrees"] = scene.skyRotationDegrees;
         }
         if (scene.hasShadowLightPosition) root["light"]["shadowPosition"] = VectorJson(scene.shadowLightPosition);
+        if (scene.light.angularDiameterDegrees != 0)
+            root["light"]["angularDiameterDegrees"] = scene.light.angularDiameterDegrees;
+        if (scene.light.shadowSamples != 8)
+            root["light"]["shadowSamples"] = scene.light.shadowSamples;
         if (!scene.materials.empty())
             for (const auto& material : scene.materials) root["materials"][material.first] = MaterialJson(material.second);
         for (const auto& object : scene.objects)

@@ -357,6 +357,8 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
     renderSettings.environmentSpecular = definition.environmentSpecular.empty() ? std::string() :
         SceneData::ResolveSceneAsset(definition.environmentSpecular, sceneFilename);
     renderSettings.environmentRotationDegrees = definition.environmentRotationDegrees;
+    renderSettings.sunAngularDiameterDegrees = definition.light.angularDiameterDegrees;
+    renderSettings.sunShadowSamples = definition.light.shadowSamples;
     auto& light = renderSettings.dirLights[0];
     light.Ambient = definition.light.ambient;
     light.Diffuse = definition.light.diffuse;
@@ -657,6 +659,8 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
     result.light.diffuse = settings.dirLights[0].Diffuse;
     result.light.specular = settings.dirLights[0].Specular;
     result.light.direction = settings.dirLights[0].Direction;
+    result.light.angularDiameterDegrees = settings.sunAngularDiameterDegrees;
+    result.light.shadowSamples = settings.sunShadowSamples;
     result.hasShadowLightPosition = settings.shadowLightPositionOverride;
     result.shadowLightPosition = settings.shadowLightPosition;
     result.pointLightCount = settings.numPointLights;
