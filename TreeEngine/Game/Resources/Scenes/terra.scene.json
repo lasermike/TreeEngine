@@ -29,8 +29,11 @@
     "enablePostProcessing": false,
     "blurAmount": 0,
     "environment": {
-      "diffuse": "Environment/terra-world-diffuse.dds",
-      "specular": "Environment/terra-world-specular.dds"
+      "diffuse": "Environment/terra-daylight-diffuse.dds",
+      "specular": "Environment/terra-daylight-specular.dds"
+    },
+    "sky": {
+      "cubeMap": "Environment/terra-daylight-sky.dds"
     },
     "ambientOcclusion": {
       "radius": 1.25,
