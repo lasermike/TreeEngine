@@ -77,6 +77,10 @@ public:
 
     HRESULT Initialize(bool renderToSharedTexture);
 
+    void SetRenderTestReflectionRays(int rays) {
+        m_settings.m_waterReflections = rays > 0;
+        if (rays > 0) m_settings.m_waterReflectionRays = rays;
+    }
     void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile = false, bool showShadowBuffer = false);
     HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {});
     // Render tests update objects on one thread for repeatable images; performance runs use every core.

@@ -416,6 +416,41 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         float3 reflection = EncodeGltfDisplayColor((shadowFactor * S).rgb + specularIbl);
         float f0 = ComputeDielectricF0(mat.opticalParams.x);
         float fresnel = f0 + (1.0f - f0) * pow(1.0f - saturate(dot(normal, toEye)), 5.0f);
+        if (reflectionRayCount > 0)
+        {
+            // Deterministic GGX half-vector samples: skip transmissive surfaces
+            // on reflected rays to avoid hitting the water interface again.
+            RayDesc reflectedRay;
+            reflectedRay.Origin = hitPos + faceNormal * 0.002f;
+            reflectedRay.TMin = 0.001f;
+            reflectedRay.TMax = 100.0f;
+            float3 axis = abs(faceNormal.y) < 0.99f ? float3(0, 1, 0) : float3(1, 0, 0);
+            float3 tangentR = normalize(cross(axis, faceNormal));
+            float3 bitangentR = cross(faceNormal, tangentR);
+            float3 sumR = 0;
+            float countR = 0;
+            float alphaR = max(roughness * roughness, 0.0001f);
+            uint samples = min(reflectionRayCount, 32u);
+            for (uint i = 0; i < samples; ++i)
+            {
+                float u = (i + 0.5f) / samples;
+                float phi = i * 2.39996323f;
+                float cosTheta = rsqrt(1.0f + alphaR * alphaR * u / (1.0f - u));
+                float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+                float3 h = normalize(faceNormal * cosTheta + sinTheta *
+                    (cos(phi) * tangentR + sin(phi) * bitangentR));
+                reflectedRay.Direction = reflect(incident, h);
+                if (dot(reflectedRay.Direction, faceNormal) <= 0) continue;
+                RayPayload sampleR = { float4(0, 0, 0, 1), payload.depth + 1, 3 };
+                TraceRay(Scene, rayFlags, ~0, 0, 0, 1, reflectedRay, sampleR);
+                sumR += sampleR.color.rgb;
+                countR += 1;
+            }
+            float3 environmentReflection = EncodeGltfDisplayColor(prefiltered);
+            float3 tracedColor = countR > 0 ? sumR / countR : environmentReflection;
+            float3 reflectedColor = lerp(tracedColor, environmentReflection, roughness * roughness);
+            reflection = EncodeGltfDisplayColor((shadowFactor * S).rgb) + reflectedColor * fresnel;
+        }
         float3 throughColor = transmitted.color.rgb * mat.Diffuse.rgb * textureColor.rgb * (1.0f - fresnel);
         payload.color = float4(lerp(EncodeGltfDisplayColor(surfaceColor), reflection + throughColor,
             saturate(mat.opticalParams.y)), 1);

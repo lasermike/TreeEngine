@@ -41,7 +41,7 @@ cbuffer cbChangesEveryFrame : register(b2)
     float environmentRotationSin;
     float ambientOcclusionRadius;
     float ambientOcclusionStrength;
-    float ambientOcclusionPadding;
+    uint reflectionRayCount;
 };
 
 float3 RotateEnvironmentDirection(float3 direction)

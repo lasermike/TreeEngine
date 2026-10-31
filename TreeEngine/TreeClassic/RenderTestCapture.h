@@ -27,6 +27,7 @@ struct RenderTestRequest
     unsigned height = 480;
     int warmupFrames = 3;
     int benchmarkFrames = 0;
+    int reflectionRays = 0; // 0 disables traced transmission reflections; otherwise 1-32.
     double benchmarkTimeStep = 0;
     bool postProcessing = true;
     bool validateScenePersistence = false;

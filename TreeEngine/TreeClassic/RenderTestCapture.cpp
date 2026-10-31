@@ -157,6 +157,7 @@ void ParseRenderTestCommandLine()
     parsed->height = json.at("height").get<unsigned>();
     parsed->warmupFrames = json.value("warmupFrames", 3);
     parsed->benchmarkFrames = json.value("benchmarkFrames", 0);
+    parsed->reflectionRays = json.value("reflectionRays", 0);
     parsed->benchmarkTimeStep = json.value("benchmarkTimeStep", 0.0);
     parsed->postProcessing = json.value("postProcessing", true);
     parsed->validateScenePersistence = json.value("validateScenePersistence", false);
@@ -165,6 +166,7 @@ void ParseRenderTestCommandLine()
         || parsed->width < 32 || parsed->width > 2048 || parsed->height < 32 || parsed->height > 2048
         || parsed->warmupFrames < 0 || parsed->warmupFrames > 60
         || parsed->benchmarkFrames < 0 || parsed->benchmarkFrames > 10000
+        || parsed->reflectionRays < 0 || parsed->reflectionRays > 32
         || !std::isfinite(parsed->benchmarkTimeStep) || parsed->benchmarkTimeStep < 0)
         throw std::runtime_error("Invalid render test settings");
     if (json.contains("performance"))
@@ -241,6 +243,7 @@ namespace
         try
         {
             game.ConfigureRenderTest(request->scene, request->mode == "raytracing", request->postProcessing, true);
+            game.SetRenderTestReflectionRays(request->reflectionRays);
             for (int frame = 0; frame < request->performanceFrames; ++frame)
             {
                 MSG message;
@@ -328,6 +331,7 @@ int RunRenderTestCapture(Game& game)
             }
             game.ConfigureRenderTest(request->scene, point.mode == "raytracing", request->postProcessing,
                 request->benchmarkFrames > 0, point.showShadowBuffer);
+            game.SetRenderTestReflectionRays(request->reflectionRays);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             game.GetPlayer()->SetPosition(point.overrideCamera
                 ? DirectX::XMVectorSet(point.cameraPosition[0], point.cameraPosition[1], point.cameraPosition[2], 1)

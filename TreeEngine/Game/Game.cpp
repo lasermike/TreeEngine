@@ -1266,6 +1266,9 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         ImGui::SliderFloat("Blur Amount", &sceneRenderSettings.blurAmount, 0.0f, 2.5f, "%.2f");
         ImGui::Checkbox("Enable DXR", &m_settings.m_dxrEnabled);
+        ImGui::Checkbox("Trace transmissive reflections", &m_settings.m_waterReflections);
+        if (m_settings.m_waterReflections)
+            ImGui::SliderInt("Reflection rays", &m_settings.m_waterReflectionRays, 1, 32);
         ImGui::Checkbox("Show Performance Graphs", &m_settings.m_showPerfGraph);
     }
 

@@ -20,6 +20,8 @@ public:
 
     bool m_paused;
     bool m_dxrEnabled;
+    bool m_waterReflections = false;
+    int m_waterReflectionRays = 8;
     bool m_showShadowBuffer;
     bool m_wireframe;
     bool m_showDebugUI;

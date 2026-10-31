@@ -38,7 +38,7 @@ struct CBChangesEveryFrame
     float environmentRotationSin;
     float ambientOcclusionRadius;
     float ambientOcclusionStrength;
-    float ambientOcclusionPadding;
+    UINT reflectionRayCount;
 };
 
 
