@@ -14,6 +14,10 @@ public:
 
     std::shared_ptr<GltfAsset> asset;
     bool forceLit = false;
+    std::string animatedNormalMaterial;
+    XMFLOAT2 normalVelocity1 = { 0, 0 };
+    XMFLOAT2 normalVelocity2 = { 0, 0 };
+    float normalStrength = 1;
 };
 
 class GltfModel : public WorldObject
@@ -26,6 +30,10 @@ class GltfModel : public WorldObject
 
     std::shared_ptr<GltfAsset> m_asset;
     bool m_forceLit;
+    std::string m_animatedNormalMaterial;
+    XMFLOAT2 m_normalVelocity1;
+    XMFLOAT2 m_normalVelocity2;
+    float m_normalStrength;
     std::vector<RenderBatch> m_batches;
 
 public:

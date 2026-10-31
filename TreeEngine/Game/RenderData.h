@@ -109,6 +109,7 @@ struct RenderData : SceneRenderSettings
 
     // General
     float               time;
+    float               normalAnimationTime = 0;
     UINT                frame;
     // Transformations
     ProjectionData      projectionData;

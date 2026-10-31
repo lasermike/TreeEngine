@@ -39,6 +39,7 @@ struct CBChangesEveryFrame
     float ambientOcclusionRadius;
     float ambientOcclusionStrength;
     UINT reflectionRayCount;
+    XMFLOAT4 sceneTime; // x is simulation time in seconds
 };
 
 

@@ -8,7 +8,10 @@
 GltfModel::GltfModel(GltfModelParams* parameters)
     : WorldObject(parameters),
       m_asset(parameters->asset),
-      m_forceLit(parameters->forceLit)
+      m_forceLit(parameters->forceLit),
+      m_animatedNormalMaterial(parameters->animatedNormalMaterial),
+      m_normalVelocity1(parameters->normalVelocity1), m_normalVelocity2(parameters->normalVelocity2),
+      m_normalStrength(parameters->normalStrength)
 {
 }
 
@@ -41,6 +44,13 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
         }
         ShaderMaterial shaderMaterial = imported.shaderMaterial;
+        const bool animatedNormal = !m_animatedNormalMaterial.empty() && imported.name == m_animatedNormalMaterial;
+        if (animatedNormal)
+        {
+            shaderMaterial.normalMotion = XMFLOAT4(m_normalVelocity1.x, m_normalVelocity1.y,
+                m_normalVelocity2.x, m_normalVelocity2.y);
+            shaderMaterial.normalTextures.y *= m_normalStrength;
+        }
         const std::pair<int, MaterialTextureRole> maps[] = {
             { imported.specularTextureIndex, SpecularStrengthTextureRole },
             { imported.metallicRoughnessTextureIndex, MetallicRoughnessTextureRole },
@@ -53,6 +63,7 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             shaderMaterial.flags.w = 0.0f;
         std::wstring name = assetName + L"#material" + std::to_wstring(i)
             + (m_forceLit ? L"#forceLit" : L"");
+        if (animatedNormal) name += L"#normalAnimation" + std::to_wstring(reinterpret_cast<uintptr_t>(this));
         HRR(renderManager.CreateMaterial(
             name.c_str(), texture, nullptr, nullptr, nullptr, nullptr,
             shaderMaterial, state, &materials[i]));

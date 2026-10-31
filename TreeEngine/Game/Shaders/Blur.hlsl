@@ -57,6 +57,7 @@ struct DrawRecord
     float4 matNormalTextures;
     float4 matMetallicRoughnessTextures;
     float4 matOpticalParams;
+    float4 matNormalMotion;
     float4 matUvTransformRow0[5];
     float4 matUvTransformRow1[5];
     int textureIndex;

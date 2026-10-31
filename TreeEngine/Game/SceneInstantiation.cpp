@@ -315,6 +315,22 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             CommonParameters(model, *parameters);
             parameters->asset = RuntimeModel(model.source, model.id, sceneFilename);
             parameters->forceLit = model.forceLit;
+            parameters->animatedNormalMaterial = model.animatedNormalMaterial;
+            parameters->normalVelocity1 = model.normalVelocity1;
+            parameters->normalVelocity2 = model.normalVelocity2;
+            parameters->normalStrength = model.normalStrength;
+            if (!model.animatedNormalMaterial.empty())
+            {
+                int matches = 0;
+                for (const auto& material : parameters->asset->materials)
+                    if (material.name == model.animatedNormalMaterial)
+                    {
+                        ++matches;
+                        if (material.normalTextureIndex < 0 || material.shaderMaterial.normalTextures.z > 0)
+                            throw std::runtime_error("Animated normal material requires a repeating normal texture: " + model.animatedNormalMaterial);
+                    }
+                if (matches != 1) throw std::runtime_error("Animated normal material must match exactly one glTF material: " + model.animatedNormalMaterial);
+            }
             auto runtime = std::make_unique<GltfModel>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));
@@ -608,7 +624,12 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             if (params.generatorType != ModelGeneratorType) throw std::runtime_error("Object generator type changed");
             auto& model = static_cast<SceneData::ModelDefinition&>(*definition);
             model.source = RebaseAsset(model.source, sourceFilename, destinationFilename);
-            model.forceLit = dynamic_cast<const GltfModelParams&>(params).forceLit;
+            const auto& modelParams = dynamic_cast<const GltfModelParams&>(params);
+            model.forceLit = modelParams.forceLit;
+            model.animatedNormalMaterial = modelParams.animatedNormalMaterial;
+            model.normalVelocity1 = modelParams.normalVelocity1;
+            model.normalVelocity2 = modelParams.normalVelocity2;
+            model.normalStrength = modelParams.normalStrength;
             break;
         }
         default: throw std::runtime_error("Cannot save unsupported scene object");

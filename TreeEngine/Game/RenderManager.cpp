@@ -632,6 +632,7 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
         XMConvertToRadians(m_renderData.environmentRotationDegrees));
     cb.ambientOcclusionRadius = m_renderData.ambientOcclusionRadius;
     cb.ambientOcclusionStrength = m_renderData.ambientOcclusionStrength;
+    cb.sceneTime = XMFLOAT4(m_renderData.normalAnimationTime, 0, 0, 0);
     const int reflectionRays = m_settings->m_waterReflectionRays;
     cb.reflectionRayCount = m_settings->m_waterReflections
         ? static_cast<UINT>(reflectionRays < 1 ? 1 : reflectionRays > 32 ? 32 : reflectionRays)

@@ -1057,7 +1057,7 @@ public:
     };
 
     UINT m_nextVbWorldStart = 0;
-    static_assert(sizeof(DrawRecord) == 344, "DrawRecord must match Blur.hlsl");
+    static_assert(sizeof(DrawRecord) == 360, "DrawRecord must match Blur.hlsl");
     std::vector<DrawRecord> m_drawRecords;
     size_t m_previousDrawRecordHash;
 

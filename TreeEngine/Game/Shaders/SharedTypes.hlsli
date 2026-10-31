@@ -42,6 +42,7 @@ cbuffer cbChangesEveryFrame : register(b2)
     float ambientOcclusionRadius;
     float ambientOcclusionStrength;
     uint reflectionRayCount;
+    float4 sceneTime; // x is simulation time in seconds
 };
 
 float3 RotateEnvironmentDirection(float3 direction)

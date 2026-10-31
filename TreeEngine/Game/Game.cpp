@@ -314,6 +314,7 @@ HRESULT Game::LoadScene(const std::string& name)
     m_sceneLoadTiming.definitionMs = definitionMs;
     m_renderManager.ApplySceneSettings(nextSettings);
     m_renderManager.GetRenderData().time = 0;
+    m_renderManager.GetRenderData().normalAnimationTime = 0;
     m_timeStart = 0;
     m_timeCurrent = 0;
     m_settings.m_buffersInUse = 0;
@@ -547,6 +548,7 @@ HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& capture
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Render regression frame");
     auto& renderData = m_renderManager.GetRenderData();
     renderData.time = static_cast<float>(simulationTime);
+    renderData.normalAnimationTime = static_cast<float>(simulationTime * m_settings.m_waterMotionSpeed);
     renderData.frame++;
     m_timeCurrent = simulationTime;
     XMStoreFloat4x4(&renderData.view, m_player->GetViewMatrix());
@@ -640,6 +642,8 @@ void Game::Update(DX::StepTimer const& timer)
     else if (!m_settings.m_paused)
     {
         m_timeCurrent += timer.GetElapsedSeconds();
+        m_renderManager.GetRenderData().normalAnimationTime +=
+            static_cast<float>(timer.GetElapsedSeconds()) * m_settings.m_waterMotionSpeed;
     }
     m_renderManager.GetRenderData().time = (float)m_timeCurrent;
 
@@ -1266,6 +1270,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         ImGui::SliderFloat("Blur Amount", &sceneRenderSettings.blurAmount, 0.0f, 2.5f, "%.2f");
         ImGui::Checkbox("Enable DXR", &m_settings.m_dxrEnabled);
+        ImGui::SliderFloat("Water motion speed", &m_settings.m_waterMotionSpeed, 0.0f, 4.0f, "%.2fx");
         ImGui::Checkbox("Trace transmissive reflections", &m_settings.m_waterReflections);
         if (m_settings.m_waterReflections)
             ImGui::SliderInt("Reflection rays", &m_settings.m_waterReflectionRays, 1, 32);

@@ -20,6 +20,7 @@ public:
 
     bool m_paused;
     bool m_dxrEnabled;
+    float m_waterMotionSpeed = 1.0f; // 0 freezes animated normal maps.
     bool m_waterReflections = false;
     int m_waterReflectionRays = 8;
     bool m_showShadowBuffer;

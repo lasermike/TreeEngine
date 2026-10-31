@@ -572,13 +572,31 @@ namespace SceneData
                 }
                 else if (type == "model")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "forceLit" });
+                    Fields(value, path, { "id", "type", "transform", "source", "forceLit", "normalAnimation" });
                     auto model = std::make_unique<ModelDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     model->source = String(value["source"], path + ".source");
                     if (model->source.empty()) Invalid(path + ".source", "must not be empty");
                     if (value.contains("forceLit"))
                         model->forceLit = Boolean(value["forceLit"], path + ".forceLit");
+                    if (value.contains("normalAnimation"))
+                    {
+                        const auto& animation = value["normalAnimation"];
+                        const auto animationPath = path + ".normalAnimation";
+                        Fields(animation, animationPath, { "material", "velocity1", "velocity2", "strength" });
+                        for (auto key : { "material", "velocity1", "velocity2" })
+                            if (!animation.contains(key)) Invalid(animationPath + "." + key, "required property");
+                        model->animatedNormalMaterial = String(animation["material"], animationPath + ".material");
+                        if (model->animatedNormalMaterial.empty()) Invalid(animationPath + ".material", "must not be empty");
+                        model->normalVelocity1 = Vector2(animation["velocity1"], animationPath + ".velocity1");
+                        model->normalVelocity2 = Vector2(animation["velocity2"], animationPath + ".velocity2");
+                        if (animation.contains("strength"))
+                        {
+                            model->normalStrength = Number(animation["strength"], animationPath + ".strength");
+                            if (model->normalStrength < 0 || model->normalStrength > 16)
+                                Invalid(animationPath + ".strength", "must be between 0 and 16");
+                        }
+                    }
                     auto dot = model->source.find_last_of('.');
                     std::string extension = dot == std::string::npos
                         ? std::string()
@@ -804,6 +822,10 @@ namespace SceneData
                 value["type"] = "model";
                 value["source"] = model.source;
                 value["forceLit"] = model.forceLit;
+                if (!model.animatedNormalMaterial.empty())
+                    value["normalAnimation"] = { { "material", model.animatedNormalMaterial },
+                        { "velocity1", VectorJson(model.normalVelocity1) }, { "velocity2", VectorJson(model.normalVelocity2) },
+                        { "strength", model.normalStrength } };
                 break;
             }
             default: throw std::runtime_error("Cannot serialize unsupported scene object");

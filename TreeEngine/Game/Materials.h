@@ -56,6 +56,7 @@ struct ShaderMaterial
         normalTextures = XMFLOAT4(-1, 1, 0, 0);
         metallicRoughnessTextures = XMFLOAT4(-1, 0, 0, 0);
         opticalParams = XMFLOAT4(1.5f, 0, 0, 0);
+        normalMotion = XMFLOAT4(0, 0, 0, 0);
         for (int role = 0; role < MaterialTextureRoleCount; ++role)
         {
             uvTransformRow0[role] = XMFLOAT4(1, 0, 0, 0);
@@ -83,11 +84,12 @@ struct ShaderMaterial
     XMFLOAT4 normalTextures; // normal texture slot, scale, clamp flag
     XMFLOAT4 metallicRoughnessTextures; // texture slot, clamp flag
     XMFLOAT4 opticalParams; // x = IOR; y = transmission factor
+    XMFLOAT4 normalMotion; // two UV velocities per second
     XMFLOAT4 uvTransformRow0[MaterialTextureRoleCount]; // xy = UV matrix row, z = U offset
     XMFLOAT4 uvTransformRow1[MaterialTextureRoleCount]; // xy = UV matrix row, z = V offset
 };
 
-static_assert(sizeof(ShaderMaterial) == 304, "ShaderMaterial must match Materials.fx");
+static_assert(sizeof(ShaderMaterial) == 320, "ShaderMaterial must match Materials.fx");
 
 struct CBMaterial
 {

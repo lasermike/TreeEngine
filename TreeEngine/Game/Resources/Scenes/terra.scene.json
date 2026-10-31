@@ -74,6 +74,18 @@
           50,
           50
         ]
+      },
+      "normalAnimation": {
+        "material": "River water - glTF transmission",
+        "velocity1": [
+          0.0,
+          -0.1
+        ],
+        "velocity2": [
+          0.004,
+          -0.095
+        ],
+        "strength": 4
       }
     }
   ]

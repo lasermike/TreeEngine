@@ -138,6 +138,10 @@ namespace SceneData
         ModelDefinition() : ObjectDefinition(ObjectKind::Model) {}
         std::string source;
         bool forceLit = false;
+        std::string animatedNormalMaterial;
+        DirectX::XMFLOAT2 normalVelocity1 = { 0, 0 };
+        DirectX::XMFLOAT2 normalVelocity2 = { 0, 0 };
+        float normalStrength = 1;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<ModelDefinition>(*this); }
     };
 

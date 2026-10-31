@@ -53,6 +53,7 @@ struct ShaderMaterial
     float4 normalTextures; // normal texture slot, scale, clamp flag
     float4 metallicRoughnessTextures; // texture slot, clamp flag
     float4 opticalParams; // x = IOR; y = transmission factor
+    float4 normalMotion; // two UV velocities per second
     float4 uvTransformRow0[5];
     float4 uvTransformRow1[5];
 };

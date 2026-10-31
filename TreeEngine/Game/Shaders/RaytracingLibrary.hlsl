@@ -303,7 +303,14 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     if (mat.normalTextures.x >= 0)
     {
         float2 normalUv = TransformMaterialUv(mat, texCoord, NormalTextureRole);
-        float3 tangentNormal = SampleFilteredMaterialTexture((int)mat.normalTextures.x, normalUv, mat.normalTextures.z > 0, mat, NormalTextureRole, uvDx, uvDy).xyz * 2.0f - 1.0f;
+        float2 normalUv1 = normalUv + mat.normalMotion.xy * sceneTime.x;
+        float3 tangentNormal = SampleFilteredMaterialTexture((int)mat.normalTextures.x, normalUv1, mat.normalTextures.z > 0, mat, NormalTextureRole, uvDx, uvDy).xyz * 2.0f - 1.0f;
+        if (any(mat.normalMotion != 0))
+        {
+            float2 normalUv2 = normalUv + mat.normalMotion.zw * sceneTime.x;
+            float3 secondNormal = SampleFilteredMaterialTexture((int)mat.normalTextures.x, normalUv2, mat.normalTextures.z > 0, mat, NormalTextureRole, uvDx, uvDy).xyz * 2.0f - 1.0f;
+            tangentNormal = normalize(tangentNormal + secondNormal);
+        }
         tangentNormal.xy *= mat.normalTextures.y;
         float3 binormal = normalize(cross(normal, tangent)) * (tangentData.w < 0 ? -1.0f : 1.0f);
         TransformNormalBasis(mat, tangent, binormal);

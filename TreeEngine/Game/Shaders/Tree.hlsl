@@ -280,9 +280,18 @@ float4 PS(PS_INPUT input) : SV_Target
     if (mat.normalTextures.x >= 0)
     {
         float2 normalUv = TransformMaterialUv(mat, input.Tex, NormalTextureRole);
+        float2 normalUv1 = normalUv + mat.normalMotion.xy * sceneTime.x;
         float3 tangentNormal = (mat.normalTextures.z > 0
-            ? txNormal.Sample(samLinearClamp, normalUv)
-            : txNormal.Sample(samLinearWrap, normalUv)).xyz * 2.0f - 1.0f;
+            ? txNormal.Sample(samLinearClamp, normalUv1)
+            : txNormal.Sample(samLinearWrap, normalUv1)).xyz * 2.0f - 1.0f;
+        if (any(mat.normalMotion != 0))
+        {
+            float2 normalUv2 = normalUv + mat.normalMotion.zw * sceneTime.x;
+            float3 secondNormal = (mat.normalTextures.z > 0
+                ? txNormal.Sample(samLinearClamp, normalUv2)
+                : txNormal.Sample(samLinearWrap, normalUv2)).xyz * 2.0f - 1.0f;
+            tangentNormal = normalize(tangentNormal + secondNormal);
+        }
         tangentNormal.xy *= mat.normalTextures.y;
         float3 tangent = normalize(input.T);
         float3 bitangent = normalize(input.B);

@@ -462,10 +462,38 @@ void TestAmbientOcclusionSettings()
     Reject(input.dump(), ".ambientOcclusion.raduis");
 }
 
+
+void TestModelNormalAnimation()
+{
+    const std::string json = R"({"version":1,"name":"Water","objects":[{"id":"water","type":"model","source":"water.glb","normalAnimation":{"material":"River water","velocity1":[0.012,0.006],"velocity2":[-0.005,0.009],"strength":4}}]})";
+    auto scene = SceneData::ParseScene(json, "normal-animation");
+    auto& model = static_cast<SceneData::ModelDefinition&>(*scene.objects[0]);
+    Check(model.animatedNormalMaterial == "River water" && model.normalVelocity1.x == 0.012f
+        && model.normalVelocity2.y == 0.009f && model.normalStrength == 4.0f, "normal animation settings were not parsed");
+    auto saved = SceneData::ParseScene(SceneData::SerializeScene(scene), "saved-normal-animation");
+    auto& savedModel = static_cast<SceneData::ModelDefinition&>(*saved.objects[0]);
+    Check(savedModel.animatedNormalMaterial == model.animatedNormalMaterial &&
+        savedModel.normalVelocity1.x == model.normalVelocity1.x &&
+        savedModel.normalVelocity2.y == model.normalVelocity2.y && savedModel.normalStrength == 4.0f, "normal animation did not round-trip");
+    auto bad = Json::parse(json);
+    bad["objects"][0]["normalAnimation"]["velocity1"] = Json::array({1});
+    Reject(bad.dump(), ".normalAnimation.velocity1");
+    bad = Json::parse(json);
+    bad["objects"][0]["normalAnimation"].erase("material");
+    Reject(bad.dump(), ".normalAnimation.material");
+    bad = Json::parse(json);
+    bad["objects"][0]["normalAnimation"]["strength"] = -1;
+    Reject(bad.dump(), ".normalAnimation.strength");
+    bad = Json::parse(json);
+    bad["objects"][0]["normalAnimation"]["material"] = "";
+    Reject(bad.dump(), ".normalAnimation.material");
+}
+
 int main(int argc, char** argv)
 {
     try
     {
+        TestModelNormalAnimation();
         TestAmbientOcclusionSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
