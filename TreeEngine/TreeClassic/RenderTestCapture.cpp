@@ -157,6 +157,7 @@ void ParseRenderTestCommandLine()
     parsed->height = json.at("height").get<unsigned>();
     parsed->warmupFrames = json.value("warmupFrames", 3);
     parsed->benchmarkFrames = json.value("benchmarkFrames", 0);
+    parsed->hasReflectionRays = json.contains("reflectionRays");
     parsed->reflectionRays = json.value("reflectionRays", 0);
     parsed->waterMotionSpeed = json.value("waterMotionSpeed", 1.0f);
     parsed->benchmarkTimeStep = json.value("benchmarkTimeStep", 0.0);
@@ -245,7 +246,7 @@ namespace
         try
         {
             game.ConfigureRenderTest(request->scene, request->mode == "raytracing", request->postProcessing, true);
-            game.SetRenderTestReflectionRays(request->reflectionRays);
+            if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             for (int frame = 0; frame < request->performanceFrames; ++frame)
             {
@@ -334,7 +335,7 @@ int RunRenderTestCapture(Game& game)
             }
             game.ConfigureRenderTest(request->scene, point.mode == "raytracing", request->postProcessing,
                 request->benchmarkFrames > 0, point.showShadowBuffer);
-            game.SetRenderTestReflectionRays(request->reflectionRays);
+            if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             game.GetPlayer()->SetPosition(point.overrideCamera

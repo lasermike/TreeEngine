@@ -28,7 +28,8 @@ struct RenderTestRequest
     int warmupFrames = 3;
     int benchmarkFrames = 0;
     float waterMotionSpeed = 1.0f;
-    int reflectionRays = 0; // 0 disables traced transmission reflections; otherwise 1-32.
+    bool hasReflectionRays = false; // Omitted: preserve the application default.
+    int reflectionRays = 0; // Explicit 0 disables traced transmission reflections; otherwise 1-32.
     double benchmarkTimeStep = 0;
     bool postProcessing = true;
     bool validateScenePersistence = false;
