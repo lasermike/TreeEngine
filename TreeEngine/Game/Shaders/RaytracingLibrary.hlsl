@@ -234,7 +234,7 @@ float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometri
     float3 bitangent = cross(surfaceNormal, tangent);
     float visibility = 0;
     float bias = min(0.002f, ambientOcclusionRadius * 0.01f);
-    for (uint i = 0; i < sampleCount && !(globalFlags & 0x2); ++i)
+    for (uint i = 0; i < sampleCount; ++i)
     {
         float diskRadiusSquared = (i + 0.5f) / sampleCount;
         float angle = i * 2.39996323f;
