@@ -23,6 +23,7 @@ public:
     float m_waterMotionSpeed = 1.0f; // 0 freezes animated normal maps.
     bool m_waterReflections = true;
     int m_waterReflectionRays = 16;
+    bool m_shadowsEnabled = true;
     bool m_showShadowBuffer;
     bool m_wireframe;
     bool m_showDebugUI;

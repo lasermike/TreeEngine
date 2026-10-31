@@ -234,7 +234,7 @@ float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometri
     float3 bitangent = cross(surfaceNormal, tangent);
     float visibility = 0;
     float bias = min(0.002f, ambientOcclusionRadius * 0.01f);
-    for (uint i = 0; i < sampleCount; ++i)
+    for (uint i = 0; i < sampleCount && !(globalFlags & 0x2); ++i)
     {
         float diskRadiusSquared = (i + 0.5f) / sampleCount;
         float angle = i * 2.39996323f;
@@ -338,7 +338,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     // Cast shadow ray toward the light
     float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     float3 lightDir = normalize(-light.Direction);
-    float shadowFactor = 0.0f;
+    float shadowFactor = (globalFlags & 0x2) ? 1.0f : 0.0f;
 
     RayDesc shadowRay;
     shadowRay.Origin = hitPos + normal * 0.001f;  // Offset to avoid self-intersection
@@ -354,7 +354,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float3 reference = abs(lightDir.y) < 0.99f ? float3(0, 1, 0) : float3(1, 0, 0);
     float3 sunTangent = normalize(cross(reference, lightDir));
     float3 sunBitangent = cross(lightDir, sunTangent);
-    for (uint i = 0; i < sampleCount; ++i)
+    for (uint i = 0; i < sampleCount && !(globalFlags & 0x2); ++i)
     {
         if (sampleCount > 1)
         {
@@ -369,7 +369,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
             ~0, 0, 0, 0, shadowRay, shadowPayload);
         shadowFactor += shadowPayload.color.x;
     }
-    shadowFactor /= sampleCount;
+    if (!(globalFlags & 0x2)) shadowFactor /= sampleCount;
 
     if (mat.specularTextures.x >= 0)
     {

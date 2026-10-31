@@ -34,7 +34,7 @@ cbuffer cbChangesEveryFrame : register(b2)
     DirectionalLight light;
     float4 eyePos;
     matrix shadowMatrix;
-    uint globalFlags;  // bit 0 = use shadow maps
+    uint globalFlags;  // bit 0 = use shadow maps; bit 1 = disable ray-traced shadows
     int numDirectionalLights;
     int numPointLights;
     float environmentRotationCos;

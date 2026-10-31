@@ -1265,6 +1265,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
     if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
+        ImGui::Checkbox("Enable shadows", &m_settings.m_shadowsEnabled);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
         auto& sceneRenderSettings = m_renderManager.GetRenderData();
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
@@ -1575,7 +1576,7 @@ void Game::ComputeGPU()
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
 
     //Render shadow map
-    if (m_gameData.useShadowMaps)
+    if (m_gameData.useShadowMaps && m_settings.m_shadowsEnabled)
     {
         m_renderManager.RenderShadowMap();
     }

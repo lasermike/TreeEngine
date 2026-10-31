@@ -624,7 +624,8 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
 
     // Update chandfsges every frame CB.
     CBChangesEveryFrame cb;
-    cb.globalFlags = m_renderData.pShadowMap ? 0x1 : 0x0;
+    cb.globalFlags = (m_renderData.pShadowMap && m_settings->m_shadowsEnabled ? 0x1 : 0x0)
+        | (m_settings->m_shadowsEnabled ? 0x0 : 0x2);
     cb.light = m_renderData.dirLights[0];
     cb.numDirectionalLights = m_renderData.numDirectionalLights;
     cb.numPointLights = 0;
