@@ -264,11 +264,15 @@ All gold images were regenerated when the built-in scenes moved from Phong to
 PBR materials; see the Scenes README for how materials and lights were converted.
 `LeafAtlases` was added with its own gold images when trees gained atlas leaves.
 
+`Instancing` and `LeafAtlases` gold images were regenerated when 32-bit BGRA
+PNGs (most PNGs) started getting mipmaps; before that, DirectXTK skipped their
+mip generation on desktop GPUs.
+
 As of 2026-11-01 the full Debug manifest passes 64 of 72 images. These eight
-fail on the branch with or without the leaf-atlas change:
+fail with or without the leaf-atlas and mipmap changes:
 - `tree` ray tracing at 1 and 5 seconds (RMS about 0.010 and 0.016).
-- `ai-tree` raster at every time (RMS about 0.32), because `ai-tree.scene.json`
-  changed in 423d805 after its gold images were made.
-- `ai-tree` ray tracing at every time: the process stops at a D3D12 debug-layer
-  error break before capturing.
+- `ai-tree` raster and ray tracing at every time (RMS about 0.32 and 0.29),
+  because `ai-tree.scene.json` and `terra.glb` changed after its gold images
+  were made. Before the mipmap change, ai-tree ray tracing stopped at a D3D12
+  debug-layer error break instead of capturing.
 `test-dxr-toggle.ps1` covers SimpleBox and Tree only.

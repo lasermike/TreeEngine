@@ -1011,12 +1011,12 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         &defaultHeapProperties,
         D3D12_HEAP_FLAG_NONE,
         &drawRecordDescBuffer,
-        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_COMMON, // Buffers are always created in COMMON; other initial states are ignored.
         nullptr,
         __uuidof(ID3D12Resource), (void**)&m_DrawRecordsResource));
 
     HRR(m_DrawRecordsResource->SetName(L"Draw Records"));
-    m_drawRecordState = D3D12_RESOURCE_STATE_COPY_DEST;
+    m_drawRecordState = D3D12_RESOURCE_STATE_COMMON;
 #if !defined(TREE_XBOX)
     const auto uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
     for (UINT frame = 0; frame < FrameCount; ++frame)
@@ -1463,6 +1463,86 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     return S_OK;
 }
 
+#if !defined(TREE_XBOX)
+// DirectXTK can generate mips for BGRA only on devices with standard swizzle, which desktop GPUs rarely have,
+// and this DirectXTK12 build ignores WIC_LOADER_FORCE_RGBA32, so most PNGs would load without mips. This loads
+// 32-bit BGRA and BGRX images as RGBA with a full mip chain instead. It returns S_FALSE, creating nothing, for
+// other images, which DirectXTK loads as before. colorSpace: 0 follows the image's sRGB metadata as DirectXTK
+// does, 1 is linear, 2 is sRGB. The texture is left in PIXEL_SHADER_RESOURCE, like DirectXTK's.
+static HRESULT CreateRgbaTextureFromBgraImage(ID3D12Device* device, ResourceUploadBatch& upload,
+    const wchar_t* filename, const uint8_t* data, size_t dataSize, int colorSpace, ID3D12Resource** texture)
+{
+    *texture = nullptr;
+    CComPtr<IWICImagingFactory> factory;
+    HRR(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory)));
+    CComPtr<IWICBitmapDecoder> decoder;
+    if (filename)
+    {
+        HRR(factory->CreateDecoderFromFilename(filename, nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder));
+    }
+    else
+    {
+        if (dataSize > UINT32_MAX) return E_INVALIDARG;
+        CComPtr<IWICStream> stream;
+        HRR(factory->CreateStream(&stream));
+        HRR(stream->InitializeFromMemory(const_cast<uint8_t*>(data), static_cast<DWORD>(dataSize)));
+        HRR(factory->CreateDecoderFromStream(stream, nullptr, WICDecodeMetadataCacheOnDemand, &decoder));
+    }
+    CComPtr<IWICBitmapFrameDecode> frame;
+    HRR(decoder->GetFrame(0, &frame));
+    WICPixelFormatGUID pixelFormat;
+    HRR(frame->GetPixelFormat(&pixelFormat));
+    if (pixelFormat != GUID_WICPixelFormat32bppBGRA && pixelFormat != GUID_WICPixelFormat32bppBGR)
+        return S_FALSE;
+    UINT width = 0, height = 0;
+    HRR(frame->GetSize(&width, &height));
+    if (!width || !height || width > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION || height > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION)
+        return S_FALSE; // DirectXTK resizes oversized images.
+
+    bool srgb = colorSpace == 2;
+    if (colorSpace == 0)
+    {
+        CComPtr<IWICMetadataQueryReader> metadata;
+        GUID container = {};
+        if (SUCCEEDED(frame->GetMetadataQueryReader(&metadata)) && SUCCEEDED(metadata->GetContainerFormat(&container)))
+        {
+            PROPVARIANT value;
+            PropVariantInit(&value);
+            if (container == GUID_ContainerFormatPng)
+                srgb = SUCCEEDED(metadata->GetMetadataByName(L"/sRGB/RenderingIntent", &value)) && value.vt == VT_UI1;
+            else if (SUCCEEDED(metadata->GetMetadataByName(L"System.Image.ColorSpace", &value)) && value.vt == VT_UI2)
+                srgb = value.uiVal == 1;
+            PropVariantClear(&value);
+        }
+    }
+    const DXGI_FORMAT format = srgb ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+    if (!upload.IsSupportedForGenerateMips(format))
+        return S_FALSE;
+
+    CComPtr<IWICFormatConverter> converter;
+    HRR(factory->CreateFormatConverter(&converter));
+    HRR(converter->Initialize(frame, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0, WICBitmapPaletteTypeMedianCut));
+    const UINT rowPitch = width * 4;
+    std::vector<uint8_t> pixels(static_cast<size_t>(rowPitch) * height);
+    HRR(converter->CopyPixels(nullptr, rowPitch, static_cast<UINT>(pixels.size()), pixels.data()));
+
+    UINT16 mipLevels = 1;
+    for (UINT size = std::max(width, height); size > 1; size >>= 1)
+        ++mipLevels;
+    const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, mipLevels);
+    const CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+    CComPtr<ID3D12Resource> created;
+    HRR(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr, IID_PPV_ARGS(&created)));
+    D3D12_SUBRESOURCE_DATA level0 = { pixels.data(), static_cast<LONG_PTR>(rowPitch), static_cast<LONG_PTR>(pixels.size()) };
+    upload.Upload(created, 0, &level0, 1); // Copies the pixels into the batch's upload heap.
+    upload.Transition(created, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    upload.GenerateMips(created);
+    *texture = created.Detach();
+    return S_OK;
+}
+#endif
+
 HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** texture)
 {
     if (textureIndex < 0 || textureIndex >= maxTotalTexturesInScene + 2) return E_BOUNDS;
@@ -1480,7 +1560,10 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
         ResourceUploadBatch resourceUpload(GetDevice());
         resourceUpload.Begin();
         CComPtr<ID3D12Resource> wicTexture;
-        HRR(CreateWICTextureFromFile(GetDevice(), resourceUpload, textureFilename, &wicTexture, true /*generateMips*/));
+        const HRESULT rgba = CreateRgbaTextureFromBgraImage(GetDevice(), resourceUpload, textureFilename, nullptr, 0, 0, &wicTexture);
+        HRR(rgba);
+        if (rgba == S_FALSE)
+            HRR(CreateWICTextureFromFile(GetDevice(), resourceUpload, textureFilename, &wicTexture, true /*generateMips*/));
         resourceUpload.Transition(wicTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         auto uploadFinished = resourceUpload.End(GetCommandQueue());
@@ -1555,11 +1638,16 @@ HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* /*name*/, const u
     ResourceUploadBatch resourceUpload(GetDevice());
     resourceUpload.Begin();
     CComPtr<ID3D12Resource> wicTexture;
-    WIC_LOADER_FLAGS flags = WIC_LOADER_MIP_AUTOGEN;
-    if (colorSpace == 1) flags |= WIC_LOADER_IGNORE_SRGB;
-    if (colorSpace == 2) flags |= WIC_LOADER_FORCE_SRGB;
-    HRR(CreateWICTextureFromMemoryEx(GetDevice(), resourceUpload, data, dataSize, 0,
-        D3D12_RESOURCE_FLAG_NONE, flags, &wicTexture));
+    const HRESULT rgba = CreateRgbaTextureFromBgraImage(GetDevice(), resourceUpload, nullptr, data, dataSize, colorSpace, &wicTexture);
+    HRR(rgba);
+    if (rgba == S_FALSE)
+    {
+        WIC_LOADER_FLAGS flags = WIC_LOADER_MIP_AUTOGEN;
+        if (colorSpace == 1) flags |= WIC_LOADER_IGNORE_SRGB;
+        if (colorSpace == 2) flags |= WIC_LOADER_FORCE_SRGB;
+        HRR(CreateWICTextureFromMemoryEx(GetDevice(), resourceUpload, data, dataSize, 0,
+            D3D12_RESOURCE_FLAG_NONE, flags, &wicTexture));
+    }
     resourceUpload.Transition(
         wicTexture,
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
