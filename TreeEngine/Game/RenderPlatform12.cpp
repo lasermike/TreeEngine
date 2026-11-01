@@ -241,7 +241,8 @@ enum RootSignatureParams
     ObjectTransformRootSignatureParam,
 };
 
-const UINT maxWorldVertices = 1200000; // Double-sided glTF sphere test expands to over one million vertices.
+// Ray-traced vertices per frame, after instancing and double-sided expansion. Terra alone needs about 1.16 million.
+const UINT maxWorldVertices = 3000000;
 const uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
 
 UINT skinnedIndexBufferSize = 0;

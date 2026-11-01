@@ -122,7 +122,7 @@ if ($Capacity) {
     Copy-Item -Path (Join-Path (Split-Path $CapacityExecutable) '*') -Destination $runtime -Recurse
     $modelDirectory = Join-Path $runtime 'Models\Gltf'
     New-Item -ItemType Directory -Path $modelDirectory -Force | Out-Null
-    $vertexCapacity = 1200000
+    $vertexCapacity = 3000000 # maxWorldVertices in RenderPlatform12.cpp
     foreach ($count in @($vertexCapacity, ($vertexCapacity + 1))) {
         # One indexed triangle and unused positions exercise the world-vertex boundary with one draw record.
         $positionBytes = $count * 12
@@ -175,12 +175,12 @@ if ($Capacity) {
         $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
         if ($count -eq $vertexCapacity) {
             if ($process.ExitCode -ne 0 -or -not $report.success -or $report.captures[0].samples[0].worldVertices -ne $vertexCapacity) {
-                throw 'Exact 1,200,000-vertex capacity case failed.'
+                throw 'Exact 3,000,000-vertex capacity case failed.'
             }
         } elseif ($process.ExitCode -ne 3 -or $report.success -or $report.error -notmatch '2147942522') {
             throw 'Capacity overflow did not report ERROR_INSUFFICIENT_BUFFER.'
         }
     }
-    Write-Host 'Exact 1,200,000-vertex capacity and explicit overflow rejection passed.'
+    Write-Host 'Exact 3,000,000-vertex capacity and explicit overflow rejection passed.'
 }
 Write-Host "Skinning captures: $directory"
