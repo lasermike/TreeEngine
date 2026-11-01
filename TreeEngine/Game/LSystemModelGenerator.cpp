@@ -211,8 +211,6 @@ void replaceAll(std::vector<Command>& inputOutputCmds, const Command& searchCmd,
 
 TreeModel* LSystemModelGenerator::Create()
 {
-    _model = new TreeModel();
-
     string axiom = _params._axiom;
 
     // Tokenize axiom string
@@ -256,6 +254,12 @@ TreeModel* LSystemModelGenerator::Create()
             replaceAll(inputOutputCmds, searchCmd, replaceCmds);
         }
     }
+
+    // One branch per F or L, plus the trunk.
+    int branchCount = 1;
+    for (const auto& cmd : inputOutputCmds)
+        if (cmd.symbol == 'F' || cmd.symbol == 'L') ++branchCount;
+    _model = new TreeModel(branchCount);
 
     std::stringstream ss;
 

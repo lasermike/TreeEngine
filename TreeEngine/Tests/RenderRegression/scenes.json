@@ -21,6 +21,6 @@
     { "id": "ai-tree", "name": "LoadAITree" },
     { "id": "gltf-models", "name": "LoadGltfDemo" },
     { "id": "instancing", "name": "Instancing" },
-    { "id": "leaf-atlases", "name": "LeafAtlases" }
+    { "id": "leaf-atlas-test", "name": "LeafAtlasTest" }
   ]
 }

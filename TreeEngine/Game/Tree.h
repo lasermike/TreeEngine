@@ -85,6 +85,8 @@ private:
     // Atlas leaves. The atlas rects occupy the last instance slots this tree reserves; a leaf's
     // InstancedData::AtlasRegion names its rect's slot. Empty when the tree has no atlas.
     std::vector<int> m_leafRegions; // Per branch ID: index into the params' leafRegions, or -1.
+    std::vector<float> m_leafTwists; // Per branch ID: roll about the leaf's axis, in radians. Empty without twist.
+    std::vector<float> m_leafScales; // Per branch ID: leaf length scale. Empty without size variation.
     const WorldObjectParams::LeafAtlasRegion* LeafRegion(const Branch* branch) const;
     UINT AtlasRegionSlot(UINT startInstance, const Branch* branch) const; // InstancedData::AtlasRegion value.
     UINT AtlasRectStart(UINT startInstance) const;

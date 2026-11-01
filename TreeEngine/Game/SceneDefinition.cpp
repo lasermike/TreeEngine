@@ -354,11 +354,23 @@ namespace SceneData
             if (!value.contains("leaves")) return;
             const auto& leaves = value["leaves"];
             const auto leavesPath = path + ".leaves";
-            Fields(leaves, leavesPath, { "atlas", "regions" });
+            Fields(leaves, leavesPath, { "atlas", "regions", "twistDegrees", "sizeVariation" });
             if (!leaves.contains("atlas")) Invalid(leavesPath + ".atlas", "required property");
             object.leaves.atlas = String(leaves["atlas"], leavesPath + ".atlas");
             const auto atlas = scene.atlases.find(object.leaves.atlas);
             if (atlas == scene.atlases.end()) Invalid(leavesPath + ".atlas", "unknown atlas '" + object.leaves.atlas + "'");
+            if (leaves.contains("twistDegrees"))
+            {
+                object.leaves.twistDegrees = Number(leaves["twistDegrees"], leavesPath + ".twistDegrees");
+                if (object.leaves.twistDegrees < 0 || object.leaves.twistDegrees > 180)
+                    Invalid(leavesPath + ".twistDegrees", "must be between 0 and 180");
+            }
+            if (leaves.contains("sizeVariation"))
+            {
+                object.leaves.sizeVariation = Number(leaves["sizeVariation"], leavesPath + ".sizeVariation");
+                if (object.leaves.sizeVariation < 0 || object.leaves.sizeVariation > 0.9f)
+                    Invalid(leavesPath + ".sizeVariation", "must be between 0 and 0.9");
+            }
             if (!leaves.contains("regions")) return;
             const auto& regions = leaves["regions"];
             if (!regions.is_object() || regions.empty()) Invalid(leavesPath + ".regions", "expected region names with weights");
@@ -771,6 +783,8 @@ namespace SceneData
             if (tree.leaves.atlas.empty()) return;
             value["leaves"] = { { "atlas", tree.leaves.atlas } };
             for (const auto& choice : tree.leaves.regions) value["leaves"]["regions"][choice.region] = choice.weight;
+            if (tree.leaves.twistDegrees != 0) value["leaves"]["twistDegrees"] = tree.leaves.twistDegrees;
+            if (tree.leaves.sizeVariation != 0) value["leaves"]["sizeVariation"] = tree.leaves.sizeVariation;
         }
         [[noreturn]] void FileError(const std::string& filename, const char* action, DWORD error = GetLastError())
         {

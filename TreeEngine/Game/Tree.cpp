@@ -12,6 +12,14 @@ Tree::Tree(WorldObjectParams* pParams) : _treeModel(nullptr), WorldObject(pParam
 {
 }
 
+// A repeatable value in [0, 1) for one branch; salt picks independent streams (region, twist, size).
+static float BranchRandom(int branchId, uint32_t seed, uint32_t salt)
+{
+    uint32_t hash = static_cast<uint32_t>(branchId) * 0x9E3779B1u ^ seed ^ salt;
+    hash ^= hash >> 16; hash *= 0x85EBCA6Bu; hash ^= hash >> 13; hash *= 0xC2B2AE35u; hash ^= hash >> 16;
+    return hash / 4294967296.0f;
+}
+
 Tree::~Tree(void)
 {
     SafeDelete(&_treeModel);
@@ -26,25 +34,28 @@ void Tree::Create(TreeModelGenerator* generator)
     for (int i = 0; i < _treeModel->treeData.numBranches; ++i)
         m_matureTime = std::max(m_matureTime, static_cast<float>(_treeModel->treeData.pBranches[i].depth) + 5.0f);
 
-    // Each leaf gets a weighted atlas region from a hash of its branch ID and the object ID, so the choice
-    // is the same every run and differs between trees grown from the same rules.
-    m_leafRegions.clear();
+    // Each leaf gets a weighted atlas region, and optionally a twist and size, from a hash of its branch ID and
+    // the object ID, so the choice is the same every run and differs between trees grown from the same rules.
+    const int branches = _treeModel->treeData.numBranches;
     const auto& regions = _params->leafRegions;
-    if (!regions.empty())
+    m_leafRegions.clear();
+    m_leafTwists.clear();
+    m_leafScales.clear();
+    if (!regions.empty()) m_leafRegions.assign(branches, -1);
+    if (_params->leafTwistRadians > 0) m_leafTwists.assign(branches, 0.0f);
+    if (_params->leafSizeVariation > 0) m_leafScales.assign(branches, 1.0f);
+    uint32_t seed = 2166136261u;
+    for (unsigned char character : _params->name) seed = (seed ^ character) * 16777619u;
+    float totalWeight = 0;
+    for (const auto& region : regions) totalWeight += region.weight;
+    for (int i = 0; i < branches; ++i)
     {
-        m_leafRegions.assign(_treeModel->treeData.numBranches, -1);
-        float totalWeight = 0;
-        for (const auto& region : regions) totalWeight += region.weight;
-        uint32_t seed = 2166136261u;
-        for (unsigned char character : _params->name) seed = (seed ^ character) * 16777619u;
-        for (int i = 0; i < _treeModel->treeData.numBranches; ++i)
+        const Branch& branch = _treeModel->treeData.pBranches[i];
+        if (branch.geometryType != Leaf || branch.id < 0 || branch.id >= branches)
+            continue;
+        if (!m_leafRegions.empty())
         {
-            const Branch& branch = _treeModel->treeData.pBranches[i];
-            if (branch.geometryType != Leaf || branch.id < 0 || branch.id >= _treeModel->treeData.numBranches)
-                continue;
-            uint32_t hash = static_cast<uint32_t>(branch.id) * 0x9E3779B1u ^ seed;
-            hash ^= hash >> 16; hash *= 0x85EBCA6Bu; hash ^= hash >> 13; hash *= 0xC2B2AE35u; hash ^= hash >> 16;
-            float pick = hash / 4294967296.0f * totalWeight;
+            float pick = BranchRandom(branch.id, seed, 0) * totalWeight;
             int chosen = static_cast<int>(regions.size()) - 1;
             for (size_t r = 0; r < regions.size(); ++r)
             {
@@ -53,6 +64,10 @@ void Tree::Create(TreeModelGenerator* generator)
             }
             m_leafRegions[branch.id] = chosen;
         }
+        if (!m_leafTwists.empty())
+            m_leafTwists[branch.id] = (BranchRandom(branch.id, seed, 0x68E31DA4u) * 2 - 1) * _params->leafTwistRadians;
+        if (!m_leafScales.empty())
+            m_leafScales[branch.id] = 1 + (BranchRandom(branch.id, seed, 0xB5297A4Du) * 2 - 1) * _params->leafSizeVariation;
     }
     if (_params->_animationSpeed == 0.0f)
     {
@@ -414,6 +429,15 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
         if (hr != S_OK) return hr;
         if (const auto* region = LeafRegion(frame.branch))
             localToWorld = XMMatrixMultiply(XMMatrixTranslation(region->stemOffset.x, region->stemOffset.y, 0), localToWorld);
+        if (frame.branch->id >= 0 && static_cast<size_t>(frame.branch->id) < m_leafTwists.size()
+            && m_leafTwists[frame.branch->id] != 0)
+        {
+            // Roll the leaf about its own axis, through its base (the branch start, shifted like every branch).
+            const XMVECTOR base = XMLoadFloat3(&frame.startPosition) + XMVectorSet(0, -0.5f, 0, 0);
+            const XMVECTOR axis = XMVector3Normalize(XMLoadFloat3(&frame.endPosition) - XMLoadFloat3(&frame.startPosition));
+            localToWorld = localToWorld * XMMatrixTranslationFromVector(-base)
+                * XMMatrixRotationNormal(axis, m_leafTwists[frame.branch->id]) * XMMatrixTranslationFromVector(base);
+        }
         localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
         XMStoreFloat4x4(&pose.world, localToWorld);
     }
@@ -605,7 +629,9 @@ HRESULT Tree::ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, Br
     {
         const auto* region = LeafRegion(frame.branch);
         const float widthPerLength = region ? region->widthPerLength : 0.5f;
-        vScale = XMVectorSet(XMVectorGetX(vMag) * widthPerLength, XMVectorGetX(vMag), 0.004f, 0) * animScaleFactor;
+        const float length = XMVectorGetX(vMag) * (static_cast<size_t>(frame.branch->id) < m_leafScales.size()
+            ? m_leafScales[frame.branch->id] : 1.0f);
+        vScale = XMVectorSet(length * widthPerLength, length, 0.004f, 0) * animScaleFactor;
         break;
     }
     case Stick:

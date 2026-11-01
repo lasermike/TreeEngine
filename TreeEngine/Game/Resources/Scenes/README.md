@@ -190,14 +190,40 @@ share one layout.
   weights; each leaf picks one at random in proportion to its weight. Omit
   `regions` to use every region of the atlas equally. The choice is repeatable:
   it comes from a hash of the leaf's branch and the object ID.
-- Sprites must be upright, with the stem toward the bottom of the image.
-  Sideways sprites are not supported yet.
+- `leaves.twistDegrees` (default `0`, up to `180`) rolls each leaf about its own
+  axis by a random angle within plus or minus this value, so leaves stop facing
+  the same way. `leaves.sizeVariation` (default `0`, up to `0.9`) scales each
+  leaf's length by a random factor within 1 plus or minus this fraction. Both
+  use the same repeatable hash as the region choice.
+- Sprites must be upright, with the stem toward the bottom of the image. To use
+  sideways sprites, rotate them while composing an atlas (below).
 - Instances inherit their source's `leaves` and cannot change them.
 - Trees without `leaves` draw the whole leaf texture on every leaf, as before.
 
-Leaves sample their region in raster, shadow, and DXR passes. `Leaf Atlases`
-(`leaf-atlases.scene.json`) shows several atlases from the Nature Pack, copied
-at 2048×2048 into `Resources/Nature`.
+Leaves sample their region in raster, shadow, and DXR passes.
+
+`Leaf Atlases` (`leaf-atlases.scene.json`) is a canyon plant showcase in Terra's
+lighting: 12 species that grow together in a semi-arid sandstone canyon, laid
+out from the river to the dry slope.
+- Water's edge: sedge, common reed, scouring rush (horsetail), and seep fern.
+- Bank: seepwillow, Goodding's willow, and Fremont cottonwood.
+- Bench and slope: velvet ash, skunkbush sumac, Gambel oak, pinyon pine, and
+  dry bunchgrass.
+
+It is in the `performance` test pass. Its many leaves make DXR in Debug builds
+very slow, so the render regression suite uses `Leaf Atlas Test`
+(`leaf-atlas-test.scene.json`) instead: the lighter species from every atlas,
+with instances, close up. Both scenes are in the `performance` pass.
+
+The canyon atlases are composed from several Nature Pack images, which keeps
+the scene within its 32 texture slots: `canyon_leaves_*` and `canyon_grasses_*`
+in `Resources/Nature`. `Resources/Nature/canyon-atlases.json` lists each
+sprite's source image, rectangle, rotation, and relative size. Rebuild them with
+`TreeEngine/Tools/pack-leaf-atlas.ps1 -Manifest <canyon-atlases.json> -SourceRoot <Nature_Pack_Textures> -PreviewDirectory <dir>`.
+The tool keeps only each sprite's own connected pixels, turns sprites upright
+(rotating normal-map vectors too), packs them at one texel density, bleeds
+color into transparent texels so mipmaps do not darken leaf edges, and writes
+each atlas's `regions` (`<atlas>.regions.json`) for the scene.
 
 To find regions in a new atlas, run
 `TreeEngine/Tools/find-atlas-regions.ps1 -Images <color map> -PreviewDirectory <dir>`.
@@ -301,6 +327,10 @@ Defaults are zero iterations and angle, segment length `0.01`, thickness `0.02`,
 initial direction `[0,1,0]`, no constants or rules, and constant segment length.
 `segmentLengthBehavior` is `constant` or `randomAddition`; the latter adds a
 random value from zero to `0.2`, matching the existing sea-scene callback.
+
+Rule parameters support one operation each, `k * s` or `s + k`: a bare `s`
+evaluates to 0 (write `s * 1`), and `a * s + b` gives a wrong value. Each `F`
+and `L` adds one branch; models are sized to fit, so large trees are fine.
 
 ## Validation tests
 

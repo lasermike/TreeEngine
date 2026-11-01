@@ -84,6 +84,8 @@ public:
         float weight;         // Relative chance of a leaf using this region.
     };
     std::vector<LeafAtlasRegion> leafRegions;
+    float leafTwistRadians = 0; // Largest random roll of a leaf about its own axis, either way.
+    float leafSizeVariation = 0; // Largest random change to a leaf's length, as a fraction.
 
     // Set for instances: the object whose model (and, for trees, branch poses) this object reuses.
     WorldObject* instanceSource = nullptr;

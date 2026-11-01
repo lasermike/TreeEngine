@@ -1,0 +1,1368 @@
+{
+  "version": 1,
+  "id": "LeafAtlasTest",
+  "name": "Leaf Atlas Test",
+  "testPass": "performance",
+  "camera": {
+    "position": [
+      0,
+      1.6,
+      -9
+    ],
+    "rotationDegrees": [
+      6,
+      0,
+      0
+    ]
+  },
+  "render": {
+    "clearColor": [
+      0.48,
+      0.54,
+      0.58,
+      1
+    ],
+    "farClippingPlane": 300,
+    "environment": {
+      "diffuse": "Environment/terra-daylight-diffuse.dds",
+      "specular": "Environment/terra-daylight-specular.dds"
+    },
+    "sky": {
+      "cubeMap": "Environment/terra-daylight-sky.dds"
+    },
+    "ambientOcclusion": {
+      "radius": 1.25,
+      "strength": 0.65
+    }
+  },
+  "light": {
+    "ambient": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "diffuse": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "specular": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "direction": [
+      0.6259292648824133,
+      -0.7141802822623909,
+      0.3133034947002239
+    ],
+    "angularDiameterDegrees": 2,
+    "shadowSamples": 8
+  },
+  "materials": {
+    "canyon-soil": {
+      "baseColor": [
+        0.2,
+        0.12,
+        0.07,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.95
+    },
+    "wet-sand": {
+      "baseColor": [
+        0.055,
+        0.035,
+        0.022,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.75,
+      "specular": 0.5
+    },
+    "river-water": {
+      "baseColor": [
+        0.03,
+        0.05,
+        0.05,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.08
+    },
+    "stem-green": {
+      "baseColor": [
+        0.12,
+        0.17,
+        0.06,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.8
+    },
+    "stem-dry": {
+      "baseColor": [
+        0.32,
+        0.26,
+        0.15,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.9
+    },
+    "bark-willow": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_willow_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_willow_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_willow_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "bark-pine": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_pine_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_pine_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_pine_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "bark-furrowed": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_furrowed_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_furrowed_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_furrowed_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "canyon-leaves": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/canyon_leaves_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/canyon_leaves_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/canyon_leaves_roughness.png",
+        "wrap": false
+      }
+    },
+    "canyon-grasses": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/canyon_grasses_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/canyon_grasses_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/canyon_grasses_roughness.png",
+        "wrap": false
+      }
+    },
+    "pinyon-needles": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/plants_12_atlas_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/plants_12_atlas_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/plants_12_atlas_roughness.png",
+        "wrap": false
+      }
+    }
+  },
+  "atlases": {
+    "canyon-leaves": {
+      "regions": {
+        "cottonwood-twig": {
+          "rect": [
+            0.0059,
+            0.0059,
+            0.4746,
+            0.4644
+          ],
+          "stem": [
+            0.2529,
+            0.4644
+          ]
+        },
+        "cottonwood-a": {
+          "rect": [
+            0.0059,
+            0.7798,
+            0.1353,
+            0.9941
+          ],
+          "stem": [
+            0.0688,
+            0.9941
+          ]
+        },
+        "cottonwood-b": {
+          "rect": [
+            0.3345,
+            0.4702,
+            0.5142,
+            0.7524
+          ],
+          "stem": [
+            0.4375,
+            0.7524
+          ]
+        },
+        "willow-a": {
+          "rect": [
+            0.8394,
+            0.7798,
+            0.9053,
+            0.9263
+          ],
+          "stem": [
+            0.8721,
+            0.9263
+          ]
+        },
+        "willow-b": {
+          "rect": [
+            0.6562,
+            0.7798,
+            0.7192,
+            0.9307
+          ],
+          "stem": [
+            0.6924,
+            0.9307
+          ]
+        },
+        "willow-c": {
+          "rect": [
+            0.9111,
+            0.7798,
+            0.9844,
+            0.9224
+          ],
+          "stem": [
+            0.9619,
+            0.9224
+          ]
+        },
+        "willow-d": {
+          "rect": [
+            0.3389,
+            0.7798,
+            0.4165,
+            0.9604
+          ],
+          "stem": [
+            0.3716,
+            0.9604
+          ]
+        },
+        "willow-e": {
+          "rect": [
+            0.4224,
+            0.7798,
+            0.5,
+            0.9604
+          ],
+          "stem": [
+            0.4551,
+            0.9604
+          ]
+        },
+        "ash-a": {
+          "rect": [
+            0.5815,
+            0.0059,
+            0.832,
+            0.3452
+          ],
+          "stem": [
+            0.708,
+            0.3452
+          ]
+        },
+        "ash-b": {
+          "rect": [
+            0.0059,
+            0.4702,
+            0.3286,
+            0.7739
+          ],
+          "stem": [
+            0.1348,
+            0.7739
+          ]
+        },
+        "oak-a": {
+          "rect": [
+            0.7251,
+            0.7798,
+            0.8335,
+            0.9277
+          ],
+          "stem": [
+            0.7896,
+            0.9277
+          ]
+        },
+        "oak-b": {
+          "rect": [
+            0.8315,
+            0.4702,
+            0.9463,
+            0.6948
+          ],
+          "stem": [
+            0.8989,
+            0.6948
+          ]
+        },
+        "sumac": {
+          "rect": [
+            0.1411,
+            0.7798,
+            0.333,
+            0.9619
+          ],
+          "stem": [
+            0.2437,
+            0.9619
+          ]
+        },
+        "seepwillow-a": {
+          "rect": [
+            0.4805,
+            0.0059,
+            0.5757,
+            0.374
+          ],
+          "stem": [
+            0.5371,
+            0.374
+          ]
+        },
+        "seepwillow-b": {
+          "rect": [
+            0.7246,
+            0.4702,
+            0.8257,
+            0.7109
+          ],
+          "stem": [
+            0.7832,
+            0.7109
+          ]
+        },
+        "fern-a": {
+          "rect": [
+            0.5752,
+            0.7798,
+            0.6504,
+            0.9443
+          ],
+          "stem": [
+            0.6143,
+            0.9443
+          ]
+        },
+        "fern-b": {
+          "rect": [
+            0.5059,
+            0.7798,
+            0.5693,
+            0.9478
+          ],
+          "stem": [
+            0.5425,
+            0.9478
+          ]
+        },
+        "fern-c": {
+          "rect": [
+            0.52,
+            0.4702,
+            0.7188,
+            0.7485
+          ],
+          "stem": [
+            0.6216,
+            0.7485
+          ]
+        }
+      }
+    },
+    "canyon-grasses": {
+      "regions": {
+        "sedge-1": {
+          "rect": [
+            0.1626,
+            0.0059,
+            0.2095,
+            0.7026
+          ],
+          "stem": [
+            0.1787,
+            0.7026
+          ]
+        },
+        "sedge-2": {
+          "rect": [
+            0.0479,
+            0.0059,
+            0.0771,
+            0.7295
+          ],
+          "stem": [
+            0.0625,
+            0.7295
+          ]
+        },
+        "sedge-3": {
+          "rect": [
+            0.083,
+            0.0059,
+            0.1567,
+            0.7144
+          ],
+          "stem": [
+            0.1328,
+            0.7144
+          ]
+        },
+        "sedge-4": {
+          "rect": [
+            0.2153,
+            0.0059,
+            0.2476,
+            0.6943
+          ],
+          "stem": [
+            0.2319,
+            0.6943
+          ]
+        },
+        "sedge-5": {
+          "rect": [
+            0.0059,
+            0.0059,
+            0.042,
+            0.7314
+          ],
+          "stem": [
+            0.0225,
+            0.7314
+          ]
+        },
+        "sedge-6": {
+          "rect": [
+            0.4561,
+            0.0059,
+            0.481,
+            0.5356
+          ],
+          "stem": [
+            0.4683,
+            0.5356
+          ]
+        },
+        "sedge-7": {
+          "rect": [
+            0.7373,
+            0.0059,
+            0.772,
+            0.4604
+          ],
+          "stem": [
+            0.7446,
+            0.4604
+          ]
+        },
+        "sedge-8": {
+          "rect": [
+            0.8403,
+            0.0059,
+            0.8994,
+            0.3711
+          ],
+          "stem": [
+            0.8867,
+            0.3711
+          ]
+        },
+        "dry-1": {
+          "rect": [
+            0.2534,
+            0.0059,
+            0.2842,
+            0.6279
+          ],
+          "stem": [
+            0.27,
+            0.6279
+          ]
+        },
+        "dry-2": {
+          "rect": [
+            0.3853,
+            0.0059,
+            0.416,
+            0.5659
+          ],
+          "stem": [
+            0.3901,
+            0.5659
+          ]
+        },
+        "dry-3": {
+          "rect": [
+            0.7778,
+            0.0059,
+            0.8027,
+            0.4209
+          ],
+          "stem": [
+            0.792,
+            0.4209
+          ]
+        },
+        "dry-4": {
+          "rect": [
+            0.3408,
+            0.0059,
+            0.3794,
+            0.5747
+          ],
+          "stem": [
+            0.3452,
+            0.5747
+          ]
+        },
+        "dry-5": {
+          "rect": [
+            0.4219,
+            0.0059,
+            0.4502,
+            0.5381
+          ],
+          "stem": [
+            0.4341,
+            0.5381
+          ]
+        },
+        "seed-head-a": {
+          "rect": [
+            0.0059,
+            0.7373,
+            0.0381,
+            0.9399
+          ],
+          "stem": [
+            0.02,
+            0.9399
+          ]
+        },
+        "seed-head-b": {
+          "rect": [
+            0.9053,
+            0.0059,
+            0.9468,
+            0.2954
+          ],
+          "stem": [
+            0.9253,
+            0.2954
+          ]
+        },
+        "reed-1": {
+          "rect": [
+            0.5439,
+            0.0059,
+            0.5718,
+            0.5249
+          ],
+          "stem": [
+            0.5566,
+            0.5249
+          ]
+        },
+        "reed-2": {
+          "rect": [
+            0.5156,
+            0.0059,
+            0.5381,
+            0.5278
+          ],
+          "stem": [
+            0.5244,
+            0.5278
+          ]
+        },
+        "reed-3": {
+          "rect": [
+            0.29,
+            0.0059,
+            0.335,
+            0.582
+          ],
+          "stem": [
+            0.3135,
+            0.582
+          ]
+        },
+        "reed-4": {
+          "rect": [
+            0.6069,
+            0.0059,
+            0.6431,
+            0.5146
+          ],
+          "stem": [
+            0.6177,
+            0.5146
+          ]
+        },
+        "reed-5": {
+          "rect": [
+            0.4868,
+            0.0059,
+            0.5098,
+            0.5283
+          ],
+          "stem": [
+            0.4956,
+            0.5283
+          ]
+        },
+        "reed-6": {
+          "rect": [
+            0.5776,
+            0.0059,
+            0.6011,
+            0.5249
+          ],
+          "stem": [
+            0.5903,
+            0.5249
+          ]
+        },
+        "reed-plume": {
+          "rect": [
+            0.9526,
+            0.0059,
+            0.9941,
+            0.2837
+          ],
+          "stem": [
+            0.9766,
+            0.2837
+          ]
+        },
+        "horsetail-a": {
+          "rect": [
+            0.8086,
+            0.0059,
+            0.8345,
+            0.3789
+          ],
+          "stem": [
+            0.8174,
+            0.3789
+          ]
+        },
+        "horsetail-b": {
+          "rect": [
+            0.6841,
+            0.0059,
+            0.7314,
+            0.4805
+          ],
+          "stem": [
+            0.7197,
+            0.4805
+          ]
+        },
+        "horsetail-c": {
+          "rect": [
+            0.6489,
+            0.0059,
+            0.6782,
+            0.4897
+          ],
+          "stem": [
+            0.6719,
+            0.4897
+          ]
+        }
+      }
+    },
+    "plants-12": {
+      "aspect": 0.9961,
+      "regions": {
+        "sprig-a": {
+          "rect": [
+            0.0412,
+            0.0156,
+            0.2422,
+            0.5146
+          ],
+          "stem": [
+            0.1458,
+            0.5146
+          ]
+        },
+        "sprig-b": {
+          "rect": [
+            0.2765,
+            0.0137,
+            0.4074,
+            0.5166
+          ],
+          "stem": [
+            0.3438,
+            0.5166
+          ]
+        },
+        "sprig-c": {
+          "rect": [
+            0.5265,
+            0.0161,
+            0.7279,
+            0.5151
+          ],
+          "stem": [
+            0.6316,
+            0.5151
+          ]
+        },
+        "sprig-d": {
+          "rect": [
+            0.7711,
+            0.0137,
+            0.902,
+            0.5171
+          ],
+          "stem": [
+            0.8384,
+            0.5171
+          ]
+        }
+      }
+    }
+  },
+  "objects": [
+    {
+      "id": "ground",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": {
+        "scale": [
+          90,
+          0.01,
+          90
+        ]
+      },
+      "material": "canyon-soil"
+    },
+    {
+      "id": "river",
+      "type": "primitive",
+      "shape": "box",
+      "transform": {
+        "position": [
+          0,
+          0.006,
+          -7
+        ],
+        "scale": [
+          90,
+          0.004,
+          3.2
+        ]
+      },
+      "material": "river-water"
+    },
+    {
+      "id": "wet-bank",
+      "type": "primitive",
+      "shape": "box",
+      "transform": {
+        "position": [
+          0,
+          0.0055,
+          -4.4
+        ],
+        "scale": [
+          90,
+          0.004,
+          2.0
+        ]
+      },
+      "material": "wet-sand"
+    },
+    {
+      "id": "pinyon-pine-young",
+      "type": "tree",
+      "transform": {
+        "position": [
+          3.4,
+          0.5,
+          2.6
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-pine",
+        "leaf": "pinyon-needles"
+      },
+      "leaves": {
+        "atlas": "plants-12",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25
+      },
+      "generator": {
+        "axiom": "!(1) F(0.5) Y(70) [Z(24) P(0.8)] [Y(190) Z(30) P(0.75)] [Y(300) Z(20) P(0.7)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.09,
+        "rules": [
+          {
+            "input": "P(s)",
+            "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+          },
+          {
+            "input": "Q(s)",
+            "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gambel-oak",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -3.4,
+          0.5,
+          2.2
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "bark-furrowed",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "oak-a": 1,
+          "oak-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Z(8) O(1)] [Y(70) Z(15) O(0.85)] [Y(150) Z(10) O(0.95)] [Y(230) Z(18) O(0.8)] [Y(300) Z(12) O(0.9)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.035,
+        "rules": [
+          {
+            "input": "O(s)",
+            "output": "!(s * 1) F(0.45 * s) [Y(60) Z(45) K(s * 0.5)] [Y(240) Z(40) K(s * 0.45)] Y(97) z(3) O(s * 0.85)"
+          },
+          {
+            "input": "K(s)",
+            "output": "!(s * 0.5) F(0.15) [Z(45) L(0.15)] [Y(120) Z(45) L(0.14)] [Y(240) Z(45) L(0.15)] Y(60) K(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -2.2,
+          0.5,
+          -0.6
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "bark-furrowed",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "sumac": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Z(20) S(1)] [Y(60) Z(35) S(0.8)] [Y(120) Z(25) S(0.9)] [Y(180) Z(40) S(0.75)] [Y(240) Z(30) S(0.85)] [Y(300) Z(45) S(0.7)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.012,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s * 1) F(0.27 * s) [Y(90) Z(50) M(s * 0.6)] Y(137) Z(4) S(s * 0.82)"
+          },
+          {
+            "input": "M(s)",
+            "output": "!(s * 0.5) F(0.1) [Z(45) L(0.11)] [Y(180) Z(45) L(0.11)] [Y(90) Z(30) L(0.1)] M(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-2",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          0.8,
+          0.5,
+          0.2
+        ],
+        "rotationDegrees": [
+          0,
+          75,
+          0
+        ],
+        "scale": [
+          0.9,
+          0.9,
+          0.9
+        ]
+      }
+    },
+    {
+      "id": "seepwillow",
+      "type": "tree",
+      "transform": {
+        "position": [
+          2.4,
+          0.5,
+          -1.4
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25,
+        "regions": {
+          "seepwillow-a": 2,
+          "seepwillow-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(4) U(1.00)] [Y(40) Z(9) U(0.90)] [Y(85) Z(6) U(0.95)] [Y(130) Z(11) U(0.85)] [Y(175) Z(7) U(1.00)] [Y(220) Z(12) U(0.80)] [Y(265) Z(5) U(0.92)] [Y(310) Z(10) U(0.88)]",
+        "angle": 0.017453292519943295,
+        "iterations": 9,
+        "segmentLength": 1,
+        "thickness": 0.01,
+        "rules": [
+          {
+            "input": "U(s)",
+            "output": "!(s * 1) F(0.24 * s) [Z(55) L(0.11)] [Y(180) Z(55) L(0.11)] Y(73) U(s * 0.95)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "seep-fern",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -0.2,
+          0.5,
+          -2.8
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 30,
+        "sizeVariation": 0.2,
+        "regions": {
+          "fern-a": 1,
+          "fern-b": 1,
+          "fern-c": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(357) Z(35) L(0.71)] [Y(21) Z(47) L(0.64)] [Y(48) Z(46) L(0.56)] [Y(82) Z(32) L(0.57)] [Y(110) Z(56) L(0.58)] [Y(134) Z(50) L(0.79)] [Y(167) Z(43) L(0.79)] [Y(187) Z(57) L(0.62)] [Y(216) Z(34) L(0.63)] [Y(254) Z(36) L(0.70)] [Y(279) Z(42) L(0.69)] [Y(298) Z(32) L(0.60)] [Y(335) Z(44) L(0.63)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "sedge",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -1.2,
+          0.5,
+          -4.1
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 25,
+        "sizeVariation": 0.2,
+        "regions": {
+          "sedge-1": 1,
+          "sedge-2": 1,
+          "sedge-3": 1,
+          "sedge-4": 1,
+          "sedge-5": 1,
+          "sedge-6": 1,
+          "sedge-7": 1,
+          "sedge-8": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(1) Z(17) L(0.49)] [Y(21) Z(24) L(0.47)] [Y(34) Z(19) L(0.66)] [Y(53) Z(13) L(0.69)] [Y(59) Z(16) L(0.63)] [Y(76) Z(18) L(0.41)] [Y(101) Z(26) L(0.57)] [Y(121) Z(13) L(0.61)] [Y(132) Z(21) L(0.54)] [Y(153) Z(31) L(0.54)] [Y(166) Z(7) L(0.61)] [Y(182) Z(32) L(0.65)] [Y(193) Z(15) L(0.60)] [Y(205) Z(17) L(0.45)] [Y(223) Z(7) L(0.63)] [Y(240) Z(12) L(0.52)] [Y(268) Z(7) L(0.53)] [Y(279) Z(29) L(0.65)] [Y(300) Z(13) L(0.52)] [Y(309) Z(29) L(0.69)] [Y(322) Z(10) L(0.47)] [Y(339) Z(18) L(0.58)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "sedge-3",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          1.6,
+          0.5,
+          -4.3
+        ],
+        "rotationDegrees": [
+          0,
+          66.47772378775558,
+          0
+        ],
+        "scale": [
+          1.0047634556167222,
+          1.0047634556167222,
+          1.0047634556167222
+        ]
+      }
+    },
+    {
+      "id": "common-reed",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -2.6,
+          0.5,
+          -4.0
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 25,
+        "sizeVariation": 0.2,
+        "regions": {
+          "reed-1": 1,
+          "reed-2": 1,
+          "reed-3": 1,
+          "reed-4": 1,
+          "reed-5": 1,
+          "reed-6": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(3) R(1.00)] [Y(50) Z(5) R(0.90)] [Y(100) Z(2) R(1.05)] [Y(150) Z(6) R(0.85)] [Y(200) Z(4) R(0.95)] [Y(250) Z(3) R(1.00)] [Y(300) Z(5) R(0.90)] [Y(330) Z(7) R(0.80)]",
+        "angle": 0.017453292519943295,
+        "iterations": 7,
+        "segmentLength": 1,
+        "thickness": 0.006,
+        "rules": [
+          {
+            "input": "R(s)",
+            "output": "!(s * 1) F(0.29) [Z(38) L(0.34)] Y(180) R(s * 1)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -2.6,
+          0.5,
+          -4.0
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 30,
+        "sizeVariation": 0.15,
+        "regions": {
+          "reed-plume": 1,
+          "seed-head-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(3) !(0.6) F(2.03) L(0.36)] [Y(50) Z(5) !(0.6) F(2.03) L(0.36)] [Y(100) Z(2) !(0.6) F(2.03) L(0.36)] [Y(150) Z(6) !(0.6) F(2.03) L(0.36)] [Y(200) Z(4) !(0.6) F(2.03) L(0.36)] [Y(250) Z(3) !(0.6) F(2.03) L(0.36)] [Y(300) Z(5) !(0.6) F(2.03) L(0.36)] [Y(330) Z(7) !(0.6) F(2.03) L(0.36)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.006
+      }
+    },
+    {
+      "id": "scouring-rush",
+      "type": "tree",
+      "transform": {
+        "position": [
+          2.6,
+          0.5,
+          -3.6
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 40,
+        "sizeVariation": 0.2,
+        "regions": {
+          "horsetail-a": 1,
+          "horsetail-b": 2,
+          "horsetail-c": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(16) Z(8) L(0.77)] [Y(19) Z(7) L(0.63)] [Y(32) Z(8) L(0.87)] [Y(49) Z(4) L(0.66)] [Y(63) Z(3) L(0.88)] [Y(83) Z(4) L(0.74)] [Y(95) Z(7) L(0.66)] [Y(75) Z(1) L(0.92)] [Y(115) Z(1) L(0.89)] [Y(135) Z(6) L(0.72)] [Y(131) Z(1) L(0.60)] [Y(160) Z(6) L(0.78)] [Y(172) Z(4) L(0.91)] [Y(180) Z(2) L(0.69)] [Y(172) Z(2) L(0.81)] [Y(183) Z(4) L(0.65)] [Y(222) Z(3) L(0.76)] [Y(222) Z(8) L(0.75)] [Y(248) Z(5) L(0.79)] [Y(245) Z(0) L(0.75)] [Y(244) Z(0) L(0.88)] [Y(257) Z(4) L(0.85)] [Y(285) Z(3) L(0.78)] [Y(298) Z(7) L(0.64)] [Y(311) Z(2) L(0.70)] [Y(332) Z(5) L(0.80)] [Y(345) Z(8) L(0.76)] [Y(352) Z(5) L(0.78)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "bunchgrass",
+      "type": "tree",
+      "transform": {
+        "position": [
+          0.4,
+          0.5,
+          -1.8
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-dry",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 30,
+        "sizeVariation": 0.25,
+        "regions": {
+          "dry-1": 1,
+          "dry-2": 1,
+          "dry-3": 1,
+          "dry-4": 1,
+          "dry-5": 1,
+          "sedge-5": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(3) Z(26) L(0.41)] [Y(13) Z(40) L(0.44)] [Y(34) Z(40) L(0.35)] [Y(42) Z(40) L(0.47)] [Y(50) Z(16) L(0.39)] [Y(62) Z(19) L(0.31)] [Y(86) Z(36) L(0.48)] [Y(91) Z(33) L(0.43)] [Y(105) Z(38) L(0.49)] [Y(120) Z(41) L(0.38)] [Y(138) Z(42) L(0.47)] [Y(147) Z(25) L(0.40)] [Y(164) Z(18) L(0.36)] [Y(184) Z(13) L(0.41)] [Y(193) Z(13) L(0.37)] [Y(210) Z(27) L(0.31)] [Y(229) Z(36) L(0.49)] [Y(229) Z(20) L(0.31)] [Y(254) Z(20) L(0.33)] [Y(262) Z(39) L(0.46)] [Y(273) Z(16) L(0.48)] [Y(292) Z(33) L(0.32)] [Y(298) Z(33) L(0.39)] [Y(312) Z(40) L(0.43)] [Y(337) Z(15) L(0.47)] [Y(339) Z(38) L(0.39)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "bunchgrass-seed",
+      "type": "tree",
+      "transform": {
+        "position": [
+          0.4,
+          0.5,
+          -1.8
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-dry",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 40,
+        "sizeVariation": 0.15,
+        "regions": {
+          "seed-head-a": 2,
+          "seed-head-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(355) Z(12) F(0.49) L(0.14)] [Y(29) Z(11) F(0.39) L(0.14)] [Y(70) Z(5) F(0.38) L(0.15)] [Y(114) Z(15) F(0.39) L(0.16)] [Y(150) Z(9) F(0.35) L(0.14)] [Y(185) Z(14) F(0.43) L(0.14)] [Y(239) Z(17) F(0.37) L(0.17)] [Y(278) Z(11) F(0.48) L(0.15)] [Y(320) Z(14) F(0.50) L(0.15)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.0025
+      }
+    },
+    {
+      "id": "bunchgrass-2",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -0.9,
+          0.5,
+          1.0
+        ],
+        "rotationDegrees": [
+          0,
+          317.58831153590853,
+          0
+        ],
+        "scale": [
+          1.0517671073917216,
+          1.0517671073917216,
+          1.0517671073917216
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-2",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -0.9,
+          0.5,
+          1.0
+        ],
+        "rotationDegrees": [
+          0,
+          317.58831153590853,
+          0
+        ],
+        "scale": [
+          1.0517671073917216,
+          1.0517671073917216,
+          1.0517671073917216
+        ]
+      }
+    }
+  ]
+}

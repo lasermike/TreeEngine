@@ -502,6 +502,20 @@ void TestLeafAtlases()
     auto instanceLeaves = scene;
     instanceLeaves["objects"][2]["leaves"] = { { "atlas", "plants" } };
     Reject(instanceLeaves.dump(), "objects[2].leaves: is inherited from instanceOf");
+
+    // Twist and size variation are optional, saved only when set, and bounded.
+    Check(tree.leaves.twistDegrees == 0 && tree.leaves.sizeVariation == 0, "leaf twist and size variation are not off by default");
+    Check(!saved["objects"][0]["leaves"].contains("twistDegrees") && !saved["objects"][0]["leaves"].contains("sizeVariation"),
+        "default leaf twist or size variation was saved");
+    auto varied = scene;
+    varied["objects"][0]["leaves"]["twistDegrees"] = 75;
+    varied["objects"][0]["leaves"]["sizeVariation"] = 0.25;
+    auto variedScene = SceneData::ParseScene(SceneData::SerializeScene(SceneData::ParseScene(varied.dump(), "varied")), "roundtrip");
+    const auto& variedTree = static_cast<const SceneData::TreeDefinition&>(*variedScene.objects[0]);
+    Check(variedTree.leaves.twistDegrees == 75 && variedTree.leaves.sizeVariation == 0.25f, "leaf twist or size variation did not round-trip");
+    rejectLeaves(Json::parse(R"({"atlas":"plants","twistDegrees":181})"), "leaves.twistDegrees: must be between 0 and 180");
+    rejectLeaves(Json::parse(R"({"atlas":"plants","twistDegrees":-1})"), "leaves.twistDegrees: must be between 0 and 180");
+    rejectLeaves(Json::parse(R"({"atlas":"plants","sizeVariation":0.95})"), "leaves.sizeVariation: must be between 0 and 0.9");
 }
 
 int RunScenePersistenceTests();

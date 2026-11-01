@@ -211,6 +211,8 @@ namespace
         WorldObjectParams& parameters)
     {
         if (leaves.atlas.empty()) return;
+        parameters.leafTwistRadians = XMConvertToRadians(leaves.twistDegrees);
+        parameters.leafSizeVariation = leaves.sizeVariation;
         const auto& atlas = scene.atlases.at(leaves.atlas);
         std::vector<SceneData::LeafRegionWeight> choices = leaves.regions;
         if (choices.empty())

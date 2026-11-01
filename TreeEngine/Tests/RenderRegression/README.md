@@ -262,11 +262,15 @@ were changed and no forest-scale or normal asynchronous CPU result is claimed.
 
 All gold images were regenerated when the built-in scenes moved from Phong to
 PBR materials; see the Scenes README for how materials and lights were converted.
-`LeafAtlases` was added with its own gold images when trees gained atlas leaves.
+`Instancing` gold images were regenerated when 32-bit BGRA PNGs (most PNGs)
+started getting mipmaps; before that, DirectXTK skipped their mip generation on
+desktop GPUs.
 
-`Instancing` and `LeafAtlases` gold images were regenerated when 32-bit BGRA
-PNGs (most PNGs) started getting mipmaps; before that, DirectXTK skipped their
-mip generation on desktop GPUs.
+`LeafAtlasTest` covers atlas leaves: a compact subset of the canyon plants in
+`Leaf Atlases`, using both canyon atlases, the pinyon atlas, leaf twist and size
+variation, and tree instances. The full `Leaf Atlases` showcase is not in this
+manifest because its many leaves make DXR in Debug take minutes per frame; it
+is measured by the performance pass instead.
 
 As of 2026-11-01 the full Debug manifest passes 64 of 72 images. These eight
 fail with or without the leaf-atlas and mipmap changes:

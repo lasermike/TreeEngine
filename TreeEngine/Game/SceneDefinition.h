@@ -74,6 +74,8 @@ namespace SceneData
     {
         std::string atlas;
         std::vector<LeafRegionWeight> regions; // Empty means every region of the atlas, equally weighted.
+        float twistDegrees = 0;  // Each leaf rolls about its own axis by up to this many degrees either way.
+        float sizeVariation = 0; // Each leaf's length is scaled by 1 plus or minus up to this fraction.
     };
 
     enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite, Sphere };
