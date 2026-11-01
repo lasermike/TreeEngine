@@ -437,6 +437,73 @@ void TestTestPasses()
     reject({ "performance", "performance" }, "duplicate test pass 'performance'");
 }
 
+void TestLeafAtlases()
+{
+    // Atlases name sprite regions once; trees pick weighted regions for their leaves.
+    auto scene = Json::parse(R"({"version":1,"name":"Atlases",
+        "atlases":{"plants":{"aspect":2,"regions":{
+            "oak":{"rect":[0.1,0.2,0.3,0.6],"stem":[0.2,0.6]},
+            "fern":{"rect":[0.5,0,0.7,0.5]}}}},
+        "objects":[
+            {"id":"tree","type":"tree","leaves":{"atlas":"plants","regions":{"oak":3,"fern":1}},"generator":{"axiom":"F"}},
+            {"id":"all","type":"fixedTree","leaves":{"atlas":"plants"}},
+            {"id":"copy","instanceOf":"tree"}]})");
+    auto parsed = SceneData::ParseScene(scene.dump(), "atlases.scene.json");
+    const auto& atlas = parsed.atlases.at("plants");
+    Check(atlas.aspect == 2 && atlas.regions.size() == 2, "atlas was not read");
+    Check(atlas.regions.at("oak").stem.x == 0.2f && atlas.regions.at("oak").rect.w == 0.6f, "region rect or stem was not read");
+    Check(atlas.regions.at("fern").stem.x == 0.6f && atlas.regions.at("fern").stem.y == 0.5f,
+        "a region without a stem did not default to its bottom center");
+    const auto& tree = static_cast<const SceneData::TreeDefinition&>(*parsed.objects[0]);
+    Check(tree.leaves.atlas == "plants" && tree.leaves.regions.size() == 2, "tree leaves were not read");
+    bool weighted = false;
+    for (const auto& choice : tree.leaves.regions) weighted = weighted || (choice.region == "oak" && choice.weight == 3);
+    Check(weighted, "region weight was not read");
+    const auto& all = static_cast<const SceneData::FixedTreeDefinition&>(*parsed.objects[1]);
+    Check(all.leaves.atlas == "plants" && all.leaves.regions.empty(), "leaves without regions should use the whole atlas");
+    const auto& copy = static_cast<const SceneData::TreeDefinition&>(*parsed.objects[2]);
+    Check(copy.leaves.atlas == "plants" && copy.leaves.regions.size() == 2, "an instance did not inherit its source's leaves");
+
+    auto saved = Json::parse(SceneData::SerializeScene(parsed));
+    Check(saved["atlases"]["plants"]["regions"]["fern"]["stem"][0] == 0.6f, "atlas was not saved");
+    Check(saved["objects"][0]["leaves"]["regions"]["oak"] == 3.0f && !saved["objects"][1]["leaves"].contains("regions"),
+        "tree leaves were not saved in their authored form");
+    Check(!saved["objects"][2].contains("leaves"), "an instance saved inherited leaves");
+    auto reparsed = SceneData::ParseScene(saved.dump(), "roundtrip");
+    Check(reparsed.atlases.at("plants").regions.at("oak").rect.z == 0.3f, "atlas did not round-trip");
+
+    auto rejectAtlas = [&](const char* region, const std::string& expected) {
+        auto bad = scene;
+        bad["atlases"]["plants"]["regions"]["bad"] = Json::parse(region);
+        Reject(bad.dump(), expected);
+    };
+    rejectAtlas(R"({"rect":[0.5,0,0.4,1]})", "regions.bad.rect: expected [u0, v0, u1, v1]");
+    rejectAtlas(R"({"rect":[0,0,1,1.5]})", "regions.bad.rect: expected [u0, v0, u1, v1]");
+    rejectAtlas(R"({"rect":[0,0,0.5,0.5],"stem":[0.6,0.5]})", "regions.bad.stem: must lie inside rect");
+    rejectAtlas(R"({"stem":[0.5,0.5]})", "regions.bad.rect: required property");
+    rejectAtlas(R"({"rect":[0,0,1,1],"pivot":[0,0]})", "regions.bad.pivot: unknown property");
+    auto bad = scene;
+    bad["atlases"]["plants"]["aspect"] = 0;
+    Reject(bad.dump(), "plants.aspect: must be positive");
+    bad = scene;
+    bad["atlases"]["plants"]["regions"] = Json::object();
+    Reject(bad.dump(), "plants.regions: expected named regions");
+
+    auto rejectLeaves = [&](const Json& leaves, const std::string& expected) {
+        auto badLeaves = scene;
+        badLeaves["objects"][0]["leaves"] = leaves;
+        Reject(badLeaves.dump(), expected);
+    };
+    rejectLeaves(Json::parse(R"({"atlas":"missing"})"), "leaves.atlas: unknown atlas 'missing'");
+    rejectLeaves(Json::parse(R"({"regions":{"oak":1}})"), "leaves.atlas: required property");
+    rejectLeaves(Json::parse(R"({"atlas":"plants","regions":{"maple":1}})"), "leaves.regions.maple: atlas 'plants' has no region 'maple'");
+    rejectLeaves(Json::parse(R"({"atlas":"plants","regions":{"oak":0}})"), "leaves.regions.oak: weight must be positive");
+    rejectLeaves(Json::parse(R"({"atlas":"plants","regions":{}})"), "leaves.regions: expected region names with weights");
+    auto instanceLeaves = scene;
+    instanceLeaves["objects"][2]["leaves"] = { { "atlas", "plants" } };
+    Reject(instanceLeaves.dump(), "objects[2].leaves: is inherited from instanceOf");
+}
+
 int RunScenePersistenceTests();
 
 
@@ -535,6 +602,7 @@ int main(int argc, char** argv)
         TestPbrSceneMaterials();
         TestInstancing();
         TestTestPasses();
+        TestLeafAtlases();
         const auto minimal = Json::parse(R"({"version":1,"name":"Example","objects":[{"id":"box","type":"primitive"}]})");
         auto defaults = SceneData::ParseScene(minimal.dump(), "test.scene.json");
         Check(defaults.objects.size() == 1, "default object missing");

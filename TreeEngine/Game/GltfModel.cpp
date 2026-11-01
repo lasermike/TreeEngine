@@ -131,6 +131,7 @@ HRESULT GltfModel::ComputeConstants(IRenderFrame* frame)
             XMStoreFloat4x4(&instanceData[nextInstance].World, importedTransform * authoredTransform);
             instanceData[nextInstance].InstanceOffset = nextInstance;
             instanceData[nextInstance].InstanceOffsetPrev = nextInstance;
+            instanceData[nextInstance].AtlasRegion = 0;
             ++nextInstance;
         }
     }

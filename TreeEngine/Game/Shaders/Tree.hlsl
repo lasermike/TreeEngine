@@ -73,6 +73,15 @@ void ApplyObjectTransform(inout float3 position, inout float3 normal, inout floa
     tangent = mul(tangent, (float3x3) objectTransform);
 }
 
+// Leaves from a texture atlas read their region from the instance slot AtlasRegion names.
+float2 AtlasUv(float2 uv, uint atlasRegion)
+{
+    // Not ?:, which evaluates both sides and would read slot 0xFFFFFFFF.
+    if (atlasRegion == 0)
+        return uv;
+    return ApplyAtlasRect(uv, InstanceBuffer[atlasRegion - 1].World[0]);
+}
+
 cbuffer cbMaterial : register (b3)
 {
     ShaderMaterial mat;
@@ -87,6 +96,7 @@ struct VS_INPUT
     float2 Tex : TEXCOORD0;
     float4 TangentL : TANGENT;
     float4x4 World  : WORLD;
+    uint  AtlasRegion : ATLASREGION;
     uint  VertexID : SV_VertexID;
 };
 
@@ -103,7 +113,7 @@ struct VS_SKINNED_INPUT
     float4x4 World  : WORLD;
     uint  InstanceOffset : BLENDINDICES0;
     uint  InstanceOffsetPrev : BLENDINDICES1;
-    uint  InstanceOffsetNext : BLENDINDICES2;
+    uint  AtlasRegion : ATLASREGION;
     uint  VertexID : SV_VertexID;
 };
 
@@ -187,7 +197,7 @@ PS_INPUT VS(VS_INPUT input)
 
     output.Pos = mul(float4(output.PosW, 1.0f), View);
     output.Pos = mul(output.Pos, Projection);
-    output.Tex = input.Tex;
+    output.Tex = AtlasUv(input.Tex, input.AtlasRegion);
 
     // View direction.  Calcuate here and have it interpolated by to the pixel shader
     output.ViewDirection = normalize(eyePos.xyz - output.PosW);
@@ -368,7 +378,7 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
     ApplyObjectTransform(position, unusedNormal, unusedTangent);
     float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
-    output.Tex = input.Tex;
+    output.Tex = AtlasUv(input.Tex, input.AtlasRegion);
 
     return output;
 }

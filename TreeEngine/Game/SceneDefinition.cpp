@@ -313,6 +313,68 @@ namespace SceneData
                 object.leaf = MaterialReference(value["materials"]["leaf"], path + ".materials.leaf", scene);
         }
 
+        AtlasDefinition ReadAtlas(const Json& value, const std::string& path)
+        {
+            Fields(value, path, { "aspect", "regions" });
+            AtlasDefinition result;
+            if (value.contains("aspect"))
+            {
+                result.aspect = Number(value["aspect"], path + ".aspect");
+                if (result.aspect <= 0) Invalid(path + ".aspect", "must be positive");
+            }
+            if (!value.contains("regions") || !value["regions"].is_object() || value["regions"].empty())
+                Invalid(path + ".regions", "expected named regions");
+            for (auto it = value["regions"].begin(); it != value["regions"].end(); ++it)
+            {
+                const auto regionPath = path + ".regions." + it.key();
+                if (it.key().empty()) Invalid(regionPath, "region names must not be empty");
+                Fields(it.value(), regionPath, { "rect", "stem" });
+                if (!it.value().contains("rect")) Invalid(regionPath + ".rect", "required property");
+                AtlasRegionDefinition region;
+                region.rect = Vector4(it.value()["rect"], regionPath + ".rect");
+                const auto& r = region.rect;
+                if (r.x < 0 || r.y < 0 || r.z > 1 || r.w > 1 || r.x >= r.z || r.y >= r.w)
+                    Invalid(regionPath + ".rect", "expected [u0, v0, u1, v1] with 0 <= u0 < u1 <= 1 and 0 <= v0 < v1 <= 1");
+                // The stem defaults to the bottom center of the rectangle.
+                region.stem = XMFLOAT2((r.x + r.z) / 2, r.w);
+                if (it.value().contains("stem"))
+                {
+                    region.stem = Vector2(it.value()["stem"], regionPath + ".stem");
+                    if (region.stem.x < r.x || region.stem.x > r.z || region.stem.y < r.y || region.stem.y > r.w)
+                        Invalid(regionPath + ".stem", "must lie inside rect");
+                }
+                result.regions.emplace(it.key(), region);
+            }
+            return result;
+        }
+
+        template<class T>
+        void ReadLeaves(const Json& value, const std::string& path, const SceneDefinition& scene, T& object)
+        {
+            if (!value.contains("leaves")) return;
+            const auto& leaves = value["leaves"];
+            const auto leavesPath = path + ".leaves";
+            Fields(leaves, leavesPath, { "atlas", "regions" });
+            if (!leaves.contains("atlas")) Invalid(leavesPath + ".atlas", "required property");
+            object.leaves.atlas = String(leaves["atlas"], leavesPath + ".atlas");
+            const auto atlas = scene.atlases.find(object.leaves.atlas);
+            if (atlas == scene.atlases.end()) Invalid(leavesPath + ".atlas", "unknown atlas '" + object.leaves.atlas + "'");
+            if (!leaves.contains("regions")) return;
+            const auto& regions = leaves["regions"];
+            if (!regions.is_object() || regions.empty()) Invalid(leavesPath + ".regions", "expected region names with weights");
+            for (auto it = regions.begin(); it != regions.end(); ++it)
+            {
+                const auto regionPath = leavesPath + ".regions." + it.key();
+                if (!atlas->second.regions.count(it.key()))
+                    Invalid(regionPath, "atlas '" + object.leaves.atlas + "' has no region '" + it.key() + "'");
+                LeafRegionWeight choice;
+                choice.region = it.key();
+                choice.weight = Number(it.value(), regionPath);
+                if (choice.weight <= 0) Invalid(regionPath, "weight must be positive");
+                object.leaves.regions.push_back(choice);
+            }
+        }
+
         // Applies an instance's trunk/leaf overrides on top of the materials copied from its source.
         template<class T>
         void ReadInstanceTreeMaterials(const Json& value, const std::string& path, const SceneDefinition& scene, T& object)
@@ -338,7 +400,7 @@ namespace SceneData
         std::unique_ptr<ObjectDefinition> ReadInstance(const Json& value, const std::string& path, const SceneDefinition& scene)
         {
             if (value.contains("type")) Invalid(path + ".type", "is inherited from instanceOf; remove it");
-            for (auto field : { "textureCoordScale", "animationSpeed", "depthLOD", "shape", "trunkShape", "generator", "dataFile", "source", "forceLit" })
+            for (auto field : { "textureCoordScale", "animationSpeed", "depthLOD", "shape", "trunkShape", "leaves", "generator", "dataFile", "source", "forceLit" })
                 if (value.contains(field)) Invalid(path + "." + field, "is inherited from instanceOf; an instance sets only transform and materials");
             Fields(value, path, { "id", "instanceOf", "transform", "material", "materials" });
             if (!value.contains("id")) Invalid(path + ".id", "required property");
@@ -386,7 +448,7 @@ namespace SceneData
         try
         {
             const auto root = Json::parse(jsonText);
-            Fields(root, sourceName, { "version", "id", "name", "priority", "testPass", "camera", "render", "light", "pointLightCount", "pointLight", "materials", "objects" });
+            Fields(root, sourceName, { "version", "id", "name", "priority", "testPass", "camera", "render", "light", "pointLightCount", "pointLight", "materials", "atlases", "objects" });
             if (!root.contains("version") || Integer(root["version"], sourceName + ".version", 1, 1) != 1)
                 Invalid(sourceName + ".version", "expected schema version 1");
             SceneDefinition scene;
@@ -515,6 +577,13 @@ namespace SceneData
                 for (auto it = materials.begin(); it != materials.end(); ++it)
                     scene.materials.emplace(it.key(), ReadMaterial(it.value(), sourceName + ".materials." + it.key()));
             }
+            if (root.contains("atlases"))
+            {
+                const auto& atlases = root["atlases"];
+                if (!atlases.is_object()) Invalid(sourceName + ".atlases", "expected named atlases");
+                for (auto it = atlases.begin(); it != atlases.end(); ++it)
+                    scene.atlases.emplace(it.key(), ReadAtlas(it.value(), sourceName + ".atlases." + it.key()));
+            }
             if (!root.contains("objects") || !root["objects"].is_array() || root["objects"].empty())
                 Invalid(sourceName + ".objects", "expected a nonempty array");
             std::set<std::string> ids;
@@ -548,34 +617,37 @@ namespace SceneData
                 }
                 else if (type == "tree")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape", "materials", "generator" });
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape", "materials", "leaves", "generator" });
                     auto tree = std::make_unique<TreeDefinition>();
                     if (value.contains("trunkShape")) tree->trunkShape = ReadShape(value["trunkShape"], path + ".trunkShape");
                     if (tree->trunkShape != Shape::Cylinder && tree->trunkShape != Shape::SkinnedCylinder)
                         Invalid(path + ".trunkShape", "expected cylinder or skinnedCylinder");
                     ReadTreeMaterials(value, path, scene, *tree);
+                    ReadLeaves(value, path, scene, *tree);
                     if (!value.contains("generator")) Invalid(path + ".generator", "required property");
                     tree->generator = ReadGenerator(value["generator"], path + ".generator");
                     object = std::move(tree);
                 }
                 else if (type == "fixedTree")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape", "materials" });
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape", "materials", "leaves" });
                     auto tree = std::make_unique<FixedTreeDefinition>();
                     if (value.contains("trunkShape")) tree->trunkShape = ReadShape(value["trunkShape"], path + ".trunkShape");
                     if (tree->trunkShape != Shape::Cylinder && tree->trunkShape != Shape::SkinnedCylinder)
                         Invalid(path + ".trunkShape", "expected cylinder or skinnedCylinder");
                     ReadTreeMaterials(value, path, scene, *tree);
+                    ReadLeaves(value, path, scene, *tree);
                     object = std::move(tree);
                 }
                 else if (type == "graph")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "dataFile", "materials" });
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "dataFile", "materials", "leaves" });
                     auto graph = std::make_unique<GraphDefinition>();
                     if (!value.contains("dataFile")) Invalid(path + ".dataFile", "required property");
                     graph->dataFile = String(value["dataFile"], path + ".dataFile");
                     if (graph->dataFile.empty()) Invalid(path + ".dataFile", "must not be empty");
                     ReadTreeMaterials(value, path, scene, *graph);
+                    ReadLeaves(value, path, scene, *graph);
                     object = std::move(graph);
                 }
                 else if (type == "model")
@@ -696,6 +768,9 @@ namespace SceneData
         {
             if (tree.hasMaterials)
                 value["materials"] = { { "trunk", MaterialJson(tree.trunk) }, { "leaf", MaterialJson(tree.leaf) } };
+            if (tree.leaves.atlas.empty()) return;
+            value["leaves"] = { { "atlas", tree.leaves.atlas } };
+            for (const auto& choice : tree.leaves.regions) value["leaves"]["regions"][choice.region] = choice.weight;
         }
         [[noreturn]] void FileError(const std::string& filename, const char* action, DWORD error = GetLastError())
         {
@@ -745,6 +820,13 @@ namespace SceneData
             root["light"]["shadowSamples"] = scene.light.shadowSamples;
         if (!scene.materials.empty())
             for (const auto& material : scene.materials) root["materials"][material.first] = MaterialJson(material.second);
+        for (const auto& atlas : scene.atlases)
+        {
+            Json value = { { "aspect", atlas.second.aspect }, { "regions", Json::object() } };
+            for (const auto& region : atlas.second.regions)
+                value["regions"][region.first] = { { "rect", VectorJson(region.second.rect) }, { "stem", VectorJson(region.second.stem) } };
+            root["atlases"][atlas.first] = std::move(value);
+        }
         for (const auto& object : scene.objects)
         {
             if (!object) throw std::runtime_error("Cannot serialize a null scene object");

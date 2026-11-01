@@ -70,7 +70,6 @@ private:
         XMFLOAT3 endPosition;
         XMFLOAT3 scale;
         int instanceOffset;
-        int instanceOffsetNext;
         int instanceOffsetPrev;
     };
 
@@ -82,6 +81,13 @@ private:
         bool renderable = false;
     };
     std::vector<BranchPose> m_branchPoses;
+
+    // Atlas leaves. The atlas rects occupy the last instance slots this tree reserves; a leaf's
+    // InstancedData::AtlasRegion names its rect's slot. Empty when the tree has no atlas.
+    std::vector<int> m_leafRegions; // Per branch ID: index into the params' leafRegions, or -1.
+    const WorldObjectParams::LeafAtlasRegion* LeafRegion(const Branch* branch) const;
+    UINT AtlasRegionSlot(UINT startInstance, const Branch* branch) const; // InstancedData::AtlasRegion value.
+    UINT AtlasRectStart(UINT startInstance) const;
     float m_matureTime = 0;
     float m_lastPoseTime = 0;
     XMFLOAT3 m_lastPosePosition = {};

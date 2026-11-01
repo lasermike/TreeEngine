@@ -25,6 +25,35 @@ void Tree::Create(TreeModelGenerator* generator)
     m_matureTime = 0;
     for (int i = 0; i < _treeModel->treeData.numBranches; ++i)
         m_matureTime = std::max(m_matureTime, static_cast<float>(_treeModel->treeData.pBranches[i].depth) + 5.0f);
+
+    // Each leaf gets a weighted atlas region from a hash of its branch ID and the object ID, so the choice
+    // is the same every run and differs between trees grown from the same rules.
+    m_leafRegions.clear();
+    const auto& regions = _params->leafRegions;
+    if (!regions.empty())
+    {
+        m_leafRegions.assign(_treeModel->treeData.numBranches, -1);
+        float totalWeight = 0;
+        for (const auto& region : regions) totalWeight += region.weight;
+        uint32_t seed = 2166136261u;
+        for (unsigned char character : _params->name) seed = (seed ^ character) * 16777619u;
+        for (int i = 0; i < _treeModel->treeData.numBranches; ++i)
+        {
+            const Branch& branch = _treeModel->treeData.pBranches[i];
+            if (branch.geometryType != Leaf || branch.id < 0 || branch.id >= _treeModel->treeData.numBranches)
+                continue;
+            uint32_t hash = static_cast<uint32_t>(branch.id) * 0x9E3779B1u ^ seed;
+            hash ^= hash >> 16; hash *= 0x85EBCA6Bu; hash ^= hash >> 13; hash *= 0xC2B2AE35u; hash ^= hash >> 16;
+            float pick = hash / 4294967296.0f * totalWeight;
+            int chosen = static_cast<int>(regions.size()) - 1;
+            for (size_t r = 0; r < regions.size(); ++r)
+            {
+                if (pick < regions[r].weight) { chosen = static_cast<int>(r); break; }
+                pick -= regions[r].weight;
+            }
+            m_leafRegions[branch.id] = chosen;
+        }
+    }
     if (_params->_animationSpeed == 0.0f)
     {
         _params->_animationSpeed = _treeModel->treeData.numLevels / 10.0f;
@@ -177,7 +206,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         if (!m_reusePose)
         {
             m_poseValid = false;
-            BranchInstance firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), -1, 0, 0 };
+            BranchInstance firstFrame = { _treeModel->trunk, nullptr, _position, XMFLOAT3(), XMFLOAT3(), -1, 0 };
             m_treeFrames[0] = firstFrame;
             m_numBranchInstances = 1;
         }
@@ -219,6 +248,22 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Compute Constants memcpy");
+
+    // The atlas rects that leaves' AtlasRegion values point at, rewritten every frame like the rest of the buffer.
+    if (!m_leafRegions.empty())
+    {
+        UINT slot = AtlasRectStart(startInstance);
+        for (const auto& region : _params->leafRegions)
+        {
+            InstancedData rect = {};
+            rect.World._11 = region.atlasRect.x;
+            rect.World._12 = region.atlasRect.y;
+            rect.World._13 = region.atlasRect.z;
+            rect.World._14 = region.atlasRect.w;
+            rect.InstanceOffset = rect.InstanceOffsetPrev = slot;
+            dataView[slot++] = rect;
+        }
+    }
 
     UINT segmentOffset = startInstance;
     for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
@@ -280,17 +325,12 @@ HRESULT Tree::ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRend
     {
         if (frame.branch->Child(c) != 0)
         {
-            if (c == 0)
-            {
-                frame.instanceOffsetNext = m_numBranchInstances;
-            }
-
             Branch* child = &_treeModel->treeData.pBranches[frame.branch->Child(c)];
 
             XMFLOAT3 childStart;
             XMStoreFloat3(&childStart, vChildStart);
 
-            BranchInstance childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), -1, -1, frame.instanceOffset };
+            BranchInstance childFrame = { child, &frame, childStart, XMFLOAT3(), XMFLOAT3(), -1, frame.instanceOffset };
             m_treeFrames[m_numBranchInstances++] = childFrame;
         }
     }
@@ -298,6 +338,26 @@ HRESULT Tree::ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRend
     PIXEndEvent();
 
     return S_OK;
+}
+
+const WorldObjectParams::LeafAtlasRegion* Tree::LeafRegion(const Branch* branch) const
+{
+    if (branch->id < 0 || static_cast<size_t>(branch->id) >= m_leafRegions.size()) return nullptr;
+    const int region = m_leafRegions[branch->id];
+    return region < 0 ? nullptr : &_params->leafRegions[region];
+}
+
+UINT Tree::AtlasRectStart(UINT startInstance) const
+{
+    const UINT branches = _treeModel->treeData.numBranches;
+    return startInstance + (m_instanceCount > 0 ? branches * (1 + InstanceLayoutCount) : branches);
+}
+
+UINT Tree::AtlasRegionSlot(UINT startInstance, const Branch* branch) const
+{
+    if (branch->id < 0 || static_cast<size_t>(branch->id) >= m_leafRegions.size() || m_leafRegions[branch->id] < 0)
+        return 0;
+    return AtlasRectStart(startInstance) + m_leafRegions[branch->id] + 1;
 }
 
 TreeSegment Tree::SelectSegmentType(BranchInstance& frame, RenderData* pRenderData) const
@@ -325,6 +385,8 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
         HRESULT hr = ComputeTransformationsManual(&localToWorld, frame);
         pose.renderable = hr == S_OK;
         if (hr != S_OK) return hr;
+        if (const auto* region = LeafRegion(frame.branch))
+            localToWorld = XMMatrixMultiply(XMMatrixTranslation(region->stemOffset.x, region->stemOffset.y, 0), localToWorld);
         localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
         XMStoreFloat4x4(&pose.world, localToWorld);
     }
@@ -332,6 +394,7 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
 
     InstancedData data = {};
     data.World = pose.world;
+    data.AtlasRegion = AtlasRegionSlot(startInstance, frame.branch);
 
 
     PIXEndEvent();
@@ -354,11 +417,6 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
     else
     {
         data.InstanceOffsetPrev = instanceOffset;
-    }
-
-    if (segment == TreeSegment::BranchLOD0)
-    {
-        data.InstanceOffsetNext = frame.instanceOffsetNext;
     }
 
     m_segmentInstanceData[segmentIndex].push_back(data);
@@ -517,8 +575,12 @@ HRESULT Tree::ComputeBranchVectorEndPoint(XMVECTOR* vComputedEnd, float time, Br
     switch (frame.branch->geometryType)
     {
     case Leaf:
-        vScale = XMVectorSet(XMVectorGetX(vMag) * 0.5f, XMVectorGetX(vMag), 0.004f, 0) * animScaleFactor;
+    {
+        const auto* region = LeafRegion(frame.branch);
+        const float widthPerLength = region ? region->widthPerLength : 0.5f;
+        vScale = XMVectorSet(XMVectorGetX(vMag) * widthPerLength, XMVectorGetX(vMag), 0.004f, 0) * animScaleFactor;
         break;
+    }
     case Stick:
         vScale = XMVectorSet(frame.branch->thickness, XMVectorGetX(vMag), frame.branch->thickness, 0) * animScaleFactor;
         break;
@@ -617,7 +679,8 @@ unsigned int Tree::GetMaxInstances()
     if (!_treeModel)
         return 0;
     const unsigned int branches = _treeModel->treeData.numBranches;
-    return m_instanceCount > 0 ? branches * (1 + InstanceLayoutCount) : branches;
+    const unsigned int atlasRects = static_cast<unsigned int>(_params->leafRegions.size());
+    return (m_instanceCount > 0 ? branches * (1 + InstanceLayoutCount) : branches) + atlasRects;
 }
 
 unsigned int Tree::GetMaxDrawnInstances()
@@ -699,10 +762,9 @@ void Tree::BuildInstanceLayouts(UINT startInstance)
 
             InstancedData data = {};
             data.World = pose.world;
+            data.AtlasRegion = AtlasRegionSlot(startInstance, frame.branch);
             data.InstanceOffset = offset;
             data.InstanceOffsetPrev = parent >= 0 && m_layoutOffsets[parent] >= 0 ? m_layoutOffsets[parent] : offset;
-            if (segment == TreeSegment::BranchLOD0)
-                data.InstanceOffsetNext = frame.instanceOffsetNext;
             layout.segments[segmentIndex].push_back(data);
             m_layoutOffsets[i] = static_cast<int>(offset);
 

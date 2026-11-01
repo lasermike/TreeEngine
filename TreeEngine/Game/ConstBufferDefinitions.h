@@ -7,8 +7,11 @@ struct InstancedData
     XMFLOAT4X4 World;
     UINT  InstanceOffset;
     UINT  InstanceOffsetPrev;
-    UINT  InstanceOffsetNext;
+    // Leaves drawn from a texture atlas: one plus the instance slot whose World row 0 holds the region as
+    // (u offset, v offset, u scale, v scale). Zero draws the whole texture; every writer must set it.
+    UINT  AtlasRegion;
 };
+static_assert(offsetof(InstancedData, AtlasRegion) == 72, "InputLayoutDesc::InstancedBasic16 reads AtlasRegion at byte 72");
 
 //
 // Const buffer definitions

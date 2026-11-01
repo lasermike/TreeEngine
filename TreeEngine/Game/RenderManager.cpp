@@ -93,9 +93,9 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     if (!m_renderData.environmentDiffuse.empty())
     {
         HRR(GetPlatform()->LoadTexture(SceneData::WidePath(m_renderData.environmentDiffuse).c_str(),
-            8, &m_environmentDiffuse));
+            MaxSceneTextures, &m_environmentDiffuse));
         HRR(GetPlatform()->LoadTexture(SceneData::WidePath(m_renderData.environmentSpecular).c_str(),
-            9, &m_environmentSpecular));
+            MaxSceneTextures + 1, &m_environmentSpecular));
     }
 
     if (maxInstances > 0)
@@ -242,6 +242,7 @@ HRESULT RenderManager::LoadTexture(const wchar_t* textureFilename, LoadedTexture
 
     if (existingTexture == m_textures.end())
     {
+        if (m_textures.size() >= MaxSceneTextures) return E_BOUNDS; // Later slots hold the environment cubes.
         HRR(GetPlatform()->LoadTexture(textureFilename, (int) m_textures.size(), loadedTexture));
         m_textures[textureFilename] = *loadedTexture;
     }
@@ -388,7 +389,7 @@ HRESULT RenderManager::LoadGltfTexture(const GltfTextureSource& source, LoadedTe
         return S_OK;
     }
     if (!source.IsMemoryBacked()) return E_INVALIDARG;
-    if (m_textures.size() >= 8) return E_BOUNDS;
+    if (m_textures.size() >= MaxSceneTextures) return E_BOUNDS;
     const int slot = static_cast<int>(m_textures.size());
     HRR(GetPlatform()->LoadTextureFromMemory(source.key.c_str(), source.encodedData.data(),
         source.encodedData.size(), slot, texture, source.colorSpace));

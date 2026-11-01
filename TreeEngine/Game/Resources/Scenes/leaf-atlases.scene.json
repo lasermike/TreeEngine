@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "id": "LeafAtlases",
+  "name": "Leaf Atlases",
+  "camera": {
+    "position": [0, 1.5, -6.5],
+    "rotationDegrees": [8, 0, 0]
+  },
+  "render": {
+    "farClippingPlane": 100,
+    "environment": {
+      "diffuse": "Environment/kiara_3_morning_4k-diffuse.dds",
+      "specular": "Environment/kiara_3_morning_4k-specular.dds"
+    },
+    "sky": { "cubeMap": "kiara_3_morning_4k-skybox.dds", "rotationDegrees": 180 },
+    "ambientOcclusion": { "radius": 0.25, "strength": 0.8 }
+  },
+  "light": {
+    "ambient": [0.5, 0.5, 0.5, 1],
+    "diffuse": [2.5, 2.5, 2.5, 1],
+    "specular": [0.6, 0.6, 0.6, 1],
+    "direction": [-0.35, -0.75, 0.55],
+    "angularDiameterDegrees": 0.5
+  },
+  "materials": {
+    "bark": {
+      "baseColor": [0.55, 0.42, 0.3, 1],
+      "metallic": 0,
+      "roughness": 0.9,
+      "baseColorTexture": { "source": "Bark_0005_diffuse.dds" }
+    },
+    "green-stem": { "baseColor": [0.2, 0.32, 0.1, 1], "metallic": 0, "roughness": 0.7 },
+    "soil": { "baseColor": [0.07, 0.08, 0.04, 1], "metallic": 0, "roughness": 0.95 },
+    "plants-4-leaf": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": { "source": "Nature/plants_4_atlas_color.png", "wrap": false },
+      "normalTexture": { "source": "Nature/plants_4_atlas_normal.png", "wrap": false },
+      "metallicRoughnessTexture": { "source": "Nature/plants_4_atlas_roughness.png", "wrap": false }
+    },
+    "plants-7-leaf": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": { "source": "Nature/plants_7_atlas_color.png", "wrap": false },
+      "normalTexture": { "source": "Nature/plants_7_atlas_normal.png", "wrap": false },
+      "metallicRoughnessTexture": { "source": "Nature/plants_7_atlas_roughness.png", "wrap": false }
+    },
+    "plants-12-leaf": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": { "source": "Nature/plants_12_atlas_color.png", "wrap": false },
+      "normalTexture": { "source": "Nature/plants_12_atlas_normal.png", "wrap": false },
+      "metallicRoughnessTexture": { "source": "Nature/plants_12_atlas_roughness.png", "wrap": false }
+    },
+    "grass-blade": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": { "source": "Nature/grass_atlas_color.png", "wrap": false },
+      "normalTexture": { "source": "Nature/grass_atlas_normal.png", "wrap": false },
+      "metallicRoughnessTexture": { "source": "Nature/grass_atlas_roughness.png", "wrap": false }
+    }
+  },
+  "atlases": {
+    "plants-4": {
+      "regions": {
+        "fern-a": { "rect": [0.0127, 0.0156, 0.2065, 0.4395], "stem": [0.1133, 0.4395] },
+        "fern-b": { "rect": [0.6602, 0.5176, 0.8223, 0.9507], "stem": [0.7539, 0.9507] },
+        "slender-a": { "rect": [0.1855, 0, 0.2773, 0.2129], "stem": [0.2242, 0.2129] },
+        "slender-b": { "rect": [0.2314, 0.2148, 0.3232, 0.4277], "stem": [0.2701, 0.4277] },
+        "rose": { "rect": [0.3281, 0.0039, 0.6, 0.3691], "stem": [0.4981, 0.3691] },
+        "oak-a": { "rect": [0.6016, 0.0078, 0.7412, 0.1992], "stem": [0.6843, 0.1992] },
+        "oak-b": { "rect": [0.6055, 0.2212, 0.7534, 0.5117], "stem": [0.6925, 0.5117] },
+        "lilac-a": { "rect": [0.0396, 0.4824, 0.1577, 0.7085], "stem": [0.1039, 0.7085] },
+        "lilac-b": { "rect": [0.1768, 0.4824, 0.3032, 0.7129], "stem": [0.2432, 0.7129] },
+        "lilac-c": { "rect": [0.0479, 0.7344, 0.165, 0.9531], "stem": [0.1102, 0.9531] },
+        "lilac-d": { "rect": [0.1914, 0.7363, 0.3081, 0.9404], "stem": [0.235, 0.9404] },
+        "blade-a": { "rect": [0.9033, 0.0254, 0.937, 0.9473], "stem": [0.9132, 0.9473] },
+        "blade-b": { "rect": [0.4844, 0.4556, 0.521, 0.9629], "stem": [0.5076, 0.9629] },
+        "blade-c": { "rect": [0.3271, 0.5156, 0.3574, 0.9429], "stem": [0.3431, 0.9429] },
+        "blade-d": { "rect": [0.3809, 0.5005, 0.438, 0.9629], "stem": [0.4245, 0.9629] },
+        "blade-e": { "rect": [0.541, 0.5176, 0.5732, 0.9453], "stem": [0.5624, 0.9453] },
+        "blade-dry": { "rect": [0.9473, 0.0449, 0.978, 0.5659], "stem": [0.9647, 0.5659] },
+        "seed-head": { "rect": [0.9473, 0.6309, 0.9883, 0.8853], "stem": [0.9651, 0.8853] }
+      }
+    },
+    "plants-7": {
+      "regions": {
+        "toothed": { "rect": [0.0332, 0.0117, 0.2754, 0.3257], "stem": [0.1532, 0.3257] },
+        "ovate": { "rect": [0.3477, 0.0039, 0.543, 0.334], "stem": [0.4203, 0.334] },
+        "lobed": { "rect": [0.3379, 0.4746, 0.6592, 0.9185], "stem": [0.508, 0.78] }
+      }
+    },
+    "plants-12": {
+      "aspect": 0.9961,
+      "regions": {
+        "sprig-a": { "rect": [0.0412, 0.0156, 0.2422, 0.5146], "stem": [0.1458, 0.5146] },
+        "sprig-b": { "rect": [0.2765, 0.0137, 0.4074, 0.5166], "stem": [0.3438, 0.5166] },
+        "sprig-c": { "rect": [0.5265, 0.0161, 0.7279, 0.5151], "stem": [0.6316, 0.5151] },
+        "sprig-d": { "rect": [0.7711, 0.0137, 0.902, 0.5171], "stem": [0.8384, 0.5171] }
+      }
+    },
+    "grass": {
+      "regions": {
+        "blade-1": { "rect": [0.1172, 0.0762, 0.1758, 0.9531], "stem": [0.1378, 0.9531] },
+        "blade-2": { "rect": [0.2368, 0.0391, 0.2734, 0.9497], "stem": [0.2551, 0.9497] },
+        "blade-3": { "rect": [0.2969, 0.0566, 0.3896, 0.9482], "stem": [0.3592, 0.9482] },
+        "blade-4": { "rect": [0.4404, 0.0781, 0.48, 0.9448], "stem": [0.4606, 0.9448] },
+        "blade-5": { "rect": [0.5605, 0.0566, 0.6055, 0.9702], "stem": [0.581, 0.9702] },
+        "blade-6": { "rect": [0.7119, 0.1113, 0.75, 0.8945], "stem": [0.7321, 0.8945] },
+        "blade-7": { "rect": [0.8579, 0.2036, 0.8965, 0.9082], "stem": [0.8638, 0.9082] }
+      }
+    }
+  },
+  "objects": [
+    {
+      "id": "ground",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "scale": [14, 0.01, 14] },
+      "material": "soil"
+    },
+    {
+      "id": "conifer",
+      "type": "tree",
+      "transform": { "position": [0, 0.5, 4] },
+      "animationSpeed": 8,
+      "trunkShape": "skinnedCylinder",
+      "materials": { "trunk": "bark", "leaf": "plants-12-leaf" },
+      "leaves": { "atlas": "plants-12" },
+      "generator": {
+        "axiom": "!(1) F(0.35) T(1)",
+        "angle": 0.017453292519943295,
+        "iterations": 9,
+        "segmentLength": 1,
+        "thickness": 0.05,
+        "rules": [
+          {
+            "input": "T(s)",
+            "output": "!(s) F(0.24) [Z(78) W(s)] [Y(72) Z(80) W(s)] [Y(144) Z(76) W(s)] [Y(216) Z(81) W(s)] [Y(288) Z(79) W(s)] Y(31) T(s * 0.9)"
+          },
+          {
+            "input": "W(s)",
+            "output": "!(s * 0.35) F(0.1) [Y(90) Z(55) L(0.2)] [Y(270) Z(55) L(0.2)] z(4) W(s * 0.9)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "oak-sapling",
+      "type": "tree",
+      "transform": { "position": [-2.6, 0.5, 3] },
+      "animationSpeed": 8,
+      "trunkShape": "skinnedCylinder",
+      "materials": { "trunk": "bark", "leaf": "plants-4-leaf" },
+      "leaves": { "atlas": "plants-4", "regions": { "oak-a": 1, "oak-b": 2 } },
+      "generator": {
+        "axiom": "!(1) F(0.5) A(1)",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.045,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s) F(0.25 * s) [Z(48) B(s * 0.7)] [Y(180) Z(42) B(s * 0.65)] Y(67) z(2) A(s * 0.85)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.6) F(0.12 * s + 0.04) [Y(90) Z(45) L(0.2)] [Y(270) Z(45) L(0.19)] [Z(35) C(s * 0.6)] Y(137) z(10) B(s * 0.85)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(s * 0.4) F(0.07) [Y(90) Z(50) L(0.18)] [Y(270) Z(50) L(0.17)] Y(90) C(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "broadleaf",
+      "type": "tree",
+      "transform": { "position": [2.6, 0.5, 3] },
+      "animationSpeed": 8,
+      "trunkShape": "skinnedCylinder",
+      "materials": { "trunk": "bark", "leaf": "plants-7-leaf" },
+      "leaves": { "atlas": "plants-7", "regions": { "toothed": 2, "ovate": 2, "lobed": 1 } },
+      "generator": {
+        "axiom": "!(1) F(0.6) A(1)",
+        "angle": 0.017453292519943295,
+        "iterations": 5,
+        "segmentLength": 1,
+        "thickness": 0.04,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s) F(0.28 * s) [Z(55) B(s * 0.6)] [Y(120) Z(50) B(s * 0.6)] [Y(240) Z(58) B(s * 0.55)] Y(40) A(s * 0.8)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.6) F(0.14 * s + 0.04) [Y(90) Z(60) L(0.24)] [Y(270) Z(60) L(0.22)] [Z(40) C(s * 0.5)] Y(150) Z(6) B(s * 0.85)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(s * 0.4) F(0.08) [Y(90) Z(55) L(0.22)] [Y(270) Z(55) L(0.2)] C(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "lilac",
+      "type": "tree",
+      "transform": { "position": [-2.8, 0.5, 0.5] },
+      "animationSpeed": 8,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "green-stem", "leaf": "plants-4-leaf" },
+      "leaves": { "atlas": "plants-4", "regions": { "lilac-a": 1, "lilac-b": 1, "lilac-c": 1, "lilac-d": 1 } },
+      "generator": {
+        "axiom": "[Z(10) S(1)] [Y(72) Z(18) S(0.9)] [Y(144) Z(12) S(1)] [Y(216) Z(20) S(0.85)] [Y(288) Z(14) S(0.95)]",
+        "angle": 0.017453292519943295,
+        "iterations": 7,
+        "segmentLength": 1,
+        "thickness": 0.012,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s) F(0.22 * s) [Z(60) L(0.17)] [Y(180) Z(60) L(0.16)] Y(90) z(5) S(s * 0.88)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rose-bush",
+      "type": "tree",
+      "transform": { "position": [2.8, 0.5, 0.5] },
+      "animationSpeed": 8,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "green-stem", "leaf": "plants-4-leaf" },
+      "leaves": { "atlas": "plants-4", "regions": { "rose": 3, "slender-a": 1, "slender-b": 1 } },
+      "generator": {
+        "axiom": "[Z(8) R(1)] [Y(120) Z(16) R(0.9)] [Y(240) Z(12) R(0.95)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.012,
+        "rules": [
+          {
+            "input": "R(s)",
+            "output": "!(s) F(0.2 * s) [Z(50) L(0.22)] Y(137) z(3) [Z(35) R(s * 0.6)] R(s * 0.9)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "fern",
+      "type": "tree",
+      "transform": { "position": [-1, 0.5, 1] },
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "green-stem", "leaf": "plants-4-leaf" },
+      "leaves": { "atlas": "plants-4", "regions": { "fern-a": 1, "fern-b": 1 } },
+      "generator": {
+        "axiom": "[Z(35) L(0.75)] [Y(40) Z(55) L(0.65)] [Y(80) Z(30) L(0.8)] [Y(125) Z(50) L(0.7)] [Y(165) Z(40) L(0.75)] [Y(205) Z(60) L(0.6)] [Y(245) Z(35) L(0.8)] [Y(290) Z(50) L(0.7)] [Y(330) Z(42) L(0.72)]",
+        "angle": 0.017453292519943295,
+        "segmentLength": 1,
+        "thickness": 0.01
+      }
+    },
+    {
+      "id": "atlas-sampler",
+      "type": "tree",
+      "transform": { "position": [1, 0.5, 1.2] },
+      "animationSpeed": 8,
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "green-stem", "leaf": "plants-4-leaf" },
+      "leaves": { "atlas": "plants-4" },
+      "generator": {
+        "axiom": "[Z(10) S(1)] [Y(90) Z(16) S(0.9)] [Y(180) Z(12) S(1)] [Y(270) Z(18) S(0.85)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.012,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s) F(0.2 * s) [Z(55) L(0.2)] [Y(180) Z(55) L(0.2)] Y(90) z(4) S(s * 0.88)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "grass-1",
+      "type": "tree",
+      "transform": { "position": [0, 0.5, -1] },
+      "trunkShape": "cylinder",
+      "materials": { "trunk": "green-stem", "leaf": "grass-blade" },
+      "leaves": { "atlas": "grass" },
+      "generator": {
+        "axiom": "[Z(6) L(0.55)] [Y(23) Z(18) L(0.45)] [Y(45) Z(9) L(0.6)] [Y(68) Z(22) L(0.4)] [Y(90) Z(7) L(0.58)] [Y(113) Z(15) L(0.5)] [Y(135) Z(10) L(0.62)] [Y(158) Z(20) L(0.42)] [Y(180) Z(8) L(0.56)] [Y(203) Z(16) L(0.48)] [Y(225) Z(11) L(0.6)] [Y(248) Z(24) L(0.38)] [Y(270) Z(5) L(0.64)] [Y(293) Z(17) L(0.46)] [Y(315) Z(12) L(0.55)] [Y(338) Z(21) L(0.44)]",
+        "angle": 0.017453292519943295,
+        "segmentLength": 1,
+        "thickness": 0.01
+      }
+    },
+    { "id": "grass-2", "instanceOf": "grass-1", "transform": { "position": [-1.7, 0.5, -1.6], "rotationDegrees": [0, 70, 0], "scale": [1, 0.85, 1] } },
+    { "id": "grass-3", "instanceOf": "grass-1", "transform": { "position": [1.6, 0.5, -1.4], "rotationDegrees": [0, 140, 0], "scale": [1, 1.1, 1] } },
+    { "id": "grass-4", "instanceOf": "grass-1", "transform": { "position": [-0.4, 0.5, 2.2], "rotationDegrees": [0, 210, 0] } },
+    { "id": "grass-5", "instanceOf": "grass-1", "transform": { "position": [3.6, 0.5, -0.8], "rotationDegrees": [0, 280, 0], "scale": [1, 0.9, 1] } },
+    { "id": "grass-6", "instanceOf": "grass-1", "transform": { "position": [-3.8, 0.5, -0.6], "rotationDegrees": [0, 330, 0], "scale": [1, 1.2, 1] } }
+  ]
+}

@@ -189,6 +189,11 @@ struct DoubleBufferResource
 //#define ID3DInputLayout void*
 #endif
 
+// Textures one scene can load. Each gets a slot in the ray-tracing texture table, which
+// RaytracingLibrary.hlsl and GlobalRootSignature.hlsl size to match. The two environment
+// cube maps use the slots after these.
+const int MaxSceneTextures = 32;
+
 enum InputLayouts
 {
     BASIC_INPUT_LAYOUT = 0,
@@ -201,14 +206,14 @@ enum InputLayouts
 class InputLayoutDesc
 {
 public:
-    static const InputElementDesc InstancedBasic16[8];
+    static const InputElementDesc InstancedBasic16[9];
     static const InputElementDesc InstancedSkinned[14];
     static const InputElementDesc Basic32[3];
 
     //GetLayout()
 };
 
-__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[8] =
+__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[9] =
 {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
     { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
@@ -218,6 +223,8 @@ __declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[8
     { "WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    // InstancedData::AtlasRegion, after the two skinning offsets this layout skips.
+    { "ATLASREGION", 0, DXGI_FORMAT_R32_UINT, 1, 72, InputClassificationInstance, 1 },
 };
 
 __declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[14] =
@@ -235,7 +242,8 @@ __declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[1
     { "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "BLENDINDICES", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     { "BLENDINDICES", 1, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
-    { "BLENDINDICES", 2, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    // Some pipelines pair this layout with the unskinned vertex shaders, which read AtlasRegion.
+    { "ATLASREGION", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
 };
 
 __declspec(selectany) const InputElementDesc InputLayoutDesc::Basic32[3] =

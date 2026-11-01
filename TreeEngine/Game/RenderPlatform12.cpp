@@ -191,16 +191,13 @@ enum CbvSrvUavHeapOffsets
     DxrMaterial_SrvHeapOffset = 24,
     DxrGeometryInfo_SrvHeapOffset = 25,
     DxrTexture0_SrvHeapOffset = 26,     // Start of DXR texture slots (up to maxTotalTexturesInScene)
-    DxrTexture1_SrvHeapOffset = 27,
-    DxrTexture2_SrvHeapOffset = 28,
-    DxrTexture3_SrvHeapOffset = 29,
 
-    DxrSky_SrvHeapOffset = 34, // Follows the eight DXR scene texture slots.
-    EnvironmentDiffuse_SrvHeapOffset = 35,
-    EnvironmentSpecular_SrvHeapOffset = 36,
+    DxrSky_SrvHeapOffset = DxrTexture0_SrvHeapOffset + MaxSceneTextures, // Follows the DXR scene texture slots.
+    EnvironmentDiffuse_SrvHeapOffset,
+    EnvironmentSpecular_SrvHeapOffset,
 
     // Per-material descriptors
-    Material0_HeapOffset = 37,
+    Material0_HeapOffset,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
     Texture0Srv_HeapOffset = Material0_HeapOffset + 1,
     Num_CbvSrvUavHeapOffsets
@@ -250,7 +247,7 @@ const uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
 UINT skinnedIndexBufferSize = 0;
 UINT indexBufferSize = 0;
 
-const int maxTotalTexturesInScene = 8;
+const int maxTotalTexturesInScene = MaxSceneTextures;
 const int maxNumMaterials = 128; // Includes the 98 materials in the glTF textureless sphere test.
 
 int RenderUnit::s_nextId = 0;

@@ -49,6 +49,33 @@ namespace SceneData
         DirectX::XMFLOAT2 textureCoordScale = { 1, 1 };
     };
 
+    // One sprite in a texture atlas, in 0-1 UV measured from the image's top-left corner.
+    struct AtlasRegionDefinition
+    {
+        DirectX::XMFLOAT4 rect = { 0, 0, 1, 1 }; // u0, v0, u1, v1
+        DirectX::XMFLOAT2 stem = { 0.5f, 1 };    // Where the sprite attaches to its branch.
+    };
+
+    // A texture layout shared by every map of the materials that use it.
+    struct AtlasDefinition
+    {
+        float aspect = 1; // Image width / height, so regions keep their shape.
+        std::map<std::string, AtlasRegionDefinition> regions;
+    };
+
+    struct LeafRegionWeight
+    {
+        std::string region;
+        float weight = 1;
+    };
+
+    // Which atlas regions a tree's leaves use. An empty atlas draws the whole leaf texture on every leaf.
+    struct LeafAtlasDefinition
+    {
+        std::string atlas;
+        std::vector<LeafRegionWeight> regions; // Empty means every region of the atlas, equally weighted.
+    };
+
     enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite, Sphere };
     enum class ObjectKind { Primitive, Tree, FixedTree, Graph, Model };
     enum class SegmentLengthBehavior { Constant, RandomAddition };
@@ -109,6 +136,7 @@ namespace SceneData
         bool hasMaterials = false;
         MaterialDefinition trunk;
         MaterialDefinition leaf;
+        LeafAtlasDefinition leaves;
         LSystemDefinition generator;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TreeDefinition>(*this); }
     };
@@ -120,6 +148,7 @@ namespace SceneData
         bool hasMaterials = false;
         MaterialDefinition trunk;
         MaterialDefinition leaf;
+        LeafAtlasDefinition leaves;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<FixedTreeDefinition>(*this); }
     };
 
@@ -130,6 +159,7 @@ namespace SceneData
         bool hasMaterials = false;
         MaterialDefinition trunk;
         MaterialDefinition leaf;
+        LeafAtlasDefinition leaves;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<GraphDefinition>(*this); }
     };
 
@@ -189,6 +219,7 @@ namespace SceneData
             DirectX::XMFLOAT3 attenuation = {};
         } pointLight;
         std::map<std::string, MaterialDefinition> materials;
+        std::map<std::string, AtlasDefinition> atlases;
         std::vector<std::unique_ptr<ObjectDefinition>> objects;
     };
 

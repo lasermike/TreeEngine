@@ -206,6 +206,30 @@ namespace
         parameters.materialTextures.push_back(RuntimeMaterialTextures(tree.trunk, tree.id, sceneFilename));
         parameters.materialTextures.push_back(RuntimeMaterialTextures(tree.leaf, tree.id, sceneFilename));
     }
+
+    void ApplyLeafAtlas(const SceneData::LeafAtlasDefinition& leaves, const SceneData::SceneDefinition& scene,
+        WorldObjectParams& parameters)
+    {
+        if (leaves.atlas.empty()) return;
+        const auto& atlas = scene.atlases.at(leaves.atlas);
+        std::vector<SceneData::LeafRegionWeight> choices = leaves.regions;
+        if (choices.empty())
+            for (const auto& region : atlas.regions) choices.push_back({ region.first, 1 });
+        for (const auto& choice : choices)
+        {
+            const auto& region = atlas.regions.at(choice.region);
+            const auto& r = region.rect;
+            const float width = r.z - r.x, height = r.w - r.y;
+            // The unit leaf quad spans [-0.5, 0.5] with v = 0 at the top; its base center attaches to the branch.
+            const float stemU = (region.stem.x - r.x) / width, stemV = (region.stem.y - r.y) / height;
+            WorldObjectParams::LeafAtlasRegion runtime;
+            runtime.atlasRect = XMFLOAT4(r.x, r.y, width, height);
+            runtime.stemOffset = XMFLOAT2(0.5f - stemU, stemV - 1);
+            runtime.widthPerLength = width * atlas.aspect / height;
+            runtime.weight = choice.weight;
+            parameters.leafRegions.push_back(runtime);
+        }
+    }
 }
 
 void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& scene,
@@ -266,6 +290,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             CommonParameters(tree, *parameters);
             parameters->meshes.push_back(RuntimeShape(tree.trunkShape));
             ApplyTreeMaterials(tree, *parameters, sceneFilename);
+            ApplyLeafAtlas(tree.leaves, definition, *parameters);
             auto& generator = parameters->GetGeneratorParameters();
             generator._axiom = tree.generator.axiom;
             generator._constants = tree.generator.constants;
@@ -290,6 +315,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             CommonParameters(tree, *parameters);
             parameters->meshes.push_back(RuntimeShape(tree.trunkShape));
             ApplyTreeMaterials(tree, *parameters, sceneFilename);
+            ApplyLeafAtlas(tree.leaves, definition, *parameters);
             linkTreeInstance(tree, *parameters);
             auto runtime = std::make_unique<Tree>(parameters.get());
             parameters.release();
@@ -303,6 +329,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             if (graph.instanceOf.empty())
                 parameters->GetGeneratorParameters().points = LoadGraphPoints(graph.dataFile, graph.id, sceneFilename);
             ApplyTreeMaterials(graph, *parameters, sceneFilename);
+            ApplyLeafAtlas(graph.leaves, definition, *parameters);
             linkTreeInstance(graph, *parameters);
             auto runtime = std::make_unique<Tree>(parameters.get());
             parameters.release();

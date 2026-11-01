@@ -84,6 +84,7 @@ prompts, autosave, directory watcher, or asset packaging are provided.
 - `pointLightCount`: point-light activation, `0` or `1`.
 - `pointLight`: optional `ambient`, `diffuse`, `specular`, `position`, `range`, and `attenuation`. Range and attenuation components must be nonnegative.
 - `materials`: map of names to material definitions.
+- `atlases`: map of names to texture-atlas layouts for tree leaves; see [Leaf atlases](#leaf-atlases).
 - `objects`: nonempty array of typed object definitions with unique nonempty `id` values.
 
 Unknown properties are errors, including typos. Errors name the source file and
@@ -105,16 +106,16 @@ A `primitive` supports `shape` and `material`. Supported shapes are
 `sphere` (unit diameter, like the box and cylinders). The default shape is `box`.
 
 A `tree` supports `trunkShape` (`skinnedCylinder` by default, or `cylinder`),
-named `materials.trunk` and `materials.leaf`, and a required `generator`.
-The generator is currently an L-system.
+named `materials.trunk` and `materials.leaf`, optional `leaves`, and a required
+`generator`. The generator is currently an L-system.
 
 A `fixedTree` creates the existing fixed procedural tree generator and supports
 `trunkShape` (`skinnedCylinder` by default, or `cylinder`) and the same optional
-`materials.trunk`/`materials.leaf` slots as a tree.
+`materials.trunk`/`materials.leaf` slots and `leaves` as a tree.
 
 A `graph` requires `dataFile`, a CSV file containing the graph samples. Its
 normalization matches the former `LoadGraph` behavior.
-It also supports optional `materials.trunk`/`materials.leaf` slots.
+It also supports optional `materials.trunk`/`materials.leaf` slots and `leaves`.
 
 A `model` requires `source`, a `.gltf` or `.glb` file, and supports optional
 `forceLit` plus its transform. Its asset owns its geometry and materials.
@@ -151,6 +152,60 @@ referenced object. An omitted transform is the identity, as for other objects.
   materials they override.
 
 The `Instancing` scene shows tree, primitive, and model instances.
+
+### Leaf atlases
+
+A leaf texture can be an atlas: one image holding many leaf sprites. A scene's
+`atlases` section names each sprite once, and a tree's `leaves` chooses which
+ones its leaves use. The leaf material points at the atlas images as usual; the
+layout applies to all of its maps, so color, normal, and roughness atlases must
+share one layout.
+
+```json
+"atlases": {
+  "plants-4": {
+    "regions": {
+      "lilac": { "rect": [0.0396, 0.4824, 0.1577, 0.7085], "stem": [0.1039, 0.7085] },
+      "oak":   { "rect": [0.6055, 0.2212, 0.7534, 0.5117] }
+    }
+  }
+},
+"objects": [{
+  "id": "shrub", "type": "tree",
+  "materials": { "trunk": "bark", "leaf": "plants-4-leaf" },
+  "leaves": { "atlas": "plants-4", "regions": { "lilac": 3, "oak": 1 } },
+  "generator": { ... }
+}]
+```
+
+- `rect` (required) is `[u0, v0, u1, v1]` in 0–1 UV measured from the image's
+  top-left corner, so it does not depend on the image's resolution.
+- `stem` is where the sprite attaches to its branch, in the same UV space, and
+  must lie inside `rect`. It defaults to the bottom center of `rect`. The leaf
+  quad is moved so this point sits on the branch.
+- `aspect` (default `1`) is the image's width divided by its height. Each leaf
+  keeps its region's shape: an `L(length)` leaf is `length` tall and as wide as
+  its region's proportions require.
+- `leaves.atlas` names the atlas. `leaves.regions` maps region names to positive
+  weights; each leaf picks one at random in proportion to its weight. Omit
+  `regions` to use every region of the atlas equally. The choice is repeatable:
+  it comes from a hash of the leaf's branch and the object ID.
+- Sprites must be upright, with the stem toward the bottom of the image.
+  Sideways sprites are not supported yet.
+- Instances inherit their source's `leaves` and cannot change them.
+- Trees without `leaves` draw the whole leaf texture on every leaf, as before.
+
+Leaves sample their region in raster, shadow, and DXR passes. `Leaf Atlases`
+(`leaf-atlases.scene.json`) shows several atlases from the Nature Pack, copied
+at 2048×2048 into `Resources/Nature`.
+
+To find regions in a new atlas, run
+`TreeEngine/Tools/find-atlas-regions.ps1 -Images <color map> -PreviewDirectory <dir>`.
+It prints `rect` and `stem` for each sprite it finds in the alpha channel, and
+draws the boxes on a preview image. Check the preview: packed sprites can merge
+into one box, and the stem guess (the lowest opaque point) is wrong for
+sideways or upside-down sprites.
+
 ## Materials
 
 A material property can be a named reference such as `"material": "ground"`
@@ -186,9 +241,9 @@ optional `wrap` (default `true`; `false` clamps) and `transform` (`offset`,
 `rotation` in radians, and `scale`, as in `KHR_texture_transform`).
 `normalTexture` also takes `scale` (default `1`, nonnegative). Maps may be PNG,
 JPEG, or DDS (glTF assets themselves remain PNG/JPEG only); base-color and
-specular-color maps are sRGB, and the others are linear. The renderer has eight
-material texture slots shared by every texture in a scene, so heavily mapped
-scenes can fail to load with `E_BOUNDS`. Emissive, occlusion, and other glTF
+specular-color maps are sRGB, and the others are linear. A scene can load 32
+distinct textures, counting every map, model texture, and default texture;
+past that, loading fails with `E_BOUNDS`. Emissive, occlusion, and other glTF
 extensions are not supported, as for models.
 
 Asset references resolve relative to the scene file first, with existing

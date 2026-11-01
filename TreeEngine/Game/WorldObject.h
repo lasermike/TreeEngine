@@ -74,6 +74,17 @@ public:
     std::vector<ShaderMaterial> materials;
     std::vector<MaterialTextureSources> materialTextures; // Optional PBR maps, parallel to materials.
     std::vector<PrimitiveType> meshes;
+
+    // A tree leaf sprite from a texture atlas. Trees without regions draw the whole leaf texture on every leaf.
+    struct LeafAtlasRegion
+    {
+        XMFLOAT4 atlasRect;   // (u offset, v offset, u scale, v scale), written to an instance slot for the shaders.
+        XMFLOAT2 stemOffset;  // Moves the unit leaf quad so the sprite's stem sits on the branch.
+        float widthPerLength; // Leaf width as a fraction of its length.
+        float weight;         // Relative chance of a leaf using this region.
+    };
+    std::vector<LeafAtlasRegion> leafRegions;
+
     // Set for instances: the object whose model (and, for trees, branch poses) this object reuses.
     WorldObject* instanceSource = nullptr;
 

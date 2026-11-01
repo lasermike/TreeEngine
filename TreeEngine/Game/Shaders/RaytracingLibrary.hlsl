@@ -24,10 +24,19 @@ ByteAddressBuffer originalVertexBuffer : register(t5); // SimpleVertex (48 bytes
 ByteAddressBuffer skinnedVertexBuffer : register(t6); // SkinnedVertex (60 bytes per vertex)
 StructuredBuffer<InstancedData> instanceDataBuffer : register(t7);
 ByteAddressBuffer skinnedIndexBuffer : register(t8); // Skinned index buffer
-Texture2D<float4> sceneTextures[8] : register(t9);
-TextureCube<float4> skyTexture : register(t17);
-TextureCube<float4> environmentDiffuse : register(t18);
-TextureCube<float4> environmentSpecular : register(t19);
+Texture2D<float4> sceneTextures[32] : register(t9); // MaxSceneTextures in RenderPlatform.h
+TextureCube<float4> skyTexture : register(t41);
+TextureCube<float4> environmentDiffuse : register(t42);
+TextureCube<float4> environmentSpecular : register(t43);
+
+// Leaves from a texture atlas read their region from the instance slot AtlasRegion names.
+float2 AtlasUv(float2 uv, uint atlasRegion)
+{
+    // Not ?:, which evaluates both sides and would read slot 0xFFFFFFFF.
+    if (atlasRegion == 0)
+        return uv;
+    return ApplyAtlasRect(uv, instanceDataBuffer[atlasRegion - 1].World[0]);
+}
 
 SamplerState samLinear : register(s0);
 SamplerState samLinearClamp : register(s1);
@@ -211,7 +220,8 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
         SimpleVertexData sv1 = LoadOriginalVertex(geoInfo.baseVertexLocation + i1, geoInfo.isSkinned);
         SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
 
-        float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
+        float2 texCoord = AtlasUv(sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z,
+            instanceDataBuffer[geoInfo.instanceIndex].AtlasRegion);
 
         float4 textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularColor.w > 0);
 
@@ -284,6 +294,10 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float4 tangentData = sv0.tangent * bary.x + sv1.tangent * bary.y + sv2.tangent * bary.z;
     float3 tangent = normalize(tangentData.xyz);
 
+    const uint atlasRegion = instanceDataBuffer[geoInfo.instanceIndex].AtlasRegion;
+    sv0.tex = AtlasUv(sv0.tex, atlasRegion);
+    sv1.tex = AtlasUv(sv1.tex, atlasRegion);
+    sv2.tex = AtlasUv(sv2.tex, atlasRegion);
     float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
     float2 uvDx, uvDy;
     ComputeTextureFootprint(geoInfo, uint3(i0, i1, i2),

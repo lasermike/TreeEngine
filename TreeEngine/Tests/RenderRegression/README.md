@@ -58,8 +58,8 @@ External Binaries/Intermediates directories are no longer used by the maintained
 desktop builds. Do not remove shared legacy outputs; any cleanup requires
 inspection and separate approval of the exact generated subdirectories.
 
-`scenes.json` lists eleven scenes, both rendering modes, and captures at 0, 1,
-and 5 seconds (66 images). It also specifies resolution, random seed,
+`scenes.json` lists twelve scenes, both rendering modes, and captures at 0, 1,
+and 5 seconds (72 images). It also specifies resolution, random seed,
 postprocessing, warmup frames, and tolerances. Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
@@ -260,7 +260,15 @@ were changed and no forest-scale or normal asynchronous CPU result is claimed.
 
 ### Baseline status
 
-The full Debug manifest passes all 66 images. All gold images were regenerated
-when the built-in scenes moved from Phong to PBR materials; see the Scenes README
-for how materials and lights were converted.
+All gold images were regenerated when the built-in scenes moved from Phong to
+PBR materials; see the Scenes README for how materials and lights were converted.
+`LeafAtlases` was added with its own gold images when trees gained atlas leaves.
+
+As of 2026-11-01 the full Debug manifest passes 64 of 72 images. These eight
+fail on the branch with or without the leaf-atlas change:
+- `tree` ray tracing at 1 and 5 seconds (RMS about 0.010 and 0.016).
+- `ai-tree` raster at every time (RMS about 0.32), because `ai-tree.scene.json`
+  changed in 423d805 after its gold images were made.
+- `ai-tree` ray tracing at every time: the process stops at a D3D12 debug-layer
+  error break before capturing.
 `test-dxr-toggle.ps1` covers SimpleBox and Tree only.

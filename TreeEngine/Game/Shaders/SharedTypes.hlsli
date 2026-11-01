@@ -4,8 +4,14 @@ struct InstancedData
     float4x4 World;
     uint InstanceOffset;
     uint InstanceOffsetPrev;
-    uint InstanceOffsetNext;
+    uint AtlasRegion; // One plus the slot whose World[0] holds the atlas rect; zero draws the whole texture.
 };
+
+// atlasRect is (u offset, v offset, u scale, v scale).
+float2 ApplyAtlasRect(float2 uv, float4 atlasRect)
+{
+    return atlasRect.xy + uv * atlasRect.zw;
+}
 
 // Object-transform slot meaning "no per-draw object transform" (matches UINT_MAX on the CPU).
 static const uint NoObjectTransform = 0xFFFFFFFF;
