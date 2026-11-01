@@ -1747,6 +1747,8 @@ HRESULT RenderPlatform12::CreateTexture2D(const wchar_t* name, const float* poin
 HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* texture, VertexShader* vs, PixelShader* ps, VertexShader* shadowVs, PixelShader* shadowPs,
                                          ShaderMaterial& shaderMaterial, StockRenderState renderState, int materialNum, Material** newMaterial)
 {
+    if (materialNum < 0 || materialNum >= maxNumMaterials) return E_BOUNDS; // Each material owns a descriptor-heap block.
+
     if (!vs)
     {
         vs = m_vertexShader;
@@ -1772,8 +1774,6 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
     UploadBuffer<CBMaterial>* uploadBuffer = new UploadBuffer<CBMaterial>(GetDevice(), 1, true);
 
     m_gameLevelResources.push_back(uploadBuffer->Resource());
-
-    assert(materialNum < maxNumMaterials);
 
     D3D12_GPU_DESCRIPTOR_HANDLE gpuMaterialHandle = m_descriptorHeap.hGPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);
     D3D12_CPU_DESCRIPTOR_HANDLE cpuMaterialHandle = m_descriptorHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset);

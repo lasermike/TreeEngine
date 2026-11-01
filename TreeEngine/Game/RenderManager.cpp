@@ -365,8 +365,8 @@ HRESULT RenderManager::CreateMaterial(const wchar_t* name, const wchar_t* textur
 
 
     Material* newMat = nullptr;
-    GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shadowVertexShader, shadowPixelShader, shaderMaterial,
-                                  renderState, (int) m_materials.size(), &newMat);
+    HRR(GetPlatform()->CreateMaterial(name, texture, vertexShader, pixelShader, shadowVertexShader, shadowPixelShader, shaderMaterial,
+                                      renderState, (int) m_materials.size(), &newMat));
 
     m_materials[name] = newMat;
     *newMaterial = newMat;

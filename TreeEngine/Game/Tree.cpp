@@ -109,28 +109,55 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     {
         material.ApplyTextureCoordScale(_params->textureCoordScale.x, _params->textureCoordScale.y);
     }
-    const std::wstring branchLOD0MaterialName = L"BranchLOD0_" + std::to_wstring(_id);
-    const std::wstring branchLOD1MaterialName = L"BranchLOD1_" + std::to_wstring(_id);
-    const std::wstring leafLOD0MaterialName = L"LeafLOD0_" + std::to_wstring(_id);
-    auto createMaterial = [&](const std::wstring& name, size_t slot, const wchar_t* textureFilename,
+    // Materials are named by their content, so trees with identical materials (instances, and trees using the same
+    // scene material) share one. Each distinct material takes one of the renderer's maxNumMaterials slots.
+    auto contentName = [](const wchar_t* prefix, const ShaderMaterial& shaderMaterial, const std::wstring& texture,
+        const wchar_t* vs, const wchar_t* shadowVs, const StockRenderState& state)
+    {
+        uint64_t hash = 14695981039346656037ull;
+        auto mix = [&hash](const void* data, size_t size)
+        {
+            for (size_t i = 0; i < size; ++i) hash = (hash ^ static_cast<const unsigned char*>(data)[i]) * 1099511628211ull;
+        };
+        mix(&shaderMaterial, sizeof(shaderMaterial));
+        mix(texture.c_str(), texture.size() * sizeof(wchar_t));
+        for (const wchar_t* shader : { vs, shadowVs })
+        {
+            const std::wstring text = shader ? shader : L"";
+            mix(text.c_str(), (text.size() + 1) * sizeof(wchar_t));
+        }
+        const int fields[] = { static_cast<int>(state.blendState), static_cast<int>(state.samplerState),
+            static_cast<int>(state.rasterizerState), static_cast<int>(state.depthStencilState) };
+        mix(fields, sizeof(fields));
+        wchar_t suffix[17];
+        swprintf_s(suffix, L"%016llx", static_cast<unsigned long long>(hash));
+        return std::wstring(prefix) + suffix;
+    };
+    auto createMaterial = [&](const wchar_t* prefix, size_t slot, const wchar_t* textureFilename,
         const wchar_t* vs, const wchar_t* shadowVs, StockRenderState state, Material** material) -> HRESULT
     {
         ApplyPbrRenderState(shaderMaterials[slot], state);
         const auto* maps = _params->MaterialTextures(slot);
         if (!maps || maps->Empty())
+        {
+            const auto name = contentName(prefix, shaderMaterials[slot], textureFilename ? textureFilename : L"", vs, shadowVs, state);
             return renderManager.CreateMaterial(name.c_str(), textureFilename, vs, nullptr, shadowVs, nullptr, shaderMaterials[slot], state, material);
+        }
         HRR(renderManager.BindMaterialTextures(*maps, shaderMaterials[slot]));
-        return renderManager.CreateMaterial(name.c_str(), maps->roles[BaseColorTextureRole].get(), vs, nullptr, shadowVs, nullptr, shaderMaterials[slot], state, material);
+        // The bound material holds every map's texture slot; the base-color map is passed separately.
+        const auto& baseColor = maps->roles[BaseColorTextureRole];
+        const auto name = contentName(prefix, shaderMaterials[slot], baseColor ? baseColor->key : L"", vs, shadowVs, state);
+        return renderManager.CreateMaterial(name.c_str(), baseColor.get(), vs, nullptr, shadowVs, nullptr, shaderMaterials[slot], state, material);
     };
     Material* pBranchLOD0 = nullptr;
-    HRR(createMaterial(branchLOD0MaterialName, 0, _params->textureFilename[0].c_str(), vsFilename.c_str(), shadowVsFilename.c_str(), StockRenderState(), &pBranchLOD0));
+    HRR(createMaterial(L"BranchLOD0_", 0, _params->textureFilename[0].c_str(), vsFilename.c_str(), shadowVsFilename.c_str(), StockRenderState(), &pBranchLOD0));
     Mesh* pNewMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_params->meshes[0]);
     renderManager.CreateMesh(L"BranchLOD0", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, inputLayout, &pNewMesh);
     renderManager.ReserveRenderUnit(pBranchLOD0, pNewMesh, this, &m_segmentRenderUnits[TreeSegmentIndex(TreeSegment::BranchLOD0)]);
 
     Material* pBranchLOD1 = nullptr;
-    HRR(createMaterial(branchLOD1MaterialName, 0, _params->textureFilename[0].c_str(), nullptr, nullptr, StockRenderState(), &pBranchLOD1));
+    HRR(createMaterial(L"BranchLOD1_", 0, _params->textureFilename[0].c_str(), nullptr, nullptr, StockRenderState(), &pBranchLOD1));
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Box);
     renderManager.CreateMesh(L"BranchLOD1", renderManager.GetPlatform()->GetVertexBuffer(geometryBuffer), renderManager.GetPlatform()->GetIndexBuffer(geometryBuffer), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
@@ -140,7 +167,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     leafLOD0State.blendState = StockBlendStates::Overwrite;
     Material* pLeafLOD0 = nullptr;
     const wchar_t* leafLOD0Texture = _params->textureFilename.size() > 1 ? _params->textureFilename[1].c_str() : nullptr;
-    HRR(createMaterial(leafLOD0MaterialName, 1, leafLOD0Texture, nullptr, nullptr, leafLOD0State, &pLeafLOD0));
+    HRR(createMaterial(L"LeafLOD0_", 1, leafLOD0Texture, nullptr, nullptr, leafLOD0State, &pLeafLOD0));
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Sprite);
     renderManager.CreateMesh(L"LeafLOD0", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
