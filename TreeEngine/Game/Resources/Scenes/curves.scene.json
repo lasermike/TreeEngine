@@ -2,7 +2,7 @@
   "version": 1,
   "id": "LoadCurvesScene",
   "name": "Curves",
-  "priority": 1,
+  "priority": 10,
   "camera": {
     "position": [0, 1.5, -6]
   },

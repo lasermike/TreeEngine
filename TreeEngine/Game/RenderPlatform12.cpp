@@ -1983,18 +1983,18 @@ HRESULT RenderPlatform12::InitDevice()
 #else
 
 #if defined(_DEBUG)
-    //// Enable the D3D12 debug layer.
-    //CComPtr<ID3D12Debug> debugController;
-    //if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-    //{
-    //    debugController->EnableDebugLayer();
-    //}
+    // Enable the D3D12 debug layer.
+    CComPtr<ID3D12Debug> debugController;
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+    {
+        debugController->EnableDebugLayer();
+    }
 
-    //CComPtr<ID3D12Debug5> debug5;
-    //if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug5), (void**)&debug5)))
-    //{
-    //    debug5->SetEnableAutoName(TRUE);
-    //}
+    CComPtr<ID3D12Debug5> debug5;
+    if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug5), (void**)&debug5)))
+    {
+        debug5->SetEnableAutoName(TRUE);
+    }
 
 
 #endif
@@ -2036,11 +2036,11 @@ HRESULT RenderPlatform12::InitDevice()
 
 #if defined(_DEBUG)
     // Enable the D3D12 debug layer.
-    CComPtr<ID3D12Debug> debugController;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-    {
-        debugController->EnableDebugLayer();
-    }
+//    CComPtr<ID3D12Debug> debugController;
+    //if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+    //{
+    //    debugController->EnableDebugLayer();
+    //}
 #endif
 
     HRR(D3D12CreateDevice(

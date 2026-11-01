@@ -2,25 +2,25 @@
   "version": 1,
   "id": "LoadGraph",
   "name": "Graph",
-  "priority": 1,
+  "priority": 10,
   "camera": {
-    "position": [5, 1.5, -8.2]
+    "position": [ 5, 1.5, -8.2 ]
   },
   "render": {
     "useShadowMaps": false
   },
   "light": {
-    "ambient": [0.5, 0.5, 0.5, 1],
-    "diffuse": [3.14159, 3.14159, 3.14159, 1],
-    "specular": [0.6, 0.6, 0.6, 1],
-    "direction": [-0.57735, -0.57735, 0.57735]
+    "ambient": [ 0.5, 0.5, 0.5, 1 ],
+    "diffuse": [ 3.14159, 3.14159, 3.14159, 1 ],
+    "specular": [ 0.6, 0.6, 0.6, 1 ],
+    "direction": [ -0.57735, -0.57735, 0.57735 ]
   },
   "objects": [
     {
       "id": "graph",
       "type": "graph",
       "dataFile": "graphdata.txt",
-      "transform": { "position": [0, 0.55, 0] },
+      "transform": { "position": [ 0, 0.55, 0 ] },
       "animationSpeed": 300,
       "depthLOD": -1
     },
@@ -28,7 +28,7 @@
       "id": "ground",
       "type": "primitive",
       "shape": "cylinderHD",
-      "transform": { "scale": [30, 0.01, 30] }
+      "transform": { "scale": [ 30, 0.01, 30 ] }
     }
   ]
 }

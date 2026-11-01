@@ -2,20 +2,20 @@
   "version": 1,
   "id": "LoadTestBlock",
   "name": "Test Block",
-  "priority": 1,
+  "priority": 10,
   "camera": {
-    "position": [-4, 1.5, -4],
-    "rotationDegrees": [0, 45, 0]
+    "position": [ -4, 1.5, -4 ],
+    "rotationDegrees": [ 0, 45, 0 ]
   },
   "light": {
-    "ambient": [0.2, 0.2, 0.2, 1],
-    "diffuse": [2.19911, 2.19911, 1.88496, 1],
-    "specular": [0.8, 0.8, 0.7, 1],
-    "direction": [-0.57735, -0.57735, 0.57735]
+    "ambient": [ 0.2, 0.2, 0.2, 1 ],
+    "diffuse": [ 2.19911, 2.19911, 1.88496, 1 ],
+    "specular": [ 0.8, 0.8, 0.7, 1 ],
+    "direction": [ -0.57735, -0.57735, 0.57735 ]
   },
   "materials": {
     "undersea-default": {
-      "baseColor": [0, 1, 0, 1],
+      "baseColor": [ 0, 1, 0, 1 ],
       "metallic": 0,
       "roughness": 0.6,
       "baseColorTexture": { "source": "undersea.dds" }
@@ -27,8 +27,8 @@
       "type": "primitive",
       "shape": "cylinderHD",
       "transform": {
-        "position": [2, 0, 0],
-        "scale": [2, 0.01, 2]
+        "position": [ 2, 0, 0 ],
+        "scale": [ 2, 0.01, 2 ]
       },
       "material": "undersea-default"
     },
@@ -37,9 +37,9 @@
       "type": "primitive",
       "shape": "box",
       "transform": {
-        "position": [0, 0, 2],
-        "scale": [1, 1.5, 2],
-        "rotation": [0.4082483, 0.4082483, 0.4082483, 0.7071068]
+        "position": [ 0, 0, 2 ],
+        "scale": [ 1, 1.5, 2 ],
+        "rotation": [ 0.4082483, 0.4082483, 0.4082483, 0.7071068 ]
       }
     }
   ]
