@@ -33,7 +33,7 @@ $windows = @(
     [ordered]@{ name = 'frames10to20'; first = 10; end = 20 }
 )
 $gpuPasses = @('frame', 'shadow', 'main', 'deformation', 'blas', 'tlas', 'rays')
-$metricNames = @('frameMs', 'sceneUpdateMs', 'drawUploadMs') + @($gpuPasses | ForEach-Object { "gpu_$($_)Ms" })
+$metricNames = @('frameMs', 'sceneUpdateMs', 'drawUploadMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs') + @($gpuPasses | ForEach-Object { "gpu_$($_)Ms" })
 $utf8 = New-Object Text.UTF8Encoding($false)
 
 if ($Build) {
@@ -103,6 +103,12 @@ function Get-WindowSummary($Samples, $Window) {
         frameMs = Get-Statistics @($inWindow | ForEach-Object { $_.frameMs })
         sceneUpdateMs = Get-Statistics @($inWindow | ForEach-Object { $_.sceneUpdateMs })
         drawUploadMs = Get-Statistics @($inWindow | ForEach-Object { $_.drawUploadMs })
+    }
+    foreach ($metric in @('blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs')) {
+        $summary[$metric] = $null
+        if (@($inWindow | Where-Object { $_.PSObject.Properties.Name -notcontains $metric }).Count -eq 0) {
+            $summary[$metric] = Get-Statistics @($inWindow | ForEach-Object { $_.$metric })
+        }
     }
     for ($i = 0; $i -lt $gpuPasses.Count; $i++) {
         $summary["gpu_$($gpuPasses[$i])Ms"] = Get-Statistics @($inWindow | ForEach-Object { $_.gpuMs[$i] })
@@ -217,7 +223,10 @@ $rows = foreach ($job in $jobs) {
         if ($job.success) {
             $row.loadTotalMs = $job.sceneLoad.totalMs; $row.loadDefinitionMs = $job.sceneLoad.definitionMs
             $row.loadGenerationMs = $job.sceneLoad.generationMs; $row.loadGraphicsMs = $job.sceneLoad.graphicsMs
-            foreach ($metric in $metricNames) { $row[$metric] = $job.windows[$window.name][$metric].mean }
+            foreach ($metric in $metricNames) {
+                $statistics = $job.windows[$window.name][$metric]
+                if ($null -ne $statistics) { $row[$metric] = $statistics.mean }
+            }
         }
         [pscustomobject]$row
     }

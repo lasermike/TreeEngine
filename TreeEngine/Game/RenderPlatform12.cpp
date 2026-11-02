@@ -2686,6 +2686,16 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     // Instances link micromaps through their slot's entry; the linkage must not change across BLAS updates.
     const int* opacityMicromaps = m_ommIndices && m_settings->m_opacityMicromaps ? m_renderData->instanceOpacityMicromap : nullptr;
 
+    const bool profileCpu = m_renderData->profile.enabled;
+    auto cpuStart = profileCpu ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+    auto elapsedCpuMs = [&]()
+    {
+        const auto now = std::chrono::steady_clock::now();
+        const double elapsed = std::chrono::duration<double, std::milli>(now - cpuStart).count();
+        cpuStart = now;
+        return elapsed;
+    };
+
     // Hash the draw records to see if the geometry is the same as last build
     size_t currentHash = opacityMicromaps ? 1 : 0;
 
@@ -2705,6 +2715,10 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     
     m_previousDrawRecordHash = currentHash;
     m_renderData->profile.rebuiltBLAS = freshBuild;
+    if (profileCpu)
+    {
+        m_renderData->profile.blasHashMs = elapsedCpuMs();
+    }
 
 
     UINT geometryDescIndex = 0;
@@ -2792,6 +2806,11 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     }
 
+    if (profileCpu)
+    {
+        m_renderData->profile.blasDescriptorsMs = elapsedCpuMs();
+    }
+
     ///////////////
 
     if (freshBuild)
@@ -2844,7 +2863,15 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
                                                                                 rtInputs, 
                                                                                 freshBuild ? 0 : m_BLAS->GetGPUVirtualAddress(),
                                                                                 m_scratchBLAS->GetGPUVirtualAddress() };
+    if (profileCpu)
+    {
+        cpuStart = std::chrono::steady_clock::now();
+    }
     commandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+    if (profileCpu)
+    {
+        m_renderData->profile.blasSubmitMs = elapsedCpuMs();
+    }
     commandList.Release();
 
     D3D12_RESOURCE_BARRIER uavBarrier2 = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
@@ -2925,7 +2952,15 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     topLevelBuildDesc.ScratchAccelerationStructureData = m_scratchTLAS->GetGPUVirtualAddress();
 
     HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
+    if (profileCpu)
+    {
+        cpuStart = std::chrono::steady_clock::now();
+    }
     commandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+    if (profileCpu)
+    {
+        m_renderData->profile.tlasSubmitMs = elapsedCpuMs();
+    }
 
     D3D12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
     commandList->ResourceBarrier(1, &uavBarrier);	// Need the top level build to finish before we can render with it...
@@ -3407,6 +3442,7 @@ HRESULT RenderPlatform12::BeginProfileFrame()
     }
     profile.gpuMs.fill(0);
     profile.drawUploadMs = 0;
+    profile.blasHashMs = profile.blasDescriptorsMs = profile.blasSubmitMs = profile.tlasSubmitMs = 0;
     profile.drawRecords = profile.worldVertices = profile.skinnedVertices = 0;
     profile.indexEntries = profile.dispatchGroups = 0;
     profile.rebuiltPoseBranches = profile.reusedPoseBranches = 0;

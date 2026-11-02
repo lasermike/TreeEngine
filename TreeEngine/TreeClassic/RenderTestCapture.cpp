@@ -284,6 +284,8 @@ namespace
                 report["samples"].push_back({
                     { "frame", frame }, { "simulationTime", simulationTime }, { "frameMs", frameMs },
                     { "sceneUpdateMs", profile.sceneUpdateMs }, { "drawUploadMs", profile.drawUploadMs },
+                    { "blasHashMs", profile.blasHashMs }, { "blasDescriptorsMs", profile.blasDescriptorsMs },
+                    { "blasSubmitMs", profile.blasSubmitMs }, { "tlasSubmitMs", profile.tlasSubmitMs },
                     { "gpuMs", profile.gpuMs }, { "drawRecords", profile.drawRecords },
                     { "worldVertices", profile.worldVertices }, { "skinnedVertices", profile.skinnedVertices },
                     { "indexEntries", profile.indexEntries }, { "dispatchGroups", profile.dispatchGroups },
@@ -378,6 +380,8 @@ int RunRenderTestCapture(Game& game)
                         { "simulationTime", simulationTime },
                         { "frameMs", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() },
                         { "sceneUpdateMs", profile.sceneUpdateMs }, { "drawUploadMs", profile.drawUploadMs },
+                        { "blasHashMs", profile.blasHashMs }, { "blasDescriptorsMs", profile.blasDescriptorsMs },
+                        { "blasSubmitMs", profile.blasSubmitMs }, { "tlasSubmitMs", profile.tlasSubmitMs },
                         { "gpuMs", profile.gpuMs }, { "drawRecords", profile.drawRecords },
                         { "worldVertices", profile.worldVertices }, { "skinnedVertices", profile.skinnedVertices },
                         { "indexEntries", profile.indexEntries }, { "dispatchGroups", profile.dispatchGroups },

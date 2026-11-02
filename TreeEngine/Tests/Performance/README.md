@@ -48,6 +48,8 @@ process with a `performance` request. The process:
    - `frameMs`: CPU wall time of the whole frame, including the wait for the GPU.
    - `sceneUpdateMs`: CPU scene update, including the worker wait.
    - `drawUploadMs`: CPU DXR draw upload.
+   - `blasHashMs` and `blasDescriptorsMs`: CPU time to hash BLAS inputs and prepare geometry descriptors and associated data.
+   - `blasSubmitMs` and `tlasSubmitMs`: CPU wall time inside the respective build-command API calls, not GPU execution time.
    - `gpuMs`: GPU passes in the order frame, shadow, main, deformation, BLAS, TLAS, rays.
      Passes that don't run in a mode report 0; BLAS, TLAS, rays and deformation run only in ray tracing.
    - Counters: draw records, vertices, pose branches rebuilt and reused, acceleration-structure bytes, and others.
@@ -81,7 +83,7 @@ Tools should read the fields in `results.json` or `index.json`, not parse direct
       (uniform triangles that need no map), `subdivisionLevel`, `bytes`, and `states`
       (micro-triangles transparent, opaque, unknown-transparent, unknown-opaque)
     - every frame's `samples`
-    - `windows.<name>.<metric>`, the `{ mean, min, max }` of `frameMs`, `sceneUpdateMs`, `drawUploadMs` and `gpu_<pass>Ms`
+    - `windows.<name>.<metric>`, the `{ mean, min, max }` of CPU timing metrics and `gpu_<pass>Ms`
 - **`summary.csv`:** one row per job and window, with load times and window means. Open it in Excel for a quick look.
 - **`jobs/<scene>-<mode>-run<N>/`:** the raw `request.json`, the app's `report.json`, and logs.
   These are for local debugging and are not committed (see `.gitignore`); `results.json` has every sample.
