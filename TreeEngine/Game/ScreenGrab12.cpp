@@ -713,7 +713,15 @@ namespace
             DXGI_FORMAT fmt = EnsureNotTypeless(desc.Format);
 
             D3D12_FEATURE_DATA_FORMAT_SUPPORT formatInfo = { fmt };
-            hr = device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &formatInfo, sizeof(formatInfo));
+            ComPtr<ID3D12Device16> device16;
+            if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(device16.GetAddressOf()))))
+            {
+                hr = device16->CheckFeatureSupport1(D3D12_FEATURE_FORMAT_SUPPORT, &formatInfo, sizeof(formatInfo), 722);
+            }
+            else
+            {
+                hr = device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &formatInfo, sizeof(formatInfo));
+            }
             if (FAILED(hr))
                 return hr;
 

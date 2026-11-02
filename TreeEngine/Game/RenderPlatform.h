@@ -991,7 +991,7 @@ public:
     CComPtr<ID3D12Resource>		m_scratchTLAS;
     CComPtr<ID3D12Resource>		m_BLAS;
     CComPtr<ID3D12Resource>		m_scratchBLAS;
-    UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesTLAS;
+    UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesTLAS = nullptr;
 
 
     // DXR buffers

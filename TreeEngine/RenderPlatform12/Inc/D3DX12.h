@@ -1225,7 +1225,18 @@ inline UINT8 D3D12GetFormatPlaneCount(
     )
 {
     D3D12_FEATURE_DATA_FORMAT_INFO formatInfo = {Format};
-    if (FAILED(pDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_INFO, &formatInfo, sizeof(formatInfo))))
+    ID3D12Device16* device16 = nullptr;
+    HRESULT hr = pDevice->QueryInterface(IID_PPV_ARGS(&device16));
+    if (SUCCEEDED(hr))
+    {
+        hr = device16->CheckFeatureSupport1(D3D12_FEATURE_FORMAT_INFO, &formatInfo, sizeof(formatInfo), 722);
+        device16->Release();
+    }
+    else
+    {
+        hr = pDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_INFO, &formatInfo, sizeof(formatInfo));
+    }
+    if (FAILED(hr))
     {
         return 0;
     }

@@ -1334,6 +1334,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeDelete(&m_renderData->pShadowMap);
 
 #if defined(DXR_ENABLED)
+    m_shaderBindingTable.Reset();
     SafeDelete(&m_renderData->pDxrOutBuffer);
  
     m_VBWorld.Release();
@@ -1349,6 +1350,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeDelete(&m_bvhGeometryDescs);
     SafeDelete(&m_dxrMaterialBuffer);
     SafeDelete(&m_dxrGeometryInfoBuffer);
+    SafeDelete(&m_instancesTLAS);
 
 #endif
 
@@ -3166,6 +3168,9 @@ HRESULT RenderPlatform12::UninitDevice()
     m_commandQueue.Release();
 
     m_loadTextureHeap.Release();
+
+    g_pd3dSrvDescHeapAlloc.Destroy();
+    SafeRelease(&g_pd3dSrvDescHeap);
 
     CloseHandle(m_fenceEvent);
     m_fenceEvent = nullptr;
