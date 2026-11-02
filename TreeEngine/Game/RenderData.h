@@ -73,6 +73,7 @@ struct RenderProfile
     double sceneUpdateMs = 0;
     double drawUploadMs = 0;
     double blasHashMs = 0;
+    double blasSnapshotMs = 0;
     double blasDescriptorsMs = 0;
     double blasSubmitMs = 0;
     double tlasSubmitMs = 0;
@@ -89,6 +90,7 @@ struct RenderProfile
     std::uint64_t worldVertexCapacityBytes = 0;
     std::uint64_t accelerationStructureBytes = 0;
     bool rebuiltBLAS = false;
+    bool reusedBLAS = false;
 };
 
 struct ProjectionData

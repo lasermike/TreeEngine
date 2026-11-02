@@ -65,6 +65,14 @@ foreach ($scene in @('LoadTestTree', 'LoadTrees', 'Instancing')) {
             }
             $sample = $report.captures[$i * 2].samples[0]
             $reference = $report.captures[$i * 2 + 1].samples[0]
+            if ($mode -eq 'raytracing') {
+                if (-not $reference.reusedBLAS) {
+                    throw "Identical geometry did not reuse the BLAS: $scene / state $i"
+                }
+                if ($i -in @(1, 2, 7, 8) -and $sample.reusedBLAS) {
+                    throw "Changed tree geometry reused a stale BLAS: $scene / state $i"
+                }
+            }
             if ($reference.rebuiltPoseBranches -le 0 -or $reference.reusedPoseBranches -ne 0) {
                 throw "Reference pose was not recomputed: $scene / $mode / state $i"
             }

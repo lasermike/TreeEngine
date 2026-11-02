@@ -175,6 +175,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
     { key: 'frameMs', title: 'CPU frame', sub: 'Wall time of the whole frame, including the wait for the GPU' },
     { key: 'sceneUpdateMs', title: 'CPU scene update', sub: 'Includes the wait for worker threads' },
     { key: 'drawUploadMs', title: 'CPU DXR draw upload', sub: '' },
+    { key: 'blasSnapshotMs', title: 'CPU BLAS input snapshot', sub: 'Compare geometry and transform inputs for reuse' },
     { key: 'blasHashMs', title: 'CPU BLAS hash', sub: 'Draw and micromap identity hashing' },
     { key: 'blasDescriptorsMs', title: 'CPU BLAS descriptors', sub: 'Geometry descriptors and material data' },
     { key: 'blasSubmitMs', title: 'CPU BLAS build call', sub: 'Time spent recording the BLAS build command' },

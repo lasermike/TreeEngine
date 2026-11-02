@@ -1185,6 +1185,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             ImGui::SeparatorText("CPU timings");
             ImGui::Text("Scene update (includes worker wait): %.3f ms", profile.sceneUpdateMs);
             ImGui::Text("DXR draw upload: %.3f ms", profile.drawUploadMs);
+            ImGui::Text("BLAS input snapshot: %.3f ms (%s)", profile.blasSnapshotMs,
+                profile.reusedBLAS ? "reused" : "updated");
             ImGui::Text("BLAS hash / descriptors: %.3f / %.3f ms", profile.blasHashMs, profile.blasDescriptorsMs);
             ImGui::Text("BLAS / TLAS build calls: %.3f / %.3f ms", profile.blasSubmitMs, profile.tlasSubmitMs);
 

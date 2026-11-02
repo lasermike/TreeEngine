@@ -33,7 +33,7 @@ $windows = @(
     [ordered]@{ name = 'frames10to20'; first = 10; end = 20 }
 )
 $gpuPasses = @('frame', 'shadow', 'main', 'deformation', 'blas', 'tlas', 'rays')
-$metricNames = @('frameMs', 'sceneUpdateMs', 'drawUploadMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs') + @($gpuPasses | ForEach-Object { "gpu_$($_)Ms" })
+$metricNames = @('frameMs', 'sceneUpdateMs', 'drawUploadMs', 'blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs') + @($gpuPasses | ForEach-Object { "gpu_$($_)Ms" })
 $utf8 = New-Object Text.UTF8Encoding($false)
 
 if ($Build) {
@@ -104,7 +104,7 @@ function Get-WindowSummary($Samples, $Window) {
         sceneUpdateMs = Get-Statistics @($inWindow | ForEach-Object { $_.sceneUpdateMs })
         drawUploadMs = Get-Statistics @($inWindow | ForEach-Object { $_.drawUploadMs })
     }
-    foreach ($metric in @('blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs')) {
+    foreach ($metric in @('blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs')) {
         $summary[$metric] = $null
         if (@($inWindow | Where-Object { $_.PSObject.Properties.Name -notcontains $metric }).Count -eq 0) {
             $summary[$metric] = Get-Statistics @($inWindow | ForEach-Object { $_.$metric })

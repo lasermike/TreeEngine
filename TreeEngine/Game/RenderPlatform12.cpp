@@ -1040,6 +1040,10 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     GetDevice()->CreateShaderResourceView(m_DrawRecordsResource, &descDrawRecordsSrv, m_descriptorHeap.hCPU(DrawRecords_SrvHeapOffset));
 
     m_previousDrawRecordHash = 0;
+    m_previousBlasInputs.clear();
+    m_currentBlasInputs.clear();
+    m_cpuInstanceData.clear();
+    m_mappedInstanceData = nullptr;
 
     m_bvhGeometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[maxInstances];
     m_ommTriangleDescs.assign(maxInstances, {});
@@ -1357,6 +1361,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeDelete(&m_dxrMaterialBuffer);
     SafeDelete(&m_dxrGeometryInfoBuffer);
     SafeDelete(&m_instancesTLAS);
+    m_previousBlasInputs.clear();
+    m_currentBlasInputs.clear();
 
 #endif
 
@@ -1366,6 +1372,13 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 HRESULT RenderPlatform12::EndFrame(D3DBuffer* buffer)
 {
     HRESULT hr = S_OK;
+#if defined(DXR_ENABLED)
+    if (m_mappedInstanceData && !m_cpuInstanceData.empty())
+    {
+        memcpy(m_mappedInstanceData, m_cpuInstanceData.data(), m_cpuInstanceData.size() * sizeof(InstancedData));
+    }
+    m_mappedInstanceData = nullptr;
+#endif
     buffer->buffer->Unmap(0, nullptr);
     return hr;
 }
@@ -2592,6 +2605,7 @@ static HRESULT CreateFilledUploadBuffer(ID3D12Device* device, const void* data, 
 
 void RenderPlatform12::ReleaseOpacityMicromaps()
 {
+    m_previousBlasInputs.clear();
     m_ommArray.Release();
     m_ommScratch.Release();
     m_ommData.Release();
@@ -2686,6 +2700,73 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     // Instances link micromaps through their slot's entry; the linkage must not change across BLAS updates.
     const int* opacityMicromaps = m_ommIndices && m_settings->m_opacityMicromaps ? m_renderData->instanceOpacityMicromap : nullptr;
 
+    const auto snapshotStart = m_renderData->profile.enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+    // Compare the actual instance inputs, including skinning parents and per-object transforms.
+    // Scene updates write to ordinary CPU memory, avoiding slow reads from the upload heap.
+    m_currentBlasInputs.clear();
+    const auto appendInput = [&](const void* data, size_t size)
+    {
+        const size_t offset = m_currentBlasInputs.size();
+        m_currentBlasInputs.resize(offset + size);
+        memcpy(m_currentBlasInputs.data() + offset, data, size);
+    };
+    const bool usesOpacityMicromaps = opacityMicromaps != nullptr;
+    appendInput(&usesOpacityMicromaps, sizeof(usesOpacityMicromaps));
+    const size_t instanceCount = m_cpuInstanceData.size();
+    const InstancedData* instances = m_cpuInstanceData.data();
+    bool snapshotValid = instances != nullptr;
+    if (snapshotValid)
+    {
+        for (const DrawRecord& record : m_drawRecords)
+        {
+            appendInput(&record, sizeof(record));
+            if (record.startingInstance > instanceCount || record.numInstances > instanceCount - record.startingInstance)
+            {
+                snapshotValid = false;
+                break;
+            }
+            if (record.objectTransformSlot != UINT_MAX)
+            {
+                if (record.objectTransformSlot >= instanceCount)
+                {
+                    snapshotValid = false;
+                    break;
+                }
+                appendInput(&instances[record.objectTransformSlot].World, sizeof(XMFLOAT4X4));
+            }
+            for (UINT i = 0; i < record.numInstances; ++i)
+            {
+                const UINT slot = record.startingInstance + i;
+                const InstancedData& instance = instances[slot];
+                appendInput(&instance, sizeof(instance));
+                if (record.inputLayout == SKINNED_INPUT_LAYOUT && instance.InstanceOffsetPrev != instance.InstanceOffset)
+                {
+                    if (instance.InstanceOffsetPrev >= instanceCount)
+                    {
+                        snapshotValid = false;
+                        break;
+                    }
+                    appendInput(&instances[instance.InstanceOffsetPrev].World, sizeof(XMFLOAT4X4));
+                }
+                if (opacityMicromaps)
+                {
+                    appendInput(&opacityMicromaps[slot], sizeof(opacityMicromaps[slot]));
+                }
+            }
+            if (!snapshotValid)
+            {
+                break;
+            }
+        }
+    }
+    const bool unchangedInputs = snapshotValid && !m_previousBlasInputs.empty()
+        && m_currentBlasInputs == m_previousBlasInputs;
+    if (m_renderData->profile.enabled)
+    {
+        m_renderData->profile.blasSnapshotMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - snapshotStart).count();
+    }
+
     const bool profileCpu = m_renderData->profile.enabled;
     auto cpuStart = profileCpu ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     auto elapsedCpuMs = [&]()
@@ -2702,8 +2783,12 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
         currentHash = hash_combine(currentHash, m_drawRecords[drawRecordIndex]);
-        if (!opacityMicromaps) continue;
         const DrawRecord& dr = m_drawRecords[drawRecordIndex];
+        const bool alphaCutoutSprite = dr.inputLayout != SKINNED_INPUT_LAYOUT
+            && dr.indexBufferStart == m_spriteIndices.IndexOffset && dr.indexBufferCount == m_spriteIndices.IndexCount
+            && dr.material.flags.z > 0 && !(dr.material.flags.x > 0);
+        currentHash = hash_combine(currentHash, std::hash<bool>{}(alphaCutoutSprite));
+        if (!opacityMicromaps) continue;
         for (UINT instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
             currentHash ^= std::hash<int>()(opacityMicromaps[dr.startingInstance + instanceIndex]) + 0x9e3779b9 + (currentHash << 6) + (currentHash >> 2);
     }
@@ -2809,6 +2894,31 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     if (profileCpu)
     {
         m_renderData->profile.blasDescriptorsMs = elapsedCpuMs();
+    }
+
+    if (!freshBuild && unchangedInputs && m_BLAS && m_TLAS)
+    {
+        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+            m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+        m_renderData->profile.reusedBLAS = true;
+        if (profileCpu)
+        {
+            m_renderData->profile.accelerationStructureBytes = m_BLAS->GetDesc().Width + m_TLAS->GetDesc().Width
+                + m_scratchBLAS->GetDesc().Width + m_scratchTLAS->GetDesc().Width;
+        }
+        PIXEndEvent(GetCommandList());
+        ProfileTimestamp(ProfilePass::BLAS, true);
+        ProfileTimestamp(ProfilePass::TLAS, false);
+        ProfileTimestamp(ProfilePass::TLAS, true);
+        return S_OK;
+    }
+    if (snapshotValid)
+    {
+        m_previousBlasInputs.swap(m_currentBlasInputs);
+    }
+    else
+    {
+        m_previousBlasInputs.clear();
     }
 
     ///////////////
@@ -3442,13 +3552,14 @@ HRESULT RenderPlatform12::BeginProfileFrame()
     }
     profile.gpuMs.fill(0);
     profile.drawUploadMs = 0;
-    profile.blasHashMs = profile.blasDescriptorsMs = profile.blasSubmitMs = profile.tlasSubmitMs = 0;
+    profile.blasSnapshotMs = profile.blasHashMs = profile.blasDescriptorsMs = profile.blasSubmitMs = profile.tlasSubmitMs = 0;
     profile.drawRecords = profile.worldVertices = profile.skinnedVertices = 0;
     profile.indexEntries = profile.dispatchGroups = 0;
     profile.rebuiltPoseBranches = profile.reusedPoseBranches = 0;
     profile.poseCacheBytes = profile.drawUploadBytes = profile.accelerationStructureBytes = 0;
     profile.drawUploadCapacityBytes = profile.worldVertexCapacityBytes = 0;
     profile.rebuiltBLAS = false;
+    profile.reusedBLAS = false;
     m_profileQueryMask = 0;
     ProfileTimestamp(ProfilePass::Frame, false);
     return S_OK;
@@ -3487,6 +3598,15 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     // Get a handle to the instance buffer.  Game will fill out data before calling Render()
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
     HR(buffer->buffer->Map(0, &readRange, reinterpret_cast<void**>(dataView)));
+#if defined(DXR_ENABLED)
+    m_mappedInstanceData = *dataView;
+    const size_t instanceCount = static_cast<size_t>(buffer->buffer->GetDesc().Width) / sizeof(InstancedData);
+    if (m_cpuInstanceData.size() != instanceCount)
+    {
+        m_cpuInstanceData.assign(instanceCount, {});
+    }
+    *dataView = m_cpuInstanceData.data();
+#endif
     //TODO should Map() in D3D12 only get called once at create time?
 
     // Needs on xbox?
