@@ -49,6 +49,8 @@ process with a `performance` request. The process:
    - `sceneUpdateMs`: CPU scene update, including the worker wait.
    - `drawUploadMs`: CPU DXR draw upload.
    - `blasSnapshotMs`: CPU time to snapshot and compare BLAS geometry and transform inputs.
+   - `blasCpuMs`: total CPU wall time for BLAS work, including input checks, descriptor preparation, resource setup, and command recording.
+   - `firstBlasBuildCpuMs` and `firstBlasBuildGpuMs`: the first actual BLAS rebuild in the run, independent of the selected frame window; GPU time also includes any initial opacity-micromap build. Older runs without the CPU metric leave it blank.
    - `blasHashMs` and `blasDescriptorsMs`: CPU time to hash BLAS inputs and prepare geometry descriptors and associated data.
    - `blasSubmitMs` and `tlasSubmitMs`: CPU wall time inside the respective build-command API calls, not GPU execution time.
    - `gpuMs`: GPU passes in the order frame, shadow, main, deformation, BLAS, TLAS, rays.

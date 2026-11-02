@@ -522,6 +522,11 @@ void TestLeafAtlases()
 void TestOpacityMicromaps()
 {
     using namespace OpacityMicromap;
+    Check(IndexRangeFits(88, 2, 360), "last two micromap indices should fit exactly");
+    Check(!IndexRangeFits(88, 3, 360), "micromap range extending past the buffer must be rejected");
+    Check(!IndexRangeFits(154, 2, 360), "micromap start beyond the buffer must be rejected");
+    Check(!IndexRangeFits(-1, 2, 360), "missing micromap index must be rejected");
+    Check(!IndexRangeFits(0, UINT64_MAX, 360), "oversized micromap range must be rejected without overflow");
     // Every micro-triangle maps to a distinct index along the space-filling curve.
     for (uint32_t level = 1; level <= 8; ++level)
     {

@@ -2,6 +2,7 @@
 
 #include "RenderPlatform.h"
 #include "Settings.h"
+#include "OpacityMicromapBaker.h"
 #include <chrono>
 
 #include "DDSTextureLoader12.h"
@@ -2690,6 +2691,8 @@ HRESULT RenderPlatform12::RecordOpacityMicromapBuild()
 
 HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 {
+    const bool profileBlasCpu = m_renderData->profile.enabled;
+    const auto blasCpuStart = profileBlasCpu ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
     ProfileTimestamp(ProfilePass::BLAS, false);
 
@@ -2807,6 +2810,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
 
     UINT geometryDescIndex = 0;
+    const UINT64 opacityBufferBytes = opacityMicromaps ? m_ommIndices->GetDesc().Width : 0;
     UINT64 geometryCount = 0;
     for (const auto& record : m_drawRecords)
         geometryCount += record.numInstances;
@@ -2836,9 +2840,13 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
             // Alpha-masked sprites (leaves) keep only their front quad. The back quad is coplanar, so either could win a hit;
             // the closest-hit shader shades back-face hits with the flipped normal instead. Their any-hit doesn't cull back faces.
-            if (dr.inputLayout != SKINNED_INPUT_LAYOUT && dr.indexBufferStart == m_spriteIndices.IndexOffset
-                && dr.indexBufferCount == m_spriteIndices.IndexCount && dr.material.flags.z > 0 && !(dr.material.flags.x > 0))
+            const bool micromapLeaf = dr.inputLayout != SKINNED_INPUT_LAYOUT && m_spriteIndices.IndexCount > 0
+                && dr.indexBufferStart == m_spriteIndices.IndexOffset && dr.indexBufferCount == m_spriteIndices.IndexCount
+                && dr.material.flags.z > 0 && !(dr.material.flags.x > 0);
+            if (micromapLeaf)
+            {
                 geometryDesc.Triangles.IndexCount = m_spriteIndices.IndexCount / 2;
+            }
 
             assert(geometryDesc.Triangles.VertexBuffer.StartAddress + geometryDesc.Triangles.VertexCount * geometryDesc.Triangles.VertexBuffer.StrideInBytes
                 <= m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
@@ -2856,14 +2864,17 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
                  <= indexBufferEnd);
 
             const int opacityMicromap = opacityMicromaps ? opacityMicromaps[dr.startingInstance + instanceIndex] : -1;
-            if (opacityMicromap >= 0)
+            // Only leaf sprites have compatible baked indices, and every referenced index must fit the buffer.
+            const UINT64 opacityOffset = opacityMicromap >= 0 ? static_cast<UINT64>(opacityMicromap) * sizeof(int) : 0;
+            if (micromapLeaf && OpacityMicromap::IndexRangeFits(opacityMicromap,
+                geometryDesc.Triangles.IndexCount / 3, opacityBufferBytes))
             {
                 // The same triangles, plus one micromap index-buffer entry per triangle starting at the instance's entry.
                 D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC& triangles = m_ommTriangleDescs[geometryDescIndex];
                 D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC& linkage = m_ommLinkageDescs[geometryDescIndex];
                 triangles = geometryDesc.Triangles;
                 linkage = {};
-                linkage.OpacityMicromapIndexBuffer.StartAddress = m_ommIndices->GetGPUVirtualAddress() + sizeof(int) * opacityMicromap;
+                linkage.OpacityMicromapIndexBuffer.StartAddress = m_ommIndices->GetGPUVirtualAddress() + opacityOffset;
                 linkage.OpacityMicromapIndexBuffer.StrideInBytes = sizeof(int);
                 linkage.OpacityMicromapIndexFormat = DXGI_FORMAT_R32_UINT;
                 linkage.OpacityMicromapArray = m_ommArray ? m_ommArray->GetGPUVirtualAddress() : 0;
@@ -2910,6 +2921,11 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         ProfileTimestamp(ProfilePass::BLAS, true);
         ProfileTimestamp(ProfilePass::TLAS, false);
         ProfileTimestamp(ProfilePass::TLAS, true);
+        if (profileBlasCpu)
+        {
+            m_renderData->profile.blasCpuMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - blasCpuStart).count();
+        }
         return S_OK;
     }
     if (snapshotValid)
@@ -2989,6 +3005,11 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     PIXEndEvent(GetCommandList());
     ProfileTimestamp(ProfilePass::BLAS, true);
+    if (profileBlasCpu)
+    {
+        m_renderData->profile.blasCpuMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - blasCpuStart).count();
+    }
 
     //HRR(ExecuteCurrentCommandList(true));
 
@@ -3552,7 +3573,7 @@ HRESULT RenderPlatform12::BeginProfileFrame()
     }
     profile.gpuMs.fill(0);
     profile.drawUploadMs = 0;
-    profile.blasSnapshotMs = profile.blasHashMs = profile.blasDescriptorsMs = profile.blasSubmitMs = profile.tlasSubmitMs = 0;
+    profile.blasCpuMs = profile.blasSnapshotMs = profile.blasHashMs = profile.blasDescriptorsMs = profile.blasSubmitMs = profile.tlasSubmitMs = 0;
     profile.drawRecords = profile.worldVertices = profile.skinnedVertices = 0;
     profile.indexEntries = profile.dispatchGroups = 0;
     profile.rebuiltPoseBranches = profile.reusedPoseBranches = 0;

@@ -74,6 +74,7 @@ struct RenderProfile
     double drawUploadMs = 0;
     double blasHashMs = 0;
     double blasSnapshotMs = 0;
+    double blasCpuMs = 0;
     double blasDescriptorsMs = 0;
     double blasSubmitMs = 0;
     double tlasSubmitMs = 0;

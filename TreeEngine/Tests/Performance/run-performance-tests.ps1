@@ -33,7 +33,7 @@ $windows = @(
     [ordered]@{ name = 'frames10to20'; first = 10; end = 20 }
 )
 $gpuPasses = @('frame', 'shadow', 'main', 'deformation', 'blas', 'tlas', 'rays')
-$metricNames = @('frameMs', 'sceneUpdateMs', 'drawUploadMs', 'blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs') + @($gpuPasses | ForEach-Object { "gpu_$($_)Ms" })
+$metricNames = @('frameMs', 'sceneUpdateMs', 'drawUploadMs', 'blasCpuMs', 'blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs', 'firstBlasBuildCpuMs', 'firstBlasBuildGpuMs') + @($gpuPasses | ForEach-Object { "gpu_$($_)Ms" })
 $utf8 = New-Object Text.UTF8Encoding($false)
 
 if ($Build) {
@@ -104,10 +104,23 @@ function Get-WindowSummary($Samples, $Window) {
         sceneUpdateMs = Get-Statistics @($inWindow | ForEach-Object { $_.sceneUpdateMs })
         drawUploadMs = Get-Statistics @($inWindow | ForEach-Object { $_.drawUploadMs })
     }
-    foreach ($metric in @('blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs')) {
+    foreach ($metric in @('blasCpuMs', 'blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs')) {
         $summary[$metric] = $null
         if (@($inWindow | Where-Object { $_.PSObject.Properties.Name -notcontains $metric }).Count -eq 0) {
             $summary[$metric] = Get-Statistics @($inWindow | ForEach-Object { $_.$metric })
+        }
+    }
+    # Initial creation is usually frame 0, outside the steady-state windows. Use the first actual rebuild.
+    $firstBuild = @($Samples | Where-Object { $_.PSObject.Properties.Name -contains 'rebuiltBLAS' -and $_.rebuiltBLAS } | Select-Object -First 1)
+    $summary['firstBlasBuildCpuMs'] = $null
+    $summary['firstBlasBuildGpuMs'] = $null
+    if ($firstBuild.Count -gt 0) {
+        $first = $firstBuild[0]
+        if ($first.PSObject.Properties.Name -contains 'blasCpuMs') {
+            $summary['firstBlasBuildCpuMs'] = Get-Statistics @([double]$first.blasCpuMs)
+        }
+        if ($first.PSObject.Properties.Name -contains 'gpuMs' -and @($first.gpuMs).Count -gt 4) {
+            $summary['firstBlasBuildGpuMs'] = Get-Statistics @([double]$first.gpuMs[4])
         }
     }
     for ($i = 0; $i -lt $gpuPasses.Count; $i++) {

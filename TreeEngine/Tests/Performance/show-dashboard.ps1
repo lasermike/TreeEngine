@@ -26,7 +26,7 @@ foreach ($file in Get-ChildItem -LiteralPath $sceneDirectory -Filter '*.scene.js
 
 # summary.csv columns copied into each run, as numbers. Other columns identify the row.
 $valueColumns = @('loadTotalMs', 'loadDefinitionMs', 'loadGenerationMs', 'loadGraphicsMs', 'processMs',
-    'frameMs', 'sceneUpdateMs', 'drawUploadMs', 'blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs', 'gpu_frameMs', 'gpu_shadowMs', 'gpu_mainMs',
+    'frameMs', 'sceneUpdateMs', 'drawUploadMs', 'blasCpuMs', 'blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs', 'firstBlasBuildCpuMs', 'firstBlasBuildGpuMs', 'gpu_frameMs', 'gpu_shadowMs', 'gpu_mainMs',
     'gpu_deformationMs', 'gpu_blasMs', 'gpu_tlasMs', 'gpu_raysMs')
 $columns = @('scene', 'mode', 'run', 'window') + $valueColumns
 

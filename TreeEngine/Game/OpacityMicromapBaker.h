@@ -7,6 +7,18 @@
 // transparent, or unknown; rays then skip the any-hit shader everywhere except unknown micro-triangles.
 namespace OpacityMicromap
 {
+    // The index buffer has one 32-bit entry per triangle. Check the full range before linking it.
+    inline bool IndexRangeFits(int firstIndex, uint64_t triangleCount, uint64_t bufferBytes)
+    {
+        if (firstIndex < 0)
+        {
+            return false;
+        }
+        const uint64_t entries = bufferBytes / sizeof(int32_t);
+        const uint64_t first = static_cast<uint64_t>(firstIndex);
+        return first <= entries && triangleCount <= entries - first;
+    }
+
     // D3D12_RAYTRACING_OPACITY_MICROMAP_STATE values, two bits each in OC1_4_STATE data.
     enum State : uint8_t { Transparent = 0, Opaque = 1, UnknownTransparent = 2, UnknownOpaque = 3 };
 
