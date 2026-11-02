@@ -363,6 +363,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     const UINT skinnedVertexCount = static_cast<UINT>(geometryData.skinnedVertices.size());
     const UINT skinnedIndexCount = static_cast<UINT>(geometryData.skinnedIndices.size());
     m_spriteIndices = geometryData.spriteIndices;
+    m_geometryData = &geometryData;
 #if defined(TREE_XBOX)
     //D3D12XBOX_DPBB_STATE dpbbDesc = {};
     //D3D12XboxInitializeDefaultDpbbState(&dpbbDesc);
@@ -1359,6 +1360,11 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_ommTriangleDescs.clear();
     m_ommLinkageDescs.clear();
     ReleaseOpacityMicromaps();
+    // The GPU is idle (waited above), and a new level's meshes may reuse these index ranges.
+    m_instanceIndexBuffers.clear();
+    m_retiringResources.clear();
+    m_retiredResources.clear();
+    m_geometryData = nullptr;
     SafeDelete(&m_dxrMaterialBuffer);
     SafeDelete(&m_dxrGeometryInfoBuffer);
     SafeDelete(&m_instancesTLAS);
@@ -2605,6 +2611,53 @@ static HRESULT CreateFilledUploadBuffer(ID3D12Device* device, const void* data, 
     return S_OK;
 }
 
+void RenderPlatform12::Retire(CComPtr<ID3D12Resource>& resource)
+{
+    if (resource)
+        m_retiringResources.push_back(resource);
+    resource.Release();
+}
+
+// A buffer of the mesh's indices repeated for at least `instances` instances, instance i's offset by i * vertexCount.
+// Grows with headroom when a record needs more instances; the BLAS is rebuilt then anyway, since counts are hashed.
+HRESULT RenderPlatform12::InstanceIndexBuffer(const InstanceIndexKey& key, UINT instances, D3D12_GPU_VIRTUAL_ADDRESS& address)
+{
+    InstanceIndices& entry = m_instanceIndexBuffers[key];
+    if (!entry.buffer || entry.capacity < instances)
+    {
+        if (!m_geometryData)
+            return E_UNEXPECTED;
+        const std::vector<UINT>& source = key.skinned ? m_geometryData->skinnedIndices : m_geometryData->indices;
+        if (static_cast<size_t>(key.indexStart) + key.indexCount > source.size())
+            return E_BOUNDS;
+        const UINT capacity = (std::max)(instances + instances / 2, 16u);
+        if (static_cast<UINT64>(capacity) * key.vertexCount > UINT_MAX)
+            return HRESULT_FROM_WIN32(ERROR_ARITHMETIC_OVERFLOW);
+        std::vector<UINT> indices(static_cast<size_t>(capacity) * key.indexCount);
+        for (UINT instance = 0; instance < capacity; ++instance)
+            for (UINT i = 0; i < key.indexCount; ++i)
+                indices[static_cast<size_t>(instance) * key.indexCount + i] = source[key.indexStart + i] + instance * key.vertexCount;
+        const UINT64 bytes = indices.size() * sizeof(UINT);
+
+        CComPtr<ID3D12Resource> upload;
+        HRR(CreateFilledUploadBuffer(GetDevice(), indices.data(), static_cast<size_t>(bytes), &upload));
+        Retire(entry.buffer);
+        const CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+        const auto desc = CD3DX12_RESOURCE_DESC::Buffer(bytes);
+        // Buffers start in COMMON; the copy promotes the new one to COPY_DEST.
+        HRR(GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON,
+            nullptr, IID_PPV_ARGS(&entry.buffer)));
+        GetCommandList()->CopyBufferRegion(entry.buffer, 0, upload, 0, bytes);
+        const auto readable = CD3DX12_RESOURCE_BARRIER::Transition(entry.buffer,
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        GetCommandList()->ResourceBarrier(1, &readable);
+        Retire(upload);
+        entry.capacity = capacity;
+    }
+    address = entry.buffer->GetGPUVirtualAddress();
+    return S_OK;
+}
+
 void RenderPlatform12::ReleaseOpacityMicromaps()
 {
     m_previousBlasInputs.clear();
@@ -2613,6 +2666,8 @@ void RenderPlatform12::ReleaseOpacityMicromaps()
     m_ommData.Release();
     m_ommDescs.Release();
     m_ommIndices.Release();
+    Retire(m_ommRecordIndices);
+    m_ommTriangleIndexData.clear();
     m_ommCount = m_ommLevel = 0;
     m_ommBuildPending = false;
 }
@@ -2625,6 +2680,7 @@ HRESULT RenderPlatform12::BuildOpacityMicromaps(const uint8_t* data, size_t data
         return S_FALSE;
     // Special indices (fully opaque or transparent) are negative and read as signed 32-bit values.
     HRR(CreateFilledUploadBuffer(GetDevice(), triangleIndices, sizeof(int) * triangleCount, &m_ommIndices));
+    m_ommTriangleIndexData.assign(triangleIndices, triangleIndices + triangleCount);
     if (micromapCount)
     {
         std::vector<D3D12_RAYTRACING_OPACITY_MICROMAP_DESC> descs(micromapCount);
@@ -2818,97 +2874,128 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     }
 
 
-    UINT geometryDescIndex = 0;
-    const UINT64 opacityBufferBytes = opacityMicromaps ? m_ommIndices->GetDesc().Width : 0;
-    UINT64 geometryCount = 0;
-    for (const auto& record : m_drawRecords)
-        geometryCount += record.numInstances;
-    if (geometryCount > m_maxBLASInstances)
-        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
-    for (size_t i = 0; i < m_drawRecords.size(); i++)
+    // One BLAS geometry per draw record. The driver's CPU cost for a build grows with the geometry count (about
+    // 2.5 us per geometry until it warms up), so one per instance made rebuilds cost tens of milliseconds.
+    // Alpha-masked sprites (leaves) keep only their front quad. The back quad is coplanar, so either could win a hit;
+    // the closest-hit shader shades back-face hits with the flipped normal instead. Their any-hit doesn't cull back faces.
+    const auto micromapLeaf = [&](const DrawRecord& dr)
     {
-        DrawRecord& dr = m_drawRecords[i];
+        return dr.inputLayout != SKINNED_INPUT_LAYOUT && m_spriteIndices.IndexCount > 0
+            && dr.indexBufferStart == m_spriteIndices.IndexOffset && dr.indexBufferCount == m_spriteIndices.IndexCount
+            && dr.material.flags.z > 0 && !(dr.material.flags.x > 0);
+    };
+    const auto blasIndexCount = [&](const DrawRecord& dr) { return micromapLeaf(dr) ? m_spriteIndices.IndexCount / 2 : dr.indexBufferCount; };
+    // A record links micromaps when any instance has a baked entry whose triangles fit the index data.
+    const UINT64 ommTriangleBytes = m_ommTriangleIndexData.size() * sizeof(int);
+    const auto instanceMicromap = [&](const DrawRecord& dr, UINT instance)
+    {
+        const int entry = opacityMicromaps[dr.startingInstance + instance];
+        return OpacityMicromap::IndexRangeFits(entry, blasIndexCount(dr) / 3, ommTriangleBytes) ? entry : -1;
+    };
+    const auto linksMicromaps = [&](const DrawRecord& dr)
+    {
+        if (!opacityMicromaps || !m_ommArray || !micromapLeaf(dr))
+            return false;
+        for (UINT instance = 0; instance < dr.numInstances; ++instance)
+            if (instanceMicromap(dr, instance) >= 0)
+                return true;
+        return false;
+    };
+    if (m_drawRecords.size() > m_maxBLASInstances)
+        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
 
-        for (UINT instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
+    if (freshBuild)
+    {
+        // The micromap index of every triangle of every instance, in geometry order. Updates keep this linkage.
+        std::vector<int> recordIndices;
+        for (const DrawRecord& dr : m_drawRecords)
         {
-            D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = m_bvhGeometryDescs[geometryDescIndex];
-
-            geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-            geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
-
-            // Set explicitly: OmmTriangles.pTriangles shares this union slot from the previous frame.
-            geometryDesc.Triangles.Transform3x4 = 0;
-            geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-            geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + (dr.vbWorldStart + (instanceIndex * dr.vertexCount)) * sizeof(XMFLOAT4);
-            geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(XMFLOAT4);
-            geometryDesc.Triangles.VertexCount = dr.vertexCount;
-
-            geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-            geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ? m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() : m_indexBuffer.buffer->GetGPUVirtualAddress())
-                                                    + dr.indexBufferStart * sizeof(UINT);
-            geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
-            // Alpha-masked sprites (leaves) keep only their front quad. The back quad is coplanar, so either could win a hit;
-            // the closest-hit shader shades back-face hits with the flipped normal instead. Their any-hit doesn't cull back faces.
-            const bool micromapLeaf = dr.inputLayout != SKINNED_INPUT_LAYOUT && m_spriteIndices.IndexCount > 0
-                && dr.indexBufferStart == m_spriteIndices.IndexOffset && dr.indexBufferCount == m_spriteIndices.IndexCount
-                && dr.material.flags.z > 0 && !(dr.material.flags.x > 0);
-            if (micromapLeaf)
+            if (!dr.numInstances || !linksMicromaps(dr))
+                continue;
+            const UINT triangles = blasIndexCount(dr) / 3;
+            for (UINT instance = 0; instance < dr.numInstances; ++instance)
             {
-                geometryDesc.Triangles.IndexCount = m_spriteIndices.IndexCount / 2;
+                const int entry = instanceMicromap(dr, instance);
+                for (UINT t = 0; t < triangles; ++t)
+                    recordIndices.push_back(entry >= 0 ? m_ommTriangleIndexData[entry + t]
+                        : D3D12_RAYTRACING_OPACITY_MICROMAP_SPECIAL_INDEX_FULLY_UNKNOWN_OPAQUE);
             }
+        }
+        Retire(m_ommRecordIndices);
+        if (!recordIndices.empty())
+            HRR(CreateFilledUploadBuffer(GetDevice(), recordIndices.data(), recordIndices.size() * sizeof(int), &m_ommRecordIndices));
+    }
 
-            assert(geometryDesc.Triangles.VertexBuffer.StartAddress + geometryDesc.Triangles.VertexCount * geometryDesc.Triangles.VertexBuffer.StrideInBytes
-                <= m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
+    UINT geometryDescIndex = 0;
+    UINT64 ommRecordOffset = 0;
+    for (const DrawRecord& dr : m_drawRecords)
+    {
+        if (!dr.numInstances)
+            continue;
+        const UINT indexCount = blasIndexCount(dr);
+        D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = m_bvhGeometryDescs[geometryDescIndex];
 
-            D3D12_GPU_VIRTUAL_ADDRESS indexBufferEnd;
-            if (dr.inputLayout == SKINNED_INPUT_LAYOUT)
-            {
-                indexBufferEnd = m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() + skinnedIndexBufferSize;
-            }
-            else
-            {
-                indexBufferEnd = m_indexBuffer.buffer->GetGPUVirtualAddress() + indexBufferSize;
-            }
-            assert(geometryDesc.Triangles.IndexBuffer + geometryDesc.Triangles.IndexCount * sizeof(DWORD)
-                 <= indexBufferEnd);
+        geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+        geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
-            const int opacityMicromap = opacityMicromaps ? opacityMicromaps[dr.startingInstance + instanceIndex] : -1;
-            // Only leaf sprites have compatible baked indices, and every referenced index must fit the buffer.
-            const UINT64 opacityOffset = opacityMicromap >= 0 ? static_cast<UINT64>(opacityMicromap) * sizeof(int) : 0;
-            if (micromapLeaf && OpacityMicromap::IndexRangeFits(opacityMicromap,
-                geometryDesc.Triangles.IndexCount / 3, opacityBufferBytes))
-            {
-                // The same triangles, plus one micromap index-buffer entry per triangle starting at the instance's entry.
-                D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC& triangles = m_ommTriangleDescs[geometryDescIndex];
-                D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC& linkage = m_ommLinkageDescs[geometryDescIndex];
-                triangles = geometryDesc.Triangles;
-                linkage = {};
-                linkage.OpacityMicromapIndexBuffer.StartAddress = m_ommIndices->GetGPUVirtualAddress() + opacityOffset;
-                linkage.OpacityMicromapIndexBuffer.StrideInBytes = sizeof(int);
-                linkage.OpacityMicromapIndexFormat = DXGI_FORMAT_R32_UINT;
-                linkage.OpacityMicromapArray = m_ommArray ? m_ommArray->GetGPUVirtualAddress() : 0;
-                geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
-                geometryDesc.OmmTriangles.pTriangles = &triangles;
-                geometryDesc.OmmTriangles.pOmmLinkage = &linkage;
-            }
+        // Set explicitly: OmmTriangles.pTriangles shares this union slot from the previous frame.
+        geometryDesc.Triangles.Transform3x4 = 0;
+        geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+        geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + dr.vbWorldStart * sizeof(XMFLOAT4);
+        geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(XMFLOAT4);
+        geometryDesc.Triangles.VertexCount = dr.vertexCount * dr.numInstances;
 
-            // Populate per-geometry material and geometry info for raytracing shaders
-            m_dxrMaterialBuffer->CopyData(geometryDescIndex, dr.material);
+        geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+        geometryDesc.Triangles.IndexCount = indexCount * dr.numInstances;
+        const bool skinned = dr.inputLayout == SKINNED_INPUT_LAYOUT;
+        if (dr.numInstances == 1)
+        {
+            geometryDesc.Triangles.IndexBuffer = (skinned ? m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() : m_indexBuffer.buffer->GetGPUVirtualAddress())
+                + dr.indexBufferStart * sizeof(UINT);
+            assert(dr.indexBufferStart + indexCount <= (skinned ? skinnedIndexBufferSize : indexBufferSize) / sizeof(UINT));
+        }
+        else
+        {
+            HRR(InstanceIndexBuffer({ skinned ? 1u : 0u, dr.indexBufferStart, indexCount, dr.vertexCount }, dr.numInstances,
+                geometryDesc.Triangles.IndexBuffer));
+        }
+        assert(geometryDesc.Triangles.VertexBuffer.StartAddress + geometryDesc.Triangles.VertexCount * geometryDesc.Triangles.VertexBuffer.StrideInBytes
+            <= m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
 
-            DxrGeometryInfo geoInfo = {};
-            geoInfo.vertexBufferOffset = dr.vbWorldStart + (instanceIndex * dr.vertexCount);
-            geoInfo.indexBufferOffset = dr.indexBufferStart;
-            geoInfo.vertexCount = dr.vertexCount;
-            geoInfo.baseVertexLocation = dr.baseVertexLocation;
-            geoInfo.textureIndex = dr.textureIndex;
-            geoInfo.isSkinned = (dr.inputLayout == SKINNED_INPUT_LAYOUT) ? 1 : 0;
-            geoInfo.instanceIndex = dr.startingInstance + instanceIndex;
-            geoInfo.objectTransformSlot = dr.objectTransformSlot;
-            m_dxrGeometryInfoBuffer->CopyData(geometryDescIndex, geoInfo);
-
-            geometryDescIndex++;
+        if (m_ommRecordIndices && linksMicromaps(dr))
+        {
+            // The same triangles, plus the record's run of the per-triangle micromap index buffer.
+            D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC& triangles = m_ommTriangleDescs[geometryDescIndex];
+            D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC& linkage = m_ommLinkageDescs[geometryDescIndex];
+            triangles = geometryDesc.Triangles;
+            linkage = {};
+            linkage.OpacityMicromapIndexBuffer.StartAddress = m_ommRecordIndices->GetGPUVirtualAddress() + ommRecordOffset;
+            linkage.OpacityMicromapIndexBuffer.StrideInBytes = sizeof(int);
+            linkage.OpacityMicromapIndexFormat = DXGI_FORMAT_R32_UINT;
+            linkage.OpacityMicromapArray = m_ommArray->GetGPUVirtualAddress();
+            geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
+            geometryDesc.OmmTriangles.pTriangles = &triangles;
+            geometryDesc.OmmTriangles.pOmmLinkage = &linkage;
+            ommRecordOffset += static_cast<UINT64>(geometryDesc.Triangles.IndexCount / 3) * sizeof(int);
+            assert(ommRecordOffset <= m_ommRecordIndices->GetDesc().Width);
         }
 
+        // Populate per-geometry material and geometry info for raytracing shaders
+        m_dxrMaterialBuffer->CopyData(geometryDescIndex, dr.material);
+
+        DxrGeometryInfo geoInfo = {};
+        geoInfo.vertexBufferOffset = dr.vbWorldStart;
+        geoInfo.indexBufferOffset = dr.indexBufferStart;
+        geoInfo.vertexCount = dr.vertexCount;
+        geoInfo.baseVertexLocation = dr.baseVertexLocation;
+        geoInfo.textureIndex = dr.textureIndex;
+        geoInfo.isSkinned = skinned ? 1 : 0;
+        geoInfo.instanceIndex = dr.startingInstance;
+        geoInfo.objectTransformSlot = dr.objectTransformSlot;
+        geoInfo.trianglesPerInstance = indexCount / 3;
+        m_dxrGeometryInfoBuffer->CopyData(geometryDescIndex, geoInfo);
+
+        geometryDescIndex++;
     }
 
     if (profileCpu)
@@ -2948,14 +3035,6 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     ///////////////
 
-    if (freshBuild)
-    {
-        m_BLAS.Release();
-        m_scratchBLAS.Release();
-        m_TLAS.Release();
-        m_scratchTLAS.Release();
-    }
-
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs = { };
     rtInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
     rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
@@ -2969,24 +3048,29 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     if (freshBuild)
     {
-        assert(m_BLAS == nullptr);
-        assert(m_scratchBLAS == nullptr);
-
         CComPtr<ID3D12Device5> device;
         HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
 
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO preBuildInfo;
         device->GetRaytracingAccelerationStructurePrebuildInfo(&rtInputs, &preBuildInfo);
-
-        D3D12_RESOURCE_DESC blasDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-
+        // Keep buffers that are large enough: recreating them took milliseconds on every rebuild. The queue runs
+        // frames in order, so rebuilding into the BLAS the previous frame traced is as safe as updating it.
+        const UINT64 scratchBytes = (std::max)(preBuildInfo.ScratchDataSizeInBytes, preBuildInfo.UpdateScratchDataSizeInBytes);
         D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_BLAS));
-        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchBLAS));
+        if (!m_BLAS || m_BLAS->GetDesc().Width < preBuildInfo.ResultDataMaxSizeInBytes)
+        {
+            Retire(m_BLAS);
+            D3D12_RESOURCE_DESC blasDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                nullptr, __uuidof(ID3D12Resource), (void**)&m_BLAS));
+        }
+        if (!m_scratchBLAS || m_scratchBLAS->GetDesc().Width < scratchBytes)
+        {
+            Retire(m_scratchBLAS);
+            D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(scratchBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
+                nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchBLAS));
+        }
     }
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
@@ -3060,11 +3144,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     m_instancesTLAS->Unmap();
     topLevelBuildDesc.Inputs.InstanceDescs = m_instancesTLAS->GetGPUVirtualAddress(0);
 
-    if (freshBuild)
+    if (!m_TLAS)
     {
-        assert(m_TLAS == nullptr);
-        assert(m_scratchTLAS == nullptr);
-
         // Create all the resources only once, even if we're going to rebuild the TLAS every frame.
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO tlasPrebuildInfo;
         topLevelBuildDesc.Inputs.NumDescs = MAX_INSTANCES_IN_TLAS;  // Create enough room for several when we create the buffers.
@@ -3693,6 +3774,9 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     ProfileTimestamp(ProfilePass::Main, false);
     // Ensure last frame is completed
     WaitOnFence();
+    // Resources retired while recording the previous frame are no longer in use; this frame's wait one more.
+    m_retiredResources.clear();
+    m_retiredResources.swap(m_retiringResources);
 
 
 

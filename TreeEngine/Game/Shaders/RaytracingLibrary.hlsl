@@ -134,6 +134,17 @@ float3 LoadVertexPosition(uint vertexIndex)
     return pos.xyz;
 }
 
+// The hit's geometry, narrowed to its instance. A BLAS geometry holds a draw record's instances, each with
+// trianglesPerInstance triangles and vertexCount world vertices; primitiveId is the triangle within the instance.
+DxrGeometryInfo HitGeometry(out uint primitiveId)
+{
+    DxrGeometryInfo geometry = geometryInfoBuffer[GeometryIndex()];
+    const uint instance = PrimitiveIndex() / geometry.trianglesPerInstance;
+    primitiveId = PrimitiveIndex() - instance * geometry.trianglesPerInstance;
+    geometry.instanceIndex += instance;
+    geometry.vertexBufferOffset += instance * geometry.vertexCount;
+    return geometry;
+}
 
 // Estimate a pixel footprint by intersecting neighboring camera rays with the
 // hit triangle plane. Secondary transmission uses this camera footprint as an
@@ -188,9 +199,9 @@ float4 SampleFilteredMaterialTexture(int slot, float2 uv, bool clampTexture,
 [shader("anyhit")]
 void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    uint geomIndex = GeometryIndex();
-    ShaderMaterial mat = materialBuffer[geomIndex];
-    DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
+    ShaderMaterial mat = materialBuffer[GeometryIndex()];
+    uint primitiveId;
+    DxrGeometryInfo geoInfo = HitGeometry(primitiveId);
 
     if (payload.isShadow != 0 && mat.opticalParams.y > 0.0f)
     {
@@ -211,7 +222,6 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
     {
         float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
-        uint primitiveId = PrimitiveIndex();
         uint i0 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 0, geoInfo.isSkinned);
         uint i1 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 1, geoInfo.isSkinned);
         uint i2 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 2, geoInfo.isSkinned);
@@ -282,12 +292,11 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
     // Look up per-geometry material and geometry info
-    uint geomIndex = GeometryIndex();
-    ShaderMaterial mat = materialBuffer[geomIndex];
-    DxrGeometryInfo geoInfo = geometryInfoBuffer[geomIndex];
+    ShaderMaterial mat = materialBuffer[GeometryIndex()];
+    uint primitiveId;
+    DxrGeometryInfo geoInfo = HitGeometry(primitiveId);
 
     // Load triangle indices from the correct index buffer
-    uint primitiveId = PrimitiveIndex();
     uint i0 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 0, geoInfo.isSkinned);
     uint i1 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 1, geoInfo.isSkinned);
     uint i2 = LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + 2, geoInfo.isSkinned);

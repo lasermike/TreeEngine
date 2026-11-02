@@ -1,6 +1,8 @@
 ﻿#pragma once
 
 #include "GeometryGenerator.h"
+#include <map>
+#include <tuple>
 #include "Materials.h"
 
 #if defined(TREE3D12) || defined (TREE3D11)
@@ -1019,6 +1021,7 @@ public:
         UINT isSkinned;             // 1 if skinned vertex buffer, 0 if simple
         UINT instanceIndex;         // index into instance buffer for world matrix
         UINT objectTransformSlot;   // instance-buffer slot of a per-draw object transform (UINT_MAX = identity)
+        UINT trianglesPerInstance;  // A geometry holds a draw record's instances, this many triangles each.
     };
     UploadBuffer<DxrGeometryInfo>* m_dxrGeometryInfoBuffer;
 
@@ -1042,8 +1045,32 @@ public:
     // Per BLAS geometry that links micromaps: the triangles and linkage its OMM_TRIANGLES desc points at.
     std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC> m_ommTriangleDescs;
     std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC> m_ommLinkageDescs;
+    std::vector<int>            m_ommTriangleIndexData; // CPU copy of m_ommIndices.
+    CComPtr<ID3D12Resource>     m_ommRecordIndices; // Per micromap geometry: one micromap index per triangle of every instance.
     HRESULT RecordOpacityMicromapBuild();
     void ReleaseOpacityMicromaps();
+
+    // One BLAS geometry covers a draw record's instances, whose world vertices are contiguous. Multi-instance
+    // records index them through a buffer that repeats a mesh's indices per instance, offset by vertexCount.
+    struct InstanceIndexKey
+    {
+        UINT skinned, indexStart, indexCount, vertexCount;
+        bool operator<(const InstanceIndexKey& other) const
+        {
+            return std::tie(skinned, indexStart, indexCount, vertexCount)
+                < std::tie(other.skinned, other.indexStart, other.indexCount, other.vertexCount);
+        }
+    };
+    struct InstanceIndices { CComPtr<ID3D12Resource> buffer; UINT capacity = 0; };
+    std::map<InstanceIndexKey, InstanceIndices> m_instanceIndexBuffers;
+    const GeometryBufferData*   m_geometryData = nullptr; // The level's mesh data, owned by RenderManager.
+    HRESULT InstanceIndexBuffer(const InstanceIndexKey& key, UINT instances, D3D12_GPU_VIRTUAL_ADDRESS& address);
+
+    // Resources the GPU may still use. BLAS work is recorded before RenderProlog waits for the previous frame,
+    // so a resource retired while recording frame N is released in frame N + 1, once frame N has finished.
+    std::vector<CComPtr<ID3D12Resource>> m_retiringResources;
+    std::vector<CComPtr<ID3D12Resource>> m_retiredResources;
+    void Retire(CComPtr<ID3D12Resource>& resource);
 
     uint32_t m_maxBLASInstances;
 

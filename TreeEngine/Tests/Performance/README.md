@@ -80,9 +80,10 @@ process with a `performance` request. The process:
    `startTime + n * frameTimeStep`. A pacing test first renders its settle frames, numbered from
    `-settleFrames` to -1, then moves the camera to frame *n*'s point on the path before each frame.
    Frame 0 also generates the scene and sets up graphics, so it is slow.
-   In ray tracing, the driver's CPU cost for the BLAS update stays high for about 11 frames after a
-   full build (on an RTX 5080, about 25 ms for LeafAtlases, and 75 ms with opacity micromaps), so
-   `frames10to20` still includes two of those frames.
+   In ray tracing, the driver's CPU cost for a BLAS build grows with its geometry count until it warms
+   up (about 2.5 µs per geometry on an RTX 5080). The BLAS has one geometry per draw record (~190 in
+   LeafAtlases), so builds stay under a millisecond; runs before the merge had one per instance and
+   show slow frames for about 11 frames after each full build, two of them inside `frames10to20`.
    Object updates use every core, unlike image tests, which use one thread so images repeat.
    No images are written.
 3. **Records a sample for every frame:**

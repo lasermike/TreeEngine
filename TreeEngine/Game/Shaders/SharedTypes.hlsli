@@ -26,6 +26,7 @@ struct DxrGeometryInfo
     uint isSkinned;             // 1 if skinned vertex buffer, 0 if simple
     uint instanceIndex;         // index into instance buffer for world matrix
     uint objectTransformSlot;   // instance-buffer slot of a per-draw object transform (NoObjectTransform = identity)
+    uint trianglesPerInstance;  // A geometry holds a draw record's instances, this many triangles each.
 };
 
 cbuffer cbChangesPerPass : register(b1)
