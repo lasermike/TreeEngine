@@ -202,6 +202,27 @@ share one layout.
 
 Leaves sample their region in raster, shadow, and DXR passes.
 
+#### Opacity micromaps
+
+On GPUs with DXR tier 1.2, ray tracing uses opacity micromaps (OMMs) for
+alpha-tested leaves. Each leaf triangle gets a map of 4,096 micro-triangles
+(subdivision level 6) marked opaque, transparent, or unknown. The hardware
+decides opaque and transparent hits itself, and only unknown micro-triangles,
+along leaf edges, still run the any-hit alpha test.
+- Maps are baked on the CPU when the scene loads, once per leaf texture, cutoff,
+  UV transform, and atlas region. The bake uses the same mip-0 texels as the
+  any-hit shader and is conservative: a micro-triangle is certain only when
+  every texel its bilinear footprint can touch agrees. Images are the same with
+  OMMs on or off.
+- Only PNG and JPEG base-color textures are baked. DDS textures, alpha blending,
+  and transmission keep the any-hit test.
+- Ray tracing uses only the front quad of each alpha-masked leaf sprite. The
+  back quad is coplanar, so either could win a hit. Back-face hits shade with the
+  flipped normal instead.
+- Turn them off with **Opacity micromaps** in the debug UI's Settings, which also
+  shows how many micro-triangles are opaque, transparent, and left to any-hit.
+  Render-test requests take `"opacityMicromaps": false`.
+
 `Leaf Atlases` (`leaf-atlases.scene.json`) is a canyon plant showcase in Terra's
 lighting: 12 species that grow together in a semi-arid sandstone canyon, laid
 out from the river to the dry slope.

@@ -160,6 +160,7 @@ void ParseRenderTestCommandLine()
     parsed->hasReflectionRays = json.contains("reflectionRays");
     parsed->reflectionRays = json.value("reflectionRays", 0);
     parsed->waterMotionSpeed = json.value("waterMotionSpeed", 1.0f);
+    parsed->opacityMicromaps = json.value("opacityMicromaps", true);
     parsed->benchmarkTimeStep = json.value("benchmarkTimeStep", 0.0);
     parsed->postProcessing = json.value("postProcessing", true);
     parsed->validateScenePersistence = json.value("validateScenePersistence", false);
@@ -248,6 +249,7 @@ namespace
             game.ConfigureRenderTest(request->scene, request->mode == "raytracing", request->postProcessing, true);
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
+            game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
             for (int frame = 0; frame < request->performanceFrames; ++frame)
             {
                 MSG message;
@@ -272,6 +274,12 @@ namespace
                     report["sceneLoad"] = { { "totalMs", load.TotalMs() }, { "definitionMs", load.definitionMs },
                         { "generationMs", load.generationMs }, { "graphicsMs", load.graphicsMs } };
                     report["adapter"] = Utf8(profile.adapter);
+                    // Baked during the load; "requested" is the request's opacityMicromaps, applied when supported.
+                    const auto& micromaps = game.GetRenderManager().GetRenderData().opacityMicromaps;
+                    report["opacityMicromaps"] = { { "requested", request->opacityMicromaps }, { "supported", micromaps.supported },
+                        { "micromaps", micromaps.micromaps }, { "specialTriangles", micromaps.specialTriangles },
+                        { "subdivisionLevel", micromaps.subdivisionLevel }, { "bytes", micromaps.bytes },
+                        { "states", { micromaps.states[0], micromaps.states[1], micromaps.states[2], micromaps.states[3] } } };
                 }
                 report["samples"].push_back({
                     { "frame", frame }, { "simulationTime", simulationTime }, { "frameMs", frameMs },
@@ -337,6 +345,7 @@ int RunRenderTestCapture(Game& game)
                 request->benchmarkFrames > 0, point.showShadowBuffer);
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
+            game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             game.GetPlayer()->SetPosition(point.overrideCamera
                 ? DirectX::XMVectorSet(point.cameraPosition[0], point.cameraPosition[1], point.cameraPosition[2], 1)

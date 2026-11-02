@@ -121,6 +121,20 @@ struct RenderData : SceneRenderSettings
     // Instance rendering
     InstancedData*      instanceData;
     D3DBuffer*          instanceBuffer;
+    // Per instance slot: the first opacity-micromap index-buffer entry for the slot's triangles, or -1 for none.
+    // Owned by RenderManager; written alongside instanceData.
+    int*                instanceOpacityMicromap = nullptr;
+
+    // Opacity micromaps baked for the current scene (DXR tier 1.2).
+    struct OpacityMicromapStats
+    {
+        bool supported = false;       // Device reports DXR tier 1.2.
+        UINT micromaps = 0;           // Micromaps stored (triangles with mixed opacity).
+        UINT specialTriangles = 0;    // Triangles marked fully opaque or transparent without a micromap.
+        UINT subdivisionLevel = 0;
+        std::uint64_t bytes = 0;      // Micromap data before the driver builds the array.
+        std::uint64_t states[4] = {}; // Micro-triangles per state: transparent, opaque, unknown transparent, unknown opaque.
+    } opacityMicromaps;
 
     // Per frame statistics
     FrameStatistic*     frameStats;

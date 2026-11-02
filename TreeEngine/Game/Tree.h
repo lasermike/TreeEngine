@@ -59,6 +59,7 @@ private:
     };
 
     std::array<InstanceDataArray, TreeSegmentCount> m_segmentInstanceData;
+    std::array<std::vector<int>, TreeSegmentCount> m_segmentOpacityMicromaps; // Per instance in m_segmentInstanceData.
     std::array<RenderUnit*, TreeSegmentCount> m_segmentRenderUnits = {};
     std::array<int, TreeSegmentCount> m_numInstancesPerSegment = {};
 
@@ -89,6 +90,9 @@ private:
     std::vector<float> m_leafScales; // Per branch ID: leaf length scale. Empty without size variation.
     const WorldObjectParams::LeafAtlasRegion* LeafRegion(const Branch* branch) const;
     UINT AtlasRegionSlot(UINT startInstance, const Branch* branch) const; // InstancedData::AtlasRegion value.
+    // Opacity-micromap entries for the leaf material: one per params leafRegions entry, or one for the whole texture.
+    std::vector<int> m_leafOpacityMicromaps;
+    int LeafOpacityMicromap(const Branch* branch) const; // RenderData::instanceOpacityMicromap value.
     UINT AtlasRectStart(UINT startInstance) const;
     float m_matureTime = 0;
     float m_lastPoseTime = 0;
@@ -121,7 +125,7 @@ private:
 
     Tree* InstanceSource() const { return static_cast<Tree*>(_params->instanceSource); }
     TreeSegment SelectLayoutSegment(const BranchInstance& frame, InstanceLayoutKind layout) const;
-    void BuildInstanceLayouts(UINT startInstance);
+    void BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps);
     HRESULT ComputeInstanceConstants(IRenderFrame* pFrameConfig);
 
     HRESULT ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRenderData);

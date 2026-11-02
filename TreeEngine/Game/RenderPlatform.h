@@ -697,6 +697,9 @@ public:
     virtual HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass) = 0;
     virtual HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture) = 0;
     virtual HRESULT LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture, int colorSpace) = 0;
+    // Replaces the scene's opacity micromaps: OC1_4_STATE data for micromapCount micromaps at one subdivision level,
+    // and one index per triangle (a micromap, or a special index) that instances point into. S_FALSE if unsupported.
+    virtual HRESULT BuildOpacityMicromaps(const uint8_t* data, size_t dataSize, const UINT* byteOffsets, UINT micromapCount, UINT subdivisionLevel, const int* triangleIndices, UINT triangleCount) = 0;
     virtual HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture) = 0;
     virtual HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer) = 0;
     virtual HRESULT LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader) = 0;
@@ -937,6 +940,7 @@ public:
     HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture, int colorSpace);
+    HRESULT BuildOpacityMicromaps(const uint8_t* data, size_t dataSize, const UINT* byteOffsets, UINT micromapCount, UINT subdivisionLevel, const int* triangleIndices, UINT triangleCount);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
     HRESULT CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
@@ -974,6 +978,7 @@ public:
 
     uint32_t m_numInstancesInTLAS;
     bool m_dxrEnabledThisFrame = false;
+    bool m_opacityMicromapsSupported = false; // Device reports DXR tier 1.2.
     INT m_dxrSkyInstance = -1;
 
 
@@ -1023,6 +1028,22 @@ public:
     static const uint32_t MAX_INSTANCES_IN_TLAS = 1;
 
     D3D12_RAYTRACING_GEOMETRY_DESC* m_bvhGeometryDescs;
+
+    // Opacity micromaps (DXR 1.2) for the current scene; see BuildOpacityMicromaps.
+    CComPtr<ID3D12Resource>     m_ommArray;
+    CComPtr<ID3D12Resource>     m_ommScratch;
+    CComPtr<ID3D12Resource>     m_ommData;
+    CComPtr<ID3D12Resource>     m_ommDescs;
+    CComPtr<ID3D12Resource>     m_ommIndices; // One entry per baked triangle; instances point into it.
+    UINT                        m_ommCount = 0;
+    UINT                        m_ommLevel = 0;
+    GeometryBufferData::BufferOffsets m_spriteIndices = {}; // The sprite mesh: a front quad, then a coplanar back quad.
+    bool                        m_ommBuildPending = false;
+    // Per BLAS geometry that links micromaps: the triangles and linkage its OMM_TRIANGLES desc points at.
+    std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC> m_ommTriangleDescs;
+    std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC> m_ommLinkageDescs;
+    HRESULT RecordOpacityMicromapBuild();
+    void ReleaseOpacityMicromaps();
 
     uint32_t m_maxBLASInstances;
 
@@ -1197,6 +1218,7 @@ public:
     HRESULT SetRenderUnit(RenderUnit* ru, RenderPass pass);
     HRESULT LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
     HRESULT LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture, int colorSpace);
+    HRESULT BuildOpacityMicromaps(const uint8_t* data, size_t dataSize, const UINT* byteOffsets, UINT micromapCount, UINT subdivisionLevel, const int* triangleIndices, UINT triangleCount);
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
     HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit);
 
@@ -1275,6 +1297,7 @@ typedef HRESULT (*CreateMaterialFunc)(const wchar_t* name, LoadedTexture* textur
 typedef HRESULT (*SetRenderUnitFunc)(RenderUnit* ru, RenderPass pass);
 typedef HRESULT (*LoadTextureFunc)(const wchar_t* textureFilename, int textureIndex, LoadedTexture** loadedTexture);
 typedef HRESULT (*LoadTextureFromMemoryFunc)(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture, int colorSpace);
+typedef HRESULT (*BuildOpacityMicromapsFunc)(const uint8_t* data, size_t dataSize, const UINT* byteOffsets, UINT micromapCount, UINT subdivisionLevel, const int* triangleIndices, UINT triangleCount);
 typedef HRESULT (*CreateTexture2DFunc)(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture);
 
 typedef HRESULT (*CreateD3DBufferFunc)(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer);
@@ -1334,6 +1357,7 @@ class RenderPlatformDLL : public RenderPlatform
     SetRenderUnitFunc SetRenderUnitFuncPtr;
     LoadTextureFunc LoadTextureFuncPtr;
     LoadTextureFromMemoryFunc LoadTextureFromMemoryFuncPtr;
+    BuildOpacityMicromapsFunc BuildOpacityMicromapsFuncPtr;
     CreateTexture2DFunc CreateTexture2DFuncPtr;
     CreateD3DBufferFunc CreateD3DBufferFuncPtr;
     CreateRenderUnitFunc CreateRenderUnitFuncPtr;
@@ -1415,6 +1439,10 @@ public:
     HRESULT LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture, int colorSpace)
     {
         return LoadTextureFromMemoryFuncPtr(name, data, dataSize, textureIndex, loadedTexture, colorSpace);
+    }
+    HRESULT BuildOpacityMicromaps(const uint8_t* data, size_t dataSize, const UINT* byteOffsets, UINT micromapCount, UINT subdivisionLevel, const int* triangleIndices, UINT triangleCount)
+    {
+        return BuildOpacityMicromapsFuncPtr(data, dataSize, byteOffsets, micromapCount, subdivisionLevel, triangleIndices, triangleCount);
     }
 
     HRESULT CreateTexture2D(const wchar_t* name, const float* points, UINT width, UINT height, int textureIndex, LoadedTexture** texture)

@@ -3,6 +3,8 @@
 #include "RenderData.h"
 #include "RenderPlatform.h"
 #include "StockRenderStates.h"
+#include "OpacityMicromapBaker.h"
+#include <memory>
 
 class WorldObject;
 class Settings;
@@ -94,6 +96,15 @@ class RenderManager : public IRenderFrame
     int m_lastMaxInstances;
     bool m_lastUseShadowMaps;
 
+    // Opacity micromaps for the scene's alpha-tested leaves (see RegisterLeafOpacity).
+    std::vector<int> m_instanceOpacityMicromap; // Per instance slot; RenderData::instanceOpacityMicromap points here.
+    std::vector<uint8_t> m_ommData;
+    std::vector<UINT> m_ommByteOffsets;
+    std::vector<int> m_ommTriangleIndices;      // Per baked triangle: a micromap index or a special index.
+    std::map<std::wstring, int> m_ommEntries;   // Bake key -> first triangle entry, or -1.
+    std::map<std::wstring, std::shared_ptr<OpacityMicromap::AlphaImage>> m_ommAlpha; // Decoded mip-0 alpha.
+    std::shared_ptr<OpacityMicromap::AlphaImage> LoadOpacityAlpha(const GltfTextureSource& texture, bool wrap);
+
     DirectionalLight                    m_light;  // Doesn't belong here, will move later
 
     HRESULT LoadTexture(const wchar_t* textureFilename, LoadedTexture** loadedTexture);
@@ -143,6 +154,13 @@ public:
     // Loads a non-base-color material map and stores its slot in the shader material.
     HRESULT BindMaterialTexture(const GltfTextureSource& source, MaterialTextureRole role, ShaderMaterial& shaderMaterial);
     HRESULT BindMaterialTextures(const MaterialTextureSources& sources, ShaderMaterial& shaderMaterial);
+    // Bakes opacity micromaps for the leaf sprite drawn with an alpha-masked material (after its textures are bound)
+    // and an atlas rect, and returns its first entry for RenderData::instanceOpacityMicromap, or -1 when it can't:
+    // no DXR tier 1.2, no alpha mask, or a base-color map that is not a memory-backed PNG or JPEG.
+    // Identical requests share one entry.
+    int RegisterLeafOpacity(const ShaderMaterial& material, const GltfTextureSource* baseColor, XMFLOAT4 atlasRect);
+    // Hands the scene's baked micromaps to the platform; call after the scene's objects initialize their graphics.
+    HRESULT FinalizeOpacityMicromaps();
     HRESULT CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,

@@ -361,6 +361,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     const int indexCopyCount = static_cast<int>(geometryData.indices.size());
     const UINT skinnedVertexCount = static_cast<UINT>(geometryData.skinnedVertices.size());
     const UINT skinnedIndexCount = static_cast<UINT>(geometryData.skinnedIndices.size());
+    m_spriteIndices = geometryData.spriteIndices;
 #if defined(TREE_XBOX)
     //D3D12XBOX_DPBB_STATE dpbbDesc = {};
     //D3D12XboxInitializeDefaultDpbbState(&dpbbDesc);
@@ -1041,6 +1042,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_previousDrawRecordHash = 0;
 
     m_bvhGeometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[maxInstances];
+    m_ommTriangleDescs.assign(maxInstances, {});
+    m_ommLinkageDescs.assign(maxInstances, {});
     ZeroMemory(m_bvhGeometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * maxInstances);
 
     m_instancesTLAS = new UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>(GetDevice(), MAX_INSTANCES_IN_TLAS, true);
@@ -1348,6 +1351,9 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     }
 
     SafeDelete(&m_bvhGeometryDescs);
+    m_ommTriangleDescs.clear();
+    m_ommLinkageDescs.clear();
+    ReleaseOpacityMicromaps();
     SafeDelete(&m_dxrMaterialBuffer);
     SafeDelete(&m_dxrGeometryInfoBuffer);
     SafeDelete(&m_instancesTLAS);
@@ -2147,6 +2153,19 @@ HRESULT RenderPlatform12::InitDevice()
     //LOG("\t\tLUID AdapterLuid: %d", desc.AdapterLuid;
     LOGF("\t\tFlags: %d\n", desc.Flags);
 
+    // Opacity micromaps arrived with DXR tier 1.2.
+    // CheckFeatureSupport1 reports the capabilities of the Agility SDK version the app ships (D3D12SDKVersion).
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
+    CComPtr<ID3D12Device16> device16;
+    const HRESULT optionsResult = SUCCEEDED(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device16), (void**)&device16))
+        ? device16->CheckFeatureSupport1(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5), 722)
+        : m_d3dDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5));
+    if (SUCCEEDED(optionsResult))
+        m_opacityMicromapsSupported = options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_2;
+    m_renderData->opacityMicromaps.supported = m_opacityMicromapsSupported;
+    LOGF("\t\tRaytracingTier: %d (opacity micromaps %s)\n", static_cast<int>(options5.RaytracingTier),
+        m_opacityMicromapsSupported ? "supported" : "not supported");
+
 #if defined(_DEBUG)
     CComPtr<ID3D12Debug1> debug1;
     if (SUCCEEDED(debugController->QueryInterface(__uuidof(ID3D12Debug1), (void**)&debug1)))
@@ -2335,9 +2354,18 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
         auto shaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
         shaderConfig->Config(sizeof(float) * 4 + sizeof(UINT) * 2, 8);  // RayPayload color, depth, and shadow flag.
 
-        auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
         UINT maxRecursionDepth = 3;  // Primary, transmitted, and shadow rays
-        pipelineConfig->Config(maxRecursionDepth);
+        if (m_opacityMicromapsSupported)
+        {
+            // Required before any BLAS links opacity micromaps.
+            auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG1_SUBOBJECT>();
+            pipelineConfig->Config(maxRecursionDepth, D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS);
+        }
+        else
+        {
+            auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+            pipelineConfig->Config(maxRecursionDepth);
+        }
     }
 
     // Create Global Root Signature
@@ -2547,6 +2575,105 @@ bool RenderPlatform12::DrawRecord::operator==(const DrawRecord& dr) const
 }
 
 
+// Copies data into a new upload-heap buffer the GPU reads in place.
+static HRESULT CreateFilledUploadBuffer(ID3D12Device* device, const void* data, size_t size, ID3D12Resource** buffer)
+{
+    const CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_UPLOAD);
+    const auto desc = CD3DX12_RESOURCE_DESC::Buffer(std::max<size_t>(size, 4));
+    HRR(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr, IID_PPV_ARGS(buffer)));
+    void* mapped = nullptr;
+    const CD3DX12_RANGE noRead(0, 0);
+    HRR((*buffer)->Map(0, &noRead, &mapped));
+    memcpy(mapped, data, size);
+    (*buffer)->Unmap(0, nullptr);
+    return S_OK;
+}
+
+void RenderPlatform12::ReleaseOpacityMicromaps()
+{
+    m_ommArray.Release();
+    m_ommScratch.Release();
+    m_ommData.Release();
+    m_ommDescs.Release();
+    m_ommIndices.Release();
+    m_ommCount = m_ommLevel = 0;
+    m_ommBuildPending = false;
+}
+
+HRESULT RenderPlatform12::BuildOpacityMicromaps(const uint8_t* data, size_t dataSize, const UINT* byteOffsets, UINT micromapCount,
+    UINT subdivisionLevel, const int* triangleIndices, UINT triangleCount)
+{
+    ReleaseOpacityMicromaps();
+    if (!m_opacityMicromapsSupported || !triangleCount)
+        return S_FALSE;
+    // Special indices (fully opaque or transparent) are negative and read as signed 32-bit values.
+    HRR(CreateFilledUploadBuffer(GetDevice(), triangleIndices, sizeof(int) * triangleCount, &m_ommIndices));
+    if (micromapCount)
+    {
+        std::vector<D3D12_RAYTRACING_OPACITY_MICROMAP_DESC> descs(micromapCount);
+        for (UINT i = 0; i < micromapCount; ++i)
+        {
+            descs[i].ByteOffset = byteOffsets[i];
+            descs[i].SubdivisionLevel = subdivisionLevel;
+            descs[i].Format = D3D12_RAYTRACING_OPACITY_MICROMAP_FORMAT_OC1_4_STATE;
+        }
+        HRR(CreateFilledUploadBuffer(GetDevice(), data, dataSize, &m_ommData));
+        HRR(CreateFilledUploadBuffer(GetDevice(), descs.data(), sizeof(descs[0]) * descs.size(), &m_ommDescs));
+    }
+    m_ommCount = micromapCount;
+    m_ommLevel = subdivisionLevel;
+    // The array is built on the next frame's command list, ahead of the BLAS that links it.
+    m_ommBuildPending = micromapCount > 0;
+    return S_OK;
+}
+
+HRESULT RenderPlatform12::RecordOpacityMicromapBuild()
+{
+    m_ommBuildPending = false;
+    D3D12_RAYTRACING_OPACITY_MICROMAP_HISTOGRAM_ENTRY histogram = {};
+    histogram.Count = m_ommCount;
+    histogram.SubdivisionLevel = m_ommLevel;
+    histogram.Format = D3D12_RAYTRACING_OPACITY_MICROMAP_FORMAT_OC1_4_STATE;
+    D3D12_RAYTRACING_OPACITY_MICROMAP_ARRAY_DESC arrayDesc = {};
+    arrayDesc.NumOmmHistogramEntries = 1;
+    arrayDesc.pOmmHistogram = &histogram;
+    arrayDesc.InputBuffer = m_ommData->GetGPUVirtualAddress();
+    arrayDesc.PerOmmDescs.StartAddress = m_ommDescs->GetGPUVirtualAddress();
+    arrayDesc.PerOmmDescs.StrideInBytes = sizeof(D3D12_RAYTRACING_OPACITY_MICROMAP_DESC);
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+    inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_OPACITY_MICROMAP_ARRAY;
+    inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    inputs.NumDescs = 1;
+    inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+    inputs.pOpacityMicromapArrayDesc = &arrayDesc;
+
+    CComPtr<ID3D12Device5> device;
+    HRR(m_d3dDevice->QueryInterface(__uuidof(ID3D12Device5), (void**)&device));
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuild = {};
+    device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuild);
+    if (!prebuild.ResultDataMaxSizeInBytes)
+        return E_FAIL;
+    const CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+    const auto arrayBuffer = CD3DX12_RESOURCE_DESC::Buffer(prebuild.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    const auto scratchBuffer = CD3DX12_RESOURCE_DESC::Buffer(std::max<UINT64>(prebuild.ScratchDataSizeInBytes, 4), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    HRR(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &arrayBuffer,
+        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&m_ommArray)));
+    HRR(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &scratchBuffer,
+        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_ommScratch)));
+
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC build = {};
+    build.DestAccelerationStructureData = m_ommArray->GetGPUVirtualAddress();
+    build.Inputs = inputs;
+    build.ScratchAccelerationStructureData = m_ommScratch->GetGPUVirtualAddress();
+    CComPtr<ID3D12GraphicsCommandList4> commandList;
+    HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList4), (void**)&commandList));
+    commandList->BuildRaytracingAccelerationStructure(&build, 0, nullptr);
+    const auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(m_ommArray);
+    commandList->ResourceBarrier(1, &barrier);
+    return S_OK;
+}
+
 HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 {
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
@@ -2554,12 +2681,21 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     bool freshBuild = forceRebuild || m_TLAS == nullptr;
 
+    if (m_ommBuildPending)
+        HRR(RecordOpacityMicromapBuild());
+    // Instances link micromaps through their slot's entry; the linkage must not change across BLAS updates.
+    const int* opacityMicromaps = m_ommIndices && m_settings->m_opacityMicromaps ? m_renderData->instanceOpacityMicromap : nullptr;
+
     // Hash the draw records to see if the geometry is the same as last build
-    size_t currentHash = 0;
+    size_t currentHash = opacityMicromaps ? 1 : 0;
 
     for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
     {
         currentHash = hash_combine(currentHash, m_drawRecords[drawRecordIndex]);
+        if (!opacityMicromaps) continue;
+        const DrawRecord& dr = m_drawRecords[drawRecordIndex];
+        for (UINT instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
+            currentHash ^= std::hash<int>()(opacityMicromaps[dr.startingInstance + instanceIndex]) + 0x9e3779b9 + (currentHash << 6) + (currentHash >> 2);
     }
 
     if (currentHash != m_previousDrawRecordHash)
@@ -2588,6 +2724,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
             geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
+            // Set explicitly: OmmTriangles.pTriangles shares this union slot from the previous frame.
+            geometryDesc.Triangles.Transform3x4 = 0;
             geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
             geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + (dr.vbWorldStart + (instanceIndex * dr.vertexCount)) * sizeof(XMFLOAT4);
             geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(XMFLOAT4);
@@ -2597,6 +2735,11 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             geometryDesc.Triangles.IndexBuffer = (dr.inputLayout == SKINNED_INPUT_LAYOUT ? m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress() : m_indexBuffer.buffer->GetGPUVirtualAddress())
                                                     + dr.indexBufferStart * sizeof(UINT);
             geometryDesc.Triangles.IndexCount = dr.indexBufferCount;
+            // Alpha-masked sprites (leaves) keep only their front quad. The back quad is coplanar, so either could win a hit;
+            // the closest-hit shader shades back-face hits with the flipped normal instead. Their any-hit doesn't cull back faces.
+            if (dr.inputLayout != SKINNED_INPUT_LAYOUT && dr.indexBufferStart == m_spriteIndices.IndexOffset
+                && dr.indexBufferCount == m_spriteIndices.IndexCount && dr.material.flags.z > 0 && !(dr.material.flags.x > 0))
+                geometryDesc.Triangles.IndexCount = m_spriteIndices.IndexCount / 2;
 
             assert(geometryDesc.Triangles.VertexBuffer.StartAddress + geometryDesc.Triangles.VertexCount * geometryDesc.Triangles.VertexBuffer.StrideInBytes
                 <= m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
@@ -2612,6 +2755,23 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             }
             assert(geometryDesc.Triangles.IndexBuffer + geometryDesc.Triangles.IndexCount * sizeof(DWORD)
                  <= indexBufferEnd);
+
+            const int opacityMicromap = opacityMicromaps ? opacityMicromaps[dr.startingInstance + instanceIndex] : -1;
+            if (opacityMicromap >= 0)
+            {
+                // The same triangles, plus one micromap index-buffer entry per triangle starting at the instance's entry.
+                D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC& triangles = m_ommTriangleDescs[geometryDescIndex];
+                D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC& linkage = m_ommLinkageDescs[geometryDescIndex];
+                triangles = geometryDesc.Triangles;
+                linkage = {};
+                linkage.OpacityMicromapIndexBuffer.StartAddress = m_ommIndices->GetGPUVirtualAddress() + sizeof(int) * opacityMicromap;
+                linkage.OpacityMicromapIndexBuffer.StrideInBytes = sizeof(int);
+                linkage.OpacityMicromapIndexFormat = DXGI_FORMAT_R32_UINT;
+                linkage.OpacityMicromapArray = m_ommArray ? m_ommArray->GetGPUVirtualAddress() : 0;
+                geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
+                geometryDesc.OmmTriangles.pTriangles = &triangles;
+                geometryDesc.OmmTriangles.pOmmLinkage = &linkage;
+            }
 
             // Populate per-geometry material and geometry info for raytracing shaders
             m_dxrMaterialBuffer->CopyData(geometryDescIndex, dr.material);

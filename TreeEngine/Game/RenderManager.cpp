@@ -7,6 +7,9 @@
 #include "Primitive.h" // TEMPTEMP
 
 #include "Settings.h"
+#if !defined(TREE_XBOX)
+#include <wincodec.h> // Leaf alpha for opacity micromaps.
+#endif
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -102,6 +105,8 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     {
         HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, GetPlatform()));
     }
+    m_instanceOpacityMicromap.assign(maxInstances, -1);
+    m_renderData.instanceOpacityMicromap = m_instanceOpacityMicromap.empty() ? nullptr : m_instanceOpacityMicromap.data();
 
     return S_OK;
 }
@@ -122,6 +127,16 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     HRR(GetPlatform()->UninitGameLevelGraphics());
 
     m_instancedBuffer.Release();
+    m_renderData.instanceOpacityMicromap = nullptr;
+    m_instanceOpacityMicromap.clear();
+    m_ommData.clear();
+    m_ommByteOffsets.clear();
+    m_ommTriangleIndices.clear();
+    m_ommEntries.clear();
+    m_ommAlpha.clear();
+    const bool ommSupported = m_renderData.opacityMicromaps.supported;
+    m_renderData.opacityMicromaps = {};
+    m_renderData.opacityMicromaps.supported = ommSupported;
 
     for (auto& t : m_textures)
     {
@@ -427,6 +442,127 @@ HRESULT RenderManager::BindMaterialTextures(const MaterialTextureSources& source
         if (role != BaseColorTextureRole && sources.roles[role])
             HRR(BindMaterialTexture(*sources.roles[role], static_cast<MaterialTextureRole>(role), shaderMaterial));
     return S_OK;
+}
+
+// Micro-triangles per edge of a leaf triangle: 2^6 = 64, a few texels each on a 2048 atlas.
+static const UINT LeafOpacitySubdivisionLevel = 6;
+
+std::shared_ptr<OpacityMicromap::AlphaImage> RenderManager::LoadOpacityAlpha(const GltfTextureSource& texture, bool wrap)
+{
+    const std::wstring key = texture.key + (wrap ? L"|wrap" : L"|clamp");
+    auto found = m_ommAlpha.find(key);
+    if (found != m_ommAlpha.end())
+        return found->second;
+    std::shared_ptr<OpacityMicromap::AlphaImage> result;
+    m_ommAlpha[key] = nullptr;
+#if !defined(TREE_XBOX)
+    const auto& bytes = texture.encodedData;
+    if (!texture.IsMemoryBacked() || bytes.size() < 4 || memcmp(bytes.data(), "DDS ", 4) == 0 || bytes.size() > UINT32_MAX)
+        return nullptr;
+    const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    {
+        CComPtr<IWICImagingFactory> factory;
+        CComPtr<IWICStream> stream;
+        CComPtr<IWICBitmapDecoder> decoder;
+        CComPtr<IWICBitmapFrameDecode> frame;
+        CComPtr<IWICFormatConverter> converter;
+        UINT width = 0, height = 0;
+        if (SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory)))
+            && SUCCEEDED(factory->CreateStream(&stream))
+            && SUCCEEDED(stream->InitializeFromMemory(const_cast<BYTE*>(bytes.data()), static_cast<DWORD>(bytes.size())))
+            && SUCCEEDED(factory->CreateDecoderFromStream(stream, nullptr, WICDecodeMetadataCacheOnDemand, &decoder))
+            && SUCCEEDED(decoder->GetFrame(0, &frame)) && SUCCEEDED(frame->GetSize(&width, &height)) && width && height
+            && SUCCEEDED(factory->CreateFormatConverter(&converter))
+            && SUCCEEDED(converter->Initialize(frame, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0,
+                WICBitmapPaletteTypeMedianCut)))
+        {
+            std::vector<uint8_t> rgba(static_cast<size_t>(width) * height * 4);
+            if (SUCCEEDED(converter->CopyPixels(nullptr, width * 4, static_cast<UINT>(rgba.size()), rgba.data())))
+            {
+                result = std::make_shared<OpacityMicromap::AlphaImage>();
+                result->width = width;
+                result->height = height;
+                result->wrap = wrap;
+                result->alpha.resize(static_cast<size_t>(width) * height);
+                for (size_t i = 0; i < result->alpha.size(); ++i)
+                    result->alpha[i] = rgba[i * 4 + 3];
+            }
+        }
+    }
+    if (SUCCEEDED(com))
+        CoUninitialize();
+#endif
+    m_ommAlpha[key] = result;
+    return result;
+}
+
+int RenderManager::RegisterLeafOpacity(const ShaderMaterial& material, const GltfTextureSource* baseColor, XMFLOAT4 atlasRect)
+{
+    // Matches the any-hit alpha test: a base-color texture sampled at mip 0, compared with flags.z.
+    const float cutoff = material.flags.z;
+    // Not for alpha blending or transmission: their any-hit ignores hits for reasons other than alpha.
+    if (!m_renderData.opacityMicromaps.supported || cutoff <= 0 || material.flags.y <= 0 || material.flags.x > 0
+        || material.opticalParams.y > 0 || !baseColor)
+        return -1;
+    const XMFLOAT4& row0 = material.uvTransformRow0[BaseColorTextureRole];
+    const XMFLOAT4& row1 = material.uvTransformRow1[BaseColorTextureRole];
+    const bool wrap = !(material.specularColor.w > 0);
+    wchar_t parameters[256];
+    swprintf_s(parameters, L"|%g|%d|%g,%g,%g|%g,%g,%g|%g,%g,%g,%g", cutoff, wrap ? 1 : 0, row0.x, row0.y, row0.z,
+        row1.x, row1.y, row1.z, atlasRect.x, atlasRect.y, atlasRect.z, atlasRect.w);
+    const std::wstring key = baseColor->key + parameters;
+    auto found = m_ommEntries.find(key);
+    if (found != m_ommEntries.end())
+        return found->second;
+    m_ommEntries[key] = -1;
+    const auto alpha = LoadOpacityAlpha(*baseColor, wrap);
+    if (!alpha)
+        return -1;
+
+    // The leaf sprite's front-quad triangles in index order (ray tracing leaves out the coplanar back quad),
+    // with the same UV path as the any-hit shader:
+    // ApplyAtlasRect, then TransformMaterialUv.
+    const auto& sprite = m_geometryData.spriteIndices;
+    auto textureUv = [&](UINT index)
+    {
+        const XMFLOAT2 uv = m_geometryData.vertices[sprite.VertexOffset + index].Tex;
+        const float u = atlasRect.x + uv.x * atlasRect.z, v = atlasRect.y + uv.y * atlasRect.w;
+        return OpacityMicromap::Uv{ u * row0.x + v * row0.y + row0.z, u * row1.x + v * row1.y + row1.z };
+    };
+    auto& stats = m_renderData.opacityMicromaps;
+    const int first = static_cast<int>(m_ommTriangleIndices.size());
+    for (UINT triangle = 0; triangle + 2 < sprite.IndexCount / 2; triangle += 3)
+    {
+        const UINT* indices = &m_geometryData.indices[sprite.IndexOffset + triangle];
+        const OpacityMicromap::Uv uv[3] = { textureUv(indices[0]), textureUv(indices[1]), textureUv(indices[2]) };
+        const auto baked = OpacityMicromap::BakeTriangle(*alpha, cutoff, uv, LeafOpacitySubdivisionLevel);
+        for (int state = 0; state < 4; ++state)
+            stats.states[state] += baked.stateCounts[state];
+        if (baked.specialIndex != 0)
+        {
+            m_ommTriangleIndices.push_back(baked.specialIndex);
+            ++stats.specialTriangles;
+            continue;
+        }
+        m_ommTriangleIndices.push_back(static_cast<int>(m_ommByteOffsets.size()));
+        m_ommByteOffsets.push_back(static_cast<UINT>(m_ommData.size()));
+        m_ommData.insert(m_ommData.end(), baked.data.begin(), baked.data.end());
+        ++stats.micromaps;
+    }
+    stats.subdivisionLevel = LeafOpacitySubdivisionLevel;
+    stats.bytes = m_ommData.size();
+    m_ommEntries[key] = first;
+    return first;
+}
+
+HRESULT RenderManager::FinalizeOpacityMicromaps()
+{
+    if (m_ommTriangleIndices.empty())
+        return S_OK;
+    const HRESULT hr = GetPlatform()->BuildOpacityMicromaps(m_ommData.data(), m_ommData.size(), m_ommByteOffsets.data(),
+        static_cast<UINT>(m_ommByteOffsets.size()), LeafOpacitySubdivisionLevel, m_ommTriangleIndices.data(),
+        static_cast<UINT>(m_ommTriangleIndices.size()));
+    return FAILED(hr) ? hr : S_OK;
 }
 
 HRESULT RenderManager::CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
@@ -829,6 +965,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data, Settings*
     ASSIGN_FUNC(SetRenderUnit);
     ASSIGN_FUNC(LoadTexture);
     ASSIGN_FUNC(LoadTextureFromMemory);
+    ASSIGN_FUNC(BuildOpacityMicromaps);
     ASSIGN_FUNC(CreateTexture2D);
     ASSIGN_FUNC(CreateD3DBuffer);
     ASSIGN_FUNC(CreateRenderUnit);

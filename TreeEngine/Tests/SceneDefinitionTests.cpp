@@ -2,6 +2,7 @@
 #include "GltfLoader.h"
 #include "SceneDefinition.h"
 #include "RenderData.h"
+#include "OpacityMicromapBaker.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -518,6 +519,76 @@ void TestLeafAtlases()
     rejectLeaves(Json::parse(R"({"atlas":"plants","sizeVariation":0.95})"), "leaves.sizeVariation: must be between 0 and 0.9");
 }
 
+void TestOpacityMicromaps()
+{
+    using namespace OpacityMicromap;
+    // Every micro-triangle maps to a distinct index along the space-filling curve.
+    for (uint32_t level = 1; level <= 8; ++level)
+    {
+        const uint32_t size = 1u << level;
+        std::vector<bool> seen(size * size, false);
+        for (uint32_t i = 0; i < size; ++i)
+            for (uint32_t j = 0; i + j < size; ++j)
+                for (int inverted = 0; inverted < 2; ++inverted)
+                {
+                    if (inverted && i + j + 1 >= size) continue;
+                    const float u = (i + (inverted ? 2.0f : 1.0f) / 3) / size, v = (j + (inverted ? 2.0f : 1.0f) / 3) / size;
+                    const uint32_t index = BarycentricsToIndex(u, v, level);
+                    Check(index < size * size && !seen[index], "micro-triangle indices are not a bijection");
+                    seen[index] = true;
+                }
+    }
+
+    // An opaque disk on a transparent background, with a soft edge.
+    AlphaImage image;
+    image.width = image.height = 64;
+    image.wrap = false;
+    image.alpha.resize(64 * 64);
+    for (int y = 0; y < 64; ++y)
+        for (int x = 0; x < 64; ++x)
+        {
+            const float d = std::sqrt((x - 31.5f) * (x - 31.5f) + (y - 31.5f) * (y - 31.5f));
+            image.alpha[y * 64 + x] = static_cast<uint8_t>(std::min(std::max((22.0f - d) * 64.0f, 0.0f), 255.0f));
+        }
+    const Uv uv[3] = { { 0, 0 }, { 1, 0 }, { 0, 1 } };
+    const uint32_t level = 5;
+    const auto baked = BakeTriangle(image, 0.5f, uv, level);
+    Check(baked.specialIndex == 0 && baked.data.size() == (1u << (2 * level)) / 4, "disk triangle should store OC1_4_STATE data");
+    Check(baked.stateCounts[Opaque] > 0 && baked.stateCounts[Transparent] > 0
+        && baked.stateCounts[UnknownOpaque] + baked.stateCounts[UnknownTransparent] > 0, "disk triangle should have every kind of state");
+    // Certain states agree with dense bilinear samples inside each micro-triangle.
+    auto alphaAt = [&](float u, float v)
+    {
+        const float x = u * 64 - 0.5f, y = v * 64 - 0.5f;
+        const int x0 = static_cast<int>(std::floor(x)), y0 = static_cast<int>(std::floor(y));
+        const float fx = x - x0, fy = y - y0;
+        auto at = [&](int px, int py) { return image.alpha[std::min(std::max(py, 0), 63) * 64 + std::min(std::max(px, 0), 63)] / 255.0f; };
+        return (at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx) * (1 - fy) + (at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx) * fy;
+    };
+    const uint32_t size = 1u << level;
+    for (uint32_t i = 0; i < size; ++i)
+        for (uint32_t j = 0; i + j < size; ++j)
+        {
+            const float u = static_cast<float>(i) / size, v = static_cast<float>(j) / size, step = 1.0f / size;
+            const uint32_t index = BarycentricsToIndex(u + step / 3, v + step / 3, level);
+            const uint32_t state = (baked.data[index / 4] >> (2 * (index % 4))) & 3;
+            for (int sample = 0; sample < 25 && (state == Opaque || state == Transparent); ++sample)
+            {
+                float a = (sample % 5 + 0.5f) / 5, b = (sample / 5 + 0.5f) / 5;
+                if (a + b > 1) { a = 1 - a; b = 1 - b; }
+                const bool passes = alphaAt(u + a * step, v + b * step) >= 0.5f;
+                Check(passes == (state == Opaque), "a certain micro-triangle state disagrees with the texture");
+            }
+        }
+
+    // Uniform triangles use special indices and store nothing.
+    image.alpha.assign(64 * 64, 255);
+    const auto opaque = BakeTriangle(image, 0.5f, uv, 4);
+    Check(opaque.specialIndex == FullyOpaqueIndex && opaque.data.empty(), "fully opaque triangle should use the special index");
+    image.alpha.assign(64 * 64, 0);
+    Check(BakeTriangle(image, 0.5f, uv, 4).specialIndex == FullyTransparentIndex, "fully transparent triangle should use the special index");
+}
+
 int RunScenePersistenceTests();
 
 
@@ -617,6 +688,7 @@ int main(int argc, char** argv)
         TestInstancing();
         TestTestPasses();
         TestLeafAtlases();
+        TestOpacityMicromaps();
         const auto minimal = Json::parse(R"({"version":1,"name":"Example","objects":[{"id":"box","type":"primitive"}]})");
         auto defaults = SceneData::ParseScene(minimal.dump(), "test.scene.json");
         Check(defaults.objects.size() == 1, "default object missing");

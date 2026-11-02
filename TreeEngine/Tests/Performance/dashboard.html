@@ -334,7 +334,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
   }
   function runTitle(run) {
     return run.label + (run.label === shortCommit(run) ? '' : ' (' + shortCommit(run) + ')') +
-      (run.dirty ? ' • uncommitted changes' : '') + (run.backportedHarness ? ' • measuring code backported' : '');
+      (run.dirty ? ' • uncommitted changes' : '') + (run.backportedHarness ? ' • measuring code backported' : '') +
+      (run.opacityMicromapsOff ? ' • opacity micromaps off' : '');
   }
 
   // ---- Comparison table -----------------------------------------------------------------

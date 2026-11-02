@@ -231,8 +231,6 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
             return;
         }
     }
-    if (payload.isShadow == 2)
-        payload.color.x = min(payload.color.x, RayTCurrent() / ambientOcclusionRadius);
 }
 
 // Local diffuse visibility with distance falloff and stable cosine-weighted probes.
@@ -263,7 +261,8 @@ float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometri
         ray.TMin = bias;
         ray.TMax = ambientOcclusionRadius;
         RayPayload probe = { float4(1, 1, 1, 1), 0, 2 };
-        TraceRay(Scene, RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, ~0, 0, 0, 0, ray, probe);
+        // The closest hit records the distance: opacity micromaps can accept leaf hits without running any-hit.
+        TraceRay(Scene, RAY_FLAG_NONE, ~0, 0, 0, 0, ray, probe);
         visibility += smoothstep(0.0f, 1.0f, probe.color.x);
     }
     return lerp(1.0f, visibility / sampleCount, ambientOcclusionStrength);
@@ -272,6 +271,13 @@ float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometri
 [shader("closesthit")]
 void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
+    if (payload.isShadow == 2)
+    {
+        // Ambient-occlusion probe: only the distance to the nearest occluder matters.
+        payload.color.x = RayTCurrent() / ambientOcclusionRadius;
+        return;
+    }
+
     // Barycentric weights
     float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
@@ -292,6 +298,13 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     SimpleVertexData sv2 = LoadOriginalVertex(geoInfo.baseVertexLocation + i2, geoInfo.isSkinned);
     float3 normal = normalize(sv0.normal * bary.x + sv1.normal * bary.y + sv2.normal * bary.z);
     float4 tangentData = sv0.tangent * bary.x + sv1.tangent * bary.y + sv2.tangent * bary.z;
+    if (HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
+    {
+        // Two-sided alpha-masked surfaces (leaf sprites keep only their front quad): shade the side the ray sees.
+        // Texture axes keep their world directions, so the binormal sign flips with the normal.
+        normal = -normal;
+        tangentData.w = -tangentData.w;
+    }
     float3 tangent = normalize(tangentData.xyz);
 
     const uint atlasRegion = instanceDataBuffer[geoInfo.instanceIndex].AtlasRegion;

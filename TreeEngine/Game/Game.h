@@ -78,6 +78,7 @@ public:
     HRESULT Initialize(bool renderToSharedTexture);
 
     void SetRenderTestWaterMotionSpeed(float speed) { m_settings.m_waterMotionSpeed = speed; }
+    void SetRenderTestOpacityMicromaps(bool enabled) { m_settings.m_opacityMicromaps = enabled; }
     void SetRenderTestReflectionRays(int rays) {
         m_settings.m_waterReflections = rays > 0;
         if (rays > 0) m_settings.m_waterReflectionRays = rays;

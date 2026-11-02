@@ -183,6 +183,18 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
     Material* pLeafLOD0 = nullptr;
     const wchar_t* leafLOD0Texture = _params->textureFilename.size() > 1 ? _params->textureFilename[1].c_str() : nullptr;
     HRR(createMaterial(L"LeafLOD0_", 1, leafLOD0Texture, nullptr, nullptr, leafLOD0State, &pLeafLOD0));
+    // Opacity micromaps let DXR skip the leaf alpha test wherever the texture is certainly opaque or transparent.
+    // Instances draw the source's layouts, which carry the source's micromaps.
+    m_leafOpacityMicromaps.clear();
+    if (!IsInstance())
+    {
+        const auto* maps = _params->MaterialTextures(1);
+        const GltfTextureSource* baseColor = maps ? maps->roles[BaseColorTextureRole].get() : nullptr;
+        if (_params->leafRegions.empty())
+            m_leafOpacityMicromaps.push_back(renderManager.RegisterLeafOpacity(shaderMaterials[1], baseColor, XMFLOAT4(0, 0, 1, 1)));
+        for (const auto& region : _params->leafRegions)
+            m_leafOpacityMicromaps.push_back(renderManager.RegisterLeafOpacity(shaderMaterials[1], baseColor, region.atlasRect));
+    }
     pNewMesh = nullptr;
     pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(PrimitiveType_Sprite);
     renderManager.CreateMesh(L"LeafLOD0", renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER), renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), pBufferOffsets, BASIC_INPUT_LAYOUT, &pNewMesh);
@@ -238,6 +250,8 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         {
             instanceData.clear();
         }
+        for (auto& opacityMicromaps : m_segmentOpacityMicromaps)
+            opacityMicromaps.clear();
         m_numInstancesPerSegment.fill(0);
 
         if (m_treeFrames.size() < _treeModel->treeData.numBranches)
@@ -314,6 +328,10 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         if (instanceData.size() > 0)
         {
             memcpy(dataView + segmentOffset, &instanceData[0], instanceData.size() * sizeof(InstancedData));
+            // Written where the instances land: skipped branches shift slots from the precounted InstanceOffset.
+            if (renderData.instanceOpacityMicromap)
+                std::copy(m_segmentOpacityMicromaps[segmentIndex].begin(), m_segmentOpacityMicromaps[segmentIndex].end(),
+                    renderData.instanceOpacityMicromap + segmentOffset);
         }
 
         pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, segmentOffset, (UINT)instanceData.size());
@@ -324,7 +342,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     {
         // The layouts depend only on the pose and depth LOD, so they are rebuilt only when those change.
         if (!m_reusePose || !m_instanceLayoutsValid || m_instanceLayoutDepthLOD != _params->depthLOD)
-            BuildInstanceLayouts(startInstance);
+            BuildInstanceLayouts(startInstance, renderData.instanceOpacityMicromap);
         for (auto& layout : m_instanceLayouts)
             for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
             {
@@ -393,6 +411,17 @@ UINT Tree::AtlasRectStart(UINT startInstance) const
 {
     const UINT branches = _treeModel->treeData.numBranches;
     return startInstance + (m_instanceCount > 0 ? branches * (1 + InstanceLayoutCount) : branches);
+}
+
+int Tree::LeafOpacityMicromap(const Branch* branch) const
+{
+    if (branch->geometryType != Leaf || m_leafOpacityMicromaps.empty())
+        return -1;
+    if (m_leafRegions.empty())
+        return m_leafOpacityMicromaps[0];
+    if (branch->id < 0 || static_cast<size_t>(branch->id) >= m_leafRegions.size() || m_leafRegions[branch->id] < 0)
+        return -1;
+    return m_leafOpacityMicromaps[m_leafRegions[branch->id]];
 }
 
 UINT Tree::AtlasRegionSlot(UINT startInstance, const Branch* branch) const
@@ -471,6 +500,7 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
     }
 
     m_segmentInstanceData[segmentIndex].push_back(data);
+    m_segmentOpacityMicromaps[segmentIndex].push_back(LeafOpacityMicromap(frame.branch));
 
     switch (frame.branch->geometryType)
     {
@@ -772,7 +802,7 @@ TreeSegment Tree::SelectLayoutSegment(const BranchInstance& frame, InstanceLayou
     return layout == NearLayout || frame.branch->depth < _params->depthLOD ? TreeSegment::BranchLOD0 : TreeSegment::BranchLOD1;
 }
 
-void Tree::BuildInstanceLayouts(UINT startInstance)
+void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
 {
     const UINT branches = _treeModel->treeData.numBranches;
     if (m_layoutOffsets.size() < static_cast<size_t>(m_numBranchInstances))
@@ -819,6 +849,8 @@ void Tree::BuildInstanceLayouts(UINT startInstance)
             data.InstanceOffset = offset;
             data.InstanceOffsetPrev = parent >= 0 && m_layoutOffsets[parent] >= 0 ? m_layoutOffsets[parent] : offset;
             layout.segments[segmentIndex].push_back(data);
+            if (opacityMicromaps)
+                opacityMicromaps[offset] = LeafOpacityMicromap(frame.branch);
             m_layoutOffsets[i] = static_cast<int>(offset);
 
             if (frame.branch->geometryType == Leaf) layout.leafCount++;

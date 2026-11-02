@@ -28,6 +28,7 @@ struct RenderTestRequest
     int warmupFrames = 3;
     int benchmarkFrames = 0;
     float waterMotionSpeed = 1.0f;
+    bool opacityMicromaps = true; // false makes DXR run the leaf alpha test without opacity micromaps.
     bool hasReflectionRays = false; // Omitted: preserve the application default.
     int reflectionRays = 0; // Explicit 0 disables traced transmission reflections; otherwise 1-32.
     double benchmarkTimeStep = 0;

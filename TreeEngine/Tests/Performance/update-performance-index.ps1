@@ -27,6 +27,7 @@ function Get-IndexEntry([string]$Path) {
         branch = $run.branch
         dirty = $run.dirty
         backportedHarness = [bool]($run.PSObject.Properties.Name -contains 'backportedHarness' -and $run.backportedHarness)
+        opacityMicromapsOff = [bool]($run.PSObject.Properties.Name -contains 'opacityMicromaps' -and -not $run.opacityMicromaps)
         configuration = $run.configuration
         adapter = $run.adapter
         scenes = @($run.scenes | ForEach-Object { $_.id })

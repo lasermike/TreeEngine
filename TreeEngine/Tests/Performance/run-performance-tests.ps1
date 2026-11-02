@@ -14,7 +14,9 @@ param(
     # The commit -Executable was built from, when it isn't this checkout's HEAD.
     [string]$SourceCommit,
     # -Executable is an older commit with this harness's capture code added, to backfill history.
-    [switch]$BackportedHarness
+    [switch]$BackportedHarness,
+    # Ray trace leaves without opacity micromaps (DXR 1.2), to measure what they save.
+    [switch]$DisableOpacityMicromaps
 )
 
 # Measures every scene whose definition has "testPass": "performance" and writes the results to
@@ -122,12 +124,13 @@ for ($run = 1; $run -le $Runs; $run++) {
             $reportPath = Join-Path $jobDirectory 'report.json'
             $request = [ordered]@{
                 scene = $scene.id; mode = $mode; seed = 12345; width = $Width; height = $Height; postProcessing = $true
+                opacityMicromaps = (-not $DisableOpacityMicromaps)
                 report = $reportPath; performance = [ordered]@{ frames = $frames; frameTimeStep = $frameTimeStep; startTime = $StartTime }
             }
             $requestPath = Join-Path $jobDirectory 'request.json'
             [IO.File]::WriteAllText($requestPath, ($request | ConvertTo-Json -Depth 5), $utf8)
             $job = [ordered]@{ scene = $scene.id; sceneName = $scene.name; mode = $mode; run = $run; success = $false; error = $null
-                processMs = $null; sceneLoad = $null; windows = $null; samples = @() }
+                processMs = $null; sceneLoad = $null; opacityMicromaps = $null; windows = $null; samples = @() }
             try {
                 $stopwatch = [Diagnostics.Stopwatch]::StartNew()
                 $process = Start-Process -FilePath $Executable -ArgumentList @('--render-test', ('"' + $requestPath + '"')) `
@@ -145,6 +148,7 @@ for ($run = 1; $run -le $Runs; $run++) {
                 if (-not $report.success) { throw "Capture failed: $($report.error)" }
                 if ($process.ExitCode -ne 0) { throw "Process exited with code $($process.ExitCode)." }
                 $job.sceneLoad = $report.sceneLoad
+                if ($report.PSObject.Properties.Name -contains 'opacityMicromaps') { $job.opacityMicromaps = $report.opacityMicromaps }
                 $job.samples = @($report.samples)
                 $job.windows = [ordered]@{}
                 foreach ($window in $windows) {
@@ -180,6 +184,7 @@ $results = [ordered]@{
     branch = Get-GitValue @('rev-parse', '--abbrev-ref', 'HEAD')
     dirty = [bool]$status
     backportedHarness = [bool]$BackportedHarness
+    opacityMicromaps = (-not $DisableOpacityMicromaps)
     configuration = $(if ($Executable -match '\\Debug\\') { 'Debug' } else { $Configuration })
     executable = $Executable
     cpu = $cpu.Name.Trim()

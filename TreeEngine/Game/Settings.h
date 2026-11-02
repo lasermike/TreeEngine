@@ -24,6 +24,7 @@ public:
     bool m_waterReflections = true;
     int m_waterReflectionRays = 16;
     bool m_shadowsEnabled = true;
+    bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
     bool m_showShadowBuffer;
     bool m_wireframe;
     bool m_showDebugUI;

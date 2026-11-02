@@ -836,6 +836,11 @@ HRESULT RenderPlatform11::LoadTexture(const wchar_t* textureFilename, int textur
     return S_OK;
 }
 
+HRESULT RenderPlatform11::BuildOpacityMicromaps(const uint8_t*, size_t, const UINT*, UINT, UINT, const int*, UINT)
+{
+    return S_FALSE; // D3D11 has no ray tracing.
+}
+
 HRESULT RenderPlatform11::LoadTextureFromMemory(const wchar_t* /*name*/, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** loadedTexture, int colorSpace)
 {
     TextureCOMScope com;

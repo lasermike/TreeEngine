@@ -504,6 +504,7 @@ HRESULT Game::Regenerate()
 
     // Init new stuff
     HRR(m_pScene->InitGraphics(m_renderManager));
+    HRR(m_renderManager.FinalizeOpacityMicromaps());
     graphicsMs += ElapsedMs(start);
 
     // The first regenerate after a load completes it; later ones (edits, device reloads) are not loads.
@@ -1271,6 +1272,22 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         ImGui::SliderFloat("Blur Amount", &sceneRenderSettings.blurAmount, 0.0f, 2.5f, "%.2f");
         ImGui::Checkbox("Enable DXR", &m_settings.m_dxrEnabled);
+        const auto& micromaps = sceneRenderSettings.opacityMicromaps;
+        if (micromaps.supported)
+        {
+            ImGui::Checkbox("Opacity micromaps", &m_settings.m_opacityMicromaps);
+            const double states = static_cast<double>(micromaps.states[0] + micromaps.states[1] + micromaps.states[2] + micromaps.states[3]);
+            if (states > 0)
+            {
+                ImGui::Text("  %u micromaps + %u uniform triangles, level %u, %.1f KB", micromaps.micromaps,
+                    micromaps.specialTriangles, micromaps.subdivisionLevel, micromaps.bytes / 1024.0);
+                ImGui::Text("  Micro-triangles: %.0f%% opaque, %.0f%% transparent, %.0f%% any-hit",
+                    100.0 * micromaps.states[1] / states, 100.0 * micromaps.states[0] / states,
+                    100.0 * (micromaps.states[2] + micromaps.states[3]) / states);
+            }
+        }
+        else
+            ImGui::TextDisabled("Opacity micromaps: needs DXR tier 1.2");
         ImGui::SliderFloat("Water motion speed", &m_settings.m_waterMotionSpeed, 0.0f, 4.0f, "%.2fx");
         ImGui::Checkbox("Trace transmissive reflections", &m_settings.m_waterReflections);
         if (m_settings.m_waterReflections)

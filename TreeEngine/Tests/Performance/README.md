@@ -22,6 +22,7 @@ committed, so a dashboard can compare runs across commits and machines.
 | `-Modes` | `raster, raytracing` | Rendering modes. |
 | `-Scenes` | all tagged | Scene `id`s to measure; each must be in the pass. |
 | `-StartTime` | `5` | Simulation time of frame 0, in seconds. Trees grow from time 0, so earlier times measure nearly empty scenes. |
+| `-DisableOpacityMicromaps` | off | Ray trace leaves without opacity micromaps, to measure what they save (see the scenes README). |
 
 Close other GPU-heavy programs first. The script measures whatever else the machine is doing.
 
@@ -38,6 +39,9 @@ process with a `performance` request. The process:
    - `totalMs`: the sum.
 2. **Renders 20 frames with profiling on.** Frame *n* is at simulation time `startTime + n/60`.
    Frame 0 also generates the scene and sets up graphics, so it is slow.
+   In ray tracing, the driver's CPU cost for the BLAS update stays high for about 11 frames after a
+   full build (on an RTX 5080, about 25 ms for LeafAtlases, and 75 ms with opacity micromaps), so
+   `frames10to20` still includes two of those frames.
    Object updates use every core, unlike image tests, which use one thread so images repeat.
    No images are written.
 3. **Records a sample for every frame:**
@@ -67,10 +71,15 @@ Tools should read the fields in `results.json` or `index.json`, not parse direct
       a commit whose hash no longer exists.
     - `configuration`, `cpu`, `logicalProcessors`, `os`, `adapter`, `workerThreads`
     - `width`, `height`, `frames`, `startTime`, `frameTimeStep`, `runs`, `modes`, `scenes`
+    - `opacityMicromaps`: false when measured with `-DisableOpacityMicromaps`; missing in older runs.
+      The dashboard marks such runs "opacity micromaps off".
     - `gpuPasses`
   - **`windows`:** the frame ranges summarized: `frames5to10` is frames 5–9, and `frames10to20` is frames 10–19.
   - **`jobs[]`**, one per scene, mode and run:
     - `scene`, `sceneName`, `mode`, `run`, `success`, `error`, `processMs`, `sceneLoad`
+    - `opacityMicromaps`: `requested`, `supported`, and what the load baked: `micromaps`, `specialTriangles`
+      (uniform triangles that need no map), `subdivisionLevel`, `bytes`, and `states`
+      (micro-triangles transparent, opaque, unknown-transparent, unknown-opaque)
     - every frame's `samples`
     - `windows.<name>.<metric>`, the `{ mean, min, max }` of `frameMs`, `sceneUpdateMs`, `drawUploadMs` and `gpu_<pass>Ms`
 - **`summary.csv`:** one row per job and window, with load times and window means. Open it in Excel for a quick look.

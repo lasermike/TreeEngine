@@ -36,6 +36,7 @@
     <ClCompile Include="..\Game\GltfLoader.cpp" />
     <ClCompile Include="..\Game\SceneDefinition.cpp" />
     <ClCompile Include="..\Game\SceneCatalog.cpp" />
+    <ClCompile Include="..\Game\OpacityMicromapBaker.cpp" />
     <SceneJson Include="..\Game\Resources\Scenes\*.scene.json" />
     <GltfAsset Include="Assets\Gltf\*.*" />
     <None Include="@(SceneJson)" />
