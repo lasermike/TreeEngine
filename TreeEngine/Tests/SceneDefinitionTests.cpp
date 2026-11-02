@@ -407,35 +407,11 @@ void TestInstancing()
     Reject(forward.dump(), "instances must follow the object they copy");
 }
 
-void TestTestPasses()
+void TestTestPassRemoved()
 {
-    // testPass is a name or an array of names; saving writes the same compact form back.
-    auto scene = Json::parse(R"({"version":1,"name":"Passes","objects":[{"id":"box","type":"primitive"}]})");
-    auto none = SceneData::ParseScene(scene.dump(), "passes.scene.json");
-    Check(none.testPasses.empty() && !Json::parse(SceneData::SerializeScene(none)).contains("testPass"),
-        "a scene without testPass gained one");
-    scene["testPass"] = "performance";
-    auto one = SceneData::ParseScene(scene.dump(), "passes.scene.json");
-    Check(one.testPasses == std::vector<std::string>{ "performance" }, "single test pass was not read");
-    Check(Json::parse(SceneData::SerializeScene(one))["testPass"] == "performance", "single test pass was not saved as a string");
-    scene["testPass"] = { "performance", "smoke-2" };
-    auto two = SceneData::ParseScene(scene.dump(), "passes.scene.json");
-    Check(two.testPasses.size() == 2 && two.testPasses[1] == "smoke-2", "test pass array was not read");
-    Check(SceneData::ParseScene(SceneData::SerializeScene(two), "roundtrip").testPasses == two.testPasses,
-        "test pass array did not round-trip");
-
-    auto reject = [&](const Json& value, const std::string& expected) {
-        auto bad = scene;
-        bad["testPass"] = value;
-        Reject(bad.dump(), expected);
-    };
-    reject(Json::array(), "non-empty array");
-    reject(3, "expected a test pass name");
-    reject("", "testPass: test pass names");
-    reject("Performance", "testPass: test pass names");
-    reject("2fast", "testPass: test pass names");
-    reject({ "performance", 1 }, "testPass[1]: expected a string");
-    reject({ "performance", "performance" }, "duplicate test pass 'performance'");
+    // Performance tests are listed in Tests/Performance/scenes.json, not in scene files.
+    auto scene = Json::parse(R"({"version":1,"name":"Passes","testPass":"performance","objects":[{"id":"box","type":"primitive"}]})");
+    Reject(scene.dump(), "testPass: unknown property");
 }
 
 void TestLeafAtlases()
@@ -691,7 +667,7 @@ int main(int argc, char** argv)
         }
         TestPbrSceneMaterials();
         TestInstancing();
-        TestTestPasses();
+        TestTestPassRemoved();
         TestLeafAtlases();
         TestOpacityMicromaps();
         const auto minimal = Json::parse(R"({"version":1,"name":"Example","objects":[{"id":"box","type":"primitive"}]})");

@@ -116,6 +116,12 @@ td .delta { display: block; font-size: 12px; color: var(--text-muted); }
 td .delta.slower { color: var(--critical); }
 td .delta.faster { color: var(--good-text); }
 .empty { color: var(--text-secondary); padding: 32px 0; }
+.pacing-filters { margin: 12px 0 8px; }
+#pacing-chart { position: relative; }
+.series { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); }
+.series span { display: inline-flex; align-items: center; gap: 6px; }
+.chart svg.trace { display: block; width: 100%; height: 280px; overflow: visible; outline: none; }
+.chart svg.trace:focus-visible { outline: 2px solid var(--s1); outline-offset: 4px; border-radius: 4px; }
 code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
 </style>
 </head>
@@ -145,6 +151,18 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
       <h2>Latest run compared with the previous run</h2>
       <p class="note" id="compare-note"></p>
       <div class="table-wrap" id="compare"></div>
+    </section>
+
+    <section class="card chart" id="pacing" hidden>
+      <h2>Frame pacing while the camera moves</h2>
+      <p class="note" id="pacing-note"></p>
+      <div class="filters pacing-filters" role="group" aria-label="Frame pacing selection">
+        <label>Test <select id="pacing-test"></select></label>
+        <label>Run <select id="pacing-run"></select></label>
+        <label>Compare with <select id="pacing-compare"></select></label>
+      </div>
+      <div id="pacing-chart"></div>
+      <div class="table-wrap" id="pacing-table"></div>
     </section>
 
     <section>
@@ -347,6 +365,224 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
   }
 
   // ---- Comparison table -----------------------------------------------------------------
+  // ---- Frame pacing ---------------------------------------------------------------------------
+  // Each pacing run's repeats are combined per frame: the median, with the min and max in the tooltip.
+  var pacingState = { test: '', run: '', compare: null };   // compare null: pick the run before the selected one.
+  var PACING_COLUMNS = [
+    { key: 'frameP50Ms', title: 'Median (ms)' }, { key: 'frameP90Ms', title: 'p90 (ms)' }, { key: 'frameP99Ms', title: 'p99 (ms)' },
+    { key: 'frameMaxMs', title: 'Max (ms)' }, { key: 'spikes', title: 'Spikes', count: true },
+    { key: 'over33Ms', title: 'Over 33 ms', count: true }, { key: 'rebuiltBLASFrames', title: 'BLAS rebuilds', count: true }
+  ];
+  function pacingJobs(run, test) {
+    return (run.pacing || []).filter(function (p) { return p.test === test && p.mode === state.mode; });
+  }
+  function pacingTrace(jobs) {
+    var n = Math.min.apply(null, jobs.map(function (j) { return j.frameMs.length; })), frames = [], rebuilt = {};
+    for (var i = 0; i < n; i++) {
+      var v = jobs.map(function (j) { return j.frameMs[i]; }).sort(function (a, b) { return a - b; });
+      var mid = v.length >> 1;
+      frames.push({ median: v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2, min: v[0], max: v[v.length - 1] });
+    }
+    jobs.forEach(function (j) { j.rebuilt.forEach(function (f) { rebuilt[f] = true; }); });
+    return { frames: frames, rebuilt: rebuilt, repeats: jobs.length, step: jobs[0].frameTimeStep || 1 / 60 };
+  }
+  function pacingMean(jobs, k) {
+    var sum = 0; jobs.forEach(function (j) { sum += j.summary[k]; }); return sum / jobs.length;
+  }
+  function shortTitle(run) { return run.label.length > 24 ? run.label.substring(0, 23) + '…' : run.label; }
+  function lineKey(color, dash, w) {
+    var k = svg('svg', { width: w, height: 12, viewBox: '0 0 ' + w + ' 12', 'aria-hidden': 'true' });
+    var line = { x1: 1, y1: 6, x2: w - 1, y2: 6, stroke: color, 'stroke-width': 2, 'stroke-linecap': 'round' };
+    if (dash) line['stroke-dasharray'] = '5 3';
+    k.appendChild(svg('line', line));
+    return k;
+  }
+
+  function renderPacing(list) {
+    var section = document.getElementById('pacing');
+    var anyPacing = runs.some(function (r) { return r.pacing && r.pacing.length; });
+    section.hidden = !anyPacing;
+    if (!anyPacing) return;
+    var chartBox = document.getElementById('pacing-chart'), tableBox = document.getElementById('pacing-table');
+    var note = document.getElementById('pacing-note');
+    chartBox.textContent = ''; tableBox.textContent = '';
+    var tests = [];
+    list.forEach(function (r) { (r.pacing || []).forEach(function (p) { if (p.mode === state.mode && tests.indexOf(p.test) < 0) tests.push(p.test); }); });
+    if (!tests.length) {
+      ['pacing-test', 'pacing-run', 'pacing-compare'].forEach(function (id) { document.getElementById(id).textContent = ''; });
+      note.textContent = 'No frame-pacing runs match these filters in this mode.';
+      return;
+    }
+    tests.sort();
+    if (tests.indexOf(pacingState.test) < 0) { pacingState.test = tests[0]; pacingState.compare = null; }
+    fillSelect(document.getElementById('pacing-test'), tests, tests, pacingState.test);
+
+    // Latest first.
+    var candidates = list.filter(function (r) { return pacingJobs(r, pacingState.test).length; }).reverse();
+    var ids = candidates.map(function (r) { return r.directory; });
+    if (ids.indexOf(pacingState.run) < 0) { pacingState.run = ids[0]; pacingState.compare = null; }
+    var runIndex = ids.indexOf(pacingState.run);
+    if (pacingState.compare === null || (pacingState.compare && (ids.indexOf(pacingState.compare) < 0 || pacingState.compare === pacingState.run)))
+      pacingState.compare = runIndex + 1 < ids.length ? ids[runIndex + 1] : '';
+    fillSelect(document.getElementById('pacing-run'), ids, candidates.map(runTitle), pacingState.run);
+    var others = ids.filter(function (id) { return id !== pacingState.run; });
+    fillSelect(document.getElementById('pacing-compare'), [''].concat(others),
+      ['None'].concat(others.map(function (id) { return runTitle(candidates[ids.indexOf(id)]); })), pacingState.compare);
+
+    var selected = candidates[runIndex];
+    var compared = pacingState.compare ? candidates[ids.indexOf(pacingState.compare)] : null;
+    var series = [{ run: selected, trace: pacingTrace(pacingJobs(selected, pacingState.test)), color: 'var(--s1)', dash: null, name: 'Run' }];
+    if (compared) series.push({ run: compared, trace: pacingTrace(pacingJobs(compared, pacingState.test)), color: 'var(--s2)', dash: '6 4', name: 'Compared' });
+    note.textContent = 'Frame time of every measured frame while the camera follows the test’s path; settle frames are left out. ' +
+      (series.some(function (s) { return s.trace.repeats > 1; }) ? 'Lines are the median of each run’s repeats; hover for the range. ' : '') +
+      'Ticks under the axis mark frames that rebuilt the BLAS.';
+    renderPacingChart(chartBox, series);
+
+    var table = el('table'), head = el('tr');
+    head.appendChild(el('th', null, 'Run'));
+    PACING_COLUMNS.forEach(function (c) { head.appendChild(el('th', null, c.title)); });
+    var thead = el('thead'); thead.appendChild(head); table.appendChild(thead);
+    var tbody = el('tbody');
+    candidates.forEach(function (run) {
+      var jobs = pacingJobs(run, pacingState.test), tr = el('tr');
+      tr.appendChild(el('td', null, runTitle(run) + (jobs.length > 1 ? ' (mean of ' + jobs.length + ')' : '')));
+      PACING_COLUMNS.forEach(function (c) {
+        var v = pacingMean(jobs, c.key);
+        tr.appendChild(el('td', null, c.count ? (Math.round(v * 10) / 10).toLocaleString() : fmt(v)));
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody); tableBox.appendChild(table);
+  }
+
+  function renderPacingChart(container, series) {
+    var card = container.parentNode;
+    var legendRow = el('div', { 'class': 'series' });
+    series.forEach(function (s) {
+      var item = el('span');
+      item.appendChild(lineKey(s.color, s.dash, 24));
+      item.appendChild(document.createTextNode(s.name + ': ' + runTitle(s.run)));
+      legendRow.appendChild(item);
+    });
+    container.appendChild(legendRow);
+
+    var width = Math.max(container.clientWidth, 280), height = 280;
+    var m = { l: 48, r: 12, t: 10, b: 26 + series.length * 8 };
+    var plotW = width - m.l - m.r, plotH = height - m.t - m.b;
+    var count = series[0].trace.frames.length, step = series[0].trace.step, max = 0;
+    series.forEach(function (s) { s.trace.frames.forEach(function (f) { max = Math.max(max, f.median); }); });
+    var ticks = niceTicks(max), top = ticks[ticks.length - 1];
+    function x(i) { return m.l + (count > 1 ? i / (count - 1) : 0.5) * plotW; }
+    function y(v) { return m.t + plotH - (v / top) * plotH; }
+    var plot = svg('svg', { 'class': 'trace', viewBox: '0 0 ' + width + ' ' + height, tabindex: '0', role: 'img',
+      'aria-label': 'Frame time of each frame along the camera path. Use the arrow keys to read values.' });
+    ticks.forEach(function (t) {
+      plot.appendChild(svg('line', { x1: m.l, x2: width - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }));
+      var label = svg('text', { x: m.l - 8, y: y(t) + 4, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 11, 'style': 'font-variant-numeric: tabular-nums' });
+      label.textContent = t.toLocaleString();
+      plot.appendChild(label);
+    });
+    // 30 frames per second: frames above this line are visible hitches.
+    var budget = 1000 / 30;
+    if (top >= budget) {
+      plot.appendChild(svg('line', { x1: m.l, x2: width - m.r, y1: y(budget), y2: y(budget), stroke: 'var(--text-muted)', 'stroke-width': 1, 'stroke-dasharray': '2 3' }));
+      var budgetLabel = svg('text', { x: width - m.r, y: y(budget) - 4, 'text-anchor': 'end', fill: 'var(--text-secondary)', 'font-size': 11 });
+      budgetLabel.textContent = '33.3 ms (30 fps)';
+      plot.appendChild(budgetLabel);
+    }
+    // Seconds along the camera path.
+    var seconds = (count - 1) * step, every = seconds > 2 ? 0.5 : 0.25;
+    for (var t = 0; t <= seconds + 1e-6; t += every) {
+      var label = svg('text', { x: x(t / step), y: height - 6, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 11 });
+      label.textContent = (Math.round(t * 100) / 100) + ' s';
+      plot.appendChild(label);
+    }
+    series.forEach(function (s, row) {
+      var d = '';
+      s.trace.frames.forEach(function (f, i) { d += (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(f.median).toFixed(1); });
+      var attrs = { d: d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+      if (s.dash) attrs['stroke-dasharray'] = s.dash;
+      plot.appendChild(svg('path', attrs));
+      var ry = m.t + plotH + 4 + row * 8;
+      Object.keys(s.trace.rebuilt).forEach(function (f) {
+        plot.appendChild(svg('line', { x1: x(+f), x2: x(+f), y1: ry, y2: ry + 5, stroke: s.color, 'stroke-width': 2, 'stroke-linecap': 'round' }));
+      });
+    });
+    var crosshair = svg('line', { y1: m.t, y2: m.t + plotH, stroke: 'var(--axis)', 'stroke-width': 1, visibility: 'hidden' });
+    plot.appendChild(crosshair);
+    container.appendChild(plot);
+
+    // Crosshair and tooltip: snap to the nearest frame; arrow keys step frames.
+    var tooltip = el('div', { 'class': 'tooltip', role: 'status' });
+    tooltip.hidden = true;
+    container.appendChild(tooltip);
+    var current = -1;
+    function show(i) {
+      current = i;
+      crosshair.setAttribute('x1', x(i)); crosshair.setAttribute('x2', x(i)); crosshair.setAttribute('visibility', 'visible');
+      tooltip.textContent = '';
+      tooltip.appendChild(el('div', { 'class': 'head' }, (i * step).toFixed(2) + ' s along the path'));
+      tooltip.appendChild(el('div', { 'class': 'meta' }, 'Frame ' + i));
+      series.forEach(function (s) {
+        var f = s.trace.frames[i];
+        if (!f) return;
+        var row = el('div', { 'class': 'row' });
+        row.appendChild(lineKey(s.color, s.dash, 16));
+        row.appendChild(el('strong', null, fmt(f.median) + ' ms'));
+        if (s.trace.repeats > 1) row.appendChild(el('span', { 'class': 'range' }, fmt(f.min) + '–' + fmt(f.max)));
+        row.appendChild(el('span', { 'class': 'name' }, shortTitle(s.run) + (s.trace.rebuilt[i] ? ' • BLAS rebuilt' : '')));
+        tooltip.appendChild(row);
+      });
+      tooltip.hidden = false;
+      var plotRect = plot.getBoundingClientRect(), boxRect = container.getBoundingClientRect();
+      var px = plotRect.left - boxRect.left + x(i) * plotRect.width / width;
+      var left = px + 12;
+      if (left + tooltip.offsetWidth > container.clientWidth) left = px - tooltip.offsetWidth - 12;
+      tooltip.style.left = Math.max(0, left) + 'px';
+      tooltip.style.top = (plotRect.top - boxRect.top + 8) + 'px';
+    }
+    function hide() { current = -1; tooltip.hidden = true; crosshair.setAttribute('visibility', 'hidden'); }
+    plot.addEventListener('pointermove', function (e) {
+      var rect = plot.getBoundingClientRect(), px = (e.clientX - rect.left) * width / rect.width;
+      show(Math.min(count - 1, Math.max(0, Math.round((px - m.l) / plotW * (count - 1)))));
+    });
+    plot.addEventListener('pointerleave', hide);
+    plot.addEventListener('blur', hide);
+    plot.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        show(current < 0 ? 0 : Math.min(count - 1, Math.max(0, current + (e.key === 'ArrowRight' ? 1 : -1))));
+      } else if (e.key === 'Escape') hide();
+    });
+    plot.addEventListener('focus', function () { show(0); });
+
+    // The same values as a table.
+    var details = el('details');
+    details.appendChild(el('summary', null, 'Show frames as table'));
+    var wrap = el('div', { 'class': 'table-wrap' }), table = el('table'), head = el('tr');
+    head.appendChild(el('th', null, 'Frame'));
+    head.appendChild(el('th', null, 'Time (s)'));
+    series.forEach(function (s) { head.appendChild(el('th', null, s.name + ' (ms)')); });
+    var thead = el('thead'); thead.appendChild(head); table.appendChild(thead);
+    var tbody = el('tbody');
+    for (var i = 0; i < count; i++) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, String(i)));
+      tr.appendChild(el('td', null, (i * step).toFixed(3)));
+      series.forEach(function (s) {
+        var f = s.trace.frames[i];
+        tr.appendChild(el('td', null, f ? fmt(f.median) + (s.trace.rebuilt[i] ? ' (rebuild)' : '') : '—'));
+      });
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody); wrap.appendChild(table); details.appendChild(wrap);
+    container.appendChild(details);
+  }
+
+  document.getElementById('pacing-test').addEventListener('change', function (e) { pacingState.test = e.target.value; pacingState.compare = null; render(); });
+  document.getElementById('pacing-run').addEventListener('change', function (e) { pacingState.run = e.target.value; pacingState.compare = null; render(); });
+  document.getElementById('pacing-compare').addEventListener('change', function (e) { pacingState.compare = e.target.value; render(); });
+
   function renderCompare(list) {
     var note = document.getElementById('compare-note');
     var wrap = document.getElementById('compare');
@@ -509,7 +745,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
 
   function render() {
     Array.prototype.forEach.call(modeButtons, function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-mode') === state.mode ? 'true' : 'false'); });
-    var list = filteredRuns();
+    renderPacing(filteredRuns());
+    // Steady charts and the comparison use runs with steady results; pacing-only runs have none.
+    var list = filteredRuns().filter(function (r) { return r.rows.length; });
     var charts = document.getElementById('charts');
     charts.textContent = '';
     var compare = document.getElementById('compare');

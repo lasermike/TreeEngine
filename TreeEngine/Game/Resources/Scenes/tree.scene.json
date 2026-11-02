@@ -2,7 +2,6 @@
   "version": 1,
   "id": "LoadTreeScene",
   "name": "Tree",
-  "testPass": "performance",
   "priority": 1,
   "camera": {
     "position": [1.11395788, 0.711319208, 2.05959034],

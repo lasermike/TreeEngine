@@ -2,7 +2,6 @@
   "version": 1,
   "id": "LeafAtlases",
   "name": "Leaf Atlases - canyon plants",
-  "testPass": "performance",
   "camera": {
     "position": [
       0,

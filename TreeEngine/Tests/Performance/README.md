@@ -1,14 +1,20 @@
 # Performance tests
 
-`run-performance-tests.ps1` measures every built-in scene whose definition has
-`"testPass": "performance"`. It records scene load times and the metrics shown
-by **Enable profiling** in the debug UI. Results go in `Artifacts/` and are
-committed, so a dashboard can compare runs across commits and machines.
+`run-performance-tests.ps1` runs the tests listed in [`scenes.json`](scenes.json). It records scene
+load times and the metrics shown by **Enable profiling** in the debug UI. Results go in `Artifacts/`
+and are committed, so a dashboard can compare runs across commits and machines.
+
+There are two kinds of test:
+- **Steady** tests render 20 frames with a fixed camera and summarize frame windows: what a scene
+  costs once it is running.
+- **Frame-pacing** tests move the camera along a keyframed path for a few seconds of simulation
+  and report the distribution of frame times and the spikes: hitches that averages hide.
 
 ```powershell
 .\run-performance-tests.ps1 2f8956a                  # label with the commit
 .\run-performance-tests.ps1 "after texture cache"    # or a note
-.\run-performance-tests.ps1 smoke -Runs 1 -Scenes Instancing -Modes raytracing
+.\run-performance-tests.ps1 smoke -Runs 1 -Tests Instancing -Modes raytracing
+.\run-performance-tests.ps1 pan -Tests LeafAtlases-pan -Modes raytracing
 ```
 
 | Parameter | Default | Meaning |
@@ -17,19 +23,52 @@ committed, so a dashboard can compare runs across commits and machines.
 | `-Configuration` | `Release` | Which `TreeClassic.exe` to measure. A Debug build prints a warning. |
 | `-Build` | off | Build TreeClassic in that configuration first. |
 | `-Executable` | | Measure a specific build, such as one from another worktree. |
-| `-Runs` | `3` | Repetitions of every scene and mode. |
+| `-Runs` | `3` | Repetitions of every test and mode. |
 | `-Width`, `-Height` | `1280`, `720` | Render size. |
-| `-Modes` | `raster, raytracing` | Rendering modes. |
-| `-Scenes` | all tagged | Scene `id`s to measure; each must be in the pass. |
-| `-StartTime` | `5` | Simulation time of frame 0, in seconds. Trees grow from time 0, so earlier times measure nearly empty scenes. |
+| `-Modes` | `raster, raytracing` | Rendering modes; a test runs in the ones it also lists. |
+| `-Tests` (alias `-Scenes`) | all | Test `id`s from `scenes.json`. Steady tests use their scene's `id`. |
+| `-StartTime` | from `scenes.json` | Simulation time of frame 0 for steady tests, in seconds. Trees grow from time 0, so earlier times measure nearly empty scenes. |
 | `-DisableOpacityMicromaps` | off | Ray trace leaves without opacity micromaps, to measure what they save (see the scenes README). |
 
 Close other GPU-heavy programs first. The script measures whatever else the machine is doing.
 
+## Tests: `scenes.json`
+
+```json
+{
+  "version": 1,
+  "defaults": { "modes": ["raster", "raytracing"], "frameTimeStep": 0.016666666666666666, "startTime": 5, "frames": 20 },
+  "tests": [
+    { "id": "LeafAtlases", "scene": "LeafAtlases", "type": "steady" },
+    { "id": "LeafAtlases-pan", "scene": "LeafAtlases", "type": "pacing",
+      "startTime": 3, "duration": 3, "settleFrames": 30,
+      "camera": [
+        { "time": 0, "position": [0, 2.4, -14], "rotationDegrees": [-4, 0, 0] },
+        { "time": 3, "position": [6, 2.4, -14], "rotationDegrees": [-4, -25, 0] } ] }
+  ]
+}
+```
+
+- `id`: letters, digits and hyphens, unique. It names the job directories and the dashboard series.
+  Give a steady test its scene's `id`, so its history continues across runs.
+- `scene`: the `id` of a scene in `Game/Resources/Scenes`.
+- `modes` and `frameTimeStep` (seconds per frame) default to `defaults`.
+- **Steady** tests: `startTime` and `frames` (at least 20) default to `defaults`.
+- **Pacing** tests:
+  - `startTime`: simulation time when the camera starts moving.
+  - `duration`: seconds of simulation to measure; the frame count is `duration / frameTimeStep`.
+  - `settleFrames` (default 30): frames rendered at `startTime` with the camera on the first key
+    before measuring. They absorb the scene load and the driver's slow updates after the first
+    acceleration-structure build, so the measured frames show what the motion costs. At least 1:
+    the first frame loads the scene, which places the camera from the scene definition.
+  - `camera`: at least two keys, `time` from 0 to `duration` in increasing order. `position` and
+    `rotationDegrees` (pitch, yaw, roll) are like a scene's camera. Positions are interpolated
+    linearly and rotations spherically.
+
 ## How a job runs
 
-Runs are the outer loop: run 1 measures every scene and mode, then run 2, and so on. This spreads
-background and thermal noise across scenes. Each job is a fresh `TreeClassic --render-test`
+Runs are the outer loop: run 1 measures every test and mode, then run 2, and so on. This spreads
+background and thermal noise across tests. Each job is a fresh `TreeClassic --render-test`
 process with a `performance` request. The process:
 
 1. **Loads the scene and times it** (`sceneLoad`):
@@ -37,7 +76,9 @@ process with a `performance` request. The process:
    - `generationMs`: generate trees and other procedural geometry.
    - `graphicsMs`: release the previous level and create GPU buffers, materials and pipelines.
    - `totalMs`: the sum.
-2. **Renders 20 frames with profiling on.** Frame *n* is at simulation time `startTime + n/60`.
+2. **Renders the frames with profiling on**, 20 for steady tests. Frame *n* is at simulation time
+   `startTime + n * frameTimeStep`. A pacing test first renders its settle frames, numbered from
+   `-settleFrames` to -1, then moves the camera to frame *n*'s point on the path before each frame.
    Frame 0 also generates the scene and sets up graphics, so it is slow.
    In ray tracing, the driver's CPU cost for the BLAS update stays high for about 11 frames after a
    full build (on an RTX 5080, about 25 ms for LeafAtlases, and 75 ms with opacity micromaps), so
@@ -55,7 +96,9 @@ process with a `performance` request. The process:
    - `blasSubmitMs` and `tlasSubmitMs`: CPU wall time inside the respective build-command API calls, not GPU execution time.
    - `gpuMs`: GPU passes in the order frame, shadow, main, deformation, BLAS, TLAS, rays.
      Passes that don't run in a mode report 0; BLAS, TLAS, rays and deformation run only in ray tracing.
-   - Counters: draw records, vertices, pose branches rebuilt and reused, acceleration-structure bytes, and others.
+   - Counters: draw records, vertices, pose branches rebuilt and reused, acceleration-structure bytes,
+     whether the frame rebuilt the BLAS (`rebuiltBLAS`), and others.
+   - `cameraPosition`, and `settle`: true for settle frames.
 
 The script also times each whole process (`processMs`), which includes startup and device creation.
 
@@ -68,27 +111,40 @@ never contain one. If the directory already exists, a `-2`, `-3`, … suffix is 
 
 Tools should read the fields in `results.json` or `index.json`, not parse directory names.
 
-- **`results.json`:** everything, for the dashboard (`schemaVersion` 2), written as compact JSON.
+- **`results.json`:** everything, for the dashboard (`schemaVersion` 3), written as compact JSON.
+  Schema 3 added `tests`, and `test`, `type` and `pacing` on jobs; schema 2 runs had only steady jobs.
   - **Run information:**
     - `label`, `machine`, `startedUtc`, `finishedUtc`
     - `commit`, `commitDate`, `commitSubject`, `branch`, `dirty` (uncommitted changes when measured).
       A rebase changes commit hashes, so order runs by `commitDate` and use the subject to find
       a commit whose hash no longer exists.
     - `configuration`, `cpu`, `logicalProcessors`, `os`, `adapter`, `workerThreads`
-    - `width`, `height`, `frames`, `startTime`, `frameTimeStep`, `runs`, `modes`, `scenes`
+    - `width`, `height`, `runs`, `modes`
+    - `tests`: the `scenes.json` entries measured, with defaults filled in.
+    - `scenes`, `frames`, `startTime`, `frameTimeStep`: the steady tests and their settings, as in schema 2.
     - `opacityMicromaps`: false when measured with `-DisableOpacityMicromaps`; missing in older runs.
       The dashboard marks such runs "opacity micromaps off".
     - `gpuPasses`
   - **`windows`:** the frame ranges summarized: `frames5to10` is frames 5–9, and `frames10to20` is frames 10–19.
-  - **`jobs[]`**, one per scene, mode and run:
-    - `scene`, `sceneName`, `mode`, `run`, `success`, `error`, `processMs`, `sceneLoad`
+  - **`jobs[]`**, one per test, mode and run:
+    - `test`, `type` (`steady` or `pacing`), `scene` (the test id for steady tests, so older runs line up;
+      the scene id for pacing tests), `sceneName`, `mode`, `run`, `success`, `error`, `processMs`, `sceneLoad`
     - `opacityMicromaps`: `requested`, `supported`, and what the load baked: `micromaps`, `specialTriangles`
       (uniform triangles that need no map), `subdivisionLevel`, `bytes`, and `states`
       (micro-triangles transparent, opaque, unknown-transparent, unknown-opaque)
     - every frame's `samples`
-    - `windows.<name>.<metric>`, the `{ mean, min, max }` of CPU timing metrics and `gpu_<pass>Ms`
-- **`summary.csv`:** one row per job and window, with load times and window means. Open it in Excel for a quick look.
-- **`jobs/<scene>-<mode>-run<N>/`:** the raw `request.json`, the app's `report.json`, and logs.
+    - Steady jobs: `windows.<name>.<metric>`, the `{ mean, min, max }` of CPU timing metrics and `gpu_<pass>Ms`
+    - Pacing jobs: `pacing`, from the measured (not settle) frames:
+      - `frameP50Ms`, `frameP90Ms`, `frameP99Ms`, `frameMaxMs`, `frameMeanMs`: frame-time percentiles
+        (nearest rank), maximum and mean.
+      - `spikes`: frames longer than `spikeThresholdMs`, which is twice the median or one 60 fps frame
+        (16.7 ms), whichever is longer.
+      - `spikeExcessMs`: the time those frames took beyond the median, summed.
+      - `over33Ms`: frames longer than 33.3 ms (under 30 fps).
+      - `rebuiltBLASFrames` and `maxBlasCpuMs`: frames that rebuilt the BLAS, and the longest CPU BLAS work.
+- **`summary.csv`:** one row per steady job and window, with load times and window means. Open it in Excel for a quick look.
+- **`pacing.csv`:** one row per pacing job with its `pacing` summary.
+- **`jobs/<test>-<mode>-run<N>/`:** the raw `request.json`, the app's `report.json`, and logs.
   These are for local debugging and are not committed (see `.gitignore`); `results.json` has every sample.
 
 A failed job is recorded with its `error` and the pass continues. The script then exits with code 1.
@@ -96,7 +152,7 @@ A failed job is recorded with its `error` and the pass continues. The script the
 ### Index
 
 `Artifacts/index.json` lists every run, one per line, oldest first: `directory`, `startedUtc`,
-`machine`, `label`, the commit fields, `configuration`, `adapter`, `scenes`, `modes`, `runs`,
+`machine`, `label`, the commit fields, `configuration`, `adapter`, `scenes` (steady tests), `tests`, `modes`, `runs`,
 `jobs` and `failures`. A dashboard reads it to list runs, then loads a run's `results.json`
 when needed. Each pass adds its own line. After merging runs from another machine, or if the
 file has a merge conflict, rebuild it from the run directories:
@@ -119,7 +175,8 @@ merged, and git stores a full new copy of it each time.
 .\show-dashboard.ps1
 ```
 
-This gathers `index.json` and each run's `summary.csv` into `dashboard-data.js` (generated and not
+This gathers `index.json`, each run's `summary.csv`, and the pacing jobs' frame times from `results.json`
+into `dashboard-data.js` (generated and not
 committed) and opens `dashboard.html` in the browser. It works from the local file; no server is needed.
 Run it again after new runs.
 
@@ -127,11 +184,17 @@ Run it again after new runs.
   with uncommitted changes. Click a scene in the legend to hide or show it.
 - **Latest run compared with the previous run:** scene load, CPU frame, CPU scene update and GPU frame
   per scene, with changes beyond ±10% flagged as slower or faster.
+- **Frame pacing while the camera moves:** pick a pacing test, a run and a run to compare with. The chart
+  plots every measured frame's time along the camera path (the median of the run's repeats), with a
+  33.3 ms line and ticks under the axis at frames that rebuilt the BLAS. Hover or use the arrow keys for
+  each frame's values and range. The table lists every run's percentiles, spikes and rebuilds.
 - **Charts:** one per metric, with runs in commit order on the x-axis and a line per scene. Each point
   is the mean of the run's repeats; hover, or focus a chart and use the arrow keys, to see the range.
   Charts for passes that don't run in the chosen mode are hidden. Each chart has a table view.
 
-## Adding a scene
+## Adding a test
 
-Add `"testPass": "performance"` to a scene in `Game/Resources/Scenes`; the scene must have an `id`.
-`testPass` may also be an array, for example `["performance", "smoke"]`.
+Add an entry to `scenes.json`. The scene must have an `id`. For a pacing path, a scene's `camera`
+is a good first key, and the debug UI's **Camera Position** shows where to put the others. (Its
+**Camera Orientation** is a quaternion, not degrees.) Check the first run's `cameraPosition` samples and the dashboard trace to confirm the
+camera moves as intended.

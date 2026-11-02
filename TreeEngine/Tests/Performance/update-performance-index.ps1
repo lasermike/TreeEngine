@@ -31,6 +31,8 @@ function Get-IndexEntry([string]$Path) {
         configuration = $run.configuration
         adapter = $run.adapter
         scenes = @($run.scenes | ForEach-Object { $_.id })
+        # Schema 3: every test id, including pacing tests; older runs ran only their scenes.
+        tests = @($(if ($run.PSObject.Properties.Name -contains 'tests') { $run.tests | ForEach-Object { $_.id } } else { $run.scenes | ForEach-Object { $_.id } }))
         modes = @($run.modes)
         runs = $run.runs
         jobs = $jobs.Count

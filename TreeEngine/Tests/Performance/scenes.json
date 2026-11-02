@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "defaults": {
+    "modes": ["raster", "raytracing"],
+    "frameTimeStep": 0.016666666666666666,
+    "startTime": 5,
+    "frames": 20
+  },
+  "tests": [
+    { "id": "LoadAITree", "scene": "LoadAITree", "type": "steady" },
+    { "id": "LoadGltfDemo", "scene": "LoadGltfDemo", "type": "steady" },
+    { "id": "Instancing", "scene": "Instancing", "type": "steady" },
+    { "id": "LeafAtlases", "scene": "LeafAtlases", "type": "steady" },
+    { "id": "LeafAtlasTest", "scene": "LeafAtlasTest", "type": "steady" },
+    { "id": "LoadTerra", "scene": "LoadTerra", "type": "steady" },
+    { "id": "LoadTreeScene", "scene": "LoadTreeScene", "type": "steady" },
+    { "id": "LoadTrees", "scene": "LoadTrees", "type": "steady" },
+    {
+      "id": "LeafAtlases-pan",
+      "scene": "LeafAtlases",
+      "type": "pacing",
+      "startTime": 3,
+      "duration": 3,
+      "settleFrames": 30,
+      "camera": [
+        { "time": 0, "position": [0, 2.4, -14], "rotationDegrees": [-4, 0, 0] },
+        { "time": 3, "position": [6, 2.4, -14], "rotationDegrees": [-4, -25, 0] }
+      ]
+    }
+  ]
+}

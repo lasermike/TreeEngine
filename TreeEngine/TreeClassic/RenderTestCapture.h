@@ -18,6 +18,14 @@ struct RenderTestPoint
     std::array<float, 3> cameraPosition = {};
 };
 
+// A camera pose on a performance run's path; time is seconds after the run's start time.
+struct RenderTestCameraKey
+{
+    double time = 0;
+    std::array<float, 3> position = {};
+    std::array<float, 3> rotationDegrees = {}; // Pitch, yaw, roll, as in a scene's camera.
+};
+
 struct RenderTestRequest
 {
     std::string scene;
@@ -39,6 +47,11 @@ struct RenderTestRequest
     int performanceFrames = 20;
     double performanceFrameTimeStep = 1.0 / 60.0;
     double performanceStartTime = 5; // Simulation time of frame 0, after the trees have grown.
+    // Frames rendered at the start time before the measured frames: they absorb the scene load and the
+    // driver's slow updates after the first acceleration-structure build. Reported with "settle": true.
+    int performanceSettleFrames = 0;
+    // Optional camera path, interpolated per measured frame. Settle frames hold the first key.
+    std::vector<RenderTestCameraKey> performanceCamera;
     std::wstring report;
     std::vector<RenderTestPoint> captures;
 };

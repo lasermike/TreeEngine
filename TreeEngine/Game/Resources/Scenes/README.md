@@ -77,7 +77,6 @@ prompts, autosave, directory watcher, or asset packaging are provided.
 - `version`: required schema version, currently `1`.
 - `id`: optional stable scene identity, described above.
 - `name`: required nonempty display name.
-- `testPass`: optional test pass name, or array of names, that include this scene. Names use lowercase letters, digits, and hyphens and start with a letter. `"performance"` adds the scene to `Tests/Performance/run-performance-tests.ps1`, which requires the scene to have an `id`.
 - `camera`: transform with optional `position`, `rotation`, and `scale`.
 - `render`: optional `clearColor`, `farClippingPlane`, `useShadowMaps`, `useAlphaBlendedRenderTarget`, `environment`, and `sky`. The far plane defaults to 30 and must exceed the 0.2-unit near plane. `environment` requires `diffuse` and `specular` paths to linear HDR DDS cube maps. The specular cube's mip levels run from smooth to rough; the environment lights glTF materials in both raster and DXR without changing the background. `sky` draws a background: `cubeMap` (required) is a DDS cube map, and `rotationDegrees` (default `0`) is a yaw about +Y. The sky follows the camera, is drawn behind all objects, and supplies the DXR ray-miss color; without it the background is `clearColor`. Skies are not objects and have no material.
 - `light`: optional directional-light `ambient`, `diffuse`, `specular`, `direction`, and `shadowPosition`. Omitting `shadowPosition` retains automatic shadow placement; supplying it preserves the authored light-position override.
@@ -231,10 +230,11 @@ out from the river to the dry slope.
 - Bench and slope: velvet ash, skunkbush sumac, Gambel oak, pinyon pine, and
   dry bunchgrass.
 
-It is in the `performance` test pass. Its many leaves make DXR in Debug builds
-very slow, so the render regression suite uses `Leaf Atlas Test`
-(`leaf-atlas-test.scene.json`) instead: the lighter species from every atlas,
-with instances, close up. Both scenes are in the `performance` pass.
+Its many leaves make DXR in Debug builds very slow, so the render regression
+suite uses `Leaf Atlas Test` (`leaf-atlas-test.scene.json`) instead: the lighter
+species from every atlas, with instances, close up. Both scenes are performance
+tests (`Tests/Performance/scenes.json`), and `LeafAtlases-pan` measures frame
+pacing while the camera moves through the canyon.
 
 The canyon atlases are composed from several Nature Pack images, which keeps
 the scene within its 32 texture slots: `canyon_leaves_*` and `canyon_grasses_*`

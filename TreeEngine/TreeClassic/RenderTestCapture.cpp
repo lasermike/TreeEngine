@@ -10,6 +10,7 @@
 #include <memory>
 #include <stdexcept>
 #include <cmath>
+#include <algorithm>
 #include <chrono>
 
 namespace
@@ -180,10 +181,31 @@ void ParseRenderTestCommandLine()
         parsed->performanceFrames = performance.value("frames", 20);
         parsed->performanceFrameTimeStep = performance.value("frameTimeStep", 1.0 / 60.0);
         parsed->performanceStartTime = performance.value("startTime", 5.0);
+        parsed->performanceSettleFrames = performance.value("settleFrames", 0);
         if (parsed->performanceFrames < 1 || parsed->performanceFrames > 10000
+            || parsed->performanceSettleFrames < 0 || parsed->performanceSettleFrames > 1000
             || !std::isfinite(parsed->performanceFrameTimeStep) || parsed->performanceFrameTimeStep < 0
             || !std::isfinite(parsed->performanceStartTime) || parsed->performanceStartTime < 0)
             throw std::runtime_error("Invalid performance settings");
+        if (performance.contains("camera"))
+        {
+            for (const auto& value : performance.at("camera"))
+            {
+                RenderTestCameraKey key;
+                key.time = value.at("time").get<double>();
+                key.position = value.at("position").get<std::array<float, 3>>();
+                key.rotationDegrees = value.at("rotationDegrees").get<std::array<float, 3>>();
+                bool finite = std::isfinite(key.time);
+                for (int i = 0; i < 3; ++i)
+                    finite = finite && std::isfinite(key.position[i]) && std::isfinite(key.rotationDegrees[i]);
+                if (!finite || key.time < 0 || (!parsed->performanceCamera.empty() && key.time <= parsed->performanceCamera.back().time))
+                    throw std::runtime_error("Camera keys need finite values and increasing nonnegative times");
+                parsed->performanceCamera.push_back(key);
+            }
+            // The first frame loads the scene, which places the camera from the scene definition.
+            if (parsed->performanceCamera.size() < 2 || parsed->performanceSettleFrames < 1)
+                throw std::runtime_error("A camera path needs at least two keys and one settle frame");
+        }
         if (json.contains("captures") || parsed->validateScenePersistence)
             throw std::runtime_error("Performance runs do not capture images or validate persistence");
         request = std::move(parsed);
@@ -233,13 +255,33 @@ namespace
         return result;
     }
 
+    // The camera pose at time seconds into the path: linear between keys, held outside them.
+    void ApplyCameraPath(Game& game, const std::vector<RenderTestCameraKey>& keys, double time)
+    {
+        using namespace DirectX;
+        auto rotation = [](const RenderTestCameraKey& key)
+        {
+            return XMQuaternionRotationRollPitchYaw(XMConvertToRadians(key.rotationDegrees[0]),
+                XMConvertToRadians(key.rotationDegrees[1]), XMConvertToRadians(key.rotationDegrees[2]));
+        };
+        size_t next = 1;
+        while (next + 1 < keys.size() && keys[next].time < time) ++next;
+        const auto& a = keys[next - 1];
+        const auto& b = keys[next];
+        const float t = static_cast<float>((std::min)(1.0, (std::max)(0.0, (time - a.time) / (b.time - a.time))));
+        game.GetPlayer()->SetPosition(XMVectorLerp(XMVectorSet(a.position[0], a.position[1], a.position[2], 1),
+            XMVectorSet(b.position[0], b.position[1], b.position[2], 1), t));
+        game.GetPlayer()->SetRotation(XMQuaternionSlerp(rotation(a), rotation(b), t));
+    }
+
     // Renders the requested frames with profiling on and reports every frame's timings and counters.
     int RunPerformanceCapture(Game& game)
     {
         nlohmann::json report = { { "scene", request->scene }, { "mode", request->mode },
             { "width", request->width }, { "height", request->height }, { "seed", request->seed },
             { "frames", request->performanceFrames }, { "frameTimeStep", request->performanceFrameTimeStep },
-            { "startTime", request->performanceStartTime },
+            { "startTime", request->performanceStartTime }, { "settleFrames", request->performanceSettleFrames },
+            { "cameraKeys", request->performanceCamera.size() },
             { "workerThreads", game.GetWorkerThreadCount() },
             { "gpuPasses", { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays" } },
             { "samples", nlohmann::json::array() }, { "success", false } };
@@ -250,7 +292,8 @@ namespace
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
-            for (int frame = 0; frame < request->performanceFrames; ++frame)
+            const int settleFrames = request->performanceSettleFrames;
+            for (int frame = 0; frame < settleFrames + request->performanceFrames; ++frame)
             {
                 MSG message;
                 while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
@@ -259,7 +302,11 @@ namespace
                     TranslateMessage(&message);
                     DispatchMessage(&message);
                 }
-                const double simulationTime = request->performanceStartTime + frame * request->performanceFrameTimeStep;
+                // Settle frames hold the start time and the first camera key; measured frames then advance both.
+                const double pathTime = frame < settleFrames ? 0.0 : (frame - settleFrames) * request->performanceFrameTimeStep;
+                const double simulationTime = request->performanceStartTime + pathTime;
+                if (!request->performanceCamera.empty())
+                    ApplyCameraPath(game, request->performanceCamera, pathTime);
                 const auto start = std::chrono::steady_clock::now();
                 const HRESULT result = game.RenderTestFrame(simulationTime);
                 const double frameMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -281,8 +328,12 @@ namespace
                         { "subdivisionLevel", micromaps.subdivisionLevel }, { "bytes", micromaps.bytes },
                         { "states", { micromaps.states[0], micromaps.states[1], micromaps.states[2], micromaps.states[3] } } };
                 }
+                DirectX::XMFLOAT3 camera;
+                DirectX::XMStoreFloat3(&camera, game.GetPlayer()->GetPosition());
                 report["samples"].push_back({
-                    { "frame", frame }, { "simulationTime", simulationTime }, { "frameMs", frameMs },
+                    { "frame", frame - settleFrames }, { "settle", frame < settleFrames },
+                    { "cameraPosition", { camera.x, camera.y, camera.z } },
+                    { "simulationTime", simulationTime }, { "frameMs", frameMs },
                     { "sceneUpdateMs", profile.sceneUpdateMs }, { "drawUploadMs", profile.drawUploadMs },
                     { "blasHashMs", profile.blasHashMs }, { "blasDescriptorsMs", profile.blasDescriptorsMs },
                     { "blasSnapshotMs", profile.blasSnapshotMs }, { "reusedBLAS", profile.reusedBLAS },

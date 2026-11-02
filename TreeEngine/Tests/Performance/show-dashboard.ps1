@@ -35,11 +35,30 @@ function ConvertTo-Number([string]$Value) {
     return [double]::Parse($Value, [Globalization.CultureInfo]::InvariantCulture)
 }
 
+# Pacing jobs (results.json schema 3): each repeat's summary, frame times, and the frames that rebuilt the BLAS.
+function Get-PacingJobs([string]$ResultsPath) {
+    if (-not (Test-Path -LiteralPath $ResultsPath)) { return }
+    $results = Get-Content -LiteralPath $ResultsPath -Raw | ConvertFrom-Json
+    if ($results.schemaVersion -lt 3) { return }
+    foreach ($job in @($results.jobs | Where-Object { $_.type -eq 'pacing' -and $_.success })) {
+        $measured = @($job.samples | Where-Object { -not $_.settle })
+        [ordered]@{
+            test = $job.test; scene = $job.scene; mode = $job.mode; run = $job.run; summary = $job.pacing
+            frameTimeStep = @($results.tests | Where-Object { $_.id -eq $job.test })[0].frameTimeStep
+            frameMs = @($measured | ForEach-Object { [math]::Round([double]$_.frameMs, 3) })
+            rebuilt = @($measured | Where-Object { $_.rebuiltBLAS } | ForEach-Object { [int]$_.frame })
+        }
+    }
+}
+
 $runs = foreach ($entry in @($index.runs)) {
     $summaryPath = Join-Path (Join-Path $artifactRoot $entry.directory) 'summary.csv'
-    if (-not (Test-Path -LiteralPath $summaryPath)) { Write-Warning "Skipping $($entry.directory): no summary.csv"; continue }
     $rows = New-Object 'System.Collections.Generic.List[object]'
-    foreach ($row in Import-Csv -LiteralPath $summaryPath) {
+    $hasSummary = Test-Path -LiteralPath $summaryPath
+    if (-not $hasSummary -and -not (Test-Path -LiteralPath (Join-Path (Join-Path $artifactRoot $entry.directory) 'pacing.csv'))) {
+        Write-Warning "Skipping $($entry.directory): no summary.csv"; continue
+    }
+    foreach ($row in $(if ($hasSummary) { Import-Csv -LiteralPath $summaryPath } else { @() })) {
         if ($row.success -ne 'True') { continue }
         $values = @($row.scene, $row.mode, [int]$row.run, $row.window)
         foreach ($column in $valueColumns) {
@@ -50,6 +69,7 @@ $runs = foreach ($entry in @($index.runs)) {
     $run = [ordered]@{}
     foreach ($property in $entry.PSObject.Properties) { $run[$property.Name] = $property.Value }
     $run.rows = $rows.ToArray()
+    $run.pacing = @(Get-PacingJobs (Join-Path (Join-Path $artifactRoot $entry.directory) 'results.json'))
     [pscustomobject]$run
 }
 
@@ -60,7 +80,7 @@ $data = [ordered]@{
     runs = @($runs)
 }
 $dataPath = Join-Path $PSScriptRoot 'dashboard-data.js'
-$json = $data | ConvertTo-Json -Depth 8 -Compress
+$json = $data | ConvertTo-Json -Depth 10 -Compress
 [IO.File]::WriteAllText($dataPath, "window.PERF_DATA = $json;`n", $utf8)
 Write-Host "Dashboard data: $(@($runs).Count) runs in $dataPath"
 if (-not $NoOpen) { Start-Process (Join-Path $PSScriptRoot 'dashboard.html') }

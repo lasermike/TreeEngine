@@ -2,7 +2,6 @@
   "version": 1,
   "id": "LeafAtlasTest",
   "name": "Leaf Atlas Test",
-  "testPass": "performance",
   "camera": {
     "position": [
       0,
