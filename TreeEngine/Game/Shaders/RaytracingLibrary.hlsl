@@ -546,10 +546,11 @@ void MissShader(inout RayPayload payload)
                 dot(direction, cross(c, a)),
                 dot(direction, cross(a, b))) / determinant;
 
-            payload.color = float4(
-                skyTexture.SampleLevel(
-                    samLinear, -localDirection, 0).rgb,
-                1);
+            float3 sky = skyTexture.SampleLevel(samLinear, -localDirection, 0).rgb;
+            // HDR skies can hold infinities or NaNs where the sun overflowed half floats (kiara_3_morning does);
+            // treat them as the brightest half-float value instead of letting them turn reflections black.
+            sky = select(or(isnan(sky), isinf(sky)), 65504.0f, sky);
+            payload.color = float4(sky, 1);
         }
     }
 }

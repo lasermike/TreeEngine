@@ -15,11 +15,17 @@ namespace TreeRenderTests
 
     public static class ImageComparison
     {
+        // Copy pixels 1:1. DrawImageUnscaled draws at the image's physical size, so a 72-DPI capture drawn into a
+        // 96-DPI bitmap was scaled by 4/3 and only its top-left 75% x 75% was compared.
         private static Bitmap RgbBitmap(Image image)
         {
             Bitmap bitmap = new Bitmap(image.Width, image.Height, PixelFormat.Format32bppArgb);
             using (Graphics graphics = Graphics.FromImage(bitmap))
-                graphics.DrawImageUnscaled(image, 0, 0);
+            {
+                graphics.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+                graphics.DrawImage(image, new Rectangle(0, 0, image.Width, image.Height),
+                    0, 0, image.Width, image.Height, GraphicsUnit.Pixel);
+            }
             return bitmap;
         }
 

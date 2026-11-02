@@ -24,8 +24,19 @@ try {
     $difference = [Drawing.Image]::FromFile($diff)
     try { if ($difference.Width -ne 2 -or $difference.Height -ne 2) { throw 'Difference image was not written correctly.' } } finally { $difference.Dispose() }
 } finally { $image.Dispose() }
+# Captures are saved at 72 DPI; a difference in the bottom-right pixel must still count.
+$lowDpi = New-Object Drawing.Bitmap(8, 8)
+try {
+    $lowDpi.SetResolution(72, 72)
+    for ($y = 0; $y -lt 8; $y++) { for ($x = 0; $x -lt 8; $x++) { $lowDpi.SetPixel($x, $y, [Drawing.Color]::Black) } }
+    $lowDpi.Save($gold, [Drawing.Imaging.ImageFormat]::Png)
+    $lowDpi.SetPixel(7, 7, [Drawing.Color]::White)
+    $lowDpi.Save($actual, [Drawing.Imaging.ImageFormat]::Png)
+    $corner = [TreeRenderTests.ImageComparison]::Compare($gold, $actual, $diff)
+    if ($corner.ChangedPixels -ne 1 -or $corner.MaxError -ne 1) { throw "A 72-DPI bottom-right difference was missed (changed pixels: $($corner.ChangedPixels))." }
+} finally { $lowDpi.Dispose() }
 $differentSize = New-Object Drawing.Bitmap(3, 2)
 try { $differentSize.Save($actual, [Drawing.Imaging.ImageFormat]::Png) } finally { $differentSize.Dispose() }
 $sizeMismatch = [TreeRenderTests.ImageComparison]::Compare($gold, $actual, $diff)
 if ($sizeMismatch.SameDimensions) { throw 'Dimension mismatch was accepted.' }
-Write-Host 'Image comparison checks passed: equal images, exact RMS, maximum error, changed pixels, diff output, threshold rejection, dimension mismatch.'
+Write-Host 'Image comparison checks passed: equal images, exact RMS, maximum error, changed pixels, diff output, threshold rejection, 72-DPI corners, dimension mismatch.'
