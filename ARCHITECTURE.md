@@ -81,7 +81,7 @@ The future plan in `.github/copilot-instructions.md` is to drop UWP and D3D11 an
 ## 4. External dependencies
 
 **NuGet** (via `packages.config`):
-- `Microsoft.Direct3D.D3D12` 1.619.6 (Agility SDK), used by TreeClassic and RenderPlatform12
+- `Microsoft.Direct3D.D3D12` 1.722.0-preview (Agility SDK), used by TreeClassic and RenderPlatform12
 - `WinPixEventRuntime` 1.0.240308001
 - Older copies of both are still in `packages/` for the stale UWP projects (1.610.2, 1.619.4, 1.0.170625002, 1.0.190604001)
 
