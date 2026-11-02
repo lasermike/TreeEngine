@@ -18,49 +18,56 @@
   },
   "render": {
     "clearColor": [
-      0,
-      0,
-      0.5019608,
+      0.48,
+      0.54,
+      0.58,
       1
     ],
     "useShadowMaps": true,
     "useAlphaBlendedRenderTarget": true,
     "farClippingPlane": 800,
+    "enablePostProcessing": false,
+    "blurAmount": 0,
     "environment": {
-      "diffuse": "Environment/kiara_3_morning_4k-diffuse.dds",
-      "specular": "Environment/kiara_3_morning_4k-specular.dds"
+      "diffuse": "Environment/terra-daylight-diffuse.dds",
+      "specular": "Environment/terra-daylight-specular.dds"
     },
     "sky": {
-      "cubeMap": "kiara_3_morning_4k-skybox.dds",
-      "rotationDegrees": 180
+      "cubeMap": "Environment/terra-daylight-sky.dds"
+    },
+    "ambientOcclusion": {
+      "radius": 1.25,
+      "strength": 0.65
     }
   },
   "light": {
     "ambient": [
-      0.6,
-      0.6,
-      0.6,
+      0,
+      0,
+      0,
       1
     ],
     "diffuse": [
-      1,
-      1,
-      1,
+      2.3,
+      2.3,
+      2.3,
       1
     ],
     "specular": [
-      0.6,
-      0.6,
-      0.6,
+      2.3,
+      2.3,
+      2.3,
       1
     ],
     "direction": [
-      -0.57,
-      -0.57,
-      -0.57
-    ]
+      0.6259292648824133,
+      -0.7141802822623909,
+      0.3133034947002239
+    ],
+    "angularDiameterDegrees": 2,
+    "shadowSamples": 8
   },
-  "pointLightCount": 1,
+  "pointLightCount": 0,
   "materials": {
     "stem-green": {
       "baseColor": [
@@ -219,6 +226,18 @@
           50.0,
           50.0
         ]
+      },
+      "normalAnimation": {
+        "material": "River water - glTF transmission",
+        "velocity1": [
+          0.0,
+          -0.1
+        ],
+        "velocity2": [
+          0.004,
+          -0.095
+        ],
+        "strength": 2.5
       }
     },
     {
