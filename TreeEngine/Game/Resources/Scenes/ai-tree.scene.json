@@ -4,11 +4,25 @@
   "name": "AI Tree",
   "priority": 1,
   "camera": {
-    "position": [ 2, 7, -77 ],
-    "rotation": [ 0.01, 0.187, 0.008, 1]
+    "position": [
+      2,
+      7,
+      -77
+    ],
+    "rotation": [
+      0.01,
+      0.187,
+      0.008,
+      1
+    ]
   },
   "render": {
-    "clearColor": [ 0, 0, 0.5019608, 1 ],
+    "clearColor": [
+      0,
+      0,
+      0.5019608,
+      1
+    ],
     "useShadowMaps": true,
     "useAlphaBlendedRenderTarget": true,
     "farClippingPlane": 800,
@@ -16,113 +30,5298 @@
       "diffuse": "Environment/kiara_3_morning_4k-diffuse.dds",
       "specular": "Environment/kiara_3_morning_4k-specular.dds"
     },
-    "sky": { "cubeMap": "kiara_3_morning_4k-skybox.dds", "rotationDegrees": 180 }
+    "sky": {
+      "cubeMap": "kiara_3_morning_4k-skybox.dds",
+      "rotationDegrees": 180
+    }
   },
   "light": {
-    "ambient": [0.6, 0.6, 0.6, 1],
-    "diffuse": [1, 1, 1, 1],
-    "specular": [0.6, 0.6, 0.6, 1],
-    "direction": [-0.57, -0.57, -0.57]
+    "ambient": [
+      0.6,
+      0.6,
+      0.6,
+      1
+    ],
+    "diffuse": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "specular": [
+      0.6,
+      0.6,
+      0.6,
+      1
+    ],
+    "direction": [
+      -0.57,
+      -0.57,
+      -0.57
+    ]
   },
   "pointLightCount": 1,
   "materials": {
-    "bark": {
-      "baseColor": [0.73, 0.48, 0.24, 1],
+    "stem-green": {
+      "baseColor": [
+        0.12,
+        0.17,
+        0.06,
+        1
+      ],
       "metallic": 0,
-      "roughness": 0.8,
-      "baseColorTexture": { "source": "Bark_0005_diffuse.dds" }
+      "roughness": 0.8
     },
-    "needles": {
-      "baseColor": [0.5, 0.8, 0.35, 1],
+    "stem-dry": {
+      "baseColor": [
+        0.32,
+        0.26,
+        0.15,
+        1
+      ],
       "metallic": 0,
-      "roughness": 0.8,
-      "alphaMode": "mask",
-      "alphaCutoff": 0.6,
-      "baseColorTexture": { "source": "FirBranchTip.dds" }
+      "roughness": 0.9
     },
-    "ground": {
-      "baseColor": [0.6, 0.6, 0.6, 1],
+    "bark-willow": {
       "metallic": 0,
-      "roughness": 0.6,
-      "baseColorTexture": { "source": "grid3.png" }
-    },
-    "chrome": { "baseColor": [0.95, 0.95, 0.95, 1], "metallic": 1, "roughness": 0.05 },
-    "axis-red": { "baseColor": [1, 0, 0, 1], "unlit": true },
-    "axis-green": { "baseColor": [0, 0.2158605, 0, 1], "unlit": true },
-    "axis-blue": { "baseColor": [0, 0, 1, 1], "unlit": true }
-  },
-  "objects": [
-    {
-      "id": "tree",
-      "type": "tree",
-      "transform": { "position": [ 3.3, 6, -70 ] },
-      "animationSpeed": 15,
-      "depthLOD": 1,
-      "trunkShape": "skinnedCylinder",
-      "materials": { "trunk": "bark", "leaf": "needles" },
-      "generator": {
-        "axiom": "F(35) A(100,0)",
-        "angle": 6.283185307179586,
-        "iterations": 11,
-        "segmentLength": 0.022,
-        "thickness": 0.08,
-        "segmentLengthBehavior": "constant",
-        "rules": [
-          {
-            "input": "D(d,r)",
-            "output": "!(d * .0008) F(d * .16) [Y(r) z(.025) $(1) L(d * .7)] [Y(r + .25) Z(.02) $(1) L(d * .6)]"
-          },
-          {
-            "input": "C(c,r)",
-            "output": "!(c * .0008) F(c * .18) [Y(r) z(.08) D(c * .7,r + .2)] [Y(r + .5) Z(.07) D(c * .6,r + .7)] x(.008) Z(.012) C(c * .65,r + .37)"
-          },
-          {
-            "input": "B(b,r)",
-            "output": "!(b * .00085) F(b * .26) [Y(r + .24) z(.045) D(b * .38,r + .11)] [Y(r) z(.1) C(b * .6,r + .31)] [Y(r + .5) Z(.09) C(b * .52,r + .67)] x(.005) Z(.008) B(b * .76,r + .19)"
-          },
-          {
-            "input": "A(t,r)",
-            "output": "!(t * .0009) F(t * .14) [Y(r + .17) z(.05) $(1) L(t * .15)] [Y(r) z(.21) B(t * .46,r + .13)] [Y(r + .31) z(.19) B(t * .4,r + .47)] [Y(r + .66) z(.2) B(t * .34,r + .81)] x(.0015) Z(.0025) A(t * .93,r + .382)"
-          }
-        ]
+      "roughness": 1,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_willow_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_willow_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_willow_roughness.jpg",
+        "wrap": true
       }
     },
-    {
-      "id": "axis-x",
-      "type": "primitive",
-      "shape": "cylinderHD",
-      "transform": { "position": [-3.5, 0, 0], "scale": [0.1, 1, 0.1], "rotationDegrees": [0, 0, 90] },
-      "material": "axis-red"
+    "bark-pine": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_pine_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_pine_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_pine_roughness.jpg",
+        "wrap": true
+      }
     },
-    {
-      "id": "axis-y",
-      "type": "primitive",
-      "shape": "cylinderHD",
-      "transform": { "position": [-4, 0.5, 0], "scale": [0.1, 1, 0.1] },
-      "material": "axis-green"
+    "bark-furrowed": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_furrowed_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_furrowed_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_furrowed_roughness.jpg",
+        "wrap": true
+      }
     },
-    {
-      "id": "axis-z",
-      "type": "primitive",
-      "shape": "cylinderHD",
-      "transform": { "position": [-4, 0, 0.5], "scale": [0.1, 1, 0.1], "rotationDegrees": [90, 0, 0] },
-      "material": "axis-blue"
+    "canyon-leaves": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/canyon_leaves_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/canyon_leaves_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/canyon_leaves_roughness.png",
+        "wrap": false
+      }
     },
-    {
-      "id": "shiny-sphere",
-      "type": "primitive",
-      "shape": "sphere",
-      "transform": { "position": [6, 6.5, -72], "scale": [1.5, 1.5, 1.5] },
-      "material": "chrome"
+    "canyon-grasses": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/canyon_grasses_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/canyon_grasses_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/canyon_grasses_roughness.png",
+        "wrap": false
+      }
     },
+    "pinyon-needles": {
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/plants_12_atlas_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/plants_12_atlas_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/plants_12_atlas_roughness.png",
+        "wrap": false
+      }
+    }
+  },
+  "objects": [
     {
       "id": "embedded-glb",
       "type": "model",
       "source": "Models/Gltf/terra.glb",
       "transform": {
-        "position": [ 0, 0, 0 ],
-        "scale": [ 50.0, 50.0, 50.0 ]
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    },
+    {
+      "id": "goodding-willow",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -1.3469,
+          4.9468,
+          -67.625
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-willow",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25,
+        "regions": {
+          "willow-a": 1,
+          "willow-b": 1,
+          "willow-c": 1,
+          "willow-d": 1,
+          "willow-e": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Z(14) T(1)] [Y(140) Z(20) T(0.85)] [Y(250) Z(11) T(0.9)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.12,
+        "segmentLengthBehavior": "randomAddition",
+        "rules": [
+          {
+            "input": "T(s)",
+            "output": "!(s * 1) F(1.25 * s) [Y(70) Z(40) W(s * 0.55)] [Y(250) Z(35) W(s * 0.5)] [Y(160) Z(45) W(s * 0.45)] Y(110) z(3) T(s * 0.8)"
+          },
+          {
+            "input": "W(s)",
+            "output": "!(s * 0.5) F(s + 0.25) [Y(90) Z(25) V(s * 0.6)] [Y(270) Z(30) V(s * 0.5)] Z(7) W(s * 0.75)"
+          },
+          {
+            "input": "V(s)",
+            "output": "!(s * 0.35) F(0.22) [Z(40) L(0.15)] [Y(180) Z(40) L(0.15)] [Y(90) Z(45) L(0.14)] [Y(270) Z(45) L(0.14)] Z(12) V(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "fremont-cottonwood",
+      "type": "tree",
+      "transform": {
+        "position": [
+          33.7624,
+          4.4479,
+          -41.6508
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-willow",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "cottonwood-twig": 1
+        }
+      },
+      "generator": {
+        "axiom": "!(1) F(2.4) Y(20) [Z(30) A(1)] [Y(125) Z(34) A(0.9)] [Y(245) Z(27) A(0.95)] Z(5) A(0.8)",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.16,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s * 0.7) F(1.5 * s) [Y(90) Z(32) B(s * 0.6)] [Y(270) Z(36) B(s * 0.55)] Y(137) z(6) A(s * 0.78)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.55) F(s + 0.4) [Y(60) Z(40) C(s * 0.6)] [Y(240) Z(45) C(s * 0.5)] Y(97) Z(8) B(s * 0.75)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(s * 0.45) F(s + 0.25) [Z(35) L(0.8)] [Y(180) Z(40) L(0.75)] Y(120) C(s * 0.7)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "velvet-ash",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -4.7634,
+          5.0075,
+          -21.6807
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-furrowed",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 70,
+        "sizeVariation": 0.25,
+        "regions": {
+          "ash-a": 1,
+          "ash-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "!(1) F(2.2) A(1)",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.12,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s * 0.8) F(0.9 * s) [Z(38) B(s * 0.65)] [Y(180) Z(38) B(s * 0.65)] Y(90) A(s * 0.85)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.55) F(s + 0.2) [Z(42) C(s * 0.6)] [Y(180) Z(42) C(s * 0.6)] Y(90) z(4) B(s * 0.78)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(s * 0.4) F(0.25) [Z(40) L(0.4)] [Y(180) Z(40) L(0.38)] Y(90) C(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "goodding-willow-1",
+      "instanceOf": "goodding-willow",
+      "transform": {
+        "position": [
+          32.052,
+          5.4448,
+          -7.046
+        ],
+        "rotationDegrees": [
+          0,
+          71.73,
+          0
+        ],
+        "scale": [
+          0.912,
+          0.912,
+          0.912
+        ]
+      }
+    },
+    {
+      "id": "fremont-cottonwood-1",
+      "instanceOf": "fremont-cottonwood",
+      "transform": {
+        "position": [
+          4.6441,
+          5.0969,
+          23.6691
+        ],
+        "rotationDegrees": [
+          0,
+          26.53,
+          0
+        ],
+        "scale": [
+          1.1877,
+          1.1877,
+          1.1877
+        ]
+      }
+    },
+    {
+      "id": "velvet-ash-1",
+      "instanceOf": "velvet-ash",
+      "transform": {
+        "position": [
+          31.3818,
+          4.3106,
+          39.603
+        ],
+        "rotationDegrees": [
+          0,
+          336.26,
+          0
+        ],
+        "scale": [
+          0.978,
+          0.978,
+          0.978
+        ]
+      }
+    },
+    {
+      "id": "pinyon-pine",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -19.3442,
+          14.3207,
+          -39.7229
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-pine",
+        "leaf": "pinyon-needles"
+      },
+      "leaves": {
+        "atlas": "plants-12",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25
+      },
+      "generator": {
+        "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+        "angle": 0.017453292519943295,
+        "iterations": 7,
+        "segmentLength": 1,
+        "thickness": 0.12,
+        "rules": [
+          {
+            "input": "P(s)",
+            "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+          },
+          {
+            "input": "Q(s)",
+            "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pinyon-pine-young",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -14.8695,
+          12.7087,
+          -14.8576
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-pine",
+        "leaf": "pinyon-needles"
+      },
+      "leaves": {
+        "atlas": "plants-12",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25
+      },
+      "generator": {
+        "axiom": "!(1) F(0.5) Y(70) [Z(24) P(0.8)] [Y(190) Z(30) P(0.75)] [Y(300) Z(20) P(0.7)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.09,
+        "rules": [
+          {
+            "input": "P(s)",
+            "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+          },
+          {
+            "input": "Q(s)",
+            "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gambel-oak",
+      "type": "tree",
+      "transform": {
+        "position": [
+          38.308,
+          8.0459,
+          -17.9826
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "bark-furrowed",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "oak-a": 1,
+          "oak-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Z(8) O(1)] [Y(70) Z(15) O(0.85)] [Y(150) Z(10) O(0.95)] [Y(230) Z(18) O(0.8)] [Y(300) Z(12) O(0.9)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.035,
+        "rules": [
+          {
+            "input": "O(s)",
+            "output": "!(s * 1) F(0.45 * s) [Y(60) Z(45) K(s * 0.5)] [Y(240) Z(40) K(s * 0.45)] Y(97) z(3) O(s * 0.85)"
+          },
+          {
+            "input": "K(s)",
+            "output": "!(s * 0.5) F(0.15) [Z(45) L(0.15)] [Y(120) Z(45) L(0.14)] [Y(240) Z(45) L(0.15)] Y(60) K(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pinyon-pine-1",
+      "instanceOf": "pinyon-pine",
+      "transform": {
+        "position": [
+          -16.6764,
+          13.9841,
+          20.3449
+        ],
+        "rotationDegrees": [
+          0,
+          299.68,
+          0
+        ],
+        "scale": [
+          0.8857,
+          0.8857,
+          0.8857
+        ]
+      }
+    },
+    {
+      "id": "gambel-oak-1",
+      "instanceOf": "gambel-oak",
+      "transform": {
+        "position": [
+          35.1658,
+          7.3575,
+          20.6185
+        ],
+        "rotationDegrees": [
+          0,
+          349.02,
+          0
+        ],
+        "scale": [
+          0.9961,
+          0.9961,
+          0.9961
+        ]
+      }
+    },
+    {
+      "id": "pinyon-pine-young-1",
+      "instanceOf": "pinyon-pine-young",
+      "transform": {
+        "position": [
+          -14.1257,
+          10.9046,
+          47.2566
+        ],
+        "rotationDegrees": [
+          0,
+          145.74,
+          0
+        ],
+        "scale": [
+          0.9675,
+          0.9675,
+          0.9675
+        ]
+      }
+    },
+    {
+      "id": "seepwillow",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -2.188,
+          5.128,
+          -70.1857
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25,
+        "regions": {
+          "seepwillow-a": 2,
+          "seepwillow-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(4) U(1.00)] [Y(40) Z(9) U(0.90)] [Y(85) Z(6) U(0.95)] [Y(130) Z(11) U(0.85)] [Y(175) Z(7) U(1.00)] [Y(220) Z(12) U(0.80)] [Y(265) Z(5) U(0.92)] [Y(310) Z(10) U(0.88)]",
+        "angle": 0.017453292519943295,
+        "iterations": 9,
+        "segmentLength": 1,
+        "thickness": 0.01,
+        "rules": [
+          {
+            "input": "U(s)",
+            "output": "!(s * 1) F(0.24 * s) [Z(55) L(0.11)] [Y(180) Z(55) L(0.11)] Y(73) U(s * 0.95)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac",
+      "type": "tree",
+      "transform": {
+        "position": [
+          37.9668,
+          7.0816,
+          -58.998
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "bark-furrowed",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "sumac": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Z(20) S(1)] [Y(60) Z(35) S(0.8)] [Y(120) Z(25) S(0.9)] [Y(180) Z(40) S(0.75)] [Y(240) Z(30) S(0.85)] [Y(300) Z(45) S(0.7)]",
+        "angle": 0.017453292519943295,
+        "iterations": 6,
+        "segmentLength": 1,
+        "thickness": 0.012,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s * 1) F(0.27 * s) [Y(90) Z(50) M(s * 0.6)] Y(137) Z(4) S(s * 0.82)"
+          },
+          {
+            "input": "M(s)",
+            "output": "!(s * 0.5) F(0.1) [Z(45) L(0.11)] [Y(180) Z(45) L(0.11)] [Y(90) Z(30) L(0.1)] M(s * 0.8)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-1",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          -11.7835,
+          7.6396,
+          -36.2514
+        ],
+        "rotationDegrees": [
+          0,
+          137.4,
+          0
+        ],
+        "scale": [
+          1.1106,
+          1.1106,
+          1.1106
+        ]
+      }
+    },
+    {
+      "id": "seepwillow-1",
+      "instanceOf": "seepwillow",
+      "transform": {
+        "position": [
+          32.0347,
+          4.9608,
+          -16.0681
+        ],
+        "rotationDegrees": [
+          0,
+          220.69,
+          0
+        ],
+        "scale": [
+          0.8926,
+          0.8926,
+          0.8926
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-2",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          -6.7476,
+          11.716,
+          -7.0124
+        ],
+        "rotationDegrees": [
+          0,
+          13.37,
+          0
+        ],
+        "scale": [
+          0.9798,
+          0.9798,
+          0.9798
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-3",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          34.3805,
+          12.3742,
+          10.3095
+        ],
+        "rotationDegrees": [
+          0,
+          5.97,
+          0
+        ],
+        "scale": [
+          0.7884,
+          0.7884,
+          0.7884
+        ]
+      }
+    },
+    {
+      "id": "seepwillow-2",
+      "instanceOf": "seepwillow",
+      "transform": {
+        "position": [
+          2.8472,
+          4.9785,
+          28.0734
+        ],
+        "rotationDegrees": [
+          0,
+          137.49,
+          0
+        ],
+        "scale": [
+          0.9412,
+          0.9412,
+          0.9412
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-4",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          33.6194,
+          6.8414,
+          52.3018
+        ],
+        "rotationDegrees": [
+          0,
+          337.66,
+          0
+        ],
+        "scale": [
+          1.1398,
+          1.1398,
+          1.1398
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-5",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          -20.9374,
+          13.8666,
+          -53.8821
+        ],
+        "rotationDegrees": [
+          0,
+          297.47,
+          0
+        ],
+        "scale": [
+          1.242,
+          1.242,
+          1.242
+        ]
+      }
+    },
+    {
+      "id": "seepwillow-3",
+      "instanceOf": "seepwillow",
+      "transform": {
+        "position": [
+          -33.0006,
+          7.8432,
+          -13.8547
+        ],
+        "rotationDegrees": [
+          0,
+          111.98,
+          0
+        ],
+        "scale": [
+          1.0047,
+          1.0047,
+          1.0047
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-6",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          -13.8489,
+          13.4268,
+          22.3686
+        ],
+        "rotationDegrees": [
+          0,
+          134.34,
+          0
+        ],
+        "scale": [
+          1.1498,
+          1.1498,
+          1.1498
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-7",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          40.8643,
+          6.7389,
+          26.7819
+        ],
+        "rotationDegrees": [
+          0,
+          71.94,
+          0
+        ],
+        "scale": [
+          1.0803,
+          1.0803,
+          1.0803
+        ]
+      }
+    },
+    {
+      "id": "seepwillow-4",
+      "instanceOf": "seepwillow",
+      "transform": {
+        "position": [
+          -4.8027,
+          5.8522,
+          -72.123
+        ],
+        "rotationDegrees": [
+          0,
+          122.71,
+          0
+        ],
+        "scale": [
+          0.9325,
+          0.9325,
+          0.9325
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-8",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          38.9945,
+          8.119,
+          -56.0535
+        ],
+        "rotationDegrees": [
+          0,
+          2.16,
+          0
+        ],
+        "scale": [
+          0.7856,
+          0.7856,
+          0.7856
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-9",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          -13.1179,
+          10.6832,
+          -43.171
+        ],
+        "rotationDegrees": [
+          0,
+          204.9,
+          0
+        ],
+        "scale": [
+          1.1053,
+          1.1053,
+          1.1053
+        ]
+      }
+    },
+    {
+      "id": "seepwillow-5",
+      "instanceOf": "seepwillow",
+      "transform": {
+        "position": [
+          29.947,
+          4.7555,
+          -16.8374
+        ],
+        "rotationDegrees": [
+          0,
+          327.48,
+          0
+        ],
+        "scale": [
+          1.2469,
+          1.2469,
+          1.2469
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-10",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          -5.9743,
+          12.3854,
+          3.1852
+        ],
+        "rotationDegrees": [
+          0,
+          226.72,
+          0
+        ],
+        "scale": [
+          1.1177,
+          1.1177,
+          1.1177
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-11",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          35.7113,
+          11.7772,
+          13.6022
+        ],
+        "rotationDegrees": [
+          0,
+          239.77,
+          0
+        ],
+        "scale": [
+          0.9315,
+          0.9315,
+          0.9315
+        ]
+      }
+    },
+    {
+      "id": "seepwillow-6",
+      "instanceOf": "seepwillow",
+      "transform": {
+        "position": [
+          1.9251,
+          4.9652,
+          35.1641
+        ],
+        "rotationDegrees": [
+          0,
+          257.82,
+          0
+        ],
+        "scale": [
+          0.9165,
+          0.9165,
+          0.9165
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-12",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          24.1707,
+          9.3354,
+          55.3785
+        ],
+        "rotationDegrees": [
+          0,
+          241.05,
+          0
+        ],
+        "scale": [
+          1.1894,
+          1.1894,
+          1.1894
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-13",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          -19.2272,
+          13.951,
+          -47.1052
+        ],
+        "rotationDegrees": [
+          0,
+          0.81,
+          0
+        ],
+        "scale": [
+          0.7968,
+          0.7968,
+          0.7968
+        ]
+      }
+    },
+    {
+      "id": "seepwillow-7",
+      "instanceOf": "seepwillow",
+      "transform": {
+        "position": [
+          -15.0457,
+          5.753,
+          -23.8525
+        ],
+        "rotationDegrees": [
+          0,
+          338.5,
+          0
+        ],
+        "scale": [
+          0.922,
+          0.922,
+          0.922
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-14",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          -16.7238,
+          13.5712,
+          6.1584
+        ],
+        "rotationDegrees": [
+          0,
+          148.61,
+          0
+        ],
+        "scale": [
+          0.9384,
+          0.9384,
+          0.9384
+        ]
+      }
+    },
+    {
+      "id": "skunkbush-sumac-15",
+      "instanceOf": "skunkbush-sumac",
+      "transform": {
+        "position": [
+          39.7536,
+          9.9757,
+          21.634
+        ],
+        "rotationDegrees": [
+          0,
+          144.56,
+          0
+        ],
+        "scale": [
+          1.0705,
+          1.0705,
+          1.0705
+        ]
+      }
+    },
+    {
+      "id": "seepwillow-8",
+      "instanceOf": "seepwillow",
+      "transform": {
+        "position": [
+          -1.035,
+          5.2066,
+          -71.9296
+        ],
+        "rotationDegrees": [
+          0,
+          335.15,
+          0
+        ],
+        "scale": [
+          0.8204,
+          0.8204,
+          0.8204
+        ]
+      }
+    },
+    {
+      "id": "sedge",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -5.1145,
+          5.0562,
+          -65.0547
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 25,
+        "sizeVariation": 0.2,
+        "regions": {
+          "sedge-1": 1,
+          "sedge-2": 1,
+          "sedge-3": 1,
+          "sedge-4": 1,
+          "sedge-5": 1,
+          "sedge-6": 1,
+          "sedge-7": 1,
+          "sedge-8": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(1) Z(17) L(0.49)] [Y(21) Z(24) L(0.47)] [Y(34) Z(19) L(0.66)] [Y(53) Z(13) L(0.69)] [Y(59) Z(16) L(0.63)] [Y(76) Z(18) L(0.41)] [Y(101) Z(26) L(0.57)] [Y(121) Z(13) L(0.61)] [Y(132) Z(21) L(0.54)] [Y(153) Z(31) L(0.54)] [Y(166) Z(7) L(0.61)] [Y(182) Z(32) L(0.65)] [Y(193) Z(15) L(0.60)] [Y(205) Z(17) L(0.45)] [Y(223) Z(7) L(0.63)] [Y(240) Z(12) L(0.52)] [Y(268) Z(7) L(0.53)] [Y(279) Z(29) L(0.65)] [Y(300) Z(13) L(0.52)] [Y(309) Z(29) L(0.69)] [Y(322) Z(10) L(0.47)] [Y(339) Z(18) L(0.58)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "sedge-wide",
+      "type": "tree",
+      "transform": {
+        "position": [
+          32.7785,
+          4.9396,
+          -57.9065
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 25,
+        "sizeVariation": 0.2,
+        "regions": {
+          "sedge-1": 1,
+          "sedge-2": 1,
+          "sedge-3": 1,
+          "sedge-4": 1,
+          "sedge-5": 1,
+          "sedge-6": 1,
+          "sedge-7": 1,
+          "sedge-8": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(356) Z(10) L(0.48)] [Y(10) Z(30) L(0.64)] [Y(27) Z(28) L(0.54)] [Y(39) Z(12) L(0.62)] [Y(52) Z(41) L(0.59)] [Y(58) Z(24) L(0.38)] [Y(74) Z(12) L(0.37)] [Y(79) Z(16) L(0.45)] [Y(89) Z(10) L(0.40)] [Y(102) Z(23) L(0.36)] [Y(126) Z(31) L(0.39)] [Y(128) Z(22) L(0.46)] [Y(138) Z(40) L(0.65)] [Y(155) Z(27) L(0.38)] [Y(162) Z(22) L(0.43)] [Y(185) Z(16) L(0.36)] [Y(199) Z(28) L(0.39)] [Y(205) Z(11) L(0.51)] [Y(224) Z(40) L(0.56)] [Y(224) Z(23) L(0.40)] [Y(244) Z(29) L(0.58)] [Y(249) Z(18) L(0.59)] [Y(272) Z(40) L(0.59)] [Y(281) Z(36) L(0.42)] [Y(288) Z(22) L(0.36)] [Y(292) Z(20) L(0.43)] [Y(315) Z(43) L(0.48)] [Y(331) Z(45) L(0.64)] [Y(334) Z(18) L(0.42)] [Y(343) Z(17) L(0.54)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "scouring-rush",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -8.9452,
+          6.3561,
+          -37.0683
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 40,
+        "sizeVariation": 0.2,
+        "regions": {
+          "horsetail-a": 1,
+          "horsetail-b": 2,
+          "horsetail-c": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(16) Z(8) L(0.77)] [Y(19) Z(7) L(0.63)] [Y(32) Z(8) L(0.87)] [Y(49) Z(4) L(0.66)] [Y(63) Z(3) L(0.88)] [Y(83) Z(4) L(0.74)] [Y(95) Z(7) L(0.66)] [Y(75) Z(1) L(0.92)] [Y(115) Z(1) L(0.89)] [Y(135) Z(6) L(0.72)] [Y(131) Z(1) L(0.60)] [Y(160) Z(6) L(0.78)] [Y(172) Z(4) L(0.91)] [Y(180) Z(2) L(0.69)] [Y(172) Z(2) L(0.81)] [Y(183) Z(4) L(0.65)] [Y(222) Z(3) L(0.76)] [Y(222) Z(8) L(0.75)] [Y(248) Z(5) L(0.79)] [Y(245) Z(0) L(0.75)] [Y(244) Z(0) L(0.88)] [Y(257) Z(4) L(0.85)] [Y(285) Z(3) L(0.78)] [Y(298) Z(7) L(0.64)] [Y(311) Z(2) L(0.70)] [Y(332) Z(5) L(0.80)] [Y(345) Z(8) L(0.76)] [Y(352) Z(5) L(0.78)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "common-reed",
+      "type": "tree",
+      "transform": {
+        "position": [
+          33.3746,
+          4.9923,
+          -17.9616
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 25,
+        "sizeVariation": 0.2,
+        "regions": {
+          "reed-1": 1,
+          "reed-2": 1,
+          "reed-3": 1,
+          "reed-4": 1,
+          "reed-5": 1,
+          "reed-6": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(3) R(1.00)] [Y(50) Z(5) R(0.90)] [Y(100) Z(2) R(1.05)] [Y(150) Z(6) R(0.85)] [Y(200) Z(4) R(0.95)] [Y(250) Z(3) R(1.00)] [Y(300) Z(5) R(0.90)] [Y(330) Z(7) R(0.80)]",
+        "angle": 0.017453292519943295,
+        "iterations": 7,
+        "segmentLength": 1,
+        "thickness": 0.006,
+        "rules": [
+          {
+            "input": "R(s)",
+            "output": "!(s * 1) F(0.29) [Z(38) L(0.34)] Y(180) R(s * 1)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes",
+      "type": "tree",
+      "transform": {
+        "position": [
+          33.3746,
+          4.9923,
+          -17.9616
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 30,
+        "sizeVariation": 0.15,
+        "regions": {
+          "reed-plume": 1,
+          "seed-head-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(3) !(0.6) F(2.03) L(0.36)] [Y(50) Z(5) !(0.6) F(2.03) L(0.36)] [Y(100) Z(2) !(0.6) F(2.03) L(0.36)] [Y(150) Z(6) !(0.6) F(2.03) L(0.36)] [Y(200) Z(4) !(0.6) F(2.03) L(0.36)] [Y(250) Z(3) !(0.6) F(2.03) L(0.36)] [Y(300) Z(5) !(0.6) F(2.03) L(0.36)] [Y(330) Z(7) !(0.6) F(2.03) L(0.36)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.006
+      }
+    },
+    {
+      "id": "seep-fern",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -1.349,
+          5.1344,
+          -5.7407
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "canyon-leaves"
+      },
+      "leaves": {
+        "atlas": "canyon-leaves",
+        "twistDegrees": 30,
+        "sizeVariation": 0.2,
+        "regions": {
+          "fern-a": 1,
+          "fern-b": 1,
+          "fern-c": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(357) Z(35) L(0.71)] [Y(21) Z(47) L(0.64)] [Y(48) Z(46) L(0.56)] [Y(82) Z(32) L(0.57)] [Y(110) Z(56) L(0.58)] [Y(134) Z(50) L(0.79)] [Y(167) Z(43) L(0.79)] [Y(187) Z(57) L(0.62)] [Y(216) Z(34) L(0.63)] [Y(254) Z(36) L(0.70)] [Y(279) Z(42) L(0.69)] [Y(298) Z(32) L(0.60)] [Y(335) Z(44) L(0.63)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "sedge-1",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          30.2987,
+          5.0831,
+          13.7989
+        ],
+        "rotationDegrees": [
+          0,
+          277.58,
+          0
+        ],
+        "scale": [
+          1.2183,
+          1.2183,
+          1.2183
+        ]
+      }
+    },
+    {
+      "id": "sedge-wide-1",
+      "instanceOf": "sedge-wide",
+      "transform": {
+        "position": [
+          -2.0008,
+          5.2723,
+          34.1104
+        ],
+        "rotationDegrees": [
+          0,
+          346.71,
+          0
+        ],
+        "scale": [
+          1.1046,
+          1.1046,
+          1.1046
+        ]
+      }
+    },
+    {
+      "id": "scouring-rush-1",
+      "instanceOf": "scouring-rush",
+      "transform": {
+        "position": [
+          28.6149,
+          5.4785,
+          50.1812
+        ],
+        "rotationDegrees": [
+          0,
+          309.83,
+          0
+        ],
+        "scale": [
+          0.8937,
+          0.8937,
+          0.8937
+        ]
+      }
+    },
+    {
+      "id": "common-reed-1",
+      "instanceOf": "common-reed",
+      "transform": {
+        "position": [
+          -9.8711,
+          5.8901,
+          -55.1387
+        ],
+        "rotationDegrees": [
+          0,
+          75.96,
+          0
+        ],
+        "scale": [
+          1.1527,
+          1.1527,
+          1.1527
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes-1",
+      "instanceOf": "common-reed-plumes",
+      "transform": {
+        "position": [
+          -9.8711,
+          5.8901,
+          -55.1387
+        ],
+        "rotationDegrees": [
+          0,
+          75.96,
+          0
+        ],
+        "scale": [
+          1.1527,
+          1.1527,
+          1.1527
+        ]
+      }
+    },
+    {
+      "id": "seep-fern-1",
+      "instanceOf": "seep-fern",
+      "transform": {
+        "position": [
+          -31.9776,
+          8.7285,
+          -12.0213
+        ],
+        "rotationDegrees": [
+          0,
+          236.18,
+          0
+        ],
+        "scale": [
+          1.1645,
+          1.1645,
+          1.1645
+        ]
+      }
+    },
+    {
+      "id": "sedge-2",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          -22.0546,
+          9.1555,
+          10.3605
+        ],
+        "rotationDegrees": [
+          0,
+          240.72,
+          0
+        ],
+        "scale": [
+          1.0697,
+          1.0697,
+          1.0697
+        ]
+      }
+    },
+    {
+      "id": "sedge-wide-2",
+      "instanceOf": "sedge-wide",
+      "transform": {
+        "position": [
+          38.2936,
+          4.5534,
+          34.019
+        ],
+        "rotationDegrees": [
+          0,
+          348.47,
+          0
+        ],
+        "scale": [
+          1.0209,
+          1.0209,
+          1.0209
+        ]
+      }
+    },
+    {
+      "id": "scouring-rush-2",
+      "instanceOf": "scouring-rush",
+      "transform": {
+        "position": [
+          1.9245,
+          4.9687,
+          -68.038
+        ],
+        "rotationDegrees": [
+          0,
+          92.0,
+          0
+        ],
+        "scale": [
+          0.9886,
+          0.9886,
+          0.9886
+        ]
+      }
+    },
+    {
+      "id": "common-reed-2",
+      "instanceOf": "common-reed",
+      "transform": {
+        "position": [
+          31.72,
+          4.8057,
+          -54.6422
+        ],
+        "rotationDegrees": [
+          0,
+          236.67,
+          0
+        ],
+        "scale": [
+          0.987,
+          0.987,
+          0.987
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes-2",
+      "instanceOf": "common-reed-plumes",
+      "transform": {
+        "position": [
+          31.72,
+          4.8057,
+          -54.6422
+        ],
+        "rotationDegrees": [
+          0,
+          236.67,
+          0
+        ],
+        "scale": [
+          0.987,
+          0.987,
+          0.987
+        ]
+      }
+    },
+    {
+      "id": "seep-fern-2",
+      "instanceOf": "seep-fern",
+      "transform": {
+        "position": [
+          -11.6097,
+          7.6996,
+          -37.2166
+        ],
+        "rotationDegrees": [
+          0,
+          116.97,
+          0
+        ],
+        "scale": [
+          1.0988,
+          1.0988,
+          1.0988
+        ]
+      }
+    },
+    {
+      "id": "sedge-3",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          32.3711,
+          4.9709,
+          -19.9769
+        ],
+        "rotationDegrees": [
+          0,
+          295.97,
+          0
+        ],
+        "scale": [
+          0.8739,
+          0.8739,
+          0.8739
+        ]
+      }
+    },
+    {
+      "id": "sedge-wide-3",
+      "instanceOf": "sedge-wide",
+      "transform": {
+        "position": [
+          -1.8837,
+          5.2996,
+          -8.2394
+        ],
+        "rotationDegrees": [
+          0,
+          260.28,
+          0
+        ],
+        "scale": [
+          1.1324,
+          1.1324,
+          1.1324
+        ]
+      }
+    },
+    {
+      "id": "scouring-rush-3",
+      "instanceOf": "scouring-rush",
+      "transform": {
+        "position": [
+          29.2453,
+          5.5922,
+          10.7394
+        ],
+        "rotationDegrees": [
+          0,
+          43.75,
+          0
+        ],
+        "scale": [
+          1.2164,
+          1.2164,
+          1.2164
+        ]
+      }
+    },
+    {
+      "id": "common-reed-3",
+      "instanceOf": "common-reed",
+      "transform": {
+        "position": [
+          0.0419,
+          5.0128,
+          35.3148
+        ],
+        "rotationDegrees": [
+          0,
+          260.72,
+          0
+        ],
+        "scale": [
+          1.0743,
+          1.0743,
+          1.0743
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes-3",
+      "instanceOf": "common-reed-plumes",
+      "transform": {
+        "position": [
+          0.0419,
+          5.0128,
+          35.3148
+        ],
+        "rotationDegrees": [
+          0,
+          260.72,
+          0
+        ],
+        "scale": [
+          1.0743,
+          1.0743,
+          1.0743
+        ]
+      }
+    },
+    {
+      "id": "seep-fern-3",
+      "instanceOf": "seep-fern",
+      "transform": {
+        "position": [
+          33.3023,
+          5.5224,
+          48.6065
+        ],
+        "rotationDegrees": [
+          0,
+          67.64,
+          0
+        ],
+        "scale": [
+          1.2147,
+          1.2147,
+          1.2147
+        ]
+      }
+    },
+    {
+      "id": "sedge-4",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          -12.1853,
+          8.5893,
+          -57.8698
+        ],
+        "rotationDegrees": [
+          0,
+          152.69,
+          0
+        ],
+        "scale": [
+          0.7864,
+          0.7864,
+          0.7864
+        ]
+      }
+    },
+    {
+      "id": "sedge-wide-4",
+      "instanceOf": "sedge-wide",
+      "transform": {
+        "position": [
+          -17.789,
+          7.2571,
+          -26.069
+        ],
+        "rotationDegrees": [
+          0,
+          143.96,
+          0
+        ],
+        "scale": [
+          1.2474,
+          1.2474,
+          1.2474
+        ]
+      }
+    },
+    {
+      "id": "scouring-rush-4",
+      "instanceOf": "scouring-rush",
+      "transform": {
+        "position": [
+          -24.9285,
+          6.8729,
+          10.6366
+        ],
+        "rotationDegrees": [
+          0,
+          96.58,
+          0
+        ],
+        "scale": [
+          0.8269,
+          0.8269,
+          0.8269
+        ]
+      }
+    },
+    {
+      "id": "common-reed-4",
+      "instanceOf": "common-reed",
+      "transform": {
+        "position": [
+          40.9932,
+          4.5351,
+          35.9666
+        ],
+        "rotationDegrees": [
+          0,
+          287.36,
+          0
+        ],
+        "scale": [
+          1.1554,
+          1.1554,
+          1.1554
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes-4",
+      "instanceOf": "common-reed-plumes",
+      "transform": {
+        "position": [
+          40.9932,
+          4.5351,
+          35.9666
+        ],
+        "rotationDegrees": [
+          0,
+          287.36,
+          0
+        ],
+        "scale": [
+          1.1554,
+          1.1554,
+          1.1554
+        ]
+      }
+    },
+    {
+      "id": "seep-fern-4",
+      "instanceOf": "seep-fern",
+      "transform": {
+        "position": [
+          -3.8157,
+          5.657,
+          -71.0193
+        ],
+        "rotationDegrees": [
+          0,
+          156.72,
+          0
+        ],
+        "scale": [
+          0.7763,
+          0.7763,
+          0.7763
+        ]
+      }
+    },
+    {
+      "id": "sedge-5",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          31.6341,
+          4.1423,
+          -50.2294
+        ],
+        "rotationDegrees": [
+          0,
+          204.88,
+          0
+        ],
+        "scale": [
+          1.1739,
+          1.1739,
+          1.1739
+        ]
+      }
+    },
+    {
+      "id": "sedge-wide-5",
+      "instanceOf": "sedge-wide",
+      "transform": {
+        "position": [
+          -12.69,
+          9.8065,
+          -39.007
+        ],
+        "rotationDegrees": [
+          0,
+          107.76,
+          0
+        ],
+        "scale": [
+          0.8621,
+          0.8621,
+          0.8621
+        ]
+      }
+    },
+    {
+      "id": "scouring-rush-5",
+      "instanceOf": "scouring-rush",
+      "transform": {
+        "position": [
+          35.126,
+          5.57,
+          -17.7941
+        ],
+        "rotationDegrees": [
+          0,
+          147.94,
+          0
+        ],
+        "scale": [
+          1.2357,
+          1.2357,
+          1.2357
+        ]
+      }
+    },
+    {
+      "id": "common-reed-5",
+      "instanceOf": "common-reed",
+      "transform": {
+        "position": [
+          1.8899,
+          4.8023,
+          -4.0822
+        ],
+        "rotationDegrees": [
+          0,
+          340.25,
+          0
+        ],
+        "scale": [
+          1.0221,
+          1.0221,
+          1.0221
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes-5",
+      "instanceOf": "common-reed-plumes",
+      "transform": {
+        "position": [
+          1.8899,
+          4.8023,
+          -4.0822
+        ],
+        "rotationDegrees": [
+          0,
+          340.25,
+          0
+        ],
+        "scale": [
+          1.0221,
+          1.0221,
+          1.0221
+        ]
+      }
+    },
+    {
+      "id": "seep-fern-5",
+      "instanceOf": "seep-fern",
+      "transform": {
+        "position": [
+          27.243,
+          4.9267,
+          9.2593
+        ],
+        "rotationDegrees": [
+          0,
+          181.02,
+          0
+        ],
+        "scale": [
+          1.0191,
+          1.0191,
+          1.0191
+        ]
+      }
+    },
+    {
+      "id": "sedge-6",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          2.9921,
+          4.9576,
+          32.0611
+        ],
+        "rotationDegrees": [
+          0,
+          285.59,
+          0
+        ],
+        "scale": [
+          1.0851,
+          1.0851,
+          1.0851
+        ]
+      }
+    },
+    {
+      "id": "sedge-wide-6",
+      "instanceOf": "sedge-wide",
+      "transform": {
+        "position": [
+          28.8297,
+          4.4051,
+          47.1995
+        ],
+        "rotationDegrees": [
+          0,
+          326.74,
+          0
+        ],
+        "scale": [
+          1.0134,
+          1.0134,
+          1.0134
+        ]
+      }
+    },
+    {
+      "id": "scouring-rush-6",
+      "instanceOf": "scouring-rush",
+      "transform": {
+        "position": [
+          -27.0978,
+          8.1446,
+          -48.3164
+        ],
+        "rotationDegrees": [
+          0,
+          57.58,
+          0
+        ],
+        "scale": [
+          0.8962,
+          0.8962,
+          0.8962
+        ]
+      }
+    },
+    {
+      "id": "common-reed-6",
+      "instanceOf": "common-reed",
+      "transform": {
+        "position": [
+          -18.219,
+          7.41,
+          -25.3122
+        ],
+        "rotationDegrees": [
+          0,
+          290.22,
+          0
+        ],
+        "scale": [
+          1.1894,
+          1.1894,
+          1.1894
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes-6",
+      "instanceOf": "common-reed-plumes",
+      "transform": {
+        "position": [
+          -18.219,
+          7.41,
+          -25.3122
+        ],
+        "rotationDegrees": [
+          0,
+          290.22,
+          0
+        ],
+        "scale": [
+          1.1894,
+          1.1894,
+          1.1894
+        ]
+      }
+    },
+    {
+      "id": "seep-fern-6",
+      "instanceOf": "seep-fern",
+      "transform": {
+        "position": [
+          -26.0837,
+          6.3432,
+          11.9444
+        ],
+        "rotationDegrees": [
+          0,
+          61.22,
+          0
+        ],
+        "scale": [
+          0.948,
+          0.948,
+          0.948
+        ]
+      }
+    },
+    {
+      "id": "sedge-7",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          39.1817,
+          4.7813,
+          30.8266
+        ],
+        "rotationDegrees": [
+          0,
+          6.49,
+          0
+        ],
+        "scale": [
+          1.1519,
+          1.1519,
+          1.1519
+        ]
+      }
+    },
+    {
+      "id": "sedge-wide-7",
+      "instanceOf": "sedge-wide",
+      "transform": {
+        "position": [
+          -4.2008,
+          5.5551,
+          -69.7525
+        ],
+        "rotationDegrees": [
+          0,
+          260.66,
+          0
+        ],
+        "scale": [
+          0.9289,
+          0.9289,
+          0.9289
+        ]
+      }
+    },
+    {
+      "id": "scouring-rush-7",
+      "instanceOf": "scouring-rush",
+      "transform": {
+        "position": [
+          32.9745,
+          4.826,
+          -50.6287
+        ],
+        "rotationDegrees": [
+          0,
+          134.24,
+          0
+        ],
+        "scale": [
+          0.9643,
+          0.9643,
+          0.9643
+        ]
+      }
+    },
+    {
+      "id": "common-reed-7",
+      "instanceOf": "common-reed",
+      "transform": {
+        "position": [
+          -11.3712,
+          7.5717,
+          -37.0028
+        ],
+        "rotationDegrees": [
+          0,
+          14.08,
+          0
+        ],
+        "scale": [
+          0.9549,
+          0.9549,
+          0.9549
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes-7",
+      "instanceOf": "common-reed-plumes",
+      "transform": {
+        "position": [
+          -11.3712,
+          7.5717,
+          -37.0028
+        ],
+        "rotationDegrees": [
+          0,
+          14.08,
+          0
+        ],
+        "scale": [
+          0.9549,
+          0.9549,
+          0.9549
+        ]
+      }
+    },
+    {
+      "id": "seep-fern-7",
+      "instanceOf": "seep-fern",
+      "transform": {
+        "position": [
+          33.1282,
+          4.9907,
+          -19.0579
+        ],
+        "rotationDegrees": [
+          0,
+          201.22,
+          0
+        ],
+        "scale": [
+          0.8926,
+          0.8926,
+          0.8926
+        ]
+      }
+    },
+    {
+      "id": "sedge-8",
+      "instanceOf": "sedge",
+      "transform": {
+        "position": [
+          2.3203,
+          4.4443,
+          -8.7726
+        ],
+        "rotationDegrees": [
+          0,
+          271.9,
+          0
+        ],
+        "scale": [
+          0.8022,
+          0.8022,
+          0.8022
+        ]
+      }
+    },
+    {
+      "id": "sedge-wide-8",
+      "instanceOf": "sedge-wide",
+      "transform": {
+        "position": [
+          30.112,
+          4.9645,
+          14.6183
+        ],
+        "rotationDegrees": [
+          0,
+          291.83,
+          0
+        ],
+        "scale": [
+          1.1307,
+          1.1307,
+          1.1307
+        ]
+      }
+    },
+    {
+      "id": "scouring-rush-8",
+      "instanceOf": "scouring-rush",
+      "transform": {
+        "position": [
+          4.0473,
+          4.9774,
+          27.8047
+        ],
+        "rotationDegrees": [
+          0,
+          136.93,
+          0
+        ],
+        "scale": [
+          1.1284,
+          1.1284,
+          1.1284
+        ]
+      }
+    },
+    {
+      "id": "common-reed-8",
+      "instanceOf": "common-reed",
+      "transform": {
+        "position": [
+          33.3525,
+          6.4414,
+          50.8113
+        ],
+        "rotationDegrees": [
+          0,
+          188.9,
+          0
+        ],
+        "scale": [
+          1.0262,
+          1.0262,
+          1.0262
+        ]
+      }
+    },
+    {
+      "id": "common-reed-plumes-8",
+      "instanceOf": "common-reed-plumes",
+      "transform": {
+        "position": [
+          33.3525,
+          6.4414,
+          50.8113
+        ],
+        "rotationDegrees": [
+          0,
+          188.9,
+          0
+        ],
+        "scale": [
+          1.0262,
+          1.0262,
+          1.0262
+        ]
+      }
+    },
+    {
+      "id": "seep-fern-8",
+      "instanceOf": "seep-fern",
+      "transform": {
+        "position": [
+          -28.1591,
+          8.4965,
+          -50.2192
+        ],
+        "rotationDegrees": [
+          0,
+          128.66,
+          0
+        ],
+        "scale": [
+          0.8612,
+          0.8612,
+          0.8612
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -22.9907,
+          14.0263,
+          -14.6224
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-dry",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 30,
+        "sizeVariation": 0.25,
+        "regions": {
+          "dry-1": 1,
+          "dry-2": 1,
+          "dry-3": 1,
+          "dry-4": 1,
+          "dry-5": 1,
+          "sedge-5": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(3) Z(26) L(0.41)] [Y(13) Z(40) L(0.44)] [Y(34) Z(40) L(0.35)] [Y(42) Z(40) L(0.47)] [Y(50) Z(16) L(0.39)] [Y(62) Z(19) L(0.31)] [Y(86) Z(36) L(0.48)] [Y(91) Z(33) L(0.43)] [Y(105) Z(38) L(0.49)] [Y(120) Z(41) L(0.38)] [Y(138) Z(42) L(0.47)] [Y(147) Z(25) L(0.40)] [Y(164) Z(18) L(0.36)] [Y(184) Z(13) L(0.41)] [Y(193) Z(13) L(0.37)] [Y(210) Z(27) L(0.31)] [Y(229) Z(36) L(0.49)] [Y(229) Z(20) L(0.31)] [Y(254) Z(20) L(0.33)] [Y(262) Z(39) L(0.46)] [Y(273) Z(16) L(0.48)] [Y(292) Z(33) L(0.32)] [Y(298) Z(33) L(0.39)] [Y(312) Z(40) L(0.43)] [Y(337) Z(15) L(0.47)] [Y(339) Z(38) L(0.39)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.02
+      }
+    },
+    {
+      "id": "bunchgrass-seed",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -22.9907,
+          14.0263,
+          -14.6224
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "cylinder",
+      "materials": {
+        "trunk": "stem-dry",
+        "leaf": "canyon-grasses"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 40,
+        "sizeVariation": 0.15,
+        "regions": {
+          "seed-head-a": 2,
+          "seed-head-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(355) Z(12) F(0.49) L(0.14)] [Y(29) Z(11) F(0.39) L(0.14)] [Y(70) Z(5) F(0.38) L(0.15)] [Y(114) Z(15) F(0.39) L(0.16)] [Y(150) Z(9) F(0.35) L(0.14)] [Y(185) Z(14) F(0.43) L(0.14)] [Y(239) Z(17) F(0.37) L(0.17)] [Y(278) Z(11) F(0.48) L(0.15)] [Y(320) Z(14) F(0.50) L(0.15)]",
+        "angle": 0.017453292519943295,
+        "iterations": 0,
+        "segmentLength": 1,
+        "thickness": 0.0025
+      }
+    },
+    {
+      "id": "bunchgrass-1",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -18.0963,
+          12.8398,
+          7.8066
+        ],
+        "rotationDegrees": [
+          0,
+          126.66,
+          0
+        ],
+        "scale": [
+          1.1948,
+          1.1948,
+          1.1948
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-1",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -18.0963,
+          12.8398,
+          7.8066
+        ],
+        "rotationDegrees": [
+          0,
+          126.66,
+          0
+        ],
+        "scale": [
+          1.1948,
+          1.1948,
+          1.1948
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-2",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          38.0076,
+          9.1532,
+          21.2156
+        ],
+        "rotationDegrees": [
+          0,
+          214.3,
+          0
+        ],
+        "scale": [
+          1.2236,
+          1.2236,
+          1.2236
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-2",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          38.0076,
+          9.1532,
+          21.2156
+        ],
+        "rotationDegrees": [
+          0,
+          214.3,
+          0
+        ],
+        "scale": [
+          1.2236,
+          1.2236,
+          1.2236
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-3",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -8.1468,
+          7.0545,
+          -69.8039
+        ],
+        "rotationDegrees": [
+          0,
+          183.3,
+          0
+        ],
+        "scale": [
+          0.8523,
+          0.8523,
+          0.8523
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-3",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -8.1468,
+          7.0545,
+          -69.8039
+        ],
+        "rotationDegrees": [
+          0,
+          183.3,
+          0
+        ],
+        "scale": [
+          0.8523,
+          0.8523,
+          0.8523
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-4",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          36.9266,
+          6.7442,
+          -54.6706
+        ],
+        "rotationDegrees": [
+          0,
+          24.03,
+          0
+        ],
+        "scale": [
+          1.1442,
+          1.1442,
+          1.1442
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-4",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          36.9266,
+          6.7442,
+          -54.6706
+        ],
+        "rotationDegrees": [
+          0,
+          24.03,
+          0
+        ],
+        "scale": [
+          1.1442,
+          1.1442,
+          1.1442
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-5",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -11.739,
+          8.7996,
+          -41.0851
+        ],
+        "rotationDegrees": [
+          0,
+          349.53,
+          0
+        ],
+        "scale": [
+          1.0916,
+          1.0916,
+          1.0916
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-5",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -11.739,
+          8.7996,
+          -41.0851
+        ],
+        "rotationDegrees": [
+          0,
+          349.53,
+          0
+        ],
+        "scale": [
+          1.0916,
+          1.0916,
+          1.0916
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-6",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          38.1412,
+          8.2189,
+          -16.8243
+        ],
+        "rotationDegrees": [
+          0,
+          216.48,
+          0
+        ],
+        "scale": [
+          0.8833,
+          0.8833,
+          0.8833
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-6",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          38.1412,
+          8.2189,
+          -16.8243
+        ],
+        "rotationDegrees": [
+          0,
+          216.48,
+          0
+        ],
+        "scale": [
+          0.8833,
+          0.8833,
+          0.8833
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-7",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -7.9195,
+          12.6275,
+          -5.3759
+        ],
+        "rotationDegrees": [
+          0,
+          57.03,
+          0
+        ],
+        "scale": [
+          1.218,
+          1.218,
+          1.218
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-7",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -7.9195,
+          12.6275,
+          -5.3759
+        ],
+        "rotationDegrees": [
+          0,
+          57.03,
+          0
+        ],
+        "scale": [
+          1.218,
+          1.218,
+          1.218
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-8",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          35.0246,
+          12.3187,
+          12.3891
+        ],
+        "rotationDegrees": [
+          0,
+          155.79,
+          0
+        ],
+        "scale": [
+          0.7787,
+          0.7787,
+          0.7787
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-8",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          35.0246,
+          12.3187,
+          12.3891
+        ],
+        "rotationDegrees": [
+          0,
+          155.79,
+          0
+        ],
+        "scale": [
+          0.7787,
+          0.7787,
+          0.7787
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-9",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -8.081,
+          7.9018,
+          36.8234
+        ],
+        "rotationDegrees": [
+          0,
+          87.22,
+          0
+        ],
+        "scale": [
+          1.1124,
+          1.1124,
+          1.1124
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-9",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -8.081,
+          7.9018,
+          36.8234
+        ],
+        "rotationDegrees": [
+          0,
+          87.22,
+          0
+        ],
+        "scale": [
+          1.1124,
+          1.1124,
+          1.1124
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-10",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          33.2127,
+          7.3029,
+          52.9344
+        ],
+        "rotationDegrees": [
+          0,
+          338.68,
+          0
+        ],
+        "scale": [
+          1.0511,
+          1.0511,
+          1.0511
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-10",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          33.2127,
+          7.3029,
+          52.9344
+        ],
+        "rotationDegrees": [
+          0,
+          338.68,
+          0
+        ],
+        "scale": [
+          1.0511,
+          1.0511,
+          1.0511
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-11",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -19.8647,
+          13.9891,
+          -58.1053
+        ],
+        "rotationDegrees": [
+          0,
+          259.2,
+          0
+        ],
+        "scale": [
+          0.9493,
+          0.9493,
+          0.9493
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-11",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -19.8647,
+          13.9891,
+          -58.1053
+        ],
+        "rotationDegrees": [
+          0,
+          259.2,
+          0
+        ],
+        "scale": [
+          0.9493,
+          0.9493,
+          0.9493
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-12",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -20.056,
+          13.0709,
+          -20.7885
+        ],
+        "rotationDegrees": [
+          0,
+          234.02,
+          0
+        ],
+        "scale": [
+          1.2327,
+          1.2327,
+          1.2327
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-12",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -20.056,
+          13.0709,
+          -20.7885
+        ],
+        "rotationDegrees": [
+          0,
+          234.02,
+          0
+        ],
+        "scale": [
+          1.2327,
+          1.2327,
+          1.2327
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-13",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -14.9941,
+          13.9997,
+          11.9755
+        ],
+        "rotationDegrees": [
+          0,
+          198.38,
+          0
+        ],
+        "scale": [
+          0.8138,
+          0.8138,
+          0.8138
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-13",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -14.9941,
+          13.9997,
+          11.9755
+        ],
+        "rotationDegrees": [
+          0,
+          198.38,
+          0
+        ],
+        "scale": [
+          0.8138,
+          0.8138,
+          0.8138
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-14",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          39.754,
+          9.8264,
+          21.3631
+        ],
+        "rotationDegrees": [
+          0,
+          289.25,
+          0
+        ],
+        "scale": [
+          0.9425,
+          0.9425,
+          0.9425
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-14",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          39.754,
+          9.8264,
+          21.3631
+        ],
+        "rotationDegrees": [
+          0,
+          289.25,
+          0
+        ],
+        "scale": [
+          0.9425,
+          0.9425,
+          0.9425
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-15",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -6.7466,
+          7.0507,
+          -73.1584
+        ],
+        "rotationDegrees": [
+          0,
+          279.76,
+          0
+        ],
+        "scale": [
+          0.8647,
+          0.8647,
+          0.8647
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-15",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -6.7466,
+          7.0507,
+          -73.1584
+        ],
+        "rotationDegrees": [
+          0,
+          279.76,
+          0
+        ],
+        "scale": [
+          0.8647,
+          0.8647,
+          0.8647
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-16",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          36.975,
+          6.7,
+          -54.0369
+        ],
+        "rotationDegrees": [
+          0,
+          350.19,
+          0
+        ],
+        "scale": [
+          0.9366,
+          0.9366,
+          0.9366
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-16",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          36.975,
+          6.7,
+          -54.0369
+        ],
+        "rotationDegrees": [
+          0,
+          350.19,
+          0
+        ],
+        "scale": [
+          0.9366,
+          0.9366,
+          0.9366
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-17",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -13.8639,
+          11.4262,
+          -45.0402
+        ],
+        "rotationDegrees": [
+          0,
+          199.91,
+          0
+        ],
+        "scale": [
+          1.2415,
+          1.2415,
+          1.2415
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-17",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -13.8639,
+          11.4262,
+          -45.0402
+        ],
+        "rotationDegrees": [
+          0,
+          199.91,
+          0
+        ],
+        "scale": [
+          1.2415,
+          1.2415,
+          1.2415
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-18",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          37.0046,
+          7.2206,
+          -10.3298
+        ],
+        "rotationDegrees": [
+          0,
+          241.03,
+          0
+        ],
+        "scale": [
+          1.1067,
+          1.1067,
+          1.1067
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-18",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          37.0046,
+          7.2206,
+          -10.3298
+        ],
+        "rotationDegrees": [
+          0,
+          241.03,
+          0
+        ],
+        "scale": [
+          1.1067,
+          1.1067,
+          1.1067
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-19",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -7.8963,
+          11.5746,
+          -7.9879
+        ],
+        "rotationDegrees": [
+          0,
+          320.79,
+          0
+        ],
+        "scale": [
+          1.1973,
+          1.1973,
+          1.1973
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-19",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -7.8963,
+          11.5746,
+          -7.9879
+        ],
+        "rotationDegrees": [
+          0,
+          320.79,
+          0
+        ],
+        "scale": [
+          1.1973,
+          1.1973,
+          1.1973
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-20",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          34.8709,
+          12.6322,
+          9.7656
+        ],
+        "rotationDegrees": [
+          0,
+          327.39,
+          0
+        ],
+        "scale": [
+          1.0176,
+          1.0176,
+          1.0176
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-20",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          34.8709,
+          12.6322,
+          9.7656
+        ],
+        "rotationDegrees": [
+          0,
+          327.39,
+          0
+        ],
+        "scale": [
+          1.0176,
+          1.0176,
+          1.0176
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-21",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -4.7792,
+          7.1288,
+          29.1528
+        ],
+        "rotationDegrees": [
+          0,
+          27.89,
+          0
+        ],
+        "scale": [
+          1.0071,
+          1.0071,
+          1.0071
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-21",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -4.7792,
+          7.1288,
+          29.1528
+        ],
+        "rotationDegrees": [
+          0,
+          27.89,
+          0
+        ],
+        "scale": [
+          1.0071,
+          1.0071,
+          1.0071
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-22",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          34.1912,
+          7.1867,
+          53.0409
+        ],
+        "rotationDegrees": [
+          0,
+          45.4,
+          0
+        ],
+        "scale": [
+          1.0378,
+          1.0378,
+          1.0378
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-22",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          34.1912,
+          7.1867,
+          53.0409
+        ],
+        "rotationDegrees": [
+          0,
+          45.4,
+          0
+        ],
+        "scale": [
+          1.0378,
+          1.0378,
+          1.0378
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-23",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -17.1413,
+          13.6322,
+          -51.3801
+        ],
+        "rotationDegrees": [
+          0,
+          172.47,
+          0
+        ],
+        "scale": [
+          0.899,
+          0.899,
+          0.899
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-23",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -17.1413,
+          13.6322,
+          -51.3801
+        ],
+        "rotationDegrees": [
+          0,
+          172.47,
+          0
+        ],
+        "scale": [
+          0.899,
+          0.899,
+          0.899
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-24",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -24.2515,
+          13.9995,
+          -17.8554
+        ],
+        "rotationDegrees": [
+          0,
+          3.34,
+          0
+        ],
+        "scale": [
+          1.1725,
+          1.1725,
+          1.1725
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-24",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -24.2515,
+          13.9995,
+          -17.8554
+        ],
+        "rotationDegrees": [
+          0,
+          3.34,
+          0
+        ],
+        "scale": [
+          1.1725,
+          1.1725,
+          1.1725
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-25",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -19.0478,
+          12.5276,
+          8.3991
+        ],
+        "rotationDegrees": [
+          0,
+          87.66,
+          0
+        ],
+        "scale": [
+          1.1403,
+          1.1403,
+          1.1403
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-25",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -19.0478,
+          12.5276,
+          8.3991
+        ],
+        "rotationDegrees": [
+          0,
+          87.66,
+          0
+        ],
+        "scale": [
+          1.1403,
+          1.1403,
+          1.1403
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-26",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          41.1007,
+          10.4077,
+          20.8806
+        ],
+        "rotationDegrees": [
+          0,
+          258.76,
+          0
+        ],
+        "scale": [
+          0.7544,
+          0.7544,
+          0.7544
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-26",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          41.1007,
+          10.4077,
+          20.8806
+        ],
+        "rotationDegrees": [
+          0,
+          258.76,
+          0
+        ],
+        "scale": [
+          0.7544,
+          0.7544,
+          0.7544
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-27",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -9.0168,
+          7.151,
+          -71.9338
+        ],
+        "rotationDegrees": [
+          0,
+          144.12,
+          0
+        ],
+        "scale": [
+          0.8545,
+          0.8545,
+          0.8545
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-27",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -9.0168,
+          7.151,
+          -71.9338
+        ],
+        "rotationDegrees": [
+          0,
+          144.12,
+          0
+        ],
+        "scale": [
+          0.8545,
+          0.8545,
+          0.8545
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-28",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          38.9503,
+          7.7233,
+          -54.858
+        ],
+        "rotationDegrees": [
+          0,
+          96.95,
+          0
+        ],
+        "scale": [
+          1.0479,
+          1.0479,
+          1.0479
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-28",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          38.9503,
+          7.7233,
+          -54.858
+        ],
+        "rotationDegrees": [
+          0,
+          96.95,
+          0
+        ],
+        "scale": [
+          1.0479,
+          1.0479,
+          1.0479
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-29",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -14.9475,
+          12.3443,
+          -41.9458
+        ],
+        "rotationDegrees": [
+          0,
+          68.61,
+          0
+        ],
+        "scale": [
+          0.9728,
+          0.9728,
+          0.9728
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-29",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -14.9475,
+          12.3443,
+          -41.9458
+        ],
+        "rotationDegrees": [
+          0,
+          68.61,
+          0
+        ],
+        "scale": [
+          0.9728,
+          0.9728,
+          0.9728
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-30",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          37.6795,
+          7.3014,
+          -13.1697
+        ],
+        "rotationDegrees": [
+          0,
+          348.44,
+          0
+        ],
+        "scale": [
+          0.9288,
+          0.9288,
+          0.9288
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-30",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          37.6795,
+          7.3014,
+          -13.1697
+        ],
+        "rotationDegrees": [
+          0,
+          348.44,
+          0
+        ],
+        "scale": [
+          0.9288,
+          0.9288,
+          0.9288
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-31",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -5.1685,
+          12.3481,
+          4.3291
+        ],
+        "rotationDegrees": [
+          0,
+          166.59,
+          0
+        ],
+        "scale": [
+          1.1102,
+          1.1102,
+          1.1102
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-31",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -5.1685,
+          12.3481,
+          4.3291
+        ],
+        "rotationDegrees": [
+          0,
+          166.59,
+          0
+        ],
+        "scale": [
+          1.1102,
+          1.1102,
+          1.1102
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-32",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          35.1864,
+          7.4271,
+          20.3014
+        ],
+        "rotationDegrees": [
+          0,
+          106.72,
+          0
+        ],
+        "scale": [
+          1.0707,
+          1.0707,
+          1.0707
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-32",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          35.1864,
+          7.4271,
+          20.3014
+        ],
+        "rotationDegrees": [
+          0,
+          106.72,
+          0
+        ],
+        "scale": [
+          1.0707,
+          1.0707,
+          1.0707
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-33",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -6.8122,
+          7.3437,
+          30.6972
+        ],
+        "rotationDegrees": [
+          0,
+          168.65,
+          0
+        ],
+        "scale": [
+          1.0877,
+          1.0877,
+          1.0877
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-33",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -6.8122,
+          7.3437,
+          30.6972
+        ],
+        "rotationDegrees": [
+          0,
+          168.65,
+          0
+        ],
+        "scale": [
+          1.0877,
+          1.0877,
+          1.0877
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-34",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          35.7393,
+          6.665,
+          52.7013
+        ],
+        "rotationDegrees": [
+          0,
+          168.16,
+          0
+        ],
+        "scale": [
+          1.2382,
+          1.2382,
+          1.2382
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-34",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          35.7393,
+          6.665,
+          52.7013
+        ],
+        "rotationDegrees": [
+          0,
+          168.16,
+          0
+        ],
+        "scale": [
+          1.2382,
+          1.2382,
+          1.2382
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-35",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -19.1344,
+          14.0053,
+          -50.202
+        ],
+        "rotationDegrees": [
+          0,
+          294.66,
+          0
+        ],
+        "scale": [
+          1.1817,
+          1.1817,
+          1.1817
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-35",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -19.1344,
+          14.0053,
+          -50.202
+        ],
+        "rotationDegrees": [
+          0,
+          294.66,
+          0
+        ],
+        "scale": [
+          1.1817,
+          1.1817,
+          1.1817
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-36",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -20.8882,
+          14.0203,
+          -12.7718
+        ],
+        "rotationDegrees": [
+          0,
+          210.47,
+          0
+        ],
+        "scale": [
+          0.8996,
+          0.8996,
+          0.8996
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-36",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -20.8882,
+          14.0203,
+          -12.7718
+        ],
+        "rotationDegrees": [
+          0,
+          210.47,
+          0
+        ],
+        "scale": [
+          0.8996,
+          0.8996,
+          0.8996
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-37",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -16.3098,
+          13.7468,
+          7.3635
+        ],
+        "rotationDegrees": [
+          0,
+          149.88,
+          0
+        ],
+        "scale": [
+          0.8151,
+          0.8151,
+          0.8151
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-37",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -16.3098,
+          13.7468,
+          7.3635
+        ],
+        "rotationDegrees": [
+          0,
+          149.88,
+          0
+        ],
+        "scale": [
+          0.8151,
+          0.8151,
+          0.8151
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-38",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          34.6326,
+          7.3324,
+          19.3954
+        ],
+        "rotationDegrees": [
+          0,
+          186.39,
+          0
+        ],
+        "scale": [
+          1.2488,
+          1.2488,
+          1.2488
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-38",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          34.6326,
+          7.3324,
+          19.3954
+        ],
+        "rotationDegrees": [
+          0,
+          186.39,
+          0
+        ],
+        "scale": [
+          1.2488,
+          1.2488,
+          1.2488
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-39",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -6.7999,
+          7.8132,
+          -68.059
+        ],
+        "rotationDegrees": [
+          0,
+          58.06,
+          0
+        ],
+        "scale": [
+          1.0324,
+          1.0324,
+          1.0324
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-39",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -6.7999,
+          7.8132,
+          -68.059
+        ],
+        "rotationDegrees": [
+          0,
+          58.06,
+          0
+        ],
+        "scale": [
+          1.0324,
+          1.0324,
+          1.0324
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-40",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          39.6663,
+          7.8712,
+          -55.37
+        ],
+        "rotationDegrees": [
+          0,
+          56.22,
+          0
+        ],
+        "scale": [
+          1.1595,
+          1.1595,
+          1.1595
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-40",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          39.6663,
+          7.8712,
+          -55.37
+        ],
+        "rotationDegrees": [
+          0,
+          56.22,
+          0
+        ],
+        "scale": [
+          1.1595,
+          1.1595,
+          1.1595
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-41",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -16.345,
+          13.1898,
+          -41.9235
+        ],
+        "rotationDegrees": [
+          0,
+          234.0,
+          0
+        ],
+        "scale": [
+          1.1631,
+          1.1631,
+          1.1631
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-41",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -16.345,
+          13.1898,
+          -41.9235
+        ],
+        "rotationDegrees": [
+          0,
+          234.0,
+          0
+        ],
+        "scale": [
+          1.1631,
+          1.1631,
+          1.1631
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-42",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          39.0272,
+          8.5332,
+          -16.1224
+        ],
+        "rotationDegrees": [
+          0,
+          83.97,
+          0
+        ],
+        "scale": [
+          1.162,
+          1.162,
+          1.162
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-42",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          39.0272,
+          8.5332,
+          -16.1224
+        ],
+        "rotationDegrees": [
+          0,
+          83.97,
+          0
+        ],
+        "scale": [
+          1.162,
+          1.162,
+          1.162
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-43",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -2.8028,
+          6.9602,
+          -1.0346
+        ],
+        "rotationDegrees": [
+          0,
+          230.19,
+          0
+        ],
+        "scale": [
+          1.162,
+          1.162,
+          1.162
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-43",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -2.8028,
+          6.9602,
+          -1.0346
+        ],
+        "rotationDegrees": [
+          0,
+          230.19,
+          0
+        ],
+        "scale": [
+          1.162,
+          1.162,
+          1.162
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-44",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          33.7544,
+          12.0014,
+          8.9569
+        ],
+        "rotationDegrees": [
+          0,
+          251.46,
+          0
+        ],
+        "scale": [
+          1.2,
+          1.2,
+          1.2
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-44",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          33.7544,
+          12.0014,
+          8.9569
+        ],
+        "rotationDegrees": [
+          0,
+          251.46,
+          0
+        ],
+        "scale": [
+          1.2,
+          1.2,
+          1.2
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-45",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          0.1648,
+          7.0385,
+          22.1266
+        ],
+        "rotationDegrees": [
+          0,
+          158.1,
+          0
+        ],
+        "scale": [
+          0.9051,
+          0.9051,
+          0.9051
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-45",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          0.1648,
+          7.0385,
+          22.1266
+        ],
+        "rotationDegrees": [
+          0,
+          158.1,
+          0
+        ],
+        "scale": [
+          0.9051,
+          0.9051,
+          0.9051
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-46",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          34.7277,
+          7.0654,
+          53.066
+        ],
+        "rotationDegrees": [
+          0,
+          19.79,
+          0
+        ],
+        "scale": [
+          0.8348,
+          0.8348,
+          0.8348
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-46",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          34.7277,
+          7.0654,
+          53.066
+        ],
+        "rotationDegrees": [
+          0,
+          19.79,
+          0
+        ],
+        "scale": [
+          0.8348,
+          0.8348,
+          0.8348
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-47",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -15.9957,
+          12.8053,
+          -52.8956
+        ],
+        "rotationDegrees": [
+          0,
+          281.02,
+          0
+        ],
+        "scale": [
+          1.0401,
+          1.0401,
+          1.0401
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-47",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -15.9957,
+          12.8053,
+          -52.8956
+        ],
+        "rotationDegrees": [
+          0,
+          281.02,
+          0
+        ],
+        "scale": [
+          1.0401,
+          1.0401,
+          1.0401
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-48",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -16.3176,
+          13.3808,
+          -13.8656
+        ],
+        "rotationDegrees": [
+          0,
+          114.72,
+          0
+        ],
+        "scale": [
+          1.1408,
+          1.1408,
+          1.1408
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-48",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -16.3176,
+          13.3808,
+          -13.8656
+        ],
+        "rotationDegrees": [
+          0,
+          114.72,
+          0
+        ],
+        "scale": [
+          1.1408,
+          1.1408,
+          1.1408
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-49",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -10.8397,
+          13.8085,
+          7.7653
+        ],
+        "rotationDegrees": [
+          0,
+          87.15,
+          0
+        ],
+        "scale": [
+          1.0742,
+          1.0742,
+          1.0742
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-49",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -10.8397,
+          13.8085,
+          7.7653
+        ],
+        "rotationDegrees": [
+          0,
+          87.15,
+          0
+        ],
+        "scale": [
+          1.0742,
+          1.0742,
+          1.0742
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-50",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          38.9997,
+          9.7845,
+          21.8814
+        ],
+        "rotationDegrees": [
+          0,
+          61.58,
+          0
+        ],
+        "scale": [
+          0.9349,
+          0.9349,
+          0.9349
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-50",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          38.9997,
+          9.7845,
+          21.8814
+        ],
+        "rotationDegrees": [
+          0,
+          61.58,
+          0
+        ],
+        "scale": [
+          0.9349,
+          0.9349,
+          0.9349
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-51",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -10.1067,
+          7.3312,
+          -72.7156
+        ],
+        "rotationDegrees": [
+          0,
+          240.34,
+          0
+        ],
+        "scale": [
+          1.2448,
+          1.2448,
+          1.2448
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-51",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -10.1067,
+          7.3312,
+          -72.7156
+        ],
+        "rotationDegrees": [
+          0,
+          240.34,
+          0
+        ],
+        "scale": [
+          1.2448,
+          1.2448,
+          1.2448
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-52",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          38.7563,
+          7.5462,
+          -53.687
+        ],
+        "rotationDegrees": [
+          0,
+          163.75,
+          0
+        ],
+        "scale": [
+          0.7898,
+          0.7898,
+          0.7898
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-52",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          38.7563,
+          7.5462,
+          -53.687
+        ],
+        "rotationDegrees": [
+          0,
+          163.75,
+          0
+        ],
+        "scale": [
+          0.7898,
+          0.7898,
+          0.7898
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-53",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          -12.2918,
+          8.5597,
+          -50.3615
+        ],
+        "rotationDegrees": [
+          0,
+          130.12,
+          0
+        ],
+        "scale": [
+          1.1172,
+          1.1172,
+          1.1172
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-53",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          -12.2918,
+          8.5597,
+          -50.3615
+        ],
+        "rotationDegrees": [
+          0,
+          130.12,
+          0
+        ],
+        "scale": [
+          1.1172,
+          1.1172,
+          1.1172
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-54",
+      "instanceOf": "bunchgrass",
+      "transform": {
+        "position": [
+          37.0006,
+          6.7943,
+          -15.0735
+        ],
+        "rotationDegrees": [
+          0,
+          45.25,
+          0
+        ],
+        "scale": [
+          0.9918,
+          0.9918,
+          0.9918
+        ]
+      }
+    },
+    {
+      "id": "bunchgrass-seed-54",
+      "instanceOf": "bunchgrass-seed",
+      "transform": {
+        "position": [
+          37.0006,
+          6.7943,
+          -15.0735
+        ],
+        "rotationDegrees": [
+          0,
+          45.25,
+          0
+        ],
+        "scale": [
+          0.9918,
+          0.9918,
+          0.9918
+        ]
       }
     }
-  ]
+  ],
+  "atlases": {
+    "canyon-leaves": {
+      "regions": {
+        "cottonwood-twig": {
+          "rect": [
+            0.0059,
+            0.0059,
+            0.4746,
+            0.4644
+          ],
+          "stem": [
+            0.2529,
+            0.4644
+          ]
+        },
+        "cottonwood-a": {
+          "rect": [
+            0.0059,
+            0.7798,
+            0.1353,
+            0.9941
+          ],
+          "stem": [
+            0.0688,
+            0.9941
+          ]
+        },
+        "cottonwood-b": {
+          "rect": [
+            0.3345,
+            0.4702,
+            0.5142,
+            0.7524
+          ],
+          "stem": [
+            0.4375,
+            0.7524
+          ]
+        },
+        "willow-a": {
+          "rect": [
+            0.8394,
+            0.7798,
+            0.9053,
+            0.9263
+          ],
+          "stem": [
+            0.8721,
+            0.9263
+          ]
+        },
+        "willow-b": {
+          "rect": [
+            0.6562,
+            0.7798,
+            0.7192,
+            0.9307
+          ],
+          "stem": [
+            0.6924,
+            0.9307
+          ]
+        },
+        "willow-c": {
+          "rect": [
+            0.9111,
+            0.7798,
+            0.9844,
+            0.9224
+          ],
+          "stem": [
+            0.9619,
+            0.9224
+          ]
+        },
+        "willow-d": {
+          "rect": [
+            0.3389,
+            0.7798,
+            0.4165,
+            0.9604
+          ],
+          "stem": [
+            0.3716,
+            0.9604
+          ]
+        },
+        "willow-e": {
+          "rect": [
+            0.4224,
+            0.7798,
+            0.5,
+            0.9604
+          ],
+          "stem": [
+            0.4551,
+            0.9604
+          ]
+        },
+        "ash-a": {
+          "rect": [
+            0.5815,
+            0.0059,
+            0.832,
+            0.3452
+          ],
+          "stem": [
+            0.708,
+            0.3452
+          ]
+        },
+        "ash-b": {
+          "rect": [
+            0.0059,
+            0.4702,
+            0.3286,
+            0.7739
+          ],
+          "stem": [
+            0.1348,
+            0.7739
+          ]
+        },
+        "oak-a": {
+          "rect": [
+            0.7251,
+            0.7798,
+            0.8335,
+            0.9277
+          ],
+          "stem": [
+            0.7896,
+            0.9277
+          ]
+        },
+        "oak-b": {
+          "rect": [
+            0.8315,
+            0.4702,
+            0.9463,
+            0.6948
+          ],
+          "stem": [
+            0.8989,
+            0.6948
+          ]
+        },
+        "sumac": {
+          "rect": [
+            0.1411,
+            0.7798,
+            0.333,
+            0.9619
+          ],
+          "stem": [
+            0.2437,
+            0.9619
+          ]
+        },
+        "seepwillow-a": {
+          "rect": [
+            0.4805,
+            0.0059,
+            0.5757,
+            0.374
+          ],
+          "stem": [
+            0.5371,
+            0.374
+          ]
+        },
+        "seepwillow-b": {
+          "rect": [
+            0.7246,
+            0.4702,
+            0.8257,
+            0.7109
+          ],
+          "stem": [
+            0.7832,
+            0.7109
+          ]
+        },
+        "fern-a": {
+          "rect": [
+            0.5752,
+            0.7798,
+            0.6504,
+            0.9443
+          ],
+          "stem": [
+            0.6143,
+            0.9443
+          ]
+        },
+        "fern-b": {
+          "rect": [
+            0.5059,
+            0.7798,
+            0.5693,
+            0.9478
+          ],
+          "stem": [
+            0.5425,
+            0.9478
+          ]
+        },
+        "fern-c": {
+          "rect": [
+            0.52,
+            0.4702,
+            0.7188,
+            0.7485
+          ],
+          "stem": [
+            0.6216,
+            0.7485
+          ]
+        }
+      }
+    },
+    "canyon-grasses": {
+      "regions": {
+        "sedge-1": {
+          "rect": [
+            0.1626,
+            0.0059,
+            0.2095,
+            0.7026
+          ],
+          "stem": [
+            0.1787,
+            0.7026
+          ]
+        },
+        "sedge-2": {
+          "rect": [
+            0.0479,
+            0.0059,
+            0.0771,
+            0.7295
+          ],
+          "stem": [
+            0.0625,
+            0.7295
+          ]
+        },
+        "sedge-3": {
+          "rect": [
+            0.083,
+            0.0059,
+            0.1567,
+            0.7144
+          ],
+          "stem": [
+            0.1328,
+            0.7144
+          ]
+        },
+        "sedge-4": {
+          "rect": [
+            0.2153,
+            0.0059,
+            0.2476,
+            0.6943
+          ],
+          "stem": [
+            0.2319,
+            0.6943
+          ]
+        },
+        "sedge-5": {
+          "rect": [
+            0.0059,
+            0.0059,
+            0.042,
+            0.7314
+          ],
+          "stem": [
+            0.0225,
+            0.7314
+          ]
+        },
+        "sedge-6": {
+          "rect": [
+            0.4561,
+            0.0059,
+            0.481,
+            0.5356
+          ],
+          "stem": [
+            0.4683,
+            0.5356
+          ]
+        },
+        "sedge-7": {
+          "rect": [
+            0.7373,
+            0.0059,
+            0.772,
+            0.4604
+          ],
+          "stem": [
+            0.7446,
+            0.4604
+          ]
+        },
+        "sedge-8": {
+          "rect": [
+            0.8403,
+            0.0059,
+            0.8994,
+            0.3711
+          ],
+          "stem": [
+            0.8867,
+            0.3711
+          ]
+        },
+        "dry-1": {
+          "rect": [
+            0.2534,
+            0.0059,
+            0.2842,
+            0.6279
+          ],
+          "stem": [
+            0.27,
+            0.6279
+          ]
+        },
+        "dry-2": {
+          "rect": [
+            0.3853,
+            0.0059,
+            0.416,
+            0.5659
+          ],
+          "stem": [
+            0.3901,
+            0.5659
+          ]
+        },
+        "dry-3": {
+          "rect": [
+            0.7778,
+            0.0059,
+            0.8027,
+            0.4209
+          ],
+          "stem": [
+            0.792,
+            0.4209
+          ]
+        },
+        "dry-4": {
+          "rect": [
+            0.3408,
+            0.0059,
+            0.3794,
+            0.5747
+          ],
+          "stem": [
+            0.3452,
+            0.5747
+          ]
+        },
+        "dry-5": {
+          "rect": [
+            0.4219,
+            0.0059,
+            0.4502,
+            0.5381
+          ],
+          "stem": [
+            0.4341,
+            0.5381
+          ]
+        },
+        "seed-head-a": {
+          "rect": [
+            0.0059,
+            0.7373,
+            0.0381,
+            0.9399
+          ],
+          "stem": [
+            0.02,
+            0.9399
+          ]
+        },
+        "seed-head-b": {
+          "rect": [
+            0.9053,
+            0.0059,
+            0.9468,
+            0.2954
+          ],
+          "stem": [
+            0.9253,
+            0.2954
+          ]
+        },
+        "reed-1": {
+          "rect": [
+            0.5439,
+            0.0059,
+            0.5718,
+            0.5249
+          ],
+          "stem": [
+            0.5566,
+            0.5249
+          ]
+        },
+        "reed-2": {
+          "rect": [
+            0.5156,
+            0.0059,
+            0.5381,
+            0.5278
+          ],
+          "stem": [
+            0.5244,
+            0.5278
+          ]
+        },
+        "reed-3": {
+          "rect": [
+            0.29,
+            0.0059,
+            0.335,
+            0.582
+          ],
+          "stem": [
+            0.3135,
+            0.582
+          ]
+        },
+        "reed-4": {
+          "rect": [
+            0.6069,
+            0.0059,
+            0.6431,
+            0.5146
+          ],
+          "stem": [
+            0.6177,
+            0.5146
+          ]
+        },
+        "reed-5": {
+          "rect": [
+            0.4868,
+            0.0059,
+            0.5098,
+            0.5283
+          ],
+          "stem": [
+            0.4956,
+            0.5283
+          ]
+        },
+        "reed-6": {
+          "rect": [
+            0.5776,
+            0.0059,
+            0.6011,
+            0.5249
+          ],
+          "stem": [
+            0.5903,
+            0.5249
+          ]
+        },
+        "reed-plume": {
+          "rect": [
+            0.9526,
+            0.0059,
+            0.9941,
+            0.2837
+          ],
+          "stem": [
+            0.9766,
+            0.2837
+          ]
+        },
+        "horsetail-a": {
+          "rect": [
+            0.8086,
+            0.0059,
+            0.8345,
+            0.3789
+          ],
+          "stem": [
+            0.8174,
+            0.3789
+          ]
+        },
+        "horsetail-b": {
+          "rect": [
+            0.6841,
+            0.0059,
+            0.7314,
+            0.4805
+          ],
+          "stem": [
+            0.7197,
+            0.4805
+          ]
+        },
+        "horsetail-c": {
+          "rect": [
+            0.6489,
+            0.0059,
+            0.6782,
+            0.4897
+          ],
+          "stem": [
+            0.6719,
+            0.4897
+          ]
+        }
+      }
+    },
+    "plants-12": {
+      "aspect": 0.9961,
+      "regions": {
+        "sprig-a": {
+          "rect": [
+            0.0412,
+            0.0156,
+            0.2422,
+            0.5146
+          ],
+          "stem": [
+            0.1458,
+            0.5146
+          ]
+        },
+        "sprig-b": {
+          "rect": [
+            0.2765,
+            0.0137,
+            0.4074,
+            0.5166
+          ],
+          "stem": [
+            0.3438,
+            0.5166
+          ]
+        },
+        "sprig-c": {
+          "rect": [
+            0.5265,
+            0.0161,
+            0.7279,
+            0.5151
+          ],
+          "stem": [
+            0.6316,
+            0.5151
+          ]
+        },
+        "sprig-d": {
+          "rect": [
+            0.7711,
+            0.0137,
+            0.902,
+            0.5171
+          ],
+          "stem": [
+            0.8384,
+            0.5171
+          ]
+        }
+      }
+    }
+  }
 }
