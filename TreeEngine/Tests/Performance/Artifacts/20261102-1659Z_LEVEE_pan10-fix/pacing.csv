@@ -1,0 +1,4 @@
+﻿"test","scene","mode","run","success","processMs","frameP50Ms","frameP90Ms","frameP99Ms","frameMaxMs","frameMeanMs","spikes","over33Ms","spikeExcessMs","rebuiltBLASFrames","maxBlasCpuMs"
+"LeafAtlases-pan","LeafAtlases","raytracing","1","True","4106.3249","3.1835","3.7404","80.1159","84.8002","4.82038583333333","11","11","853.1424","48","80.0268"
+"LeafAtlases-pan","LeafAtlases","raytracing","2","True","4165.9156","3.3264","3.7792","80.5407","82.5796","4.95490216666667","11","11","855.9715","48","78.1486"
+"LeafAtlases-pan","LeafAtlases","raytracing","3","True","4159.9542","3.3257","3.8047","81.1394","82.4853","4.96330283333333","11","11","855.4398","48","77.4336"

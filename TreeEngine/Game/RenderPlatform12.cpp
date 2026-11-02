@@ -2547,17 +2547,18 @@ inline std::size_t hash_combine(std::size_t seed, std::size_t value) noexcept
 template<>
 struct std::hash<RenderPlatform12::DrawRecord>
 {
+    // Only what shapes the BLAS geometry descriptors: the world-vertex and index ranges. Instance slots
+    // (startingInstance, objectTransformSlot) and the original-vertex offset reach the shaders through
+    // DxrGeometryInfo, which is rewritten every frame; instanced trees move their slots when they switch
+    // between near and far layouts with identical geometry, and that must not force a full rebuild.
     std::size_t operator()(const RenderPlatform12::DrawRecord& d) const noexcept
     {
-        std::size_t h = std::hash<UINT>{}(d.startingInstance);
+        std::size_t h = std::hash<UINT>{}(d.numInstances);
 
-        h = hash_combine(h, std::hash<UINT>{}(d.numInstances));
         h = hash_combine(h, std::hash<UINT>{}(d.indexBufferCount));
         h = hash_combine(h, std::hash<UINT>{}(d.indexBufferStart));
         h = hash_combine(h, std::hash<UINT>{}(d.vbWorldStart));
-        h = hash_combine(h, std::hash<UINT>{}(d.baseVertexLocation));
         h = hash_combine(h, std::hash<UINT>{}(d.vertexCount));
-        h = hash_combine(h, std::hash<UINT>{}(d.objectTransformSlot));
 
         /* If InputLayouts is an enum class, hash its underlying value.
            If it�s a struct, ensure there�s std::hash<InputLayouts>. */
@@ -2704,7 +2705,10 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     const int* opacityMicromaps = m_ommIndices && m_settings->m_opacityMicromaps ? m_renderData->instanceOpacityMicromap : nullptr;
 
     const auto snapshotStart = m_renderData->profile.enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
-    // Compare the actual instance inputs, including skinning parents and per-object transforms.
+    // Compare what the deformation pass turns into world vertices, by value and in geometry order: the
+    // vertex ranges, each instance's matrix, its skinning parent's and the object transform. Instance-slot
+    // numbers are left out: instanced trees move to other slots when they switch between near and far
+    // layouts with the same geometry, and a needless BLAS update can cost the driver tens of milliseconds.
     // Scene updates write to ordinary CPU memory, avoiding slow reads from the upload heap.
     m_currentBlasInputs.clear();
     const auto appendInput = [&](const void* data, size_t size)
@@ -2722,7 +2726,9 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     {
         for (const DrawRecord& record : m_drawRecords)
         {
-            appendInput(&record, sizeof(record));
+            const UINT geometry[] = { record.numInstances, record.indexBufferCount, record.indexBufferStart, record.vbWorldStart,
+                record.baseVertexLocation, record.vertexCount, static_cast<UINT>(record.inputLayout), record.objectTransformSlot != UINT_MAX };
+            appendInput(geometry, sizeof(geometry));
             if (record.startingInstance > instanceCount || record.numInstances > instanceCount - record.startingInstance)
             {
                 snapshotValid = false;
@@ -2741,8 +2747,10 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             {
                 const UINT slot = record.startingInstance + i;
                 const InstancedData& instance = instances[slot];
-                appendInput(&instance, sizeof(instance));
-                if (record.inputLayout == SKINNED_INPUT_LAYOUT && instance.InstanceOffsetPrev != instance.InstanceOffset)
+                appendInput(&instance.World, sizeof(instance.World));
+                const bool skinnedToParent = record.inputLayout == SKINNED_INPUT_LAYOUT && instance.InstanceOffsetPrev != instance.InstanceOffset;
+                appendInput(&skinnedToParent, sizeof(skinnedToParent));
+                if (skinnedToParent)
                 {
                     if (instance.InstanceOffsetPrev >= instanceCount)
                     {
@@ -2780,7 +2788,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         return elapsed;
     };
 
-    // Hash the draw records to see if the geometry is the same as last build
+    // Hash the geometry layout to see whether the BLAS can be updated in place or must be rebuilt.
+    // Micromap entries are hashed in geometry order, since an update must keep the same linkage.
     size_t currentHash = opacityMicromaps ? 1 : 0;
 
     for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
