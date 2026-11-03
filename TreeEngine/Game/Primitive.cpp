@@ -100,6 +100,7 @@ HRESULT Primitive::ComputeConstants(IRenderFrame* pFrameConfig)
     XMStoreFloat4x4(&firstDataView->World, transform);
     firstDataView[0].InstanceOffset = startInstance;
     firstDataView[0].AtlasRegion = 0;
+    firstDataView[0].PreviousSlot = startInstance;
 
     return S_OK;
 }

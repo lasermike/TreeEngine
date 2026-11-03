@@ -132,6 +132,7 @@ HRESULT GltfModel::ComputeConstants(IRenderFrame* frame)
             instanceData[nextInstance].InstanceOffset = nextInstance;
             instanceData[nextInstance].InstanceOffsetPrev = nextInstance;
             instanceData[nextInstance].AtlasRegion = 0;
+            instanceData[nextInstance].PreviousSlot = nextInstance;
             ++nextInstance;
         }
     }

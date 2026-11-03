@@ -282,6 +282,13 @@ void ParseRenderTestCommandLine()
             if (!std::isfinite(point.jitter[0]) || !std::isfinite(point.jitter[1]))
                 throw std::runtime_error("Invalid capture jitter");
         }
+        if (value.contains("previousTime"))
+        {
+            point.hasPreviousTime = true;
+            point.previousTime = value.at("previousTime").get<double>();
+            if (!std::isfinite(point.previousTime) || point.previousTime < 0)
+                throw std::runtime_error("Invalid capture previousTime");
+        }
         if (!std::isfinite(point.time) || point.time < 0 || point.filename.empty())
             throw std::runtime_error("Invalid capture time or filename");
         if (point.mode != "raster" && point.mode != "raytracing")
@@ -511,6 +518,7 @@ int RunRenderTestCapture(Game& game)
                     placeCamera(frame < captureFrame);
                 auto start = std::chrono::steady_clock::now();
                 const double simulationTime = frame == captureFrame ? point.time
+                    : point.hasPreviousTime ? point.previousTime
                     : point.time + std::max(0, frame - request->warmupFrames) * request->benchmarkTimeStep;
                 HRESULT result = game.RenderTestFrame(simulationTime,
                     frame == captureFrame ? point.filename : std::wstring(), point.overrideCamera);

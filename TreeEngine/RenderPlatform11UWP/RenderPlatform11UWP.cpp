@@ -95,7 +95,7 @@ RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool re
     return m_pPlatform->RenderEpilog(oculus, useShadowMaps, renderToSharedTexture);
 }
 
-RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
+RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer)
 {
     return m_pPlatform->RenderSceneSetup(pass, instancedBuffer);
 }

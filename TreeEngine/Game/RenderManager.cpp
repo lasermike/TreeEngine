@@ -111,13 +111,11 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     return S_OK;
 }
 
-HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+HRESULT InstanceBufferRing::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
 {
-    delete buffers[0];
-    delete buffers[1];
-
-    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[0]));
-    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[1]));
+    Release();
+    for (auto& buffer : buffers)
+        HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffer));
 
     return S_OK;
 }

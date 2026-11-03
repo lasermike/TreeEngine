@@ -29,6 +29,8 @@ struct RenderTestPoint
     std::string debugView = "none";   // "none", "motion", "reprojection" or "history" (Settings::MotionView).
     bool hasJitter = false;           // Fixed sub-pixel camera jitter, in pixels.
     std::array<float, 2> jitter = {};
+    bool hasPreviousTime = false;     // Warm-up frames render at this simulation time, so growth moves objects.
+    double previousTime = 0;
 };
 
 // A camera pose on a performance run's path; time is seconds after the run's start time.

@@ -114,26 +114,24 @@ struct D3DBuffer
 
 };
 
-struct DoubleBuffer
+// Per-frame instance buffers. The scene pass reads this frame's and last frame's (for motion vectors), and the CPU
+// fills the next frame's before waiting for the GPU, so three keep the CPU off both buffers a frame in flight reads.
+struct InstanceBufferRing
 {
-    D3DBuffer* buffers[2];
-
-    DoubleBuffer()
-    {
-        buffers[0] = nullptr;
-        buffers[1] = nullptr;
-    }
+    static const UINT Count = 3;
+    D3DBuffer* buffers[Count] = {};
 
     HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
 
-    D3DBuffer* Get(UINT frame) { return buffers[frame % 2]; }
+    D3DBuffer* Get(UINT frame) { return buffers[frame % Count]; }
 
     void Release()
     {
-        delete buffers[0];
-        delete buffers[1];
-        buffers[0] = nullptr;
-        buffers[1] = nullptr;
+        for (auto& buffer : buffers)
+        {
+            delete buffer;
+            buffer = nullptr;
+        }
     }
 };
 
@@ -208,14 +206,14 @@ enum InputLayouts
 class InputLayoutDesc
 {
 public:
-    static const InputElementDesc InstancedBasic16[9];
-    static const InputElementDesc InstancedSkinned[14];
+    static const InputElementDesc InstancedBasic16[10];
+    static const InputElementDesc InstancedSkinned[15];
     static const InputElementDesc Basic32[3];
 
     //GetLayout()
 };
 
-__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[9] =
+__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[10] =
 {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
     { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
@@ -227,9 +225,10 @@ __declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[9
     { "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     // InstancedData::AtlasRegion, after the two skinning offsets this layout skips.
     { "ATLASREGION", 0, DXGI_FORMAT_R32_UINT, 1, 72, InputClassificationInstance, 1 },
+    { "PREVIOUSSLOT", 0, DXGI_FORMAT_R32_UINT, 1, 76, InputClassificationInstance, 1 },
 };
 
-__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[14] =
+__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[15] =
 {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
     { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
@@ -246,6 +245,7 @@ __declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[1
     { "BLENDINDICES", 1, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     // Some pipelines pair this layout with the unskinned vertex shaders, which read AtlasRegion.
     { "ATLASREGION", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "PREVIOUSSLOT", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
 };
 
 __declspec(selectany) const InputElementDesc InputLayoutDesc::Basic32[3] =
@@ -684,7 +684,7 @@ public:
     virtual HRESULT RenderDebugUI() = 0;
     virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) = 0;
 
-    virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
+    virtual HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer) = 0;
     virtual HRESULT SetRenderPhase(RenderState state) = 0;
 
     virtual HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot) = 0;
@@ -927,7 +927,7 @@ public:
     HRESULT RenderDebugUI();
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
+    HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
@@ -1060,7 +1060,10 @@ public:
     bool                        m_haveViewProjection = false;
     bool                        m_cameraHistoryValid = false;
     CComPtr<ID3D12RootSignature> m_motionRootSignature;
-    CComPtr<ID3D12Resource>     m_motionVelocity;
+    CComPtr<ID3D12Resource>     m_motionVelocity;       // Window-sized; the scene pass's second render target.
+    ID3D12Resource*             m_lastInstanceBuffer = nullptr;     // The instance buffer BeginNewFrame last mapped,
+    UINT                        m_lastInstanceFrame = UINT_MAX;     // and its frame.
+    ID3D12Resource*             m_previousInstanceBuffer = nullptr; // Last frame's, when this frame follows it.
     CComPtr<ID3D12Resource>     m_motionHistory;
     UINT                        m_motionViewGeneration = UINT_MAX;  // Off-screen generation the motion views follow.
     UINT                        m_colorHistoryFrame = UINT_MAX;     // The frame whose color m_motionHistory holds.
@@ -1263,7 +1266,7 @@ public:
     HRESULT RenderDebugUI();
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
+    HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
@@ -1343,7 +1346,7 @@ typedef HRESULT (*RenderPostProcessFunc)();
 typedef HRESULT (*RenderDebugUIFunc)();
 typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
-typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
+typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, InstanceBufferRing* instancedBuffer);
 typedef HRESULT (*SetRenderPhaseFunc)(RenderState state);
 
 typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
@@ -1472,7 +1475,7 @@ public:
 
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, renderToSharedTexture); }
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
+    HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
     HRESULT SetRenderPhase(RenderState state) { return SetRenderPhaseFuncPtr(state); }
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot)

@@ -249,6 +249,7 @@ enum constBufferRootSignatureOffsets
 enum srvRootSignatureOffsets
 {
     BranchDataRootSignatureShaderSlot = 2,
+    PreviousInstancesRootSignatureShaderSlot = 9,
 };
 
 enum RootSignatureParams
@@ -262,7 +263,23 @@ enum RootSignatureParams
     SpecularSrvTableRootSignatureParam,
     EnvironmentSrvTableRootSignatureParam,
     ObjectTransformRootSignatureParam,
+    PreviousInstancesRootSignatureParam,
 };
+
+// Velocity for pixels without object motion (NoObjectMotion in Shaders/SharedTypes.hlsli).
+static const FLOAT NoObjectMotionClear[4] = { 65504.0f, 65504.0f, 0.0f, 0.0f };
+
+// Scene-pass pipelines also write velocity to a second target, without blending. Surfaces that don't write depth
+// (blended water) leave the velocity of what's behind them, so velocity always matches the depth buffer.
+static void AddVelocityTarget(D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)
+{
+    desc.NumRenderTargets = 2;
+    desc.RTVFormats[1] = DXGI_FORMAT_R16G16_FLOAT;
+    desc.BlendState.IndependentBlendEnable = TRUE;
+    desc.BlendState.RenderTarget[1] = CD3DX12_BLEND_DESC(D3D12_DEFAULT).RenderTarget[0];
+    if (desc.DepthStencilState.DepthWriteMask == D3D12_DEPTH_WRITE_MASK_ZERO || !desc.DepthStencilState.DepthEnable)
+        desc.BlendState.RenderTarget[1].RenderTargetWriteMask = 0;
+}
 
 // Ray-traced vertices per frame, after instancing and double-sided expansion. Terra alone needs about 1.16 million.
 const UINT maxWorldVertices = 3000000;
@@ -428,7 +445,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0 /* t0 */);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 3 /* t3-t6 */);
     ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 7 /* t7-t8 */);
-    CD3DX12_ROOT_PARAMETER rootParameters[9];
+    CD3DX12_ROOT_PARAMETER rootParameters[10];
     rootParameters[EnvironmentSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -438,6 +455,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
     rootParameters[ObjectTransformRootSignatureParam].InitAsConstants(1, 4 /* b4 */, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+    // Last frame's instance buffer, for motion vectors.
+    rootParameters[PreviousInstancesRootSignatureParam].InitAsShaderResourceView(PreviousInstancesRootSignatureShaderSlot, 0,
+        D3D12_SHADER_VISIBILITY_VERTEX);
 
     D3D12_STATIC_SAMPLER_DESC sampler[5];
     sampler[0] = D3D12_STATIC_SAMPLER_DESC();
@@ -823,6 +843,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     psoDesc.NumRenderTargets = 1;
     psoDesc.RTVFormats[0] = GetSwapChainFormat();
     psoDesc.SampleDesc.Count = 1;
+    AddVelocityTarget(psoDesc);
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineState));
 
     // PSO for shadow map pass.
@@ -841,6 +862,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // Shadow map pass does not have a render target.
     shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+    shadowPsoDesc.RTVFormats[1] = DXGI_FORMAT_UNKNOWN;
+    shadowPsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     shadowPsoDesc.NumRenderTargets = 0;
 
     HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, __uuidof(ID3D12PipelineState), (void**) &m_pipelineStateShadowMap));
@@ -1410,7 +1433,6 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_computeRootSignature.Release();
     m_smaaRootSignature.Release();
     m_motionRootSignature.Release();
-    m_motionVelocity.Release();
     m_motionHistory.Release();
     m_motionViewGeneration = UINT_MAX;
     ResetMotionHistory();
@@ -1490,7 +1512,7 @@ HRESULT RenderPlatform12::EndFrame(D3DBuffer* buffer)
     return hr;
 }
 
-HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
+HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer)
 {
     m_currentInstanceBuffer = instancedBuffer->Get(m_renderData->frame);
 
@@ -1983,6 +2005,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     psoDesc.NumRenderTargets = 1;
     psoDesc.RTVFormats[0] = GetSwapChainFormat();
     psoDesc.SampleDesc.Count = 1;
+    AddVelocityTarget(psoDesc);
 
     ID3D12PipelineState* pipelineState = nullptr;
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&pipelineState));
@@ -2004,6 +2027,8 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
 
     // Shadow map pass does not have a render target.
     shadowPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+    shadowPsoDesc.RTVFormats[1] = DXGI_FORMAT_UNKNOWN;
+    shadowPsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     shadowPsoDesc.NumRenderTargets = 0;
 
     ID3D12PipelineState* pipelineStateShadowMap = nullptr;
@@ -2347,7 +2372,7 @@ HRESULT RenderPlatform12::InitDevice()
     // Create descriptor heaps.
     //
     // Each frame has its own depth stencils and then there is one for shadows.
-    HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount + OffscreenBufferCount, L"rtvHeap"));
+    HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount + OffscreenBufferCount + 1, L"rtvHeap"));
     HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount, L"dsvHeap")); // 1 for shadow
 
     // Heap for loading textures
@@ -3448,6 +3473,15 @@ HRESULT RenderPlatform12::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4*
     XMStoreFloat4x4(&cbChangesPerPass.mView, view);
 
     XMStoreFloat4x4(&cbChangesPerPass.mInverseViewProjection, XMMatrixInverse(nullptr, view * projection));
+    if (!shadowPass)
+    {
+        // The same expression for both frames, so an unmoved camera gives identical matrices.
+        const XMMATRIX current = XMLoadFloat4x4(&m_view) * XMLoadFloat4x4(&m_projection);
+        XMStoreFloat4x4(&cbChangesPerPass.mViewProjection, current);
+        XMStoreFloat4x4(&cbChangesPerPass.mPreviousViewProjection, m_cameraHistoryValid
+            ? XMLoadFloat4x4(&m_previousView) * XMLoadFloat4x4(&m_previousProjection) : current);
+        cbChangesPerPass.previousInstancesValid = m_cameraHistoryValid && m_previousInstanceBuffer ? 1 : 0;
+    }
 
     int offset = shadowPass ? ShadowPass_CBSI : NormalPass_CBSI;
     m_constBufferChangesPerPass->CopyData(offset, cbChangesPerPass);
@@ -3488,6 +3522,7 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
 
     m_offscreenBuffer1.Release();
     m_offscreenBuffer2.Release();
+    m_motionVelocity.Release();
 
     return hr;
 }
@@ -3684,6 +3719,17 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         D3D12_RESOURCE_STATE_COMMON,
         &clearValue,
         __uuidof(ID3D12Resource), (void**)&m_offscreenBuffer2));
+
+    // Velocity, written by the scene pass as its second render target and completed by MotionVectorsCS.
+    {
+        const auto velocityDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16_FLOAT, windowWidth, windowHeight, 1, 1, 1, 0,
+            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        const CD3DX12_CLEAR_VALUE velocityClear(DXGI_FORMAT_R16G16_FLOAT, NoObjectMotionClear);
+        HRR(GetDevice()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE,
+            &velocityDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &velocityClear, IID_PPV_ARGS(&m_motionVelocity)));
+        m_motionVelocity->SetName(L"Motion velocity");
+        GetDevice()->CreateRenderTargetView(m_motionVelocity, nullptr, m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount));
+    }
     ++m_offscreenGeneration;
 
     // Create offscreen rendering views
@@ -3947,6 +3993,9 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
 
     m_renderData->instanceData = *dataView;
     m_renderData->instanceBuffer = buffer;
+    m_previousInstanceBuffer = m_lastInstanceBuffer && m_lastInstanceFrame + 1 == m_renderData->frame ? m_lastInstanceBuffer : nullptr;
+    m_lastInstanceBuffer = buffer->buffer;
+    m_lastInstanceFrame = m_renderData->frame;
 
 #if defined (DXR_ENABLED)
 
@@ -3979,6 +4028,9 @@ HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
 
     // Set root signature constant buffers
     GetCommandList()->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
+    // Without last frame's instances, any valid buffer will do: the per-pass constants mark it invalid.
+    GetCommandList()->SetGraphicsRootShaderResourceView(PreviousInstancesRootSignatureParam, (m_previousInstanceBuffer
+        ? m_previousInstanceBuffer : m_renderData->instanceBuffer->buffer)->GetGPUVirtualAddress());
     GetCommandList()->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(NormalPass_CBSI));
     GetCommandList()->SetGraphicsRootConstantBufferView(ChangesEveryFrameRootSignatureParam, m_constBufferChangesEveryFrame->GetGPUVirtualAddress(0));
 
@@ -4034,8 +4086,11 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
         GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
     }
 
-    GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    // The second target is velocity (Game/Shaders/MotionVectors.hlsl), always in the RENDER_TARGET state here.
+    const D3D12_CPU_DESCRIPTOR_HANDLE targets[2] = { rtvHandle, m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount) };
+    GetCommandList()->OMSetRenderTargets(2, targets, FALSE, &dsvHandle);
     GetCommandList()->ClearRenderTargetView(rtvHandle, &m_renderData->clearColor.x, 0, nullptr); // TODO refactor out with case above
+    GetCommandList()->ClearRenderTargetView(targets[1], NoObjectMotionClear, 0, nullptr);
     GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     GetCommandList()->SetPipelineState(m_pipelineState);  // Needed here?  Supports rendering without material?
@@ -4207,26 +4262,23 @@ void RenderPlatform12::ResetMotionHistory()
     m_cameraHistoryValid = false;
     m_viewProjectionFrame = UINT_MAX;
     m_colorHistoryFrame = UINT_MAX;
+    m_lastInstanceBuffer = nullptr;
+    m_previousInstanceBuffer = nullptr;
+    m_lastInstanceFrame = UINT_MAX;
 }
 
-// Velocity and history color at the window size, and the motion passes' views. Runs after RenderProlog has waited for
+// History color at the window size, and the motion passes' views (velocity is created with the off-screen buffers). Runs after RenderProlog has waited for
 // the previous frame, so rewriting descriptors is safe.
 HRESULT RenderPlatform12::EnsureMotionResources(UINT width, UINT height)
 {
     const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
     bool recreated = false;
-    if (!m_motionVelocity || m_motionVelocity->GetDesc().Width != width || m_motionVelocity->GetDesc().Height != height)
+    if (!m_motionHistory || m_motionHistory->GetDesc().Width != width || m_motionHistory->GetDesc().Height != height)
     {
-        Retire(m_motionVelocity);
         Retire(m_motionHistory);
-        const auto velocityDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16_FLOAT, width, height, 1, 1, 1, 0,
-            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &velocityDesc,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&m_motionVelocity)));
         const auto historyDesc = CD3DX12_RESOURCE_DESC::Tex2D(m_offscreenBuffer1->GetDesc().Format, width, height, 1, 1);
         HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &historyDesc,
             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&m_motionHistory)));
-        m_motionVelocity->SetName(L"Motion velocity");
         m_motionHistory->SetName(L"Motion history color");
         m_colorHistoryFrame = UINT_MAX;
         recreated = true;
@@ -4491,7 +4543,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
             const UINT groupsX = (width + 7) / 8, groupsY = (height + 7) / 8;
 
             barrier(m_pDepthStencil, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-            barrier(m_motionVelocity, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            barrier(m_motionVelocity, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             GetCommandList()->SetPipelineState(m_gameLevelPSOs["motionVectors"]);
             GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(MotionDepth_SrvHeapOffset));
             GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(MotionVelocity_UavHeapOffset));
@@ -4515,6 +4567,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
             GetCommandList()->CopyResource(m_motionHistory, m_offscreenBuffer1);
             barrier(m_motionHistory, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             m_colorHistoryFrame = m_renderData->frame;
+            barrier(m_motionVelocity, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
             if (debugView)
             {

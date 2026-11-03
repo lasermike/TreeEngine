@@ -75,10 +75,13 @@ Captures can also test motion vectors. A capture's `cameraRotationDegrees` (pitc
 render the warm-up frames from another camera, so the captured frame has known motion. `debugView` captures
 a motion debug view instead of the scene: `"motion"`, `"reprojection"` (last frame's color fetched along the
 motion vectors) or `"history"` (last frame's color unmoved). `jitter: [x, y]`, on a request or a capture,
-offsets the camera by a fixed sub-pixel amount, in pixels. `test-motion-vectors.ps1` checks that:
+offsets the camera by a fixed sub-pixel amount, in pixels. `previousTime` renders the warm-up frames at an
+earlier simulation time, so growing trees move. `test-motion-vectors.ps1` checks that:
 - reprojection is much closer to the new frame than the unmoved history, for sideways, forward and yaw moves;
 - an unmoved camera gives exactly zero motion;
-- `jitter: [1, 0]` shifts the image one pixel right.
+- `jitter: [1, 0]` shifts the image one pixel right;
+- growing trees (LeafAtlasTest; Instancing's shared layouts) reproject much better than unmoved on the pixels
+  that moved, and show exactly zero motion when nothing changed between frames.
 
 `test-scene-persistence.ps1` covers primitives, L-system/fixed trees, graphs,
 glTF assets, and scene-authored PBR materials (`PbrMaterials`: a mapped sphere

@@ -88,7 +88,7 @@ class RenderManager : public IRenderFrame
 
     // App resources.
 
-    DoubleBuffer                        m_instancedBuffer;
+    InstanceBufferRing                        m_instancedBuffer;
 
     GeometryGenerator                   m_geometryGenerator;
     GeometryBufferData                  m_geometryData;

@@ -3,9 +3,15 @@ struct InstancedData
 {
     float4x4 World;
     uint InstanceOffset;
-    uint InstanceOffsetPrev;
+    uint InstanceOffsetPrev; // The skinning parent's slot.
     uint AtlasRegion; // One plus the slot whose World[0] holds the atlas rect; zero draws the whole texture.
+    uint PreviousSlot; // This instance's slot in last frame's instance buffer, or NoPreviousSlot.
 };
+
+static const uint NoPreviousSlot = 0xFFFFFFFF;
+
+// Velocity a pixel holds when nothing drew it with object motion; MotionVectorsCS fills it from the camera.
+static const float NoObjectMotion = 65504.0f;
 
 // atlasRect is (u offset, v offset, u scale, v scale).
 float2 ApplyAtlasRect(float2 uv, float4 atlasRect)
@@ -34,6 +40,9 @@ cbuffer cbChangesPerPass : register(b1)
     matrix View;
     matrix Projection;
     matrix InverseViewProjection;
+    matrix ViewProjectionNoJitter;      // Motion vectors: this frame, without jitter.
+    matrix PreviousViewProjection;      // Last frame, without jitter.
+    uint PreviousInstancesValid;        // PreviousInstanceBuffer holds last frame's instances.
 };
 
 cbuffer cbChangesEveryFrame : register(b2)

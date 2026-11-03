@@ -60,6 +60,7 @@ private:
 
     std::array<InstanceDataArray, TreeSegmentCount> m_segmentInstanceData;
     std::array<std::vector<int>, TreeSegmentCount> m_segmentOpacityMicromaps; // Per instance in m_segmentInstanceData.
+    std::array<std::vector<int>, TreeSegmentCount> m_segmentBranchIds; // Per instance in m_segmentInstanceData.
     std::array<RenderUnit*, TreeSegmentCount> m_segmentRenderUnits = {};
     std::array<int, TreeSegmentCount> m_numInstancesPerSegment = {};
 
@@ -113,12 +114,25 @@ private:
     struct InstanceLayout
     {
         std::array<InstanceDataArray, TreeSegmentCount> segments;
+        std::array<std::vector<int>, TreeSegmentCount> branchIds; // Per instance in segments.
         std::array<UINT, TreeSegmentCount> start = {};
         UINT leafCount = 0;
         UINT stickCount = 0;
     };
     std::array<InstanceLayout, InstanceLayoutCount> m_instanceLayouts;
     std::vector<int> m_layoutOffsets; // Scratch: each branch frame's slot in the layout being built.
+
+    // Motion vectors: each branch's instance slot in the last two frames, for the tree's own instances and for each
+    // layout. Branch slots shift as branches appear or change segment type, so InstancedData::PreviousSlot is looked
+    // up here by branch ID.
+    struct SlotHistory
+    {
+        std::vector<UINT> slots[2];
+        std::vector<UINT> frames[2]; // Frame number plus one; zero is never written.
+    };
+    std::array<SlotHistory, 1 + InstanceLayoutCount> m_slotHistory;
+    void LinkPreviousSlots(InstancedData* instances, UINT firstSlot, const std::vector<int>& branchIds,
+        SlotHistory& history, UINT frame);
     int m_instanceCount = 0;
     bool m_instanceLayoutsValid = false;
     int m_instanceLayoutDepthLOD = 0;

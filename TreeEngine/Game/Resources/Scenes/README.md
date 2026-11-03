@@ -407,17 +407,18 @@ with the debug UI's preferences. It works on the final image, so it applies to r
 SMAA runs before the post-processing blur (`blurAmount`). The blur also softens jagged edges, so with SMAA
 on, a lower `blurAmount` keeps more texture detail.
 
-Temporal anti-aliasing and upscalers (DLSS, FSR) are planned on top of camera motion vectors, which a
-compute pass derives from depth and the last frame's camera (`Game/Shaders/MotionVectors.hlsl`). They are
-exact for static geometry; growing and moving objects get their own motion in a later step. **Motion
-vectors** in Settings shows them:
+Temporal anti-aliasing and upscalers (DLSS, FSR) are planned on top of motion vectors. The scene pass writes
+each surface's motion, from its position last frame (growing trees, moved and instanced objects) and last
+frame's camera. A compute pass (`Game/Shaders/MotionVectors.hlsl`) fills the sky from the camera alone. Blended
+surfaces that don't write depth, like water, keep the motion of what's behind them, as depth does. Raster
+always draws the scene, so DXR uses the same vectors. **Motion vectors** in Settings shows them:
 - `Motion`: direction as hue, length as brightness (16 pixels or more is full brightness).
 - `Reprojected history`: last frame's image fetched along the motion vectors. While the camera moves, it
   should look like the live image, except at edges the move uncovered.
 - `History`: last frame's image unmoved, for comparison.
 
-The pass runs only while a view is on. Sub-pixel camera jitter is in place for TAA but stays off until TAA
-exists.
+The compute pass and the views run only while a view is on; the scene pass always writes velocity. Sub-pixel
+camera jitter is in place for TAA but stays off until TAA exists.
 
 ## Sun shadow softness
 
