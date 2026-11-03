@@ -81,5 +81,7 @@
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tree.hlsl" />
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl" />
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Smaa.hlsl" />
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\MotionVectors.hlsl" />
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\MotionDebug.hlsl" />
   </ItemGroup>
 </Project>

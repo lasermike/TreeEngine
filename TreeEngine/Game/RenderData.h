@@ -117,6 +117,7 @@ struct RenderData : SceneRenderSettings
     // General
     float               time;
     float               normalAnimationTime = 0;
+    XMFLOAT2            jitterPixels = XMFLOAT2(0, 0);   // This frame's sub-pixel camera jitter; see Settings::m_jitter.
     UINT                frame;
     // Transformations
     ProjectionData      projectionData;

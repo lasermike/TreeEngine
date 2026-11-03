@@ -29,6 +29,13 @@ public:
     enum class Antialiasing { None, Smaa };
     Antialiasing m_antialiasing = Antialiasing::Smaa;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
+    // Camera motion vectors (Game/Shaders/MotionVectors.hlsl). A debug view replaces the scene color.
+    enum class MotionView { Off, Motion, ReprojectedHistory, History };
+    MotionView m_motionView = MotionView::Off;
+    // Sub-pixel camera jitter for TAA; off until TAA exists. A fixed offset, in pixels, is for tests.
+    bool m_jitter = false;
+    bool m_hasFixedJitter = false;
+    float m_fixedJitter[2] = {};
 
     // Diagnostics for stress tests. DRED must be chosen before the device is created.
     bool m_enableDred = false;

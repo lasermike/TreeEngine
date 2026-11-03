@@ -209,6 +209,16 @@ enum CbvSrvUavHeapOffsets
     SmaaEdges_UavHeapOffset,
     SmaaWeights_UavHeapOffset,
 
+    // Motion tables (t0-t2; see Game/Shaders/MotionCommon.hlsli): the velocity pass reads depth, the debug pass
+    // velocity, last frame's color and this frame's color.
+    MotionDepth_SrvHeapOffset,
+    MotionDepthHistory_SrvHeapOffset,
+    MotionDepthColor_SrvHeapOffset,
+    MotionVelocity_SrvHeapOffset,
+    MotionHistory_SrvHeapOffset,
+    MotionColor_SrvHeapOffset,
+    MotionVelocity_UavHeapOffset,
+
     // Per-material descriptors
     Material0_HeapOffset,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
@@ -585,6 +595,28 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         m_smaaRootSignature->SetName(L"SMAA");
     }
 
+    {
+        // Motion vectors: 40 constants (Game/Shaders/MotionCommon.hlsli), three SRVs, one UAV, a linear clamp sampler.
+        CD3DX12_DESCRIPTOR_RANGE srvRange, uavRange;
+        srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 0);
+        uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+        CD3DX12_ROOT_PARAMETER parameters[3];
+        parameters[0].InitAsConstants(40, 0);
+        parameters[1].InitAsDescriptorTable(1, &srvRange);
+        parameters[2].InitAsDescriptorTable(1, &uavRange);
+        const CD3DX12_STATIC_SAMPLER_DESC sampler(0, D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+            D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+        CD3DX12_ROOT_SIGNATURE_DESC desc(_countof(parameters), parameters, 1, &sampler);
+        CComPtr<ID3DBlob> serialized, errors;
+        const HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &serialized, &errors);
+        if (errors)
+            ::OutputDebugStringA(static_cast<const char*>(errors->GetBufferPointer()));
+        HRR(hr);
+        HRR(GetDevice()->CreateRootSignature(0, serialized->GetBufferPointer(), serialized->GetBufferSize(),
+            IID_PPV_ARGS(&m_motionRootSignature)));
+        m_motionRootSignature->SetName(L"Motion vectors");
+    }
+
     // Init text font
     //m_bitmapFont = new XSF::BitmapFont();
     //HRR(m_bitmapFont->Create(this, L"Arial_16"));
@@ -857,7 +889,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
         // SMAA passes.
         const std::pair<const wchar_t*, const char*> smaaPasses[] = {
-            { L"SmaaEdgesCS.cso", "smaaEdges" }, { L"SmaaWeightsCS.cso", "smaaWeights" }, { L"SmaaBlendCS.cso", "smaaBlend" } };
+            { L"SmaaEdgesCS.cso", "smaaEdges" }, { L"SmaaWeightsCS.cso", "smaaWeights" }, { L"SmaaBlendCS.cso", "smaaBlend" },
+            { L"MotionVectorsCS.cso", "motionVectors" }, { L"MotionDebugCS.cso", "motionDebug" } };
         for (const auto& pass : smaaPasses)
         {
             ComputeShader* shader = nullptr;
@@ -865,7 +898,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             if (!shader)
                 return E_FAIL;
             D3D12_COMPUTE_PIPELINE_STATE_DESC pso = {};
-            pso.pRootSignature = m_smaaRootSignature;
+            pso.pRootSignature = strncmp(pass.second, "motion", 6) == 0 ? m_motionRootSignature : m_smaaRootSignature;
 #if defined(TREE_XBOX)
             pso.CS = { reinterpret_cast<BYTE*>(shader->shader.data()), shader->shader.size() };
 #else
@@ -1376,6 +1409,11 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_rootSignature.Release();
     m_computeRootSignature.Release();
     m_smaaRootSignature.Release();
+    m_motionRootSignature.Release();
+    m_motionVelocity.Release();
+    m_motionHistory.Release();
+    m_motionViewGeneration = UINT_MAX;
+    ResetMotionHistory();
     m_smaaEdges.Release();
     m_smaaWeights.Release();
     m_smaaArea.Release();
@@ -3369,6 +3407,41 @@ HRESULT RenderPlatform12::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4*
 {
     CBChangesPerPass cbChangesPerPass = {};
     XMMATRIX projection = XMLoadFloat4x4(pProjMat);
+    if (!shadowPass)
+    {
+        // Called more than once per frame for the main camera; the history moves on once per frame.
+        if (m_viewProjectionFrame != m_renderData->frame)
+        {
+            m_viewProjectionFrame = m_renderData->frame;
+            m_previousView = m_view;
+            m_previousProjection = m_projection;
+            m_cameraHistoryValid = m_haveViewProjection;
+            m_haveViewProjection = true;
+        }
+        m_view = *pViewMat;
+        m_projection = *pProjMat;
+
+        // Sub-pixel jitter: Halton(2, 3) over 8 frames, or a fixed offset for tests. Ray generation unprojects through
+        // the jittered InverseViewProjection, so primary rays follow. Motion vectors use the matrices without it.
+        XMFLOAT2 jitter(0, 0);
+        if (m_settings->m_hasFixedJitter)
+            jitter = XMFLOAT2(m_settings->m_fixedJitter[0], m_settings->m_fixedJitter[1]);
+        else if (m_settings->m_jitter)
+        {
+            auto halton = [](UINT index, UINT base) { float f = 1, r = 0; for (; index; index /= base) { f /= base; r += f * (index % base); } return r; };
+            const UINT index = m_renderData->frame % 8 + 1;
+            jitter = XMFLOAT2(halton(index, 2) - 0.5f, halton(index, 3) - 0.5f);
+        }
+        m_renderData->jitterPixels = jitter;
+        if (jitter.x != 0 || jitter.y != 0)
+        {
+            XMFLOAT4X4 jittered;
+            XMStoreFloat4x4(&jittered, projection);
+            jittered._31 += 2.0f * jitter.x / m_scissorRect.right;
+            jittered._32 -= 2.0f * jitter.y / m_scissorRect.bottom;
+            projection = XMLoadFloat4x4(&jittered);
+        }
+    }
     XMStoreFloat4x4(&cbChangesPerPass.mProjection, projection);
 
     XMMATRIX view = XMLoadFloat4x4(pViewMat);
@@ -3553,11 +3626,11 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         static_cast<UINT>(windowHeight),
         1,
         1,
-        DXGI_FORMAT_D32_FLOAT,
+        DXGI_FORMAT_R32_TYPELESS,     // Written through a D32_FLOAT view, read as R32_FLOAT by the motion pass.
         1,
         0,
         D3D12_TEXTURE_LAYOUT_UNKNOWN,
-        D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
+        D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
     D3D12_CLEAR_VALUE depthClearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
     depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
@@ -3575,7 +3648,11 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     SetDebugName(m_pDepthStencil, L"Game::m_pDepthStencil");
 
     // Create the depth stencil view.
-    GetDevice()->CreateDepthStencilView(m_pDepthStencil, nullptr, m_dsvHeap.hCPU(0));
+    D3D12_DEPTH_STENCIL_VIEW_DESC depthView = {};
+    depthView.Format = DXGI_FORMAT_D32_FLOAT;
+    depthView.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    GetDevice()->CreateDepthStencilView(m_pDepthStencil, &depthView, m_dsvHeap.hCPU(0));
+    ResetMotionHistory();
 
     // Create offscreen rendering surfaces
     D3D12_RESOURCE_DESC offscreenDesc;
@@ -3944,7 +4021,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle;
 
     //TODO NEXT: use compute to copy offscreen1 to rtv
-    if (m_renderData->enablePostProcessing || SmaaEnabled())
+    if (UsesOffscreenChain())
     {
         // Render scene to m_offscreenBuffer1
         rtvHandle = m_rtvHeap.hCPU(FrameCount);
@@ -4044,6 +4121,135 @@ std::vector<float> CalcGaussWeights(float sigma)
     return weights;
 }
 
+namespace
+{
+    using Matrix4d = std::array<std::array<double, 4>, 4>;
+
+    Matrix4d Multiply(const Matrix4d& a, const Matrix4d& b)
+    {
+        Matrix4d result = {};
+        for (int row = 0; row < 4; ++row)
+            for (int column = 0; column < 4; ++column)
+                for (int k = 0; k < 4; ++k)
+                    result[row][column] += a[row][k] * b[k][column];
+        return result;
+    }
+
+    // Gauss-Jordan with partial pivoting.
+    Matrix4d Inverse(Matrix4d a)
+    {
+        Matrix4d result = {};
+        for (int i = 0; i < 4; ++i) result[i][i] = 1;
+        for (int column = 0; column < 4; ++column)
+        {
+            int pivot = column;
+            for (int row = column + 1; row < 4; ++row)
+                if (std::abs(a[row][column]) > std::abs(a[pivot][column])) pivot = row;
+            std::swap(a[column], a[pivot]);
+            std::swap(result[column], result[pivot]);
+            const double scale = 1 / a[column][column];
+            for (int k = 0; k < 4; ++k) { a[column][k] *= scale; result[column][k] *= scale; }
+            for (int row = 0; row < 4; ++row)
+            {
+                if (row == column) continue;
+                const double factor = a[row][column];
+                for (int k = 0; k < 4; ++k) { a[row][k] -= factor * a[column][k]; result[row][k] -= factor * result[column][k]; }
+            }
+        }
+        return result;
+    }
+
+    // This frame's clip space to last frame's, for row vectors, in double precision so an unmoved camera gives the
+    // identity exactly. Without translation it maps directions, for pixels at the far plane.
+    void ClipToPreviousClip(const XMFLOAT4X4& view, const XMFLOAT4X4& projection, const XMFLOAT4X4& previousView,
+        const XMFLOAT4X4& previousProjection, bool withoutTranslation, XMFLOAT4X4& result)
+    {
+        auto load = [withoutTranslation](const XMFLOAT4X4& m, bool isView)
+        {
+            Matrix4d d;
+            for (int row = 0; row < 4; ++row)
+                for (int column = 0; column < 4; ++column)
+                    d[row][column] = m.m[row][column];
+            if (isView && withoutTranslation) d[3][0] = d[3][1] = d[3][2] = 0;
+            return d;
+        };
+        const Matrix4d current = Multiply(load(view, true), load(projection, false));
+        const Matrix4d previous = Multiply(load(previousView, true), load(previousProjection, false));
+        const Matrix4d combined = Multiply(Inverse(current), previous);
+        for (int row = 0; row < 4; ++row)
+            for (int column = 0; column < 4; ++column)
+            {
+                // Snap round-off to the identity: an unmoved camera must give zero motion.
+                const double identity = row == column ? 1.0 : 0.0;
+                const double value = std::abs(combined[row][column] - identity) < 1e-12 ? identity : combined[row][column];
+                result.m[row][column] = static_cast<float>(value);
+            }
+    }
+}
+
+// The scene renders to off-screen buffer 1 when post-processing, SMAA or the motion pass needs it.
+bool RenderPlatform12::UsesOffscreenChain() const
+{
+    return m_renderData->enablePostProcessing || SmaaEnabled() || MotionVectorsNeeded();
+}
+
+// The motion pass runs for its debug views; TAA will need it too.
+bool RenderPlatform12::MotionVectorsNeeded() const
+{
+    return m_settings->m_motionView != Settings::MotionView::Off && m_motionRootSignature
+        && m_gameLevelPSOs.count("motionDebug") > 0;
+}
+
+// After a resize, a level load or a device reset, the previous camera and color no longer apply.
+void RenderPlatform12::ResetMotionHistory()
+{
+    m_haveViewProjection = false;
+    m_cameraHistoryValid = false;
+    m_viewProjectionFrame = UINT_MAX;
+    m_colorHistoryFrame = UINT_MAX;
+}
+
+// Velocity and history color at the window size, and the motion passes' views. Runs after RenderProlog has waited for
+// the previous frame, so rewriting descriptors is safe.
+HRESULT RenderPlatform12::EnsureMotionResources(UINT width, UINT height)
+{
+    const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
+    bool recreated = false;
+    if (!m_motionVelocity || m_motionVelocity->GetDesc().Width != width || m_motionVelocity->GetDesc().Height != height)
+    {
+        Retire(m_motionVelocity);
+        Retire(m_motionHistory);
+        const auto velocityDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16_FLOAT, width, height, 1, 1, 1, 0,
+            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &velocityDesc,
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&m_motionVelocity)));
+        const auto historyDesc = CD3DX12_RESOURCE_DESC::Tex2D(m_offscreenBuffer1->GetDesc().Format, width, height, 1, 1);
+        HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &historyDesc,
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&m_motionHistory)));
+        m_motionVelocity->SetName(L"Motion velocity");
+        m_motionHistory->SetName(L"Motion history color");
+        m_colorHistoryFrame = UINT_MAX;
+        recreated = true;
+    }
+    if (recreated || m_motionViewGeneration != m_offscreenGeneration)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC depthView = {};
+        depthView.Format = DXGI_FORMAT_R32_FLOAT;
+        depthView.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        depthView.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        depthView.Texture2D.MipLevels = 1;
+        GetDevice()->CreateShaderResourceView(m_pDepthStencil, &depthView, m_descriptorHeap.hCPU(MotionDepth_SrvHeapOffset));
+        GetDevice()->CreateShaderResourceView(m_motionHistory, nullptr, m_descriptorHeap.hCPU(MotionDepthHistory_SrvHeapOffset));
+        GetDevice()->CreateShaderResourceView(m_offscreenBuffer1, nullptr, m_descriptorHeap.hCPU(MotionDepthColor_SrvHeapOffset));
+        GetDevice()->CreateShaderResourceView(m_motionVelocity, nullptr, m_descriptorHeap.hCPU(MotionVelocity_SrvHeapOffset));
+        GetDevice()->CreateShaderResourceView(m_motionHistory, nullptr, m_descriptorHeap.hCPU(MotionHistory_SrvHeapOffset));
+        GetDevice()->CreateShaderResourceView(m_offscreenBuffer1, nullptr, m_descriptorHeap.hCPU(MotionColor_SrvHeapOffset));
+        GetDevice()->CreateUnorderedAccessView(m_motionVelocity, nullptr, nullptr, m_descriptorHeap.hCPU(MotionVelocity_UavHeapOffset));
+        m_motionViewGeneration = m_offscreenGeneration;
+    }
+    return S_OK;
+}
+
 bool RenderPlatform12::SmaaEnabled() const
 {
     return m_settings->m_antialiasing == Settings::Antialiasing::Smaa && m_smaaRootSignature
@@ -4113,7 +4319,6 @@ HRESULT RenderPlatform12::RenderSmaa(UINT width, UINT height)
 {
     PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"SMAA");
     HRR(EnsureSmaaResources(width, height));
-    ProfileTimestamp(ProfilePass::AntiAliasing, false);
 
     struct { float metrics[4]; UINT showEdges; } constants = {
         { 1.0f / width, 1.0f / height, static_cast<float>(width), static_cast<float>(height) },
@@ -4141,8 +4346,6 @@ HRESULT RenderPlatform12::RenderSmaa(UINT width, UINT height)
     pass("smaaWeights", SmaaEdges_SrvHeapOffset, SmaaWeights_UavHeapOffset);
     transition(m_smaaWeights, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     pass("smaaBlend", SmaaColor_SrvHeapOffset, Offscreen2_UavHeapOffset);
-
-    ProfileTimestamp(ProfilePass::AntiAliasing, true);
     return S_OK;
 }
 
@@ -4210,7 +4413,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         ProfileTimestamp(ProfilePass::Rays, true);
 
         // Replace the main image before blur/UI; the DXR texture matches the target size and format.
-        ID3D12Resource* colorTarget = m_renderData->enablePostProcessing || SmaaEnabled()
+        ID3D12Resource* colorTarget = UsesOffscreenChain()
             ? static_cast<ID3D12Resource*>(m_offscreenBuffer1)
             : static_cast<ID3D12Resource*>(m_renderTargets[m_frameIndex]);
         ID3D12Resource* dxrOutput = m_renderData->pDxrOutBuffer->uavOutput;
@@ -4237,7 +4440,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
     // buffer 2, the blur ping-pongs between the two, and whichever holds the result is copied to the back buffer.
     // Both buffers end in COMMON and the back buffer in RENDER_TARGET for the UI.
     const bool smaa = SmaaEnabled();
-    if (m_renderData->enablePostProcessing || smaa)
+    if (UsesOffscreenChain())
     {
         ID3D12Resource* buffers[2] = { m_offscreenBuffer1, m_offscreenBuffer2 };
         D3D12_RESOURCE_STATES states[2] = { D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON };
@@ -4255,6 +4458,72 @@ HRESULT RenderPlatform12::RenderPostProcess()
         ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
         GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
+        const bool motion = MotionVectorsNeeded();
+        if (motion || smaa)
+            ProfileTimestamp(ProfilePass::AntiAliasing, false);
+        if (motion)
+        {
+            // Velocity from depth, then the debug view (it reads last frame's color), then this frame's color becomes
+            // the history, then the debug view replaces the scene color.
+            PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Motion vectors");
+            const UINT width = m_scissorRect.right, height = m_scissorRect.bottom;
+            HRR(EnsureMotionResources(width, height));
+            auto barrier = [&](ID3D12Resource* resource, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
+            {
+                const auto transitionBarrier = CD3DX12_RESOURCE_BARRIER::Transition(resource, from, to);
+                GetCommandList()->ResourceBarrier(1, &transitionBarrier);
+            };
+            struct
+            {
+                XMFLOAT4X4 currentToPrevious, currentToPreviousDirection;
+                float size[4];
+                UINT cameraHistoryValid, colorHistoryValid, debugView, pad;
+            } constants = {};
+            ClipToPreviousClip(m_view, m_projection, m_previousView, m_previousProjection, false, constants.currentToPrevious);
+            ClipToPreviousClip(m_view, m_projection, m_previousView, m_previousProjection, true, constants.currentToPreviousDirection);
+            constants.size[0] = 1.0f / width; constants.size[1] = 1.0f / height;
+            constants.size[2] = static_cast<float>(width); constants.size[3] = static_cast<float>(height);
+            constants.cameraHistoryValid = m_cameraHistoryValid ? 1 : 0;
+            constants.colorHistoryValid = m_colorHistoryFrame != UINT_MAX && m_colorHistoryFrame + 1 == m_renderData->frame ? 1 : 0;
+            constants.debugView = static_cast<UINT>(m_settings->m_motionView);
+            GetCommandList()->SetComputeRootSignature(m_motionRootSignature);
+            GetCommandList()->SetComputeRoot32BitConstants(0, 40, &constants, 0);
+            const UINT groupsX = (width + 7) / 8, groupsY = (height + 7) / 8;
+
+            barrier(m_pDepthStencil, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            barrier(m_motionVelocity, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            GetCommandList()->SetPipelineState(m_gameLevelPSOs["motionVectors"]);
+            GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(MotionDepth_SrvHeapOffset));
+            GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(MotionVelocity_UavHeapOffset));
+            GetCommandList()->Dispatch(groupsX, groupsY, 1);
+            barrier(m_motionVelocity, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            barrier(m_pDepthStencil, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+            const bool debugView = m_settings->m_motionView != Settings::MotionView::Off;
+            if (debugView)
+            {
+                transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                transition(1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                GetCommandList()->SetPipelineState(m_gameLevelPSOs["motionDebug"]);
+                GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(MotionVelocity_SrvHeapOffset));
+                GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen2_UavHeapOffset));
+                GetCommandList()->Dispatch(groupsX, groupsY, 1);
+            }
+
+            transition(0, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            barrier(m_motionHistory, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+            GetCommandList()->CopyResource(m_motionHistory, m_offscreenBuffer1);
+            barrier(m_motionHistory, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            m_colorHistoryFrame = m_renderData->frame;
+
+            if (debugView)
+            {
+                transition(1, D3D12_RESOURCE_STATE_COPY_SOURCE);
+                transition(0, D3D12_RESOURCE_STATE_COPY_DEST);
+                GetCommandList()->CopyResource(m_offscreenBuffer1, m_offscreenBuffer2);
+            }
+        }
+
         if (smaa)
         {
             transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -4262,6 +4531,8 @@ HRESULT RenderPlatform12::RenderPostProcess()
             HRR(RenderSmaa(m_scissorRect.right, m_scissorRect.bottom));
             current = 1;
         }
+        if (motion || smaa)
+            ProfileTimestamp(ProfilePass::AntiAliasing, true);
 
         if (m_renderData->enablePostProcessing)
         {

@@ -1052,6 +1052,22 @@ public:
     UINT                        m_smaaColorGeneration = UINT_MAX; // The off-screen generation the SMAA color SRV views.
     bool CheckDeviceRemoved();
     bool SmaaEnabled() const;
+
+    // Motion vectors (Game/Shaders/MotionVectors.hlsl): camera history without jitter, velocity, last frame's color.
+    XMFLOAT4X4                  m_view = {}, m_projection = {};
+    XMFLOAT4X4                  m_previousView = {}, m_previousProjection = {};
+    UINT                        m_viewProjectionFrame = UINT_MAX;
+    bool                        m_haveViewProjection = false;
+    bool                        m_cameraHistoryValid = false;
+    CComPtr<ID3D12RootSignature> m_motionRootSignature;
+    CComPtr<ID3D12Resource>     m_motionVelocity;
+    CComPtr<ID3D12Resource>     m_motionHistory;
+    UINT                        m_motionViewGeneration = UINT_MAX;  // Off-screen generation the motion views follow.
+    UINT                        m_colorHistoryFrame = UINT_MAX;     // The frame whose color m_motionHistory holds.
+    bool MotionVectorsNeeded() const;
+    bool UsesOffscreenChain() const;
+    HRESULT EnsureMotionResources(UINT width, UINT height);
+    void ResetMotionHistory();
     HRESULT EnsureSmaaResources(UINT width, UINT height);
     HRESULT RenderSmaa(UINT width, UINT height);
     bool                        m_ommBuildPending = false;

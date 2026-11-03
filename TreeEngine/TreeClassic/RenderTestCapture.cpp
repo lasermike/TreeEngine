@@ -165,6 +165,13 @@ void ParseRenderTestCommandLine()
     parsed->antialiasing = json.value("antialiasing", std::string("none"));
     if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa")
         throw std::runtime_error("antialiasing must be \"none\" or \"smaa\"");
+    if (json.contains("jitter"))
+    {
+        parsed->hasJitter = true;
+        parsed->jitter = json.at("jitter").get<std::array<float, 2>>();
+        if (!std::isfinite(parsed->jitter[0]) || !std::isfinite(parsed->jitter[1]))
+            throw std::runtime_error("Invalid jitter");
+    }
     parsed->benchmarkTimeStep = json.value("benchmarkTimeStep", 0.0);
     parsed->postProcessing = json.value("postProcessing", true);
     parsed->validateScenePersistence = json.value("validateScenePersistence", false);
@@ -241,6 +248,39 @@ void ParseRenderTestCommandLine()
             for (float coordinate : point.cameraPosition)
                 if (!std::isfinite(coordinate)) throw std::runtime_error("Invalid capture camera position");
             point.overrideCamera = true;
+        }
+        auto readVector = [&](const char* name, std::array<float, 3>& vector)
+        {
+            if (!value.contains(name)) return false;
+            vector = value.at(name).get<std::array<float, 3>>();
+            for (float coordinate : vector)
+                if (!std::isfinite(coordinate)) throw std::runtime_error(std::string("Invalid ") + name);
+            if (!point.overrideCamera) throw std::runtime_error(std::string(name) + " needs cameraPosition");
+            return true;
+        };
+        point.hasCameraRotation = readVector("cameraRotationDegrees", point.cameraRotationDegrees);
+        point.hasPreviousCamera = readVector("previousCameraPosition", point.previousCameraPosition);
+        point.previousCameraRotationDegrees = point.cameraRotationDegrees;
+        if (readVector("previousCameraRotationDegrees", point.previousCameraRotationDegrees))
+        {
+            if (!point.hasCameraRotation) throw std::runtime_error("previousCameraRotationDegrees needs cameraRotationDegrees");
+            if (!point.hasPreviousCamera)
+            {
+                point.hasPreviousCamera = true;
+                point.previousCameraPosition = point.cameraPosition;
+            }
+        }
+        point.debugView = value.value("debugView", std::string("none"));
+        if (point.debugView != "none" && point.debugView != "motion" && point.debugView != "reprojection" && point.debugView != "history")
+            throw std::runtime_error("debugView must be \"none\", \"motion\", \"reprojection\" or \"history\"");
+        point.hasJitter = parsed->hasJitter;
+        point.jitter = parsed->jitter;
+        if (value.contains("jitter"))
+        {
+            point.hasJitter = true;
+            point.jitter = value.at("jitter").get<std::array<float, 2>>();
+            if (!std::isfinite(point.jitter[0]) || !std::isfinite(point.jitter[1]))
+                throw std::runtime_error("Invalid capture jitter");
         }
         if (!std::isfinite(point.time) || point.time < 0 || point.filename.empty())
             throw std::runtime_error("Invalid capture time or filename");
@@ -433,9 +473,26 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
             game.SetRenderTestAntialiasing(point.antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
+            const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion
+                : point.debugView == "reprojection" ? Settings::MotionView::ReprojectedHistory
+                : point.debugView == "history" ? Settings::MotionView::History : Settings::MotionView::Off;
+            game.SetRenderTestMotion(motionView, point.hasJitter, point.jitter[0], point.jitter[1]);
             game.GetPlayer()->SetPosition(point.overrideCamera
                 ? DirectX::XMVectorSet(point.cameraPosition[0], point.cameraPosition[1], point.cameraPosition[2], 1)
                 : DirectX::XMLoadFloat3(&originalCamera));
+            // The camera for a frame: the previous one while warming up, when the capture names one.
+            auto placeCamera = [&](bool previous)
+            {
+                using namespace DirectX;
+                const auto& position = previous ? point.previousCameraPosition : point.cameraPosition;
+                const auto& rotation = previous ? point.previousCameraRotationDegrees : point.cameraRotationDegrees;
+                game.GetPlayer()->SetPosition(XMVectorSet(position[0], position[1], position[2], 1));
+                if (point.hasCameraRotation)
+                    game.GetPlayer()->SetRotation(XMQuaternionRotationRollPitchYaw(XMConvertToRadians(rotation[0]),
+                        XMConvertToRadians(rotation[1]), XMConvertToRadians(rotation[2])));
+            };
+            if (point.overrideCamera)
+                placeCamera(false);
             nlohmann::json samples = nlohmann::json::array();
             const int captureFrame = request->warmupFrames + request->benchmarkFrames;
             for (int frame = 0; frame <= captureFrame; ++frame)
@@ -450,6 +507,8 @@ int RunRenderTestCapture(Game& game)
                     TranslateMessage(&message);
                     DispatchMessage(&message);
                 }
+                if (point.hasPreviousCamera)
+                    placeCamera(frame < captureFrame);
                 auto start = std::chrono::steady_clock::now();
                 const double simulationTime = frame == captureFrame ? point.time
                     : point.time + std::max(0, frame - request->warmupFrames) * request->benchmarkTimeStep;

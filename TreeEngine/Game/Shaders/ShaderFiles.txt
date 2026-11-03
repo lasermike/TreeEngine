@@ -18,6 +18,8 @@ Blur.hlsl,cs,VSasCSSkinned
 Smaa.hlsl,cs,SmaaEdgesCS
 Smaa.hlsl,cs,SmaaWeightsCS
 Smaa.hlsl,cs,SmaaBlendCS
+MotionVectors.hlsl,cs,MotionVectorsCS
+MotionDebug.hlsl,cs,MotionDebugCS
 RaytracingLibrary.hlsl,lib,RaytracingLibrary
 GlobalRootSignature.hlsl,rootsig,GlobalRootSignature
 LocalRootSignature.hlsl,rootsig,LocalRootSignature

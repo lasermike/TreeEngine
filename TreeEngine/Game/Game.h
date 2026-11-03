@@ -80,6 +80,13 @@ public:
     void SetRenderTestWaterMotionSpeed(float speed) { m_settings.m_waterMotionSpeed = speed; }
     void SetRenderTestOpacityMicromaps(bool enabled) { m_settings.m_opacityMicromaps = enabled; }
     void SetRenderTestAntialiasing(Settings::Antialiasing mode) { m_settings.m_antialiasing = mode; m_settings.m_showAntialiasingEdges = false; }
+    void SetRenderTestMotion(Settings::MotionView view, bool hasJitter, float jitterX, float jitterY) {
+        m_settings.m_motionView = view;
+        m_settings.m_jitter = false;
+        m_settings.m_hasFixedJitter = hasJitter;
+        m_settings.m_fixedJitter[0] = jitterX;
+        m_settings.m_fixedJitter[1] = jitterY;
+    }
     void SetRenderTestReflectionRays(int rays) {
         m_settings.m_waterReflections = rays > 0;
         if (rays > 0) m_settings.m_waterReflectionRays = rays;

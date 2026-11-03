@@ -33,6 +33,9 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Copies the deployed runtime into the ignored test artifacts directory.
 .\Tests\RenderRegression\test-tree-skinning.ps1 -Capacity
 
+# Camera motion vectors and jitter in LeafAtlasTest and AI Tree, raster and DXR.
+.\Tests\RenderRegression\test-motion-vectors.ps1
+
 # Edit, save, reload, restart, and compare scene appearance in both modes.
 # Uses an isolated runtime copy; never modifies the deployment's UserScenes.
 .\Tests\RenderRegression\test-scene-persistence.ps1
@@ -66,6 +69,16 @@ render without anti-aliasing, whatever the app's own setting. Scene IDs refer to
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
 regression selection.
+
+Captures can also test motion vectors. A capture's `cameraRotationDegrees` (pitch, yaw, roll; it needs
+`cameraPosition`) sets the camera's rotation. `previousCameraPosition` and `previousCameraRotationDegrees`
+render the warm-up frames from another camera, so the captured frame has known motion. `debugView` captures
+a motion debug view instead of the scene: `"motion"`, `"reprojection"` (last frame's color fetched along the
+motion vectors) or `"history"` (last frame's color unmoved). `jitter: [x, y]`, on a request or a capture,
+offsets the camera by a fixed sub-pixel amount, in pixels. `test-motion-vectors.ps1` checks that:
+- reprojection is much closer to the new frame than the unmoved history, for sideways, forward and yaw moves;
+- an unmoved camera gives exactly zero motion;
+- `jitter: [1, 0]` shifts the image one pixel right.
 
 `test-scene-persistence.ps1` covers primitives, L-system/fixed trees, graphs,
 glTF assets, and scene-authored PBR materials (`PbrMaterials`: a mapped sphere
