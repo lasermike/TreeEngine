@@ -458,7 +458,42 @@ namespace SceneData
             if (scene.name.empty()) Invalid(sourceName + ".name", "must not be empty");
             if (root.contains("priority"))
                 scene.priority = Integer(root["priority"], sourceName + ".priority", 0, std::numeric_limits<int>::max());
-            if (root.contains("camera")) scene.camera = ReadTransform(root["camera"], sourceName + ".camera");
+            if (root.contains("camera"))
+            {
+                auto camera = root["camera"];
+                Fields(camera, sourceName + ".camera", { "position", "scale", "rotation", "rotationDegrees", "animation" });
+                if (camera.contains("animation"))
+                {
+                    const auto& animation = camera["animation"];
+                    const auto animationPath = sourceName + ".camera.animation";
+                    Fields(animation, animationPath, { "loop", "keys" });
+                    if (animation.contains("loop"))
+                        scene.cameraAnimationLoop = Boolean(animation["loop"], animationPath + ".loop");
+                    if (!animation.contains("keys")) Invalid(animationPath + ".keys", "required property");
+                    const auto& keys = animation["keys"];
+                    const auto path = animationPath + ".keys";
+                    if (!keys.is_array() || keys.size() < 2) Invalid(path, "expected at least two keys");
+                    for (size_t i = 0; i < keys.size(); ++i)
+                    {
+                        const auto& value = keys[i];
+                        const auto item = path + "[" + std::to_string(i) + "]";
+                        Fields(value, item, { "time", "position", "lookAt" });
+                        if (!value.contains("time") || !value.contains("position") || !value.contains("lookAt"))
+                            Invalid(item, "time, position, and lookAt are required");
+                        CameraAnimationKey key;
+                        key.time = Number(value["time"], item + ".time");
+                        key.position = Vector3(value["position"], item + ".position");
+                        key.lookAt = Vector3(value["lookAt"], item + ".lookAt");
+                        if (key.time < 0 || (i == 0 && key.time != 0) || (i > 0 && key.time <= scene.cameraAnimation.back().time))
+                            Invalid(item + ".time", "first key must be zero and times must strictly increase");
+                        if (XMVector3LessOrEqual(XMVector3LengthSq(XMLoadFloat3(&key.lookAt)), XMVectorReplicate(0.000001f)))
+                            Invalid(item + ".lookAt", "must be nonzero");
+                        scene.cameraAnimation.push_back(key);
+                    }
+                }
+                camera.erase("animation");
+                scene.camera = ReadTransform(camera, sourceName + ".camera");
+            }
             if (root.contains("pointLightCount")) scene.pointLightCount = Integer(root["pointLightCount"], sourceName + ".pointLightCount", 0, 1);
             if (root.contains("pointLight"))
             {
@@ -787,6 +822,13 @@ namespace SceneData
                 { "range", scene.pointLight.range }, { "attenuation", VectorJson(scene.pointLight.attenuation) } } },
             { "objects", Json::array() } };
         if (!scene.id.empty()) root["id"] = scene.id;
+        if (!scene.cameraAnimation.empty())
+        {
+            root["camera"]["animation"] = { { "loop", scene.cameraAnimationLoop }, { "keys", Json::array() } };
+            for (const auto& key : scene.cameraAnimation)
+                root["camera"]["animation"]["keys"].push_back({ { "time", key.time }, { "position", VectorJson(key.position) },
+                    { "lookAt", VectorJson(key.lookAt) } });
+        }
         if (scene.environmentDiffuse.empty() != scene.environmentSpecular.empty())
             throw std::runtime_error("Scene environment needs both diffuse and specular cube maps");
         if (scene.ambientOcclusionRadius != 0 || scene.ambientOcclusionStrength != 1)

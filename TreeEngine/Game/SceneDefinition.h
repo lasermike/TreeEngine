@@ -187,12 +187,21 @@ namespace SceneData
         int shadowSamples = 8;
     };
 
+    struct CameraAnimationKey
+    {
+        float time = 0;
+        DirectX::XMFLOAT3 position = {};
+        DirectX::XMFLOAT3 lookAt = {};
+    };
+
     struct SceneDefinition
     {
         std::string id;
         std::string name;
         int priority = 0;
         Transform camera;
+        std::vector<CameraAnimationKey> cameraAnimation;
+        bool cameraAnimationLoop = false;
         DirectX::XMFLOAT4 clearColor = { 0.5294118f, 0.8078431f, 0.9215686f, 1 };
         float farClippingPlane = 30.0f;
         bool enablePostProcessing = true;

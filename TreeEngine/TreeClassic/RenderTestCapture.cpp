@@ -308,7 +308,7 @@ namespace
                 if (!request->performanceCamera.empty())
                     ApplyCameraPath(game, request->performanceCamera, pathTime);
                 const auto start = std::chrono::steady_clock::now();
-                const HRESULT result = game.RenderTestFrame(simulationTime);
+                const HRESULT result = game.RenderTestFrame(simulationTime, {}, !request->performanceCamera.empty());
                 const double frameMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
                 if (FAILED(result)) throw std::runtime_error("Rendering failed, HRESULT=" + std::to_string(static_cast<unsigned>(result)));
                 const auto& profile = game.GetRenderManager().GetRenderData().profile;
@@ -423,7 +423,7 @@ int RunRenderTestCapture(Game& game)
                 const double simulationTime = frame == captureFrame ? point.time
                     : point.time + std::max(0, frame - request->warmupFrames) * request->benchmarkTimeStep;
                 HRESULT result = game.RenderTestFrame(simulationTime,
-                    frame == captureFrame ? point.filename : std::wstring());
+                    frame == captureFrame ? point.filename : std::wstring(), point.overrideCamera);
                 if (FAILED(result)) throw std::runtime_error("Rendering/capture failed, HRESULT=" + std::to_string(static_cast<unsigned>(result)));
                 if (request->benchmarkFrames && frame >= request->warmupFrames && frame < captureFrame)
                 {

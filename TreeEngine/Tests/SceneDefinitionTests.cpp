@@ -904,24 +904,12 @@ int main(int argc, char** argv)
 
         const std::string filename = argc > 1 ? argv[1] : TestDataFilename("ai-tree.scene.json");
         auto ai = SceneData::ReadScene(filename);
-        Check(ai.name == "AI Tree" && ai.objects.size() == 6, "AI tree scene topology changed");
-        auto& aiTree = static_cast<SceneData::TreeDefinition&>(*ai.objects[0]);
-        Check(aiTree.generator.iterations == 11 && aiTree.generator.rules.size() == 4, "AI tree generator changed");
-        Check(aiTree.generator.axiom == "F(35) A(100,0)", "AI tree axiom changed");
-        Check(aiTree.trunk.baseColorTexture.source == "Bark_0005_diffuse.dds"
-            && aiTree.leaf.baseColorTexture.source == "FirBranchTip.dds"
-            && aiTree.leaf.alphaMode == SceneData::AlphaMode::Mask && aiTree.leaf.alphaCutoff == 0.6f,
-            "tree material settings changed");
-        Check(ai.skyCubeMap == "kiara_3_morning_4k-skybox.dds" && ai.skyRotationDegrees == 180.0f, "AI tree sky changed");
-        auto& aiSphere = static_cast<SceneData::PrimitiveDefinition&>(*ai.objects[4]);
-        Check(aiSphere.id == "shiny-sphere" && aiSphere.shape == SceneData::Shape::Sphere 
-            && aiSphere.material.metallic == 1 && aiSphere.material.roughness == 0.05f,
-            "AI tree shiny sphere changed");
-        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[5]);
-        Check(aiModel.source == "Models/Gltf/terra.glb" && !aiModel.forceLit,
-            "AI tree imported model changed");
-        Check(std::abs(ai.camera.rotation.w - 1.0f) < 1e-6f
-            && std::abs(ai.camera.position.z + 77.0f) < 1e-3f, "AI tree camera changed");
+        Check(ai.name == "AI Tree" && ai.objects.size() == 202, "AI tree scene topology changed");
+        Check(ai.skyCubeMap == "Environment/terra-daylight-sky.dds", "AI tree sky changed");
+        Check(ai.objects[0]->kind == SceneData::ObjectKind::Model, "AI tree terrain missing");
+        auto& aiModel = static_cast<SceneData::ModelDefinition&>(*ai.objects[0]);
+        Check(aiModel.source == "Models/Gltf/terra.glb" && !aiModel.forceLit, "AI tree imported model changed");
+        Check(ai.cameraAnimationLoop && ai.cameraAnimation.size() == 7 && ai.cameraAnimation.back().time == 42, "AI tree flight changed");
 
         const std::pair<const char*, const char*> catalogScenes[] = {
             { "tree.scene.json", "Tree" },
@@ -946,6 +934,19 @@ int main(int argc, char** argv)
         try { SceneData::ReadScene("does-not-exist.scene.json"); }
         catch (const std::runtime_error& e) { missingFileRejected = std::string(e.what()).find("cannot open") != std::string::npos; }
         Check(missingFileRejected, "missing file did not report an error");
+
+        // Camera paths survive scene saves and reject invalid timing.
+        auto animated = SceneData::ParseScene(R"({"version":1,"name":"Camera","objects":[{"id":"box","type":"primitive","shape":"box"}],"camera":{"animation":{"loop":true,"keys":[{"time":0,"position":[0,2,0],"lookAt":[0,0,1]},{"time":2,"position":[1,2,0],"lookAt":[0,0,1]}]}}})", "camera-test");
+        auto restored = SceneData::ParseScene(SceneData::SerializeScene(animated), "camera-roundtrip");
+        Check(restored.cameraAnimationLoop && restored.cameraAnimation.size() == 2 && restored.cameraAnimation[1].time == 2 &&
+            restored.cameraAnimation[1].position.x == 1 && restored.cameraAnimation[1].lookAt.z == 1, "camera animation did not survive serialization");
+        bool invalidCameraRejected = false;
+        try
+        {
+            SceneData::ParseScene(R"({"version":1,"name":"Camera","objects":[{"id":"box","type":"primitive","shape":"box"}],"camera":{"animation":{"keys":[{"time":0,"position":[0,0,0],"lookAt":[0,0,1]},{"time":0,"position":[1,0,0],"lookAt":[0,0,1]}]}}})", "camera-test");
+        }
+        catch (const std::runtime_error&) { invalidCameraRejected = true; }
+        Check(invalidCameraRejected, "camera animation accepted duplicate times");
 
         // Applying a staged scene must not replace live renderer resources or time.
         RenderData live;

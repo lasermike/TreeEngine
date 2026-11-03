@@ -84,7 +84,7 @@ public:
         if (rays > 0) m_settings.m_waterReflectionRays = rays;
     }
     void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile = false, bool showShadowBuffer = false);
-    HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {});
+    HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {}, bool overrideSceneCamera = false);
     // Render tests update objects on one thread for repeatable images; performance runs use every core.
     // Call before Initialize.
     void SetRenderTestUsesAllCores(bool allCores) { m_renderTestAllCores = allCores; }

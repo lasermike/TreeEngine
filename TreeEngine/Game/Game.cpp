@@ -45,6 +45,34 @@ std::wstring Wide(const std::string& value)
 
 namespace
 {
+    void ApplySceneCamera(const SceneData::SceneDefinition& scene, Player& player, double time)
+    {
+        const auto& keys = scene.cameraAnimation;
+        if (keys.size() < 2) return;
+        if (scene.cameraAnimationLoop && time >= 0)
+            time = std::fmod(time, static_cast<double>(keys.back().time));
+        size_t next = 1;
+        while (next + 1 < keys.size() && keys[next].time < time) ++next;
+        const size_t first = next - 1;
+        const size_t previous = first > 0 ? first - 1 : (scene.cameraAnimationLoop && keys.size() > 2 ? keys.size() - 2 : first);
+        const size_t following = next + 1 < keys.size() ? next + 1 : (scene.cameraAnimationLoop && keys.size() > 2 ? 1 : next);
+        const float t = static_cast<float>((std::max)(0.0, (std::min)(1.0,
+            (time - keys[first].time) / (keys[next].time - keys[first].time))));
+        auto interpolate = [&](bool lookAt)
+        {
+            auto point = [&](size_t i) { return XMLoadFloat3(lookAt ? &keys[i].lookAt : &keys[i].position); };
+            return XMVectorCatmullRom(point(previous), point(first), point(next), point(following), t);
+        };
+        const XMVECTOR position = interpolate(false);
+        const XMVECTOR direction = interpolate(true);
+        if (XMVectorGetX(XMVector3LengthSq(direction)) < 0.000001f) return;
+        const XMVECTOR forward = XMVector3Normalize(direction);
+        const XMVECTOR up = fabsf(XMVectorGetY(forward)) > 0.999f ? XMVectorSet(0, 0, 1, 0) : XMVectorSet(0, 1, 0, 0);
+        const XMMATRIX view = XMMatrixLookToLH(position, forward, up);
+        player.SetPosition(position);
+        player.SetRotation(XMQuaternionRotationMatrix(XMMatrixTranspose(view)));
+    }
+
     double ElapsedMs(std::chrono::steady_clock::time_point start)
     {
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -532,7 +560,7 @@ void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bo
     m_showHelp = false;
 }
 
-HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& captureFilename)
+HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& captureFilename, bool overrideSceneCamera)
 {
     if (!m_renderTestMode || !std::isfinite(simulationTime) || simulationTime < 0) return E_INVALIDARG;
     if (m_needsResize)
@@ -552,6 +580,7 @@ HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& capture
     renderData.normalAnimationTime = static_cast<float>(simulationTime * m_settings.m_waterMotionSpeed);
     renderData.frame++;
     m_timeCurrent = simulationTime;
+    if (!overrideSceneCamera) ApplySceneCamera(m_sceneDefinition, *m_player, simulationTime);
     XMStoreFloat4x4(&renderData.view, m_player->GetViewMatrix());
     renderData.eyePos = m_player->GetEyePosition();
     HRR(m_renderManager.BeginNewFrame());
@@ -676,6 +705,8 @@ void Game::Update(DX::StepTimer const& timer)
     // Compute per-frame values
     HR(m_pScene->Update(m_renderManager, *m_threadPool));
 
+    if (!m_settings.m_paused)
+        ApplySceneCamera(m_sceneDefinition, *m_player, m_timeCurrent);
     m_player->Update(timer, &m_renderManager.GetRenderData());
 
     HR(m_renderManager.EndFrame());
@@ -1223,12 +1254,14 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
         // Time
         double rangeMin = 0.0, rangeMax = __max(m_timeCurrent, 50);
-        ImGui::SliderScalar("Time", ImGuiDataType_Double, &m_timeCurrent, &rangeMin, &rangeMax, "%.3f", 0 /*flags*/);
+        if (ImGui::SliderScalar("Time", ImGuiDataType_Double, &m_timeCurrent, &rangeMin, &rangeMax, "%.3f", 0 /*flags*/)
+            && m_settings.m_paused)
+            ApplySceneCamera(m_sceneDefinition, *m_player, m_timeCurrent);
 
         // Camera
         ImGui::PushItemWidth(200);
-        ImGui::DragFloat3("Camera Position", (float*)m_player->GetEyePositionPtr(), ImGuiColorEditFlags_Float);
-        ImGui::DragFloat3("Camera Orientation", (float*)m_player->GetEyeRotationPtr(), ImGuiColorEditFlags_Float);
+        ImGui::DragFloat3("Camera Position", (float*)m_player->GetEyePositionPtr(), 0.5f);
+        ImGui::DragFloat3("Camera Orientation", (float*)m_player->GetEyeRotationPtr(), 0.01f);
 
         auto& renderData = m_renderManager.GetRenderData();
         auto& lightDirection = renderData.dirLights[0].Direction;
