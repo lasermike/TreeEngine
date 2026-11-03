@@ -89,6 +89,12 @@ public:
     // Render tests update objects on one thread for repeatable images; performance runs use every core.
     // Call before Initialize.
     void SetRenderTestUsesAllCores(bool allCores) { m_renderTestAllCores = allCores; }
+    // Before Initialize: DRED is chosen when the device is created.
+    void SetRenderTestDiagnostics(bool dred, const std::wstring& dredReportPath)
+    {
+        m_settings.m_enableDred = dred;
+        m_settings.m_dredReportPath = dredReportPath;
+    }
     unsigned GetWorkerThreadCount() const { return m_workerThreadCount; }
     const SceneLoadTiming& GetSceneLoadTiming() const { return m_sceneLoadTiming; }
 

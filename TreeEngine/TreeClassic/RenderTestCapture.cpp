@@ -169,6 +169,10 @@ void ParseRenderTestCommandLine()
     parsed->postProcessing = json.value("postProcessing", true);
     parsed->validateScenePersistence = json.value("validateScenePersistence", false);
     parsed->report = Wide(json.at("report").get<std::string>());
+    parsed->allCores = json.value("allCores", false);
+    parsed->dred = json.value("dred", false);
+    parsed->dredReport = Wide(json.value("dredReport", std::string()));
+    parsed->dumpFile = Wide(json.value("dumpFile", std::string()));
     if (parsed->scene.empty() || (parsed->mode != "raster" && parsed->mode != "raytracing")
         || parsed->width < 32 || parsed->width > 2048 || parsed->height < 32 || parsed->height > 2048
         || parsed->warmupFrames < 0 || parsed->warmupFrames > 60
@@ -225,6 +229,11 @@ void ParseRenderTestCommandLine()
         if (point.width < 32 || point.width > 2048 || point.height < 32 || point.height > 2048)
             throw std::runtime_error("Invalid capture dimensions");
         point.poseCache = value.value("poseCache", true);
+        point.scene = value.value("scene", std::string());
+        point.antialiasing = value.value("antialiasing", parsed->antialiasing);
+        if (point.antialiasing != "none" && point.antialiasing != "smaa")
+            throw std::runtime_error("Capture antialiasing must be \"none\" or \"smaa\"");
+        point.postProcessing = value.value("postProcessing", parsed->postProcessing);
         point.showShadowBuffer = value.value("showShadowBuffer", false);
         if (value.contains("cameraPosition"))
         {
@@ -387,8 +396,25 @@ int RunRenderTestCapture(Game& game)
             DirectX::XMStoreFloat3(&originalCamera, game.GetPlayer()->GetPosition());
             report["scenePersistenceValidated"] = true;
         }
-        for (const auto& point : request->captures)
+        std::string currentScene = request->scene;
+        for (size_t step = 0; step < request->captures.size(); ++step)
         {
+            const auto& point = request->captures[step];
+            // Logged before any work so the last line names the step if the process dies.
+            std::cerr << "step " << step << ": " << (point.scene.empty() ? currentScene : point.scene) << " / " << point.mode
+                << " " << point.width << "x" << point.height << " aa=" << point.antialiasing
+                << " post=" << (point.postProcessing ? 1 : 0) << " t=" << point.time << std::endl;
+            if (!point.scene.empty() && point.scene != currentScene)
+            {
+                const HRESULT loaded = game.LoadScene(point.scene);
+                if (FAILED(loaded))
+                    throw std::runtime_error("Loading scene " + point.scene + " failed, HRESULT=" + std::to_string(static_cast<unsigned>(loaded)));
+                currentScene = point.scene;
+                DirectX::XMStoreFloat3(&originalCamera, game.GetPlayer()->GetPosition());
+                // Trees draw from the process-wide rand(); reseed so the scene generates as in a fresh process
+                // (as the persistence check does). Interactive loads keep varying.
+                srand(request->seed);
+            }
             if (point.width != currentWidth || point.height != currentHeight)
             {
                 HWND window = game.GetWindow();
@@ -400,12 +426,12 @@ int RunRenderTestCapture(Game& game)
                 currentWidth = point.width;
                 currentHeight = point.height;
             }
-            game.ConfigureRenderTest(request->scene, point.mode == "raytracing", request->postProcessing,
+            game.ConfigureRenderTest(currentScene, point.mode == "raytracing", point.postProcessing,
                 request->benchmarkFrames > 0, point.showShadowBuffer);
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
-            game.SetRenderTestAntialiasing(request->antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
+            game.SetRenderTestAntialiasing(point.antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             game.GetPlayer()->SetPosition(point.overrideCamera
                 ? DirectX::XMVectorSet(point.cameraPosition[0], point.cameraPosition[1], point.cameraPosition[2], 1)
@@ -415,7 +441,7 @@ int RunRenderTestCapture(Game& game)
             for (int frame = 0; frame <= captureFrame; ++frame)
             {
                 if (!request->benchmarkFrames || frame == 0 || frame == captureFrame)
-                    std::cerr << "Rendering " << request->scene << " / " << point.mode
+                    std::cerr << "Rendering " << currentScene << " / " << point.mode
                         << " at " << point.time << "s, frame " << frame << std::endl;
                 MSG message;
                 while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
@@ -464,7 +490,8 @@ int RunRenderTestCapture(Game& game)
             const auto& projection = game.GetRenderManager().GetRenderData().projectionData;
             if (projection.screenWidth != point.width || projection.screenHeight != point.height)
                 throw std::runtime_error("Render target did not follow the window size");
-            report["captures"].push_back({ { "time", point.time }, { "mode", point.mode },
+            report["captures"].push_back({ { "scene", currentScene }, { "antialiasing", point.antialiasing },
+                { "postProcessing", point.postProcessing }, { "time", point.time }, { "mode", point.mode },
                 { "width", point.width }, { "height", point.height }, { "success", true },
                 { "poseCache", point.poseCache }, { "samples", samples } });
         }

@@ -1048,7 +1048,9 @@ public:
     CComPtr<ID3D12Resource>     m_smaaWeights;
     CComPtr<ID3D12Resource>     m_smaaArea;
     CComPtr<ID3D12Resource>     m_smaaSearch;
-    ID3D12Resource*             m_smaaColorSource = nullptr; // The off-screen buffer the color SRV currently views.
+    UINT                        m_offscreenGeneration = 0;   // Bumped whenever the off-screen buffers are recreated.
+    UINT                        m_smaaColorGeneration = UINT_MAX; // The off-screen generation the SMAA color SRV views.
+    bool CheckDeviceRemoved();
     bool SmaaEnabled() const;
     HRESULT EnsureSmaaResources(UINT width, UINT height);
     HRESULT RenderSmaa(UINT width, UINT height);

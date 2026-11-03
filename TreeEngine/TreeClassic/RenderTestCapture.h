@@ -16,6 +16,10 @@ struct RenderTestPoint
     bool showShadowBuffer = false;
     bool overrideCamera = false;
     std::array<float, 3> cameraPosition = {};
+    // Stress sequences: load this scene first when it differs from the current one, as the app's scene cycling does.
+    std::string scene;
+    std::string antialiasing;   // "none" or "smaa"; empty uses the request's.
+    bool postProcessing = true;
 };
 
 // A camera pose on a performance run's path; time is seconds after the run's start time.
@@ -55,6 +59,11 @@ struct RenderTestRequest
     std::vector<RenderTestCameraKey> performanceCamera;
     std::wstring report;
     std::vector<RenderTestPoint> captures;
+    // Stress diagnostics.
+    bool allCores = false;          // Update objects on every core, like the app, instead of one ordered thread.
+    bool dred = false;              // Record DRED breadcrumbs and page faults; written to dredReport on device removal.
+    std::wstring dredReport;
+    std::wstring dumpFile;          // Minidump written if the process crashes or aborts.
 };
 
 void ParseRenderTestCommandLine();

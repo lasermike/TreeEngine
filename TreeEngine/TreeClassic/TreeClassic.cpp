@@ -2,6 +2,9 @@
 //
 
 #include "pch.h"
+#include <dbghelp.h>
+#include <csignal>
+#pragma comment(lib, "dbghelp.lib")
 #include "TreeClassic.h"
 #include "Game.h"
 #include "InputManager.h"
@@ -108,6 +111,72 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 
+namespace
+{
+    // Render tests: a crash or abort writes a minidump to the request's dumpFile and exits with code 5.
+    // The interactive app writes to %LOCALAPPDATA%\TreeEngine\CrashDumps\TreeClassic-<time>.dmp.
+    std::wstring CrashDumpPath()
+    {
+        const RenderTestRequest* request = GetRenderTestRequest();
+        if (request)
+            return request->dumpFile;
+        wchar_t folder[MAX_PATH] = {};
+        const DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", folder, MAX_PATH);
+        if (!length || length >= MAX_PATH)
+            return {};
+        std::wstring path(folder);
+        path += L"\\TreeEngine";
+        CreateDirectoryW(path.c_str(), nullptr);
+        path += L"\\CrashDumps";
+        CreateDirectoryW(path.c_str(), nullptr);
+        SYSTEMTIME time;
+        GetLocalTime(&time);
+        wchar_t name[64];
+        swprintf_s(name, L"\\TreeClassic-%04u%02u%02u-%02u%02u%02u.dmp", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
+        return path + name;
+    }
+
+    LONG WINAPI WriteCrashDump(EXCEPTION_POINTERS* exception)
+    {
+        const std::wstring dumpPath = CrashDumpPath();
+        if (!dumpPath.empty())
+        {
+            HANDLE file = CreateFileW(dumpPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (file != INVALID_HANDLE_VALUE)
+            {
+                MINIDUMP_EXCEPTION_INFORMATION info = { GetCurrentThreadId(), exception, FALSE };
+                MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file,
+                    static_cast<MINIDUMP_TYPE>(MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithThreadInfo),
+                    exception ? &info : nullptr, nullptr, nullptr);
+                CloseHandle(file);
+            }
+        }
+        std::cerr << "Crashed" << (exception ? ", exception 0x" : "") << std::hex
+            << (exception ? exception->ExceptionRecord->ExceptionCode : 0) << std::dec << std::endl;
+        TerminateProcess(GetCurrentProcess(), 5);
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    // Aborts, failed asserts, invalid CRT parameters and pure calls raise an exception so the dump has their stack.
+    void RaiseCrash(DWORD code)
+    {
+        __try { RaiseException(code, EXCEPTION_NONCONTINUABLE, 0, nullptr); }
+        __except (WriteCrashDump(GetExceptionInformation())) {}
+    }
+    void OnAbort(int) { RaiseCrash(0xE0000AB0); }
+    void OnInvalidParameter(const wchar_t*, const wchar_t*, const wchar_t*, unsigned, uintptr_t) { RaiseCrash(0xE0000AB1); }
+    void OnPureCall() { RaiseCrash(0xE0000AB2); }
+
+    void InstallCrashHandlers()
+    {
+        SetUnhandledExceptionFilter(WriteCrashDump);
+        signal(SIGABRT, OnAbort);
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+        _set_invalid_parameter_handler(OnInvalidParameter);
+        _set_purecall_handler(OnPureCall);
+    }
+}
+
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                        _In_opt_ HINSTANCE hPrevInstance,
                        _In_ LPTSTR    lpCmdLine,
@@ -121,11 +190,19 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
     if (GetRenderTestRequest())
     {
         SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+        // GUI apps show assert() and abort() in a message box, which would wait forever in a hidden test window.
+        _set_error_mode(_OUT_TO_STDERR);
 #if defined(_DEBUG)
         _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
         _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
 #endif
         srand(GetRenderTestRequest()->seed);
+        InstallCrashHandlers();
+    }
+    else
+    {
+        // The app keeps its assert and abort dialogs; unhandled exceptions leave a minidump.
+        SetUnhandledExceptionFilter(WriteCrashDump);
     }
 
     // Set the current directory to the executable's directory
@@ -387,7 +464,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     {
         g_game->ConfigureRenderTest(GetRenderTestRequest()->scene,
             GetRenderTestRequest()->mode == "raytracing", GetRenderTestRequest()->postProcessing);
-        g_game->SetRenderTestUsesAllCores(GetRenderTestRequest()->performance);
+        g_game->SetRenderTestUsesAllCores(GetRenderTestRequest()->performance || GetRenderTestRequest()->allCores);
+        g_game->SetRenderTestDiagnostics(GetRenderTestRequest()->dred, GetRenderTestRequest()->dredReport);
     }
     g_game->SetWindow(m_hWnd);
     OnWindowSizeChanged();

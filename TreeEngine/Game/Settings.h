@@ -29,6 +29,11 @@ public:
     enum class Antialiasing { None, Smaa };
     Antialiasing m_antialiasing = Antialiasing::Smaa;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
+
+    // Diagnostics for stress tests. DRED must be chosen before the device is created.
+    bool m_enableDred = false;
+    std::wstring m_dredReportPath;      // Written once if the device is removed.
+    HRESULT m_deviceRemoved = 0;        // S_OK, or the device-removed reason once detected.
     bool m_showShadowBuffer;
     bool m_wireframe;
     bool m_showDebugUI;

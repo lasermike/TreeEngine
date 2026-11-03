@@ -594,6 +594,8 @@ HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& capture
     m_settings.m_captureResult = captureFilename.empty() ? S_OK : E_PENDING;
     ComputeGPU();
     Render(false);
+    if (FAILED(m_settings.m_deviceRemoved))
+        return m_settings.m_deviceRemoved;
     return m_settings.m_captureResult;
 }
 

@@ -1380,7 +1380,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_smaaWeights.Release();
     m_smaaArea.Release();
     m_smaaSearch.Release();
-    m_smaaColorSource = nullptr;
+    m_smaaColorGeneration = UINT_MAX;
     m_profileQueries.Release();
     m_profileReadback.Release();
 
@@ -2174,6 +2174,19 @@ HRESULT RenderPlatform12::InitDevice()
 
 
 #endif
+
+    if (m_settings->m_enableDred)
+    {
+        // Device Removed Extended Data: breadcrumbs of the GPU work in flight and the page-fault address, reported by
+        // CheckDeviceRemoved. Works without the debug layer; must be enabled before the device is created.
+        CComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dred;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dred))))
+        {
+            dred->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+            dred->SetBreadcrumbContextEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+            dred->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        }
+    }
 
     CComPtr<IDXGIFactory4> factory4;
     HRR(CreateDXGIFactory1(IID_PPV_ARGS(&factory4)));
@@ -3261,8 +3274,77 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
 #endif
 
+// Returns true once the device has been removed. The first time, records the reason in Settings::m_deviceRemoved
+// and writes the DRED breadcrumbs and page-fault data (when enabled) to Settings::m_dredReportPath.
+bool RenderPlatform12::CheckDeviceRemoved()
+{
+    if (FAILED(m_settings->m_deviceRemoved))
+        return true;
+    if (!m_d3dDevice)
+        return false;
+    const HRESULT reason = m_d3dDevice->GetDeviceRemovedReason();
+    if (SUCCEEDED(reason))
+        return false;
+    m_settings->m_deviceRemoved = reason;
+    char line[512];
+    sprintf_s(line, "Device removed: 0x%08X\n", static_cast<unsigned>(reason));
+    OutputDebugStringA(line);
+    if (m_settings->m_dredReportPath.empty())
+        return true;
+    FILE* file = nullptr;
+    if (_wfopen_s(&file, m_settings->m_dredReportPath.c_str(), L"w") || !file)
+        return true;
+    fputs(line, file);
+    CComPtr<ID3D12DeviceRemovedExtendedData1> dred;
+    if (FAILED(m_d3dDevice->QueryInterface(IID_PPV_ARGS(&dred))))
+    {
+        fputs("DRED unavailable (not enabled for this run).\n", file);
+        fclose(file);
+        return true;
+    }
+    D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 breadcrumbs = {};
+    if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput1(&breadcrumbs)))
+    {
+        fputs("\nCommand lists with unfinished GPU work (last completed operation marked):\n", file);
+        for (const D3D12_AUTO_BREADCRUMB_NODE1* node = breadcrumbs.pHeadAutoBreadcrumbNode; node; node = node->pNext)
+        {
+            const UINT completed = node->pLastBreadcrumbValue ? *node->pLastBreadcrumbValue : 0;
+            if (completed >= node->BreadcrumbCount)
+                continue;
+            fprintf(file, "  list '%ls' on queue '%ls': %u of %u operations completed\n",
+                node->pCommandListDebugNameW ? node->pCommandListDebugNameW : L"?",
+                node->pCommandQueueDebugNameW ? node->pCommandQueueDebugNameW : L"?", completed, node->BreadcrumbCount);
+            const UINT first = completed > 8 ? completed - 8 : 0;
+            const UINT last = (std::min)(node->BreadcrumbCount, completed + 4);
+            for (UINT i = first; i < last; ++i)
+            {
+                const wchar_t* context = nullptr;
+                for (UINT c = 0; c < node->BreadcrumbContextsCount; ++c)
+                    if (node->pBreadcrumbContexts[c].BreadcrumbIndex == i)
+                        context = node->pBreadcrumbContexts[c].pContextString;
+                fprintf(file, "    %s %4u: op %d %ls\n", i + 1 == completed ? "->" : "  ", i,
+                    static_cast<int>(node->pCommandHistory[i]), context ? context : L"");
+            }
+        }
+    }
+    D3D12_DRED_PAGE_FAULT_OUTPUT1 pageFault = {};
+    if (SUCCEEDED(dred->GetPageFaultAllocationOutput1(&pageFault)))
+    {
+        fprintf(file, "\nPage fault at GPU VA 0x%llX\n", static_cast<unsigned long long>(pageFault.PageFaultVA));
+        fputs("Live allocations at that address:\n", file);
+        for (const D3D12_DRED_ALLOCATION_NODE1* node = pageFault.pHeadExistingAllocationNode; node; node = node->pNext)
+            fprintf(file, "  %ls (type %d)\n", node->ObjectNameW ? node->ObjectNameW : L"?", static_cast<int>(node->AllocationType));
+        fputs("Recently freed allocations at that address:\n", file);
+        for (const D3D12_DRED_ALLOCATION_NODE1* node = pageFault.pHeadRecentFreedAllocationNode; node; node = node->pNext)
+            fprintf(file, "  %ls (type %d)\n", node->ObjectNameW ? node->ObjectNameW : L"?", static_cast<int>(node->AllocationType));
+    }
+    fclose(file);
+    return true;
+}
+
 void RenderPlatform12::HandleD3D12Error(HRESULT hr)
 {
+    CheckDeviceRemoved();
     if (hr == E_ABORT)
     {
         if (g_enableDXRValidation)
@@ -3525,6 +3607,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         D3D12_RESOURCE_STATE_COMMON,
         &clearValue,
         __uuidof(ID3D12Resource), (void**)&m_offscreenBuffer2));
+    ++m_offscreenGeneration;
 
     // Create offscreen rendering views
     // SRV
@@ -4016,10 +4099,11 @@ HRESULT RenderPlatform12::EnsureSmaaResources(UINT width, UINT height)
         GetDevice()->CreateUnorderedAccessView(m_smaaEdges, nullptr, nullptr, m_descriptorHeap.hCPU(SmaaEdges_UavHeapOffset));
         GetDevice()->CreateUnorderedAccessView(m_smaaWeights, nullptr, nullptr, m_descriptorHeap.hCPU(SmaaWeights_UavHeapOffset));
     }
-    if (m_smaaColorSource != m_offscreenBuffer1)
+    // By generation: a recreated buffer can come back at the same address, which left a stale view.
+    if (m_smaaColorGeneration != m_offscreenGeneration)
     {
         GetDevice()->CreateShaderResourceView(m_offscreenBuffer1, nullptr, m_descriptorHeap.hCPU(SmaaColor_SrvHeapOffset));
-        m_smaaColorSource = m_offscreenBuffer1;
+        m_smaaColorGeneration = m_offscreenGeneration;
     }
     return S_OK;
 }
@@ -4340,6 +4424,8 @@ HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool
 
 #else
     HR(m_pSwapChain->Present(0, 0));
+    if (CheckDeviceRemoved())
+        return m_settings->m_deviceRemoved;
 #endif
 
     m_graphicsMemory->Commit(m_commandQueue);
