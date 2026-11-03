@@ -18,7 +18,9 @@ param(
     # -Executable is an older commit with this harness's capture code added, to backfill history.
     [switch]$BackportedHarness,
     # Ray trace leaves without opacity micromaps (DXR 1.2), to measure what they save.
-    [switch]$DisableOpacityMicromaps
+    [switch]$DisableOpacityMicromaps,
+    # Anti-aliasing for every test, overriding scenes.json: none or smaa.
+    [ValidateSet('none', 'smaa')][string]$Antialiasing
 )
 
 # Runs the tests in scenes.json and writes the results to
@@ -33,7 +35,7 @@ $windows = @(
     [ordered]@{ name = 'frames5to10'; first = 5; end = 10 },
     [ordered]@{ name = 'frames10to20'; first = 10; end = 20 }
 )
-$gpuPasses = @('frame', 'shadow', 'main', 'deformation', 'blas', 'tlas', 'rays')
+$gpuPasses = @('frame', 'shadow', 'main', 'deformation', 'blas', 'tlas', 'rays', 'antialiasing')
 $metricNames = @('frameMs', 'sceneUpdateMs', 'drawUploadMs', 'blasCpuMs', 'blasSnapshotMs', 'blasHashMs', 'blasDescriptorsMs', 'blasSubmitMs', 'tlasSubmitMs', 'firstBlasBuildCpuMs', 'firstBlasBuildGpuMs') + @($gpuPasses | ForEach-Object { "gpu_$($_)Ms" })
 $pacingMetricNames = @('frameP50Ms', 'frameP90Ms', 'frameP99Ms', 'frameMaxMs', 'frameMeanMs', 'spikes', 'over33Ms', 'spikeExcessMs', 'rebuiltBLASFrames', 'maxBlasCpuMs')
 $utf8 = New-Object Text.UTF8Encoding($false)
@@ -81,8 +83,10 @@ foreach ($entry in @($manifest.tests)) {
     if (-not $testModes.Count -or @($testModes | Where-Object { $_ -notin @('raster', 'raytracing') }).Count) { throw "$where`: invalid modes." }
     $step = Get-Setting $entry $defaults 'frameTimeStep' (1.0 / 60.0)
     if (-not (Test-FiniteNumber $step) -or $step -le 0) { throw "$where`: frameTimeStep must be positive." }
+    $testAntialiasing = $(if ($Antialiasing) { $Antialiasing } else { [string](Get-Setting $entry $defaults 'antialiasing' 'none') })
+    if ($testAntialiasing -notin @('none', 'smaa')) { throw "$where`: antialiasing must be none or smaa." }
     $test = [ordered]@{ id = $entry.id; scene = $entry.scene; sceneName = $sceneFiles[[string]$entry.scene].name; type = $entry.type
-        modes = $testModes; frameTimeStep = [double]$step }
+        modes = $testModes; frameTimeStep = [double]$step; antialiasing = $testAntialiasing }
     if ($entry.type -eq 'steady') {
         $test.startTime = [double]$(if ($PSBoundParameters.ContainsKey('StartTime')) { $StartTime } else { Get-Setting $entry $defaults 'startTime' 5 })
         $test.frames = [int](Get-Setting $entry $defaults 'frames' 20)
@@ -226,7 +230,7 @@ for ($run = 1; $run -le $Runs; $run++) {
             }
             $request = [ordered]@{
                 scene = $test.scene; mode = $mode; seed = 12345; width = $Width; height = $Height; postProcessing = $true
-                opacityMicromaps = (-not $DisableOpacityMicromaps)
+                opacityMicromaps = (-not $DisableOpacityMicromaps); antialiasing = $test.antialiasing
                 report = $reportPath; performance = $performance
             }
             $requestPath = Join-Path $jobDirectory 'request.json'
@@ -300,6 +304,8 @@ $results = [ordered]@{
     dirty = [bool]$status
     backportedHarness = [bool]$BackportedHarness
     opacityMicromaps = (-not $DisableOpacityMicromaps)
+    # -Antialiasing for the whole run, or null when each test used its scenes.json setting.
+    antialiasing = $(if ($Antialiasing) { $Antialiasing } else { $null })
     configuration = $(if ($Executable -match '\\Debug\\') { 'Debug' } else { $Configuration })
     executable = $Executable
     cpu = $cpu.Name.Trim()

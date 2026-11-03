@@ -61,7 +61,7 @@ enum RenderPass
 
 enum class ProfilePass
 {
-    Frame, Shadow, Main, Deformation, BLAS, TLAS, Rays, Count
+    Frame, Shadow, Main, Deformation, BLAS, TLAS, Rays, AntiAliasing, Count
 };
 
 struct RenderProfile

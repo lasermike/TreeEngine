@@ -25,6 +25,10 @@ public:
     int m_waterReflectionRays = 16;
     bool m_shadowsEnabled = true;
     bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
+    // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
+    enum class Antialiasing { None, Smaa };
+    Antialiasing m_antialiasing = Antialiasing::Smaa;
+    bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
     bool m_showShadowBuffer;
     bool m_wireframe;
     bool m_showDebugUI;

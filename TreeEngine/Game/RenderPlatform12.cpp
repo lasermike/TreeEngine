@@ -40,6 +40,8 @@ bool useImGui = true;
 #endif
 
 #include "MathHelper.h"
+#include "../ThirdParty/SMAA/AreaTex.h"
+#include "../ThirdParty/SMAA/SearchTex.h"
 
 #include "dxgidebug.h"
 
@@ -196,6 +198,16 @@ enum CbvSrvUavHeapOffsets
     DxrSky_SrvHeapOffset = DxrTexture0_SrvHeapOffset + MaxSceneTextures, // Follows the DXR scene texture slots.
     EnvironmentDiffuse_SrvHeapOffset,
     EnvironmentSpecular_SrvHeapOffset,
+
+    // SMAA tables. Each pass binds three SRVs (t0-t2) and one UAV (u0); see Game/Shaders/Smaa.hlsl.
+    SmaaColor_SrvHeapOffset,            // Edge and blend passes: color (off-screen buffer 1), weights, edges.
+    SmaaBlendWeights_SrvHeapOffset,
+    SmaaBlendEdges_SrvHeapOffset,
+    SmaaEdges_SrvHeapOffset,            // Weight pass: edges, area texture, search texture.
+    SmaaArea_SrvHeapOffset,
+    SmaaSearch_SrvHeapOffset,
+    SmaaEdges_UavHeapOffset,
+    SmaaWeights_UavHeapOffset,
 
     // Per-material descriptors
     Material0_HeapOffset,
@@ -548,6 +560,31 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         m_computeRootSignature->SetName(L"Compute Game Level PSO");
     }
 
+    {
+        // SMAA: constants (metrics, debug flag), three SRVs, one UAV, linear and point clamp samplers.
+        CD3DX12_DESCRIPTOR_RANGE srvRange, uavRange;
+        srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 0);
+        uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+        CD3DX12_ROOT_PARAMETER parameters[3];
+        parameters[0].InitAsConstants(5, 0);
+        parameters[1].InitAsDescriptorTable(1, &srvRange);
+        parameters[2].InitAsDescriptorTable(1, &uavRange);
+        const CD3DX12_STATIC_SAMPLER_DESC samplers[2] = {
+            CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
+            CD3DX12_STATIC_SAMPLER_DESC(1, D3D12_FILTER_MIN_MAG_MIP_POINT,
+                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP) };
+        CD3DX12_ROOT_SIGNATURE_DESC desc(_countof(parameters), parameters, _countof(samplers), samplers);
+        CComPtr<ID3DBlob> serialized, errors;
+        const HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &serialized, &errors);
+        if (errors)
+            ::OutputDebugStringA(static_cast<const char*>(errors->GetBufferPointer()));
+        HRR(hr);
+        HRR(GetDevice()->CreateRootSignature(0, serialized->GetBufferPointer(), serialized->GetBufferSize(),
+            IID_PPV_ARGS(&m_smaaRootSignature)));
+        m_smaaRootSignature->SetName(L"SMAA");
+    }
+
     // Init text font
     //m_bitmapFont = new XSF::BitmapFont();
     //HRR(m_bitmapFont->Create(this, L"Arial_16"));
@@ -817,6 +854,25 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         };
         vertBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
         HRR(GetDevice()->CreateComputePipelineState(&vertBlurPSO, __uuidof(ID3D12PipelineState), (void**)&m_gameLevelPSOs["vertBlur"]));
+
+        // SMAA passes.
+        const std::pair<const wchar_t*, const char*> smaaPasses[] = {
+            { L"SmaaEdgesCS.cso", "smaaEdges" }, { L"SmaaWeightsCS.cso", "smaaWeights" }, { L"SmaaBlendCS.cso", "smaaBlend" } };
+        for (const auto& pass : smaaPasses)
+        {
+            ComputeShader* shader = nullptr;
+            LoadComputeShader(pass.first, &shader);
+            if (!shader)
+                return E_FAIL;
+            D3D12_COMPUTE_PIPELINE_STATE_DESC pso = {};
+            pso.pRootSignature = m_smaaRootSignature;
+#if defined(TREE_XBOX)
+            pso.CS = { reinterpret_cast<BYTE*>(shader->shader.data()), shader->shader.size() };
+#else
+            pso.CS = { reinterpret_cast<BYTE*>(shader->shader->GetBufferPointer()), shader->shader->GetBufferSize() };
+#endif
+            HRR(GetDevice()->CreateComputePipelineState(&pso, IID_PPV_ARGS(&m_gameLevelPSOs[pass.second])));
+        }
     }
 
     {
@@ -1319,6 +1375,12 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     m_rootSignature.Release();
     m_computeRootSignature.Release();
+    m_smaaRootSignature.Release();
+    m_smaaEdges.Release();
+    m_smaaWeights.Release();
+    m_smaaArea.Release();
+    m_smaaSearch.Release();
+    m_smaaColorSource = nullptr;
     m_profileQueries.Release();
     m_profileReadback.Release();
 
@@ -3799,7 +3861,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle;
 
     //TODO NEXT: use compute to copy offscreen1 to rtv
-    if (m_renderData->enablePostProcessing)
+    if (m_renderData->enablePostProcessing || SmaaEnabled())
     {
         // Render scene to m_offscreenBuffer1
         rtvHandle = m_rtvHeap.hCPU(FrameCount);
@@ -3899,6 +3961,107 @@ std::vector<float> CalcGaussWeights(float sigma)
     return weights;
 }
 
+bool RenderPlatform12::SmaaEnabled() const
+{
+    return m_settings->m_antialiasing == Settings::Antialiasing::Smaa && m_smaaRootSignature
+        && m_gameLevelPSOs.count("smaaBlend") > 0;
+}
+
+// Creates the lookup textures once and the edge and weight textures at the window size, and points the color SRV at
+// off-screen buffer 1. Runs after RenderProlog has waited for the previous frame, so rewriting descriptors is safe.
+HRESULT RenderPlatform12::EnsureSmaaResources(UINT width, UINT height)
+{
+    const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
+    if (!m_smaaArea)
+    {
+        struct Lookup { CComPtr<ID3D12Resource>& texture; const unsigned char* bytes; UINT width, height, pitch; DXGI_FORMAT format; int srv; };
+        Lookup lookups[] = {
+            { m_smaaArea, areaTexBytes, AREATEX_WIDTH, AREATEX_HEIGHT, AREATEX_PITCH, DXGI_FORMAT_R8G8_UNORM, SmaaArea_SrvHeapOffset },
+            { m_smaaSearch, searchTexBytes, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT, SEARCHTEX_PITCH, DXGI_FORMAT_R8_UNORM, SmaaSearch_SrvHeapOffset } };
+        for (Lookup& lookup : lookups)
+        {
+            const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(lookup.format, lookup.width, lookup.height, 1, 1);
+            HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
+                nullptr, IID_PPV_ARGS(&lookup.texture)));
+            CComPtr<ID3D12Resource> upload;
+            const CD3DX12_HEAP_PROPERTIES uploadHeap(D3D12_HEAP_TYPE_UPLOAD);
+            const auto uploadDesc = CD3DX12_RESOURCE_DESC::Buffer(GetRequiredIntermediateSize(lookup.texture, 0, 1));
+            HRR(GetDevice()->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE, &uploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr, IID_PPV_ARGS(&upload)));
+            D3D12_SUBRESOURCE_DATA data = { lookup.bytes, static_cast<LONG_PTR>(lookup.pitch), static_cast<LONG_PTR>(lookup.pitch) * lookup.height };
+            UpdateSubresources(GetCommandList(), lookup.texture, upload, 0, 0, 1, &data);
+            const auto readable = CD3DX12_RESOURCE_BARRIER::Transition(lookup.texture,
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            GetCommandList()->ResourceBarrier(1, &readable);
+            Retire(upload);
+            GetDevice()->CreateShaderResourceView(lookup.texture, nullptr, m_descriptorHeap.hCPU(lookup.srv));
+        }
+    }
+    if (!m_smaaEdges || m_smaaEdges->GetDesc().Width != width || m_smaaEdges->GetDesc().Height != height)
+    {
+        Retire(m_smaaEdges);
+        Retire(m_smaaWeights);
+        // RGBA8 for both: typed UAV stores of it work everywhere, and the edges only need the memory of a small target.
+        const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, width, height, 1, 1, 1, 0,
+            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+            nullptr, IID_PPV_ARGS(&m_smaaEdges)));
+        HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+            nullptr, IID_PPV_ARGS(&m_smaaWeights)));
+        m_smaaEdges->SetName(L"SMAA edges");
+        m_smaaWeights->SetName(L"SMAA weights");
+        GetDevice()->CreateShaderResourceView(m_smaaEdges, nullptr, m_descriptorHeap.hCPU(SmaaEdges_SrvHeapOffset));
+        GetDevice()->CreateShaderResourceView(m_smaaEdges, nullptr, m_descriptorHeap.hCPU(SmaaBlendEdges_SrvHeapOffset));
+        GetDevice()->CreateShaderResourceView(m_smaaWeights, nullptr, m_descriptorHeap.hCPU(SmaaBlendWeights_SrvHeapOffset));
+        GetDevice()->CreateUnorderedAccessView(m_smaaEdges, nullptr, nullptr, m_descriptorHeap.hCPU(SmaaEdges_UavHeapOffset));
+        GetDevice()->CreateUnorderedAccessView(m_smaaWeights, nullptr, nullptr, m_descriptorHeap.hCPU(SmaaWeights_UavHeapOffset));
+    }
+    if (m_smaaColorSource != m_offscreenBuffer1)
+    {
+        GetDevice()->CreateShaderResourceView(m_offscreenBuffer1, nullptr, m_descriptorHeap.hCPU(SmaaColor_SrvHeapOffset));
+        m_smaaColorSource = m_offscreenBuffer1;
+    }
+    return S_OK;
+}
+
+// SMAA 1x from off-screen buffer 1 (non-pixel-shader resource) into off-screen buffer 2 (unordered access).
+HRESULT RenderPlatform12::RenderSmaa(UINT width, UINT height)
+{
+    PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"SMAA");
+    HRR(EnsureSmaaResources(width, height));
+    ProfileTimestamp(ProfilePass::AntiAliasing, false);
+
+    struct { float metrics[4]; UINT showEdges; } constants = {
+        { 1.0f / width, 1.0f / height, static_cast<float>(width), static_cast<float>(height) },
+        m_settings->m_showAntialiasingEdges ? 1u : 0u };
+    GetCommandList()->SetComputeRootSignature(m_smaaRootSignature);
+    GetCommandList()->SetComputeRoot32BitConstants(0, 5, &constants, 0);
+    const UINT groupsX = (width + 7) / 8, groupsY = (height + 7) / 8;
+    auto pass = [&](const char* pso, int srvTable, int uav)
+    {
+        GetCommandList()->SetPipelineState(m_gameLevelPSOs[pso]);
+        GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(srvTable));
+        GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(uav));
+        GetCommandList()->Dispatch(groupsX, groupsY, 1);
+    };
+    auto transition = [&](ID3D12Resource* resource, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
+    {
+        const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(resource, from, to);
+        GetCommandList()->ResourceBarrier(1, &barrier);
+    };
+
+    transition(m_smaaEdges, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    pass("smaaEdges", SmaaColor_SrvHeapOffset, SmaaEdges_UavHeapOffset);
+    transition(m_smaaEdges, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    transition(m_smaaWeights, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    pass("smaaWeights", SmaaEdges_SrvHeapOffset, SmaaWeights_UavHeapOffset);
+    transition(m_smaaWeights, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    pass("smaaBlend", SmaaColor_SrvHeapOffset, Offscreen2_UavHeapOffset);
+
+    ProfileTimestamp(ProfilePass::AntiAliasing, true);
+    return S_OK;
+}
+
 HRESULT RenderPlatform12::RenderPostProcess()
 {
     HRESULT hr = S_OK;
@@ -3963,7 +4126,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         ProfileTimestamp(ProfilePass::Rays, true);
 
         // Replace the main image before blur/UI; the DXR texture matches the target size and format.
-        ID3D12Resource* colorTarget = m_renderData->enablePostProcessing
+        ID3D12Resource* colorTarget = m_renderData->enablePostProcessing || SmaaEnabled()
             ? static_cast<ID3D12Resource*>(m_offscreenBuffer1)
             : static_cast<ID3D12Resource*>(m_renderTargets[m_frameIndex]);
         ID3D12Resource* dxrOutput = m_renderData->pDxrOutBuffer->uavOutput;
@@ -3986,87 +4149,89 @@ HRESULT RenderPlatform12::RenderPostProcess()
 
     //PIXEndEvent(GetCommandList()); // RenderScene
 
-    // Incoming resource state when post processing is enabled
-    // m_offscreenBuffer1 - D3D12_RESOURCE_STATE_RENDER_TARGET  - contains rendered scene
-    // m_offscreenBuffer2 - D3D12_RESOURCE_STATE_COMMON         - empty / undefined
-    // m_renderTargets[m_frameIndex] - D3D12_RESOURCE_STATE_PRESENT - empty / undefined
-
-    // Post processing - blur
-    //   Stage 1 - read from m_offscreenBuffer1 and write to m_offscreenBuffer2
-    //   Stage 2 - read from m_offscreenBuffer2 and write to m_offscreenBuffer1
-    //   Stage 3 - copy from m_offscreenBuffer1 to m_renderTargets[m_frameIndex]
-    if (m_renderData->enablePostProcessing)
+    // Post-processing. The scene is in off-screen buffer 1 (render target); buffer 2 is free (common). SMAA writes
+    // buffer 2, the blur ping-pongs between the two, and whichever holds the result is copied to the back buffer.
+    // Both buffers end in COMMON and the back buffer in RENDER_TARGET for the UI.
+    const bool smaa = SmaaEnabled();
+    if (m_renderData->enablePostProcessing || smaa)
     {
-        PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing Blur");
-
-        // use compute to post process
-        CD3DX12_CPU_DESCRIPTOR_HANDLE offscreen1Handle(m_rtvHeap.hCPU(FrameCount));
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+        ID3D12Resource* buffers[2] = { m_offscreenBuffer1, m_offscreenBuffer2 };
+        D3D12_RESOURCE_STATES states[2] = { D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON };
+        auto transition = [&](int buffer, D3D12_RESOURCE_STATES to)
+        {
+            if (states[buffer] == to)
+                return;
+            const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(buffers[buffer], states[buffer], to);
+            GetCommandList()->ResourceBarrier(1, &barrier);
+            states[buffer] = to;
+        };
+        int current = 0;
 
         // Restore heaps
         ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
         GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-        // blur stuff
-        auto weights = CalcGaussWeights(m_renderData->blurAmount);
-        int blurRadius = (int)weights.size() / 2;
+        if (smaa)
+        {
+            transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            transition(1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            HRR(RenderSmaa(m_scissorRect.right, m_scissorRect.bottom));
+            current = 1;
+        }
 
-        GetCommandList()->SetComputeRootSignature(m_computeRootSignature);
+        if (m_renderData->enablePostProcessing)
+        {
+            PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post processing Blur");
+            const int other = 1 - current;
 
-        GetCommandList()->SetComputeRoot32BitConstants(0, 1, &blurRadius, 0);
-        GetCommandList()->SetComputeRoot32BitConstants(0, (UINT)weights.size(), weights.data(), 1);
+            // blur stuff
+            auto weights = CalcGaussWeights(m_renderData->blurAmount);
+            int blurRadius = (int)weights.size() / 2;
 
-        ///. for each blur pass
-        //
-        // Horizontal Blur pass.
-        GetCommandList()->SetPipelineState(m_gameLevelPSOs["horzBlur"]);
+            GetCommandList()->SetComputeRootSignature(m_computeRootSignature);
 
-        GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen1_SrvHeapOffset));
-        GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen2_UavHeapOffset));
+            GetCommandList()->SetComputeRoot32BitConstants(0, 1, &blurRadius, 0);
+            GetCommandList()->SetComputeRoot32BitConstants(0, (UINT)weights.size(), weights.data(), 1);
 
-        // How many groups do we need to dispatch to cover a row of pixels, where each
-        // group covers 256 pixels (the 256 is defined in the ComputeShader).
-        UINT numGroupsX = (UINT)ceilf(m_scissorRect.right / 256.0f);
-        GetCommandList()->Dispatch(numGroupsX, m_scissorRect.bottom, 1);
+            // Horizontal blur pass: current image into the other buffer.
+            transition(current, D3D12_RESOURCE_STATE_GENERIC_READ);
+            transition(other, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            GetCommandList()->SetPipelineState(m_gameLevelPSOs["horzBlur"]);
+            GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen1_SrvHeapOffset + current));
+            GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen1_UavHeapOffset + other));
 
-        // swap source and destination
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+            // How many groups do we need to dispatch to cover a row of pixels, where each
+            // group covers 256 pixels (the 256 is defined in the ComputeShader).
+            UINT numGroupsX = (UINT)ceilf(m_scissorRect.right / 256.0f);
+            GetCommandList()->Dispatch(numGroupsX, m_scissorRect.bottom, 1);
 
-        // Vertical Blur pass.
-        //
-        GetCommandList()->SetPipelineState(m_gameLevelPSOs["vertBlur"]);
+            // Vertical blur pass: back into the current buffer.
+            transition(other, D3D12_RESOURCE_STATE_GENERIC_READ);
+            transition(current, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            GetCommandList()->SetPipelineState(m_gameLevelPSOs["vertBlur"]);
+            GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen1_SrvHeapOffset + other));
+            GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen1_UavHeapOffset + current));
 
-        GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(Offscreen2_SrvHeapOffset));
-        GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen1_UavHeapOffset));
-
-        // How many groups do we need to dispatch to cover a column of pixels, where each
-        // group covers 256 pixels  (the 256 is defined in the ComputeShader).
-        UINT numGroupsY = (UINT)ceilf(m_scissorRect.bottom / 256.0f);
-        GetCommandList()->Dispatch(m_scissorRect.right, numGroupsY, 1);
-
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer2, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COMMON));
-
+            // How many groups do we need to dispatch to cover a column of pixels, where each
+            // group covers 256 pixels  (the 256 is defined in the ComputeShader).
+            UINT numGroupsY = (UINT)ceilf(m_scissorRect.bottom / 256.0f);
+            GetCommandList()->Dispatch(m_scissorRect.right, numGroupsY, 1);
+        }
 
         // Copy back to render target
         // TODO: eliminate this copy by using uav view of render target buffer
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
+        transition(current, D3D12_RESOURCE_STATE_COPY_SOURCE);
         GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST));
-        GetCommandList()->CopyResource(m_renderTargets[m_frameIndex], m_offscreenBuffer1);
+        GetCommandList()->CopyResource(m_renderTargets[m_frameIndex], buffers[current]);
 
         // Transition to render target to draw UI
         GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
-        GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_offscreenBuffer1, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
+        transition(0, D3D12_RESOURCE_STATE_COMMON);
+        transition(1, D3D12_RESOURCE_STATE_COMMON);
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
         GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
-        // Outgoing resource state
-        // m_offscreenBuffer1 - D3D12_RESOURCE_STATE_COMMON
-        // m_offscreenBuffer2 - D3D12_RESOURCE_STATE_COMMON 
-        // m_renderTargets -    D3D12_RESOURCE_STATE_RENDER_TARGET - final result
     }
 
     return hr;

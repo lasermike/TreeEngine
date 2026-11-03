@@ -56,9 +56,13 @@ foreach ($scene in $selectedScenes) {
             $points += [ordered]@{ time = [double]$config.times[$i]; filename = (Join-Path $jobDirectory "time-$i.png") }
         }
         $workerReportPath = Join-Path $jobDirectory 'capture-report.json'
+        # Optional per scene: "smaa" captures with SMAA 1x. Golds without it keep their original metadata.
+        $antialiasing = $(if ($scene.PSObject.Properties.Name -contains 'antialiasing') { [string]$scene.antialiasing } else { 'none' })
+        if ($antialiasing -notin @('none', 'smaa')) { throw "Scene $($scene.id): antialiasing must be none or smaa." }
         $request = [ordered]@{
             scene = $scene.name; mode = $mode; seed = $config.seed; width = $config.width; height = $config.height
-            warmupFrames = $config.warmupFrames; postProcessing = $config.postProcessing; report = $workerReportPath; captures = $points
+            warmupFrames = $config.warmupFrames; postProcessing = $config.postProcessing; antialiasing = $antialiasing
+            report = $workerReportPath; captures = $points
         }
         if ($BenchmarkFrames) { $request.benchmarkFrames = $BenchmarkFrames }
         $requestPath = Join-Path $jobDirectory 'request.json'
@@ -84,6 +88,7 @@ foreach ($scene in $selectedScenes) {
             $goldMetadata = Join-Path $GoldDirectory "$goldName.json"
             $diff = Join-Path $jobDirectory "time-$i-diff.png"
             $settings = [ordered]@{ scene = $scene.name; mode = $mode; time = $points[$i].time; width = $config.width; height = $config.height; seed = $config.seed; warmupFrames = $config.warmupFrames; postProcessing = $config.postProcessing }
+            if ($antialiasing -ne 'none') { $settings.antialiasing = $antialiasing }
             $settingsText = $settings | ConvertTo-Json -Compress
             $row = [ordered]@{ scene = $scene.id; mode = $mode; time = $points[$i].time; status = 'pass'; rms = $null; maxError = $null; changedPixels = $null; actual = $actual; gold = $gold; diff = $null; error = $null }
             try {

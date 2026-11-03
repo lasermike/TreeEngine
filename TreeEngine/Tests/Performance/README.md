@@ -29,6 +29,7 @@ There are two kinds of test:
 | `-Tests` (alias `-Scenes`) | all | Test `id`s from `scenes.json`. Steady tests use their scene's `id`. |
 | `-StartTime` | from `scenes.json` | Simulation time of frame 0 for steady tests, in seconds. Trees grow from time 0, so earlier times measure nearly empty scenes. |
 | `-DisableOpacityMicromaps` | off | Ray trace leaves without opacity micromaps, to measure what they save (see the scenes README). |
+| `-Antialiasing` | from `scenes.json` | `none` or `smaa`, for every test in the run. |
 
 Close other GPU-heavy programs first. The script measures whatever else the machine is doing.
 
@@ -52,7 +53,7 @@ Close other GPU-heavy programs first. The script measures whatever else the mach
 - `id`: letters, digits and hyphens, unique. It names the job directories and the dashboard series.
   Give a steady test its scene's `id`, so its history continues across runs.
 - `scene`: the `id` of a scene in `Game/Resources/Scenes`.
-- `modes` and `frameTimeStep` (seconds per frame) default to `defaults`.
+- `modes`, `frameTimeStep` (seconds per frame) and `antialiasing` (`none`, the default, or `smaa`) default to `defaults`.
 - **Steady** tests: `startTime` and `frames` (at least 20) default to `defaults`.
 - **Pacing** tests:
   - `startTime`: simulation time when the camera starts moving.
@@ -95,8 +96,9 @@ process with a `performance` request. The process:
    - `firstBlasBuildCpuMs` and `firstBlasBuildGpuMs`: the first actual BLAS rebuild in the run, independent of the selected frame window; GPU time also includes any initial opacity-micromap build. Older runs without the CPU metric leave it blank.
    - `blasHashMs` and `blasDescriptorsMs`: CPU time to hash BLAS inputs and prepare geometry descriptors and associated data.
    - `blasSubmitMs` and `tlasSubmitMs`: CPU wall time inside the respective build-command API calls, not GPU execution time.
-   - `gpuMs`: GPU passes in the order frame, shadow, main, deformation, BLAS, TLAS, rays.
-     Passes that don't run in a mode report 0; BLAS, TLAS, rays and deformation run only in ray tracing.
+   - `gpuMs`: GPU passes in the order frame, shadow, main, deformation, BLAS, TLAS, rays, anti-aliasing.
+     Passes that don't run in a mode report 0; BLAS, TLAS, rays and deformation run only in ray tracing,
+     and anti-aliasing only with SMAA. Runs before it was added have seven entries.
    - Counters: draw records, vertices, pose branches rebuilt and reused, acceleration-structure bytes,
      whether the frame rebuilt the BLAS (`rebuiltBLAS`), and others.
    - `cameraPosition`, and `settle`: true for settle frames.
@@ -125,6 +127,8 @@ Tools should read the fields in `results.json` or `index.json`, not parse direct
     - `scenes`, `frames`, `startTime`, `frameTimeStep`: the steady tests and their settings, as in schema 2.
     - `opacityMicromaps`: false when measured with `-DisableOpacityMicromaps`; missing in older runs.
       The dashboard marks such runs "opacity micromaps off".
+    - `antialiasing`: the `-Antialiasing` value, or null when each test used its own setting (in `tests`).
+      The dashboard marks SMAA runs.
     - `gpuPasses`
   - **`windows`:** the frame ranges summarized: `frames5to10` is frames 5–9, and `frames10to20` is frames 10–19.
   - **`jobs[]`**, one per test, mode and run:

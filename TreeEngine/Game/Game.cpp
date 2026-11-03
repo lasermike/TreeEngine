@@ -105,6 +105,9 @@ namespace
             };
             readPlacement(settings.m_debugUIOverlayPlacement);
             readPlacement(settings.m_debugUISeparatePlacement);
+            int antialiasing = 0;
+            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Smaa))
+                settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
         }
     }
 
@@ -117,7 +120,8 @@ namespace
         const auto& separateWindow = settings.m_debugUISeparatePlacement;
         file << settings.m_debugUIScale << ' ' << (settings.m_debugUISeparateWindow ? 1 : 0) << '\n'
             << overlay.x << ' ' << overlay.y << ' ' << overlay.width << ' ' << overlay.height << '\n'
-            << separateWindow.x << ' ' << separateWindow.y << ' ' << separateWindow.width << ' ' << separateWindow.height << '\n';
+            << separateWindow.x << ' ' << separateWindow.y << ' ' << separateWindow.width << ' ' << separateWindow.height << '\n'
+            << static_cast<int>(settings.m_antialiasing) << '\n';
     }
 
     std::string DebugRelativePath(const std::wstring& filename)
@@ -1222,7 +1226,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             ImGui::Text("BLAS / TLAS build calls: %.3f / %.3f ms", profile.blasSubmitMs, profile.tlasSubmitMs);
 
             ImGui::SeparatorText("GPU timings");
-            static const char* passNames[] = { "Frame", "Shadow", "Main", "Deformation", "BLAS", "TLAS", "Rays" };
+            static const char* passNames[] = { "Frame", "Shadow", "Main", "Deformation", "BLAS", "TLAS", "Rays", "Anti-aliasing" };
             static_assert(_countof(passNames) == static_cast<size_t>(ProfilePass::Count));
             for (size_t pass = 0; pass < _countof(passNames); ++pass)
                 ImGui::Text("%s: %.3f ms", passNames[pass], profile.gpuMs[pass]);
@@ -1307,6 +1311,11 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
         auto& sceneRenderSettings = m_renderManager.GetRenderData();
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
+        int antialiasing = static_cast<int>(m_settings.m_antialiasing);
+        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0"))
+            m_settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
+        if (m_settings.m_antialiasing == Settings::Antialiasing::Smaa)
+            ImGui::Checkbox("Show SMAA edges", &m_settings.m_showAntialiasingEdges);
         ImGui::SliderFloat("Blur Amount", &sceneRenderSettings.blurAmount, 0.0f, 2.5f, "%.2f");
         ImGui::Checkbox("Enable DXR", &m_settings.m_dxrEnabled);
         const auto& micromaps = sceneRenderSettings.opacityMicromaps;

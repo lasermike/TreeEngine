@@ -58,9 +58,11 @@ External Binaries/Intermediates directories are no longer used by the maintained
 desktop builds. Do not remove shared legacy outputs; any cleanup requires
 inspection and separate approval of the exact generated subdirectories.
 
-`scenes.json` lists twelve scenes, both rendering modes, and captures at 0, 1,
-and 5 seconds (72 images). It also specifies resolution, random seed,
-postprocessing, warmup frames, and tolerances. Scene IDs refer to this manifest;
+`scenes.json` lists fourteen scene entries, both rendering modes, and captures at
+0, 1, and 5 seconds (84 images). It also specifies resolution, random seed,
+postprocessing, warmup frames, and tolerances. An entry may set `"antialiasing":
+"smaa"` to capture with SMAA 1x (`leaf-atlas-test-smaa`, `tree-smaa`); other entries
+render without anti-aliasing, whatever the app's own setting. Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
 regression selection.

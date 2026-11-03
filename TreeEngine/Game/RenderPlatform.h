@@ -1041,6 +1041,17 @@ public:
     UINT                        m_ommCount = 0;
     UINT                        m_ommLevel = 0;
     GeometryBufferData::BufferOffsets m_spriteIndices = {}; // The sprite mesh: a front quad, then a coplanar back quad.
+
+    // SMAA 1x (Game/Shaders/Smaa.hlsl): edges and blending weights at the window size, and the lookup textures.
+    CComPtr<ID3D12RootSignature> m_smaaRootSignature;
+    CComPtr<ID3D12Resource>     m_smaaEdges;
+    CComPtr<ID3D12Resource>     m_smaaWeights;
+    CComPtr<ID3D12Resource>     m_smaaArea;
+    CComPtr<ID3D12Resource>     m_smaaSearch;
+    ID3D12Resource*             m_smaaColorSource = nullptr; // The off-screen buffer the color SRV currently views.
+    bool SmaaEnabled() const;
+    HRESULT EnsureSmaaResources(UINT width, UINT height);
+    HRESULT RenderSmaa(UINT width, UINT height);
     bool                        m_ommBuildPending = false;
     // Per BLAS geometry that links micromaps: the triangles and linkage its OMM_TRIANGLES desc points at.
     std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC> m_ommTriangleDescs;

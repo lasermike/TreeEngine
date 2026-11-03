@@ -80,5 +80,6 @@
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\ATGFont.hlsl" />
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tree.hlsl" />
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl" />
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Smaa.hlsl" />
   </ItemGroup>
 </Project>

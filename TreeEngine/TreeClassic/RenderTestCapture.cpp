@@ -162,6 +162,9 @@ void ParseRenderTestCommandLine()
     parsed->reflectionRays = json.value("reflectionRays", 0);
     parsed->waterMotionSpeed = json.value("waterMotionSpeed", 1.0f);
     parsed->opacityMicromaps = json.value("opacityMicromaps", true);
+    parsed->antialiasing = json.value("antialiasing", std::string("none"));
+    if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa")
+        throw std::runtime_error("antialiasing must be \"none\" or \"smaa\"");
     parsed->benchmarkTimeStep = json.value("benchmarkTimeStep", 0.0);
     parsed->postProcessing = json.value("postProcessing", true);
     parsed->validateScenePersistence = json.value("validateScenePersistence", false);
@@ -283,7 +286,7 @@ namespace
             { "startTime", request->performanceStartTime }, { "settleFrames", request->performanceSettleFrames },
             { "cameraKeys", request->performanceCamera.size() },
             { "workerThreads", game.GetWorkerThreadCount() },
-            { "gpuPasses", { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays" } },
+            { "gpuPasses", { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays", "antialiasing" } },
             { "samples", nlohmann::json::array() }, { "success", false } };
         int exitCode = 0;
         try
@@ -292,6 +295,7 @@ namespace
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
+            game.SetRenderTestAntialiasing(request->antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
             const int settleFrames = request->performanceSettleFrames;
             for (int frame = 0; frame < settleFrames + request->performanceFrames; ++frame)
             {
@@ -401,6 +405,7 @@ int RunRenderTestCapture(Game& game)
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
+            game.SetRenderTestAntialiasing(request->antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             game.GetPlayer()->SetPosition(point.overrideCamera
                 ? DirectX::XMVectorSet(point.cameraPosition[0], point.cameraPosition[1], point.cameraPosition[2], 1)
@@ -463,7 +468,7 @@ int RunRenderTestCapture(Game& game)
                 { "width", point.width }, { "height", point.height }, { "success", true },
                 { "poseCache", point.poseCache }, { "samples", samples } });
         }
-        report["gpuPasses"] = { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays" };
+        report["gpuPasses"] = { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays", "antialiasing" };
         report["success"] = true;
     }
     catch (const std::exception& error)

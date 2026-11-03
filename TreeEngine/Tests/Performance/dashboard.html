@@ -208,6 +208,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
     { key: 'gpu_blasMs', title: 'GPU BLAS build', sub: '' },
     { key: 'gpu_tlasMs', title: 'GPU TLAS build', sub: '' },
     { key: 'gpu_raysMs', title: 'GPU rays', sub: '' },
+    { key: 'gpu_antialiasingMs', title: 'GPU anti-aliasing', sub: 'SMAA passes; 0 when anti-aliasing is off' },
     { key: 'loadDefinitionMs', title: 'Scene load: definition', sub: 'Read the scene file and build objects, textures and models' },
     { key: 'loadGenerationMs', title: 'Scene load: generation', sub: 'Generate trees and other procedural geometry' },
     { key: 'loadGraphicsMs', title: 'Scene load: graphics', sub: 'Create GPU buffers, materials and pipelines' }
@@ -361,7 +362,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; }
   function runTitle(run) {
     return run.label + (run.label === shortCommit(run) ? '' : ' (' + shortCommit(run) + ')') +
       (run.dirty ? ' • uncommitted changes' : '') + (run.backportedHarness ? ' • measuring code backported' : '') +
-      (run.opacityMicromapsOff ? ' • opacity micromaps off' : '');
+      (run.opacityMicromapsOff ? ' • opacity micromaps off' : '') +
+      (run.antialiasing && run.antialiasing !== 'none' ? ' • ' + run.antialiasing.toUpperCase() : '');
   }
 
   // ---- Comparison table -----------------------------------------------------------------

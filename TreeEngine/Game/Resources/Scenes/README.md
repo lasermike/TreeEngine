@@ -395,6 +395,19 @@ Example: "ambientOcclusion": { "radius": 1.25, "strength": 0.65 }
 
 A model can specify "normalAnimation": {"material": "material name", "velocity1": [0.012, 0.006], "velocity2": [-0.005, 0.009]}. The name must uniquely identify a glTF material with a repeating normal map. Velocities are UV units per simulation second; two moving samples are blended. Optional strength multiplies the imported normal scale (0 to 16, default 1). The debug UI Water motion speed slider scales the animation and zero freezes its current phase. The effect uses scene time in raster and DXR and pauses with the simulation. Omit the property for static normals.
 
+## Anti-aliasing
+
+Anti-aliasing is an app setting, not part of a scene: **Anti-aliasing** in the debug UI's Settings, saved
+with the debug UI's preferences. It works on the final image, so it applies to raster and DXR alike.
+- `SMAA 1x` (the default) finds edges in the color image and blends across them: about 0.03 ms at
+  1280x720 on an RTX 5080. **Show SMAA edges** draws the detected edges, horizontal in red and vertical
+  in green, over the dimmed scene.
+- `None` turns it off.
+
+SMAA runs before the post-processing blur (`blurAmount`). The blur also softens jagged edges, so with SMAA
+on, a lower `blurAmount` keeps more texture detail. Temporal anti-aliasing and upscalers (DLSS, FSR) are
+planned on top of motion vectors.
+
 ## Sun shadow softness
 
 The directional light can specify "angularDiameterDegrees" (0 to 10, default 0) and "shadowSamples" (1 to 32, default 8). A positive angle with more than one sample traces the apparent sun disk in DXR; zero keeps hard shadows. The angle is the sun's full angular diameter. Raster shadow maps retain their existing filtering. Soft sun sampling applies to directly visible surfaces; secondary reflection and transmission hits use a single shadow ray to limit cost. More samples increase ray tracing cost.
