@@ -26,7 +26,8 @@ public:
     bool m_shadowsEnabled = true;
     bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
     // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
-    enum class Antialiasing { None, Smaa };
+    // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.
+    enum class Antialiasing { None, Smaa, Taa };
     Antialiasing m_antialiasing = Antialiasing::Smaa;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
     // Raster alpha-tested surfaces (foliage) pass against a hashed per-surface threshold instead of the material's

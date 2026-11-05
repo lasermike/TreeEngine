@@ -163,8 +163,8 @@ void ParseRenderTestCommandLine()
     parsed->waterMotionSpeed = json.value("waterMotionSpeed", 1.0f);
     parsed->opacityMicromaps = json.value("opacityMicromaps", true);
     parsed->antialiasing = json.value("antialiasing", std::string("none"));
-    if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa")
-        throw std::runtime_error("antialiasing must be \"none\" or \"smaa\"");
+    if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa" && parsed->antialiasing != "taa")
+        throw std::runtime_error("antialiasing must be \"none\", \"smaa\" or \"taa\"");
     const std::string alphaTest = json.value("alphaTest", std::string("hashed"));
     if (alphaTest != "hashed" && alphaTest != "cutoff")
         throw std::runtime_error("alphaTest must be \"hashed\" or \"cutoff\"");
@@ -242,8 +242,8 @@ void ParseRenderTestCommandLine()
         point.poseCache = value.value("poseCache", true);
         point.scene = value.value("scene", std::string());
         point.antialiasing = value.value("antialiasing", parsed->antialiasing);
-        if (point.antialiasing != "none" && point.antialiasing != "smaa")
-            throw std::runtime_error("Capture antialiasing must be \"none\" or \"smaa\"");
+        if (point.antialiasing != "none" && point.antialiasing != "smaa" && point.antialiasing != "taa")
+            throw std::runtime_error("Capture antialiasing must be \"none\", \"smaa\" or \"taa\"");
         point.postProcessing = value.value("postProcessing", parsed->postProcessing);
         point.showShadowBuffer = value.value("showShadowBuffer", false);
         if (value.contains("cameraPosition"))
@@ -318,6 +318,12 @@ namespace
         return result;
     }
 
+    // A request's "antialiasing" value, already validated.
+    Settings::Antialiasing AntialiasingSetting(const std::string& name)
+    {
+        return name == "smaa" ? Settings::Antialiasing::Smaa : name == "taa" ? Settings::Antialiasing::Taa : Settings::Antialiasing::None;
+    }
+
     // The camera pose at time seconds into the path: linear between keys, held outside them.
     void ApplyCameraPath(Game& game, const std::vector<RenderTestCameraKey>& keys, double time)
     {
@@ -355,7 +361,7 @@ namespace
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
-            game.SetRenderTestAntialiasing(request->antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
+            game.SetRenderTestAntialiasing(AntialiasingSetting(request->antialiasing));
             game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
             const int settleFrames = request->performanceSettleFrames;
             for (int frame = 0; frame < settleFrames + request->performanceFrames; ++frame)
@@ -483,7 +489,7 @@ int RunRenderTestCapture(Game& game)
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
-            game.SetRenderTestAntialiasing(point.antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
+            game.SetRenderTestAntialiasing(AntialiasingSetting(point.antialiasing));
             game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion

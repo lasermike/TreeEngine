@@ -20,6 +20,7 @@ Smaa.hlsl,cs,SmaaWeightsCS
 Smaa.hlsl,cs,SmaaBlendCS
 MotionVectors.hlsl,cs,MotionVectorsCS
 MotionDebug.hlsl,cs,MotionDebugCS
+Taa.hlsl,cs,TaaResolveCS
 RaytracingLibrary.hlsl,lib,RaytracingLibrary
 GlobalRootSignature.hlsl,rootsig,GlobalRootSignature
 LocalRootSignature.hlsl,rootsig,LocalRootSignature

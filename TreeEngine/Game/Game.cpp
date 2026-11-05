@@ -106,7 +106,7 @@ namespace
             readPlacement(settings.m_debugUIOverlayPlacement);
             readPlacement(settings.m_debugUISeparatePlacement);
             int antialiasing = 0;
-            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Smaa))
+            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Taa))
                 settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
         }
     }
@@ -1314,7 +1314,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         auto& sceneRenderSettings = m_renderManager.GetRenderData();
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         int antialiasing = static_cast<int>(m_settings.m_antialiasing);
-        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0"))
+        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0TAA\0"))
             m_settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
         if (m_settings.m_antialiasing == Settings::Antialiasing::Smaa)
             ImGui::Checkbox("Show SMAA edges", &m_settings.m_showAntialiasingEdges);

@@ -1068,6 +1068,15 @@ public:
     UINT                        m_motionViewGeneration = UINT_MAX;  // Off-screen generation the motion views follow.
     UINT                        m_colorHistoryFrame = UINT_MAX;     // The frame whose color m_motionHistory holds.
     bool MotionVectorsNeeded() const;
+
+    // Temporal anti-aliasing (Game/Shaders/Taa.hlsl): resolved color accumulates in a float history, ping-ponged.
+    CComPtr<ID3D12RootSignature> m_taaRootSignature;
+    CComPtr<ID3D12Resource>     m_taaHistory[2];
+    UINT                        m_taaHistoryIndex = 0;              // The history this frame reads.
+    UINT                        m_taaHistoryFrame = UINT_MAX;       // The frame whose resolve the history holds.
+    UINT                        m_taaViewGeneration = UINT_MAX;
+    bool TaaEnabled() const;
+    HRESULT EnsureTaaResources(UINT width, UINT height);
     bool UsesOffscreenChain() const;
     HRESULT EnsureMotionResources(UINT width, UINT height);
     void ResetMotionHistory();

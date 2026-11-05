@@ -413,12 +413,18 @@ with the debug UI's preferences. It works on the final image, so it applies to r
 - `SMAA 1x` (the default) finds edges in the color image and blends across them: about 0.03 ms at
   1280x720 on an RTX 5080. **Show SMAA edges** draws the detected edges, horizontal in red and vertical
   in green, over the dimmed scene.
+- `TAA` (temporal anti-aliasing, `Game/Shaders/Taa.hlsl`) moves the camera by a sub-pixel offset every frame
+  and accumulates the frames along the motion vectors, so each pixel averages several samples. Unlike SMAA it
+  also resolves detail smaller than a pixel: thin branches and needles, the distant foliage speckle of the
+  hashed alpha test, specular glints and ray-traced noise. Last frame's result is clipped to the colors around
+  each pixel now, which keeps moving and uncovered edges from ghosting. It settles in a few frames after a
+  camera cut and is slightly softer than SMAA.
 - `None` turns it off.
 
-SMAA runs before the post-processing blur (`blurAmount`). The blur also softens jagged edges, so with SMAA
-on, a lower `blurAmount` keeps more texture detail.
+SMAA and TAA run before the post-processing blur (`blurAmount`). The blur also softens jagged edges, so with
+anti-aliasing on, a lower `blurAmount` keeps more texture detail.
 
-Temporal anti-aliasing and upscalers (DLSS, FSR) are planned on top of motion vectors. The scene pass writes
+Upscalers (DLSS, FSR) are planned on the same inputs as TAA. The scene pass writes
 each surface's motion, from its position last frame (growing trees, moved and instanced objects) and last
 frame's camera. A compute pass (`Game/Shaders/MotionVectors.hlsl`) fills the sky from the camera alone. Blended
 surfaces that don't write depth, like water, keep the motion of what's behind them, as depth does. Raster
@@ -428,8 +434,8 @@ always draws the scene, so DXR uses the same vectors. **Motion vectors** in Sett
   should look like the live image, except at edges the move uncovered.
 - `History`: last frame's image unmoved, for comparison.
 
-The compute pass and the views run only while a view is on; the scene pass always writes velocity. Sub-pixel
-camera jitter is in place for TAA but stays off until TAA exists.
+The compute pass runs while TAA or a view is on; the scene pass always writes velocity. The camera jitters only
+with TAA.
 
 ## Sun shadow softness
 

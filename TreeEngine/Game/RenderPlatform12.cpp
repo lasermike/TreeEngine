@@ -219,8 +219,16 @@ enum CbvSrvUavHeapOffsets
     MotionColor_SrvHeapOffset,
     MotionVelocity_UavHeapOffset,
 
+    // TAA tables, one per history parity (see Game/Shaders/Taa.hlsl): reading history N, the SRV table is color,
+    // velocity, depth and history N, and the UAV table is the resolved output and history 1 - N.
+    TaaRead0_SrvHeapOffset,
+    TaaRead1_SrvHeapOffset = TaaRead0_SrvHeapOffset + 4,
+    TaaWrite0_UavHeapOffset = TaaRead1_SrvHeapOffset + 4,
+    TaaWrite1_UavHeapOffset = TaaWrite0_UavHeapOffset + 2,
+    TaaEnd_HeapOffset = TaaWrite1_UavHeapOffset + 2,
+
     // Per-material descriptors
-    Material0_HeapOffset,
+    Material0_HeapOffset = TaaEnd_HeapOffset,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
     Texture0Srv_HeapOffset = Material0_HeapOffset + 1,
     Num_CbvSrvUavHeapOffsets
@@ -637,6 +645,28 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         m_motionRootSignature->SetName(L"Motion vectors");
     }
 
+    {
+        // TAA: 8 constants, four SRVs (color, velocity, depth, history), two UAVs (output, new history), linear clamp.
+        CD3DX12_DESCRIPTOR_RANGE srvRange, uavRange;
+        srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);
+        uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0);
+        CD3DX12_ROOT_PARAMETER parameters[3];
+        parameters[0].InitAsConstants(8, 0);
+        parameters[1].InitAsDescriptorTable(1, &srvRange);
+        parameters[2].InitAsDescriptorTable(1, &uavRange);
+        const CD3DX12_STATIC_SAMPLER_DESC sampler(0, D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+            D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+        CD3DX12_ROOT_SIGNATURE_DESC desc(_countof(parameters), parameters, 1, &sampler);
+        CComPtr<ID3DBlob> serialized, errors;
+        const HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &serialized, &errors);
+        if (errors)
+            ::OutputDebugStringA(static_cast<const char*>(errors->GetBufferPointer()));
+        HRR(hr);
+        HRR(GetDevice()->CreateRootSignature(0, serialized->GetBufferPointer(), serialized->GetBufferSize(),
+            IID_PPV_ARGS(&m_taaRootSignature)));
+        m_taaRootSignature->SetName(L"TAA");
+    }
+
     // Init text font
     //m_bitmapFont = new XSF::BitmapFont();
     //HRR(m_bitmapFont->Create(this, L"Arial_16"));
@@ -913,7 +943,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         // SMAA passes.
         const std::pair<const wchar_t*, const char*> smaaPasses[] = {
             { L"SmaaEdgesCS.cso", "smaaEdges" }, { L"SmaaWeightsCS.cso", "smaaWeights" }, { L"SmaaBlendCS.cso", "smaaBlend" },
-            { L"MotionVectorsCS.cso", "motionVectors" }, { L"MotionDebugCS.cso", "motionDebug" } };
+            { L"MotionVectorsCS.cso", "motionVectors" }, { L"MotionDebugCS.cso", "motionDebug" },
+            { L"TaaResolveCS.cso", "taaResolve" } };
         for (const auto& pass : smaaPasses)
         {
             ComputeShader* shader = nullptr;
@@ -921,7 +952,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             if (!shader)
                 return E_FAIL;
             D3D12_COMPUTE_PIPELINE_STATE_DESC pso = {};
-            pso.pRootSignature = strncmp(pass.second, "motion", 6) == 0 ? m_motionRootSignature : m_smaaRootSignature;
+            pso.pRootSignature = strncmp(pass.second, "motion", 6) == 0 ? m_motionRootSignature
+                : strncmp(pass.second, "taa", 3) == 0 ? m_taaRootSignature : m_smaaRootSignature;
 #if defined(TREE_XBOX)
             pso.CS = { reinterpret_cast<BYTE*>(shader->shader.data()), shader->shader.size() };
 #else
@@ -1434,6 +1466,10 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_smaaRootSignature.Release();
     m_motionRootSignature.Release();
     m_motionHistory.Release();
+    m_taaRootSignature.Release();
+    m_taaHistory[0].Release();
+    m_taaHistory[1].Release();
+    m_taaViewGeneration = UINT_MAX;
     m_motionViewGeneration = UINT_MAX;
     ResetMotionHistory();
     m_smaaEdges.Release();
@@ -3505,7 +3541,7 @@ HRESULT RenderPlatform12::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4*
         XMFLOAT2 jitter(0, 0);
         if (m_settings->m_hasFixedJitter)
             jitter = XMFLOAT2(m_settings->m_fixedJitter[0], m_settings->m_fixedJitter[1]);
-        else if (m_settings->m_jitter)
+        else if (m_settings->m_jitter || TaaEnabled())
         {
             auto halton = [](UINT index, UINT base) { float f = 1, r = 0; for (; index; index /= base) { f /= base; r += f * (index % base); } return r; };
             const UINT index = m_renderData->frame % 8 + 1;
@@ -4302,11 +4338,60 @@ bool RenderPlatform12::UsesOffscreenChain() const
     return m_renderData->enablePostProcessing || SmaaEnabled() || MotionVectorsNeeded();
 }
 
-// The motion pass runs for its debug views; TAA will need it too.
+// The motion pass runs for TAA and for its debug views.
 bool RenderPlatform12::MotionVectorsNeeded() const
 {
-    return m_settings->m_motionView != Settings::MotionView::Off && m_motionRootSignature
+    return (m_settings->m_motionView != Settings::MotionView::Off || TaaEnabled()) && m_motionRootSignature
         && m_gameLevelPSOs.count("motionDebug") > 0;
+}
+
+bool RenderPlatform12::TaaEnabled() const
+{
+    return m_settings->m_antialiasing == Settings::Antialiasing::Taa && m_taaRootSignature
+        && m_gameLevelPSOs.count("taaResolve") > 0;
+}
+
+// The two float histories at the window size, and both parities' tables. Runs after RenderProlog has waited for the
+// previous frame, so rewriting descriptors is safe.
+HRESULT RenderPlatform12::EnsureTaaResources(UINT width, UINT height)
+{
+    bool recreated = false;
+    if (!m_taaHistory[0] || m_taaHistory[0]->GetDesc().Width != width || m_taaHistory[0]->GetDesc().Height != height)
+    {
+        const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
+        const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16B16A16_FLOAT, width, height, 1, 1, 1, 0,
+            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        for (int i = 0; i < 2; ++i)
+        {
+            Retire(m_taaHistory[i]);
+            HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc,
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&m_taaHistory[i])));
+            m_taaHistory[i]->SetName(i ? L"TAA history B" : L"TAA history A");
+        }
+        m_taaHistoryFrame = UINT_MAX;
+        recreated = true;
+    }
+    if (recreated || m_taaViewGeneration != m_offscreenGeneration)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC depthView = {};
+        depthView.Format = DXGI_FORMAT_R32_FLOAT;
+        depthView.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        depthView.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        depthView.Texture2D.MipLevels = 1;
+        for (int read = 0; read < 2; ++read)
+        {
+            const int srv = read ? TaaRead1_SrvHeapOffset : TaaRead0_SrvHeapOffset;
+            const int uav = read ? TaaWrite1_UavHeapOffset : TaaWrite0_UavHeapOffset;
+            GetDevice()->CreateShaderResourceView(m_offscreenBuffer1, nullptr, m_descriptorHeap.hCPU(srv));
+            GetDevice()->CreateShaderResourceView(m_motionVelocity, nullptr, m_descriptorHeap.hCPU(srv + 1));
+            GetDevice()->CreateShaderResourceView(m_pDepthStencil, &depthView, m_descriptorHeap.hCPU(srv + 2));
+            GetDevice()->CreateShaderResourceView(m_taaHistory[read], nullptr, m_descriptorHeap.hCPU(srv + 3));
+            GetDevice()->CreateUnorderedAccessView(m_offscreenBuffer2, nullptr, nullptr, m_descriptorHeap.hCPU(uav));
+            GetDevice()->CreateUnorderedAccessView(m_taaHistory[1 - read], nullptr, nullptr, m_descriptorHeap.hCPU(uav + 1));
+        }
+        m_taaViewGeneration = m_offscreenGeneration;
+    }
+    return S_OK;
 }
 
 // After a resize, a level load or a device reset, the previous camera and color no longer apply.
@@ -4316,6 +4401,7 @@ void RenderPlatform12::ResetMotionHistory()
     m_cameraHistoryValid = false;
     m_viewProjectionFrame = UINT_MAX;
     m_colorHistoryFrame = UINT_MAX;
+    m_taaHistoryFrame = UINT_MAX;
     m_lastInstanceBuffer = nullptr;
     m_previousInstanceBuffer = nullptr;
     m_lastInstanceFrame = UINT_MAX;
@@ -4548,6 +4634,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
     const bool smaa = SmaaEnabled();
     if (UsesOffscreenChain())
     {
+        PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post-processing");
         ID3D12Resource* buffers[2] = { m_offscreenBuffer1, m_offscreenBuffer2 };
         D3D12_RESOURCE_STATES states[2] = { D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON };
         auto transition = [&](int buffer, D3D12_RESOURCE_STATES to)
@@ -4569,8 +4656,8 @@ HRESULT RenderPlatform12::RenderPostProcess()
             ProfileTimestamp(ProfilePass::AntiAliasing, false);
         if (motion)
         {
-            // Velocity from depth, then the debug view (it reads last frame's color), then this frame's color becomes
-            // the history, then the debug view replaces the scene color.
+            // Velocity from depth, then TAA resolves into the scene color, then a debug view (it reads last frame's
+            // color) replaces it after this frame's color becomes the debug history.
             PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Motion vectors");
             const UINT width = m_scissorRect.right, height = m_scissorRect.bottom;
             HRR(EnsureMotionResources(width, height));
@@ -4596,39 +4683,83 @@ HRESULT RenderPlatform12::RenderPostProcess()
             GetCommandList()->SetComputeRoot32BitConstants(0, 40, &constants, 0);
             const UINT groupsX = (width + 7) / 8, groupsY = (height + 7) / 8;
 
-            barrier(m_pDepthStencil, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-            barrier(m_motionVelocity, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-            GetCommandList()->SetPipelineState(m_gameLevelPSOs["motionVectors"]);
-            GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(MotionDepth_SrvHeapOffset));
-            GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(MotionVelocity_UavHeapOffset));
-            GetCommandList()->Dispatch(groupsX, groupsY, 1);
-            barrier(m_motionVelocity, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            {
+                PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Velocity");
+                barrier(m_pDepthStencil, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                barrier(m_motionVelocity, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                GetCommandList()->SetPipelineState(m_gameLevelPSOs["motionVectors"]);
+                GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(MotionDepth_SrvHeapOffset));
+                GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(MotionVelocity_UavHeapOffset));
+                GetCommandList()->Dispatch(groupsX, groupsY, 1);
+                barrier(m_motionVelocity, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            }
+
+            if (TaaEnabled())
+            {
+                // Resolve into off-screen buffer 2 and the other history, then copy back so the rest of the chain sees
+                // the resolved image in buffer 1. Depth is still readable for the nearest-pixel velocity.
+                PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"TAA");
+                HRR(EnsureTaaResources(width, height));
+                const UINT read = m_taaHistoryIndex, write = 1 - read;
+                {
+                    PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Resolve");
+                    struct
+                    {
+                        float size[4];
+                        UINT historyValid;
+                        float currentWeight, clipGamma;
+                        UINT pad;
+                    } taaConstants = { { constants.size[0], constants.size[1], constants.size[2], constants.size[3] },
+                        m_taaHistoryFrame != UINT_MAX && m_taaHistoryFrame + 1 == m_renderData->frame && m_cameraHistoryValid ? 1u : 0u,
+                        0.1f, 1.25f, 0 };
+                    transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                    transition(1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                    barrier(m_taaHistory[write], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                    GetCommandList()->SetComputeRootSignature(m_taaRootSignature);
+                    GetCommandList()->SetComputeRoot32BitConstants(0, 8, &taaConstants, 0);
+                    GetCommandList()->SetPipelineState(m_gameLevelPSOs["taaResolve"]);
+                    GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(read ? TaaRead1_SrvHeapOffset : TaaRead0_SrvHeapOffset));
+                    GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(read ? TaaWrite1_UavHeapOffset : TaaWrite0_UavHeapOffset));
+                    GetCommandList()->Dispatch(groupsX, groupsY, 1);
+                    barrier(m_taaHistory[write], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                }
+                {
+                    PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Copy to scene color");
+                    transition(1, D3D12_RESOURCE_STATE_COPY_SOURCE);
+                    transition(0, D3D12_RESOURCE_STATE_COPY_DEST);
+                    GetCommandList()->CopyResource(m_offscreenBuffer1, m_offscreenBuffer2);
+                }
+                m_taaHistoryIndex = write;
+                m_taaHistoryFrame = m_renderData->frame;
+            }
             barrier(m_pDepthStencil, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-            const bool debugView = m_settings->m_motionView != Settings::MotionView::Off;
-            if (debugView)
+            if (m_settings->m_motionView != Settings::MotionView::Off)
             {
-                transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-                transition(1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-                GetCommandList()->SetPipelineState(m_gameLevelPSOs["motionDebug"]);
-                GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(MotionVelocity_SrvHeapOffset));
-                GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen2_UavHeapOffset));
-                GetCommandList()->Dispatch(groupsX, groupsY, 1);
+                {
+                    PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Motion debug view");
+                    transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                    transition(1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                    GetCommandList()->SetComputeRootSignature(m_motionRootSignature);
+                    GetCommandList()->SetComputeRoot32BitConstants(0, 40, &constants, 0);
+                    GetCommandList()->SetPipelineState(m_gameLevelPSOs["motionDebug"]);
+                    GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(MotionVelocity_SrvHeapOffset));
+                    GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(Offscreen2_UavHeapOffset));
+                    GetCommandList()->Dispatch(groupsX, groupsY, 1);
+                }
+                {
+                    PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Motion debug history copy");
+                    transition(0, D3D12_RESOURCE_STATE_COPY_SOURCE);
+                    barrier(m_motionHistory, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+                    GetCommandList()->CopyResource(m_motionHistory, m_offscreenBuffer1);
+                    barrier(m_motionHistory, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                    m_colorHistoryFrame = m_renderData->frame;
+                    transition(1, D3D12_RESOURCE_STATE_COPY_SOURCE);
+                    transition(0, D3D12_RESOURCE_STATE_COPY_DEST);
+                    GetCommandList()->CopyResource(m_offscreenBuffer1, m_offscreenBuffer2);
+                }
             }
-
-            transition(0, D3D12_RESOURCE_STATE_COPY_SOURCE);
-            barrier(m_motionHistory, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
-            GetCommandList()->CopyResource(m_motionHistory, m_offscreenBuffer1);
-            barrier(m_motionHistory, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-            m_colorHistoryFrame = m_renderData->frame;
             barrier(m_motionVelocity, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-            if (debugView)
-            {
-                transition(1, D3D12_RESOURCE_STATE_COPY_SOURCE);
-                transition(0, D3D12_RESOURCE_STATE_COPY_DEST);
-                GetCommandList()->CopyResource(m_offscreenBuffer1, m_offscreenBuffer2);
-            }
         }
 
         if (smaa)
@@ -4682,6 +4813,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
 
         // Copy back to render target
         // TODO: eliminate this copy by using uav view of render target buffer
+        PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Copy to back buffer");
         transition(current, D3D12_RESOURCE_STATE_COPY_SOURCE);
         GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST));
         GetCommandList()->CopyResource(m_renderTargets[m_frameIndex], buffers[current]);

@@ -33,6 +33,9 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Copies the deployed runtime into the ignored test artifacts directory.
 .\Tests\RenderRegression\test-tree-skinning.ps1 -Capacity
 
+# Temporal anti-aliasing against a 4-sample reference: convergence, stability and a camera step.
+.\Tests\RenderRegression\test-taa.ps1
+
 # Camera motion vectors and jitter in LeafAtlasTest and AI Tree, raster and DXR.
 .\Tests\RenderRegression\test-motion-vectors.ps1
 
@@ -65,7 +68,8 @@ inspection and separate approval of the exact generated subdirectories.
 0, 1, and 5 seconds (84 images). It also specifies resolution, random seed,
 postprocessing, warmup frames, and tolerances. An entry may set `"antialiasing":
 "smaa"` to capture with SMAA 1x (`leaf-atlas-test-smaa`, `tree-smaa`); other entries
-render without anti-aliasing, whatever the app's own setting. A request's `alphaTest` is `"hashed"` (the default, like the app)
+render without anti-aliasing, whatever the app's own setting. An entry or capture may also set `"antialiasing": "taa"`; TAA needs warm-up frames to converge (`test-taa.ps1`
+uses 40). A request's `alphaTest` is `"hashed"` (the default, like the app)
 or `"cutoff"` (each material's alpha cutoff). Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
