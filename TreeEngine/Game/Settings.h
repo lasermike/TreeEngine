@@ -28,7 +28,7 @@ public:
     // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
     // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.
     enum class Antialiasing { None, Smaa, Taa };
-    Antialiasing m_antialiasing = Antialiasing::Smaa;
+    Antialiasing m_antialiasing = Antialiasing::Taa;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
     // Raster alpha-tested surfaces (foliage) pass against a hashed per-surface threshold instead of the material's
     // cutoff where their texture is minified, so raster matches ray tracing's density at every distance

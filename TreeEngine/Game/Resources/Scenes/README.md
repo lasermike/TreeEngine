@@ -410,10 +410,10 @@ off. PNG textures get their mipmaps from an area-weighted filter that keeps each
 
 Anti-aliasing is an app setting, not part of a scene: **Anti-aliasing** in the debug UI's Settings, saved
 with the debug UI's preferences. It works on the final image, so it applies to raster and DXR alike.
-- `SMAA 1x` (the default) finds edges in the color image and blends across them: about 0.03 ms at
+- `SMAA 1x` finds edges in the color image and blends across them: about 0.03 ms at
   1280x720 on an RTX 5080. **Show SMAA edges** draws the detected edges, horizontal in red and vertical
   in green, over the dimmed scene.
-- `TAA` (temporal anti-aliasing, `Game/Shaders/Taa.hlsl`) moves the camera by a sub-pixel offset every frame
+- `TAA` (the default; temporal anti-aliasing, `Game/Shaders/Taa.hlsl`) moves the camera by a sub-pixel offset every frame
   and accumulates the frames along the motion vectors, so each pixel averages several samples. Unlike SMAA it
   also resolves detail smaller than a pixel: thin branches and needles, the distant foliage speckle of the
   hashed alpha test, specular glints and ray-traced noise. Last frame's result is clipped to the colors around

@@ -4,6 +4,7 @@
 #include "Settings.h"
 #include "OpacityMicromapBaker.h"
 #include <chrono>
+#include <ppl.h>
 
 #include "DDSTextureLoader12.h"
 #include "BitmapFont12.h"
@@ -1722,9 +1723,9 @@ static HRESULT CreateRgbaTextureFromBgraImage(ID3D12Device* device, ResourceUplo
         const float c = i / 255.0f;
         toLinear[i] = !srgb ? c : c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
     }
-    auto encode = [srgb](float linear)
+    auto encode = [srgb](double value)
     {
-        linear = std::min(std::max(linear, 0.0f), 1.0f);
+        const float linear = static_cast<float>(std::min(std::max(value, 0.0), 1.0));
         const float c = !srgb ? linear : linear <= 0.0031308f ? linear * 12.92f : 1.055f * std::pow(linear, 1.0f / 2.4f) - 0.055f;
         return static_cast<uint8_t>(c * 255.0f + 0.5f);
     };
@@ -1733,7 +1734,8 @@ static HRESULT CreateRgbaTextureFromBgraImage(ID3D12Device* device, ResourceUplo
         const UINT dw = std::max(1u, w / 2), dh = std::max(1u, h / 2);
         const std::vector<uint8_t>& source = levels.back();
         std::vector<uint8_t> destination(static_cast<size_t>(dw) * dh * 4);
-        for (UINT y = 0; y < dh; ++y)
+        // Rows in parallel: a 4096x4096 atlas took a third of a second on one thread.
+        concurrency::parallel_for(0u, dh, [&](UINT y)
         {
             const double y0 = static_cast<double>(y) * h / dh, y1 = static_cast<double>(y + 1) * h / dh;
             for (UINT x = 0; x < dw; ++x)
@@ -1759,10 +1761,10 @@ static HRESULT CreateRgbaTextureFromBgraImage(ID3D12Device* device, ResourceUplo
                     }
                 uint8_t* out = &destination[(static_cast<size_t>(y) * dw + x) * 4];
                 for (int c = 0; c < 3; ++c)
-                    out[c] = encode(static_cast<float>(alpha > 0 ? weighted[c] / alpha : plain[c] / weight));
+                    out[c] = encode(alpha > 0 ? weighted[c] / alpha : plain[c] / weight);
                 out[3] = static_cast<uint8_t>(alpha / weight * 255.0 + 0.5);
             }
-        }
+        });
         levels.push_back(std::move(destination));
         w = dw;
         h = dh;

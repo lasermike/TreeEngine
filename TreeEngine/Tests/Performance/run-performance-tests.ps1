@@ -20,7 +20,7 @@ param(
     # Ray trace leaves without opacity micromaps (DXR 1.2), to measure what they save.
     [switch]$DisableOpacityMicromaps,
     # Anti-aliasing for every test, overriding scenes.json: none or smaa.
-    [ValidateSet('none', 'smaa')][string]$Antialiasing
+    [ValidateSet('none', 'smaa', 'taa')][string]$Antialiasing
 )
 
 # Runs the tests in scenes.json and writes the results to
@@ -84,7 +84,7 @@ foreach ($entry in @($manifest.tests)) {
     $step = Get-Setting $entry $defaults 'frameTimeStep' (1.0 / 60.0)
     if (-not (Test-FiniteNumber $step) -or $step -le 0) { throw "$where`: frameTimeStep must be positive." }
     $testAntialiasing = $(if ($Antialiasing) { $Antialiasing } else { [string](Get-Setting $entry $defaults 'antialiasing' 'none') })
-    if ($testAntialiasing -notin @('none', 'smaa')) { throw "$where`: antialiasing must be none or smaa." }
+    if ($testAntialiasing -notin @('none', 'smaa', 'taa')) { throw "$where`: antialiasing must be none, smaa or taa." }
     $test = [ordered]@{ id = $entry.id; scene = $entry.scene; sceneName = $sceneFiles[[string]$entry.scene].name; type = $entry.type
         modes = $testModes; frameTimeStep = [double]$step; antialiasing = $testAntialiasing }
     if ($entry.type -eq 'steady') {
