@@ -80,6 +80,7 @@ public:
     void SetRenderTestWaterMotionSpeed(float speed) { m_settings.m_waterMotionSpeed = speed; }
     void SetRenderTestOpacityMicromaps(bool enabled) { m_settings.m_opacityMicromaps = enabled; }
     void SetRenderTestAntialiasing(Settings::Antialiasing mode) { m_settings.m_antialiasing = mode; m_settings.m_showAntialiasingEdges = false; }
+    void SetRenderTestHashedAlphaTest(bool hashed) { m_settings.m_hashedAlphaTest = hashed; }
     void SetRenderTestMotion(Settings::MotionView view, bool hasJitter, float jitterX, float jitterY) {
         m_settings.m_motionView = view;
         m_settings.m_jitter = false;

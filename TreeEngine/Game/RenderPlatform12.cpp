@@ -1666,8 +1666,6 @@ static HRESULT CreateRgbaTextureFromBgraImage(ID3D12Device* device, ResourceUplo
         }
     }
     const DXGI_FORMAT format = srgb ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-    if (!upload.IsSupportedForGenerateMips(format))
-        return S_FALSE;
 
     CComPtr<IWICFormatConverter> converter;
     HRR(factory->CreateFormatConverter(&converter));
@@ -1676,18 +1674,74 @@ static HRESULT CreateRgbaTextureFromBgraImage(ID3D12Device* device, ResourceUplo
     std::vector<uint8_t> pixels(static_cast<size_t>(rowPitch) * height);
     HRR(converter->CopyPixels(nullptr, rowPitch, static_cast<UINT>(pixels.size()), pixels.data()));
 
-    UINT16 mipLevels = 1;
-    for (UINT size = std::max(width, height); size > 1; size >>= 1)
-        ++mipLevels;
-    const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, mipLevels);
+    // Mips are built here rather than with ResourceUploadBatch::GenerateMips, which takes one bilinear sample per
+    // texel: for odd sizes that drops texels, and a 978x496 leaf texture's 1x1 mip came out 86% opaque against a
+    // 26% average, so distant alpha-tested leaves drew far too dense. An area-weighted box filter keeps every mip's
+    // average; RGB is weighted by alpha and, for sRGB textures, filtered in linear light.
+    std::vector<std::vector<uint8_t>> levels(1, std::move(pixels));
+    std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+    float toLinear[256];
+    for (int i = 0; i < 256; ++i)
+    {
+        const float c = i / 255.0f;
+        toLinear[i] = !srgb ? c : c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
+    }
+    auto encode = [srgb](float linear)
+    {
+        linear = std::min(std::max(linear, 0.0f), 1.0f);
+        const float c = !srgb ? linear : linear <= 0.0031308f ? linear * 12.92f : 1.055f * std::pow(linear, 1.0f / 2.4f) - 0.055f;
+        return static_cast<uint8_t>(c * 255.0f + 0.5f);
+    };
+    for (UINT w = width, h = height; w > 1 || h > 1;)
+    {
+        const UINT dw = std::max(1u, w / 2), dh = std::max(1u, h / 2);
+        const std::vector<uint8_t>& source = levels.back();
+        std::vector<uint8_t> destination(static_cast<size_t>(dw) * dh * 4);
+        for (UINT y = 0; y < dh; ++y)
+        {
+            const double y0 = static_cast<double>(y) * h / dh, y1 = static_cast<double>(y + 1) * h / dh;
+            for (UINT x = 0; x < dw; ++x)
+            {
+                const double x0 = static_cast<double>(x) * w / dw, x1 = static_cast<double>(x + 1) * w / dw;
+                // Color is weighted by alpha, so the color stored under transparent texels (often grey) doesn't
+                // bleed into visible leaves; a fully transparent region falls back to the plain average.
+                double weighted[3] = {}, plain[3] = {}, alpha = 0, weight = 0;
+                for (UINT sy = static_cast<UINT>(y0); sy < static_cast<UINT>(std::ceil(y1)); ++sy)
+                    for (UINT sx = static_cast<UINT>(x0); sx < static_cast<UINT>(std::ceil(x1)); ++sx)
+                    {
+                        const double area = (std::min<double>(sx + 1, x1) - std::max<double>(sx, x0))
+                            * (std::min<double>(sy + 1, y1) - std::max<double>(sy, y0));
+                        const uint8_t* texel = &source[(static_cast<size_t>(sy) * w + sx) * 4];
+                        const double texelAlpha = texel[3] / 255.0;
+                        for (int c = 0; c < 3; ++c)
+                        {
+                            weighted[c] += toLinear[texel[c]] * texelAlpha * area;
+                            plain[c] += toLinear[texel[c]] * area;
+                        }
+                        alpha += texelAlpha * area;
+                        weight += area;
+                    }
+                uint8_t* out = &destination[(static_cast<size_t>(y) * dw + x) * 4];
+                for (int c = 0; c < 3; ++c)
+                    out[c] = encode(static_cast<float>(alpha > 0 ? weighted[c] / alpha : plain[c] / weight));
+                out[3] = static_cast<uint8_t>(alpha / weight * 255.0 + 0.5);
+            }
+        }
+        levels.push_back(std::move(destination));
+        w = dw;
+        h = dh;
+    }
+    for (UINT level = 0, w = width, h = height; level < levels.size(); ++level, w = std::max(1u, w / 2), h = std::max(1u, h / 2))
+        subresources.push_back({ levels[level].data(), static_cast<LONG_PTR>(w) * 4, static_cast<LONG_PTR>(w) * 4 * h });
+
+    const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, static_cast<UINT16>(levels.size()));
     const CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
     CComPtr<ID3D12Resource> created;
     HRR(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
         nullptr, IID_PPV_ARGS(&created)));
-    D3D12_SUBRESOURCE_DATA level0 = { pixels.data(), static_cast<LONG_PTR>(rowPitch), static_cast<LONG_PTR>(pixels.size()) };
-    upload.Upload(created, 0, &level0, 1); // Copies the pixels into the batch's upload heap.
+    // Copies every level into the batch's upload heap.
+    upload.Upload(created, 0, subresources.data(), static_cast<UINT>(subresources.size()));
     upload.Transition(created, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    upload.GenerateMips(created);
     *texture = created.Detach();
     return S_OK;
 }

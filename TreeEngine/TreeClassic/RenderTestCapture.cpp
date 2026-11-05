@@ -165,6 +165,10 @@ void ParseRenderTestCommandLine()
     parsed->antialiasing = json.value("antialiasing", std::string("none"));
     if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa")
         throw std::runtime_error("antialiasing must be \"none\" or \"smaa\"");
+    const std::string alphaTest = json.value("alphaTest", std::string("hashed"));
+    if (alphaTest != "hashed" && alphaTest != "cutoff")
+        throw std::runtime_error("alphaTest must be \"hashed\" or \"cutoff\"");
+    parsed->hashedAlphaTest = alphaTest == "hashed";
     if (json.contains("jitter"))
     {
         parsed->hasJitter = true;
@@ -352,6 +356,7 @@ namespace
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
             game.SetRenderTestAntialiasing(request->antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
+            game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
             const int settleFrames = request->performanceSettleFrames;
             for (int frame = 0; frame < settleFrames + request->performanceFrames; ++frame)
             {
@@ -479,6 +484,7 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
             game.SetRenderTestAntialiasing(point.antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
+            game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion
                 : point.debugView == "reprojection" ? Settings::MotionView::ReprojectedHistory

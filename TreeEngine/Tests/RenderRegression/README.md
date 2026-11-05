@@ -65,7 +65,8 @@ inspection and separate approval of the exact generated subdirectories.
 0, 1, and 5 seconds (84 images). It also specifies resolution, random seed,
 postprocessing, warmup frames, and tolerances. An entry may set `"antialiasing":
 "smaa"` to capture with SMAA 1x (`leaf-atlas-test-smaa`, `tree-smaa`); other entries
-render without anti-aliasing, whatever the app's own setting. Scene IDs refer to this manifest;
+render without anti-aliasing, whatever the app's own setting. A request's `alphaTest` is `"hashed"` (the default, like the app)
+or `"cutoff"` (each material's alpha cutoff). Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
 regression selection.

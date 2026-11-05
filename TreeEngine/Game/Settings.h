@@ -29,6 +29,10 @@ public:
     enum class Antialiasing { None, Smaa };
     Antialiasing m_antialiasing = Antialiasing::Smaa;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
+    // Raster alpha-tested surfaces (foliage) pass against a hashed per-surface threshold instead of the material's
+    // cutoff where their texture is minified, so raster matches ray tracing's density at every distance
+    // (see Shaders/SharedTypes.hlsli).
+    bool m_hashedAlphaTest = true;
     // Camera motion vectors (Game/Shaders/MotionVectors.hlsl). A debug view replaces the scene color.
     enum class MotionView { Off, Motion, ReprojectedHistory, History };
     MotionView m_motionView = MotionView::Off;

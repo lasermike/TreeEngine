@@ -171,22 +171,28 @@ foreach ($scene in $scenes) {
     }
 }
 
-# Object motion: trees growing under a fixed scene camera, from 0.1 s earlier, when growth changes the most pixels.
+# Object motion: trees growing under a fixed camera, from a step earlier, when growth changes the most pixels.
 # LeafAtlasTest draws trees' own instances; Instancing draws instanced trees through their shared layouts.
-# Instancing's ray-traced foliage is sparser than its raster foliage, which writes the velocity, so its DXR
-# reprojection isn't judged (the zero-motion check still is).
-foreach ($scene in @(@{ id = 'leaf-atlas-test'; name = 'LeafAtlasTest'; time = 0.6; judgeDxr = $true },
-                     @{ id = 'instancing'; name = 'Instancing'; time = 1.0; judgeDxr = $false })) {
+# These use the material's alpha cutoff: hashed alpha speckles foliage at the pixel scale, and a bilinear fetch of
+# last frame can't reproduce a one-pixel random pattern, so color comparisons would measure the speckle, not the
+# vectors. (TAA's neighborhood clamp handles that.)
+# Instancing's camera moves in, where its needles are large enough to survive the cutoff, and its step is one 30 Hz
+# frame (its trees grow 15 times faster). Its reprojection isn't judged: its needles are one-pixel lines that flicker
+# under sub-pixel motion, so colors can't confirm the vectors there (TAA's job). The exact zero-motion check still
+# proves its layouts link each branch to its own last-frame slot; LeafAtlasTest's broad leaves judge the vectors.
+foreach ($scene in @(@{ id = 'leaf-atlas-test'; name = 'LeafAtlasTest'; time = 0.6; step = 0.1; camera = $null; judge = $true },
+                     @{ id = 'instancing'; name = 'Instancing'; time = 1.0; step = 1.0 / 30; camera = @(0, 1.6, 0); judge = $false })) {
     foreach ($mode in @('raster', 'raytracing')) {
         $job = Join-Path $OutputDirectory "growth-$($scene.id)-$mode"
         $captures = New-Object System.Collections.Generic.List[object]
         # Same time before and after: nothing moves, so the motion must be exactly zero.
         $captures.Add(@{ time = $scene.time; previousTime = $scene.time; filename = (Join-Path $job 'still-motion.png'); debugView = 'motion' })
         foreach ($view in @('none', 'motion', 'reprojection', 'history')) {
-            $captures.Add(@{ time = $scene.time; previousTime = $scene.time - 0.1; filename = (Join-Path $job "grow-$view.png"); debugView = $view })
+            $captures.Add(@{ time = $scene.time; previousTime = $scene.time - $scene.step; filename = (Join-Path $job "grow-$view.png"); debugView = $view })
         }
+        if ($scene.camera) { foreach ($capture in $captures) { $capture.cameraPosition = $scene.camera } }
         Invoke-Capture $job @{ scene = $scene.name; mode = $mode; seed = 12345; width = 640; height = 480
-            warmupFrames = 3; postProcessing = $false; captures = $captures.ToArray() }
+            warmupFrames = 3; postProcessing = $false; alphaTest = 'cutoff'; captures = $captures.ToArray() }
 
         $label = "$($scene.id) $mode growth"
         $still = [TreeRenderTests.MotionImages]::Brightest((Join-Path $job 'still-motion.png'))
@@ -201,7 +207,7 @@ foreach ($scene in @(@{ id = 'leaf-atlas-test'; name = 'LeafAtlasTest'; time = 0
             $label, $still, $moving, $warped.Count, $warped.MeanError, $unwarped.MeanError)
         if ($still -ne 0) { $failures.Add("$label`: nothing moved, but the motion view shows $still/255") }
         if ($warped.Count -lt 200) { $failures.Add("$label`: only $($warped.Count) pixels moved over half a pixel") }
-        elseif (($mode -eq 'raster' -or $scene.judgeDxr) -and $warped.MeanError -gt 0.6 * $unwarped.MeanError) { $failures.Add("$label`: reprojection error $($warped.MeanError) is over 0.6 of $($unwarped.MeanError) on moving pixels") }
+        elseif ($scene.judge -and $warped.MeanError -gt 0.6 * $unwarped.MeanError) { $failures.Add("$label`: reprojection error $($warped.MeanError) is over 0.6 of $($unwarped.MeanError) on moving pixels") }
     }
 }
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL $_" }; throw "$($failures.Count) motion-vector checks failed. Captures: $OutputDirectory" }

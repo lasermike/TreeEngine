@@ -151,6 +151,7 @@ struct PS_INPUT
     // Motion vectors: this frame's and last frame's clip positions, without jitter.
     float4 CurrentClip : TEXCOORD6;
     float4 PreviousClip : TEXCOORD7;
+    float3 PosL : TEXCOORD8;    // The mesh's own position, for the hashed alpha test.
 };
 
 struct PS_OUTPUT
@@ -252,6 +253,7 @@ PS_INPUT VS(VS_INPUT input)
     float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
     ApplyObjectTransform(out0, worldNormal, worldTangent);
     output.PosW = out0;
+    output.PosL = input.Pos;
     SetMotionClips(output, out0,
         PreviousObjectTransform(mul(float4(input.Pos, 1.0f), PreviousWorld(input.PreviousSlot, world)).xyz));
 
@@ -284,6 +286,7 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
     ApplyObjectTransform(skinnedPosition, worldNormal, worldTangent);
     output.PosW = skinnedPosition;
+    output.PosL = input.Pos;
     SetMotionClips(output, skinnedPosition, PreviousObjectTransform(PreviousSkinVertexPosition(input)));
 
     output.Pos = mul(float4(output.PosW, 1.0f), View);
@@ -332,9 +335,11 @@ float4 ShadeSurface(PS_INPUT input)
             ? txDiffuse.Sample(samLinearClamp, baseColorUv)
             : txDiffuse.Sample(samLinearWrap, baseColorUv));
 
-        if (mat.flags.z > 0)  // clip alpha threshold
+        if (mat.flags.z > 0)  // alpha test
         {
-            clip(textureColor.a - mat.flags.z);
+            const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL)));
+            const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv);
+            clip(AlphaTestPasses(textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
         }
     }
     else
@@ -440,6 +445,7 @@ struct ShadowMapVertexOut
 {
     float4 PosH : SV_POSITION;
     float2 Tex  : TEXCOORD;
+    float3 PosL : POSITION;     // The mesh's own position, for the hashed alpha test.
 };
 
 ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
@@ -449,6 +455,7 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
     float3 position = mul(float4(input.Pos, 1.0f), input.World).xyz;
     float3 unusedNormal = 0, unusedTangent = 0;
     ApplyObjectTransform(position, unusedNormal, unusedTangent);
+    output.PosL = input.Pos;
     float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
     output.Tex = AtlasUv(input.Tex, input.AtlasRegion);
@@ -463,6 +470,7 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
     float3 position = SkinVertexPosition(input);
     float3 unusedNormal = 0, unusedTangent = 0;
     ApplyObjectTransform(position, unusedNormal, unusedTangent);
+    output.PosL = input.Pos;
     float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
@@ -482,8 +490,10 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
             ? txDiffuse.Sample(samLinearClamp, baseColorUv)
             : txDiffuse.Sample(samLinearWrap, baseColorUv));
 
-        // Don't write transparent pixels to the shadow map.
-        clip(textureColor.a - mat.flags.z);
+        // Don't write transparent pixels to the shadow map. The footprint and level of detail are a shadow-map texel's.
+        const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL)));
+        const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv);
+        clip(AlphaTestPasses(textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
     }
 }
 

@@ -53,6 +53,7 @@ struct RenderTestRequest
     float waterMotionSpeed = 1.0f;
     bool opacityMicromaps = true; // false makes DXR run the leaf alpha test without opacity micromaps.
     std::string antialiasing = "none"; // "none" or "smaa"; none keeps gold images independent of the app default.
+    bool hashedAlphaTest = true;       // "alphaTest": "hashed" (default) or "cutoff" (the material's alpha cutoff).
     bool hasJitter = false;            // A fixed camera jitter in pixels for every capture; see RenderTestPoint.
     std::array<float, 2> jitter = {};
     bool hasReflectionRays = false; // Omitted: preserve the application default.

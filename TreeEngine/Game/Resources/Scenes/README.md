@@ -395,6 +395,17 @@ Example: "ambientOcclusion": { "radius": 1.25, "strength": 0.65 }
 
 A model can specify "normalAnimation": {"material": "material name", "velocity1": [0.012, 0.006], "velocity2": [-0.005, 0.009]}. The name must uniquely identify a glTF material with a repeating normal map. Velocities are UV units per simulation second; two moving samples are blended. Optional strength multiplies the imported normal scale (0 to 16, default 1). The debug UI Water motion speed slider scales the animation and zero freezes its current phase. The effect uses scene time in raster and DXR and pauses with the simulation. Omit the property for static normals.
 
+## Alpha-tested surfaces
+
+Materials with `alphaMode: "mask"` (leaves, needles) are opaque where alpha reaches `alphaCutoff`. Ray tracing
+tests the full-resolution texture, so distant foliage keeps its true density. Raster samples distant textures from
+mipmaps, where averaged alpha crosses a fixed cutoff unevenly: foliage would thin out, or with a cutoff of `1` all
+but vanish. So once a texture is minified, raster compares alpha with a random threshold fixed to each point of
+the surface instead, covering a pixel with probability equal to its averaged alpha (a hashed alpha test). Raster
+then matches ray tracing at any distance, while close-up cutouts keep their exact `alphaCutoff` shape. Distant
+foliage looks slightly speckled; temporal anti-aliasing will smooth that. **Hashed alpha test** in Settings turns it
+off. PNG textures get their mipmaps from an area-weighted filter that keeps each level's average alpha.
+
 ## Anti-aliasing
 
 Anti-aliasing is an app setting, not part of a scene: **Anti-aliasing** in the debug UI's Settings, saved

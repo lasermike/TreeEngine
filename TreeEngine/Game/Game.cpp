@@ -1318,6 +1318,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             m_settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
         if (m_settings.m_antialiasing == Settings::Antialiasing::Smaa)
             ImGui::Checkbox("Show SMAA edges", &m_settings.m_showAntialiasingEdges);
+        ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
         int motionView = static_cast<int>(m_settings.m_motionView);
         if (ImGui::Combo("Motion vectors", &motionView, "Off\0Motion\0Reprojected history\0History\0"))
             m_settings.m_motionView = static_cast<Settings::MotionView>(motionView);
