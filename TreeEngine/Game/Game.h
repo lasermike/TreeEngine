@@ -80,6 +80,13 @@ public:
     void SetRenderTestWaterMotionSpeed(float speed) { m_settings.m_waterMotionSpeed = speed; }
     void SetRenderTestOpacityMicromaps(bool enabled) { m_settings.m_opacityMicromaps = enabled; }
     void SetRenderTestAntialiasing(Settings::Antialiasing mode) { m_settings.m_antialiasing = mode; m_settings.m_showAntialiasingEdges = false; }
+    void SetRenderTestHashedAlphaTest(bool hashed) { m_settings.m_hashedAlphaTest = hashed; }
+    void SetRenderTestRenderScale(float scale) { m_settings.m_renderScale = scale; }
+    void SetRenderTestHdr(bool hdr, Settings::Tonemap tonemap, float exposure) {
+        m_settings.m_hdr = hdr;
+        m_settings.m_tonemap = tonemap;
+        m_settings.m_exposure = exposure;
+    }
     void SetRenderTestMotion(Settings::MotionView view, bool hasJitter, float jitterX, float jitterY) {
         m_settings.m_motionView = view;
         m_settings.m_jitter = false;
@@ -213,6 +220,10 @@ private:
     RenderProfile m_lastProfile;
 
     bool                                m_bDebugUIKeyCaptured;
+    // A window client size chosen in the debug UI, applied at the start of the next frame (resizing rebuilds the
+    // swap chain, which must not happen while a frame is being recorded). Zero when none is pending.
+    UINT                                m_pendingWindowWidth = 0, m_pendingWindowHeight = 0;
+    void ApplyPendingWindowSize();
 
     //static const int                    kNumFrameTimeLogEntries = 4000;
     //double                              m_frameTimeLog[kNumFrameTimeLogEntries];

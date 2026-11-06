@@ -18,6 +18,9 @@ cbuffer MotionConstants : register(b0)
 
 SamplerState LinearClamp : register(s0);
 
+// Matches SharedTypes.hlsli: velocity the scene pass leaves for pixels without object motion.
+static const float NoObjectMotion = 65504.0f;
+
 bool MotionPixel(uint2 pixel, out float2 uv)
 {
     uv = (float2(pixel) + 0.5) * MotionSize.xy;

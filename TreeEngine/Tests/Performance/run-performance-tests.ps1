@@ -19,8 +19,10 @@ param(
     [switch]$BackportedHarness,
     # Ray trace leaves without opacity micromaps (DXR 1.2), to measure what they save.
     [switch]$DisableOpacityMicromaps,
-    # Anti-aliasing for every test, overriding scenes.json: none or smaa.
-    [ValidateSet('none', 'smaa')][string]$Antialiasing
+    # Anti-aliasing for every test, overriding scenes.json: none, smaa, taa, fsr or dlss.
+    [ValidateSet('none', 'smaa', 'taa', 'fsr', 'dlss')][string]$Antialiasing,
+    # Scene resolution as a fraction of -Width x -Height; below 1, TAA upscales (other modes render native).
+    [ValidateRange(0.25, 1.0)][double]$RenderScale = 1.0
 )
 
 # Runs the tests in scenes.json and writes the results to
@@ -84,7 +86,7 @@ foreach ($entry in @($manifest.tests)) {
     $step = Get-Setting $entry $defaults 'frameTimeStep' (1.0 / 60.0)
     if (-not (Test-FiniteNumber $step) -or $step -le 0) { throw "$where`: frameTimeStep must be positive." }
     $testAntialiasing = $(if ($Antialiasing) { $Antialiasing } else { [string](Get-Setting $entry $defaults 'antialiasing' 'none') })
-    if ($testAntialiasing -notin @('none', 'smaa')) { throw "$where`: antialiasing must be none or smaa." }
+    if ($testAntialiasing -notin @('none', 'smaa', 'taa', 'fsr', 'dlss')) { throw "$where`: antialiasing must be none, smaa, taa, fsr or dlss." }
     $test = [ordered]@{ id = $entry.id; scene = $entry.scene; sceneName = $sceneFiles[[string]$entry.scene].name; type = $entry.type
         modes = $testModes; frameTimeStep = [double]$step; antialiasing = $testAntialiasing }
     if ($entry.type -eq 'steady') {
@@ -231,7 +233,7 @@ for ($run = 1; $run -le $Runs; $run++) {
             $request = [ordered]@{
                 scene = $test.scene; mode = $mode; seed = 12345; width = $Width; height = $Height; postProcessing = $true
                 opacityMicromaps = (-not $DisableOpacityMicromaps); antialiasing = $test.antialiasing
-                report = $reportPath; performance = $performance
+                renderScale = $RenderScale; report = $reportPath; performance = $performance
             }
             $requestPath = Join-Path $jobDirectory 'request.json'
             [IO.File]::WriteAllText($requestPath, ($request | ConvertTo-Json -Depth 6), $utf8)
@@ -306,6 +308,7 @@ $results = [ordered]@{
     opacityMicromaps = (-not $DisableOpacityMicromaps)
     # -Antialiasing for the whole run, or null when each test used its scenes.json setting.
     antialiasing = $(if ($Antialiasing) { $Antialiasing } else { $null })
+    renderScale = $RenderScale
     configuration = $(if ($Executable -match '\\Debug\\') { 'Debug' } else { $Configuration })
     executable = $Executable
     cpu = $cpu.Name.Trim()

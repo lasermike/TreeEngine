@@ -111,13 +111,11 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     return S_OK;
 }
 
-HRESULT DoubleBuffer::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
+HRESULT InstanceBufferRing::Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform)
 {
-    delete buffers[0];
-    delete buffers[1];
-
-    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[0]));
-    HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffers[1]));
+    Release();
+    for (auto& buffer : buffers)
+        HRR(platform->CreateD3DBuffer(sizeBytes, numInstances, &buffer));
 
     return S_OK;
 }
@@ -431,6 +429,7 @@ HRESULT RenderManager::BindMaterialTexture(const GltfTextureSource& source, Mate
     case SpecularColorTextureRole: shaderMaterial.specularTextures.y = static_cast<float>(slot); break;
     case NormalTextureRole: shaderMaterial.normalTextures.x = static_cast<float>(slot); break;
     case MetallicRoughnessTextureRole: shaderMaterial.metallicRoughnessTextures.x = static_cast<float>(slot); break;
+    case TintTextureRole: shaderMaterial.tintTextures.x = static_cast<float>(slot); break;
     default: return E_INVALIDARG; // Base color is bound by CreateMaterial.
     }
     return S_OK;
@@ -762,7 +761,9 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
     // Update chandfsges every frame CB.
     CBChangesEveryFrame cb;
     cb.globalFlags = (m_renderData.pShadowMap && m_settings->m_shadowsEnabled ? 0x1 : 0x0)
-        | (m_settings->m_shadowsEnabled ? 0x0 : 0x2);
+        | (m_settings->m_shadowsEnabled ? 0x0 : 0x2)
+        | (m_settings->m_hashedAlphaTest ? 0x4 : 0x0)
+        | (m_renderData.hdrSceneColor ? 0x8 : 0x0);
     cb.light = m_renderData.dirLights[0];
     cb.numDirectionalLights = m_renderData.numDirectionalLights;
     cb.numPointLights = 0;

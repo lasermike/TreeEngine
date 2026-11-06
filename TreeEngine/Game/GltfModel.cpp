@@ -11,7 +11,9 @@ GltfModel::GltfModel(GltfModelParams* parameters)
       m_forceLit(parameters->forceLit),
       m_animatedNormalMaterial(parameters->animatedNormalMaterial),
       m_normalVelocity1(parameters->normalVelocity1), m_normalVelocity2(parameters->normalVelocity2),
-      m_normalStrength(parameters->normalStrength)
+      m_normalStrength(parameters->normalStrength),
+      m_tintMaterial(parameters->tintMaterial), m_tintTexture(parameters->tintTexture),
+      m_tintUvScale(parameters->tintUvScale), m_tintUvOffset(parameters->tintUvOffset)
 {
 }
 
@@ -59,11 +61,18 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
         for (const auto& map : maps)
             if (map.first >= 0)
                 HRR(renderManager.BindMaterialTexture(m_asset->textures[map.first], map.second, shaderMaterial));
+        const bool tinted = m_tintTexture && imported.name == m_tintMaterial;
+        if (tinted)
+        {
+            HRR(renderManager.BindMaterialTexture(*m_tintTexture, TintTextureRole, shaderMaterial));
+            SetMaterialUvTransform(shaderMaterial, TintTextureRole, m_tintUvOffset, 0, m_tintUvScale);
+        }
         if (m_forceLit)
             shaderMaterial.flags.w = 0.0f;
         std::wstring name = assetName + L"#material" + std::to_wstring(i)
             + (m_forceLit ? L"#forceLit" : L"");
         if (animatedNormal) name += L"#normalAnimation" + std::to_wstring(reinterpret_cast<uintptr_t>(this));
+        if (tinted) name += L"#tint" + std::to_wstring(reinterpret_cast<uintptr_t>(this));
         HRR(renderManager.CreateMaterial(
             name.c_str(), texture, nullptr, nullptr, nullptr, nullptr,
             shaderMaterial, state, &materials[i]));
@@ -132,6 +141,7 @@ HRESULT GltfModel::ComputeConstants(IRenderFrame* frame)
             instanceData[nextInstance].InstanceOffset = nextInstance;
             instanceData[nextInstance].InstanceOffsetPrev = nextInstance;
             instanceData[nextInstance].AtlasRegion = 0;
+            instanceData[nextInstance].PreviousSlot = nextInstance;
             ++nextInstance;
         }
     }

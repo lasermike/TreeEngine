@@ -643,7 +643,7 @@ void RenderPlatform11::Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LP
 }
 
 
-HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
+HRESULT RenderPlatform11::RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer)
 {
     m_currentInstanceBuffer = instancedBuffer->Get(m_renderData->frame);
 

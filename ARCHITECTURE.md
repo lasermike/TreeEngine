@@ -29,6 +29,19 @@ TreeEngine is a C++ DirectX engine that simulates plant and tree growth in real 
 
 Its implementations are `RenderPlatform12`, `RenderPlatform11` and `RenderPlatformDLL`. `RenderPlatformDLL` is a proxy: it resolves a matching set of C-style exports (`Create`, `InitDevice`, …, the `*Func` typedefs near the end of `RenderPlatform.h`) through `GetProcAddress` in `RenderManager::SetPlatform` (`Game/RenderManager.cpp`). That set of flat C exports is the DLL's real ABI.
 
+**`Upscaler`** (`Game/Upscaler.h`) is the interface for temporal anti-aliasing and upscaling backends. TAA is the
+first (`Game/UpscalerTaa.cpp`), AMD FSR the second (`Game/UpscalerFsr.cpp`) and NVIDIA DLSS the third
+(`Game/UpscalerDlss.cpp`). `TreeEngine/Game/UPSCALING.md`
+documents it in full: the frame, the interface contract, the TAA reconstruction, and how to add a backend.
+- **Sizes.** The scene, ray tracing and motion vectors run at the render size, `Settings::m_renderScale` of the window
+  (arithmetic in `Game/UpscalerMath.h`). Tonemapping, blur, the UI and captures run at the window's size.
+- **The platform's side.** `RenderPlatform12` picks a backend per anti-aliasing mode in `BeginNewFrame`. It jitters
+  the camera over the backend's phase count and biases texture LOD by the backend's `MipBias`. It then calls
+  `Resize` and `Evaluate` with an `UpscaleFrame`: color, depth and motion, the output, the camera, and a reset flag.
+- **The backend's side.** A backend owns its history, root signature and pipelines. It writes descriptors only in a
+  16-descriptor block reserved for its mode.
+- **Native.** At render scale 1, TAA runs the original `TaaResolveCS`.
+
 **`RenderManager`** (`Game/RenderManager.h`) sits between the game and whichever renderer is loaded. It handles render-pass orchestration, the shadow map, materials and meshes, glTF textures, instance allocation and scene render settings. It implements two small interfaces:
 - **`IRenderFrame`**: `SetInstances`, `GetInstanceIndex`, `GetRenderData`. World objects use it to publish their instances.
 - **`IDebugUI`**: `UpdateDebugUI(ImGuiContext*)`. `Game` implements it.
@@ -55,6 +68,7 @@ Its implementations are `RenderPlatform12`, `RenderPlatform11` and `RenderPlatfo
 - Per-draw object transform: `IRenderFrame::SetInstances` takes an optional instance-buffer slot whose `World` the GPU applies after each instance's own (root constant `b4` in `Tree.hlsl`, `DrawRecord.objectTransformSlot` for DXR skinning in `Blur.hlsl`, `DxrGeometryInfo.objectTransformSlot` in the hit shader). Tree instances (`instanceOf`) use it to draw their source tree's branch layouts; a source with instances reserves its own layout plus far/near layouts in the instance buffer, and `SceneRoot::Update` computes sources before instances.
 - `DxrGeometryInfo` (`RenderPlatform.h`) ↔ `Shaders/SharedTypes.hlsli`
 - `CBChangesPerPass`, `CBChangesEveryFrame` and `InstancedData` (`ConstBufferDefinitions.h`) ↔ `Shaders/SharedTypes.hlsli`
+- `TaaConstants` (`UpscalerTaa.cpp`) ↔ `Shaders/Taa.hlsl`
 
 Shaders live in `Game/Shaders/`, including a DXR library (`RaytracingLibrary.hlsl`, with global and local root signatures). `buildShaders.bat` compiles them with fxc/dxc as part of the build.
 
@@ -91,6 +105,11 @@ The future plan in `.github/copilot-instructions.md` is to drop UWP and D3D11 an
 - `cgltf.h` for glTF loading, including optical materials and texture transforms
 - DirectXTK12 headers (linked as `DirectXTK12.lib`) and D3DX12 helpers, copied into each RenderPlatform project
 - DirectXTex and DDS loaders, plus the legacy Oculus SDK
+- AMD FidelityFX SDK v2.4.0, headers plus the signed loader and upscaler DLLs (Git LFS), for the FSR upscaler
+  (`ThirdParty/FidelityFX`, loaded at run time; see `Game/UPSCALING.md`)
+- NVIDIA DLSS SDK 310.9.16, NGX headers and static libraries plus the signed `nvngx_dlss.dll` (Git LFS), for the DLSS
+  upscaler (`ThirdParty/DLSS`, NGX linked into RenderPlatform12). Its license, unlike the others, carries release
+  obligations (notify NVIDIA, attribution); see `ThirdParty/DLSS/README.md`
 
 **Windows SDK and system libraries:** `d3d12`, `dxgi`, `d3dcompiler`, `d2d1`, `dwrite`, `windowscodecs` (WIC), and `fxc`/`dxc` for shaders.
 

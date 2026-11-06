@@ -29,6 +29,12 @@ struct RenderTestPoint
     std::string debugView = "none";   // "none", "motion", "reprojection" or "history" (Settings::MotionView).
     bool hasJitter = false;           // Fixed sub-pixel camera jitter, in pixels.
     std::array<float, 2> jitter = {};
+    bool hasPreviousTime = false;     // Warm-up frames render at this simulation time, so growth moves objects.
+    double previousTime = 0;
+    bool hdr = false;                 // HDR scene color; tonemap is "clamp", "aces" or "agx"; exposure in EV.
+    std::string tonemap = "clamp";
+    float exposure = 0;
+    float renderScale = 1.0f;         // Scene resolution as a fraction of the window while TAA upscales.
 };
 
 // A camera pose on a performance run's path; time is seconds after the run's start time.
@@ -51,6 +57,11 @@ struct RenderTestRequest
     float waterMotionSpeed = 1.0f;
     bool opacityMicromaps = true; // false makes DXR run the leaf alpha test without opacity micromaps.
     std::string antialiasing = "none"; // "none" or "smaa"; none keeps gold images independent of the app default.
+    bool hashedAlphaTest = true;       // "alphaTest": "hashed" (default) or "cutoff" (the material's alpha cutoff).
+    bool hdr = false;                  // Defaults for every capture; see RenderTestPoint.
+    std::string tonemap = "clamp";
+    float exposure = 0;
+    float renderScale = 1.0f;          // 0.25-1; below 1 only temporal anti-aliasing renders at the lower size.
     bool hasJitter = false;            // A fixed camera jitter in pixels for every capture; see RenderTestPoint.
     std::array<float, 2> jitter = {};
     bool hasReflectionRays = false; // Omitted: preserve the application default.

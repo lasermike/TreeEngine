@@ -33,6 +33,19 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Copies the deployed runtime into the ignored test artifacts directory.
 .\Tests\RenderRegression\test-tree-skinning.ps1 -Capacity
 
+# Temporal anti-aliasing against a 4-sample reference: convergence, stability and a camera step.
+.\Tests\RenderRegression\test-taa.ps1
+
+# Temporal upscaling at Quality (0.667) and Performance (0.5) scale against the same reference and native TAA,
+# and switching scale and window size in one process. -Hdr runs it with the HDR scene target; -Backend fsr tests
+# AMD FSR or NVIDIA DLSS (also at native), and fails if the backend is unavailable.
+.\Tests\RenderRegression\test-upscaling.ps1
+.\Tests\RenderRegression\test-upscaling.ps1 -Backend fsr
+.\Tests\RenderRegression\test-upscaling.ps1 -Backend dlss
+
+# HDR scene color: equivalence with the 8-bit path, toggling, operators, exposure, and TAA with HDR.
+.\Tests\RenderRegression\test-hdr.ps1
+
 # Camera motion vectors and jitter in LeafAtlasTest and AI Tree, raster and DXR.
 .\Tests\RenderRegression\test-motion-vectors.ps1
 
@@ -61,11 +74,21 @@ External Binaries/Intermediates directories are no longer used by the maintained
 desktop builds. Do not remove shared legacy outputs; any cleanup requires
 inspection and separate approval of the exact generated subdirectories.
 
-`scenes.json` lists fourteen scene entries, both rendering modes, and captures at
-0, 1, and 5 seconds (84 images). It also specifies resolution, random seed,
-postprocessing, warmup frames, and tolerances. An entry may set `"antialiasing":
-"smaa"` to capture with SMAA 1x (`leaf-atlas-test-smaa`, `tree-smaa`); other entries
-render without anti-aliasing, whatever the app's own setting. Scene IDs refer to this manifest;
+`scenes.json` lists seventeen scene entries, both rendering modes, and captures at
+0, 1, and 5 seconds (102 images). It also specifies resolution, random seed,
+postprocessing, warmup frames, and tolerances. Entries render without anti-aliasing and without HDR, whatever
+the app's own settings, unless they set them:
+- `"antialiasing"`: `"smaa"` (`leaf-atlas-test-smaa`, `tree-smaa`), `"taa"` (`ai-tree`) or `"fsr"` (`ai-tree-fsr`,
+  whose golds also depend on the FSR provider version the GPU gets) or `"dlss"` (`ai-tree-dlss`, NVIDIA GPUs only;
+  its golds depend on the DLSS version)
+- `"hdr": true` with `"tonemap"` (`"clamp"`, `"aces"` or `"agx"`) and `"exposure"` (EV) (`ai-tree`: AgX)
+- `"renderScale"` in [0.25, 1]: with `"taa"`, the scene renders at that fraction of the size and TAA upscales
+  (`ai-tree-taau`, `ai-tree-fsr`, `ai-tree-dlss`: 0.5); FSR and DLSS upscale too; other modes ignore it
+- `"warmupFrames"`, overriding the manifest's; TAA needs more frames to settle (`ai-tree` uses 16, `ai-tree-taau` 40)
+
+Render-test requests and captures take the same fields (`test-taa.ps1` warms TAA up for 40 frames). Reports give each
+capture's `renderScale`, `renderWidth` and `renderHeight`. A request's
+`alphaTest` is `"hashed"` (the default, like the app) or `"cutoff"` (each material's alpha cutoff). Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
 regression selection.
@@ -75,10 +98,13 @@ Captures can also test motion vectors. A capture's `cameraRotationDegrees` (pitc
 render the warm-up frames from another camera, so the captured frame has known motion. `debugView` captures
 a motion debug view instead of the scene: `"motion"`, `"reprojection"` (last frame's color fetched along the
 motion vectors) or `"history"` (last frame's color unmoved). `jitter: [x, y]`, on a request or a capture,
-offsets the camera by a fixed sub-pixel amount, in pixels. `test-motion-vectors.ps1` checks that:
+offsets the camera by a fixed sub-pixel amount, in pixels. `previousTime` renders the warm-up frames at an
+earlier simulation time, so growing trees move. `test-motion-vectors.ps1` checks that:
 - reprojection is much closer to the new frame than the unmoved history, for sideways, forward and yaw moves;
 - an unmoved camera gives exactly zero motion;
-- `jitter: [1, 0]` shifts the image one pixel right.
+- `jitter: [1, 0]` shifts the image one pixel right;
+- growing trees (LeafAtlasTest; Instancing's shared layouts) reproject much better than unmoved on the pixels
+  that moved, and show exactly zero motion when nothing changed between frames.
 
 `test-scene-persistence.ps1` covers primitives, L-system/fixed trees, graphs,
 glTF assets, and scene-authored PBR materials (`PbrMaterials`: a mapped sphere

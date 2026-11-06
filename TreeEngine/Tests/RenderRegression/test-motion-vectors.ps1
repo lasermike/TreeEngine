@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param([string]$Executable, [string]$OutputDirectory)
-# Camera motion vectors (Game/Shaders/MotionVectors.hlsl), checked through the debug views:
+# Motion vectors (Game/Shaders/MotionVectors.hlsl and the scene pass's velocity target), checked through the debug
+# views, for camera moves and for growing trees:
 #   reprojection - last frame's color fetched along the motion vectors is much closer to this frame's image than the
 #                  history without motion: at most 0.6 of its mean error. Negated vectors would be about twice as far
 #                  and doubled ones about as far. The rest is foliage edges, where the move uncovered the sky or
@@ -8,6 +9,8 @@ param([string]$Executable, [string]$OutputDirectory)
 #   no motion    - an unmoved camera gives exactly zero motion (an all-black motion view), so the reprojection is
 #                  the history unchanged
 #   jitter       - a fixed one-pixel jitter shifts the image one pixel right
+#   growth       - trees growing under a still camera move in the motion view, reproject well, and show exactly zero
+#                  motion when nothing changed between frames (which also checks each branch finds its last slot)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -25,7 +28,7 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 namespace TreeRenderTests
 {
-    public sealed class MotionStats { public double WithinTolerance, MeanError, Maximum; }
+    public sealed class MotionStats { public double WithinTolerance, MeanError, Maximum; public long Count; }
     public static class MotionImages
     {
         static byte[] Pixels(string path, out int width, out int height)
@@ -52,20 +55,30 @@ namespace TreeRenderTests
         // Columns that the shift takes outside b are skipped.
         public static MotionStats Compare(string aPath, string bPath, int shiftX, int tolerance)
         {
+            return CompareMasked(aPath, bPath, null, 0, shiftX, tolerance);
+        }
+
+        // Compare over only the pixels whose brightest channel in the mask image exceeds maskThreshold.
+        public static MotionStats CompareMasked(string aPath, string bPath, string maskPath, int maskThreshold, int shiftX, int tolerance)
+        {
             int width, height, bWidth, bHeight;
             byte[] a = Pixels(aPath, out width, out height), b = Pixels(bPath, out bWidth, out bHeight);
             if (width != bWidth || height != bHeight) throw new ArgumentException("Image sizes differ");
+            byte[] mask = maskPath == null ? null : Pixels(maskPath, out bWidth, out bHeight);
             long count = 0, within = 0; double sum = 0; int maximum = 0;
             for (int y = 0; y < height; y++)
                 for (int x = Math.Max(0, -shiftX); x < Math.Min(width, width - shiftX); x++)
                 {
                     int i = (y * width + x) * 4, j = (y * width + x + shiftX) * 4, error = 0;
+                    if (mask != null && Math.Max(mask[i], Math.Max(mask[i + 1], mask[i + 2])) <= maskThreshold) continue;
                     for (int c = 0; c < 3; c++) error = Math.Max(error, Math.Abs(a[i + c] - b[j + c]));
                     count++; sum += error; maximum = Math.Max(maximum, error);
                     if (error <= tolerance) within++;
                 }
             MotionStats stats = new MotionStats();
-            stats.WithinTolerance = (double)within / count; stats.MeanError = sum / count; stats.Maximum = maximum;
+            stats.Count = count;
+            stats.WithinTolerance = count > 0 ? (double)within / count : 0; stats.MeanError = count > 0 ? sum / count : 0;
+            stats.Maximum = maximum;
             return stats;
         }
 
@@ -155,6 +168,46 @@ foreach ($scene in $scenes) {
         Write-Host ("{0} jitter: {1:P2} match shifted one pixel, mean {2:N3}; unshifted mean {3:N3}" -f $label, $shifted.WithinTolerance, $shifted.MeanError, $unshifted.MeanError)
         if ($shifted.WithinTolerance -lt 0.99) { $failures.Add("$label`: a one-pixel jitter is not a one-pixel shift ($($shifted.WithinTolerance))") }
         if ($shifted.MeanError -gt 0.1 * $unshifted.MeanError) { $failures.Add("$label`: the jittered image is not much closer shifted than unshifted") }
+    }
+}
+
+# Object motion: trees growing under a fixed camera, from a step earlier, when growth changes the most pixels.
+# LeafAtlasTest draws trees' own instances; Instancing draws instanced trees through their shared layouts.
+# These use the material's alpha cutoff: hashed alpha speckles foliage at the pixel scale, and a bilinear fetch of
+# last frame can't reproduce a one-pixel random pattern, so color comparisons would measure the speckle, not the
+# vectors. (TAA's neighborhood clamp handles that.)
+# Instancing's camera moves in, where its needles are large enough to survive the cutoff, and its step is one 30 Hz
+# frame (its trees grow 15 times faster). Its reprojection isn't judged: its needles are one-pixel lines that flicker
+# under sub-pixel motion, so colors can't confirm the vectors there (TAA's job). The exact zero-motion check still
+# proves its layouts link each branch to its own last-frame slot; LeafAtlasTest's broad leaves judge the vectors.
+foreach ($scene in @(@{ id = 'leaf-atlas-test'; name = 'LeafAtlasTest'; time = 0.6; step = 0.1; camera = $null; judge = $true },
+                     @{ id = 'instancing'; name = 'Instancing'; time = 1.0; step = 1.0 / 30; camera = @(0, 1.6, 0); judge = $false })) {
+    foreach ($mode in @('raster', 'raytracing')) {
+        $job = Join-Path $OutputDirectory "growth-$($scene.id)-$mode"
+        $captures = New-Object System.Collections.Generic.List[object]
+        # Same time before and after: nothing moves, so the motion must be exactly zero.
+        $captures.Add(@{ time = $scene.time; previousTime = $scene.time; filename = (Join-Path $job 'still-motion.png'); debugView = 'motion' })
+        foreach ($view in @('none', 'motion', 'reprojection', 'history')) {
+            $captures.Add(@{ time = $scene.time; previousTime = $scene.time - $scene.step; filename = (Join-Path $job "grow-$view.png"); debugView = $view })
+        }
+        if ($scene.camera) { foreach ($capture in $captures) { $capture.cameraPosition = $scene.camera } }
+        Invoke-Capture $job @{ scene = $scene.name; mode = $mode; seed = 12345; width = 640; height = 480
+            warmupFrames = 3; postProcessing = $false; alphaTest = 'cutoff'; captures = $captures.ToArray() }
+
+        $label = "$($scene.id) $mode growth"
+        $still = [TreeRenderTests.MotionImages]::Brightest((Join-Path $job 'still-motion.png'))
+        $moving = [TreeRenderTests.MotionImages]::Brightest((Join-Path $job 'grow-motion.png'))
+        # Judged where the motion view shows over half a pixel of motion (8/255; 16 pixels is full brightness). New
+        # branches have no history and so no motion, and no vector could fetch them from last frame anyway.
+        $current = Join-Path $job 'grow-none.png'
+        $mask = Join-Path $job 'grow-motion.png'
+        $warped = [TreeRenderTests.MotionImages]::CompareMasked($current, (Join-Path $job 'grow-reprojection.png'), $mask, 8, 0, 4)
+        $unwarped = [TreeRenderTests.MotionImages]::CompareMasked($current, (Join-Path $job 'grow-history.png'), $mask, 8, 0, 4)
+        Write-Host ("{0}: still motion max {1}; growing motion max {2}; over {3} moving pixels, reprojection mean {4:N2}, without motion {5:N2}" -f `
+            $label, $still, $moving, $warped.Count, $warped.MeanError, $unwarped.MeanError)
+        if ($still -ne 0) { $failures.Add("$label`: nothing moved, but the motion view shows $still/255") }
+        if ($warped.Count -lt 200) { $failures.Add("$label`: only $($warped.Count) pixels moved over half a pixel") }
+        elseif ($scene.judge -and $warped.MeanError -gt 0.6 * $unwarped.MeanError) { $failures.Add("$label`: reprojection error $($warped.MeanError) is over 0.6 of $($unwarped.MeanError) on moving pixels") }
     }
 }
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL $_" }; throw "$($failures.Count) motion-vector checks failed. Captures: $OutputDirectory" }

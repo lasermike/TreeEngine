@@ -163,8 +163,22 @@ void ParseRenderTestCommandLine()
     parsed->waterMotionSpeed = json.value("waterMotionSpeed", 1.0f);
     parsed->opacityMicromaps = json.value("opacityMicromaps", true);
     parsed->antialiasing = json.value("antialiasing", std::string("none"));
-    if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa")
-        throw std::runtime_error("antialiasing must be \"none\" or \"smaa\"");
+    if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa" && parsed->antialiasing != "taa"
+        && parsed->antialiasing != "fsr" && parsed->antialiasing != "dlss")
+        throw std::runtime_error("antialiasing must be \"none\", \"smaa\", \"taa\", \"fsr\" or \"dlss\"");
+    const std::string alphaTest = json.value("alphaTest", std::string("hashed"));
+    if (alphaTest != "hashed" && alphaTest != "cutoff")
+        throw std::runtime_error("alphaTest must be \"hashed\" or \"cutoff\"");
+    parsed->hashedAlphaTest = alphaTest == "hashed";
+    parsed->hdr = json.value("hdr", false);
+    parsed->tonemap = json.value("tonemap", std::string("clamp"));
+    parsed->exposure = json.value("exposure", 0.0f);
+    if ((parsed->tonemap != "clamp" && parsed->tonemap != "aces" && parsed->tonemap != "agx")
+        || !std::isfinite(parsed->exposure) || std::abs(parsed->exposure) > 16)
+        throw std::runtime_error("tonemap must be \"clamp\", \"aces\" or \"agx\", and exposure a finite EV");
+    parsed->renderScale = json.value("renderScale", 1.0f);
+    if (!(parsed->renderScale >= 0.25f && parsed->renderScale <= 1.0f))
+        throw std::runtime_error("renderScale must be in [0.25, 1]");
     if (json.contains("jitter"))
     {
         parsed->hasJitter = true;
@@ -238,8 +252,9 @@ void ParseRenderTestCommandLine()
         point.poseCache = value.value("poseCache", true);
         point.scene = value.value("scene", std::string());
         point.antialiasing = value.value("antialiasing", parsed->antialiasing);
-        if (point.antialiasing != "none" && point.antialiasing != "smaa")
-            throw std::runtime_error("Capture antialiasing must be \"none\" or \"smaa\"");
+        if (point.antialiasing != "none" && point.antialiasing != "smaa" && point.antialiasing != "taa"
+            && point.antialiasing != "fsr" && point.antialiasing != "dlss")
+            throw std::runtime_error("Capture antialiasing must be \"none\", \"smaa\", \"taa\", \"fsr\" or \"dlss\"");
         point.postProcessing = value.value("postProcessing", parsed->postProcessing);
         point.showShadowBuffer = value.value("showShadowBuffer", false);
         if (value.contains("cameraPosition"))
@@ -282,6 +297,22 @@ void ParseRenderTestCommandLine()
             if (!std::isfinite(point.jitter[0]) || !std::isfinite(point.jitter[1]))
                 throw std::runtime_error("Invalid capture jitter");
         }
+        point.hdr = value.value("hdr", parsed->hdr);
+        point.tonemap = value.value("tonemap", parsed->tonemap);
+        point.exposure = value.value("exposure", parsed->exposure);
+        if ((point.tonemap != "clamp" && point.tonemap != "aces" && point.tonemap != "agx")
+            || !std::isfinite(point.exposure) || std::abs(point.exposure) > 16)
+            throw std::runtime_error("Capture tonemap must be \"clamp\", \"aces\" or \"agx\", and exposure a finite EV");
+        point.renderScale = value.value("renderScale", parsed->renderScale);
+        if (!(point.renderScale >= 0.25f && point.renderScale <= 1.0f))
+            throw std::runtime_error("Capture renderScale must be in [0.25, 1]");
+        if (value.contains("previousTime"))
+        {
+            point.hasPreviousTime = true;
+            point.previousTime = value.at("previousTime").get<double>();
+            if (!std::isfinite(point.previousTime) || point.previousTime < 0)
+                throw std::runtime_error("Invalid capture previousTime");
+        }
         if (!std::isfinite(point.time) || point.time < 0 || point.filename.empty())
             throw std::runtime_error("Invalid capture time or filename");
         if (point.mode != "raster" && point.mode != "raytracing")
@@ -305,6 +336,19 @@ namespace
             throw std::runtime_error("Cannot encode text as UTF-8");
         result.pop_back(); // Remove the terminator written by WideCharToMultiByte.
         return result;
+    }
+
+    // A request's "antialiasing" value, already validated.
+    Settings::Antialiasing AntialiasingSetting(const std::string& name)
+    {
+        return name == "smaa" ? Settings::Antialiasing::Smaa : name == "taa" ? Settings::Antialiasing::Taa
+            : name == "fsr" ? Settings::Antialiasing::Fsr : name == "dlss" ? Settings::Antialiasing::Dlss
+            : Settings::Antialiasing::None;
+    }
+
+    Settings::Tonemap TonemapSetting(const std::string& name)
+    {
+        return name == "aces" ? Settings::Tonemap::Aces : name == "agx" ? Settings::Tonemap::Agx : Settings::Tonemap::Clamp;
     }
 
     // The camera pose at time seconds into the path: linear between keys, held outside them.
@@ -332,6 +376,7 @@ namespace
         nlohmann::json report = { { "scene", request->scene }, { "mode", request->mode },
             { "width", request->width }, { "height", request->height }, { "seed", request->seed },
             { "frames", request->performanceFrames }, { "frameTimeStep", request->performanceFrameTimeStep },
+            { "renderScale", request->renderScale },
             { "startTime", request->performanceStartTime }, { "settleFrames", request->performanceSettleFrames },
             { "cameraKeys", request->performanceCamera.size() },
             { "workerThreads", game.GetWorkerThreadCount() },
@@ -344,7 +389,10 @@ namespace
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
-            game.SetRenderTestAntialiasing(request->antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
+            game.SetRenderTestAntialiasing(AntialiasingSetting(request->antialiasing));
+            game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
+            game.SetRenderTestHdr(request->hdr, TonemapSetting(request->tonemap), request->exposure);
+            game.SetRenderTestRenderScale(request->renderScale);
             const int settleFrames = request->performanceSettleFrames;
             for (int frame = 0; frame < settleFrames + request->performanceFrames; ++frame)
             {
@@ -374,6 +422,8 @@ namespace
                     report["sceneLoad"] = { { "totalMs", load.TotalMs() }, { "definitionMs", load.definitionMs },
                         { "generationMs", load.generationMs }, { "graphicsMs", load.graphicsMs } };
                     report["adapter"] = Utf8(profile.adapter);
+                    report["renderWidth"] = game.GetRenderManager().GetRenderData().renderWidth;
+                    report["renderHeight"] = game.GetRenderManager().GetRenderData().renderHeight;
                     // Baked during the load; "requested" is the request's opacityMicromaps, applied when supported.
                     const auto& micromaps = game.GetRenderManager().GetRenderData().opacityMicromaps;
                     report["opacityMicromaps"] = { { "requested", request->opacityMicromaps }, { "supported", micromaps.supported },
@@ -471,7 +521,10 @@ int RunRenderTestCapture(Game& game)
             if (request->hasReflectionRays) game.SetRenderTestReflectionRays(request->reflectionRays);
             game.SetRenderTestWaterMotionSpeed(request->waterMotionSpeed);
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
-            game.SetRenderTestAntialiasing(point.antialiasing == "smaa" ? Settings::Antialiasing::Smaa : Settings::Antialiasing::None);
+            game.SetRenderTestAntialiasing(AntialiasingSetting(point.antialiasing));
+            game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
+            game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
+            game.SetRenderTestRenderScale(point.renderScale);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion
                 : point.debugView == "reprojection" ? Settings::MotionView::ReprojectedHistory
@@ -511,6 +564,7 @@ int RunRenderTestCapture(Game& game)
                     placeCamera(frame < captureFrame);
                 auto start = std::chrono::steady_clock::now();
                 const double simulationTime = frame == captureFrame ? point.time
+                    : point.hasPreviousTime ? point.previousTime
                     : point.time + std::max(0, frame - request->warmupFrames) * request->benchmarkTimeStep;
                 HRESULT result = game.RenderTestFrame(simulationTime,
                     frame == captureFrame ? point.filename : std::wstring(), point.overrideCamera);
@@ -549,9 +603,12 @@ int RunRenderTestCapture(Game& game)
             const auto& projection = game.GetRenderManager().GetRenderData().projectionData;
             if (projection.screenWidth != point.width || projection.screenHeight != point.height)
                 throw std::runtime_error("Render target did not follow the window size");
+            const auto& renderData = game.GetRenderManager().GetRenderData();
             report["captures"].push_back({ { "scene", currentScene }, { "antialiasing", point.antialiasing },
                 { "postProcessing", point.postProcessing }, { "time", point.time }, { "mode", point.mode },
-                { "width", point.width }, { "height", point.height }, { "success", true },
+                { "width", point.width }, { "height", point.height }, { "renderScale", point.renderScale },
+                { "renderWidth", renderData.renderWidth }, { "renderHeight", renderData.renderHeight },
+                { "upscaler", std::string(renderData.upscalerStatus) }, { "success", true },
                 { "poseCache", point.poseCache }, { "samples", samples } });
         }
         report["gpuPasses"] = { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays", "antialiasing" };

@@ -1,11 +1,11 @@
 //--------------------------------------------------------------------------------------
 // MotionVectors.hlsl
 //
-// Camera motion vectors from depth: each pixel's clip-space position mapped to last frame's clip space
-// (Game/RenderPlatform12.cpp builds the matrix in double precision, so an unmoved camera gives exactly zero).
-// Velocity is previous UV minus current UV, so last frame's color for a pixel is at uv + velocity.
-// Exact for static geometry in raster and DXR alike (raster always writes depth); moving and growing
-// objects need per-object motion, which this pass doesn't have yet.
+// Motion vectors. The scene pass writes each surface's own motion (object and camera; PS in Tree.hlsl), and the sky
+// writes NoObjectMotion. Those pixels, and any nothing drew, get camera motion here from depth: the clip-space
+// position mapped to last frame's clip space (Game/RenderPlatform12.cpp builds the matrix in double precision, so
+// an unmoved camera gives exactly zero). Velocity is previous UV minus current UV, so last frame's color for a
+// pixel is at uv + velocity. Raster always draws the scene, so this covers DXR too.
 //--------------------------------------------------------------------------------------
 
 #include "MotionCommon.hlsli"
@@ -24,6 +24,8 @@ void MotionVectorsCS(uint3 id : SV_DispatchThreadID)
         Velocity[id.xy] = 0;
         return;
     }
+    if (Velocity[id.xy].x != NoObjectMotion)
+        return;
     const float depth = Depth.Load(int3(id.xy, 0));
     const float2 ndc = float2(uv.x * 2 - 1, 1 - uv.y * 2);
     // Nothing drawn (clear color) is a direction at infinity, which only camera rotation moves.

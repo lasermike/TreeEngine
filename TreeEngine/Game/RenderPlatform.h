@@ -11,6 +11,7 @@
 #endif
 
 #include "RenderData.h"
+#include "Upscaler.h"
 #include "StockRenderStates.h"
 
 class Settings;
@@ -114,26 +115,24 @@ struct D3DBuffer
 
 };
 
-struct DoubleBuffer
+// Per-frame instance buffers. The scene pass reads this frame's and last frame's (for motion vectors), and the CPU
+// fills the next frame's before waiting for the GPU, so three keep the CPU off both buffers a frame in flight reads.
+struct InstanceBufferRing
 {
-    D3DBuffer* buffers[2];
-
-    DoubleBuffer()
-    {
-        buffers[0] = nullptr;
-        buffers[1] = nullptr;
-    }
+    static const UINT Count = 3;
+    D3DBuffer* buffers[Count] = {};
 
     HRESULT Create(const UINT sizeBytes, const UINT numInstances, RenderPlatform* platform);
 
-    D3DBuffer* Get(UINT frame) { return buffers[frame % 2]; }
+    D3DBuffer* Get(UINT frame) { return buffers[frame % Count]; }
 
     void Release()
     {
-        delete buffers[0];
-        delete buffers[1];
-        buffers[0] = nullptr;
-        buffers[1] = nullptr;
+        for (auto& buffer : buffers)
+        {
+            delete buffer;
+            buffer = nullptr;
+        }
     }
 };
 
@@ -208,14 +207,14 @@ enum InputLayouts
 class InputLayoutDesc
 {
 public:
-    static const InputElementDesc InstancedBasic16[9];
-    static const InputElementDesc InstancedSkinned[14];
+    static const InputElementDesc InstancedBasic16[10];
+    static const InputElementDesc InstancedSkinned[15];
     static const InputElementDesc Basic32[3];
 
     //GetLayout()
 };
 
-__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[9] =
+__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[10] =
 {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
     { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
@@ -227,9 +226,10 @@ __declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedBasic16[9
     { "WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     // InstancedData::AtlasRegion, after the two skinning offsets this layout skips.
     { "ATLASREGION", 0, DXGI_FORMAT_R32_UINT, 1, 72, InputClassificationInstance, 1 },
+    { "PREVIOUSSLOT", 0, DXGI_FORMAT_R32_UINT, 1, 76, InputClassificationInstance, 1 },
 };
 
-__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[14] =
+__declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[15] =
 {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, InputClassificationVertex, 0 },
     { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, AppendAlignedElement, InputClassificationVertex, 0 },
@@ -246,6 +246,7 @@ __declspec(selectany) const InputElementDesc InputLayoutDesc::InstancedSkinned[1
     { "BLENDINDICES", 1, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
     // Some pipelines pair this layout with the unskinned vertex shaders, which read AtlasRegion.
     { "ATLASREGION", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
+    { "PREVIOUSSLOT", 0, DXGI_FORMAT_R32_UINT, 1, AppendAlignedElement, InputClassificationInstance, 1 },
 };
 
 __declspec(selectany) const InputElementDesc InputLayoutDesc::Basic32[3] =
@@ -529,6 +530,7 @@ struct RenderUnit
 #if defined(TREE3D12)
 
     ID3D12PipelineState*        m_pipelineStates[NUM_RENDER_PASSES];
+    ID3D12PipelineState*        m_hdrPipelineState = nullptr;   // The regular pass into the HDR scene target.
     int                         id;
     static int                  s_nextId;
 
@@ -684,7 +686,7 @@ public:
     virtual HRESULT RenderDebugUI() = 0;
     virtual HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) = 0;
 
-    virtual HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) = 0;
+    virtual HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer) = 0;
     virtual HRESULT SetRenderPhase(RenderState state) = 0;
 
     virtual HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot) = 0;
@@ -778,8 +780,13 @@ private:
     void ProfileTimestamp(ProfilePass pass, bool end);
     HRESULT ResolveProfileFrame();
 
+    // The scene renders at the render size (m_viewPort, m_scissorRect); post-processing, the UI and the back buffer
+    // run at the display size, the window's. They differ only while an upscaler reconstructs the display image.
     D3D12_VIEWPORT                    m_viewPort;
     D3D12_RECT                        m_scissorRect;
+    D3D12_VIEWPORT                    m_displayViewport = {};
+    D3D12_RECT                        m_displayScissor = {};
+    UpscalerSize                      m_displaySize, m_renderSize;
 
     //XSF::BitmapFont*                  m_bitmapFont;
 
@@ -835,6 +842,7 @@ private:
 
     // PSO -TODO: consolidate in game level pso's
     CComPtr<ID3D12PipelineState>      m_pipelineState;
+    CComPtr<ID3D12PipelineState>      m_pipelineStateHdr;
     CComPtr<ID3D12PipelineState>      m_pipelineStateR8FullScreenQuad;
     CComPtr<ID3D12PipelineState>      m_pipelineStateShadowMap;
     CComPtr<ID3D12PipelineState>      m_pipelineStateRGBFullScreenQuad;
@@ -927,7 +935,7 @@ public:
     HRESULT RenderDebugUI();
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
+    HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
@@ -951,7 +959,7 @@ public:
     HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader);
     HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit);
 
-    void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
+    void SetFrameSceneData(CBChangesEveryFrame* cb);
 
     HRESULT SetupGraphicsOnCommandList();
 
@@ -1060,11 +1068,39 @@ public:
     bool                        m_haveViewProjection = false;
     bool                        m_cameraHistoryValid = false;
     CComPtr<ID3D12RootSignature> m_motionRootSignature;
-    CComPtr<ID3D12Resource>     m_motionVelocity;
+    CComPtr<ID3D12Resource>     m_motionVelocity;       // Window-sized; the scene pass's second render target.
+    ID3D12Resource*             m_lastInstanceBuffer = nullptr;     // The instance buffer BeginNewFrame last mapped,
+    UINT                        m_lastInstanceFrame = UINT_MAX;     // and its frame.
+    ID3D12Resource*             m_previousInstanceBuffer = nullptr; // Last frame's, when this frame follows it.
     CComPtr<ID3D12Resource>     m_motionHistory;
     UINT                        m_motionViewGeneration = UINT_MAX;  // Off-screen generation the motion views follow.
     UINT                        m_colorHistoryFrame = UINT_MAX;     // The frame whose color m_motionHistory holds.
     bool MotionVectorsNeeded() const;
+
+    // Temporal anti-aliasing and upscaling (Game/Upscaler.h): one backend per mode, created on first use. A null
+    // entry records a mode whose backend is unavailable.
+    std::map<Settings::Antialiasing, std::unique_ptr<Upscaler>> m_upscalers;
+    Upscaler*                   m_upscaler = nullptr;   // This frame's backend, chosen in BeginNewFrame.
+    std::map<Settings::Antialiasing, std::string> m_upscalerErrors;     // Why a mode's backend is unavailable.
+    float                       m_frameTimeMs = 0;      // Time since the previous frame began, for the backend.
+    LONGLONG                    m_lastFrameCounter = 0;
+    bool TaaEnabled() const { return m_upscaler != nullptr; }
+    void ChooseFrameUpscaler();     // Picks this frame's backend and render size.
+    bool Upscaling() const { return m_renderSize.width != m_displaySize.width || m_renderSize.height != m_displaySize.height; }
+
+    // Scene color target at the render size (Game/Shaders/Tonemap.hlsl): linear light in a float target with HDR, or
+    // display-encoded while upscaling without HDR. Native LDR renders into off-screen buffer 1 instead.
+    CComPtr<ID3D12RootSignature> m_tonemapRootSignature;
+    CComPtr<ID3D12Resource>     m_sceneColor;
+    bool                        m_sceneToSceneColor = false;    // This frame renders into m_sceneColor.
+    float                       m_sceneClearColor[4] = {};      // The clear color m_sceneColor was created for.
+    CComPtr<ID3D12Resource>     m_upscaledColor;    // HDR upscaler output at the display size, read by tonemap.
+    bool HdrEnabled() const;
+    void HdrClearColor(float color[4]) const;  // The scene's clear color, decoded to linear light.
+    HRESULT EnsureSceneTargets();   // Depth, velocity, scene color and the tonemap views at this frame's sizes.
+    HRESULT CreateDepthAndVelocity(UINT width, UINT height);
+    DXGI_FORMAT SceneColorFormat() const;   // The ray-tracing output's format: the HDR target's or the swap chain's.
+    HRESULT CreateDxrOutput(UINT width, UINT height);
     bool UsesOffscreenChain() const;
     HRESULT EnsureMotionResources(UINT width, UINT height);
     void ResetMotionHistory();
@@ -1142,7 +1178,7 @@ public:
     };
 
     UINT m_nextVbWorldStart = 0;
-    static_assert(sizeof(DrawRecord) == 360, "DrawRecord must match Blur.hlsl");
+    static_assert(sizeof(DrawRecord) == 408, "DrawRecord must match Blur.hlsl");
     std::vector<DrawRecord> m_drawRecords;
     size_t m_previousDrawRecordHash;
     std::vector<BYTE> m_previousBlasInputs;
@@ -1263,7 +1299,7 @@ public:
     HRESULT RenderDebugUI();
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
+    HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer);
     HRESULT SetRenderPhase(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
@@ -1343,7 +1379,7 @@ typedef HRESULT (*RenderPostProcessFunc)();
 typedef HRESULT (*RenderDebugUIFunc)();
 typedef HRESULT (*RenderEpilogFunc)(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
-typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, DoubleBuffer* instancedBuffer);
+typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, InstanceBufferRing* instancedBuffer);
 typedef HRESULT (*SetRenderPhaseFunc)(RenderState state);
 
 typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
@@ -1472,7 +1508,7 @@ public:
 
     HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture) { return RenderEpilogFuncPtr(oculus, useShadowMaps, renderToSharedTexture); }
 
-    HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
+    HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer) { return RenderSceneSetupFuncPtr(pass, instancedBuffer); }
     HRESULT SetRenderPhase(RenderState state) { return SetRenderPhaseFuncPtr(state); }
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot)

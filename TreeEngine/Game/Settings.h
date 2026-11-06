@@ -26,9 +26,29 @@ public:
     bool m_shadowsEnabled = true;
     bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
     // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
-    enum class Antialiasing { None, Smaa };
-    Antialiasing m_antialiasing = Antialiasing::Smaa;
+    // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.
+    // Fsr: AMD FSR through the FidelityFX API (Game/UpscalerFsr.cpp), when its DLLs are next to the executable.
+    // Dlss: NVIDIA DLSS through NGX (Game/UpscalerDlss.cpp), on NVIDIA RTX GPUs with nvngx_dlss.dll present.
+    enum class Antialiasing { None, Smaa, Taa, Fsr, Dlss };
+    Antialiasing m_antialiasing = Antialiasing::Taa;
+    // Fraction of the window, per axis, the scene renders at while a temporal mode upscales (Game/UpscalerMath.h);
+    // 1 is native. Other modes, and the motion debug views, always render native.
+    float m_renderScale = 1.0f;
+    float m_upscalerSharpness = 0.0f;   // FSR's sharpening pass, 0 (off) to 1. DLSS has none.
+    // The frame time upscalers are told, in milliseconds; 0 measures it. Render tests fix it, since FSR's exposure
+    // and accumulation follow it and a measured time would make captures differ from run to run.
+    float m_upscalerFrameTimeMs = 0.0f;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
+    // HDR scene color: shaders write linear light into a float target, and Shaders/Tonemap.hlsl maps it to the display
+    // with an exposure and an operator at the end of the frame. Off keeps shaders encoding their own display output.
+    bool m_hdr = true;
+    enum class Tonemap { Clamp, Aces, Agx };
+    Tonemap m_tonemap = Tonemap::Clamp;  // Clamp matches the LDR look; ACES and AgX roll highlights off.
+    float m_exposure = 0;                // EV: the scene is scaled by 2^m_exposure before tonemapping.
+    // Raster alpha-tested surfaces (foliage) pass against a hashed per-surface threshold instead of the material's
+    // cutoff where their texture is minified, so raster matches ray tracing's density at every distance
+    // (see Shaders/SharedTypes.hlsli).
+    bool m_hashedAlphaTest = true;
     // Camera motion vectors (Game/Shaders/MotionVectors.hlsl). A debug view replaces the scene color.
     enum class MotionView { Off, Motion, ReprojectedHistory, History };
     MotionView m_motionView = MotionView::Off;

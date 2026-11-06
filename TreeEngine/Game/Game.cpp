@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Game.h"
+#include "UpscalerMath.h"
 #include "StockRenderStates.h"
 #include "SceneRoot.h"
 #include "Tree.h"
@@ -106,8 +107,11 @@ namespace
             readPlacement(settings.m_debugUIOverlayPlacement);
             readPlacement(settings.m_debugUISeparatePlacement);
             int antialiasing = 0;
-            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Smaa))
+            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Dlss))
                 settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
+            float renderScale = 1;
+            if (file >> renderScale && renderScale >= UpscalerMath::MinRenderScale && renderScale <= UpscalerMath::MaxRenderScale)
+                settings.m_renderScale = renderScale;
         }
     }
 
@@ -121,7 +125,8 @@ namespace
         file << settings.m_debugUIScale << ' ' << (settings.m_debugUISeparateWindow ? 1 : 0) << '\n'
             << overlay.x << ' ' << overlay.y << ' ' << overlay.width << ' ' << overlay.height << '\n'
             << separateWindow.x << ' ' << separateWindow.y << ' ' << separateWindow.width << ' ' << separateWindow.height << '\n'
-            << static_cast<int>(settings.m_antialiasing) << '\n';
+            << static_cast<int>(settings.m_antialiasing) << '\n'
+            << settings.m_renderScale << '\n';
     }
 
     std::string DebugRelativePath(const std::wstring& filename)
@@ -552,6 +557,7 @@ HRESULT Game::Regenerate()
 void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile, bool showShadowBuffer)
 {
     m_renderTestMode = true;
+    m_settings.m_upscalerFrameTimeMs = 1000.0f / 60.0f;
     m_renderManager.GetRenderData().profile.enabled = profile;
     m_renderTestScene = sceneName;
     m_settings.m_dxrEnabled = rayTracing;
@@ -1059,6 +1065,9 @@ int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
 
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
+    // The window procedure drops key presses while this is set, so it must clear whenever the window isn't drawn:
+    // closing the window while it had keyboard focus would otherwise leave every key, Tab included, ignored.
+    m_bDebugUIKeyCaptured = false;
     if (!m_settings.m_showDebugUI)
     {
         return S_OK;
@@ -1090,18 +1099,17 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoBackground))
         {
-            if (ImPlot::BeginPlot("##Performance"), ImVec2(0, 0), ImPlotFlags_CanvasOnly)
+            // The plot fills the window, so its x axis isn't cut off below it.
+            if (ImPlot::BeginPlot("##Performance", ImVec2(-1, -1)))
             {
-                ImGui::SetNextWindowBgAlpha(0.0f); // Optional: translucent background
                 ImPlot::SetupAxisLimitsConstraints(ImAxis_Y1, 0.0, 60.0);
                 ImPlot::SetupAxes("Seconds", "MS", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
                 ImPlot::PlotLine("Frame Duration", m_timeStamps, m_frameDurations, FRAME_DURATION_HISTORY_SIZE,
                     ImPlotLineFlags_None, m_timestampIndex);
                 ImPlot::EndPlot();
             }
-
-            ImGui::End();
         }
+        ImGui::End();   // Every Begin needs an End, even when the window is skipped.
     }
 
 
@@ -1153,7 +1161,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     ImGuiIO& io = ImGui::GetIO();
 
-    m_bDebugUIKeyCaptured = io.WantCaptureKeyboard;
+    m_bDebugUIKeyCaptured = bOpen && io.WantCaptureKeyboard;
 
     const char* scaleLabels[] = { "100%", "125%", "150%", "200%" };
     ImGui::SetNextItemWidth(88);
@@ -1308,16 +1316,97 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen))
     {
+#if defined(TREENGINE_WIN32)
+        {
+            // Window client sizes of common game resolutions. The window resizes at the start of the next frame.
+            static const struct { UINT width, height; const char* label; } resolutions[] = {
+                { 1280, 720, "1280 x 720 (720p)" }, { 1600, 900, "1600 x 900" }, { 1920, 1080, "1920 x 1080 (1080p)" },
+                { 2560, 1440, "2560 x 1440 (1440p)" }, { 3840, 2160, "3840 x 2160 (4K)" } };
+            const auto& projection = m_renderManager.GetRenderData().projectionData;
+            char current[32];
+            snprintf(current, sizeof(current), "%d x %d", projection.screenWidth, projection.screenHeight);
+            // The work area of the window's monitor, in client pixels, to mark sizes that won't fit on it.
+            MONITORINFO monitor = { sizeof(monitor) };
+            const bool haveMonitor = m_hwnd && GetMonitorInfoW(MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST), &monitor);
+            if (ImGui::BeginCombo("Window size", current))
+            {
+                for (const auto& resolution : resolutions)
+                {
+                    const bool selected = projection.screenWidth == static_cast<int>(resolution.width)
+                        && projection.screenHeight == static_cast<int>(resolution.height);
+                    const bool fits = !haveMonitor
+                        || (resolution.width <= static_cast<UINT>(monitor.rcWork.right - monitor.rcWork.left)
+                            && resolution.height <= static_cast<UINT>(monitor.rcWork.bottom - monitor.rcWork.top));
+                    char label[64];
+                    snprintf(label, sizeof(label), "%s%s", resolution.label, fits ? "" : "  (larger than this monitor)");
+                    if (ImGui::Selectable(label, selected))
+                    {
+                        m_pendingWindowWidth = resolution.width;
+                        m_pendingWindowHeight = resolution.height;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
+#endif
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Enable shadows", &m_settings.m_shadowsEnabled);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
         auto& sceneRenderSettings = m_renderManager.GetRenderData();
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         int antialiasing = static_cast<int>(m_settings.m_antialiasing);
-        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0"))
+        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0TAA\0FSR\0DLSS\0"))
             m_settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
         if (m_settings.m_antialiasing == Settings::Antialiasing::Smaa)
             ImGui::Checkbox("Show SMAA edges", &m_settings.m_showAntialiasingEdges);
+        const bool temporal = m_settings.m_antialiasing == Settings::Antialiasing::Taa
+            || m_settings.m_antialiasing == Settings::Antialiasing::Fsr || m_settings.m_antialiasing == Settings::Antialiasing::Dlss;
+        const char* upscalerStatus = m_renderManager.GetRenderData().upscalerStatus;
+        if (temporal && strncmp(upscalerStatus, "unavailable", 11) == 0)
+        {
+            // The backend failed to load (for FSR and DLSS, usually their DLLs missing next to the executable, or
+            // for DLSS a GPU or driver without it).
+            const char* modeNames[] = { "None", "SMAA", "TAA", "FSR", "DLSS" };
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "  %s %s", modeNames[static_cast<int>(m_settings.m_antialiasing)],
+                upscalerStatus);
+            ImGui::TextDisabled("  Rendering without anti-aliasing; TAA is the built-in alternative.");
+        }
+        else if (temporal)
+        {
+            if (upscalerStatus[0])
+                ImGui::TextDisabled("  %s", upscalerStatus);
+            // Render scale: the scene renders at a fraction of the window and the backend upscales (Game/Upscaler.h).
+            using UpscalerMath::Preset;
+            static bool customScale = false;
+            int preset = static_cast<int>(customScale ? Preset::Custom : UpscalerMath::PresetForScale(m_settings.m_renderScale));
+            if (ImGui::Combo("Render scale", &preset,
+                "Native\0Quality (67%)\0Balanced (59%)\0Performance (50%)\0Ultra performance (33%)\0Custom\0"))
+            {
+                customScale = preset == static_cast<int>(Preset::Custom);
+                if (!customScale)
+                    m_settings.m_renderScale = UpscalerMath::PresetScale(static_cast<Preset>(preset), m_settings.m_renderScale);
+            }
+            if (preset == static_cast<int>(Preset::Custom))
+                ImGui::SliderFloat("Scale", &m_settings.m_renderScale, 0.33f, 1.0f, "%.2f");
+            const auto& renderData = m_renderManager.GetRenderData();
+            ImGui::Text("  Render %u x %u -> %d x %d", renderData.renderWidth, renderData.renderHeight,
+                renderData.projectionData.screenWidth, renderData.projectionData.screenHeight);
+            if (m_settings.m_renderScale < 1 && m_settings.m_motionView != Settings::MotionView::Off)
+                ImGui::TextDisabled("  Native while a motion vector view is shown");
+            if (m_settings.m_antialiasing == Settings::Antialiasing::Fsr)
+                ImGui::SliderFloat("Sharpness", &m_settings.m_upscalerSharpness, 0.0f, 1.0f, "%.2f");
+        }
+        ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
+        ImGui::Checkbox("HDR", &m_settings.m_hdr);
+        if (m_settings.m_hdr)
+        {
+            int tonemap = static_cast<int>(m_settings.m_tonemap);
+            if (ImGui::Combo("Tonemap", &tonemap, "Clamp\0ACES\0AgX\0"))
+                m_settings.m_tonemap = static_cast<Settings::Tonemap>(tonemap);
+            ImGui::SliderFloat("Exposure (EV)", &m_settings.m_exposure, -4.0f, 4.0f, "%.1f");
+        }
         int motionView = static_cast<int>(m_settings.m_motionView);
         if (ImGui::Combo("Motion vectors", &motionView, "Off\0Motion\0Reprojected history\0History\0"))
             m_settings.m_motionView = static_cast<Settings::MotionView>(motionView);
@@ -1617,11 +1706,33 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 }
 
 
+// Resizes the window so its client area is the size chosen in the debug UI. Runs between frames: the resize
+// rebuilds the swap chain through WM_SIZE, as dragging the window's edge does.
+void Game::ApplyPendingWindowSize()
+{
+#if defined(TREENGINE_WIN32)
+    if (!m_pendingWindowWidth || !m_pendingWindowHeight || !m_hwnd)
+        return;
+    const UINT width = m_pendingWindowWidth, height = m_pendingWindowHeight;
+    m_pendingWindowWidth = m_pendingWindowHeight = 0;
+    if (IsZoomed(m_hwnd))
+        ShowWindow(m_hwnd, SW_RESTORE);
+    // The app is per-monitor DPI aware, so the frame is measured at the window's own DPI.
+    RECT frame = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+    const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(m_hwnd, GWL_STYLE));
+    const DWORD exStyle = static_cast<DWORD>(GetWindowLongPtrW(m_hwnd, GWL_EXSTYLE));
+    if (AdjustWindowRectExForDpi(&frame, style, GetMenu(m_hwnd) != nullptr, exStyle, GetDpiForWindow(m_hwnd)))
+        SetWindowPos(m_hwnd, nullptr, 0, 0, frame.right - frame.left, frame.bottom - frame.top,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+#endif
+}
+
 //--------------------------------------------------------------------------------------
 // Once per frame processing
 //--------------------------------------------------------------------------------------
 void Game::ComputeCPU()
 {
+    ApplyPendingWindowSize();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
 

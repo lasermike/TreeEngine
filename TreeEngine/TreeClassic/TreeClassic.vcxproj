@@ -172,6 +172,18 @@
       <AdditionalInputs>$(SolutionDir)\ThirdParty\SMAA\SMAA.hlsl</AdditionalInputs>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Taa.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tonemap.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\MotionVectors.hlsl">
       <FileType>Document</FileType>
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
@@ -237,6 +249,24 @@
           SkipUnchangedFiles="true" />
     <ItemGroup>
       <FileWrites Include="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
+  </Target>
+  <!-- Upscaler runtimes, next to the executable where they are looked for: AMD FidelityFX for FSR (the loader and the
+       upscaler DLL; ThirdParty/FidelityFX/README.md) and NVIDIA DLSS (ThirdParty/DLSS/README.md). -->
+  <ItemGroup>
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\FidelityFX\signedbin\amd_fidelityfx_loader_dx12.dll" />
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\FidelityFX\signedbin\amd_fidelityfx_upscaler_dx12.dll" />
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\DLSS\bin\nvngx_dlss.dll" />
+    <UpToDateCheckInput Include="@(UpscalerRuntime)" />
+  </ItemGroup>
+  <Target Name="CopyUpscalerRuntimes"
+          AfterTargets="Build"
+          Condition="'$(Platform)'=='x64'"
+          Inputs="@(UpscalerRuntime)"
+          Outputs="@(UpscalerRuntime->'$(OutDir)%(Filename)%(Extension)')">
+    <Copy SourceFiles="@(UpscalerRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <FileWrites Include="@(UpscalerRuntime->'$(OutDir)%(Filename)%(Extension)')" />
     </ItemGroup>
   </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

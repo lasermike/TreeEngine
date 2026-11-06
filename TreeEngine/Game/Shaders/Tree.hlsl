@@ -26,6 +26,7 @@ Texture2D txNormal : register(t5);
 Texture2D txMetallicRoughness : register(t6);
 TextureCube txEnvironmentDiffuse : register(t7);
 TextureCube txEnvironmentSpecular : register(t8);
+Texture2D txTint : register(t10);
 
 ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
 {
@@ -33,20 +34,20 @@ ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
     {
         float2 strengthUv = TransformMaterialUv(material, uv, SpecularStrengthTextureRole);
         material.specularParams.w *= material.specularTextures.z > 0
-            ? txSpecular.Sample(samLinearClamp, strengthUv).a : txSpecular.Sample(samLinearWrap, strengthUv).a;
+            ? txSpecular.SampleBias(samLinearClamp, strengthUv, renderScale.x).a : txSpecular.SampleBias(samLinearWrap, strengthUv, renderScale.x).a;
     }
     if (material.specularTextures.y >= 0)
     {
         float2 colorUv = TransformMaterialUv(material, uv, SpecularColorTextureRole);
         material.specularColor.rgb *= material.specularTextures.w > 0
-            ? txSpecularColor.Sample(samLinearClamp, colorUv).rgb : txSpecularColor.Sample(samLinearWrap, colorUv).rgb;
+            ? txSpecularColor.SampleBias(samLinearClamp, colorUv, renderScale.x).rgb : txSpecularColor.SampleBias(samLinearWrap, colorUv, renderScale.x).rgb;
     }
     if (material.metallicRoughnessTextures.x >= 0)
     {
         float2 metallicRoughnessUv = TransformMaterialUv(material, uv, MetallicRoughnessTextureRole);
         float4 mr = (material.metallicRoughnessTextures.y > 0
-            ? txMetallicRoughness.Sample(samLinearClamp, metallicRoughnessUv)
-            : txMetallicRoughness.Sample(samLinearWrap, metallicRoughnessUv));
+            ? txMetallicRoughness.SampleBias(samLinearClamp, metallicRoughnessUv, renderScale.x)
+            : txMetallicRoughness.SampleBias(samLinearWrap, metallicRoughnessUv, renderScale.x));
         material.specularParams.y *= mr.b;
         material.specularParams.z *= mr.g;
     }
@@ -55,6 +56,8 @@ ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
 
 
 StructuredBuffer<InstancedData> InstanceBuffer : register(t2);
+// Last frame's instances, for motion vectors; reached through InstancedData::PreviousSlot.
+StructuredBuffer<InstancedData> PreviousInstanceBuffer : register(t9);
 
 // Per-draw object transform for instanced objects: an instance-buffer slot whose World is
 // applied after each instance's own World. NoObjectTransform leaves the vertex untouched.
@@ -62,6 +65,23 @@ cbuffer cbObjectTransform : register(b4)
 {
     uint objectTransformSlot;
 };
+
+// Last frame's matrix for an instance whose slot last frame was previousSlot; current when it has no history.
+float4x4 PreviousWorld(uint previousSlot, float4x4 current)
+{
+    if (!PreviousInstancesValid || previousSlot == NoPreviousSlot)
+        return current;
+    return PreviousInstanceBuffer[previousSlot].World;
+}
+
+// ApplyObjectTransform's position with last frame's object transform.
+float3 PreviousObjectTransform(float3 position)
+{
+    if (objectTransformSlot == NoObjectTransform)
+        return position;
+    const InstancedData objectTransform = InstanceBuffer[objectTransformSlot];
+    return mul(float4(position, 1.0f), PreviousWorld(objectTransform.PreviousSlot, objectTransform.World)).xyz;
+}
 
 void ApplyObjectTransform(inout float3 position, inout float3 normal, inout float3 tangent)
 {
@@ -97,6 +117,7 @@ struct VS_INPUT
     float4 TangentL : TANGENT;
     float4x4 World  : WORLD;
     uint  AtlasRegion : ATLASREGION;
+    uint  PreviousSlot : PREVIOUSSLOT;
     uint  VertexID : SV_VertexID;
 };
 
@@ -114,6 +135,7 @@ struct VS_SKINNED_INPUT
     uint  InstanceOffset : BLENDINDICES0;
     uint  InstanceOffsetPrev : BLENDINDICES1;
     uint  AtlasRegion : ATLASREGION;
+    uint  PreviousSlot : PREVIOUSSLOT;
     uint  VertexID : SV_VertexID;
 };
 
@@ -127,7 +149,23 @@ struct PS_INPUT
     float3 T : TEXCOORD3;
     float3 B : TEXCOORD4;
     float3 N : TEXCOORD5;
+    // Motion vectors: this frame's and last frame's clip positions, without jitter.
+    float4 CurrentClip : TEXCOORD6;
+    float4 PreviousClip : TEXCOORD7;
+    float3 PosL : TEXCOORD8;    // The mesh's own position, for the hashed alpha test.
 };
+
+struct PS_OUTPUT
+{
+    float4 Color : SV_Target0;
+    float2 Velocity : SV_Target1;   // Last frame's UV minus this frame's; see Game/Shaders/MotionVectors.hlsl.
+};
+
+void SetMotionClips(inout PS_INPUT output, float3 positionW, float3 previousPositionW)
+{
+    output.CurrentClip = mul(float4(positionW, 1.0f), ViewProjectionNoJitter);
+    output.PreviousClip = mul(float4(previousPositionW, 1.0f), PreviousViewProjection);
+}
 
 static const bool TSLights = true;
 
@@ -142,6 +180,25 @@ float3 SkinVertexPosition(VS_SKINNED_INPUT input)
     }
 
     float4x3 worldPrev = (float4x3) InstanceBuffer[input.InstanceOffsetPrev].World;
+    float3 inputPosPrev = float3(input.Pos.x, 0.5f, input.Pos.z);
+    float3 positionPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
+
+    return lerp(positionPrev, position, input.InstanceWeight1);
+}
+
+// SkinVertexPosition with last frame's matrices: this instance's and its parent's, each through its PreviousSlot.
+float3 PreviousSkinVertexPosition(VS_SKINNED_INPUT input)
+{
+    float4x3 world = (float4x3) PreviousWorld(input.PreviousSlot, input.World);
+    float3 position = mul(float4(input.Pos, 1.0f), world).xyz;
+
+    if (input.InstanceOffsetPrev == input.InstanceOffset)
+    {
+        return position;
+    }
+
+    const InstancedData parent = InstanceBuffer[input.InstanceOffsetPrev];
+    float4x3 worldPrev = (float4x3) PreviousWorld(parent.PreviousSlot, parent.World);
     float3 inputPosPrev = float3(input.Pos.x, 0.5f, input.Pos.z);
     float3 positionPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
 
@@ -175,9 +232,12 @@ PS_INPUT SkyBoxVS(VS_INPUT vin)
     return output;
 }
 
-float4 SkyBoxPS(PS_INPUT pin) : SV_Target
+PS_OUTPUT SkyBoxPS(PS_INPUT pin)
 {
-    return txCubeMap.Sample(samLinearWrap, pin.PosW.xyz);
+    PS_OUTPUT output;
+    output.Color = float4(DisplayToScene(txCubeMap.Sample(samLinearWrap, pin.PosW.xyz).rgb), 1);
+    output.Velocity = NoObjectMotion;   // The sky moves with the camera; MotionVectorsCS reprojects it.
+    return output;
 }
 
 //--------------------------------------------------------------------------------------
@@ -194,6 +254,9 @@ PS_INPUT VS(VS_INPUT input)
     float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
     ApplyObjectTransform(out0, worldNormal, worldTangent);
     output.PosW = out0;
+    output.PosL = input.Pos;
+    SetMotionClips(output, out0,
+        PreviousObjectTransform(mul(float4(input.Pos, 1.0f), PreviousWorld(input.PreviousSlot, world)).xyz));
 
     output.Pos = mul(float4(output.PosW, 1.0f), View);
     output.Pos = mul(output.Pos, Projection);
@@ -224,6 +287,8 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     float3 worldTangent = mul(input.TangentL.xyz, (float3x3) world);
     ApplyObjectTransform(skinnedPosition, worldNormal, worldTangent);
     output.PosW = skinnedPosition;
+    output.PosL = input.Pos;
+    SetMotionClips(output, skinnedPosition, PreviousObjectTransform(PreviousSkinVertexPosition(input)));
 
     output.Pos = mul(float4(output.PosW, 1.0f), View);
     output.Pos = mul(output.Pos, Projection);
@@ -247,7 +312,7 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
-float4 PS(PS_INPUT input) : SV_Target
+float4 ShadeSurface(PS_INPUT input)
 {
     // The toEye vector is used in lighting.
     float3 toEye = normalize(input.ViewDirection);
@@ -268,21 +333,29 @@ float4 PS(PS_INPUT input) : SV_Target
     {
         float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
         textureColor = (mat.specularColor.w > 0
-            ? txDiffuse.Sample(samLinearClamp, baseColorUv)
-            : txDiffuse.Sample(samLinearWrap, baseColorUv));
+            ? txDiffuse.SampleBias(samLinearClamp, baseColorUv, renderScale.x)
+            : txDiffuse.SampleBias(samLinearWrap, baseColorUv, renderScale.x));
 
-        if (mat.flags.z > 0)  // clip alpha threshold
+        if (mat.flags.z > 0)  // alpha test
         {
-            clip(textureColor.a - mat.flags.z);
+            // While upscaling, the footprint and level of detail are a display pixel's, matching the biased sample.
+            const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL))) * renderScale.y;
+            const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv) + renderScale.x;
+            clip(AlphaTestPasses(textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
         }
     }
     else
         textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    if (mat.tintTextures.x >= 0)
+    {
+        const float2 tintUv = TransformMaterialUv(mat, input.Tex, TintTextureRole);
+        textureColor.rgb *= 2 * (mat.tintTextures.y > 0 ? txTint.SampleBias(samLinearClamp, tintUv, renderScale.x) : txTint.SampleBias(samLinearWrap, tintUv, renderScale.x)).rgb;
+    }
 
     if (mat.flags.w > 0)
     {
         float4 color = mat.Diffuse * textureColor;
-        color.rgb = EncodeGltfDisplayColor(color.rgb);
+        color.rgb = ToSceneColor(color.rgb);
         return color;
     }
 
@@ -292,14 +365,14 @@ float4 PS(PS_INPUT input) : SV_Target
         float2 normalUv = TransformMaterialUv(mat, input.Tex, NormalTextureRole);
         float2 normalUv1 = normalUv + mat.normalMotion.xy * sceneTime.x;
         float3 tangentNormal = (mat.normalTextures.z > 0
-            ? txNormal.Sample(samLinearClamp, normalUv1)
-            : txNormal.Sample(samLinearWrap, normalUv1)).xyz * 2.0f - 1.0f;
+            ? txNormal.SampleBias(samLinearClamp, normalUv1, renderScale.x)
+            : txNormal.SampleBias(samLinearWrap, normalUv1, renderScale.x)).xyz * 2.0f - 1.0f;
         if (any(mat.normalMotion != 0))
         {
             float2 normalUv2 = normalUv + mat.normalMotion.zw * sceneTime.x;
             float3 secondNormal = (mat.normalTextures.z > 0
-                ? txNormal.Sample(samLinearClamp, normalUv2)
-                : txNormal.Sample(samLinearWrap, normalUv2)).xyz * 2.0f - 1.0f;
+                ? txNormal.SampleBias(samLinearClamp, normalUv2, renderScale.x)
+                : txNormal.SampleBias(samLinearWrap, normalUv2, renderScale.x)).xyz * 2.0f - 1.0f;
             tangentNormal = normalize(tangentNormal + secondNormal);
         }
         tangentNormal.xy *= mat.normalTextures.y;
@@ -346,18 +419,30 @@ float4 PS(PS_INPUT input) : SV_Target
 
     if (mat.flags.x > 0)
         litColor.a = mat.Diffuse.a * textureColor.a;
-    litColor.rgb = EncodeGltfDisplayColor(litColor.rgb);
+    litColor.rgb = ToSceneColor(litColor.rgb);
     if (mat.opticalParams.y > 0.0f)
     {
         // Alpha blend fallback for transmission: keep reflected light while
         // displaying opaque scene geometry through the surface.
         float opacity = 1.0f - 0.9f * saturate(mat.opticalParams.y);
-        float3 reflection = EncodeGltfDisplayColor(spec.rgb + specularIbl);
+        float3 reflection = ToSceneColor(spec.rgb + specularIbl);
         litColor.rgb = lerp(litColor.rgb, reflection / opacity, mat.opticalParams.y);
         litColor.a *= opacity;
     }
 
     return litColor;
+}
+
+// Scene color and object motion. Interpolated clip positions keep the velocity exact across the triangle; an unmoved
+// surface has identical clip positions and so exactly zero velocity.
+PS_OUTPUT PS(PS_INPUT input)
+{
+    PS_OUTPUT output;
+    output.Color = ShadeSurface(input);
+    const float2 current = input.CurrentClip.xy / input.CurrentClip.w;
+    const float2 previous = input.PreviousClip.xy / input.PreviousClip.w;
+    output.Velocity = (previous - current) * float2(0.5f, -0.5f);
+    return output;
 }
 
 /////////////////////////////////////////////////////////
@@ -367,6 +452,7 @@ struct ShadowMapVertexOut
 {
     float4 PosH : SV_POSITION;
     float2 Tex  : TEXCOORD;
+    float3 PosL : POSITION;     // The mesh's own position, for the hashed alpha test.
 };
 
 ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
@@ -376,6 +462,7 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
     float3 position = mul(float4(input.Pos, 1.0f), input.World).xyz;
     float3 unusedNormal = 0, unusedTangent = 0;
     ApplyObjectTransform(position, unusedNormal, unusedTangent);
+    output.PosL = input.Pos;
     float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
     output.Tex = AtlasUv(input.Tex, input.AtlasRegion);
@@ -390,6 +477,7 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
     float3 position = SkinVertexPosition(input);
     float3 unusedNormal = 0, unusedTangent = 0;
     ApplyObjectTransform(position, unusedNormal, unusedTangent);
+    output.PosL = input.Pos;
     float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
@@ -409,8 +497,10 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
             ? txDiffuse.Sample(samLinearClamp, baseColorUv)
             : txDiffuse.Sample(samLinearWrap, baseColorUv));
 
-        // Don't write transparent pixels to the shadow map.
-        clip(textureColor.a - mat.flags.z);
+        // Don't write transparent pixels to the shadow map. The footprint and level of detail are a shadow-map texel's.
+        const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL)));
+        const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv);
+        clip(AlphaTestPasses(textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
     }
 }
 

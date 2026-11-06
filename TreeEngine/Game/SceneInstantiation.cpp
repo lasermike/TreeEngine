@@ -348,6 +348,17 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             parameters->normalVelocity1 = model.normalVelocity1;
             parameters->normalVelocity2 = model.normalVelocity2;
             parameters->normalStrength = model.normalStrength;
+            if (!model.tintMaterial.empty())
+            {
+                const auto matches = std::count_if(parameters->asset->materials.begin(), parameters->asset->materials.end(),
+                    [&](const auto& material) { return material.name == model.tintMaterial; });
+                if (matches != 1) throw std::runtime_error("Tinted material must match exactly one glTF material: " + model.tintMaterial);
+                parameters->tintMaterial = model.tintMaterial;
+                parameters->tintTexturePath = model.tintTexture;
+                parameters->tintTexture = LoadSharedMaterialTextureFile(RuntimeTexture(model.tintTexture, model.id, sceneFilename), 1);
+                parameters->tintUvScale = model.tintUvScale;
+                parameters->tintUvOffset = model.tintUvOffset;
+            }
             if (!model.animatedNormalMaterial.empty())
             {
                 int matches = 0;
@@ -661,6 +672,11 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             model.normalVelocity1 = modelParams.normalVelocity1;
             model.normalVelocity2 = modelParams.normalVelocity2;
             model.normalStrength = modelParams.normalStrength;
+            model.tintMaterial = modelParams.tintMaterial;
+            model.tintTexture = modelParams.tintTexturePath.empty() ? std::string()
+                : RebaseAsset(modelParams.tintTexturePath, sourceFilename, destinationFilename);
+            model.tintUvScale = modelParams.tintUvScale;
+            model.tintUvOffset = modelParams.tintUvOffset;
             break;
         }
         default: throw std::runtime_error("Cannot save unsupported scene object");

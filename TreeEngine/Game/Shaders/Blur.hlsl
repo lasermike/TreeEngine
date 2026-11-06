@@ -46,20 +46,8 @@ struct DrawRecord
     uint vertexCount;
     uint inputLayout;
 
-    // Material data (ShaderMaterial + textureIndex) — not used by compute shader
-    // but must match C++ struct layout for correct structured buffer stride
-    float4 matAmbient;
-    float4 matDiffuse;
-    float4 matFlags;
-    float4 matSpecularParams;
-    float4 matSpecularColor;
-    float4 matSpecularTextures;
-    float4 matNormalTextures;
-    float4 matMetallicRoughnessTextures;
-    float4 matOpticalParams;
-    float4 matNormalMotion;
-    float4 matUvTransformRow0[5];
-    float4 matUvTransformRow1[5];
+    // The C++ record's material, so the structured buffer stride matches (not read by these shaders).
+    ShaderMaterial material;
     int textureIndex;
     uint objectTransformSlot;
 };

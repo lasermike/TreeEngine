@@ -252,6 +252,8 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         }
         for (auto& opacityMicromaps : m_segmentOpacityMicromaps)
             opacityMicromaps.clear();
+        for (auto& branchIds : m_segmentBranchIds)
+            branchIds.clear();
         m_numInstancesPerSegment.fill(0);
 
         if (m_treeFrames.size() < _treeModel->treeData.numBranches)
@@ -316,7 +318,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
             rect.World._12 = region.atlasRect.y;
             rect.World._13 = region.atlasRect.z;
             rect.World._14 = region.atlasRect.w;
-            rect.InstanceOffset = rect.InstanceOffsetPrev = slot;
+            rect.InstanceOffset = rect.InstanceOffsetPrev = rect.PreviousSlot = slot;
             dataView[slot++] = rect;
         }
     }
@@ -332,6 +334,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
             if (renderData.instanceOpacityMicromap)
                 std::copy(m_segmentOpacityMicromaps[segmentIndex].begin(), m_segmentOpacityMicromaps[segmentIndex].end(),
                     renderData.instanceOpacityMicromap + segmentOffset);
+            LinkPreviousSlots(dataView, segmentOffset, m_segmentBranchIds[segmentIndex], m_slotHistory[0], renderData.frame);
         }
 
         pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, segmentOffset, (UINT)instanceData.size());
@@ -343,13 +346,20 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         // The layouts depend only on the pose and depth LOD, so they are rebuilt only when those change.
         if (!m_reusePose || !m_instanceLayoutsValid || m_instanceLayoutDepthLOD != _params->depthLOD)
             BuildInstanceLayouts(startInstance, renderData.instanceOpacityMicromap);
-        for (auto& layout : m_instanceLayouts)
+        for (int kind = 0; kind < InstanceLayoutCount; ++kind)
+        {
+            InstanceLayout& layout = m_instanceLayouts[kind];
             for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
             {
                 InstanceDataArray& instanceData = layout.segments[segmentIndex];
                 if (instanceData.size() > 0)
+                {
                     memcpy(dataView + layout.start[segmentIndex], &instanceData[0], instanceData.size() * sizeof(InstancedData));
+                    LinkPreviousSlots(dataView, layout.start[segmentIndex], layout.branchIds[segmentIndex],
+                        m_slotHistory[1 + kind], renderData.frame);
+                }
             }
+        }
     }
 
     PIXEndEvent();
@@ -501,6 +511,7 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
 
     m_segmentInstanceData[segmentIndex].push_back(data);
     m_segmentOpacityMicromaps[segmentIndex].push_back(LeafOpacityMicromap(frame.branch));
+    m_segmentBranchIds[segmentIndex].push_back(frame.branch->id);
 
     switch (frame.branch->geometryType)
     {
@@ -827,6 +838,7 @@ void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
             layout.start[segmentIndex] = next;
             next += counts[segmentIndex];
             layout.segments[segmentIndex].clear();
+            layout.branchIds[segmentIndex].clear();
         }
 
         // Emit with skinning links into this layout's own slots. Parents precede their children.
@@ -849,6 +861,7 @@ void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
             data.InstanceOffset = offset;
             data.InstanceOffsetPrev = parent >= 0 && m_layoutOffsets[parent] >= 0 ? m_layoutOffsets[parent] : offset;
             layout.segments[segmentIndex].push_back(data);
+            layout.branchIds[segmentIndex].push_back(frame.branch->id);
             if (opacityMicromaps)
                 opacityMicromaps[offset] = LeafOpacityMicromap(frame.branch);
             m_layoutOffsets[i] = static_cast<int>(offset);
@@ -859,6 +872,29 @@ void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
     }
     m_instanceLayoutsValid = true;
     m_instanceLayoutDepthLOD = _params->depthLOD;
+}
+
+// Points each instance written at firstSlot at the same branch's slot last frame and records this frame's slots.
+void Tree::LinkPreviousSlots(InstancedData* instances, UINT firstSlot, const std::vector<int>& branchIds,
+    SlotHistory& history, UINT frame)
+{
+    const size_t branches = _treeModel->treeData.numBranches;
+    const UINT current = frame & 1, previous = current ^ 1;
+    for (int i = 0; i < 2; ++i)
+        if (history.slots[i].size() < branches)
+        {
+            history.slots[i].resize(branches, InstancedData::NoPreviousSlot);
+            history.frames[i].resize(branches, 0);
+        }
+    for (size_t i = 0; i < branchIds.size(); ++i)
+    {
+        const int id = branchIds[i];
+        const UINT slot = firstSlot + static_cast<UINT>(i);
+        instances[slot].PreviousSlot = history.frames[previous][id] == frame ? history.slots[previous][id]
+            : InstancedData::NoPreviousSlot;
+        history.slots[current][id] = slot;
+        history.frames[current][id] = frame + 1;
+    }
 }
 
 HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
@@ -878,7 +914,7 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
 
     InstancedData data = {};
     XMStoreFloat4x4(&data.World, rel);
-    data.InstanceOffset = data.InstanceOffsetPrev = transformSlot;
+    data.InstanceOffset = data.InstanceOffsetPrev = data.PreviousSlot = transformSlot;
     renderData.instanceData[transformSlot] = data;
 
     if (!source.m_instanceLayoutsValid)

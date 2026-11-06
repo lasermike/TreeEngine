@@ -679,7 +679,7 @@ namespace SceneData
                 }
                 else if (type == "model")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "forceLit", "normalAnimation" });
+                    Fields(value, path, { "id", "type", "transform", "source", "forceLit", "normalAnimation", "materialTint" });
                     auto model = std::make_unique<ModelDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     model->source = String(value["source"], path + ".source");
@@ -703,6 +703,20 @@ namespace SceneData
                             if (model->normalStrength < 0 || model->normalStrength > 16)
                                 Invalid(animationPath + ".strength", "must be between 0 and 16");
                         }
+                    }
+                    if (value.contains("materialTint"))
+                    {
+                        const auto& tint = value["materialTint"];
+                        const auto tintPath = path + ".materialTint";
+                        Fields(tint, tintPath, { "material", "texture", "uvScale", "uvOffset" });
+                        for (auto key : { "material", "texture" })
+                            if (!tint.contains(key)) Invalid(tintPath + "." + key, "required property");
+                        model->tintMaterial = String(tint["material"], tintPath + ".material");
+                        if (model->tintMaterial.empty()) Invalid(tintPath + ".material", "must not be empty");
+                        model->tintTexture = String(tint["texture"], tintPath + ".texture");
+                        if (model->tintTexture.empty()) Invalid(tintPath + ".texture", "must not be empty");
+                        if (tint.contains("uvScale")) model->tintUvScale = Vector2(tint["uvScale"], tintPath + ".uvScale");
+                        if (tint.contains("uvOffset")) model->tintUvOffset = Vector2(tint["uvOffset"], tintPath + ".uvOffset");
                     }
                     auto dot = model->source.find_last_of('.');
                     std::string extension = dot == std::string::npos
@@ -954,6 +968,9 @@ namespace SceneData
                     value["normalAnimation"] = { { "material", model.animatedNormalMaterial },
                         { "velocity1", VectorJson(model.normalVelocity1) }, { "velocity2", VectorJson(model.normalVelocity2) },
                         { "strength", model.normalStrength } };
+                if (!model.tintMaterial.empty())
+                    value["materialTint"] = { { "material", model.tintMaterial }, { "texture", model.tintTexture },
+                        { "uvScale", VectorJson(model.tintUvScale) }, { "uvOffset", VectorJson(model.tintUvOffset) } };
                 break;
             }
             default: throw std::runtime_error("Cannot serialize unsupported scene object");

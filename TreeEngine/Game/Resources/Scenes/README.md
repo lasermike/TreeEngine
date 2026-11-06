@@ -395,29 +395,63 @@ Example: "ambientOcclusion": { "radius": 1.25, "strength": 0.65 }
 
 A model can specify "normalAnimation": {"material": "material name", "velocity1": [0.012, 0.006], "velocity2": [-0.005, 0.009]}. The name must uniquely identify a glTF material with a repeating normal map. Velocities are UV units per simulation second; two moving samples are blended. Optional strength multiplies the imported normal scale (0 to 16, default 1). The debug UI Water motion speed slider scales the animation and zero freezes its current phase. The effect uses scene time in raster and DXR and pauses with the simulation. Omit the property for static normals.
 
+A model can also specify "materialTint": {"material": "material name", "texture": "Terrain/tint.png", "uvScale": [su, sv], "uvOffset": [ou, ov]}. The texture multiplies that glTF material's base color by 2 x its RGB, so 0.5 leaves the color unchanged; it is read as linear data. Its UV is the model's UV times uvScale plus uvOffset (defaults 1 and 0), so a low-resolution tint can vary a tiled texture over a whole surface. Terra's terrain uses one to keep its baked weathering as broad light and dark variation over the tiled rock photoscan (`Tools/terra/fix_terra.py`).
+
+## Alpha-tested surfaces
+
+Materials with `alphaMode: "mask"` (leaves, needles) are opaque where alpha reaches `alphaCutoff`. Ray tracing
+tests the full-resolution texture, so distant foliage keeps its true density. Raster samples distant textures from
+mipmaps, where averaged alpha crosses a fixed cutoff unevenly: foliage would thin out, or with a cutoff of `1` all
+but vanish. So once a texture is minified, raster compares alpha with a random threshold fixed to each point of
+the surface instead, covering a pixel with probability equal to its averaged alpha (a hashed alpha test). Raster
+then matches ray tracing at any distance, while close-up cutouts keep their exact `alphaCutoff` shape. Distant
+foliage looks slightly speckled; temporal anti-aliasing will smooth that. **Hashed alpha test** in Settings turns it
+off. PNG textures get their mipmaps from an area-weighted filter that keeps each level's average alpha.
+
 ## Anti-aliasing
 
 Anti-aliasing is an app setting, not part of a scene: **Anti-aliasing** in the debug UI's Settings, saved
 with the debug UI's preferences. It works on the final image, so it applies to raster and DXR alike.
-- `SMAA 1x` (the default) finds edges in the color image and blends across them: about 0.03 ms at
+- `SMAA 1x` finds edges in the color image and blends across them: about 0.03 ms at
   1280x720 on an RTX 5080. **Show SMAA edges** draws the detected edges, horizontal in red and vertical
   in green, over the dimmed scene.
+- `TAA` (the default; temporal anti-aliasing, `Game/Shaders/Taa.hlsl`) moves the camera by a sub-pixel offset every frame
+  and accumulates the frames along the motion vectors, so each pixel averages several samples. Unlike SMAA it
+  also resolves detail smaller than a pixel: thin branches and needles, the distant foliage speckle of the
+  hashed alpha test, specular glints and ray-traced noise. Last frame's result is clipped to the colors around
+  each pixel now, which keeps moving and uncovered edges from ghosting. It settles in a few frames after a
+  camera cut and is slightly softer than SMAA.
 - `None` turns it off.
 
-SMAA runs before the post-processing blur (`blurAmount`). The blur also softens jagged edges, so with SMAA
-on, a lower `blurAmount` keeps more texture detail.
+SMAA and TAA run before the post-processing blur (`blurAmount`). The blur also softens jagged edges, so with
+anti-aliasing on, a lower `blurAmount` keeps more texture detail.
 
-Temporal anti-aliasing and upscalers (DLSS, FSR) are planned on top of camera motion vectors, which a
-compute pass derives from depth and the last frame's camera (`Game/Shaders/MotionVectors.hlsl`). They are
-exact for static geometry; growing and moving objects get their own motion in a later step. **Motion
-vectors** in Settings shows them:
+Upscalers (DLSS, FSR) are planned on the same inputs as TAA. The scene pass writes
+each surface's motion, from its position last frame (growing trees, moved and instanced objects) and last
+frame's camera. A compute pass (`Game/Shaders/MotionVectors.hlsl`) fills the sky from the camera alone. Blended
+surfaces that don't write depth, like water, keep the motion of what's behind them, as depth does. Raster
+always draws the scene, so DXR uses the same vectors. **Motion vectors** in Settings shows them:
 - `Motion`: direction as hue, length as brightness (16 pixels or more is full brightness).
 - `Reprojected history`: last frame's image fetched along the motion vectors. While the camera moves, it
   should look like the live image, except at edges the move uncovered.
 - `History`: last frame's image unmoved, for comparison.
 
-The pass runs only while a view is on. Sub-pixel camera jitter is in place for TAA but stays off until TAA
-exists.
+The compute pass runs while TAA or a view is on; the scene pass always writes velocity. The camera jitters only
+with TAA.
+
+## HDR and tonemapping
+
+**HDR** in Settings (on by default) renders the scene as linear light into a 16-bit float target instead of
+each shader encoding its own 8-bit display output, then maps it to the display at the end of the frame
+(`Game/Shaders/Tonemap.hlsl`), after TAA and before SMAA, the blur and the UI:
+- **Exposure (EV)** scales the light by 2^EV first.
+- **Tonemap** chooses how light above 1 reaches the display. `Clamp` clips it, as the 8-bit path does, so HDR
+  with Clamp at EV 0 looks like HDR off. `ACES` (Stephen Hill's fit) and `AgX` roll highlights off instead;
+  AgX keeps saturated highlights such as sunlit foliage from shifting hue.
+
+With HDR, ray-traced reflections and transmission add up in linear light, and blended surfaces blend in
+linear light without clipping first, so water reflects more of the sky than in the 8-bit path. TAA resolves the
+linear image. Upscalers (DLSS, FSR) will take this HDR image as their input.
 
 ## Sun shadow softness
 
