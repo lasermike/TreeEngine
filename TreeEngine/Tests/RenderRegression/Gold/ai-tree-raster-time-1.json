@@ -1,1 +1,1 @@
-{"scene":"LoadAITree","mode":"raster","time":1,"width":640,"height":480,"seed":12345,"warmupFrames":3,"postProcessing":true}
+{"scene":"LoadAITree","mode":"raster","time":1,"width":640,"height":480,"seed":12345,"warmupFrames":16,"postProcessing":true,"antialiasing":"taa","hdr":true,"tonemap":"agx","exposure":0}

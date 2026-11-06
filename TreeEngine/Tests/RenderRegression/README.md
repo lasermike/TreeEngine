@@ -69,12 +69,14 @@ inspection and separate approval of the exact generated subdirectories.
 
 `scenes.json` lists fourteen scene entries, both rendering modes, and captures at
 0, 1, and 5 seconds (84 images). It also specifies resolution, random seed,
-postprocessing, warmup frames, and tolerances. An entry may set `"antialiasing":
-"smaa"` to capture with SMAA 1x (`leaf-atlas-test-smaa`, `tree-smaa`); other entries
-render without anti-aliasing, whatever the app's own setting. An entry or capture may also set `"antialiasing": "taa"`; TAA needs warm-up frames to converge (`test-taa.ps1`
-uses 40). A request's `alphaTest` is `"hashed"` (the default, like the app)
-or `"cutoff"` (each material's alpha cutoff). A request or capture's `hdr` (default false, unlike the app, so golds stay independent of it) renders
-through the HDR target, with `tonemap` (`"clamp"`, `"aces"` or `"agx"`) and `exposure` (EV). Scene IDs refer to this manifest;
+postprocessing, warmup frames, and tolerances. Entries render without anti-aliasing and without HDR, whatever
+the app's own settings, unless they set them:
+- `"antialiasing"`: `"smaa"` (`leaf-atlas-test-smaa`, `tree-smaa`) or `"taa"` (`ai-tree`)
+- `"hdr": true` with `"tonemap"` (`"clamp"`, `"aces"` or `"agx"`) and `"exposure"` (EV) (`ai-tree`: AgX)
+- `"warmupFrames"`, overriding the manifest's; TAA needs more frames to settle (`ai-tree` uses 16)
+
+Render-test requests and captures take the same fields (`test-taa.ps1` warms TAA up for 40 frames). A request's
+`alphaTest` is `"hashed"` (the default, like the app) or `"cutoff"` (each material's alpha cutoff). Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
 regression selection.
