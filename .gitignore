@@ -207,3 +207,7 @@ FakesAssemblies/
 /Tree2020/.vs/Tree2012/v16/Solution.VC.db-shm
 /Tree2020/.vs/Tree2012/v16/Solution.VC.db-wal
 /TreeEngine/.vs/TreeEngine
+
+# Vendored SDK binaries under folder names the build-output rules above would ignore (see ThirdParty/DLSS/README.md).
+!TreeEngine/ThirdParty/DLSS/bin/
+!TreeEngine/ThirdParty/DLSS/lib/x64/
