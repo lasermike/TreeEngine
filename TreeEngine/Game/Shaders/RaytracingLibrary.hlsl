@@ -362,6 +362,9 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     {
         textureColor = SampleFilteredMaterialTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularColor.w > 0, mat, BaseColorTextureRole, uvDx, uvDy);
     }
+    if (mat.tintTextures.x >= 0)
+        textureColor.rgb *= 2 * SampleFilteredMaterialTexture(int(mat.tintTextures.x), TransformMaterialUv(mat, texCoord, TintTextureRole),
+            mat.tintTextures.y > 0, mat, TintTextureRole, uvDx, uvDy).rgb;
 
     if (mat.flags.w > 0)
     {

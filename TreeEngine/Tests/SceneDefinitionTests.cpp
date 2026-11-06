@@ -623,6 +623,39 @@ void TestModelNormalAnimation()
 }
 
 
+void TestModelMaterialTint()
+{
+    const std::string json = R"({"version":1,"name":"Tint","objects":[{"id":"rock","type":"model","source":"rock.glb","materialTint":{"material":"Limestone","texture":"Terrain/tint.png","uvScale":[6.5,5],"uvOffset":[-2.9,-2]}}]})";
+    auto scene = SceneData::ParseScene(json, "material-tint");
+    auto& model = static_cast<SceneData::ModelDefinition&>(*scene.objects[0]);
+    Check(model.tintMaterial == "Limestone" && model.tintTexture == "Terrain/tint.png" && model.tintUvScale.x == 6.5f
+        && model.tintUvScale.y == 5.0f && model.tintUvOffset.x == -2.9f && model.tintUvOffset.y == -2.0f, "material tint was not parsed");
+    auto saved = SceneData::ParseScene(SceneData::SerializeScene(scene), "saved-material-tint");
+    auto& savedModel = static_cast<SceneData::ModelDefinition&>(*saved.objects[0]);
+    Check(savedModel.tintMaterial == model.tintMaterial && savedModel.tintTexture == model.tintTexture
+        && savedModel.tintUvScale.x == model.tintUvScale.x && savedModel.tintUvOffset.y == model.tintUvOffset.y, "material tint did not round-trip");
+    // The transform is optional: identity.
+    auto plain = Json::parse(json);
+    plain["objects"][0]["materialTint"].erase("uvScale");
+    plain["objects"][0]["materialTint"].erase("uvOffset");
+    auto defaults = SceneData::ParseScene(plain.dump(), "material-tint-defaults");
+    auto& defaultModel = static_cast<SceneData::ModelDefinition&>(*defaults.objects[0]);
+    Check(defaultModel.tintUvScale.x == 1 && defaultModel.tintUvScale.y == 1 && defaultModel.tintUvOffset.x == 0, "material tint transform should default to identity");
+    auto bad = Json::parse(json);
+    bad["objects"][0]["materialTint"].erase("texture");
+    Reject(bad.dump(), ".materialTint.texture");
+    bad = Json::parse(json);
+    bad["objects"][0]["materialTint"]["material"] = "";
+    Reject(bad.dump(), ".materialTint.material");
+    bad = Json::parse(json);
+    bad["objects"][0]["materialTint"]["uvScale"] = Json::array({1});
+    Reject(bad.dump(), ".materialTint.uvScale");
+    bad = Json::parse(json);
+    bad["objects"][0]["materialTint"]["strength"] = 2;
+    Reject(bad.dump(), ".materialTint.strength");
+}
+
+
 void TestSunShadowSettings()
 {
     const std::string json = R"({"version":1,"name":"Sun","light":{"angularDiameterDegrees":2,"shadowSamples":8},"objects":[{"id":"box","type":"primitive","shape":"box"}]})";
@@ -648,6 +681,7 @@ int main(int argc, char** argv)
     {
         TestSunShadowSettings();
         TestModelNormalAnimation();
+        TestModelMaterialTint();
         TestAmbientOcclusionSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {

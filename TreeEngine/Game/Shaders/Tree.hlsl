@@ -26,6 +26,7 @@ Texture2D txNormal : register(t5);
 Texture2D txMetallicRoughness : register(t6);
 TextureCube txEnvironmentDiffuse : register(t7);
 TextureCube txEnvironmentSpecular : register(t8);
+Texture2D txTint : register(t10);
 
 ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
 {
@@ -344,6 +345,11 @@ float4 ShadeSurface(PS_INPUT input)
     }
     else
         textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    if (mat.tintTextures.x >= 0)
+    {
+        const float2 tintUv = TransformMaterialUv(mat, input.Tex, TintTextureRole);
+        textureColor.rgb *= 2 * (mat.tintTextures.y > 0 ? txTint.Sample(samLinearClamp, tintUv) : txTint.Sample(samLinearWrap, tintUv)).rgb;
+    }
 
     if (mat.flags.w > 0)
     {

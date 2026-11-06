@@ -429,6 +429,7 @@ HRESULT RenderManager::BindMaterialTexture(const GltfTextureSource& source, Mate
     case SpecularColorTextureRole: shaderMaterial.specularTextures.y = static_cast<float>(slot); break;
     case NormalTextureRole: shaderMaterial.normalTextures.x = static_cast<float>(slot); break;
     case MetallicRoughnessTextureRole: shaderMaterial.metallicRoughnessTextures.x = static_cast<float>(slot); break;
+    case TintTextureRole: shaderMaterial.tintTextures.x = static_cast<float>(slot); break;
     default: return E_INVALIDARG; // Base color is bound by CreateMaterial.
     }
     return S_OK;

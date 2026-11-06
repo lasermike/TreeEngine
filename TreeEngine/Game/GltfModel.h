@@ -18,6 +18,12 @@ public:
     XMFLOAT2 normalVelocity1 = { 0, 0 };
     XMFLOAT2 normalVelocity2 = { 0, 0 };
     float normalStrength = 1;
+    // See SceneData::ModelDefinition: a tint texture for one material, and its scene-relative path for saving.
+    std::string tintMaterial;
+    std::string tintTexturePath;
+    std::shared_ptr<const GltfTextureSource> tintTexture;
+    XMFLOAT2 tintUvScale = { 1, 1 };
+    XMFLOAT2 tintUvOffset = { 0, 0 };
 };
 
 class GltfModel : public WorldObject
@@ -34,6 +40,10 @@ class GltfModel : public WorldObject
     XMFLOAT2 m_normalVelocity1;
     XMFLOAT2 m_normalVelocity2;
     float m_normalStrength;
+    std::string m_tintMaterial;
+    std::shared_ptr<const GltfTextureSource> m_tintTexture;
+    XMFLOAT2 m_tintUvScale;
+    XMFLOAT2 m_tintUvOffset;
     std::vector<RenderBatch> m_batches;
 
 public:

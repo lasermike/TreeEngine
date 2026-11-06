@@ -90,6 +90,18 @@
           -0.095
         ],
         "strength": 2.5
+      },
+      "materialTint": {
+        "material": "Limestone - baked weathering",
+        "texture": "Terrain/terra-weathering-tint.png",
+        "uvScale": [
+          6.906996,
+          4.992965
+        ],
+        "uvOffset": [
+          -2.966357,
+          -1.991996
+        ]
       }
     }
   ]

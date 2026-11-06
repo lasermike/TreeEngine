@@ -54,8 +54,9 @@ struct ShaderMaterial
     float4 metallicRoughnessTextures; // texture slot, clamp flag
     float4 opticalParams; // x = IOR; y = transmission factor
     float4 normalMotion; // two UV velocities per second
-    float4 uvTransformRow0[5];
-    float4 uvTransformRow1[5];
+    float4 tintTextures; // tint texture slot, clamp flag
+    float4 uvTransformRow0[6];
+    float4 uvTransformRow1[6];
 };
 
 static const uint BaseColorTextureRole = 0;
@@ -63,6 +64,7 @@ static const uint MetallicRoughnessTextureRole = 1;
 static const uint NormalTextureRole = 2;
 static const uint SpecularStrengthTextureRole = 3;
 static const uint SpecularColorTextureRole = 4;
+static const uint TintTextureRole = 5;      // Base color x 2 x tint.rgb; linear data.
 
 float2 TransformMaterialUv(ShaderMaterial mat, float2 uv, uint role)
 {

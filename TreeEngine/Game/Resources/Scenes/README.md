@@ -395,6 +395,8 @@ Example: "ambientOcclusion": { "radius": 1.25, "strength": 0.65 }
 
 A model can specify "normalAnimation": {"material": "material name", "velocity1": [0.012, 0.006], "velocity2": [-0.005, 0.009]}. The name must uniquely identify a glTF material with a repeating normal map. Velocities are UV units per simulation second; two moving samples are blended. Optional strength multiplies the imported normal scale (0 to 16, default 1). The debug UI Water motion speed slider scales the animation and zero freezes its current phase. The effect uses scene time in raster and DXR and pauses with the simulation. Omit the property for static normals.
 
+A model can also specify "materialTint": {"material": "material name", "texture": "Terrain/tint.png", "uvScale": [su, sv], "uvOffset": [ou, ov]}. The texture multiplies that glTF material's base color by 2 x its RGB, so 0.5 leaves the color unchanged; it is read as linear data. Its UV is the model's UV times uvScale plus uvOffset (defaults 1 and 0), so a low-resolution tint can vary a tiled texture over a whole surface. Terra's terrain uses one to keep its baked weathering as broad light and dark variation over the tiled rock photoscan (`Tools/terra/fix_terra.py`).
+
 ## Alpha-tested surfaces
 
 Materials with `alphaMode: "mask"` (leaves, needles) are opaque where alpha reaches `alphaCutoff`. Ray tracing

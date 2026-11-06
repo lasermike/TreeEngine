@@ -248,7 +248,7 @@ enum CbvSrvUavHeapOffsets
 const int numGlobalDescriptors = Material0_HeapOffset;
 
 const int numConstantBuffersPerMaterial = 1;
-const int numTexturesPerMaterial = 5; // base color, specular, normal, metallic-roughness
+const int numTexturesPerMaterial = 6; // base color, specular strength and color, normal, metallic-roughness, tint
 const int numDescriptorsPerMaterial = numConstantBuffersPerMaterial + numTexturesPerMaterial;
 
 enum RtvHeapOffsets
@@ -463,10 +463,13 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numConstantBuffersPerMaterial, 3 /* b3 */);
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0 /* t0 */);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 3 /* t3-t6 */);
+    // The material's tint follows its other maps in the same table but reads as t10: t7-t9 are taken.
+    CD3DX12_DESCRIPTOR_RANGE materialMapRanges[2] = { ranges[3], {} };
+    materialMapRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 10 /* t10 */);
     ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 7 /* t7-t8 */);
     CD3DX12_ROOT_PARAMETER rootParameters[10];
     rootParameters[EnvironmentSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
-    rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(2, materialMapRanges, D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[MaterialCbvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[MaterialSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -2069,8 +2072,10 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
         GetDevice()->CopyDescriptorsSimple(1, dest, texture->textureView, D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
-    const int slots[4] = { static_cast<int>(shaderMaterial.specularTextures.x), static_cast<int>(shaderMaterial.specularTextures.y), static_cast<int>(shaderMaterial.normalTextures.x), static_cast<int>(shaderMaterial.metallicRoughnessTextures.x) };
-    for (int i = 0; i < 4; ++i)
+    const int slots[5] = { static_cast<int>(shaderMaterial.specularTextures.x), static_cast<int>(shaderMaterial.specularTextures.y),
+        static_cast<int>(shaderMaterial.normalTextures.x), static_cast<int>(shaderMaterial.metallicRoughnessTextures.x),
+        static_cast<int>(shaderMaterial.tintTextures.x) };
+    for (int i = 0; i < 5; ++i)
     {
         auto dest = m_descriptorHeap.hCPU(materialNum * numDescriptorsPerMaterial + Material0_HeapOffset + 2 + i);
         if (slots[i] >= 0)

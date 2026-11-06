@@ -174,6 +174,12 @@ namespace SceneData
         DirectX::XMFLOAT2 normalVelocity1 = { 0, 0 };
         DirectX::XMFLOAT2 normalVelocity2 = { 0, 0 };
         float normalStrength = 1;
+        // "materialTint": a linear texture multiplying one glTF material's base color by 2 x its RGB, through the
+        // model's UVs scaled and offset (tint UV = uv * tintUvScale + tintUvOffset).
+        std::string tintMaterial;
+        std::string tintTexture;
+        DirectX::XMFLOAT2 tintUvScale = { 1, 1 };
+        DirectX::XMFLOAT2 tintUvOffset = { 0, 0 };
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<ModelDefinition>(*this); }
     };
 
