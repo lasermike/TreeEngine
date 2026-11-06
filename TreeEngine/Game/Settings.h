@@ -28,12 +28,13 @@ public:
     // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
     // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.
     // Fsr: AMD FSR through the FidelityFX API (Game/UpscalerFsr.cpp), when its DLLs are next to the executable.
-    enum class Antialiasing { None, Smaa, Taa, Fsr };
+    // Dlss: NVIDIA DLSS through NGX (Game/UpscalerDlss.cpp), on NVIDIA RTX GPUs with nvngx_dlss.dll present.
+    enum class Antialiasing { None, Smaa, Taa, Fsr, Dlss };
     Antialiasing m_antialiasing = Antialiasing::Taa;
     // Fraction of the window, per axis, the scene renders at while a temporal mode upscales (Game/UpscalerMath.h);
     // 1 is native. Other modes, and the motion debug views, always render native.
     float m_renderScale = 1.0f;
-    float m_upscalerSharpness = 0.0f;   // FSR's sharpening pass, 0 (off) to 1.
+    float m_upscalerSharpness = 0.0f;   // FSR's sharpening pass, 0 (off) to 1. DLSS has none.
     // The frame time upscalers are told, in milliseconds; 0 measures it. Render tests fix it, since FSR's exposure
     // and accumulation follow it and a measured time would make captures differ from run to run.
     float m_upscalerFrameTimeMs = 0.0f;

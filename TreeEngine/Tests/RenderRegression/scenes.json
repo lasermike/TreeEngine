@@ -21,6 +21,7 @@
     { "id": "ai-tree", "name": "LoadAITree", "antialiasing": "taa", "hdr": true, "tonemap": "agx", "warmupFrames": 16 },
     { "id": "ai-tree-taau", "name": "LoadAITree", "antialiasing": "taa", "hdr": true, "tonemap": "agx", "renderScale": 0.5, "warmupFrames": 40 },
     { "id": "ai-tree-fsr", "name": "LoadAITree", "antialiasing": "fsr", "hdr": true, "tonemap": "agx", "renderScale": 0.5, "warmupFrames": 40 },
+    { "id": "ai-tree-dlss", "name": "LoadAITree", "antialiasing": "dlss", "hdr": true, "tonemap": "agx", "renderScale": 0.5, "warmupFrames": 40 },
     { "id": "gltf-models", "name": "LoadGltfDemo" },
     { "id": "instancing", "name": "Instancing" },
     { "id": "leaf-atlas-test", "name": "LeafAtlasTest" },

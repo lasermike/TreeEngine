@@ -101,6 +101,9 @@
     <ClCompile Include="..\Game\UpscalerFsr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\UpscalerDlss.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\Game\ScreenGrab12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -251,21 +251,22 @@
       <FileWrites Include="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
     </ItemGroup>
   </Target>
-  <!-- AMD FidelityFX runtime for the FSR upscaler (ThirdParty/FidelityFX/README.md): the loader and the upscaler DLL,
-       next to the executable, where the loader looks for effect DLLs. -->
+  <!-- Upscaler runtimes, next to the executable where they are looked for: AMD FidelityFX for FSR (the loader and the
+       upscaler DLL; ThirdParty/FidelityFX/README.md) and NVIDIA DLSS (ThirdParty/DLSS/README.md). -->
   <ItemGroup>
-    <FidelityFxRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\FidelityFX\signedbin\amd_fidelityfx_loader_dx12.dll" />
-    <FidelityFxRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\FidelityFX\signedbin\amd_fidelityfx_upscaler_dx12.dll" />
-    <UpToDateCheckInput Include="@(FidelityFxRuntime)" />
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\FidelityFX\signedbin\amd_fidelityfx_loader_dx12.dll" />
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\FidelityFX\signedbin\amd_fidelityfx_upscaler_dx12.dll" />
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\DLSS\bin\nvngx_dlss.dll" />
+    <UpToDateCheckInput Include="@(UpscalerRuntime)" />
   </ItemGroup>
-  <Target Name="CopyFidelityFxRuntime"
+  <Target Name="CopyUpscalerRuntimes"
           AfterTargets="Build"
           Condition="'$(Platform)'=='x64'"
-          Inputs="@(FidelityFxRuntime)"
-          Outputs="@(FidelityFxRuntime->'$(OutDir)%(Filename)%(Extension)')">
-    <Copy SourceFiles="@(FidelityFxRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+          Inputs="@(UpscalerRuntime)"
+          Outputs="@(UpscalerRuntime->'$(OutDir)%(Filename)%(Extension)')">
+    <Copy SourceFiles="@(UpscalerRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <ItemGroup>
-      <FileWrites Include="@(FidelityFxRuntime->'$(OutDir)%(Filename)%(Extension)')" />
+      <FileWrites Include="@(UpscalerRuntime->'$(OutDir)%(Filename)%(Extension)')" />
     </ItemGroup>
   </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

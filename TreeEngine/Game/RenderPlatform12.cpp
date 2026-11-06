@@ -167,7 +167,7 @@ HRESULT RenderPlatform12::GetDebugTexturePreview(const LoadedTexture* texture, u
 
 // Descriptors reserved per anti-aliasing mode for its upscaler backend, and the modes that may have one.
 static const UINT UpscalerDescriptorsPerMode = 16;
-static const UINT UpscalerModeSlots = 4;
+static const UINT UpscalerModeSlots = 5;
 
 enum CbvSrvUavHeapOffsets
 {

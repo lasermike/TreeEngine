@@ -96,3 +96,6 @@ std::unique_ptr<Upscaler> CreateUpscaler(Settings::Antialiasing mode, const Upsc
 
 // AMD FSR through the FidelityFX API (Game/UpscalerFsr.cpp), or null with the reason in error.
 std::unique_ptr<Upscaler> CreateFsrUpscaler(const UpscalerContext& context, std::string& error);
+
+// NVIDIA DLSS through NGX (Game/UpscalerDlss.cpp), or null with the reason in error.
+std::unique_ptr<Upscaler> CreateDlssUpscaler(const UpscalerContext& context, std::string& error);

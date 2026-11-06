@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Executable, [string]$OutputDirectory, [switch]$Hdr, [ValidateSet('taa', 'fsr')][string]$Backend = 'taa')
+param([string]$Executable, [string]$OutputDirectory, [switch]$Hdr, [ValidateSet('taa', 'fsr', 'dlss')][string]$Backend = 'taa')
 # Temporal upscaling (Game/Upscaler.h, TaauResolveCS in Game/Shaders/Taa.hlsl): the scene renders at a fraction of
 # the window and TAA reconstructs the window-size image. The reference is the frame rendered at twice the width and
 # height without anti-aliasing and box-filtered down, as in test-taa.ps1. For each scene and mode, at Quality (0.667)
@@ -9,8 +9,8 @@ param([string]$Executable, [string]$OutputDirectory, [switch]$Hdr, [ValidateSet(
 #   stability   - two converged frames 41 frames apart differ by a small mean (no shimmer from the longer jitter cycle)
 #   motion      - converged, then one sideways camera step: the error stays within a bound of native TAA's
 # A last job switches scale and window size between captures in one process, which must keep working.
-# -Backend fsr runs the same checks with AMD FSR (plus native, FSR's NativeAA) against native TAA, and its switching job
-# also passes through TAA. It fails if FSR is unavailable.
+# -Backend fsr or dlss runs the same checks with AMD FSR or NVIDIA DLSS (plus native: FSR's NativeAA, DLSS's DLAA)
+# against native TAA, and its switching job also passes through TAA. It fails if the backend is unavailable.
 # -Hdr runs everything with the HDR scene target (clamp tonemap); the reference is then averaged in linear light.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -81,7 +81,8 @@ $width = 640; $height = 480
 # Bounds on the error against the reference, as multiples of native TAA's, per backend. TAA, measured when
 # written, worst case (ray-traced leaves, where native TAA sees the most samples): converged 1.14x at Quality and
 # 1.41x at Performance, after the step 1.45x and 1.52x; AI Tree stays within 1.37x and 1.30x. FSR 3.1.6, worst case:
-# converged 0.89x native, 1.21x Quality, 1.43x Performance; after the step 0.99x, 1.12x and 1.23x.
+# converged 0.89x native, 1.21x Quality, 1.43x Performance; after the step 0.99x, 1.12x and 1.23x. DLSS 310.9.16:
+# converged 0.99x native (DLAA), 0.98x Quality, 1.16x Performance; after the step 1.08x, 1.19x and 1.21x.
 $bounds = @{
     taa = @(
         @{ name = 'quality'; scale = 0.6666667; convergence = 1.3; motion = 1.6 },
@@ -90,6 +91,10 @@ $bounds = @{
         @{ name = 'native'; scale = 1.0; convergence = 1.1; motion = 1.2 },
         @{ name = 'quality'; scale = 0.6666667; convergence = 1.4; motion = 1.35 },
         @{ name = 'performance'; scale = 0.5; convergence = 1.65; motion = 1.45 })
+    dlss = @(
+        @{ name = 'native'; scale = 1.0; convergence = 1.15; motion = 1.25 },
+        @{ name = 'quality'; scale = 0.6666667; convergence = 1.15; motion = 1.35 },
+        @{ name = 'performance'; scale = 0.5; convergence = 1.35; motion = 1.4 })
 }
 $scales = $bounds[$Backend]
 # Each scene's camera and a sideways step from it (as in test-taa.ps1).

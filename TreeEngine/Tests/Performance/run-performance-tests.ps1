@@ -19,8 +19,8 @@ param(
     [switch]$BackportedHarness,
     # Ray trace leaves without opacity micromaps (DXR 1.2), to measure what they save.
     [switch]$DisableOpacityMicromaps,
-    # Anti-aliasing for every test, overriding scenes.json: none, smaa, taa or fsr.
-    [ValidateSet('none', 'smaa', 'taa', 'fsr')][string]$Antialiasing,
+    # Anti-aliasing for every test, overriding scenes.json: none, smaa, taa, fsr or dlss.
+    [ValidateSet('none', 'smaa', 'taa', 'fsr', 'dlss')][string]$Antialiasing,
     # Scene resolution as a fraction of -Width x -Height; below 1, TAA upscales (other modes render native).
     [ValidateRange(0.25, 1.0)][double]$RenderScale = 1.0
 )
@@ -86,7 +86,7 @@ foreach ($entry in @($manifest.tests)) {
     $step = Get-Setting $entry $defaults 'frameTimeStep' (1.0 / 60.0)
     if (-not (Test-FiniteNumber $step) -or $step -le 0) { throw "$where`: frameTimeStep must be positive." }
     $testAntialiasing = $(if ($Antialiasing) { $Antialiasing } else { [string](Get-Setting $entry $defaults 'antialiasing' 'none') })
-    if ($testAntialiasing -notin @('none', 'smaa', 'taa', 'fsr')) { throw "$where`: antialiasing must be none, smaa, taa or fsr." }
+    if ($testAntialiasing -notin @('none', 'smaa', 'taa', 'fsr', 'dlss')) { throw "$where`: antialiasing must be none, smaa, taa, fsr or dlss." }
     $test = [ordered]@{ id = $entry.id; scene = $entry.scene; sceneName = $sceneFiles[[string]$entry.scene].name; type = $entry.type
         modes = $testModes; frameTimeStep = [double]$step; antialiasing = $testAntialiasing }
     if ($entry.type -eq 'steady') {

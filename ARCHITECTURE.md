@@ -30,8 +30,8 @@ TreeEngine is a C++ DirectX engine that simulates plant and tree growth in real 
 Its implementations are `RenderPlatform12`, `RenderPlatform11` and `RenderPlatformDLL`. `RenderPlatformDLL` is a proxy: it resolves a matching set of C-style exports (`Create`, `InitDevice`, …, the `*Func` typedefs near the end of `RenderPlatform.h`) through `GetProcAddress` in `RenderManager::SetPlatform` (`Game/RenderManager.cpp`). That set of flat C exports is the DLL's real ABI.
 
 **`Upscaler`** (`Game/Upscaler.h`) is the interface for temporal anti-aliasing and upscaling backends. TAA is the
-first (`Game/UpscalerTaa.cpp`) and AMD FSR the second (`Game/UpscalerFsr.cpp`); DLSS is meant to plug in behind the
-same interface. `TreeEngine/Game/UPSCALING.md`
+first (`Game/UpscalerTaa.cpp`), AMD FSR the second (`Game/UpscalerFsr.cpp`) and NVIDIA DLSS the third
+(`Game/UpscalerDlss.cpp`). `TreeEngine/Game/UPSCALING.md`
 documents it in full: the frame, the interface contract, the TAA reconstruction, and how to add a backend.
 - **Sizes.** The scene, ray tracing and motion vectors run at the render size, `Settings::m_renderScale` of the window
   (arithmetic in `Game/UpscalerMath.h`). Tonemapping, blur, the UI and captures run at the window's size.
@@ -107,6 +107,9 @@ The future plan in `.github/copilot-instructions.md` is to drop UWP and D3D11 an
 - DirectXTex and DDS loaders, plus the legacy Oculus SDK
 - AMD FidelityFX SDK v2.4.0, headers plus the signed loader and upscaler DLLs (Git LFS), for the FSR upscaler
   (`ThirdParty/FidelityFX`, loaded at run time; see `Game/UPSCALING.md`)
+- NVIDIA DLSS SDK 310.9.16, NGX headers and static libraries plus the signed `nvngx_dlss.dll` (Git LFS), for the DLSS
+  upscaler (`ThirdParty/DLSS`, NGX linked into RenderPlatform12). Its license, unlike the others, carries release
+  obligations (notify NVIDIA, attribution); see `ThirdParty/DLSS/README.md`
 
 **Windows SDK and system libraries:** `d3d12`, `dxgi`, `d3dcompiler`, `d2d1`, `dwrite`, `windowscodecs` (WIC), and `fxc`/`dxc` for shaders.
 

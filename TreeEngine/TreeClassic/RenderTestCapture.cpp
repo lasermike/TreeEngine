@@ -164,8 +164,8 @@ void ParseRenderTestCommandLine()
     parsed->opacityMicromaps = json.value("opacityMicromaps", true);
     parsed->antialiasing = json.value("antialiasing", std::string("none"));
     if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa" && parsed->antialiasing != "taa"
-        && parsed->antialiasing != "fsr")
-        throw std::runtime_error("antialiasing must be \"none\", \"smaa\", \"taa\" or \"fsr\"");
+        && parsed->antialiasing != "fsr" && parsed->antialiasing != "dlss")
+        throw std::runtime_error("antialiasing must be \"none\", \"smaa\", \"taa\", \"fsr\" or \"dlss\"");
     const std::string alphaTest = json.value("alphaTest", std::string("hashed"));
     if (alphaTest != "hashed" && alphaTest != "cutoff")
         throw std::runtime_error("alphaTest must be \"hashed\" or \"cutoff\"");
@@ -253,8 +253,8 @@ void ParseRenderTestCommandLine()
         point.scene = value.value("scene", std::string());
         point.antialiasing = value.value("antialiasing", parsed->antialiasing);
         if (point.antialiasing != "none" && point.antialiasing != "smaa" && point.antialiasing != "taa"
-            && point.antialiasing != "fsr")
-            throw std::runtime_error("Capture antialiasing must be \"none\", \"smaa\", \"taa\" or \"fsr\"");
+            && point.antialiasing != "fsr" && point.antialiasing != "dlss")
+            throw std::runtime_error("Capture antialiasing must be \"none\", \"smaa\", \"taa\", \"fsr\" or \"dlss\"");
         point.postProcessing = value.value("postProcessing", parsed->postProcessing);
         point.showShadowBuffer = value.value("showShadowBuffer", false);
         if (value.contains("cameraPosition"))
@@ -342,7 +342,8 @@ namespace
     Settings::Antialiasing AntialiasingSetting(const std::string& name)
     {
         return name == "smaa" ? Settings::Antialiasing::Smaa : name == "taa" ? Settings::Antialiasing::Taa
-            : name == "fsr" ? Settings::Antialiasing::Fsr : Settings::Antialiasing::None;
+            : name == "fsr" ? Settings::Antialiasing::Fsr : name == "dlss" ? Settings::Antialiasing::Dlss
+            : Settings::Antialiasing::None;
     }
 
     Settings::Tonemap TonemapSetting(const std::string& name)

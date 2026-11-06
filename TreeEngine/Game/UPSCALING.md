@@ -1,8 +1,8 @@
 # Temporal anti-aliasing and upscaling
 
 The scene can render at a fraction of the window's size. A temporal backend then reconstructs the window-size image
-from several jittered frames. There are two backends: the engine's own TAA and AMD FSR (through the FidelityFX API).
-DLSS is meant to plug in behind the same interface. This document covers:
+from several jittered frames. There are three backends: the engine's own TAA, AMD FSR (through the FidelityFX API)
+and NVIDIA DLSS (through NGX). This document covers:
 - how a frame flows;
 - what the platform and a backend each own;
 - how the TAA backend reconstructs the image;
@@ -15,6 +15,8 @@ DLSS is meant to plug in behind the same interface. This document covers:
 | `Game/UpscalerTaa.cpp` | The TAA backend: history, root signature, pipelines, `TaaConstants`; `CreateUpscaler` |
 | `Game/UpscalerFsr.cpp` | The FSR backend: the FidelityFX loader, context and dispatch |
 | `ThirdParty/FidelityFX/` | The FidelityFX API headers and AMD's signed DLLs (v2.4.0; see its `README.md`) |
+| `Game/UpscalerDlss.cpp` | The DLSS backend: NGX initialization, the DLSS feature and evaluation |
+| `ThirdParty/DLSS/` | The DLSS SDK's NGX headers and libraries and NVIDIA's signed runtime (310.9.16; see its `README.md`, which lists the license obligations) |
 | `Game/Shaders/Taa.hlsl` | `TaaResolveCS` (native) and `TaauResolveCS` (upscaling) |
 | `Game/RenderPlatform12.cpp` | Choosing the backend, render-size targets, jitter, LOD bias, calling `Evaluate` |
 | `Game/Settings.h` | `m_antialiasing` (the mode), `m_renderScale` (the fraction of the window), `m_upscalerSharpness`, `m_upscalerFrameTimeMs` |
@@ -246,39 +248,84 @@ Measured against the same 4-sample reference (`test-upscaling.ps1 -Backend fsr`,
 - At Quality it is 0.70–1.21×, and at Performance 0.82–1.43×. Both beat our TAAU in every scene.
 - After a camera step it is at most 0.99×, 1.12× and 1.23×.
 
+## The DLSS backend
+
+`DlssUpscaler` (`UpscalerDlss.cpp`) drives NVIDIA DLSS Super Resolution through NGX, the DLSS SDK's API, from the
+files vendored in `ThirdParty/DLSS`. Streamline is not used. Its manual-hooking path makes swapchain, command-queue
+and present hooks mandatory, while NGX needs none of them. Frame generation or Reflex would bring Streamline in
+later, without changing this interface.
+- **Linking.** RenderPlatform12 links NGX's static library (`nvsdk_ngx_d.lib`, or `nvsdk_ngx_d_dbg.lib` in Debug).
+  NGX loads `nvngx_dlss.dll` from the executable's folder, where the `TreeClassic` build copies it.
+- **Initialization.** `NVSDK_NGX_D3D12_Init_with_ProjectID` runs with TreeEngine's project GUID and the custom engine
+  type, using the existing device. Backends are created after the device exists, so no pre-device hook is needed.
+  NGX's log and cache go to `%LOCALAPPDATA%\TreeEngine\NGX`.
+- **Unavailable.** `SuperSampling.Available` from the capability parameters decides. Without the DLL, on a non-NVIDIA
+  GPU, or with an old driver, `CreateUpscaler` returns null with the reason ("DLSS needs driver X.Y or newer", and so
+  on), as for FSR.
+- **Description.** "DLSS" plus the runtime DLL's file version ("DLSS 310.9.16"), with "(DLAA)" at native.
+- **The feature.** DLSS fixes its input and output sizes, its quality mode and HDR at creation, so any of them
+  changing recreates it.
+  - Creation records onto a command list. `Resize` only marks the feature stale, and `Evaluate` releases and
+    recreates it first (the previous frame has finished).
+  - The quality mode is the one nearest the render scale: DLAA at 1, MaxQuality, Balanced, MaxPerf, or
+    UltraPerformance.
+  - Flags: `MVLowRes` (render-size motion), `AutoExposure` (tonemapping applies exposure after upscaling), `IsHDR`
+    with HDR. No `DepthInverted`, and `MVJittered` stays off.
+- **Evaluation** (`NGX_D3D12_EVALUATE_DLSS_EXT`):
+  - Color, output, depth and motion are passed as they are; NGX takes our typeless depth.
+  - The jitter passes through unchanged, as for FSR. Negated, `test-upscaling.ps1 -Backend dlss` measured up to 2×
+    the error, and shimmer.
+  - `InMVScale` is `motionToPixels`; `InRenderSubrectDimensions` is the render size.
+  - `InReset` covers a camera cut, a new feature, or a gap in `frameIndex`.
+  - Pre-exposure is 1, and the frame time is `frameTimeMs`. Sharpening is deprecated in DLSS and not used.
+- **Overrides.** The default jitter phase count (8 × ratio², NVIDIA's recommended minimum) and the default LOD bias
+  `log2(render / display)` (NVIDIA's recommendation; 0 at DLAA). `Supports` covers 1/3 to 1.
+- **Presets.** NVIDIA's defaults per quality mode; the driver picks the model.
+- **Determinism.** With the fixed frame time of render tests, captures repeat exactly.
+
+Measured against the same 4-sample reference (`test-upscaling.ps1 -Backend dlss`, DLSS 310.9.16):
+- At DLAA, DLSS's error is 0.78–0.99× native TAA's. At Quality it is 0.85–0.98×, and at Performance 0.98–1.16×.
+- After a camera step it is at most 1.08×, 1.19× and 1.21×.
+- It is the steadiest backend: consecutive converged frames differ least.
+- The box-filtered reference rewards softness, which understates reconstructions as sharp as DLSS's. Compare the
+  images too.
+
 ## Settings, UI and tests
 
-- **Debug UI** (Settings › Anti-aliasing = TAA or FSR): the backend's description ("TAA", "FSR 3.1.6") or why it
-  is unavailable, then "Render scale", and for FSR a "Sharpness" slider.
+- **Debug UI** (Settings › Anti-aliasing = TAA, FSR or DLSS): the backend's description ("TAA", "FSR 3.1.6",
+  "DLSS 310.9.16 (DLAA)") or why it is unavailable, then "Render scale", and for FSR a "Sharpness" slider.
   - Presets: Native 1, Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra performance 1/3, or a Custom slider
     from 0.33 to 1.
   - A line reads `Render W x H -> W x H`.
   - The scale is saved in `debug-ui.txt` after the anti-aliasing mode.
-- **Render tests:** requests and captures take `"antialiasing": "fsr"` and `"renderScale"` (0.25–1). Reports give
+- **Render tests:** requests and captures take `"antialiasing": "fsr"` or `"dlss"` and `"renderScale"` (0.25–1). Reports give
   `renderScale`, `renderWidth`, `renderHeight` and `upscaler`. Tests set the scale explicitly, so a saved UI
   preference can't leak in, and fix the upscaler frame time at 1/60 s.
-- **Regression:** a `scenes.json` entry may set `"renderScale"`. `ai-tree-taau` and `ai-tree-fsr` render AI Tree at
-  0.5 with TAA and with FSR, HDR and AgX. FSR's golds also depend on the provider version.
-- **`test-upscaling.ps1`** (add `-Hdr` for the HDR scene target, and `-Backend fsr` for FSR, which adds native):
+- **Regression:** a `scenes.json` entry may set `"renderScale"`. `ai-tree-taau`, `ai-tree-fsr` and `ai-tree-dlss`
+  render AI Tree at 0.5 with each backend, HDR and AgX. FSR's and DLSS's golds also depend on the vendor runtime's
+  version.
+- **`test-upscaling.ps1`** (add `-Hdr` for the HDR scene target, and `-Backend fsr` or `dlss`, which add native):
   - render sizes;
   - convergence, stability and a camera step at Quality and Performance against the reference and native TAA;
   - switching scale and window size within one process.
-- **Perf:** `run-performance-tests.ps1 <label> -Antialiasing taa -RenderScale 0.5` (or `-Antialiasing fsr`). Results record `renderScale`, and
+- **Perf:** `run-performance-tests.ps1 <label> -Antialiasing taa -RenderScale 0.5` (or `fsr`, `dlss`). Results record `renderScale`, and
   each job its render size.
 - **Unit tests:** `TestUpscalerMath` in `Tests/SceneDefinitionTests.cpp`.
 
-## Adding a backend (DLSS next)
+## Adding a backend
 
-FSR followed these steps; `UpscalerFsr.cpp` is the model for a vendor backend.
+FSR and DLSS followed these steps; `UpscalerFsr.cpp` (a run-time-loaded API) and `UpscalerDlss.cpp` (a linked SDK)
+are the models for a vendor backend.
 1. **Add the mode** to `Settings::Antialiasing`, the debug UI combo and `debug-ui.txt`'s accepted range. Also add it
    to the render-test request validation and `AntialiasingSetting`, `run-render-tests.ps1`, the perf runner's
    `-Antialiasing` and `test-upscaling.ps1 -Backend`. Each mode with a backend needs a descriptor block: raise
-   `UpscalerModeSlots` in `RenderPlatform12.cpp` above the largest mode value (it is 4 today, so DLSS as mode 4
-   needs 5).
-2. **Vendor the SDK** under `ThirdParty/<Name>`: headers, signed DLLs in Git LFS, the license and a README with the
-   version and update steps. Copy the DLLs next to the executable from `TreeClassic.vcxproj`.
+   `UpscalerModeSlots` in `RenderPlatform12.cpp` above the largest mode value (it is 5 today, for DLSS as mode 4).
+2. **Vendor the SDK** under `ThirdParty/<Name>`: headers, signed DLLs (and libraries) in Git LFS, the license and a
+   README with the version, update steps and any license obligations. Check the DLLs' signatures. Copy the DLLs next
+   to the executable from `TreeClassic.vcxproj`.
 3. **Implement `Upscaler`** in a new `Game/Upscaler<Name>.cpp`, with a branch in `CreateUpscaler`. Load the vendor
-   runtime with `LoadLibraryW` and return null with a reason when it's missing, so the mode simply stays unavailable.
+   runtime at run time, or link its SDK. Return null with a reason when the runtime or the GPU support is missing, so
+   the mode simply stays unavailable. Stub it out for platforms without the SDK.
 4. **Map `UpscaleFrame`** onto the vendor's dispatch:
    - Motion vector scale = `motionToPixels`, current → previous.
    - Depth is not inverted; describe our typeless depth as `R32_FLOAT`.
@@ -288,8 +335,10 @@ FSR followed these steps; `UpscalerFsr.cpp` is the model for a vendor backend.
    - Pass the camera's near, far and vertical field of view, HDR = `hdr`, `frameTimeMs` and `sharpness`.
 5. **Override `JitterPhaseCount` and `MipBias`** with the vendor's recommendations.
 6. **Descriptor heaps.** The vendor runtime may bind its own heaps; the platform rebinds its own after `Evaluate`.
-7. **Early initialization (DLSS).** Streamline must initialize before the D3D12 device exists (`slInit`, then an
-   upgraded device). That needs a static hook called from `RenderPlatform12::InitDevice`; the interface doesn't have
-   it yet.
-8. **Tests.** Add the backend to `test-upscaling.ps1 -Backend`, with bounds measured on a first run, and a regression
-   entry. Make sure captures repeat exactly; FSR needed the fixed frame time for that.
+7. **Command lists.** A runtime that records while creating its feature (DLSS) creates it in `Evaluate`, since
+   `Resize` has no command list.
+8. **Early initialization.** None of the current backends needs one. Streamline, if added for frame generation,
+   initializes before the D3D12 device exists (`slInit`, then an upgraded device). That would need a static hook
+   called from `RenderPlatform12::InitDevice`.
+9. **Tests.** Add the backend to `test-upscaling.ps1 -Backend`, with bounds measured on a first run, and a regression
+   entry. Make sure captures repeat exactly; FSR needed the fixed frame time for that, and DLSS repeats with it.

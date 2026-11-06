@@ -107,7 +107,7 @@ namespace
             readPlacement(settings.m_debugUIOverlayPlacement);
             readPlacement(settings.m_debugUISeparatePlacement);
             int antialiasing = 0;
-            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Fsr))
+            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Dlss))
                 settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
             float renderScale = 1;
             if (file >> renderScale && renderScale >= UpscalerMath::MinRenderScale && renderScale <= UpscalerMath::MaxRenderScale)
@@ -1357,18 +1357,20 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         auto& sceneRenderSettings = m_renderManager.GetRenderData();
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         int antialiasing = static_cast<int>(m_settings.m_antialiasing);
-        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0TAA\0FSR\0"))
+        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0TAA\0FSR\0DLSS\0"))
             m_settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
         if (m_settings.m_antialiasing == Settings::Antialiasing::Smaa)
             ImGui::Checkbox("Show SMAA edges", &m_settings.m_showAntialiasingEdges);
         const bool temporal = m_settings.m_antialiasing == Settings::Antialiasing::Taa
-            || m_settings.m_antialiasing == Settings::Antialiasing::Fsr;
+            || m_settings.m_antialiasing == Settings::Antialiasing::Fsr || m_settings.m_antialiasing == Settings::Antialiasing::Dlss;
         const char* upscalerStatus = m_renderManager.GetRenderData().upscalerStatus;
         if (temporal && strncmp(upscalerStatus, "unavailable", 11) == 0)
         {
-            // The backend failed to load (for FSR, usually its DLLs missing next to the executable).
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "  %s %s", m_settings.m_antialiasing == Settings::Antialiasing::Fsr
-                ? "FSR" : "TAA", upscalerStatus);
+            // The backend failed to load (for FSR and DLSS, usually their DLLs missing next to the executable, or
+            // for DLSS a GPU or driver without it).
+            const char* modeNames[] = { "None", "SMAA", "TAA", "FSR", "DLSS" };
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "  %s %s", modeNames[static_cast<int>(m_settings.m_antialiasing)],
+                upscalerStatus);
             ImGui::TextDisabled("  Rendering without anti-aliasing; TAA is the built-in alternative.");
         }
         else if (temporal)

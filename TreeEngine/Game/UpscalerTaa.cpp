@@ -173,6 +173,8 @@ std::unique_ptr<Upscaler> CreateUpscaler(Settings::Antialiasing mode, const Upsc
     }
     else if (mode == Settings::Antialiasing::Fsr)
         upscaler = CreateFsrUpscaler(context, reason);
+    else if (mode == Settings::Antialiasing::Dlss)
+        upscaler = CreateDlssUpscaler(context, reason);
     if (error)
         *error = reason;
     return upscaler;
