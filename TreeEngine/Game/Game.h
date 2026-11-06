@@ -81,6 +81,11 @@ public:
     void SetRenderTestOpacityMicromaps(bool enabled) { m_settings.m_opacityMicromaps = enabled; }
     void SetRenderTestAntialiasing(Settings::Antialiasing mode) { m_settings.m_antialiasing = mode; m_settings.m_showAntialiasingEdges = false; }
     void SetRenderTestHashedAlphaTest(bool hashed) { m_settings.m_hashedAlphaTest = hashed; }
+    void SetRenderTestHdr(bool hdr, Settings::Tonemap tonemap, float exposure) {
+        m_settings.m_hdr = hdr;
+        m_settings.m_tonemap = tonemap;
+        m_settings.m_exposure = exposure;
+    }
     void SetRenderTestMotion(Settings::MotionView view, bool hasJitter, float jitterX, float jitterY) {
         m_settings.m_motionView = view;
         m_settings.m_jitter = false;

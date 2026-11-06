@@ -31,6 +31,9 @@ struct RenderTestPoint
     std::array<float, 2> jitter = {};
     bool hasPreviousTime = false;     // Warm-up frames render at this simulation time, so growth moves objects.
     double previousTime = 0;
+    bool hdr = false;                 // HDR scene color; tonemap is "clamp", "aces" or "agx"; exposure in EV.
+    std::string tonemap = "clamp";
+    float exposure = 0;
 };
 
 // A camera pose on a performance run's path; time is seconds after the run's start time.
@@ -54,6 +57,9 @@ struct RenderTestRequest
     bool opacityMicromaps = true; // false makes DXR run the leaf alpha test without opacity micromaps.
     std::string antialiasing = "none"; // "none" or "smaa"; none keeps gold images independent of the app default.
     bool hashedAlphaTest = true;       // "alphaTest": "hashed" (default) or "cutoff" (the material's alpha cutoff).
+    bool hdr = false;                  // Defaults for every capture; see RenderTestPoint.
+    std::string tonemap = "clamp";
+    float exposure = 0;
     bool hasJitter = false;            // A fixed camera jitter in pixels for every capture; see RenderTestPoint.
     std::array<float, 2> jitter = {};
     bool hasReflectionRays = false; // Omitted: preserve the application default.

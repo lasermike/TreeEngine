@@ -234,7 +234,7 @@ PS_INPUT SkyBoxVS(VS_INPUT vin)
 PS_OUTPUT SkyBoxPS(PS_INPUT pin)
 {
     PS_OUTPUT output;
-    output.Color = txCubeMap.Sample(samLinearWrap, pin.PosW.xyz);
+    output.Color = float4(DisplayToScene(txCubeMap.Sample(samLinearWrap, pin.PosW.xyz).rgb), 1);
     output.Velocity = NoObjectMotion;   // The sky moves with the camera; MotionVectorsCS reprojects it.
     return output;
 }
@@ -348,7 +348,7 @@ float4 ShadeSurface(PS_INPUT input)
     if (mat.flags.w > 0)
     {
         float4 color = mat.Diffuse * textureColor;
-        color.rgb = EncodeGltfDisplayColor(color.rgb);
+        color.rgb = ToSceneColor(color.rgb);
         return color;
     }
 
@@ -412,13 +412,13 @@ float4 ShadeSurface(PS_INPUT input)
 
     if (mat.flags.x > 0)
         litColor.a = mat.Diffuse.a * textureColor.a;
-    litColor.rgb = EncodeGltfDisplayColor(litColor.rgb);
+    litColor.rgb = ToSceneColor(litColor.rgb);
     if (mat.opticalParams.y > 0.0f)
     {
         // Alpha blend fallback for transmission: keep reflected light while
         // displaying opaque scene geometry through the surface.
         float opacity = 1.0f - 0.9f * saturate(mat.opticalParams.y);
-        float3 reflection = EncodeGltfDisplayColor(spec.rgb + specularIbl);
+        float3 reflection = ToSceneColor(spec.rgb + specularIbl);
         litColor.rgb = lerp(litColor.rgb, reflection / opacity, mat.opticalParams.y);
         litColor.a *= opacity;
     }

@@ -1319,6 +1319,14 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         if (m_settings.m_antialiasing == Settings::Antialiasing::Smaa)
             ImGui::Checkbox("Show SMAA edges", &m_settings.m_showAntialiasingEdges);
         ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
+        ImGui::Checkbox("HDR", &m_settings.m_hdr);
+        if (m_settings.m_hdr)
+        {
+            int tonemap = static_cast<int>(m_settings.m_tonemap);
+            if (ImGui::Combo("Tonemap", &tonemap, "Clamp\0ACES\0AgX\0"))
+                m_settings.m_tonemap = static_cast<Settings::Tonemap>(tonemap);
+            ImGui::SliderFloat("Exposure (EV)", &m_settings.m_exposure, -4.0f, 4.0f, "%.1f");
+        }
         int motionView = static_cast<int>(m_settings.m_motionView);
         if (ImGui::Combo("Motion vectors", &motionView, "Off\0Motion\0Reprojected history\0History\0"))
             m_settings.m_motionView = static_cast<Settings::MotionView>(motionView);

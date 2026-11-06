@@ -529,6 +529,7 @@ struct RenderUnit
 #if defined(TREE3D12)
 
     ID3D12PipelineState*        m_pipelineStates[NUM_RENDER_PASSES];
+    ID3D12PipelineState*        m_hdrPipelineState = nullptr;   // The regular pass into the HDR scene target.
     int                         id;
     static int                  s_nextId;
 
@@ -835,6 +836,7 @@ private:
 
     // PSO -TODO: consolidate in game level pso's
     CComPtr<ID3D12PipelineState>      m_pipelineState;
+    CComPtr<ID3D12PipelineState>      m_pipelineStateHdr;
     CComPtr<ID3D12PipelineState>      m_pipelineStateR8FullScreenQuad;
     CComPtr<ID3D12PipelineState>      m_pipelineStateShadowMap;
     CComPtr<ID3D12PipelineState>      m_pipelineStateRGBFullScreenQuad;
@@ -1077,6 +1079,17 @@ public:
     UINT                        m_taaViewGeneration = UINT_MAX;
     bool TaaEnabled() const;
     HRESULT EnsureTaaResources(UINT width, UINT height);
+
+    // HDR scene color (Game/Shaders/Tonemap.hlsl): linear light in a float target, tonemapped into off-screen buffer 1.
+    CComPtr<ID3D12RootSignature> m_tonemapRootSignature;
+    CComPtr<ID3D12Resource>     m_hdrColor;
+    UINT                        m_hdrViewGeneration = UINT_MAX;
+    float                       m_hdrClearColor[4] = {};    // The linear clear color m_hdrColor was created for.
+    bool HdrEnabled() const;
+    void HdrClearColor(float color[4]) const;  // The scene's clear color, decoded to linear light.
+    HRESULT EnsureHdrResources(UINT width, UINT height);
+    DXGI_FORMAT SceneColorFormat() const;   // The ray-tracing output's format: the HDR target's or the swap chain's.
+    HRESULT CreateDxrOutput(UINT width, UINT height);
     bool UsesOffscreenChain() const;
     HRESULT EnsureMotionResources(UINT width, UINT height);
     void ResetMotionHistory();

@@ -366,7 +366,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     if (mat.flags.w > 0)
     {
         payload.color = mat.Diffuse * textureColor;
-        payload.color.rgb = EncodeGltfDisplayColor(payload.color.rgb);
+        payload.color.rgb = ToSceneColor(payload.color.rgb);
         payload.color.a = 1.0f;
         return;
     }
@@ -470,7 +470,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         TraceRay(Scene, rayFlags, ~0, 0, 0, 1, transmittedRay, transmitted);
         float3 specularIbl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
             float3(0, 0, 0), prefiltered);
-        float3 reflection = EncodeGltfDisplayColor((shadowFactor * S).rgb + specularIbl);
+        float3 reflection = ToSceneColor((shadowFactor * S).rgb + specularIbl);
         float f0 = ComputeDielectricF0(mat.opticalParams.x);
         float fresnel = f0 + (1.0f - f0) * pow(1.0f - saturate(dot(normal, toEye)), 5.0f);
         if (reflectionRayCount > 0)
@@ -503,17 +503,17 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
                 sumR += sampleR.color.rgb;
                 countR += 1;
             }
-            float3 environmentReflection = EncodeGltfDisplayColor(prefiltered);
+            float3 environmentReflection = ToSceneColor(prefiltered);
             float3 tracedColor = countR > 0 ? sumR / countR : environmentReflection;
             float3 reflectedColor = lerp(tracedColor, environmentReflection, roughness * roughness);
-            reflection = EncodeGltfDisplayColor((shadowFactor * S).rgb) + reflectedColor * fresnel;
+            reflection = ToSceneColor((shadowFactor * S).rgb) + reflectedColor * fresnel;
         }
         float3 throughColor = transmitted.color.rgb * mat.Diffuse.rgb * textureColor.rgb * (1.0f - fresnel);
-        payload.color = float4(lerp(EncodeGltfDisplayColor(surfaceColor), reflection + throughColor,
+        payload.color = float4(lerp(ToSceneColor(surfaceColor), reflection + throughColor,
             saturate(mat.opticalParams.y)), 1);
     }
     else
-        payload.color = float4(EncodeGltfDisplayColor(surfaceColor), 1);
+        payload.color = float4(ToSceneColor(surfaceColor), 1);
 }
 
 [shader("miss")]
@@ -526,7 +526,7 @@ void ShadowMissShader(inout RayPayload payload)
 [shader("miss")]
 void MissShader(inout RayPayload payload)
 {
-    payload.color = backgroundColor;
+    payload.color = float4(DisplayToScene(backgroundColor.rgb), backgroundColor.a);
     if (skyInstanceIndex >= 0)
     {
         float3x3 skyWorld =
@@ -550,7 +550,7 @@ void MissShader(inout RayPayload payload)
             // HDR skies can hold infinities or NaNs where the sun overflowed half floats (kiara_3_morning does);
             // treat them as the brightest half-float value instead of letting them turn reflections black.
             sky = select(or(isnan(sky), isinf(sky)), 65504.0f, sky);
-            payload.color = float4(sky, 1);
+            payload.color = float4(DisplayToScene(sky), 1);
         }
     }
 }

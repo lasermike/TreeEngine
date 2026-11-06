@@ -36,6 +36,9 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Temporal anti-aliasing against a 4-sample reference: convergence, stability and a camera step.
 .\Tests\RenderRegression\test-taa.ps1
 
+# HDR scene color: equivalence with the 8-bit path, toggling, operators, exposure, and TAA with HDR.
+.\Tests\RenderRegression\test-hdr.ps1
+
 # Camera motion vectors and jitter in LeafAtlasTest and AI Tree, raster and DXR.
 .\Tests\RenderRegression\test-motion-vectors.ps1
 
@@ -70,7 +73,8 @@ postprocessing, warmup frames, and tolerances. An entry may set `"antialiasing":
 "smaa"` to capture with SMAA 1x (`leaf-atlas-test-smaa`, `tree-smaa`); other entries
 render without anti-aliasing, whatever the app's own setting. An entry or capture may also set `"antialiasing": "taa"`; TAA needs warm-up frames to converge (`test-taa.ps1`
 uses 40). A request's `alphaTest` is `"hashed"` (the default, like the app)
-or `"cutoff"` (each material's alpha cutoff). Scene IDs refer to this manifest;
+or `"cutoff"` (each material's alpha cutoff). A request or capture's `hdr` (default false, unlike the app, so golds stay independent of it) renders
+through the HDR target, with `tonemap` (`"clamp"`, `"aces"` or `"agx"`) and `exposure` (EV). Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
 regression selection.

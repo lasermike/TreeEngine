@@ -437,6 +437,20 @@ always draws the scene, so DXR uses the same vectors. **Motion vectors** in Sett
 The compute pass runs while TAA or a view is on; the scene pass always writes velocity. The camera jitters only
 with TAA.
 
+## HDR and tonemapping
+
+**HDR** in Settings (on by default) renders the scene as linear light into a 16-bit float target instead of
+each shader encoding its own 8-bit display output, then maps it to the display at the end of the frame
+(`Game/Shaders/Tonemap.hlsl`), after TAA and before SMAA, the blur and the UI:
+- **Exposure (EV)** scales the light by 2^EV first.
+- **Tonemap** chooses how light above 1 reaches the display. `Clamp` clips it, as the 8-bit path does, so HDR
+  with Clamp at EV 0 looks like HDR off. `ACES` (Stephen Hill's fit) and `AgX` roll highlights off instead;
+  AgX keeps saturated highlights such as sunlit foliage from shifting hue.
+
+With HDR, ray-traced reflections and transmission add up in linear light, and blended surfaces blend in
+linear light without clipping first, so water reflects more of the sky than in the 8-bit path. TAA resolves the
+linear image. Upscalers (DLSS, FSR) will take this HDR image as their input.
+
 ## Sun shadow softness
 
 The directional light can specify "angularDiameterDegrees" (0 to 10, default 0) and "shadowSamples" (1 to 32, default 8). A positive angle with more than one sample traces the apparent sun disk in DXR; zero keeps hard shadows. The angle is the sun's full angular diameter. Raster shadow maps retain their existing filtering. Soft sun sampling applies to directly visible surfaces; secondary reflection and transmission hits use a single shadow ray to limit cost. More samples increase ray tracing cost.

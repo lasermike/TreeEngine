@@ -50,7 +50,8 @@ cbuffer cbChangesEveryFrame : register(b2)
     DirectionalLight light;
     float4 eyePos;
     matrix shadowMatrix;
-    uint globalFlags;  // bit 0 = use shadow maps; bit 1 = disable ray-traced shadows; bit 2 = hashed alpha test (raster)
+    uint globalFlags;  // bit 0 = use shadow maps; bit 1 = disable ray-traced shadows; bit 2 = hashed alpha test (raster);
+                       // bit 3 = HDR scene color (linear light; tonemapped later)
     int numDirectionalLights;
     int numPointLights;
     float environmentRotationCos;
@@ -115,6 +116,29 @@ bool AlphaTestPasses(float alpha, float cutoff, float textureLod, float3 positio
     if (!(globalFlags & 0x4) || textureLod <= 0)
         return alpha >= cutoff;
     return alpha >= lerp(cutoff, HashedAlphaThreshold(position, footprint), saturate(textureLod));
+}
+
+// The scene target holds linear light with HDR (globalFlags bit 3), tonemapped and encoded for display at the end
+// of the frame (Tonemap.hlsl). Without HDR it holds display-encoded sRGB, as each shader encodes its own output.
+bool HdrSceneColor()
+{
+    return (globalFlags & 0x8) != 0;
+}
+
+// A shaded color as the scene target stores it. Ray-tracing payloads use the same space, so reflections and
+// transmission combine in linear light with HDR.
+float3 ToSceneColor(float3 linearColor)
+{
+    return HdrSceneColor() ? max(linearColor, 0) : EncodeGltfDisplayColor(linearColor);
+}
+
+// Inputs that are display-referred today (the sky cube map, the clear color) as the scene target stores them.
+float3 DisplayToScene(float3 display)
+{
+    if (!HdrSceneColor())
+        return display;
+    const float3 value = max(display, 0);
+    return select(value <= 0.04045f, value / 12.92f, pow((value + 0.055f) / 1.055f, 2.4f));
 }
 
 float3 RotateEnvironmentDirection(float3 direction)

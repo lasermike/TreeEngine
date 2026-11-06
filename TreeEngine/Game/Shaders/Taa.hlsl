@@ -10,8 +10,8 @@
 // lighting change is pulled back toward what is visible now), then blended with the current sample. Velocity comes
 // from the nearest pixel in the 3x3, so a foreground edge reprojects with the foreground.
 //
-// The scene color is display-encoded and in [0, 1], so it is resolved as is; the history is 16-bit float, as 8 bits
-// would stall the accumulation and band.
+// The scene color is display-encoded and in [0, 1], or with HDR linear light (the inverse-luminance blend weights keep
+// bright samples from dominating). The history is 16-bit float, as 8 bits would stall the accumulation and band.
 //--------------------------------------------------------------------------------------
 
 cbuffer TaaConstants : register(b0)
@@ -20,7 +20,7 @@ cbuffer TaaConstants : register(b0)
     uint   HistoryValid;    // 0 on the first frame, after a resize or a level load.
     float  CurrentWeight;   // The current frame's share of the blend.
     float  ClipGamma;       // The neighborhood box: mean +- ClipGamma standard deviations.
-    uint   TaaPad;
+    uint   HdrInput;        // Color is linear HDR: resolve into the history only (Tonemap.hlsl reads it), unclamped.
 };
 
 Texture2D<float4> Color : register(t0);
@@ -39,6 +39,18 @@ float3 RgbToYCoCg(float3 c)
 float3 YCoCgToRgb(float3 c)
 {
     return float3(c.x + c.y - c.z, c.x + c.z, c.x - c.y - c.z);
+}
+
+// HDR input is resolved in a reversibly compressed space (Karis): c / (1 + max channel) maps linear light into [0, 1)
+// so the neighborhood clip and the blend treat dark and bright pixels alike, as they do with display values.
+float3 Compress(float3 c)
+{
+    return HdrInput ? c / (1 + max(c.r, max(c.g, c.b))) : c;
+}
+
+float3 Expand(float3 c)
+{
+    return HdrInput ? c / max(1 - max(c.r, max(c.g, c.b)), 1e-4f) : c;
 }
 
 // Catmull-Rom history fetch in five bilinear taps (the four corner taps of the 4x4 kernel are dropped).
@@ -92,7 +104,7 @@ void TaaResolveCS(uint3 id : SV_DispatchThreadID)
         [unroll] for (int x = -1; x <= 1; ++x)
         {
             const int2 pixel = clamp(int2(id.xy) + int2(x, y), 0, last);
-            const float3 color = RgbToYCoCg(Color.Load(int3(pixel, 0)).rgb);
+            const float3 color = RgbToYCoCg(Compress(max(Color.Load(int3(pixel, 0)).rgb, 0)));
             if (x == 0 && y == 0)
                 current = color;
             m1 += color;
@@ -113,7 +125,7 @@ void TaaResolveCS(uint3 id : SV_DispatchThreadID)
     {
         const float3 mean = m1 / 9;
         const float3 deviation = sqrt(max(m2 / 9 - mean * mean, 0));
-        const float3 history = ClipToBox(RgbToYCoCg(SampleHistory(historyUv)), mean - ClipGamma * deviation,
+        const float3 history = ClipToBox(RgbToYCoCg(Compress(SampleHistory(historyUv))), mean - ClipGamma * deviation,
             mean + ClipGamma * deviation);
         // Weighted by inverse luminance (Lottes), so a bright sample in one frame doesn't flicker the average.
         const float currentWeight = CurrentWeight / (1 + current.x);
@@ -121,6 +133,11 @@ void TaaResolveCS(uint3 id : SV_DispatchThreadID)
         resolved = (current * currentWeight + history * historyWeight) / (currentWeight + historyWeight);
     }
 
+    if (HdrInput)
+    {
+        HistoryOut[id.xy] = float4(Expand(saturate(YCoCgToRgb(resolved))), 1);
+        return;
+    }
     const float3 rgb = saturate(YCoCgToRgb(resolved));
     Output[id.xy] = float4(rgb, 1);
     HistoryOut[id.xy] = float4(rgb, 1);

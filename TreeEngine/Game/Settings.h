@@ -30,6 +30,12 @@ public:
     enum class Antialiasing { None, Smaa, Taa };
     Antialiasing m_antialiasing = Antialiasing::Taa;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
+    // HDR scene color: shaders write linear light into a float target, and Shaders/Tonemap.hlsl maps it to the display
+    // with an exposure and an operator at the end of the frame. Off keeps shaders encoding their own display output.
+    bool m_hdr = true;
+    enum class Tonemap { Clamp, Aces, Agx };
+    Tonemap m_tonemap = Tonemap::Clamp;  // Clamp matches the LDR look; ACES and AgX roll highlights off.
+    float m_exposure = 0;                // EV: the scene is scaled by 2^m_exposure before tonemapping.
     // Raster alpha-tested surfaces (foliage) pass against a hashed per-surface threshold instead of the material's
     // cutoff where their texture is minified, so raster matches ray tracing's density at every distance
     // (see Shaders/SharedTypes.hlsli).

@@ -228,8 +228,18 @@ enum CbvSrvUavHeapOffsets
     TaaWrite1_UavHeapOffset = TaaWrite0_UavHeapOffset + 2,
     TaaEnd_HeapOffset = TaaWrite1_UavHeapOffset + 2,
 
+    // HDR: TAA's tables reading the HDR target instead of off-screen buffer 1, and the tonemap pass's input (the HDR
+    // target or either TAA history) and output (off-screen buffer 1).
+    TaaHdrRead0_SrvHeapOffset = TaaEnd_HeapOffset,
+    TaaHdrRead1_SrvHeapOffset = TaaHdrRead0_SrvHeapOffset + 4,
+    TonemapScene_SrvHeapOffset = TaaHdrRead1_SrvHeapOffset + 4,
+    TonemapHistory0_SrvHeapOffset,
+    TonemapHistory1_SrvHeapOffset,
+    TonemapOutput_UavHeapOffset,
+    HdrEnd_HeapOffset,
+
     // Per-material descriptors
-    Material0_HeapOffset = TaaEnd_HeapOffset,
+    Material0_HeapOffset = HdrEnd_HeapOffset,
     Material0Cbv_HeapOffset = Material0_HeapOffset,
     Texture0Srv_HeapOffset = Material0_HeapOffset + 1,
     Num_CbvSrvUavHeapOffsets
@@ -668,6 +678,26 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         m_taaRootSignature->SetName(L"TAA");
     }
 
+    {
+        // Tonemap: 8 constants, the HDR input (SRV), the display output (UAV).
+        CD3DX12_DESCRIPTOR_RANGE srvRange, uavRange;
+        srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+        uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+        CD3DX12_ROOT_PARAMETER parameters[3];
+        parameters[0].InitAsConstants(8, 0);
+        parameters[1].InitAsDescriptorTable(1, &srvRange);
+        parameters[2].InitAsDescriptorTable(1, &uavRange);
+        CD3DX12_ROOT_SIGNATURE_DESC desc(_countof(parameters), parameters);
+        CComPtr<ID3DBlob> serialized, errors;
+        const HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &serialized, &errors);
+        if (errors)
+            ::OutputDebugStringA(static_cast<const char*>(errors->GetBufferPointer()));
+        HRR(hr);
+        HRR(GetDevice()->CreateRootSignature(0, serialized->GetBufferPointer(), serialized->GetBufferSize(),
+            IID_PPV_ARGS(&m_tonemapRootSignature)));
+        m_tonemapRootSignature->SetName(L"Tonemap");
+    }
+
     // Init text font
     //m_bitmapFont = new XSF::BitmapFont();
     //HRR(m_bitmapFont->Create(this, L"Arial_16"));
@@ -876,6 +906,11 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     psoDesc.SampleDesc.Count = 1;
     AddVelocityTarget(psoDesc);
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&m_pipelineState));
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC hdrDesc = psoDesc;
+        hdrDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        HRR(GetDevice()->CreateGraphicsPipelineState(&hdrDesc, IID_PPV_ARGS(&m_pipelineStateHdr)));
+    }
 
     // PSO for shadow map pass.
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
@@ -945,7 +980,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         const std::pair<const wchar_t*, const char*> smaaPasses[] = {
             { L"SmaaEdgesCS.cso", "smaaEdges" }, { L"SmaaWeightsCS.cso", "smaaWeights" }, { L"SmaaBlendCS.cso", "smaaBlend" },
             { L"MotionVectorsCS.cso", "motionVectors" }, { L"MotionDebugCS.cso", "motionDebug" },
-            { L"TaaResolveCS.cso", "taaResolve" } };
+            { L"TaaResolveCS.cso", "taaResolve" }, { L"TonemapCS.cso", "tonemap" } };
         for (const auto& pass : smaaPasses)
         {
             ComputeShader* shader = nullptr;
@@ -954,7 +989,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
                 return E_FAIL;
             D3D12_COMPUTE_PIPELINE_STATE_DESC pso = {};
             pso.pRootSignature = strncmp(pass.second, "motion", 6) == 0 ? m_motionRootSignature
-                : strncmp(pass.second, "taa", 3) == 0 ? m_taaRootSignature : m_smaaRootSignature;
+                : strncmp(pass.second, "taa", 3) == 0 ? m_taaRootSignature
+                : strncmp(pass.second, "tonemap", 7) == 0 ? m_tonemapRootSignature : m_smaaRootSignature;
 #if defined(TREE_XBOX)
             pso.CS = { reinterpret_cast<BYTE*>(shader->shader.data()), shader->shader.size() };
 #else
@@ -1108,7 +1144,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // Create screen sized output buffer
     m_renderData->pDxrOutBuffer = new UavBuffer(GetDevice(),
-        m_swapChainFormat,
+        SceneColorFormat(),
         m_descriptorHeap.hCPU(DxrOut_SrvHeapOffset),
         m_descriptorHeap.hGPU(DxrOut_SrvHeapOffset),
         m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
@@ -1468,6 +1504,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_motionRootSignature.Release();
     m_motionHistory.Release();
     m_taaRootSignature.Release();
+    m_tonemapRootSignature.Release();
     m_taaHistory[0].Release();
     m_taaHistory[1].Release();
     m_taaViewGeneration = UINT_MAX;
@@ -1482,6 +1519,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_profileReadback.Release();
 
     m_pipelineState.Release();
+    m_pipelineStateHdr.Release();
     m_pipelineStateR8FullScreenQuad.Release();
     m_pipelineStateRGBFullScreenQuad.Release();
     m_pipelineStateShadowMap.Release();
@@ -1571,7 +1609,8 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     CD3DX12_GPU_DESCRIPTOR_HANDLE specularRange(ru->m_material->m_cbvSrvHeapTable, 2, m_descriptorHeap.GetIncrementSize());
     GetCommandList()->SetGraphicsRootDescriptorTable(SpecularSrvTableRootSignatureParam, specularRange);
 
-    GetCommandList()->SetPipelineState(ru->m_pipelineStates[pass]);
+    GetCommandList()->SetPipelineState(pass == RegularPass && m_renderData->hdrSceneColor && ru->m_hdrPipelineState
+        ? ru->m_hdrPipelineState : ru->m_pipelineStates[pass]);
 
     // Set vertex/index buffers
     D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
@@ -2102,6 +2141,13 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     ID3D12PipelineState* pipelineState = nullptr;
     HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&pipelineState));
     pipelineState->SetName(L"Render Unit pso");
+    ID3D12PipelineState* pipelineStateHdr = nullptr;
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC hdrDesc = psoDesc;
+        hdrDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        HRR(GetDevice()->CreateGraphicsPipelineState(&hdrDesc, IID_PPV_ARGS(&pipelineStateHdr)));
+        pipelineStateHdr->SetName(L"Render Unit pso (HDR)");
+    }
 
     // Shadow pass PSO
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
@@ -2128,6 +2174,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
 
     ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
     *renderUnit = new RenderUnit(material, mesh, pipelineStates);
+    (*renderUnit)->m_hdrPipelineState = pipelineStateHdr;
     m_gameLevelRenderUnits.push_back(*renderUnit);
 
     CHAR name[32];
@@ -2135,6 +2182,8 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     m_gameLevelPSOs[name] = pipelineState;
     sprintf_s(name, "%dS", (*renderUnit)->id);
     m_gameLevelPSOs[name] = pipelineStateShadowMap;
+    sprintf_s(name, "%dH", (*renderUnit)->id);
+    m_gameLevelPSOs[name] = pipelineStateHdr;
 
     return S_OK;
 }
@@ -2464,7 +2513,8 @@ HRESULT RenderPlatform12::InitDevice()
     // Create descriptor heaps.
     //
     // Each frame has its own depth stencils and then there is one for shadows.
-    HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount + OffscreenBufferCount + 1, L"rtvHeap"));
+    // After the frames and off-screen buffers: velocity, then the HDR scene target.
+    HRR(m_rtvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, FrameCount + OffscreenBufferCount + 2, L"rtvHeap"));
     HRR(m_dsvHeap.Initialize(GetD3DDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 + FrameCount, L"dsvHeap")); // 1 for shadow
 
     // Heap for loading textures
@@ -3615,6 +3665,8 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
     m_offscreenBuffer1.Release();
     m_offscreenBuffer2.Release();
     m_motionVelocity.Release();
+    m_hdrColor.Release();
+    m_hdrViewGeneration = UINT_MAX;
 
     return hr;
 }
@@ -3866,7 +3918,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     {
         SafeDelete(&m_renderData->pDxrOutBuffer);
         m_renderData->pDxrOutBuffer = new UavBuffer(GetDevice(),
-            m_swapChainFormat,
+            SceneColorFormat(),
             m_descriptorHeap.hCPU(DxrOut_SrvHeapOffset),
             m_descriptorHeap.hGPU(DxrOut_SrvHeapOffset),
             m_descriptorHeap.hCPU(DxrOut_UavHeapOffset),
@@ -4144,6 +4196,18 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     m_retiredResources.clear();
     m_retiredResources.swap(m_retiringResources);
 
+    // HDR is decided per frame; the previous frame has finished, so targets can be (re)created.
+    m_renderData->hdrSceneColor = HdrEnabled();
+    if (m_renderData->hdrSceneColor)
+        HRR(EnsureHdrResources(m_scissorRect.right, m_scissorRect.bottom));
+#if defined(DXR_ENABLED)
+    if (m_renderData->pDxrOutBuffer && m_renderData->pDxrOutBuffer->uavOutput->GetDesc().Format != SceneColorFormat())
+    {
+        const auto outputDesc = m_renderData->pDxrOutBuffer->uavOutput->GetDesc();
+        HRR(CreateDxrOutput(static_cast<UINT>(outputDesc.Width), outputDesc.Height));
+    }
+#endif
+
 
 
 
@@ -4165,7 +4229,12 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle;
 
     //TODO NEXT: use compute to copy offscreen1 to rtv
-    if (UsesOffscreenChain())
+    if (m_renderData->hdrSceneColor)
+    {
+        // Render the scene into the HDR target, which stays in RENDER_TARGET between frames.
+        rtvHandle = m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount + 1);
+    }
+    else if (UsesOffscreenChain())
     {
         // Render scene to m_offscreenBuffer1
         rtvHandle = m_rtvHeap.hCPU(FrameCount);
@@ -4181,11 +4250,19 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     // The second target is velocity (Game/Shaders/MotionVectors.hlsl), always in the RENDER_TARGET state here.
     const D3D12_CPU_DESCRIPTOR_HANDLE targets[2] = { rtvHandle, m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount) };
     GetCommandList()->OMSetRenderTargets(2, targets, FALSE, &dsvHandle);
-    GetCommandList()->ClearRenderTargetView(rtvHandle, &m_renderData->clearColor.x, 0, nullptr); // TODO refactor out with case above
+    if (m_renderData->hdrSceneColor)
+    {
+        // The clear color is display-referred; the HDR target holds linear light.
+        float linearClear[4];
+        HdrClearColor(linearClear);
+        GetCommandList()->ClearRenderTargetView(rtvHandle, linearClear, 0, nullptr);
+    }
+    else
+        GetCommandList()->ClearRenderTargetView(rtvHandle, &m_renderData->clearColor.x, 0, nullptr); // TODO refactor out with case above
     GetCommandList()->ClearRenderTargetView(targets[1], NoObjectMotionClear, 0, nullptr);
     GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    GetCommandList()->SetPipelineState(m_pipelineState);  // Needed here?  Supports rendering without material?
+    GetCommandList()->SetPipelineState(m_renderData->hdrSceneColor ? m_pipelineStateHdr : m_pipelineState);  // Needed here?  Supports rendering without material?
 
 
     // Make shadow map available to shaders
@@ -4337,7 +4414,7 @@ namespace
 // The scene renders to off-screen buffer 1 when post-processing, SMAA or the motion pass needs it.
 bool RenderPlatform12::UsesOffscreenChain() const
 {
-    return m_renderData->enablePostProcessing || SmaaEnabled() || MotionVectorsNeeded();
+    return m_renderData->enablePostProcessing || SmaaEnabled() || MotionVectorsNeeded() || HdrEnabled();
 }
 
 // The motion pass runs for TAA and for its debug views.
@@ -4345,6 +4422,70 @@ bool RenderPlatform12::MotionVectorsNeeded() const
 {
     return (m_settings->m_motionView != Settings::MotionView::Off || TaaEnabled()) && m_motionRootSignature
         && m_gameLevelPSOs.count("motionDebug") > 0;
+}
+
+bool RenderPlatform12::HdrEnabled() const
+{
+    return m_settings->m_hdr && m_tonemapRootSignature && m_gameLevelPSOs.count("tonemap") > 0;
+}
+
+DXGI_FORMAT RenderPlatform12::SceneColorFormat() const
+{
+    return HdrEnabled() ? DXGI_FORMAT_R16G16B16A16_FLOAT : m_swapChainFormat;
+}
+
+#if defined(DXR_ENABLED)
+// The ray-tracing output, copied over the scene color, so in its format. Called with the GPU idle or after
+// RenderProlog has waited for the previous frame.
+HRESULT RenderPlatform12::CreateDxrOutput(UINT width, UINT height)
+{
+    SafeDelete(&m_renderData->pDxrOutBuffer);
+    m_renderData->pDxrOutBuffer = new UavBuffer(GetDevice(), SceneColorFormat(),
+        m_descriptorHeap.hCPU(DxrOut_SrvHeapOffset), m_descriptorHeap.hGPU(DxrOut_SrvHeapOffset),
+        m_descriptorHeap.hCPU(DxrOut_UavHeapOffset), m_descriptorHeap.hCPU(DxrOut_UavHeapOffset), width, height);
+    return S_OK;
+}
+#endif
+
+// The HDR scene target at the window size and the tonemap pass's views. Runs after RenderProlog has waited for the
+// previous frame, so rewriting descriptors is safe.
+void RenderPlatform12::HdrClearColor(float color[4]) const
+{
+    auto decode = [](float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); };
+    color[0] = decode(m_renderData->clearColor.x);
+    color[1] = decode(m_renderData->clearColor.y);
+    color[2] = decode(m_renderData->clearColor.z);
+    color[3] = m_renderData->clearColor.w;
+}
+
+HRESULT RenderPlatform12::EnsureHdrResources(UINT width, UINT height)
+{
+    // Created with the scene's clear color as its optimized clear value, so a scene with another one recreates it.
+    float clearColor[4];
+    HdrClearColor(clearColor);
+    if (!m_hdrColor || m_hdrColor->GetDesc().Width != width || m_hdrColor->GetDesc().Height != height
+        || memcmp(clearColor, m_hdrClearColor, sizeof(clearColor)) != 0)
+    {
+        Retire(m_hdrColor);
+        const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
+        const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16B16A16_FLOAT, width, height, 1, 1, 1, 0,
+            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        const CD3DX12_CLEAR_VALUE clearValue(DXGI_FORMAT_R16G16B16A16_FLOAT, clearColor);
+        HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue, IID_PPV_ARGS(&m_hdrColor)));
+        memcpy(m_hdrClearColor, clearColor, sizeof(clearColor));
+        m_hdrColor->SetName(L"HDR scene color");
+        GetDevice()->CreateRenderTargetView(m_hdrColor, nullptr, m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount + 1));
+        m_hdrViewGeneration = UINT_MAX;
+        m_taaViewGeneration = UINT_MAX;     // TAA's HDR tables name this target.
+    }
+    if (m_hdrViewGeneration != m_offscreenGeneration)
+    {
+        GetDevice()->CreateShaderResourceView(m_hdrColor, nullptr, m_descriptorHeap.hCPU(TonemapScene_SrvHeapOffset));
+        GetDevice()->CreateUnorderedAccessView(m_offscreenBuffer1, nullptr, nullptr, m_descriptorHeap.hCPU(TonemapOutput_UavHeapOffset));
+        m_hdrViewGeneration = m_offscreenGeneration;
+    }
+    return S_OK;
 }
 
 bool RenderPlatform12::TaaEnabled() const
@@ -4390,6 +4531,17 @@ HRESULT RenderPlatform12::EnsureTaaResources(UINT width, UINT height)
             GetDevice()->CreateShaderResourceView(m_taaHistory[read], nullptr, m_descriptorHeap.hCPU(srv + 3));
             GetDevice()->CreateUnorderedAccessView(m_offscreenBuffer2, nullptr, nullptr, m_descriptorHeap.hCPU(uav));
             GetDevice()->CreateUnorderedAccessView(m_taaHistory[1 - read], nullptr, nullptr, m_descriptorHeap.hCPU(uav + 1));
+            // The tonemap pass reads the resolved image from the history TAA just wrote.
+            GetDevice()->CreateShaderResourceView(m_taaHistory[read], nullptr,
+                m_descriptorHeap.hCPU(read ? TonemapHistory1_SrvHeapOffset : TonemapHistory0_SrvHeapOffset));
+            if (m_hdrColor)
+            {
+                const int hdrSrv = read ? TaaHdrRead1_SrvHeapOffset : TaaHdrRead0_SrvHeapOffset;
+                GetDevice()->CreateShaderResourceView(m_hdrColor, nullptr, m_descriptorHeap.hCPU(hdrSrv));
+                GetDevice()->CreateShaderResourceView(m_motionVelocity, nullptr, m_descriptorHeap.hCPU(hdrSrv + 1));
+                GetDevice()->CreateShaderResourceView(m_pDepthStencil, &depthView, m_descriptorHeap.hCPU(hdrSrv + 2));
+                GetDevice()->CreateShaderResourceView(m_taaHistory[read], nullptr, m_descriptorHeap.hCPU(hdrSrv + 3));
+            }
         }
         m_taaViewGeneration = m_offscreenGeneration;
     }
@@ -4607,8 +4759,8 @@ HRESULT RenderPlatform12::RenderPostProcess()
         ProfileTimestamp(ProfilePass::Rays, true);
 
         // Replace the main image before blur/UI; the DXR texture matches the target size and format.
-        ID3D12Resource* colorTarget = UsesOffscreenChain()
-            ? static_cast<ID3D12Resource*>(m_offscreenBuffer1)
+        ID3D12Resource* colorTarget = m_renderData->hdrSceneColor ? static_cast<ID3D12Resource*>(m_hdrColor)
+            : UsesOffscreenChain() ? static_cast<ID3D12Resource*>(m_offscreenBuffer1)
             : static_cast<ID3D12Resource*>(m_renderTargets[m_frameIndex]);
         ID3D12Resource* dxrOutput = m_renderData->pDxrOutBuffer->uavOutput;
         D3D12_RESOURCE_BARRIER toCopy[] = {
@@ -4638,7 +4790,10 @@ HRESULT RenderPlatform12::RenderPostProcess()
     {
         PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post-processing");
         ID3D12Resource* buffers[2] = { m_offscreenBuffer1, m_offscreenBuffer2 };
-        D3D12_RESOURCE_STATES states[2] = { D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON };
+        // With HDR the scene went to the HDR target, and buffer 1 receives the tonemapped image.
+        const bool hdr = m_renderData->hdrSceneColor;
+        D3D12_RESOURCE_STATES states[2] = { hdr ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_RENDER_TARGET,
+            D3D12_RESOURCE_STATE_COMMON };
         auto transition = [&](int buffer, D3D12_RESOURCE_STATES to)
         {
             if (states[buffer] == to)
@@ -4652,6 +4807,31 @@ HRESULT RenderPlatform12::RenderPostProcess()
         // Restore heaps
         ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
         GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+        // HDR: exposure, the operator and the display encode, from the TAA history (the resolved image) or the HDR target.
+        int resolvedHistory = -1;
+        auto tonemap = [&]()
+        {
+            PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Tonemap");
+            transition(0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            struct { float size[4]; float exposure; UINT op; UINT pad[2]; } tonemapConstants = {
+                { 1.0f / m_scissorRect.right, 1.0f / m_scissorRect.bottom, static_cast<float>(m_scissorRect.right),
+                    static_cast<float>(m_scissorRect.bottom) },
+                std::exp2(m_settings->m_exposure), static_cast<UINT>(m_settings->m_tonemap), { 0, 0 } };
+            GetCommandList()->SetComputeRootSignature(m_tonemapRootSignature);
+            GetCommandList()->SetComputeRoot32BitConstants(0, 8, &tonemapConstants, 0);
+            GetCommandList()->SetPipelineState(m_gameLevelPSOs["tonemap"]);
+            GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(resolvedHistory < 0 ? TonemapScene_SrvHeapOffset
+                : resolvedHistory ? TonemapHistory1_SrvHeapOffset : TonemapHistory0_SrvHeapOffset));
+            GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(TonemapOutput_UavHeapOffset));
+            GetCommandList()->Dispatch((m_scissorRect.right + 7) / 8, (m_scissorRect.bottom + 7) / 8, 1);
+        };
+        if (hdr)
+        {
+            const auto toRead = CD3DX12_RESOURCE_BARRIER::Transition(m_hdrColor, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            GetCommandList()->ResourceBarrier(1, &toRead);
+        }
 
         const bool motion = MotionVectorsNeeded();
         if (motion || smaa)
@@ -4710,21 +4890,24 @@ HRESULT RenderPlatform12::RenderPostProcess()
                         float size[4];
                         UINT historyValid;
                         float currentWeight, clipGamma;
-                        UINT pad;
+                        UINT hdrInput;
                     } taaConstants = { { constants.size[0], constants.size[1], constants.size[2], constants.size[3] },
                         m_taaHistoryFrame != UINT_MAX && m_taaHistoryFrame + 1 == m_renderData->frame && m_cameraHistoryValid ? 1u : 0u,
-                        0.1f, 1.25f, 0 };
+                        0.1f, 1.25f, hdr ? 1u : 0u };
                     transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
                     transition(1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
                     barrier(m_taaHistory[write], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
                     GetCommandList()->SetComputeRootSignature(m_taaRootSignature);
                     GetCommandList()->SetComputeRoot32BitConstants(0, 8, &taaConstants, 0);
                     GetCommandList()->SetPipelineState(m_gameLevelPSOs["taaResolve"]);
-                    GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(read ? TaaRead1_SrvHeapOffset : TaaRead0_SrvHeapOffset));
+                    GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(hdr
+                        ? (read ? TaaHdrRead1_SrvHeapOffset : TaaHdrRead0_SrvHeapOffset)
+                        : (read ? TaaRead1_SrvHeapOffset : TaaRead0_SrvHeapOffset)));
                     GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(read ? TaaWrite1_UavHeapOffset : TaaWrite0_UavHeapOffset));
                     GetCommandList()->Dispatch(groupsX, groupsY, 1);
                     barrier(m_taaHistory[write], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
                 }
+                if (!hdr)
                 {
                     PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Copy to scene color");
                     transition(1, D3D12_RESOURCE_STATE_COPY_SOURCE);
@@ -4733,7 +4916,11 @@ HRESULT RenderPlatform12::RenderPostProcess()
                 }
                 m_taaHistoryIndex = write;
                 m_taaHistoryFrame = m_renderData->frame;
+                resolvedHistory = static_cast<int>(write);
             }
+            // The debug views read the display image.
+            if (hdr)
+                tonemap();
             barrier(m_pDepthStencil, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
             if (m_settings->m_motionView != Settings::MotionView::Off)
@@ -4762,6 +4949,14 @@ HRESULT RenderPlatform12::RenderPostProcess()
                 }
             }
             barrier(m_motionVelocity, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        }
+        else if (hdr)
+            tonemap();
+        if (hdr)
+        {
+            const auto toTarget = CD3DX12_RESOURCE_BARRIER::Transition(m_hdrColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                D3D12_RESOURCE_STATE_RENDER_TARGET);
+            GetCommandList()->ResourceBarrier(1, &toTarget);
         }
 
         if (smaa)

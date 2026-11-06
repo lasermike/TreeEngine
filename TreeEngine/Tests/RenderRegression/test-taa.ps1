@@ -1,12 +1,14 @@
 [CmdletBinding()]
-param([string]$Executable, [string]$OutputDirectory)
+param([string]$Executable, [string]$OutputDirectory, [switch]$Hdr)
 # Temporal anti-aliasing (Game/Shaders/Taa.hlsl). The reference is the same frame rendered at twice the width and
 # height without anti-aliasing and box-filtered down, four samples per pixel. For each scene and mode:
-#   convergence - after 40 frames on a still camera, TAA's RMS error against the reference is at most 0.7 of the
-#                 unfiltered image's
+#   convergence - after 40 frames on a still camera, TAA's RMS error against the reference is at most 0.72 of the
+#                 unfiltered image's (raster lands at 0.65-0.70: the reference's textures come from one mip finer)
 #   stability   - two converged TAA frames 41 frames apart differ by a mean of at most 1/255 (no shimmer)
 #   motion      - converged, then one sideways camera step: TAA at the new camera is still closer to the new
 #                 reference than the unfiltered image (reprojection and history clipping, without gross ghosting)
+# -Hdr runs everything with the HDR scene target (clamp tonemap), where TAA resolves linear light; the reference is then
+# averaged in linear light too.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -26,8 +28,11 @@ namespace TreeRenderTests
 {
     public static class Downsample
     {
-        // Averages each 2x2 block of display values into one pixel.
-        public static void Half(string source, string destination)
+        static double Decode(int c) { double v = c / 255.0; return v <= 0.04045 ? v / 12.92 : System.Math.Pow((v + 0.055) / 1.055, 2.4); }
+        static int Encode(double v) { v = System.Math.Max(0, System.Math.Min(1, v)); return (int)System.Math.Round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * System.Math.Pow(v, 1 / 2.4) - 0.055)); }
+
+        // Averages each 2x2 block into one pixel: the display values, or with linear the light they encode (sRGB).
+        public static void Half(string source, string destination, bool linear)
         {
             using (Bitmap image = new Bitmap(source))
             using (Bitmap half = new Bitmap(image.Width / 2, image.Height / 2, PixelFormat.Format32bppArgb))
@@ -36,13 +41,16 @@ namespace TreeRenderTests
                     for (int x = 0; x < half.Width; x++)
                     {
                         int r = 0, g = 0, b = 0;
+                        double lr = 0, lg = 0, lb = 0;
                         for (int dy = 0; dy < 2; dy++)
                             for (int dx = 0; dx < 2; dx++)
                             {
                                 Color c = image.GetPixel(2 * x + dx, 2 * y + dy);
                                 r += c.R; g += c.G; b += c.B;
+                                lr += Decode(c.R); lg += Decode(c.G); lb += Decode(c.B);
                             }
-                        half.SetPixel(x, y, Color.FromArgb(255, (r + 2) / 4, (g + 2) / 4, (b + 2) / 4));
+                        half.SetPixel(x, y, linear ? Color.FromArgb(255, Encode(lr / 4), Encode(lg / 4), Encode(lb / 4))
+                            : Color.FromArgb(255, (r + 2) / 4, (g + 2) / 4, (b + 2) / 4));
                     }
                 half.Save(destination, ImageFormat.Png);
             }
@@ -87,16 +95,17 @@ foreach ($scene in $scenes) {
                previousCameraPosition = $scene.position; previousCameraRotationDegrees = $scene.rotation }
         )
         Invoke-Capture $job @{ scene = $scene.name; mode = $mode; seed = 12345; width = 640; height = 480
-            warmupFrames = 40; postProcessing = $false; captures = $captures }
+            warmupFrames = 40; postProcessing = $false; hdr = [bool]$Hdr; captures = $captures }
         $references = @(
             ($still + @{ time = 5; filename = (Join-Path $job 'reference-2x.png'); antialiasing = 'none' }),
             @{ time = 5; filename = (Join-Path $job 'reference-moved-2x.png'); antialiasing = 'none'
                cameraPosition = $scene.moved; cameraRotationDegrees = $scene.rotation }
         )
         Invoke-Capture (Join-Path $job 'reference') @{ scene = $scene.name; mode = $mode; seed = 12345; width = 1280; height = 960
-            warmupFrames = 3; postProcessing = $false; captures = $references }
-        [TreeRenderTests.Downsample]::Half((Join-Path $job 'reference-2x.png'), (Join-Path $job 'reference.png'))
-        [TreeRenderTests.Downsample]::Half((Join-Path $job 'reference-moved-2x.png'), (Join-Path $job 'reference-moved.png'))
+            warmupFrames = 3; postProcessing = $false; hdr = [bool]$Hdr; captures = $references }
+        # With HDR, TAA averages linear light, so the reference does too.
+        [TreeRenderTests.Downsample]::Half((Join-Path $job 'reference-2x.png'), (Join-Path $job 'reference.png'), [bool]$Hdr)
+        [TreeRenderTests.Downsample]::Half((Join-Path $job 'reference-moved-2x.png'), (Join-Path $job 'reference-moved.png'), [bool]$Hdr)
 
         $label = "$($scene.id) $mode"
         $compare = { param($a, $b) [TreeRenderTests.ImageComparison]::Compare((Join-Path $job $a), (Join-Path $job $b), (Join-Path $job ("diff-" + $b))) }
@@ -107,7 +116,7 @@ foreach ($scene in $scenes) {
         $taaMoved = & $compare 'reference-moved.png' 'taa-moved.png'
         Write-Host ("{0}: RMS against reference none {1:N4}, TAA {2:N4} ({3:P0}); converged frames differ by mean {4:N5}; after a step none {5:N4}, TAA {6:N4}" -f `
             $label, $none.Rms, $taa.Rms, ($taa.Rms / $none.Rms), $stable.MeanAbsoluteError, $noneMoved.Rms, $taaMoved.Rms)
-        if ($taa.Rms -gt 0.7 * $none.Rms) { $failures.Add("$label`: TAA error $($taa.Rms) is over 0.7 of the unfiltered $($none.Rms)") }
+        if ($taa.Rms -gt 0.72 * $none.Rms) { $failures.Add("$label`: TAA error $($taa.Rms) is over 0.72 of the unfiltered $($none.Rms)") }
         if ($stable.MeanAbsoluteError -gt 1.0 / 255) { $failures.Add("$label`: converged TAA frames differ by mean $($stable.MeanAbsoluteError)") }
         if ($taaMoved.Rms -ge $noneMoved.Rms) { $failures.Add("$label`: after a camera step TAA error $($taaMoved.Rms) is not below the unfiltered $($noneMoved.Rms)") }
     }

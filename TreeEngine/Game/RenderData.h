@@ -118,6 +118,7 @@ struct RenderData : SceneRenderSettings
     float               time;
     float               normalAnimationTime = 0;
     XMFLOAT2            jitterPixels = XMFLOAT2(0, 0);   // This frame's sub-pixel camera jitter; see Settings::m_jitter.
+    bool                hdrSceneColor = false;          // This frame renders linear light into the HDR target.
     UINT                frame;
     // Transformations
     ProjectionData      projectionData;

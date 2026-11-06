@@ -178,6 +178,12 @@
       <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tonemap.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\MotionVectors.hlsl">
       <FileType>Document</FileType>
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>

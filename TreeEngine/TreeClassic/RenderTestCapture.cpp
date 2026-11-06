@@ -169,6 +169,12 @@ void ParseRenderTestCommandLine()
     if (alphaTest != "hashed" && alphaTest != "cutoff")
         throw std::runtime_error("alphaTest must be \"hashed\" or \"cutoff\"");
     parsed->hashedAlphaTest = alphaTest == "hashed";
+    parsed->hdr = json.value("hdr", false);
+    parsed->tonemap = json.value("tonemap", std::string("clamp"));
+    parsed->exposure = json.value("exposure", 0.0f);
+    if ((parsed->tonemap != "clamp" && parsed->tonemap != "aces" && parsed->tonemap != "agx")
+        || !std::isfinite(parsed->exposure) || std::abs(parsed->exposure) > 16)
+        throw std::runtime_error("tonemap must be \"clamp\", \"aces\" or \"agx\", and exposure a finite EV");
     if (json.contains("jitter"))
     {
         parsed->hasJitter = true;
@@ -286,6 +292,12 @@ void ParseRenderTestCommandLine()
             if (!std::isfinite(point.jitter[0]) || !std::isfinite(point.jitter[1]))
                 throw std::runtime_error("Invalid capture jitter");
         }
+        point.hdr = value.value("hdr", parsed->hdr);
+        point.tonemap = value.value("tonemap", parsed->tonemap);
+        point.exposure = value.value("exposure", parsed->exposure);
+        if ((point.tonemap != "clamp" && point.tonemap != "aces" && point.tonemap != "agx")
+            || !std::isfinite(point.exposure) || std::abs(point.exposure) > 16)
+            throw std::runtime_error("Capture tonemap must be \"clamp\", \"aces\" or \"agx\", and exposure a finite EV");
         if (value.contains("previousTime"))
         {
             point.hasPreviousTime = true;
@@ -322,6 +334,11 @@ namespace
     Settings::Antialiasing AntialiasingSetting(const std::string& name)
     {
         return name == "smaa" ? Settings::Antialiasing::Smaa : name == "taa" ? Settings::Antialiasing::Taa : Settings::Antialiasing::None;
+    }
+
+    Settings::Tonemap TonemapSetting(const std::string& name)
+    {
+        return name == "aces" ? Settings::Tonemap::Aces : name == "agx" ? Settings::Tonemap::Agx : Settings::Tonemap::Clamp;
     }
 
     // The camera pose at time seconds into the path: linear between keys, held outside them.
@@ -363,6 +380,7 @@ namespace
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
             game.SetRenderTestAntialiasing(AntialiasingSetting(request->antialiasing));
             game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
+            game.SetRenderTestHdr(request->hdr, TonemapSetting(request->tonemap), request->exposure);
             const int settleFrames = request->performanceSettleFrames;
             for (int frame = 0; frame < settleFrames + request->performanceFrames; ++frame)
             {
@@ -491,6 +509,7 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestOpacityMicromaps(request->opacityMicromaps);
             game.SetRenderTestAntialiasing(AntialiasingSetting(point.antialiasing));
             game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
+            game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion
                 : point.debugView == "reprojection" ? Settings::MotionView::ReprojectedHistory
