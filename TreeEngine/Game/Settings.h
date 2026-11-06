@@ -29,6 +29,9 @@ public:
     // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.
     enum class Antialiasing { None, Smaa, Taa };
     Antialiasing m_antialiasing = Antialiasing::Taa;
+    // Fraction of the window, per axis, the scene renders at while a temporal mode upscales (Game/UpscalerMath.h);
+    // 1 is native. Other modes, and the motion debug views, always render native.
+    float m_renderScale = 1.0f;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
     // HDR scene color: shaders write linear light into a float target, and Shaders/Tonemap.hlsl maps it to the display
     // with an exposure and an operator at the end of the frame. Off keeps shaders encoding their own display output.

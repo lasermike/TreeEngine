@@ -30,6 +30,7 @@ There are two kinds of test:
 | `-StartTime` | from `scenes.json` | Simulation time of frame 0 for steady tests, in seconds. Trees grow from time 0, so earlier times measure nearly empty scenes. |
 | `-DisableOpacityMicromaps` | off | Ray trace leaves without opacity micromaps, to measure what they save (see the scenes README). |
 | `-Antialiasing` | from `scenes.json` | `none`, `smaa` or `taa`, for every test in the run. |
+| `-RenderScale` | 1 | Scene resolution as a fraction of `-Width` x `-Height`; below 1, `taa` upscales (other modes render native). |
 
 Close other GPU-heavy programs first. The script measures whatever else the machine is doing.
 
@@ -129,6 +130,8 @@ Tools should read the fields in `results.json` or `index.json`, not parse direct
       The dashboard marks such runs "opacity micromaps off".
     - `antialiasing`: the `-Antialiasing` value, or null when each test used its own setting (in `tests`).
       The dashboard marks SMAA runs.
+    - `renderScale`: the `-RenderScale` value; missing in older runs (native). Each job's report also gives
+      `renderWidth` and `renderHeight`.
     - `gpuPasses`
   - **`windows`:** the frame ranges summarized: `frames5to10` is frames 5–9, and `frames10to20` is frames 10–19.
   - **`jobs[]`**, one per test, mode and run:

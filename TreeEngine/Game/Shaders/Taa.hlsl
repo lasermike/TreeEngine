@@ -20,14 +20,16 @@ cbuffer TaaConstants : register(b0)
     uint   HistoryValid;    // 0 on the first frame, after a resize or a level load.
     float  CurrentWeight;   // The current frame's share of the blend.
     float  ClipGamma;       // The neighborhood box: mean +- ClipGamma standard deviations.
-    uint   HdrInput;        // Color is linear HDR: resolve into the history only (Tonemap.hlsl reads it), unclamped.
+    uint   HdrInput;        // Color is linear HDR: resolved unclamped into a float output that Tonemap.hlsl reads.
+    float4 RenderSize;      // TAAU: 1 / width, 1 / height, width, height of the color, velocity and depth inputs.
+    float2 Jitter;          // TAAU: this frame's projection offset, in render pixels.
 };
 
 Texture2D<float4> Color : register(t0);
 Texture2D<float2> Velocity : register(t1);
 Texture2D<float> Depth : register(t2);
 Texture2D<float4> History : register(t3);
-RWTexture2D<unorm float4> Output : register(u0);
+RWTexture2D<float4> Output : register(u0);     // Display-encoded unorm, or float with HDR input.
 RWTexture2D<float4> HistoryOut : register(u1);
 SamplerState LinearClamp : register(s0);
 
@@ -88,6 +90,14 @@ float3 ClipToBox(float3 history, float3 boxMin, float3 boxMax)
     return largest > 1 ? center + offset / largest : history;
 }
 
+// Stores the resolved YCoCg color: linear light with HDR input, display-encoded otherwise.
+void WriteResolved(uint2 pixel, float3 resolved)
+{
+    const float3 rgb = HdrInput ? Expand(saturate(YCoCgToRgb(resolved))) : saturate(YCoCgToRgb(resolved));
+    Output[pixel] = float4(rgb, 1);
+    HistoryOut[pixel] = float4(rgb, 1);
+}
+
 [numthreads(8, 8, 1)]
 void TaaResolveCS(uint3 id : SV_DispatchThreadID)
 {
@@ -133,12 +143,82 @@ void TaaResolveCS(uint3 id : SV_DispatchThreadID)
         resolved = (current * currentWeight + history * historyWeight) / (currentWeight + historyWeight);
     }
 
-    if (HdrInput)
-    {
-        HistoryOut[id.xy] = float4(Expand(saturate(YCoCgToRgb(resolved))), 1);
+    WriteResolved(id.xy, resolved);
+}
+
+// Temporal upscaling: one thread per display pixel, reconstructing from render-size samples. The render pixel at
+// integer position p sampled the scene at p + 0.5 - Jitter (in unjittered render pixels), so each frame covers the
+// display pixels with a different sample pattern; over JitterPhaseCount frames (Upscaler.h) every display pixel has
+// had samples close by.
+// - The current frame's color is filtered from the 3x3 render pixels around the display pixel with a Gaussian of
+//   their distance in display pixels (sigma about 0.32, close to the one-pixel box native TAA accumulates).
+// - Its blend weight scales with the nearest sample's weight, so display pixels without a close sample this frame
+//   lean on their history.
+// - On still pixels the history clip box widens (see UpscaleStillClipScale), and the clip applies in proportion to
+//   the nearest sample's weight.
+// History filtering and HDR handling match TaaResolveCS.
+static const float UpscaleStillClipScale = 2.0f;  // The clip box's growth for still pixels.
+
+[numthreads(8, 8, 1)]
+void TaauResolveCS(uint3 id : SV_DispatchThreadID)
+{
+    if (any(float2(id.xy) >= TaaSize.zw))
         return;
+    const int2 last = int2(RenderSize.zw) - 1;
+    const float2 uv = (float2(id.xy) + 0.5f) * TaaSize.xy;
+    const float2 position = uv * RenderSize.zw;        // The display pixel center in render pixels.
+    const int2 center = int2(floor(position + Jitter)); // The render pixel whose sample lies nearest.
+    const float2 displayPerRender = TaaSize.zw * RenderSize.xy;
+
+    float3 filtered = 0, m1 = 0, m2 = 0;
+    float weightSum = 0, nearestWeight = 0;
+    float nearestDepth = 2;
+    int2 nearest = clamp(center, 0, last);
+    [unroll] for (int y = -1; y <= 1; ++y)
+    {
+        [unroll] for (int x = -1; x <= 1; ++x)
+        {
+            const int2 pixel = clamp(center + int2(x, y), 0, last);
+            const float3 color = RgbToYCoCg(Compress(max(Color.Load(int3(pixel, 0)).rgb, 0)));
+            // Distance from the sample to the display pixel center, in display pixels.
+            const float2 offset = (float2(center + int2(x, y)) + 0.5f - Jitter - position) * displayPerRender;
+            const float weight = exp(-5.0f * dot(offset, offset));  // sigma = 0.32 display pixels
+            filtered += color * weight;
+            weightSum += weight;
+            nearestWeight = max(nearestWeight, weight);
+            m1 += color;
+            m2 += color * color;
+            const float depth = Depth.Load(int3(pixel, 0));
+            if (depth < nearestDepth)
+            {
+                nearestDepth = depth;
+                nearest = pixel;
+            }
+        }
     }
-    const float3 rgb = saturate(YCoCgToRgb(resolved));
-    Output[id.xy] = float4(rgb, 1);
-    HistoryOut[id.xy] = float4(rgb, 1);
+    const float3 current = filtered / max(weightSum, 1e-6f);
+
+    const float2 velocity = Velocity.Load(int3(nearest, 0));
+    const float2 historyUv = uv + velocity;
+    float3 resolved = current;
+    if (HistoryValid && all(historyUv >= 0) && all(historyUv <= 1))
+    {
+        const float3 mean = m1 / 9;
+        const float3 deviation = sqrt(max(m2 / 9 - mean * mean, 0));
+        // This frame's sparse samples can miss display-size detail the history holds, and a tight box would clip it
+        // away, so the box widens where the pixel is still. Moving pixels keep the tight box against ghosting.
+        const float stillness = saturate(1 - 8 * length(velocity * TaaSize.zw));   // Still below 1/8 pixel of motion.
+        const float gamma = ClipGamma * lerp(1.0f, UpscaleStillClipScale, stillness);
+        // On still pixels the clip applies as far as this frame has a sample near the pixel: without one, the
+        // neighborhood says little about what the pixel holds, and clipping would erase thin detail (branches) that
+        // this frame missed. Moving pixels clip fully, as stale history there would ghost.
+        const float3 sampled = RgbToYCoCg(Compress(SampleHistory(historyUv)));
+        const float clip = lerp(1.0f, saturate(2 * nearestWeight), stillness);
+        const float3 history = lerp(sampled, ClipToBox(sampled, mean - gamma * deviation, mean + gamma * deviation), clip);
+        const float share = CurrentWeight * nearestWeight;
+        const float currentWeight = share / (1 + current.x);
+        const float historyWeight = (1 - share) / (1 + history.x);
+        resolved = (current * currentWeight + history * historyWeight) / (currentWeight + historyWeight);
+    }
+    WriteResolved(id.xy, resolved);
 }

@@ -56,8 +56,9 @@ foreach ($scene in $selectedScenes) {
             $points += [ordered]@{ time = [double]$config.times[$i]; filename = (Join-Path $jobDirectory "time-$i.png") }
         }
         $workerReportPath = Join-Path $jobDirectory 'capture-report.json'
-        # Optional per scene: "antialiasing" ("smaa" or "taa"), "hdr" with "tonemap" and "exposure", and "warmupFrames"
-        # (TAA needs more than the default to settle). Golds without them keep their original metadata.
+        # Optional per scene: "antialiasing" ("smaa" or "taa"), "hdr" with "tonemap" and "exposure", "renderScale" (TAA
+        # upscales from that fraction of the size) and "warmupFrames" (TAA needs more than the default to settle). Golds
+        # without them keep their original metadata.
         $has = { param($name) $scene.PSObject.Properties.Name -contains $name }
         $antialiasing = $(if (& $has 'antialiasing') { [string]$scene.antialiasing } else { 'none' })
         if ($antialiasing -notin @('none', 'smaa', 'taa')) { throw "Scene $($scene.id): antialiasing must be none, smaa or taa." }
@@ -66,10 +67,12 @@ foreach ($scene in $selectedScenes) {
         if ($tonemap -notin @('clamp', 'aces', 'agx')) { throw "Scene $($scene.id): tonemap must be clamp, aces or agx." }
         $exposure = $(if (& $has 'exposure') { [double]$scene.exposure } else { 0.0 })
         $warmupFrames = $(if (& $has 'warmupFrames') { [int]$scene.warmupFrames } else { [int]$config.warmupFrames })
+        $renderScale = $(if (& $has 'renderScale') { [double]$scene.renderScale } else { 1.0 })
+        if ($renderScale -lt 0.25 -or $renderScale -gt 1) { throw "Scene $($scene.id): renderScale must be in [0.25, 1]." }
         $request = [ordered]@{
             scene = $scene.name; mode = $mode; seed = $config.seed; width = $config.width; height = $config.height
             warmupFrames = $warmupFrames; postProcessing = $config.postProcessing; antialiasing = $antialiasing
-            hdr = $hdr; tonemap = $tonemap; exposure = $exposure
+            hdr = $hdr; tonemap = $tonemap; exposure = $exposure; renderScale = $renderScale
             report = $workerReportPath; captures = $points
         }
         if ($BenchmarkFrames) { $request.benchmarkFrames = $BenchmarkFrames }
@@ -98,6 +101,7 @@ foreach ($scene in $selectedScenes) {
             $settings = [ordered]@{ scene = $scene.name; mode = $mode; time = $points[$i].time; width = $config.width; height = $config.height; seed = $config.seed; warmupFrames = $warmupFrames; postProcessing = $config.postProcessing }
             if ($antialiasing -ne 'none') { $settings.antialiasing = $antialiasing }
             if ($hdr) { $settings.hdr = $true; $settings.tonemap = $tonemap; $settings.exposure = $exposure }
+            if ($renderScale -ne 1) { $settings.renderScale = $renderScale }
             $settingsText = $settings | ConvertTo-Json -Compress
             $row = [ordered]@{ scene = $scene.id; mode = $mode; time = $points[$i].time; status = 'pass'; rms = $null; maxError = $null; changedPixels = $null; actual = $actual; gold = $gold; diff = $null; error = $null }
             try {

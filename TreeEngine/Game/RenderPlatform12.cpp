@@ -165,6 +165,10 @@ HRESULT RenderPlatform12::GetDebugTexturePreview(const LoadedTexture* texture, u
     return S_OK;
 }
 
+// Descriptors reserved per anti-aliasing mode for its upscaler backend, and the modes that may have one.
+static const UINT UpscalerDescriptorsPerMode = 16;
+static const UINT UpscalerModeSlots = 4;
+
 enum CbvSrvUavHeapOffsets
 {
     // Global descriptors
@@ -220,21 +224,13 @@ enum CbvSrvUavHeapOffsets
     MotionColor_SrvHeapOffset,
     MotionVelocity_UavHeapOffset,
 
-    // TAA tables, one per history parity (see Game/Shaders/Taa.hlsl): reading history N, the SRV table is color,
-    // velocity, depth and history N, and the UAV table is the resolved output and history 1 - N.
-    TaaRead0_SrvHeapOffset,
-    TaaRead1_SrvHeapOffset = TaaRead0_SrvHeapOffset + 4,
-    TaaWrite0_UavHeapOffset = TaaRead1_SrvHeapOffset + 4,
-    TaaWrite1_UavHeapOffset = TaaWrite0_UavHeapOffset + 2,
-    TaaEnd_HeapOffset = TaaWrite1_UavHeapOffset + 2,
+    // Upscaler backends (Game/Upscaler.h): a block of descriptors per anti-aliasing mode, which the backend rewrites.
+    Upscaler0_HeapOffset,
+    UpscalerEnd_HeapOffset = Upscaler0_HeapOffset + UpscalerDescriptorsPerMode * UpscalerModeSlots,
 
-    // HDR: TAA's tables reading the HDR target instead of off-screen buffer 1, and the tonemap pass's input (the HDR
-    // target or either TAA history) and output (off-screen buffer 1).
-    TaaHdrRead0_SrvHeapOffset = TaaEnd_HeapOffset,
-    TaaHdrRead1_SrvHeapOffset = TaaHdrRead0_SrvHeapOffset + 4,
-    TonemapScene_SrvHeapOffset = TaaHdrRead1_SrvHeapOffset + 4,
-    TonemapHistory0_SrvHeapOffset,
-    TonemapHistory1_SrvHeapOffset,
+    // Tonemap: the input (the scene color, or the upscaler's display-size output) and the output (off-screen buffer 1).
+    TonemapScene_SrvHeapOffset = UpscalerEnd_HeapOffset,
+    TonemapUpscaled_SrvHeapOffset,
     TonemapOutput_UavHeapOffset,
     HdrEnd_HeapOffset,
 
@@ -660,28 +656,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     }
 
     {
-        // TAA: 8 constants, four SRVs (color, velocity, depth, history), two UAVs (output, new history), linear clamp.
-        CD3DX12_DESCRIPTOR_RANGE srvRange, uavRange;
-        srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);
-        uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0);
-        CD3DX12_ROOT_PARAMETER parameters[3];
-        parameters[0].InitAsConstants(8, 0);
-        parameters[1].InitAsDescriptorTable(1, &srvRange);
-        parameters[2].InitAsDescriptorTable(1, &uavRange);
-        const CD3DX12_STATIC_SAMPLER_DESC sampler(0, D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
-            D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
-        CD3DX12_ROOT_SIGNATURE_DESC desc(_countof(parameters), parameters, 1, &sampler);
-        CComPtr<ID3DBlob> serialized, errors;
-        const HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &serialized, &errors);
-        if (errors)
-            ::OutputDebugStringA(static_cast<const char*>(errors->GetBufferPointer()));
-        HRR(hr);
-        HRR(GetDevice()->CreateRootSignature(0, serialized->GetBufferPointer(), serialized->GetBufferSize(),
-            IID_PPV_ARGS(&m_taaRootSignature)));
-        m_taaRootSignature->SetName(L"TAA");
-    }
-
-    {
         // Tonemap: 8 constants, the HDR input (SRV), the display output (UAV).
         CD3DX12_DESCRIPTOR_RANGE srvRange, uavRange;
         srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
@@ -983,7 +957,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
         const std::pair<const wchar_t*, const char*> smaaPasses[] = {
             { L"SmaaEdgesCS.cso", "smaaEdges" }, { L"SmaaWeightsCS.cso", "smaaWeights" }, { L"SmaaBlendCS.cso", "smaaBlend" },
             { L"MotionVectorsCS.cso", "motionVectors" }, { L"MotionDebugCS.cso", "motionDebug" },
-            { L"TaaResolveCS.cso", "taaResolve" }, { L"TonemapCS.cso", "tonemap" } };
+            { L"TonemapCS.cso", "tonemap" } };
         for (const auto& pass : smaaPasses)
         {
             ComputeShader* shader = nullptr;
@@ -992,7 +966,6 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
                 return E_FAIL;
             D3D12_COMPUTE_PIPELINE_STATE_DESC pso = {};
             pso.pRootSignature = strncmp(pass.second, "motion", 6) == 0 ? m_motionRootSignature
-                : strncmp(pass.second, "taa", 3) == 0 ? m_taaRootSignature
                 : strncmp(pass.second, "tonemap", 7) == 0 ? m_tonemapRootSignature : m_smaaRootSignature;
 #if defined(TREE_XBOX)
             pso.CS = { reinterpret_cast<BYTE*>(shader->shader.data()), shader->shader.size() };
@@ -1506,11 +1479,10 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     m_smaaRootSignature.Release();
     m_motionRootSignature.Release();
     m_motionHistory.Release();
-    m_taaRootSignature.Release();
+    m_upscalers.clear();
+    m_upscaler = nullptr;
     m_tonemapRootSignature.Release();
-    m_taaHistory[0].Release();
-    m_taaHistory[1].Release();
-    m_taaViewGeneration = UINT_MAX;
+    m_upscaledColor.Release();
     m_motionViewGeneration = UINT_MAX;
     ResetMotionHistory();
     m_smaaEdges.Release();
@@ -3593,15 +3565,17 @@ HRESULT RenderPlatform12::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4*
         m_view = *pViewMat;
         m_projection = *pProjMat;
 
-        // Sub-pixel jitter: Halton(2, 3) over 8 frames, or a fixed offset for tests. Ray generation unprojects through
-        // the jittered InverseViewProjection, so primary rays follow. Motion vectors use the matrices without it.
+        // Sub-pixel jitter: Halton(2, 3) over 8 frames at native (more while upscaling; see Upscaler::JitterPhaseCount),
+        // or a fixed offset for tests, in render pixels. Ray generation unprojects through the jittered
+        // InverseViewProjection, so primary rays follow. Motion vectors use the matrices without it.
         XMFLOAT2 jitter(0, 0);
         if (m_settings->m_hasFixedJitter)
             jitter = XMFLOAT2(m_settings->m_fixedJitter[0], m_settings->m_fixedJitter[1]);
         else if (m_settings->m_jitter || TaaEnabled())
         {
             auto halton = [](UINT index, UINT base) { float f = 1, r = 0; for (; index; index /= base) { f /= base; r += f * (index % base); } return r; };
-            const UINT index = m_renderData->frame % 8 + 1;
+            const UINT phases = m_upscaler ? m_upscaler->JitterPhaseCount(m_renderSize, m_displaySize) : 8;
+            const UINT index = m_renderData->frame % phases + 1;
             jitter = XMFLOAT2(halton(index, 2) - 0.5f, halton(index, 3) - 0.5f);
         }
         m_renderData->jitterPixels = jitter;
@@ -3670,10 +3644,65 @@ HRESULT RenderPlatform12::ReleaseSwapChainResources()
     m_offscreenBuffer1.Release();
     m_offscreenBuffer2.Release();
     m_motionVelocity.Release();
-    m_hdrColor.Release();
-    m_hdrViewGeneration = UINT_MAX;
+    m_sceneColor.Release();
+    m_upscaledColor.Release();
 
     return hr;
+}
+
+// Depth and velocity at the scene's render size. Called with the GPU idle, or after RenderProlog has waited for the
+// previous frame (resources this frame's recording referenced are retired, not released).
+HRESULT RenderPlatform12::CreateDepthAndVelocity(UINT width, UINT height)
+{
+    Retire(m_pDepthStencil);
+    Retire(m_motionVelocity);
+    // Create depth stencil texture
+    CD3DX12_RESOURCE_DESC depthBufferDesc(
+        D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+        0,
+        width,
+        height,
+        1,
+        1,
+        DXGI_FORMAT_R32_TYPELESS,     // Written through a D32_FLOAT view, read as R32_FLOAT by the motion pass.
+        1,
+        0,
+        D3D12_TEXTURE_LAYOUT_UNKNOWN,
+        D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+
+    D3D12_CLEAR_VALUE depthClearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
+    depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+    depthClearValue.DepthStencil.Depth = 1.0f;
+    depthClearValue.DepthStencil.Stencil = 0;
+
+    HRR(GetDevice()->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &depthBufferDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        &depthClearValue,
+        __uuidof(ID3D12Resource), (void**)&m_pDepthStencil));
+
+    SetDebugName(m_pDepthStencil, L"Game::m_pDepthStencil");
+
+    // Create the depth stencil view.
+    D3D12_DEPTH_STENCIL_VIEW_DESC depthView = {};
+    depthView.Format = DXGI_FORMAT_D32_FLOAT;
+    depthView.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    GetDevice()->CreateDepthStencilView(m_pDepthStencil, &depthView, m_dsvHeap.hCPU(0));
+    // Velocity, written by the scene pass as its second render target and completed by MotionVectorsCS.
+    {
+        const auto velocityDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16_FLOAT, width, height, 1, 1, 1, 0,
+            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        const CD3DX12_CLEAR_VALUE velocityClear(DXGI_FORMAT_R16G16_FLOAT, NoObjectMotionClear);
+        HRR(GetDevice()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE,
+            &velocityDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &velocityClear, IID_PPV_ARGS(&m_motionVelocity)));
+        m_motionVelocity->SetName(L"Motion velocity");
+        GetDevice()->CreateRenderTargetView(m_motionVelocity, nullptr, m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount));
+    }
+    ++m_offscreenGeneration;
+    ResetMotionHistory();
+    return S_OK;
 }
 
 HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
@@ -3689,6 +3718,8 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     m_scissorRect.top = 0;
     m_scissorRect.right = static_cast<LONG>(windowWidth);
     m_scissorRect.bottom = static_cast<LONG>(windowHeight);
+    m_displayScissor = m_scissorRect;
+    m_displaySize = m_renderSize = { windowWidth, windowHeight };
 
     // Setup the viewport
     m_viewPort.Width = (FLOAT)windowWidth;
@@ -3697,6 +3728,7 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
     m_viewPort.MaxDepth = 1.0f;
     m_viewPort.TopLeftX = 0;
     m_viewPort.TopLeftY = 0;
+    m_displayViewport = m_viewPort;
 
 #if defined(TREE_XBOX)
     m_swapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -3802,40 +3834,8 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
 
 #endif
 
-    // Create depth stencil texture
-    CD3DX12_RESOURCE_DESC depthBufferDesc(
-        D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-        0,
-        static_cast<UINT>(windowWidth),
-        static_cast<UINT>(windowHeight),
-        1,
-        1,
-        DXGI_FORMAT_R32_TYPELESS,     // Written through a D32_FLOAT view, read as R32_FLOAT by the motion pass.
-        1,
-        0,
-        D3D12_TEXTURE_LAYOUT_UNKNOWN,
-        D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-
-    D3D12_CLEAR_VALUE depthClearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
-    depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-    depthClearValue.DepthStencil.Depth = 1.0f;
-    depthClearValue.DepthStencil.Stencil = 0;
-
-    HRR(GetDevice()->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-        D3D12_HEAP_FLAG_NONE,
-        &depthBufferDesc,
-        D3D12_RESOURCE_STATE_DEPTH_WRITE,
-        &depthClearValue,
-        __uuidof(ID3D12Resource), (void**)&m_pDepthStencil));
-
-    SetDebugName(m_pDepthStencil, L"Game::m_pDepthStencil");
-
-    // Create the depth stencil view.
-    D3D12_DEPTH_STENCIL_VIEW_DESC depthView = {};
-    depthView.Format = DXGI_FORMAT_D32_FLOAT;
-    depthView.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    GetDevice()->CreateDepthStencilView(m_pDepthStencil, &depthView, m_dsvHeap.hCPU(0));
+    // Depth and velocity start at the window size; EnsureSceneTargets resizes them to the render size.
+    HRR(CreateDepthAndVelocity(windowWidth, windowHeight));
     ResetMotionHistory();
 
     // Create offscreen rendering surfaces
@@ -3869,16 +3869,6 @@ HRESULT RenderPlatform12::OnResize(UINT windowWidth, UINT windowHeight, bool ren
         &clearValue,
         __uuidof(ID3D12Resource), (void**)&m_offscreenBuffer2));
 
-    // Velocity, written by the scene pass as its second render target and completed by MotionVectorsCS.
-    {
-        const auto velocityDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16_FLOAT, windowWidth, windowHeight, 1, 1, 1, 0,
-            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        const CD3DX12_CLEAR_VALUE velocityClear(DXGI_FORMAT_R16G16_FLOAT, NoObjectMotionClear);
-        HRR(GetDevice()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE,
-            &velocityDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &velocityClear, IID_PPV_ARGS(&m_motionVelocity)));
-        m_motionVelocity->SetName(L"Motion velocity");
-        GetDevice()->CreateRenderTargetView(m_motionVelocity, nullptr, m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount));
-    }
     ++m_offscreenGeneration;
 
     // Create offscreen rendering views
@@ -4155,6 +4145,8 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
 
 #endif
 
+    ChooseFrameUpscaler();
+
     // Needed?
     HRR(SetupGraphicsOnCommandList());
 
@@ -4201,15 +4193,16 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     m_retiredResources.clear();
     m_retiredResources.swap(m_retiringResources);
 
-    // HDR is decided per frame; the previous frame has finished, so targets can be (re)created.
+    // HDR and the render size are decided per frame; the previous frame has finished, so targets can be (re)created.
     m_renderData->hdrSceneColor = HdrEnabled();
-    if (m_renderData->hdrSceneColor)
-        HRR(EnsureHdrResources(m_scissorRect.right, m_scissorRect.bottom));
+    HRR(EnsureSceneTargets());
 #if defined(DXR_ENABLED)
-    if (m_renderData->pDxrOutBuffer && m_renderData->pDxrOutBuffer->uavOutput->GetDesc().Format != SceneColorFormat())
+    if (m_renderData->pDxrOutBuffer)
     {
         const auto outputDesc = m_renderData->pDxrOutBuffer->uavOutput->GetDesc();
-        HRR(CreateDxrOutput(static_cast<UINT>(outputDesc.Width), outputDesc.Height));
+        if (outputDesc.Format != SceneColorFormat() || outputDesc.Width != m_renderSize.width
+            || outputDesc.Height != m_renderSize.height)
+            HRR(CreateDxrOutput(m_renderSize.width, m_renderSize.height));
     }
 #endif
 
@@ -4234,9 +4227,9 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle;
 
     //TODO NEXT: use compute to copy offscreen1 to rtv
-    if (m_renderData->hdrSceneColor)
+    if (m_sceneToSceneColor)
     {
-        // Render the scene into the HDR target, which stays in RENDER_TARGET between frames.
+        // Render the scene into the scene color target (HDR, or upscaled), which stays in RENDER_TARGET between frames.
         rtvHandle = m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount + 1);
     }
     else if (UsesOffscreenChain())
@@ -4463,94 +4456,124 @@ void RenderPlatform12::HdrClearColor(float color[4]) const
     color[3] = m_renderData->clearColor.w;
 }
 
-HRESULT RenderPlatform12::EnsureHdrResources(UINT width, UINT height)
+// This frame's render-size targets (depth, velocity, scene color) and the tonemap views. Runs after RenderProlog has
+// waited for the previous frame, so rewriting descriptors is safe.
+HRESULT RenderPlatform12::EnsureSceneTargets()
 {
-    // Created with the scene's clear color as its optimized clear value, so a scene with another one recreates it.
-    float clearColor[4];
-    HdrClearColor(clearColor);
-    if (!m_hdrColor || m_hdrColor->GetDesc().Width != width || m_hdrColor->GetDesc().Height != height
-        || memcmp(clearColor, m_hdrClearColor, sizeof(clearColor)) != 0)
-    {
-        Retire(m_hdrColor);
-        const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
-        const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16B16A16_FLOAT, width, height, 1, 1, 1, 0,
-            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        const CD3DX12_CLEAR_VALUE clearValue(DXGI_FORMAT_R16G16B16A16_FLOAT, clearColor);
-        HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc,
-            D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue, IID_PPV_ARGS(&m_hdrColor)));
-        memcpy(m_hdrClearColor, clearColor, sizeof(clearColor));
-        m_hdrColor->SetName(L"HDR scene color");
-        GetDevice()->CreateRenderTargetView(m_hdrColor, nullptr, m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount + 1));
-        m_hdrViewGeneration = UINT_MAX;
-        m_taaViewGeneration = UINT_MAX;     // TAA's HDR tables name this target.
-    }
-    if (m_hdrViewGeneration != m_offscreenGeneration)
-    {
-        GetDevice()->CreateShaderResourceView(m_hdrColor, nullptr, m_descriptorHeap.hCPU(TonemapScene_SrvHeapOffset));
-        GetDevice()->CreateUnorderedAccessView(m_offscreenBuffer1, nullptr, nullptr, m_descriptorHeap.hCPU(TonemapOutput_UavHeapOffset));
-        m_hdrViewGeneration = m_offscreenGeneration;
-    }
-    return S_OK;
-}
+    const UINT width = m_renderSize.width, height = m_renderSize.height;
+    if (!m_pDepthStencil || m_pDepthStencil->GetDesc().Width != width || m_pDepthStencil->GetDesc().Height != height)
+        HRR(CreateDepthAndVelocity(width, height));
 
-bool RenderPlatform12::TaaEnabled() const
-{
-    return m_settings->m_antialiasing == Settings::Antialiasing::Taa && m_taaRootSignature
-        && m_gameLevelPSOs.count("taaResolve") > 0;
-}
-
-// The two float histories at the window size, and both parities' tables. Runs after RenderProlog has waited for the
-// previous frame, so rewriting descriptors is safe.
-HRESULT RenderPlatform12::EnsureTaaResources(UINT width, UINT height)
-{
-    bool recreated = false;
-    if (!m_taaHistory[0] || m_taaHistory[0]->GetDesc().Width != width || m_taaHistory[0]->GetDesc().Height != height)
+    const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
+    const bool hdr = m_renderData->hdrSceneColor;
+    m_sceneToSceneColor = hdr || Upscaling();
+    if (m_sceneToSceneColor)
     {
-        const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
-        const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16B16A16_FLOAT, width, height, 1, 1, 1, 0,
-            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        for (int i = 0; i < 2; ++i)
+        // Created with the scene's clear color as its optimized clear value, so a scene with another one recreates it.
+        const DXGI_FORMAT format = hdr ? DXGI_FORMAT_R16G16B16A16_FLOAT : m_swapChainFormat;
+        float clearColor[4];
+        if (hdr)
+            HdrClearColor(clearColor);
+        else
+            memcpy(clearColor, &m_renderData->clearColor, sizeof(clearColor));
+        if (!m_sceneColor || m_sceneColor->GetDesc().Width != width || m_sceneColor->GetDesc().Height != height
+            || m_sceneColor->GetDesc().Format != format || memcmp(clearColor, m_sceneClearColor, sizeof(clearColor)) != 0)
         {
-            Retire(m_taaHistory[i]);
+            Retire(m_sceneColor);
+            const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, 1, 1, 0,
+                D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            const CD3DX12_CLEAR_VALUE clearValue(format, clearColor);
             HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc,
-                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&m_taaHistory[i])));
-            m_taaHistory[i]->SetName(i ? L"TAA history B" : L"TAA history A");
+                D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue, IID_PPV_ARGS(&m_sceneColor)));
+            memcpy(m_sceneClearColor, clearColor, sizeof(clearColor));
+            m_sceneColor->SetName(hdr ? L"HDR scene color" : L"Scene color");
+            GetDevice()->CreateRenderTargetView(m_sceneColor, nullptr, m_rtvHeap.hCPU(FrameCount + OffscreenBufferCount + 1));
         }
-        m_taaHistoryFrame = UINT_MAX;
-        recreated = true;
+        GetDevice()->CreateShaderResourceView(m_sceneColor, nullptr, m_descriptorHeap.hCPU(TonemapScene_SrvHeapOffset));
     }
-    if (recreated || m_taaViewGeneration != m_offscreenGeneration)
+
+    // With HDR the upscaler resolves into a display-size float image that tonemap reads.
+    if (hdr && m_upscaler)
     {
-        D3D12_SHADER_RESOURCE_VIEW_DESC depthView = {};
-        depthView.Format = DXGI_FORMAT_R32_FLOAT;
-        depthView.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        depthView.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        depthView.Texture2D.MipLevels = 1;
-        for (int read = 0; read < 2; ++read)
+        if (!m_upscaledColor || m_upscaledColor->GetDesc().Width != m_displaySize.width
+            || m_upscaledColor->GetDesc().Height != m_displaySize.height)
         {
-            const int srv = read ? TaaRead1_SrvHeapOffset : TaaRead0_SrvHeapOffset;
-            const int uav = read ? TaaWrite1_UavHeapOffset : TaaWrite0_UavHeapOffset;
-            GetDevice()->CreateShaderResourceView(m_offscreenBuffer1, nullptr, m_descriptorHeap.hCPU(srv));
-            GetDevice()->CreateShaderResourceView(m_motionVelocity, nullptr, m_descriptorHeap.hCPU(srv + 1));
-            GetDevice()->CreateShaderResourceView(m_pDepthStencil, &depthView, m_descriptorHeap.hCPU(srv + 2));
-            GetDevice()->CreateShaderResourceView(m_taaHistory[read], nullptr, m_descriptorHeap.hCPU(srv + 3));
-            GetDevice()->CreateUnorderedAccessView(m_offscreenBuffer2, nullptr, nullptr, m_descriptorHeap.hCPU(uav));
-            GetDevice()->CreateUnorderedAccessView(m_taaHistory[1 - read], nullptr, nullptr, m_descriptorHeap.hCPU(uav + 1));
-            // The tonemap pass reads the resolved image from the history TAA just wrote.
-            GetDevice()->CreateShaderResourceView(m_taaHistory[read], nullptr,
-                m_descriptorHeap.hCPU(read ? TonemapHistory1_SrvHeapOffset : TonemapHistory0_SrvHeapOffset));
-            if (m_hdrColor)
-            {
-                const int hdrSrv = read ? TaaHdrRead1_SrvHeapOffset : TaaHdrRead0_SrvHeapOffset;
-                GetDevice()->CreateShaderResourceView(m_hdrColor, nullptr, m_descriptorHeap.hCPU(hdrSrv));
-                GetDevice()->CreateShaderResourceView(m_motionVelocity, nullptr, m_descriptorHeap.hCPU(hdrSrv + 1));
-                GetDevice()->CreateShaderResourceView(m_pDepthStencil, &depthView, m_descriptorHeap.hCPU(hdrSrv + 2));
-                GetDevice()->CreateShaderResourceView(m_taaHistory[read], nullptr, m_descriptorHeap.hCPU(hdrSrv + 3));
-            }
+            Retire(m_upscaledColor);
+            const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16B16A16_FLOAT, m_displaySize.width,
+                m_displaySize.height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            HRR(GetDevice()->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc,
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&m_upscaledColor)));
+            m_upscaledColor->SetName(L"Upscaled HDR color");
         }
-        m_taaViewGeneration = m_offscreenGeneration;
+        GetDevice()->CreateShaderResourceView(m_upscaledColor, nullptr, m_descriptorHeap.hCPU(TonemapUpscaled_SrvHeapOffset));
     }
+    if (m_offscreenBuffer1)
+        GetDevice()->CreateUnorderedAccessView(m_offscreenBuffer1, nullptr, nullptr, m_descriptorHeap.hCPU(TonemapOutput_UavHeapOffset));
     return S_OK;
+}
+
+// This frame's upscaler backend (created on first use) and render size. Settings change between frames, so both are
+// decided once at the start of the frame and hold until the next.
+void RenderPlatform12::ChooseFrameUpscaler()
+{
+    m_upscaler = nullptr;
+    const auto mode = m_settings->m_antialiasing;
+    const UINT slot = static_cast<UINT>(mode);
+    const bool levelLoaded = m_motionRootSignature && m_gameLevelPSOs.count("motionDebug") > 0;
+    if (levelLoaded && slot < UpscalerModeSlots)
+    {
+        auto found = m_upscalers.find(mode);
+        if (found == m_upscalers.end())
+        {
+            UpscalerContext context;
+            context.device = GetDevice();
+            context.descriptors.cpuStart = m_descriptorHeap.hCPU(Upscaler0_HeapOffset + slot * UpscalerDescriptorsPerMode);
+            context.descriptors.gpuStart = m_descriptorHeap.hGPU(Upscaler0_HeapOffset + slot * UpscalerDescriptorsPerMode);
+            context.descriptors.increment = GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            context.descriptors.count = UpscalerDescriptorsPerMode;
+            context.loadShader = [this](const wchar_t* filename, D3D12_SHADER_BYTECODE& bytecode) -> HRESULT
+            {
+                ComputeShader* shader = nullptr;
+                HRR(LoadComputeShader(filename, &shader));
+                if (!shader)
+                    return E_FAIL;
+#if defined(TREE_XBOX)
+                bytecode = { shader->shader.data(), shader->shader.size() };
+#else
+                bytecode = { shader->shader->GetBufferPointer(), shader->shader->GetBufferSize() };
+#endif
+                return S_OK;
+            };
+            context.retire = [this](CComPtr<ID3D12Resource>& resource) { Retire(resource); };
+            found = m_upscalers.emplace(mode, CreateUpscaler(mode, context)).first;
+            if (!found->second && mode == Settings::Antialiasing::Taa)
+                Util.Output("ERROR: the TAA upscaler could not be created; rendering without it\n");
+        }
+        m_upscaler = found->second.get();
+    }
+
+    // Render scale applies to temporal backends only; the motion debug views compare pixels, so they stay native.
+    m_renderSize = m_displaySize;
+    if (m_upscaler && m_settings->m_motionView == Settings::MotionView::Off)
+    {
+        const float scale = UpscalerMath::ClampScale(m_settings->m_renderScale);
+        if (scale < 1 && m_upscaler->Supports(scale))
+            m_renderSize = UpscalerMath::RenderSize(m_displaySize, scale);
+    }
+    m_viewPort = m_displayViewport;
+    m_viewPort.Width = static_cast<FLOAT>(m_renderSize.width);
+    m_viewPort.Height = static_cast<FLOAT>(m_renderSize.height);
+    m_scissorRect = { 0, 0, static_cast<LONG>(m_renderSize.width), static_cast<LONG>(m_renderSize.height) };
+    m_renderData->renderWidth = m_renderSize.width;
+    m_renderData->renderHeight = m_renderSize.height;
+}
+
+// The frame constants, with the texture LOD bias that keeps minified textures at the display's detail while upscaling.
+void RenderPlatform12::SetFrameSceneData(CBChangesEveryFrame* cb)
+{
+    const float bias = m_upscaler && Upscaling() ? m_upscaler->MipBias(m_renderSize, m_displaySize) : 0.0f;
+    cb->renderScale = XMFLOAT4(bias, std::exp2(bias), 0, 0);
+    m_constBufferChangesEveryFrame->CopyData(0, *cb);
 }
 
 // After a resize, a level load or a device reset, the previous camera and color no longer apply.
@@ -4560,7 +4583,6 @@ void RenderPlatform12::ResetMotionHistory()
     m_cameraHistoryValid = false;
     m_viewProjectionFrame = UINT_MAX;
     m_colorHistoryFrame = UINT_MAX;
-    m_taaHistoryFrame = UINT_MAX;
     m_lastInstanceBuffer = nullptr;
     m_previousInstanceBuffer = nullptr;
     m_lastInstanceFrame = UINT_MAX;
@@ -4723,8 +4745,8 @@ HRESULT RenderPlatform12::RenderPostProcess()
         m_shaderBindingTable.Commit();
 
         D3D12_DISPATCH_RAYS_DESC dispatchRaysDesc = {};
-        dispatchRaysDesc.Width = (UINT)m_renderData->projectionData.screenWidth;
-        dispatchRaysDesc.Height = (UINT)m_renderData->projectionData.screenHeight;
+        dispatchRaysDesc.Width = m_renderSize.width;
+        dispatchRaysDesc.Height = m_renderSize.height;
         dispatchRaysDesc.Depth = 1;
         dispatchRaysDesc.RayGenerationShaderRecord = m_shaderBindingTable.GetRayGenerationRecord(0);
         dispatchRaysDesc.MissShaderTable = m_shaderBindingTable.GetMissShaderTable();
@@ -4764,7 +4786,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         ProfileTimestamp(ProfilePass::Rays, true);
 
         // Replace the main image before blur/UI; the DXR texture matches the target size and format.
-        ID3D12Resource* colorTarget = m_renderData->hdrSceneColor ? static_cast<ID3D12Resource*>(m_hdrColor)
+        ID3D12Resource* colorTarget = m_sceneToSceneColor ? static_cast<ID3D12Resource*>(m_sceneColor)
             : UsesOffscreenChain() ? static_cast<ID3D12Resource*>(m_offscreenBuffer1)
             : static_cast<ID3D12Resource*>(m_renderTargets[m_frameIndex]);
         ID3D12Resource* dxrOutput = m_renderData->pDxrOutBuffer->uavOutput;
@@ -4795,9 +4817,11 @@ HRESULT RenderPlatform12::RenderPostProcess()
     {
         PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Post-processing");
         ID3D12Resource* buffers[2] = { m_offscreenBuffer1, m_offscreenBuffer2 };
-        // With HDR the scene went to the HDR target, and buffer 1 receives the tonemapped image.
+        // With HDR or while upscaling the scene went to the scene color target, and buffer 1 receives the display
+        // image (tonemapped, or the upscaler's output).
         const bool hdr = m_renderData->hdrSceneColor;
-        D3D12_RESOURCE_STATES states[2] = { hdr ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_RENDER_TARGET,
+        const bool sceneTarget = m_sceneToSceneColor;
+        D3D12_RESOURCE_STATES states[2] = { sceneTarget ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_RENDER_TARGET,
             D3D12_RESOURCE_STATE_COMMON };
         auto transition = [&](int buffer, D3D12_RESOURCE_STATES to)
         {
@@ -4813,27 +4837,27 @@ HRESULT RenderPlatform12::RenderPostProcess()
         ID3D12DescriptorHeap* ppHeaps[] = { m_descriptorHeap };
         GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-        // HDR: exposure, the operator and the display encode, from the TAA history (the resolved image) or the HDR target.
-        int resolvedHistory = -1;
+        // HDR: exposure, the operator and the display encode, from the upscaler's output or the scene color.
+        bool tonemapUpscaled = false;
         auto tonemap = [&]()
         {
             PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Tonemap");
             transition(0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             struct { float size[4]; float exposure; UINT op; UINT pad[2]; } tonemapConstants = {
-                { 1.0f / m_scissorRect.right, 1.0f / m_scissorRect.bottom, static_cast<float>(m_scissorRect.right),
-                    static_cast<float>(m_scissorRect.bottom) },
+                { 1.0f / m_displayScissor.right, 1.0f / m_displayScissor.bottom, static_cast<float>(m_displayScissor.right),
+                    static_cast<float>(m_displayScissor.bottom) },
                 std::exp2(m_settings->m_exposure), static_cast<UINT>(m_settings->m_tonemap), { 0, 0 } };
             GetCommandList()->SetComputeRootSignature(m_tonemapRootSignature);
             GetCommandList()->SetComputeRoot32BitConstants(0, 8, &tonemapConstants, 0);
             GetCommandList()->SetPipelineState(m_gameLevelPSOs["tonemap"]);
-            GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(resolvedHistory < 0 ? TonemapScene_SrvHeapOffset
-                : resolvedHistory ? TonemapHistory1_SrvHeapOffset : TonemapHistory0_SrvHeapOffset));
+            GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(tonemapUpscaled
+                ? TonemapUpscaled_SrvHeapOffset : TonemapScene_SrvHeapOffset));
             GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(TonemapOutput_UavHeapOffset));
-            GetCommandList()->Dispatch((m_scissorRect.right + 7) / 8, (m_scissorRect.bottom + 7) / 8, 1);
+            GetCommandList()->Dispatch((m_displayScissor.right + 7) / 8, (m_displayScissor.bottom + 7) / 8, 1);
         };
-        if (hdr)
+        if (sceneTarget)
         {
-            const auto toRead = CD3DX12_RESOURCE_BARRIER::Transition(m_hdrColor, D3D12_RESOURCE_STATE_RENDER_TARGET,
+            const auto toRead = CD3DX12_RESOURCE_BARRIER::Transition(m_sceneColor, D3D12_RESOURCE_STATE_RENDER_TARGET,
                 D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             GetCommandList()->ResourceBarrier(1, &toRead);
         }
@@ -4843,10 +4867,10 @@ HRESULT RenderPlatform12::RenderPostProcess()
             ProfileTimestamp(ProfilePass::AntiAliasing, false);
         if (motion)
         {
-            // Velocity from depth, then TAA resolves into the scene color, then a debug view (it reads last frame's
-            // color) replaces it after this frame's color becomes the debug history.
+            // Velocity from depth at the render size, then the upscaler resolves the display image, then a debug view
+            // (it reads last frame's color) replaces it after this frame's color becomes the debug history.
             PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Motion vectors");
-            const UINT width = m_scissorRect.right, height = m_scissorRect.bottom;
+            const UINT width = m_renderSize.width, height = m_renderSize.height;
             HRR(EnsureMotionResources(width, height));
             auto barrier = [&](ID3D12Resource* resource, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
             {
@@ -4881,47 +4905,55 @@ HRESULT RenderPlatform12::RenderPostProcess()
                 barrier(m_motionVelocity, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             }
 
-            if (TaaEnabled())
+            if (m_upscaler)
             {
-                // Resolve into off-screen buffer 2 and the other history, then copy back so the rest of the chain sees
-                // the resolved image in buffer 1. Depth is still readable for the nearest-pixel velocity.
-                PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"TAA");
-                HRR(EnsureTaaResources(width, height));
-                const UINT read = m_taaHistoryIndex, write = 1 - read;
-                {
-                    PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Resolve");
-                    struct
-                    {
-                        float size[4];
-                        UINT historyValid;
-                        float currentWeight, clipGamma;
-                        UINT hdrInput;
-                    } taaConstants = { { constants.size[0], constants.size[1], constants.size[2], constants.size[3] },
-                        m_taaHistoryFrame != UINT_MAX && m_taaHistoryFrame + 1 == m_renderData->frame && m_cameraHistoryValid ? 1u : 0u,
-                        0.1f, 1.25f, hdr ? 1u : 0u };
+                // Output: with HDR the display-size float image tonemap reads; while upscaling LDR, buffer 1 directly;
+                // at native LDR buffer 2, copied back so the rest of the chain finds the resolved image in buffer 1.
+                // Depth is still readable for the nearest-pixel velocity.
+                const std::wstring scope = std::wstring(L"Upscale (") + m_upscaler->Name() + L")";
+                PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, scope.c_str());
+                HRR(m_upscaler->Resize(m_renderSize, m_displaySize, SceneColorFormat()));
+                const bool upscaling = Upscaling();
+                ID3D12Resource* output = hdr ? static_cast<ID3D12Resource*>(m_upscaledColor)
+                    : upscaling ? static_cast<ID3D12Resource*>(m_offscreenBuffer1) : static_cast<ID3D12Resource*>(m_offscreenBuffer2);
+                if (!sceneTarget)
                     transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-                    transition(1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-                    barrier(m_taaHistory[write], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-                    GetCommandList()->SetComputeRootSignature(m_taaRootSignature);
-                    GetCommandList()->SetComputeRoot32BitConstants(0, 8, &taaConstants, 0);
-                    GetCommandList()->SetPipelineState(m_gameLevelPSOs["taaResolve"]);
-                    GetCommandList()->SetComputeRootDescriptorTable(1, m_descriptorHeap.hGPU(hdr
-                        ? (read ? TaaHdrRead1_SrvHeapOffset : TaaHdrRead0_SrvHeapOffset)
-                        : (read ? TaaRead1_SrvHeapOffset : TaaRead0_SrvHeapOffset)));
-                    GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(read ? TaaWrite1_UavHeapOffset : TaaWrite0_UavHeapOffset));
-                    GetCommandList()->Dispatch(groupsX, groupsY, 1);
-                    barrier(m_taaHistory[write], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-                }
-                if (!hdr)
+                if (hdr)
+                    barrier(m_upscaledColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                else
+                    transition(upscaling ? 0 : 1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+                UpscaleFrame frame;
+                frame.textures.color = sceneTarget ? static_cast<ID3D12Resource*>(m_sceneColor) : static_cast<ID3D12Resource*>(m_offscreenBuffer1);
+                frame.textures.depth = m_pDepthStencil;
+                frame.textures.depthFormat = DXGI_FORMAT_R32_FLOAT;
+                frame.textures.motion = m_motionVelocity;
+                frame.textures.output = output;
+                frame.render = m_renderSize;
+                frame.display = m_displaySize;
+                frame.jitterPixels = m_renderData->jitterPixels;
+                frame.motionToPixels = XMFLOAT2(static_cast<float>(width), static_cast<float>(height));
+                frame.hdr = hdr;
+                frame.reset = !m_cameraHistoryValid;
+                frame.view = m_view;
+                frame.projection = m_projection;
+                frame.clipToPreviousClip = constants.currentToPrevious;
+                frame.nearZ = m_renderData->projectionData.nearClippingPlane;
+                frame.farZ = m_renderData->projectionData.farClippingPlane;
+                frame.fovY = m_renderData->projectionData.fov;
+                frame.frameIndex = m_renderData->frame;
+                HRR(m_upscaler->Evaluate(GetCommandList(), frame));
+
+                if (hdr)
+                    barrier(m_upscaledColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                else if (!upscaling)
                 {
                     PIXScopedEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Copy to scene color");
                     transition(1, D3D12_RESOURCE_STATE_COPY_SOURCE);
                     transition(0, D3D12_RESOURCE_STATE_COPY_DEST);
                     GetCommandList()->CopyResource(m_offscreenBuffer1, m_offscreenBuffer2);
                 }
-                m_taaHistoryIndex = write;
-                m_taaHistoryFrame = m_renderData->frame;
-                resolvedHistory = static_cast<int>(write);
+                tonemapUpscaled = hdr;
             }
             // The debug views read the display image.
             if (hdr)
@@ -4957,9 +4989,9 @@ HRESULT RenderPlatform12::RenderPostProcess()
         }
         else if (hdr)
             tonemap();
-        if (hdr)
+        if (sceneTarget)
         {
-            const auto toTarget = CD3DX12_RESOURCE_BARRIER::Transition(m_hdrColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+            const auto toTarget = CD3DX12_RESOURCE_BARRIER::Transition(m_sceneColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
                 D3D12_RESOURCE_STATE_RENDER_TARGET);
             GetCommandList()->ResourceBarrier(1, &toTarget);
         }
@@ -4968,7 +5000,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
         {
             transition(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             transition(1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-            HRR(RenderSmaa(m_scissorRect.right, m_scissorRect.bottom));
+            HRR(RenderSmaa(m_displayScissor.right, m_displayScissor.bottom));
             current = 1;
         }
         if (motion || smaa)
@@ -4997,8 +5029,8 @@ HRESULT RenderPlatform12::RenderPostProcess()
 
             // How many groups do we need to dispatch to cover a row of pixels, where each
             // group covers 256 pixels (the 256 is defined in the ComputeShader).
-            UINT numGroupsX = (UINT)ceilf(m_scissorRect.right / 256.0f);
-            GetCommandList()->Dispatch(numGroupsX, m_scissorRect.bottom, 1);
+            UINT numGroupsX = (UINT)ceilf(m_displayScissor.right / 256.0f);
+            GetCommandList()->Dispatch(numGroupsX, m_displayScissor.bottom, 1);
 
             // Vertical blur pass: back into the current buffer.
             transition(other, D3D12_RESOURCE_STATE_GENERIC_READ);
@@ -5009,8 +5041,8 @@ HRESULT RenderPlatform12::RenderPostProcess()
 
             // How many groups do we need to dispatch to cover a column of pixels, where each
             // group covers 256 pixels  (the 256 is defined in the ComputeShader).
-            UINT numGroupsY = (UINT)ceilf(m_scissorRect.bottom / 256.0f);
-            GetCommandList()->Dispatch(m_scissorRect.right, numGroupsY, 1);
+            UINT numGroupsY = (UINT)ceilf(m_displayScissor.bottom / 256.0f);
+            GetCommandList()->Dispatch(m_displayScissor.right, numGroupsY, 1);
         }
 
         // Copy back to render target
@@ -5025,9 +5057,10 @@ HRESULT RenderPlatform12::RenderPostProcess()
         transition(0, D3D12_RESOURCE_STATE_COMMON);
         transition(1, D3D12_RESOURCE_STATE_COMMON);
 
+        // No depth: the UI and the shadow-map preview don't use it, and depth is at the render size, which would clip
+        // everything drawn on the back buffer to that size while upscaling.
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap.hCPU(m_frameIndex));
-        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap.hCPU(SwapChainDsv_HeapOffset));
-        GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+        GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
     }
 
     return hr;
@@ -5040,6 +5073,8 @@ HRESULT RenderPlatform12::RenderDebugUI()
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Render Epilog part deux");
 
     HRR(SetupGraphicsOnCommandList());
+    GetCommandList()->RSSetViewports(1, &m_displayViewport);
+    GetCommandList()->RSSetScissorRects(1, &m_displayScissor);
 
     if (m_settings->m_showShadowBuffer)
     {

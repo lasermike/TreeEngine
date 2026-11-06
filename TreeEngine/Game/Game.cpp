@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Game.h"
+#include "UpscalerMath.h"
 #include "StockRenderStates.h"
 #include "SceneRoot.h"
 #include "Tree.h"
@@ -108,6 +109,9 @@ namespace
             int antialiasing = 0;
             if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Taa))
                 settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
+            float renderScale = 1;
+            if (file >> renderScale && renderScale >= UpscalerMath::MinRenderScale && renderScale <= UpscalerMath::MaxRenderScale)
+                settings.m_renderScale = renderScale;
         }
     }
 
@@ -121,7 +125,8 @@ namespace
         file << settings.m_debugUIScale << ' ' << (settings.m_debugUISeparateWindow ? 1 : 0) << '\n'
             << overlay.x << ' ' << overlay.y << ' ' << overlay.width << ' ' << overlay.height << '\n'
             << separateWindow.x << ' ' << separateWindow.y << ' ' << separateWindow.width << ' ' << separateWindow.height << '\n'
-            << static_cast<int>(settings.m_antialiasing) << '\n';
+            << static_cast<int>(settings.m_antialiasing) << '\n'
+            << settings.m_renderScale << '\n';
     }
 
     std::string DebugRelativePath(const std::wstring& filename)
@@ -1318,6 +1323,27 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             m_settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
         if (m_settings.m_antialiasing == Settings::Antialiasing::Smaa)
             ImGui::Checkbox("Show SMAA edges", &m_settings.m_showAntialiasingEdges);
+        if (m_settings.m_antialiasing == Settings::Antialiasing::Taa)
+        {
+            // Render scale: the scene renders at a fraction of the window and TAA upscales (Game/Upscaler.h).
+            using UpscalerMath::Preset;
+            static bool customScale = false;
+            int preset = static_cast<int>(customScale ? Preset::Custom : UpscalerMath::PresetForScale(m_settings.m_renderScale));
+            if (ImGui::Combo("Render scale", &preset,
+                "Native\0Quality (67%)\0Balanced (59%)\0Performance (50%)\0Ultra performance (33%)\0Custom\0"))
+            {
+                customScale = preset == static_cast<int>(Preset::Custom);
+                if (!customScale)
+                    m_settings.m_renderScale = UpscalerMath::PresetScale(static_cast<Preset>(preset), m_settings.m_renderScale);
+            }
+            if (preset == static_cast<int>(Preset::Custom))
+                ImGui::SliderFloat("Scale", &m_settings.m_renderScale, 0.33f, 1.0f, "%.2f");
+            const auto& renderData = m_renderManager.GetRenderData();
+            ImGui::Text("  Render %u x %u -> %d x %d", renderData.renderWidth, renderData.renderHeight,
+                renderData.projectionData.screenWidth, renderData.projectionData.screenHeight);
+            if (m_settings.m_renderScale < 1 && m_settings.m_motionView != Settings::MotionView::Off)
+                ImGui::TextDisabled("  Native while a motion vector view is shown");
+        }
         ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
         ImGui::Checkbox("HDR", &m_settings.m_hdr);
         if (m_settings.m_hdr)

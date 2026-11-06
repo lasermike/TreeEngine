@@ -61,6 +61,7 @@ cbuffer cbChangesEveryFrame : register(b2)
     uint reflectionRayCount;
     float4 sceneTime; // x is simulation time in seconds
     float4 sunShadowParams; // x: tan(angular radius), y: sample count
+    float4 renderScale;     // x: texture LOD bias while upscaling (0 at native), y: 2^x; see Game/Upscaler.h
 };
 
 // Hashed alpha testing for raster (Wyman and McGuire, "Hashed Alpha Testing", 2017). Ray tracing samples alpha at

@@ -166,7 +166,8 @@ void ComputeTextureFootprint(DxrGeometryInfo geometry, uint3 indices,
     if (projected.w <= 1e-6f)
         return;
     float2 ndc = projected.xy / projected.w;
-    float2 pixelStep = 2.0f / float2(DispatchRaysDimensions().xy);
+    // While upscaling, a display pixel's footprint (renderScale.y is render / display), so textures keep its detail.
+    float2 pixelStep = 2.0f * renderScale.y / float2(DispatchRaysDimensions().xy);
     float4 worldX = mul(float4(ndc + float2(pixelStep.x, 0), 0, 1), InverseViewProjection);
     float4 worldY = mul(float4(ndc + float2(0, -pixelStep.y), 0, 1), InverseViewProjection);
     float3 directionX = worldX.xyz / worldX.w - eyePos.xyz;

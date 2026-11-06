@@ -11,6 +11,7 @@
 #endif
 
 #include "RenderData.h"
+#include "Upscaler.h"
 #include "StockRenderStates.h"
 
 class Settings;
@@ -779,8 +780,13 @@ private:
     void ProfileTimestamp(ProfilePass pass, bool end);
     HRESULT ResolveProfileFrame();
 
+    // The scene renders at the render size (m_viewPort, m_scissorRect); post-processing, the UI and the back buffer
+    // run at the display size, the window's. They differ only while an upscaler reconstructs the display image.
     D3D12_VIEWPORT                    m_viewPort;
     D3D12_RECT                        m_scissorRect;
+    D3D12_VIEWPORT                    m_displayViewport = {};
+    D3D12_RECT                        m_displayScissor = {};
+    UpscalerSize                      m_displaySize, m_renderSize;
 
     //XSF::BitmapFont*                  m_bitmapFont;
 
@@ -953,7 +959,7 @@ public:
     HRESULT LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader);
     HRESULT CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit);
 
-    void SetFrameSceneData(CBChangesEveryFrame* cb) { m_constBufferChangesEveryFrame->CopyData(0, *cb); }
+    void SetFrameSceneData(CBChangesEveryFrame* cb);
 
     HRESULT SetupGraphicsOnCommandList();
 
@@ -1071,23 +1077,25 @@ public:
     UINT                        m_colorHistoryFrame = UINT_MAX;     // The frame whose color m_motionHistory holds.
     bool MotionVectorsNeeded() const;
 
-    // Temporal anti-aliasing (Game/Shaders/Taa.hlsl): resolved color accumulates in a float history, ping-ponged.
-    CComPtr<ID3D12RootSignature> m_taaRootSignature;
-    CComPtr<ID3D12Resource>     m_taaHistory[2];
-    UINT                        m_taaHistoryIndex = 0;              // The history this frame reads.
-    UINT                        m_taaHistoryFrame = UINT_MAX;       // The frame whose resolve the history holds.
-    UINT                        m_taaViewGeneration = UINT_MAX;
-    bool TaaEnabled() const;
-    HRESULT EnsureTaaResources(UINT width, UINT height);
+    // Temporal anti-aliasing and upscaling (Game/Upscaler.h): one backend per mode, created on first use. A null
+    // entry records a mode whose backend is unavailable.
+    std::map<Settings::Antialiasing, std::unique_ptr<Upscaler>> m_upscalers;
+    Upscaler*                   m_upscaler = nullptr;   // This frame's backend, chosen in BeginNewFrame.
+    bool TaaEnabled() const { return m_upscaler != nullptr; }
+    void ChooseFrameUpscaler();     // Picks this frame's backend and render size.
+    bool Upscaling() const { return m_renderSize.width != m_displaySize.width || m_renderSize.height != m_displaySize.height; }
 
-    // HDR scene color (Game/Shaders/Tonemap.hlsl): linear light in a float target, tonemapped into off-screen buffer 1.
+    // Scene color target at the render size (Game/Shaders/Tonemap.hlsl): linear light in a float target with HDR, or
+    // display-encoded while upscaling without HDR. Native LDR renders into off-screen buffer 1 instead.
     CComPtr<ID3D12RootSignature> m_tonemapRootSignature;
-    CComPtr<ID3D12Resource>     m_hdrColor;
-    UINT                        m_hdrViewGeneration = UINT_MAX;
-    float                       m_hdrClearColor[4] = {};    // The linear clear color m_hdrColor was created for.
+    CComPtr<ID3D12Resource>     m_sceneColor;
+    bool                        m_sceneToSceneColor = false;    // This frame renders into m_sceneColor.
+    float                       m_sceneClearColor[4] = {};      // The clear color m_sceneColor was created for.
+    CComPtr<ID3D12Resource>     m_upscaledColor;    // HDR upscaler output at the display size, read by tonemap.
     bool HdrEnabled() const;
     void HdrClearColor(float color[4]) const;  // The scene's clear color, decoded to linear light.
-    HRESULT EnsureHdrResources(UINT width, UINT height);
+    HRESULT EnsureSceneTargets();   // Depth, velocity, scene color and the tonemap views at this frame's sizes.
+    HRESULT CreateDepthAndVelocity(UINT width, UINT height);
     DXGI_FORMAT SceneColorFormat() const;   // The ray-tracing output's format: the HDR target's or the swap chain's.
     HRESULT CreateDxrOutput(UINT width, UINT height);
     bool UsesOffscreenChain() const;

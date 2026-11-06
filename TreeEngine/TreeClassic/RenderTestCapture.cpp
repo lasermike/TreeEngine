@@ -175,6 +175,9 @@ void ParseRenderTestCommandLine()
     if ((parsed->tonemap != "clamp" && parsed->tonemap != "aces" && parsed->tonemap != "agx")
         || !std::isfinite(parsed->exposure) || std::abs(parsed->exposure) > 16)
         throw std::runtime_error("tonemap must be \"clamp\", \"aces\" or \"agx\", and exposure a finite EV");
+    parsed->renderScale = json.value("renderScale", 1.0f);
+    if (!(parsed->renderScale >= 0.25f && parsed->renderScale <= 1.0f))
+        throw std::runtime_error("renderScale must be in [0.25, 1]");
     if (json.contains("jitter"))
     {
         parsed->hasJitter = true;
@@ -298,6 +301,9 @@ void ParseRenderTestCommandLine()
         if ((point.tonemap != "clamp" && point.tonemap != "aces" && point.tonemap != "agx")
             || !std::isfinite(point.exposure) || std::abs(point.exposure) > 16)
             throw std::runtime_error("Capture tonemap must be \"clamp\", \"aces\" or \"agx\", and exposure a finite EV");
+        point.renderScale = value.value("renderScale", parsed->renderScale);
+        if (!(point.renderScale >= 0.25f && point.renderScale <= 1.0f))
+            throw std::runtime_error("Capture renderScale must be in [0.25, 1]");
         if (value.contains("previousTime"))
         {
             point.hasPreviousTime = true;
@@ -366,6 +372,7 @@ namespace
         nlohmann::json report = { { "scene", request->scene }, { "mode", request->mode },
             { "width", request->width }, { "height", request->height }, { "seed", request->seed },
             { "frames", request->performanceFrames }, { "frameTimeStep", request->performanceFrameTimeStep },
+            { "renderScale", request->renderScale },
             { "startTime", request->performanceStartTime }, { "settleFrames", request->performanceSettleFrames },
             { "cameraKeys", request->performanceCamera.size() },
             { "workerThreads", game.GetWorkerThreadCount() },
@@ -381,6 +388,7 @@ namespace
             game.SetRenderTestAntialiasing(AntialiasingSetting(request->antialiasing));
             game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
             game.SetRenderTestHdr(request->hdr, TonemapSetting(request->tonemap), request->exposure);
+            game.SetRenderTestRenderScale(request->renderScale);
             const int settleFrames = request->performanceSettleFrames;
             for (int frame = 0; frame < settleFrames + request->performanceFrames; ++frame)
             {
@@ -410,6 +418,8 @@ namespace
                     report["sceneLoad"] = { { "totalMs", load.TotalMs() }, { "definitionMs", load.definitionMs },
                         { "generationMs", load.generationMs }, { "graphicsMs", load.graphicsMs } };
                     report["adapter"] = Utf8(profile.adapter);
+                    report["renderWidth"] = game.GetRenderManager().GetRenderData().renderWidth;
+                    report["renderHeight"] = game.GetRenderManager().GetRenderData().renderHeight;
                     // Baked during the load; "requested" is the request's opacityMicromaps, applied when supported.
                     const auto& micromaps = game.GetRenderManager().GetRenderData().opacityMicromaps;
                     report["opacityMicromaps"] = { { "requested", request->opacityMicromaps }, { "supported", micromaps.supported },
@@ -510,6 +520,7 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestAntialiasing(AntialiasingSetting(point.antialiasing));
             game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
             game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
+            game.SetRenderTestRenderScale(point.renderScale);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion
                 : point.debugView == "reprojection" ? Settings::MotionView::ReprojectedHistory
@@ -588,9 +599,11 @@ int RunRenderTestCapture(Game& game)
             const auto& projection = game.GetRenderManager().GetRenderData().projectionData;
             if (projection.screenWidth != point.width || projection.screenHeight != point.height)
                 throw std::runtime_error("Render target did not follow the window size");
+            const auto& renderData = game.GetRenderManager().GetRenderData();
             report["captures"].push_back({ { "scene", currentScene }, { "antialiasing", point.antialiasing },
                 { "postProcessing", point.postProcessing }, { "time", point.time }, { "mode", point.mode },
-                { "width", point.width }, { "height", point.height }, { "success", true },
+                { "width", point.width }, { "height", point.height }, { "renderScale", point.renderScale },
+                { "renderWidth", renderData.renderWidth }, { "renderHeight", renderData.renderHeight }, { "success", true },
                 { "poseCache", point.poseCache }, { "samples", samples } });
         }
         report["gpuPasses"] = { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays", "antialiasing" };

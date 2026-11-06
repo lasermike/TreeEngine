@@ -3,6 +3,7 @@
 #include "SceneDefinition.h"
 #include "RenderData.h"
 #include "OpacityMicromapBaker.h"
+#include "UpscalerMath.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -573,6 +574,29 @@ void TestOpacityMicromaps()
 int RunScenePersistenceTests();
 
 
+void TestUpscalerMath()
+{
+    using namespace UpscalerMath;
+    const Size display{ 1920, 1080 };
+    auto same = [](Size a, Size b) { return a.width == b.width && a.height == b.height; };
+    Check(same(RenderSize(display, 1.0f), display), "native render size differs from the display");
+    Check(same(RenderSize(display, 0.5f), Size{ 960, 540 }), "performance render size is wrong");
+    Check(same(RenderSize(display, PresetScale(Preset::Quality, 0)), Size{ 1280, 720 }), "quality render size is wrong");
+    Check(same(RenderSize(display, PresetScale(Preset::UltraPerformance, 0)), Size{ 640, 360 }), "ultra performance size is wrong");
+    Check(same(RenderSize(Size{ 641, 3 }, 0.5f), Size{ 321, 2 }), "odd sizes do not round to nearest");
+    Check(same(RenderSize(Size{ 1, 1 }, 0.25f), Size{ 1, 1 }), "render size fell below one pixel");
+    Check(same(RenderSize(display, 4.0f), display), "render scale above one was not clamped");
+    Check(same(RenderSize(display, 0.01f), RenderSize(display, MinRenderScale)), "render scale below the minimum was not clamped");
+    Check(same(RenderSize(display, std::nanf("")), display), "a NaN render scale was not treated as native");
+    Check(MipBias(display, display) == 0.0f, "native mip bias is not zero");
+    Check(std::abs(MipBias(Size{ 960, 540 }, display) + 1.0f) < 1e-6f, "half-resolution mip bias is not -1");
+    Check(JitterPhaseCount(display, display) == 8, "native jitter phase count changed");
+    Check(JitterPhaseCount(Size{ 960, 540 }, display) == 32, "half-resolution jitter phase count is wrong");
+    Check(JitterPhaseCount(Size{ 1280, 720 }, display) == 18, "quality jitter phase count is wrong");
+    Check(PresetForScale(0.5f) == Preset::Performance && PresetForScale(1.0f) == Preset::Native
+        && PresetForScale(0.8f) == Preset::Custom, "preset lookup is wrong");
+}
+
 void TestAmbientOcclusionSettings()
 {
     auto disabled = SceneData::ParseScene(R"({"version":1,"name":"AO defaults","objects":[{"id":"box","type":"primitive","shape":"box"}]})", "ao");
@@ -683,6 +707,7 @@ int main(int argc, char** argv)
         TestModelNormalAnimation();
         TestModelMaterialTint();
         TestAmbientOcclusionSettings();
+        TestUpscalerMath();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

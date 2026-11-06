@@ -34,20 +34,20 @@ ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
     {
         float2 strengthUv = TransformMaterialUv(material, uv, SpecularStrengthTextureRole);
         material.specularParams.w *= material.specularTextures.z > 0
-            ? txSpecular.Sample(samLinearClamp, strengthUv).a : txSpecular.Sample(samLinearWrap, strengthUv).a;
+            ? txSpecular.SampleBias(samLinearClamp, strengthUv, renderScale.x).a : txSpecular.SampleBias(samLinearWrap, strengthUv, renderScale.x).a;
     }
     if (material.specularTextures.y >= 0)
     {
         float2 colorUv = TransformMaterialUv(material, uv, SpecularColorTextureRole);
         material.specularColor.rgb *= material.specularTextures.w > 0
-            ? txSpecularColor.Sample(samLinearClamp, colorUv).rgb : txSpecularColor.Sample(samLinearWrap, colorUv).rgb;
+            ? txSpecularColor.SampleBias(samLinearClamp, colorUv, renderScale.x).rgb : txSpecularColor.SampleBias(samLinearWrap, colorUv, renderScale.x).rgb;
     }
     if (material.metallicRoughnessTextures.x >= 0)
     {
         float2 metallicRoughnessUv = TransformMaterialUv(material, uv, MetallicRoughnessTextureRole);
         float4 mr = (material.metallicRoughnessTextures.y > 0
-            ? txMetallicRoughness.Sample(samLinearClamp, metallicRoughnessUv)
-            : txMetallicRoughness.Sample(samLinearWrap, metallicRoughnessUv));
+            ? txMetallicRoughness.SampleBias(samLinearClamp, metallicRoughnessUv, renderScale.x)
+            : txMetallicRoughness.SampleBias(samLinearWrap, metallicRoughnessUv, renderScale.x));
         material.specularParams.y *= mr.b;
         material.specularParams.z *= mr.g;
     }
@@ -333,13 +333,14 @@ float4 ShadeSurface(PS_INPUT input)
     {
         float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
         textureColor = (mat.specularColor.w > 0
-            ? txDiffuse.Sample(samLinearClamp, baseColorUv)
-            : txDiffuse.Sample(samLinearWrap, baseColorUv));
+            ? txDiffuse.SampleBias(samLinearClamp, baseColorUv, renderScale.x)
+            : txDiffuse.SampleBias(samLinearWrap, baseColorUv, renderScale.x));
 
         if (mat.flags.z > 0)  // alpha test
         {
-            const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL)));
-            const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv);
+            // While upscaling, the footprint and level of detail are a display pixel's, matching the biased sample.
+            const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL))) * renderScale.y;
+            const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv) + renderScale.x;
             clip(AlphaTestPasses(textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
         }
     }
@@ -348,7 +349,7 @@ float4 ShadeSurface(PS_INPUT input)
     if (mat.tintTextures.x >= 0)
     {
         const float2 tintUv = TransformMaterialUv(mat, input.Tex, TintTextureRole);
-        textureColor.rgb *= 2 * (mat.tintTextures.y > 0 ? txTint.Sample(samLinearClamp, tintUv) : txTint.Sample(samLinearWrap, tintUv)).rgb;
+        textureColor.rgb *= 2 * (mat.tintTextures.y > 0 ? txTint.SampleBias(samLinearClamp, tintUv, renderScale.x) : txTint.SampleBias(samLinearWrap, tintUv, renderScale.x)).rgb;
     }
 
     if (mat.flags.w > 0)
@@ -364,14 +365,14 @@ float4 ShadeSurface(PS_INPUT input)
         float2 normalUv = TransformMaterialUv(mat, input.Tex, NormalTextureRole);
         float2 normalUv1 = normalUv + mat.normalMotion.xy * sceneTime.x;
         float3 tangentNormal = (mat.normalTextures.z > 0
-            ? txNormal.Sample(samLinearClamp, normalUv1)
-            : txNormal.Sample(samLinearWrap, normalUv1)).xyz * 2.0f - 1.0f;
+            ? txNormal.SampleBias(samLinearClamp, normalUv1, renderScale.x)
+            : txNormal.SampleBias(samLinearWrap, normalUv1, renderScale.x)).xyz * 2.0f - 1.0f;
         if (any(mat.normalMotion != 0))
         {
             float2 normalUv2 = normalUv + mat.normalMotion.zw * sceneTime.x;
             float3 secondNormal = (mat.normalTextures.z > 0
-                ? txNormal.Sample(samLinearClamp, normalUv2)
-                : txNormal.Sample(samLinearWrap, normalUv2)).xyz * 2.0f - 1.0f;
+                ? txNormal.SampleBias(samLinearClamp, normalUv2, renderScale.x)
+                : txNormal.SampleBias(samLinearWrap, normalUv2, renderScale.x)).xyz * 2.0f - 1.0f;
             tangentNormal = normalize(tangentNormal + secondNormal);
         }
         tangentNormal.xy *= mat.normalTextures.y;

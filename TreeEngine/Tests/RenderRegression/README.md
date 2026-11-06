@@ -36,6 +36,10 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Temporal anti-aliasing against a 4-sample reference: convergence, stability and a camera step.
 .\Tests\RenderRegression\test-taa.ps1
 
+# Temporal upscaling at Quality (0.667) and Performance (0.5) scale against the same reference and native TAA,
+# and switching scale and window size in one process. -Hdr runs it with the HDR scene target.
+.\Tests\RenderRegression\test-upscaling.ps1
+
 # HDR scene color: equivalence with the 8-bit path, toggling, operators, exposure, and TAA with HDR.
 .\Tests\RenderRegression\test-hdr.ps1
 
@@ -67,15 +71,18 @@ External Binaries/Intermediates directories are no longer used by the maintained
 desktop builds. Do not remove shared legacy outputs; any cleanup requires
 inspection and separate approval of the exact generated subdirectories.
 
-`scenes.json` lists fourteen scene entries, both rendering modes, and captures at
-0, 1, and 5 seconds (84 images). It also specifies resolution, random seed,
+`scenes.json` lists fifteen scene entries, both rendering modes, and captures at
+0, 1, and 5 seconds (90 images). It also specifies resolution, random seed,
 postprocessing, warmup frames, and tolerances. Entries render without anti-aliasing and without HDR, whatever
 the app's own settings, unless they set them:
 - `"antialiasing"`: `"smaa"` (`leaf-atlas-test-smaa`, `tree-smaa`) or `"taa"` (`ai-tree`)
 - `"hdr": true` with `"tonemap"` (`"clamp"`, `"aces"` or `"agx"`) and `"exposure"` (EV) (`ai-tree`: AgX)
-- `"warmupFrames"`, overriding the manifest's; TAA needs more frames to settle (`ai-tree` uses 16)
+- `"renderScale"` in [0.25, 1]: with `"taa"`, the scene renders at that fraction of the size and TAA upscales
+  (`ai-tree-taau`: 0.5); other modes ignore it
+- `"warmupFrames"`, overriding the manifest's; TAA needs more frames to settle (`ai-tree` uses 16, `ai-tree-taau` 40)
 
-Render-test requests and captures take the same fields (`test-taa.ps1` warms TAA up for 40 frames). A request's
+Render-test requests and captures take the same fields (`test-taa.ps1` warms TAA up for 40 frames). Reports give each
+capture's `renderScale`, `renderWidth` and `renderHeight`. A request's
 `alphaTest` is `"hashed"` (the default, like the app) or `"cutoff"` (each material's alpha cutoff). Scene IDs refer to this manifest;
 names select the legacy built-in IDs discovered from each scene's JSON metadata.
 User scenes cannot override these IDs. Catalog display order does not affect
