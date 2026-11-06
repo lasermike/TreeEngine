@@ -107,7 +107,7 @@ namespace
             readPlacement(settings.m_debugUIOverlayPlacement);
             readPlacement(settings.m_debugUISeparatePlacement);
             int antialiasing = 0;
-            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Taa))
+            if (file >> antialiasing && antialiasing >= 0 && antialiasing <= static_cast<int>(Settings::Antialiasing::Fsr))
                 settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
             float renderScale = 1;
             if (file >> renderScale && renderScale >= UpscalerMath::MinRenderScale && renderScale <= UpscalerMath::MaxRenderScale)
@@ -557,6 +557,7 @@ HRESULT Game::Regenerate()
 void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile, bool showShadowBuffer)
 {
     m_renderTestMode = true;
+    m_settings.m_upscalerFrameTimeMs = 1000.0f / 60.0f;
     m_renderManager.GetRenderData().profile.enabled = profile;
     m_renderTestScene = sceneName;
     m_settings.m_dxrEnabled = rayTracing;
@@ -1356,13 +1357,25 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         auto& sceneRenderSettings = m_renderManager.GetRenderData();
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         int antialiasing = static_cast<int>(m_settings.m_antialiasing);
-        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0TAA\0"))
+        if (ImGui::Combo("Anti-aliasing", &antialiasing, "None\0SMAA 1x\0TAA\0FSR\0"))
             m_settings.m_antialiasing = static_cast<Settings::Antialiasing>(antialiasing);
         if (m_settings.m_antialiasing == Settings::Antialiasing::Smaa)
             ImGui::Checkbox("Show SMAA edges", &m_settings.m_showAntialiasingEdges);
-        if (m_settings.m_antialiasing == Settings::Antialiasing::Taa)
+        const bool temporal = m_settings.m_antialiasing == Settings::Antialiasing::Taa
+            || m_settings.m_antialiasing == Settings::Antialiasing::Fsr;
+        const char* upscalerStatus = m_renderManager.GetRenderData().upscalerStatus;
+        if (temporal && strncmp(upscalerStatus, "unavailable", 11) == 0)
         {
-            // Render scale: the scene renders at a fraction of the window and TAA upscales (Game/Upscaler.h).
+            // The backend failed to load (for FSR, usually its DLLs missing next to the executable).
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "  %s %s", m_settings.m_antialiasing == Settings::Antialiasing::Fsr
+                ? "FSR" : "TAA", upscalerStatus);
+            ImGui::TextDisabled("  Rendering without anti-aliasing; TAA is the built-in alternative.");
+        }
+        else if (temporal)
+        {
+            if (upscalerStatus[0])
+                ImGui::TextDisabled("  %s", upscalerStatus);
+            // Render scale: the scene renders at a fraction of the window and the backend upscales (Game/Upscaler.h).
             using UpscalerMath::Preset;
             static bool customScale = false;
             int preset = static_cast<int>(customScale ? Preset::Custom : UpscalerMath::PresetForScale(m_settings.m_renderScale));
@@ -1380,6 +1393,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                 renderData.projectionData.screenWidth, renderData.projectionData.screenHeight);
             if (m_settings.m_renderScale < 1 && m_settings.m_motionView != Settings::MotionView::Off)
                 ImGui::TextDisabled("  Native while a motion vector view is shown");
+            if (m_settings.m_antialiasing == Settings::Antialiasing::Fsr)
+                ImGui::SliderFloat("Sharpness", &m_settings.m_upscalerSharpness, 0.0f, 1.0f, "%.2f");
         }
         ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
         ImGui::Checkbox("HDR", &m_settings.m_hdr);

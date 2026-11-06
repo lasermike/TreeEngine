@@ -125,6 +125,7 @@
   <ItemGroup>
     <ClCompile Include="..\Game\RenderPlatform12.cpp" />
     <ClCompile Include="..\Game\UpscalerTaa.cpp" />
+    <ClCompile Include="..\Game\UpscalerFsr.cpp" />
     <ClCompile Include="..\Game\RenderCommon.cpp" />
     <ClCompile Include="..\Game\ScreenGrab12.cpp" />
     <ClCompile Include="..\Game\ShadowMap.cpp" />

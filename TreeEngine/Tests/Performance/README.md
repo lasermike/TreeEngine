@@ -29,8 +29,8 @@ There are two kinds of test:
 | `-Tests` (alias `-Scenes`) | all | Test `id`s from `scenes.json`. Steady tests use their scene's `id`. |
 | `-StartTime` | from `scenes.json` | Simulation time of frame 0 for steady tests, in seconds. Trees grow from time 0, so earlier times measure nearly empty scenes. |
 | `-DisableOpacityMicromaps` | off | Ray trace leaves without opacity micromaps, to measure what they save (see the scenes README). |
-| `-Antialiasing` | from `scenes.json` | `none`, `smaa` or `taa`, for every test in the run. |
-| `-RenderScale` | 1 | Scene resolution as a fraction of `-Width` x `-Height`; below 1, `taa` upscales (other modes render native). |
+| `-Antialiasing` | from `scenes.json` | `none`, `smaa`, `taa` or `fsr`, for every test in the run. |
+| `-RenderScale` | 1 | Scene resolution as a fraction of `-Width` x `-Height`; below 1, `taa` and `fsr` upscale (other modes render native). |
 
 Close other GPU-heavy programs first. The script measures whatever else the machine is doing.
 
@@ -54,7 +54,7 @@ Close other GPU-heavy programs first. The script measures whatever else the mach
 - `id`: letters, digits and hyphens, unique. It names the job directories and the dashboard series.
   Give a steady test its scene's `id`, so its history continues across runs.
 - `scene`: the `id` of a scene in `Game/Resources/Scenes`.
-- `modes`, `frameTimeStep` (seconds per frame) and `antialiasing` (`none`, the default, `smaa` or `taa`) default to `defaults`.
+- `modes`, `frameTimeStep` (seconds per frame) and `antialiasing` (`none`, the default, `smaa`, `taa` or `fsr`) default to `defaults`.
 - **Steady** tests: `startTime` and `frames` (at least 20) default to `defaults`.
 - **Pacing** tests:
   - `startTime`: simulation time when the camera starts moving.

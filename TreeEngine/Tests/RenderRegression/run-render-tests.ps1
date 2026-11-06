@@ -56,12 +56,12 @@ foreach ($scene in $selectedScenes) {
             $points += [ordered]@{ time = [double]$config.times[$i]; filename = (Join-Path $jobDirectory "time-$i.png") }
         }
         $workerReportPath = Join-Path $jobDirectory 'capture-report.json'
-        # Optional per scene: "antialiasing" ("smaa" or "taa"), "hdr" with "tonemap" and "exposure", "renderScale" (TAA
+        # Optional per scene: "antialiasing" ("smaa", "taa" or "fsr"), "hdr" with "tonemap" and "exposure", "renderScale" (TAA
         # upscales from that fraction of the size) and "warmupFrames" (TAA needs more than the default to settle). Golds
         # without them keep their original metadata.
         $has = { param($name) $scene.PSObject.Properties.Name -contains $name }
         $antialiasing = $(if (& $has 'antialiasing') { [string]$scene.antialiasing } else { 'none' })
-        if ($antialiasing -notin @('none', 'smaa', 'taa')) { throw "Scene $($scene.id): antialiasing must be none, smaa or taa." }
+        if ($antialiasing -notin @('none', 'smaa', 'taa', 'fsr')) { throw "Scene $($scene.id): antialiasing must be none, smaa, taa or fsr." }
         $hdr = (& $has 'hdr') -and [bool]$scene.hdr
         $tonemap = $(if (& $has 'tonemap') { [string]$scene.tonemap } else { 'clamp' })
         if ($tonemap -notin @('clamp', 'aces', 'agx')) { throw "Scene $($scene.id): tonemap must be clamp, aces or agx." }

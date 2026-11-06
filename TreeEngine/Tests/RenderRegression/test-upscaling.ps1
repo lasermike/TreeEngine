@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Executable, [string]$OutputDirectory, [switch]$Hdr)
+param([string]$Executable, [string]$OutputDirectory, [switch]$Hdr, [ValidateSet('taa', 'fsr')][string]$Backend = 'taa')
 # Temporal upscaling (Game/Upscaler.h, TaauResolveCS in Game/Shaders/Taa.hlsl): the scene renders at a fraction of
 # the window and TAA reconstructs the window-size image. The reference is the frame rendered at twice the width and
 # height without anti-aliasing and box-filtered down, as in test-taa.ps1. For each scene and mode, at Quality (0.667)
@@ -9,13 +9,15 @@ param([string]$Executable, [string]$OutputDirectory, [switch]$Hdr)
 #   stability   - two converged frames 41 frames apart differ by a small mean (no shimmer from the longer jitter cycle)
 #   motion      - converged, then one sideways camera step: the error stays within a bound of native TAA's
 # A last job switches scale and window size between captures in one process, which must keep working.
+# -Backend fsr runs the same checks with AMD FSR (plus native, FSR's NativeAA) against native TAA, and its switching job
+# also passes through TAA. It fails if FSR is unavailable.
 # -Hdr runs everything with the HDR scene target (clamp tonemap); the reference is then averaged in linear light.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if (-not $Executable) { $Executable = Join-Path $root 'TreeClassic\bin\x64\Debug\TreeClassic.exe' }
 $Executable = (Resolve-Path -LiteralPath $Executable).Path
-if (-not $OutputDirectory) { $OutputDirectory = Join-Path $PSScriptRoot ('Artifacts\upscaling-' + [Guid]::NewGuid().ToString('N')) }
+if (-not $OutputDirectory) { $OutputDirectory = Join-Path $PSScriptRoot ("Artifacts\upscaling-$Backend-" + [Guid]::NewGuid().ToString('N')) }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $OutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
 if (-not ('TreeRenderTests.ImageComparison' -as [type])) {
@@ -76,13 +78,20 @@ function Invoke-Capture([string]$Job, [hashtable]$Request) {
 }
 
 $width = 640; $height = 480
-# Bounds on the error against the reference, as multiples of native TAA's. Measured when written, worst case
-# (ray-traced leaves, where native TAA sees the most samples): converged 1.14x at Quality and 1.41x at Performance,
-# after the step 1.45x and 1.52x; AI Tree stays within 1.37x and 1.30x.
-$scales = @(
-    @{ name = 'quality'; scale = 0.6666667; convergence = 1.3; motion = 1.6 },
-    @{ name = 'performance'; scale = 0.5; convergence = 1.6; motion = 1.65 }
-)
+# Bounds on the error against the reference, as multiples of native TAA's, per backend. TAA, measured when
+# written, worst case (ray-traced leaves, where native TAA sees the most samples): converged 1.14x at Quality and
+# 1.41x at Performance, after the step 1.45x and 1.52x; AI Tree stays within 1.37x and 1.30x. FSR 3.1.6, worst case:
+# converged 0.89x native, 1.21x Quality, 1.43x Performance; after the step 0.99x, 1.12x and 1.23x.
+$bounds = @{
+    taa = @(
+        @{ name = 'quality'; scale = 0.6666667; convergence = 1.3; motion = 1.6 },
+        @{ name = 'performance'; scale = 0.5; convergence = 1.6; motion = 1.65 })
+    fsr = @(
+        @{ name = 'native'; scale = 1.0; convergence = 1.1; motion = 1.2 },
+        @{ name = 'quality'; scale = 0.6666667; convergence = 1.4; motion = 1.35 },
+        @{ name = 'performance'; scale = 0.5; convergence = 1.65; motion = 1.45 })
+}
+$scales = $bounds[$Backend]
 # Each scene's camera and a sideways step from it (as in test-taa.ps1).
 $scenes = @(
     @{ id = 'leaf-atlas-test'; name = 'LeafAtlasTest'; position = @(0, 1.6, -9); rotation = @(6, 0, 0); moved = @(0.12, 1.6, -9) },
@@ -100,9 +109,9 @@ foreach ($scene in $scenes) {
             ($step + @{ time = 5; filename = (Join-Path $job 'taa-moved.png'); antialiasing = 'taa'; renderScale = 1.0 })
         )
         foreach ($s in $scales) {
-            $captures += ($still + @{ time = 5; filename = (Join-Path $job "$($s.name).png"); antialiasing = 'taa'; renderScale = $s.scale })
-            $captures += ($still + @{ time = 5; filename = (Join-Path $job "$($s.name)-next.png"); antialiasing = 'taa'; renderScale = $s.scale })
-            $captures += ($step + @{ time = 5; filename = (Join-Path $job "$($s.name)-moved.png"); antialiasing = 'taa'; renderScale = $s.scale })
+            $captures += ($still + @{ time = 5; filename = (Join-Path $job "$($s.name).png"); antialiasing = $Backend; renderScale = $s.scale })
+            $captures += ($still + @{ time = 5; filename = (Join-Path $job "$($s.name)-next.png"); antialiasing = $Backend; renderScale = $s.scale })
+            $captures += ($step + @{ time = 5; filename = (Join-Path $job "$($s.name)-moved.png"); antialiasing = $Backend; renderScale = $s.scale })
         }
         $report = Invoke-Capture $job @{ scene = $scene.name; mode = $mode; seed = 12345; width = $width; height = $height
             warmupFrames = 40; postProcessing = $false; hdr = [bool]$Hdr; captures = $captures }
@@ -122,7 +131,10 @@ foreach ($scene in $scenes) {
         $taaMoved = & $compare 'reference-moved.png' 'taa-moved.png'
         Write-Host ("{0}: native TAA RMS {1:N4}, after a step {2:N4}" -f $label, $taa.Rms, $taaMoved.Rms)
         foreach ($s in $scales) {
-            $capture = @($report.captures | Where-Object { $_.renderScale -gt $s.scale - 1e-4 -and $_.renderScale -lt $s.scale + 1e-4 })[0]
+            $capture = @($report.captures | Where-Object { $_.antialiasing -eq $Backend -and $_.renderScale -gt $s.scale - 1e-4 -and $_.renderScale -lt $s.scale + 1e-4 })[0]
+            if ($Backend -ne 'taa' -and $capture.upscaler -notlike "$($Backend.ToUpper())*") {
+                throw "The $Backend backend is unavailable ($($capture.upscaler)); nothing to test."
+            }
             $expectedWidth = [Math]::Round($width * $s.scale); $expectedHeight = [Math]::Round($height * $s.scale)
             if ($capture.renderWidth -ne $expectedWidth -or $capture.renderHeight -ne $expectedHeight -or $capture.width -ne $width) {
                 $failures.Add("$label $($s.name): rendered $($capture.renderWidth)x$($capture.renderHeight) for $($capture.width), expected $expectedWidth x $expectedHeight")
@@ -130,6 +142,7 @@ foreach ($scene in $scenes) {
             $converged = & $compare 'reference.png' "$($s.name).png"
             $stable = & $compare "$($s.name).png" "$($s.name)-next.png"
             $moved = & $compare 'reference-moved.png' "$($s.name)-moved.png"
+            Write-Host ("  {0} {1}" -f $Backend, $capture.upscaler)
             Write-Host ("  {0} ({1}x{2}): RMS {3:N4} ({4:N2}x native TAA); converged frames differ by mean {5:N5}; after a step {6:N4} ({7:N2}x)" -f `
                 $s.name, $capture.renderWidth, $capture.renderHeight, $converged.Rms, ($converged.Rms / $taa.Rms),
                 $stable.MeanAbsoluteError, $moved.Rms, ($moved.Rms / $taaMoved.Rms))
@@ -148,7 +161,9 @@ $sequence = @(
     @{ scale = 1.0; width = 640; height = 480 })
 $captures = @()
 for ($i = 0; $i -lt $sequence.Count; ++$i) {
-    $captures += @{ time = 5; filename = (Join-Path $job "step-$i.png"); antialiasing = 'taa'; renderScale = $sequence[$i].scale
+    # With FSR the second step switches to TAA and back, so the FSR history must reset.
+    $mode = $(if ($Backend -ne 'taa' -and $i -eq 1) { 'taa' } else { $Backend })
+    $captures += @{ time = 5; filename = (Join-Path $job "step-$i.png"); antialiasing = $mode; renderScale = $sequence[$i].scale
         width = $sequence[$i].width; height = $sequence[$i].height }
 }
 $report = Invoke-Capture $job @{ scene = 'LeafAtlasTest'; mode = 'raytracing'; seed = 12345; width = 640; height = 480

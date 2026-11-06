@@ -68,6 +68,7 @@ namespace
         }
 
         const wchar_t* Name() const override { return L"TAA"; }
+        std::string Description() const override { return "TAA"; }
         bool Supports(float renderScale) const override
         {
             return renderScale >= UpscalerMath::MinRenderScale && renderScale <= UpscalerMath::MaxRenderScale;
@@ -158,12 +159,21 @@ namespace
     };
 }
 
-std::unique_ptr<Upscaler> CreateUpscaler(Settings::Antialiasing mode, const UpscalerContext& context)
+std::unique_ptr<Upscaler> CreateUpscaler(Settings::Antialiasing mode, const UpscalerContext& context, std::string* error)
 {
-    if (mode != Settings::Antialiasing::Taa)
-        return nullptr;
-    auto taa = std::make_unique<TaaUpscaler>(context);
-    if (FAILED(taa->Initialize()))
-        return nullptr;
-    return taa;
+    std::string reason;
+    std::unique_ptr<Upscaler> upscaler;
+    if (mode == Settings::Antialiasing::Taa)
+    {
+        auto taa = std::make_unique<TaaUpscaler>(context);
+        if (SUCCEEDED(taa->Initialize()))
+            upscaler = std::move(taa);
+        else
+            reason = "the TAA shaders or root signature could not be created";
+    }
+    else if (mode == Settings::Antialiasing::Fsr)
+        upscaler = CreateFsrUpscaler(context, reason);
+    if (error)
+        *error = reason;
+    return upscaler;
 }

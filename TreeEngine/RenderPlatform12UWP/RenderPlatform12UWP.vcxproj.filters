@@ -55,6 +55,9 @@
     <ClCompile Include="..\Game\UpscalerTaa.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\Game\UpscalerFsr.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\Game\ScreenGrab12.cpp" />
   </ItemGroup>
   <ItemGroup>

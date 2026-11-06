@@ -120,6 +120,7 @@ struct RenderData : SceneRenderSettings
     XMFLOAT2            jitterPixels = XMFLOAT2(0, 0);   // This frame's sub-pixel camera jitter; see Settings::m_jitter.
     bool                hdrSceneColor = false;          // This frame renders linear light into the HDR target.
     UINT                renderWidth = 0, renderHeight = 0;  // This frame's scene resolution (below the window's while upscaling).
+    char                upscalerStatus[160] = {};           // The upscaler backend's description, or why it is unavailable.
     UINT                frame;
     // Transformations
     ProjectionData      projectionData;

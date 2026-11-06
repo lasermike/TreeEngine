@@ -27,11 +27,16 @@ public:
     bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
     // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
     // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.
-    enum class Antialiasing { None, Smaa, Taa };
+    // Fsr: AMD FSR through the FidelityFX API (Game/UpscalerFsr.cpp), when its DLLs are next to the executable.
+    enum class Antialiasing { None, Smaa, Taa, Fsr };
     Antialiasing m_antialiasing = Antialiasing::Taa;
     // Fraction of the window, per axis, the scene renders at while a temporal mode upscales (Game/UpscalerMath.h);
     // 1 is native. Other modes, and the motion debug views, always render native.
     float m_renderScale = 1.0f;
+    float m_upscalerSharpness = 0.0f;   // FSR's sharpening pass, 0 (off) to 1.
+    // The frame time upscalers are told, in milliseconds; 0 measures it. Render tests fix it, since FSR's exposure
+    // and accumulation follow it and a measured time would make captures differ from run to run.
+    float m_upscalerFrameTimeMs = 0.0f;
     bool m_showAntialiasingEdges = false; // SMAA debug view: the detected edges over the dimmed scene.
     // HDR scene color: shaders write linear light into a float target, and Shaders/Tonemap.hlsl maps it to the display
     // with an exposure and an operator at the end of the frame. Off keeps shaders encoding their own display output.

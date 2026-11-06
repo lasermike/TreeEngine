@@ -4545,12 +4545,30 @@ void RenderPlatform12::ChooseFrameUpscaler()
                 return S_OK;
             };
             context.retire = [this](CComPtr<ID3D12Resource>& resource) { Retire(resource); };
-            found = m_upscalers.emplace(mode, CreateUpscaler(mode, context)).first;
-            if (!found->second && mode == Settings::Antialiasing::Taa)
-                Util.Output("ERROR: the TAA upscaler could not be created; rendering without it\n");
+            std::string error;
+            found = m_upscalers.emplace(mode, CreateUpscaler(mode, context, &error)).first;
+            m_upscalerErrors[mode] = error;
+            if (!found->second && !error.empty())
+                Util.Output("ERROR: the upscaler for anti-aliasing mode %u is unavailable (%s); rendering without it\n",
+                    slot, error.c_str());
         }
         m_upscaler = found->second.get();
     }
+    // What the debug UI shows: the backend's description, or why the mode's backend is unavailable.
+    const auto errorFound = m_upscalerErrors.find(mode);
+    const std::string status = m_upscaler ? m_upscaler->Description()
+        : errorFound != m_upscalerErrors.end() && !errorFound->second.empty() ? "unavailable: " + errorFound->second
+        : std::string();
+    strncpy_s(m_renderData->upscalerStatus, status.c_str(), _TRUNCATE);
+
+    // Time since the last frame, for backends that adapt to it (FSR).
+    LARGE_INTEGER now = {}, frequency = {};
+    QueryPerformanceCounter(&now);
+    QueryPerformanceFrequency(&frequency);
+    m_frameTimeMs = m_lastFrameCounter && frequency.QuadPart
+        ? static_cast<float>(1000.0 * static_cast<double>(now.QuadPart - m_lastFrameCounter) / static_cast<double>(frequency.QuadPart))
+        : 0.0f;
+    m_lastFrameCounter = now.QuadPart;
 
     // Render scale applies to temporal backends only; the motion debug views compare pixels, so they stay native.
     m_renderSize = m_displaySize;
@@ -4571,7 +4589,8 @@ void RenderPlatform12::ChooseFrameUpscaler()
 // The frame constants, with the texture LOD bias that keeps minified textures at the display's detail while upscaling.
 void RenderPlatform12::SetFrameSceneData(CBChangesEveryFrame* cb)
 {
-    const float bias = m_upscaler && Upscaling() ? m_upscaler->MipBias(m_renderSize, m_displaySize) : 0.0f;
+    // The backend's bias, also at native: TAA's is 0 there, FSR (NativeAA) asks for -1.
+    const float bias = m_upscaler ? m_upscaler->MipBias(m_renderSize, m_displaySize) : 0.0f;
     cb->renderScale = XMFLOAT4(bias, std::exp2(bias), 0, 0);
     m_constBufferChangesEveryFrame->CopyData(0, *cb);
 }
@@ -4942,7 +4961,12 @@ HRESULT RenderPlatform12::RenderPostProcess()
                 frame.farZ = m_renderData->projectionData.farClippingPlane;
                 frame.fovY = m_renderData->projectionData.fov;
                 frame.frameIndex = m_renderData->frame;
+                frame.frameTimeMs = m_settings->m_upscalerFrameTimeMs > 0 ? m_settings->m_upscalerFrameTimeMs : m_frameTimeMs;
+                frame.sharpness = m_settings->m_upscalerSharpness;
                 HRR(m_upscaler->Evaluate(GetCommandList(), frame));
+                // A backend may bind its own descriptor heaps (FSR does); the passes that follow use ours.
+                ID3D12DescriptorHeap* heaps[] = { m_descriptorHeap };
+                GetCommandList()->SetDescriptorHeaps(_countof(heaps), heaps);
 
                 if (hdr)
                     barrier(m_upscaledColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

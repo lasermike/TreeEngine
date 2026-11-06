@@ -1081,6 +1081,9 @@ public:
     // entry records a mode whose backend is unavailable.
     std::map<Settings::Antialiasing, std::unique_ptr<Upscaler>> m_upscalers;
     Upscaler*                   m_upscaler = nullptr;   // This frame's backend, chosen in BeginNewFrame.
+    std::map<Settings::Antialiasing, std::string> m_upscalerErrors;     // Why a mode's backend is unavailable.
+    float                       m_frameTimeMs = 0;      // Time since the previous frame began, for the backend.
+    LONGLONG                    m_lastFrameCounter = 0;
     bool TaaEnabled() const { return m_upscaler != nullptr; }
     void ChooseFrameUpscaler();     // Picks this frame's backend and render size.
     bool Upscaling() const { return m_renderSize.width != m_displaySize.width || m_renderSize.height != m_displaySize.height; }

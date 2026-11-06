@@ -163,8 +163,9 @@ void ParseRenderTestCommandLine()
     parsed->waterMotionSpeed = json.value("waterMotionSpeed", 1.0f);
     parsed->opacityMicromaps = json.value("opacityMicromaps", true);
     parsed->antialiasing = json.value("antialiasing", std::string("none"));
-    if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa" && parsed->antialiasing != "taa")
-        throw std::runtime_error("antialiasing must be \"none\", \"smaa\" or \"taa\"");
+    if (parsed->antialiasing != "none" && parsed->antialiasing != "smaa" && parsed->antialiasing != "taa"
+        && parsed->antialiasing != "fsr")
+        throw std::runtime_error("antialiasing must be \"none\", \"smaa\", \"taa\" or \"fsr\"");
     const std::string alphaTest = json.value("alphaTest", std::string("hashed"));
     if (alphaTest != "hashed" && alphaTest != "cutoff")
         throw std::runtime_error("alphaTest must be \"hashed\" or \"cutoff\"");
@@ -251,8 +252,9 @@ void ParseRenderTestCommandLine()
         point.poseCache = value.value("poseCache", true);
         point.scene = value.value("scene", std::string());
         point.antialiasing = value.value("antialiasing", parsed->antialiasing);
-        if (point.antialiasing != "none" && point.antialiasing != "smaa" && point.antialiasing != "taa")
-            throw std::runtime_error("Capture antialiasing must be \"none\", \"smaa\" or \"taa\"");
+        if (point.antialiasing != "none" && point.antialiasing != "smaa" && point.antialiasing != "taa"
+            && point.antialiasing != "fsr")
+            throw std::runtime_error("Capture antialiasing must be \"none\", \"smaa\", \"taa\" or \"fsr\"");
         point.postProcessing = value.value("postProcessing", parsed->postProcessing);
         point.showShadowBuffer = value.value("showShadowBuffer", false);
         if (value.contains("cameraPosition"))
@@ -339,7 +341,8 @@ namespace
     // A request's "antialiasing" value, already validated.
     Settings::Antialiasing AntialiasingSetting(const std::string& name)
     {
-        return name == "smaa" ? Settings::Antialiasing::Smaa : name == "taa" ? Settings::Antialiasing::Taa : Settings::Antialiasing::None;
+        return name == "smaa" ? Settings::Antialiasing::Smaa : name == "taa" ? Settings::Antialiasing::Taa
+            : name == "fsr" ? Settings::Antialiasing::Fsr : Settings::Antialiasing::None;
     }
 
     Settings::Tonemap TonemapSetting(const std::string& name)
@@ -603,7 +606,8 @@ int RunRenderTestCapture(Game& game)
             report["captures"].push_back({ { "scene", currentScene }, { "antialiasing", point.antialiasing },
                 { "postProcessing", point.postProcessing }, { "time", point.time }, { "mode", point.mode },
                 { "width", point.width }, { "height", point.height }, { "renderScale", point.renderScale },
-                { "renderWidth", renderData.renderWidth }, { "renderHeight", renderData.renderHeight }, { "success", true },
+                { "renderWidth", renderData.renderWidth }, { "renderHeight", renderData.renderHeight },
+                { "upscaler", std::string(renderData.upscalerStatus) }, { "success", true },
                 { "poseCache", point.poseCache }, { "samples", samples } });
         }
         report["gpuPasses"] = { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays", "antialiasing" };

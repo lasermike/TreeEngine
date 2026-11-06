@@ -13,6 +13,7 @@
 #include <DirectXMath.h>
 #include <functional>
 #include <memory>
+#include <string>
 #include "Settings.h"
 #include "UpscalerMath.h"
 
@@ -75,6 +76,8 @@ class Upscaler
 public:
     virtual ~Upscaler() = default;
     virtual const wchar_t* Name() const = 0;
+    // What the debug UI shows for the backend, such as the provider version ("FSR 3.1.6").
+    virtual std::string Description() const { return {}; }
     // Whether the backend can reconstruct from this fraction of the display size.
     virtual bool Supports(float renderScale) const = 0;
     virtual float MipBias(UpscalerSize render, UpscalerSize display) const { return UpscalerMath::MipBias(render, display); }
@@ -87,5 +90,9 @@ public:
     virtual HRESULT Evaluate(ID3D12GraphicsCommandList* commandList, const UpscaleFrame& frame) = 0;
 };
 
-// The backend for an anti-aliasing mode, or null when the mode is not temporal or its backend is unavailable.
-std::unique_ptr<Upscaler> CreateUpscaler(Settings::Antialiasing mode, const UpscalerContext& context);
+// The backend for an anti-aliasing mode, or null when the mode is not temporal or its backend is unavailable; then
+// error, when given, says why (empty for modes without a backend).
+std::unique_ptr<Upscaler> CreateUpscaler(Settings::Antialiasing mode, const UpscalerContext& context, std::string* error = nullptr);
+
+// AMD FSR through the FidelityFX API (Game/UpscalerFsr.cpp), or null with the reason in error.
+std::unique_ptr<Upscaler> CreateFsrUpscaler(const UpscalerContext& context, std::string& error);

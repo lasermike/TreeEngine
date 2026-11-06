@@ -1,8 +1,8 @@
 # Temporal anti-aliasing and upscaling
 
 The scene can render at a fraction of the window's size. A temporal backend then reconstructs the window-size image
-from several jittered frames. The engine's own TAA is the first backend; FSR and DLSS are meant to plug in behind the
-same interface. This document covers:
+from several jittered frames. There are two backends: the engine's own TAA and AMD FSR (through the FidelityFX API).
+DLSS is meant to plug in behind the same interface. This document covers:
 - how a frame flows;
 - what the platform and a backend each own;
 - how the TAA backend reconstructs the image;
@@ -12,10 +12,12 @@ same interface. This document covers:
 |---|---|
 | `Game/Upscaler.h` | The `Upscaler` interface, `UpscaleFrame` / `UpscaleInputs`, `UpscalerContext`, `CreateUpscaler` |
 | `Game/UpscalerMath.h` | Render size from scale, LOD bias, jitter phase count, presets (no graphics API; unit-tested) |
-| `Game/UpscalerTaa.cpp` | The TAA backend: history, root signature, pipelines, `TaaConstants` |
+| `Game/UpscalerTaa.cpp` | The TAA backend: history, root signature, pipelines, `TaaConstants`; `CreateUpscaler` |
+| `Game/UpscalerFsr.cpp` | The FSR backend: the FidelityFX loader, context and dispatch |
+| `ThirdParty/FidelityFX/` | The FidelityFX API headers and AMD's signed DLLs (v2.4.0; see its `README.md`) |
 | `Game/Shaders/Taa.hlsl` | `TaaResolveCS` (native) and `TaauResolveCS` (upscaling) |
 | `Game/RenderPlatform12.cpp` | Choosing the backend, render-size targets, jitter, LOD bias, calling `Evaluate` |
-| `Game/Settings.h` | `m_antialiasing` (the mode) and `m_renderScale` (the fraction of the window) |
+| `Game/Settings.h` | `m_antialiasing` (the mode), `m_renderScale` (the fraction of the window), `m_upscalerSharpness`, `m_upscalerFrameTimeMs` |
 
 ## Two sizes
 
@@ -88,7 +90,9 @@ backend's `MipBias(render, display)` (default `log2(render / display)`: −0.58 
 - **Ray tracing** scales the ray cone's pixel step by `renderScale.y` (`RaytracingLibrary.hlsl`), so filtered
   texture samples match a display pixel.
 
-At native the bias is 0 and the scale 1, so every shader produces exactly what it did before upscaling existed.
+The bias is the backend's at every scale. TAA's is 0 at native, so with TAA (and without a backend) every shader
+produces exactly what it did before upscaling existed. FSR asks for one level more, `log2(render / display) − 1`,
+which is −1 at native (its NativeAA).
 
 ## The interface
 
@@ -155,10 +159,15 @@ std::unique_ptr<Upscaler> CreateUpscaler(Settings::Antialiasing mode, const Upsc
 | `clipToPreviousClip` | Current clip space to last frame's, without jitter |
 | `nearZ`, `farZ`, `fovY` | From `ProjectionData` |
 | `frameIndex` | `RenderData::frame`; a backend treats a gap as a reset |
-| `preExposure`, `frameTimeMs`, `sharpness` | 1, 0 and 0 today; reserved for FSR and DLSS |
+| `frameTimeMs` | Time since the previous frame began, measured with `QueryPerformanceCounter`, or `Settings::m_upscalerFrameTimeMs` when set (render tests fix it at 1/60 s, so FSR captures repeat exactly) |
+| `sharpness` | `Settings::m_upscalerSharpness`, 0 to 1 (FSR's sharpening pass; TAA ignores it) |
+| `preExposure` | 1 |
 
 **Resource states:** the inputs are in `NON_PIXEL_SHADER_RESOURCE` and the output in `UNORDERED_ACCESS`, on entry and
 on return.
+
+**Descriptor heaps:** a backend may bind its own descriptor heaps and root signatures during `Evaluate` (FSR does).
+The platform rebinds its heap afterwards, and every later pass sets its own root signature.
 
 ## The TAA backend
 
@@ -197,46 +206,90 @@ Measured against a 4-sample reference (see `Tests/RenderRegression/test-upscalin
 - On static rock, Quality keeps about 92% of native's fine detail and Performance about 84%.
 - Known weakness: thin, swaying branches in the distance come out fainter than at native.
 
+## The FSR backend
+
+`FsrUpscaler` (`UpscalerFsr.cpp`) drives AMD FSR through the FidelityFX API, from the SDK files vendored in
+`ThirdParty/FidelityFX`.
+- **Loading.** It loads `amd_fidelityfx_loader_dx12.dll` from the executable's folder with `LoadLibraryW` and
+  resolves the API's functions with `GetProcAddress`. There is no import library. The loader finds
+  `amd_fidelityfx_upscaler_dx12.dll` in the same folder; the `TreeClassic` build copies both there.
+- **Unavailable.** Without the DLLs, or without an upscaler provider for the device, `CreateUpscaler` returns null
+  with the reason. The debug UI shows it in orange, the frame renders without anti-aliasing, and render-test reports
+  carry it as `"upscaler": "unavailable: ..."`.
+- **Provider.** The API picks the newest provider the GPU supports: FSR 4 on recent AMD GPUs, FSR 3.1 elsewhere. The
+  chosen version shows in the debug UI and in render-test reports (`"upscaler": "FSR 3.1.6"` on an RTX 5080).
+- **Context.** `Resize` (re)creates the context when the display size or HDR changes, with `maxRenderSize` =
+  `maxUpscaleSize` = the display size. Destroying the old context there is safe, as the previous frame has finished.
+  Flags:
+  - `AUTO_EXPOSURE`: exposure is applied by the tonemap pass after upscaling, so FSR estimates its own.
+  - `HIGH_DYNAMIC_RANGE` with HDR. Without it, `NON_LINEAR_COLORSPACE` plus the `NON_LINEAR_COLOR_SRGB` dispatch
+    flag, since the color is display-encoded.
+  - `DEBUG_CHECKING` in Debug builds; its warnings and errors go to the debugger output, prefixed `FSR`.
+  - No depth flags: our depth is 0 near and 1 far, with a finite far plane.
+- **Dispatch.** `Evaluate` maps `UpscaleFrame` straight onto `ffxDispatchDescUpscale`:
+  - The jitter passes through unchanged. FSR's projection convention (+2jx/W, −2jy/H in NDC) is ours. Negated,
+    `test-upscaling.ps1 -Backend fsr` measured up to 1.6× the error at Quality and Performance.
+  - `motionVectorScale` is `motionToPixels` (the render size), as FSR prescribes for UV-space motion.
+  - Depth is typeless, so its description is set to `R32_FLOAT` for FSR's views.
+  - Reset is `frame.reset`, a new context or render size, or a gap in `frameIndex` (switching away from FSR and
+    back).
+  - Near, far and the vertical field of view come from the frame; `viewSpaceToMetersFactor` is 1.
+- **Overrides.**
+  - `JitterPhaseCount` comes from FSR's query: 18 at Quality, 32 at Performance.
+  - `MipBias` is FSR's `log2(render / display) − 1`.
+  - `Supports` covers 1/3 to 1, matching FSR's Ultra Performance to NativeAA.
+- **Not provided yet.** The reactive and transparency-and-composition masks. Water and other blended surfaces may
+  ghost slightly more than they would with them.
+
+Measured against the same 4-sample reference (`test-upscaling.ps1 -Backend fsr`, FSR 3.1.6):
+- At native, FSR's error is 0.51–0.89× native TAA's.
+- At Quality it is 0.70–1.21×, and at Performance 0.82–1.43×. Both beat our TAAU in every scene.
+- After a camera step it is at most 0.99×, 1.12× and 1.23×.
+
 ## Settings, UI and tests
 
-- **Debug UI** (Settings › Anti-aliasing = TAA): "Render scale".
+- **Debug UI** (Settings › Anti-aliasing = TAA or FSR): the backend's description ("TAA", "FSR 3.1.6") or why it
+  is unavailable, then "Render scale", and for FSR a "Sharpness" slider.
   - Presets: Native 1, Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra performance 1/3, or a Custom slider
     from 0.33 to 1.
   - A line reads `Render W x H -> W x H`.
   - The scale is saved in `debug-ui.txt` after the anti-aliasing mode.
-- **Render tests:** requests and captures take `"renderScale"` (0.25–1). Reports give `renderScale`, `renderWidth` and
-  `renderHeight`. Tests set the scale explicitly, so a saved UI preference can't leak in.
-- **Regression:** a `scenes.json` entry may set `"renderScale"`. `ai-tree-taau` renders AI Tree at 0.5 with TAA and
-  AgX.
-- **`test-upscaling.ps1`** (add `-Hdr` for the HDR scene target):
+- **Render tests:** requests and captures take `"antialiasing": "fsr"` and `"renderScale"` (0.25–1). Reports give
+  `renderScale`, `renderWidth`, `renderHeight` and `upscaler`. Tests set the scale explicitly, so a saved UI
+  preference can't leak in, and fix the upscaler frame time at 1/60 s.
+- **Regression:** a `scenes.json` entry may set `"renderScale"`. `ai-tree-taau` and `ai-tree-fsr` render AI Tree at
+  0.5 with TAA and with FSR, HDR and AgX. FSR's golds also depend on the provider version.
+- **`test-upscaling.ps1`** (add `-Hdr` for the HDR scene target, and `-Backend fsr` for FSR, which adds native):
   - render sizes;
   - convergence, stability and a camera step at Quality and Performance against the reference and native TAA;
   - switching scale and window size within one process.
-- **Perf:** `run-performance-tests.ps1 <label> -Antialiasing taa -RenderScale 0.5`. Results record `renderScale`, and
+- **Perf:** `run-performance-tests.ps1 <label> -Antialiasing taa -RenderScale 0.5` (or `-Antialiasing fsr`). Results record `renderScale`, and
   each job its render size.
 - **Unit tests:** `TestUpscalerMath` in `Tests/SceneDefinitionTests.cpp`.
 
-## Adding a backend (FSR 3.1, DLSS)
+## Adding a backend (DLSS next)
 
+FSR followed these steps; `UpscalerFsr.cpp` is the model for a vendor backend.
 1. **Add the mode** to `Settings::Antialiasing`, the debug UI combo and `debug-ui.txt`'s accepted range. Also add it
-   to the render-test and perf-runner `antialiasing` values. Each mode with a backend needs a descriptor block:
-   raise `UpscalerModeSlots` in `RenderPlatform12.cpp` above the largest mode value (it is 4 today, so FSR as mode 3
-   fits and DLSS as mode 4 needs 5).
-2. **Implement `Upscaler`** in a new `Game/Upscaler<Name>.cpp`, with a branch in `CreateUpscaler`. Load the vendor
-   runtime lazily (for example `LoadLibrary` of the FidelityFX DLL) and return null when it's missing, so the mode
-   simply stays unavailable.
-3. **Map `UpscaleFrame`** onto the vendor's dispatch:
+   to the render-test request validation and `AntialiasingSetting`, `run-render-tests.ps1`, the perf runner's
+   `-Antialiasing` and `test-upscaling.ps1 -Backend`. Each mode with a backend needs a descriptor block: raise
+   `UpscalerModeSlots` in `RenderPlatform12.cpp` above the largest mode value (it is 4 today, so DLSS as mode 4
+   needs 5).
+2. **Vendor the SDK** under `ThirdParty/<Name>`: headers, signed DLLs in Git LFS, the license and a README with the
+   version and update steps. Copy the DLLs next to the executable from `TreeClassic.vcxproj`.
+3. **Implement `Upscaler`** in a new `Game/Upscaler<Name>.cpp`, with a branch in `CreateUpscaler`. Load the vendor
+   runtime with `LoadLibraryW` and return null with a reason when it's missing, so the mode simply stays unavailable.
+4. **Map `UpscaleFrame`** onto the vendor's dispatch:
    - Motion vector scale = `motionToPixels`, current → previous.
-   - Depth is not inverted.
-   - Jitter is `jitterPixels`; check the vendor's sign convention: the sample position is `p + 0.5 − jitter`.
-   - Reset = `reset`.
-   - Pass the camera's near, far and vertical field of view, and HDR = `hdr`.
-   - FSR wants the frame time and pre-exposure: fill `frameTimeMs` and `preExposure` in the platform when FSR lands.
-4. **Override `JitterPhaseCount` and `MipBias`** if the vendor recommends other values. FSR and Streamline both
-   publish their own phase-count and LOD-bias guidance; check the SDK version being integrated.
-5. **Mind the descriptor budget.** A backend that keeps its own descriptor heap can ignore its block. One that uses
-   the block has 16 descriptors.
-6. **Early initialization (DLSS).** Streamline must initialize before the D3D12 device exists (`slInit`, then an
+   - Depth is not inverted; describe our typeless depth as `R32_FLOAT`.
+   - Jitter is `jitterPixels`. Check the vendor's sign convention by measuring both signs with `test-upscaling.ps1`:
+     the wrong one is clearly worse.
+   - Reset = `reset`, a new context or render size, or a gap in `frameIndex`.
+   - Pass the camera's near, far and vertical field of view, HDR = `hdr`, `frameTimeMs` and `sharpness`.
+5. **Override `JitterPhaseCount` and `MipBias`** with the vendor's recommendations.
+6. **Descriptor heaps.** The vendor runtime may bind its own heaps; the platform rebinds its own after `Evaluate`.
+7. **Early initialization (DLSS).** Streamline must initialize before the D3D12 device exists (`slInit`, then an
    upgraded device). That needs a static hook called from `RenderPlatform12::InitDevice`; the interface doesn't have
    it yet.
-7. **Tests.** Add the backend to `test-upscaling.ps1`'s scales or modes, with bounds measured on a first run.
+8. **Tests.** Add the backend to `test-upscaling.ps1 -Backend`, with bounds measured on a first run, and a regression
+   entry. Make sure captures repeat exactly; FSR needed the fixed frame time for that.
