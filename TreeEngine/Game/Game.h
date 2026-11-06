@@ -220,6 +220,10 @@ private:
     RenderProfile m_lastProfile;
 
     bool                                m_bDebugUIKeyCaptured;
+    // A window client size chosen in the debug UI, applied at the start of the next frame (resizing rebuilds the
+    // swap chain, which must not happen while a frame is being recorded). Zero when none is pending.
+    UINT                                m_pendingWindowWidth = 0, m_pendingWindowHeight = 0;
+    void ApplyPendingWindowSize();
 
     //static const int                    kNumFrameTimeLogEntries = 4000;
     //double                              m_frameTimeLog[kNumFrameTimeLogEntries];

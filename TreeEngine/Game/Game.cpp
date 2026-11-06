@@ -1064,6 +1064,9 @@ int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
 
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
+    // The window procedure drops key presses while this is set, so it must clear whenever the window isn't drawn:
+    // closing the window while it had keyboard focus would otherwise leave every key, Tab included, ignored.
+    m_bDebugUIKeyCaptured = false;
     if (!m_settings.m_showDebugUI)
     {
         return S_OK;
@@ -1095,18 +1098,17 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoBackground))
         {
-            if (ImPlot::BeginPlot("##Performance"), ImVec2(0, 0), ImPlotFlags_CanvasOnly)
+            // The plot fills the window, so its x axis isn't cut off below it.
+            if (ImPlot::BeginPlot("##Performance", ImVec2(-1, -1)))
             {
-                ImGui::SetNextWindowBgAlpha(0.0f); // Optional: translucent background
                 ImPlot::SetupAxisLimitsConstraints(ImAxis_Y1, 0.0, 60.0);
                 ImPlot::SetupAxes("Seconds", "MS", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
                 ImPlot::PlotLine("Frame Duration", m_timeStamps, m_frameDurations, FRAME_DURATION_HISTORY_SIZE,
                     ImPlotLineFlags_None, m_timestampIndex);
                 ImPlot::EndPlot();
             }
-
-            ImGui::End();
         }
+        ImGui::End();   // Every Begin needs an End, even when the window is skipped.
     }
 
 
@@ -1158,7 +1160,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     ImGuiIO& io = ImGui::GetIO();
 
-    m_bDebugUIKeyCaptured = io.WantCaptureKeyboard;
+    m_bDebugUIKeyCaptured = bOpen && io.WantCaptureKeyboard;
 
     const char* scaleLabels[] = { "100%", "125%", "150%", "200%" };
     ImGui::SetNextItemWidth(88);
@@ -1313,6 +1315,41 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen))
     {
+#if defined(TREENGINE_WIN32)
+        {
+            // Window client sizes of common game resolutions. The window resizes at the start of the next frame.
+            static const struct { UINT width, height; const char* label; } resolutions[] = {
+                { 1280, 720, "1280 x 720 (720p)" }, { 1600, 900, "1600 x 900" }, { 1920, 1080, "1920 x 1080 (1080p)" },
+                { 2560, 1440, "2560 x 1440 (1440p)" }, { 3840, 2160, "3840 x 2160 (4K)" } };
+            const auto& projection = m_renderManager.GetRenderData().projectionData;
+            char current[32];
+            snprintf(current, sizeof(current), "%d x %d", projection.screenWidth, projection.screenHeight);
+            // The work area of the window's monitor, in client pixels, to mark sizes that won't fit on it.
+            MONITORINFO monitor = { sizeof(monitor) };
+            const bool haveMonitor = m_hwnd && GetMonitorInfoW(MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST), &monitor);
+            if (ImGui::BeginCombo("Window size", current))
+            {
+                for (const auto& resolution : resolutions)
+                {
+                    const bool selected = projection.screenWidth == static_cast<int>(resolution.width)
+                        && projection.screenHeight == static_cast<int>(resolution.height);
+                    const bool fits = !haveMonitor
+                        || (resolution.width <= static_cast<UINT>(monitor.rcWork.right - monitor.rcWork.left)
+                            && resolution.height <= static_cast<UINT>(monitor.rcWork.bottom - monitor.rcWork.top));
+                    char label[64];
+                    snprintf(label, sizeof(label), "%s%s", resolution.label, fits ? "" : "  (larger than this monitor)");
+                    if (ImGui::Selectable(label, selected))
+                    {
+                        m_pendingWindowWidth = resolution.width;
+                        m_pendingWindowHeight = resolution.height;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
+#endif
         ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Enable shadows", &m_settings.m_shadowsEnabled);
         ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
@@ -1652,11 +1689,33 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 }
 
 
+// Resizes the window so its client area is the size chosen in the debug UI. Runs between frames: the resize
+// rebuilds the swap chain through WM_SIZE, as dragging the window's edge does.
+void Game::ApplyPendingWindowSize()
+{
+#if defined(TREENGINE_WIN32)
+    if (!m_pendingWindowWidth || !m_pendingWindowHeight || !m_hwnd)
+        return;
+    const UINT width = m_pendingWindowWidth, height = m_pendingWindowHeight;
+    m_pendingWindowWidth = m_pendingWindowHeight = 0;
+    if (IsZoomed(m_hwnd))
+        ShowWindow(m_hwnd, SW_RESTORE);
+    // The app is per-monitor DPI aware, so the frame is measured at the window's own DPI.
+    RECT frame = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+    const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(m_hwnd, GWL_STYLE));
+    const DWORD exStyle = static_cast<DWORD>(GetWindowLongPtrW(m_hwnd, GWL_EXSTYLE));
+    if (AdjustWindowRectExForDpi(&frame, style, GetMenu(m_hwnd) != nullptr, exStyle, GetDpiForWindow(m_hwnd)))
+        SetWindowPos(m_hwnd, nullptr, 0, 0, frame.right - frame.left, frame.bottom - frame.top,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+#endif
+}
+
 //--------------------------------------------------------------------------------------
 // Once per frame processing
 //--------------------------------------------------------------------------------------
 void Game::ComputeCPU()
 {
+    ApplyPendingWindowSize();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
 
