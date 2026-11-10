@@ -24,6 +24,10 @@ public:
     std::shared_ptr<const GltfTextureSource> tintTexture;
     XMFLOAT2 tintUvScale = { 1, 1 };
     XMFLOAT2 tintUvOffset = { 0, 0 };
+    // See SceneData::ModelDefinition: biplanar mapping for one material.
+    std::string biplanarMaterial;
+    float biplanarUvPerUnit = 0;
+    float biplanarSharpness = 1;
 };
 
 class GltfModel : public WorldObject
@@ -44,6 +48,9 @@ class GltfModel : public WorldObject
     std::shared_ptr<const GltfTextureSource> m_tintTexture;
     XMFLOAT2 m_tintUvScale;
     XMFLOAT2 m_tintUvOffset;
+    std::string m_biplanarMaterial;
+    float m_biplanarUvPerUnit;
+    float m_biplanarSharpness;
     std::vector<RenderBatch> m_batches;
 
 public:

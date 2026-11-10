@@ -102,6 +102,11 @@
           -2.966357,
           -1.991996
         ]
+      },
+      "biplanar": {
+        "material": "Limestone - baked weathering",
+        "uvPerUnit": 0.0483,
+        "sharpness": 1
       }
     }
   ]

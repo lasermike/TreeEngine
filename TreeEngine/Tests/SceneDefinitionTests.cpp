@@ -680,6 +680,48 @@ void TestModelMaterialTint()
 }
 
 
+void TestModelBiplanar()
+{
+    const std::string json = R"({"version":1,"name":"Biplanar","objects":[{"id":"rock","type":"model","source":"rock.glb","biplanar":{"material":"Limestone","uvPerUnit":0.0483,"sharpness":2}}]})";
+    auto scene = SceneData::ParseScene(json, "biplanar");
+    auto& model = static_cast<SceneData::ModelDefinition&>(*scene.objects[0]);
+    Check(model.biplanarMaterial == "Limestone" && model.biplanarUvPerUnit == 0.0483f && model.biplanarSharpness == 2.0f,
+        "biplanar settings were not parsed");
+    auto saved = SceneData::ParseScene(SceneData::SerializeScene(scene), "saved-biplanar");
+    auto& savedModel = static_cast<SceneData::ModelDefinition&>(*saved.objects[0]);
+    Check(savedModel.biplanarMaterial == model.biplanarMaterial && savedModel.biplanarUvPerUnit == model.biplanarUvPerUnit
+        && savedModel.biplanarSharpness == model.biplanarSharpness, "biplanar settings did not round-trip");
+    // Sharpness is optional; without the property biplanar mapping is off.
+    auto plain = Json::parse(json);
+    plain["objects"][0]["biplanar"].erase("sharpness");
+    auto defaults = SceneData::ParseScene(plain.dump(), "biplanar-defaults");
+    Check(static_cast<SceneData::ModelDefinition&>(*defaults.objects[0]).biplanarSharpness == 1, "biplanar sharpness should default to 1");
+    plain["objects"][0].erase("biplanar");
+    auto off = SceneData::ParseScene(plain.dump(), "biplanar-off");
+    auto& offModel = static_cast<SceneData::ModelDefinition&>(*off.objects[0]);
+    Check(offModel.biplanarMaterial.empty() && offModel.biplanarUvPerUnit == 0, "biplanar mapping should default to off");
+    Check(SceneData::SerializeScene(off).find("biplanar") == std::string::npos,"a model without biplanar mapping should not save it");
+    auto bad = Json::parse(json);
+    bad["objects"][0]["biplanar"].erase("uvPerUnit");
+    Reject(bad.dump(), ".biplanar.uvPerUnit");
+    bad = Json::parse(json);
+    bad["objects"][0]["biplanar"]["uvPerUnit"] = 0;
+    Reject(bad.dump(), ".biplanar.uvPerUnit");
+    bad = Json::parse(json);
+    bad["objects"][0]["biplanar"]["material"] = "";
+    Reject(bad.dump(), ".biplanar.material");
+    bad = Json::parse(json);
+    bad["objects"][0]["biplanar"]["sharpness"] = 0;
+    Reject(bad.dump(), ".biplanar.sharpness");
+    bad = Json::parse(json);
+    bad["objects"][0]["biplanar"]["sharpness"] = 17;
+    Reject(bad.dump(), ".biplanar.sharpness");
+    bad = Json::parse(json);
+    bad["objects"][0]["biplanar"]["scale"] = 1;
+    Reject(bad.dump(), ".biplanar.scale");
+}
+
+
 void TestSunShadowSettings()
 {
     const std::string json = R"({"version":1,"name":"Sun","light":{"angularDiameterDegrees":2,"shadowSamples":8},"objects":[{"id":"box","type":"primitive","shape":"box"}]})";
@@ -706,6 +748,7 @@ int main(int argc, char** argv)
         TestSunShadowSettings();
         TestModelNormalAnimation();
         TestModelMaterialTint();
+        TestModelBiplanar();
         TestAmbientOcclusionSettings();
         TestUpscalerMath();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")

@@ -75,6 +75,7 @@ static const uint TANGENT_OFFSET = 32;
 
 struct SimpleVertexData
 {
+    float3 position;    // The mesh's own position, for biplanar mapping.
     float3 normal;
     float2 tex;
     float4 tangent;
@@ -84,6 +85,7 @@ SimpleVertexData LoadSimpleVertex(uint vertexIndex)
 {
     uint address = vertexIndex * SIMPLE_VERTEX_STRIDE;
     SimpleVertexData v;
+    v.position = asfloat(originalVertexBuffer.Load3(address));
     v.normal = asfloat(uint3(
         originalVertexBuffer.Load(address + NORMAL_OFFSET),
         originalVertexBuffer.Load(address + NORMAL_OFFSET + 4),
@@ -99,6 +101,7 @@ SimpleVertexData LoadSkinnedVertex(uint vertexIndex)
 {
     uint address = vertexIndex * SKINNED_VERTEX_STRIDE;
     SimpleVertexData v;
+    v.position = asfloat(skinnedVertexBuffer.Load3(address));
     v.normal = asfloat(uint3(
         skinnedVertexBuffer.Load(address + NORMAL_OFFSET),
         skinnedVertexBuffer.Load(address + NORMAL_OFFSET + 4),
@@ -149,10 +152,11 @@ DxrGeometryInfo HitGeometry(out uint primitiveId)
 // Estimate a pixel footprint by intersecting neighboring camera rays with the
 // hit triangle plane. Secondary transmission uses this camera footprint as an
 // approximation; full refracted ray differentials are not propagated yet.
+// baryDx/baryDy are the footprint in barycentrics (weights of vertex 1 and 2), for other per-vertex attributes.
 void ComputeTextureFootprint(DxrGeometryInfo geometry, uint3 indices,
-    float2 uv0, float2 uv1, float2 uv2, out float2 uvDx, out float2 uvDy)
+    float2 uv0, float2 uv1, float2 uv2, out float2 uvDx, out float2 uvDy, out float2 baryDx, out float2 baryDy)
 {
-    uvDx = uvDy = 0.0f;
+    uvDx = uvDy = baryDx = baryDy = 0.0f;
     float3 p0 = LoadVertexPosition(geometry.vertexBufferOffset + indices.x);
     float3 edge1 = LoadVertexPosition(geometry.vertexBufferOffset + indices.y) - p0;
     float3 edge2 = LoadVertexPosition(geometry.vertexBufferOffset + indices.z) - p0;
@@ -181,8 +185,10 @@ void ComputeTextureFootprint(DxrGeometryInfo geometry, uint3 indices,
     float3 deltaY = eyePos.xyz + directionY * (planeDistance / denominatorY) - hit;
     float3 dual1 = cross(edge2, planeNormal) / areaSquared;
     float3 dual2 = cross(planeNormal, edge1) / areaSquared;
-    uvDx = dot(deltaX, dual1) * (uv1 - uv0) + dot(deltaX, dual2) * (uv2 - uv0);
-    uvDy = dot(deltaY, dual1) * (uv1 - uv0) + dot(deltaY, dual2) * (uv2 - uv0);
+    baryDx = float2(dot(deltaX, dual1), dot(deltaX, dual2));
+    baryDy = float2(dot(deltaY, dual1), dot(deltaY, dual2));
+    uvDx = baryDx.x * (uv1 - uv0) + baryDx.y * (uv2 - uv0);
+    uvDy = baryDy.x * (uv1 - uv0) + baryDy.y * (uv2 - uv0);
 }
 
 float4 SampleFilteredMaterialTexture(int slot, float2 uv, bool clampTexture,
@@ -195,6 +201,20 @@ float4 SampleFilteredMaterialTexture(int slot, float2 uv, bool clampTexture,
     return clampTexture
         ? sceneTextures[NonUniformResourceIndex(slot)].SampleGrad(samLinearClamp, uv, dx, dy)
         : sceneTextures[NonUniformResourceIndex(slot)].SampleGrad(samLinear, uv, dx, dy);
+}
+
+// A material map through the model's UVs, or blended over the biplanar projections when the material has them.
+float4 SampleMaterialMap(int slot, bool clampTexture, ShaderMaterial material, uint role, float2 uv,
+    float2 uvDx, float2 uvDy, Biplanar biplanar)
+{
+    if (material.biplanarParams.x <= 0)
+        return SampleFilteredMaterialTexture(slot, TransformMaterialUv(material, uv, role), clampTexture, material, role, uvDx, uvDy);
+    float4 result = 0;
+    [unroll] for (uint i = 0; i < 2; ++i)
+        if (biplanar.weight[i] > 0)
+            result += biplanar.weight[i] * SampleFilteredMaterialTexture(slot, TransformMaterialUv(material, biplanar.uv[i], role),
+                clampTexture, material, role, biplanar.uvDx[i], biplanar.uvDy[i]);
+    return result;
 }
 
 [shader("anyhit")]
@@ -322,10 +342,21 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     sv1.tex = AtlasUv(sv1.tex, atlasRegion);
     sv2.tex = AtlasUv(sv2.tex, atlasRegion);
     float2 texCoord = sv0.tex * bary.x + sv1.tex * bary.y + sv2.tex * bary.z;
-    float2 uvDx, uvDy;
+    float2 uvDx, uvDy, baryDx, baryDy;
     ComputeTextureFootprint(geoInfo, uint3(i0, i1, i2),
-        sv0.tex, sv1.tex, sv2.tex, uvDx, uvDy);
+        sv0.tex, sv1.tex, sv2.tex, uvDx, uvDy, baryDx, baryDy);
+    const float3 normalL = normal;
 
+    Biplanar biplanar = (Biplanar)0;
+    if (mat.biplanarParams.x > 0)
+    {
+        // The same object-space projections as raster, with the footprint carried to object space by barycentrics.
+        const float3 positionL = sv0.position * bary.x + sv1.position * bary.y + sv2.position * bary.z;
+        const float3 edge1 = sv1.position - sv0.position;
+        const float3 edge2 = sv2.position - sv0.position;
+        biplanar = BiplanarSetup(mat, positionL, baryDx.x * edge1 + baryDx.y * edge2, baryDy.x * edge1 + baryDy.y * edge2,
+            normalL, texCoord, uvDx, uvDy);
+    }
 
     // Transform object-space normal to world space using instance world matrix
     float4x4 worldMatrix = instanceDataBuffer[geoInfo.instanceIndex].World;
@@ -337,7 +368,34 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float3 surfaceNormal = normal; // Keep texture normals out of the AO hemisphere.
 
 
-    if (mat.normalTextures.x >= 0)
+    if (mat.normalTextures.x >= 0 && mat.biplanarParams.x > 0)
+    {
+        // Each projection's normal in its own frame, blended in world space; see Tree.hlsl ShadeSurface.
+        const float3 upW = normalize(mul(float3(0, 1, 0), (float3x3)worldMatrix));
+        float3 blended = 0;
+        [unroll] for (uint i = 0; i < 2; ++i)
+        {
+            if (biplanar.weight[i] <= 0)
+                continue;
+            float3 tangentNormal = SampleFilteredMaterialTexture((int)mat.normalTextures.x,
+                TransformMaterialUv(mat, biplanar.uv[i], NormalTextureRole), mat.normalTextures.z > 0, mat, NormalTextureRole,
+                biplanar.uvDx[i], biplanar.uvDy[i]).xyz * 2.0f - 1.0f;
+            tangentNormal.xy *= mat.normalTextures.y;
+            float3 projectionTangent, projectionBinormal;
+            if (biplanar.axis[i] == 1)
+            {
+                projectionTangent = tangent;
+                projectionBinormal = normalize(cross(normal, tangent)) * (tangentData.w < 0 ? -1.0f : 1.0f);
+                TransformNormalBasis(mat, projectionTangent, projectionBinormal);
+            }
+            else
+                BiplanarSideFrame(mat, biplanar.axis[i], normalL, surfaceNormal, upW, projectionTangent, projectionBinormal);
+            blended += biplanar.weight[i] * normalize(tangentNormal.x * projectionTangent
+                + tangentNormal.y * projectionBinormal + tangentNormal.z * surfaceNormal);
+        }
+        normal = normalize(blended);
+    }
+    else if (mat.normalTextures.x >= 0)
     {
         float2 normalUv = TransformMaterialUv(mat, texCoord, NormalTextureRole);
         float2 normalUv1 = normalUv + mat.normalMotion.xy * sceneTime.x;
@@ -361,7 +419,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float4 textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
     if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
     {
-        textureColor = SampleFilteredMaterialTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularColor.w > 0, mat, BaseColorTextureRole, uvDx, uvDy);
+        textureColor = SampleMaterialMap(geoInfo.textureIndex, mat.specularColor.w > 0, mat, BaseColorTextureRole, texCoord, uvDx, uvDy, biplanar);
     }
     if (mat.tintTextures.x >= 0)
         textureColor.rgb *= 2 * SampleFilteredMaterialTexture(int(mat.tintTextures.x), TransformMaterialUv(mat, texCoord, TintTextureRole),
@@ -412,19 +470,12 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     if (!(globalFlags & 0x2)) shadowFactor /= sampleCount;
 
     if (mat.specularTextures.x >= 0)
-    {
-        float2 strengthUv = TransformMaterialUv(mat, texCoord, SpecularStrengthTextureRole);
-        mat.specularParams.w *= SampleFilteredMaterialTexture((int)mat.specularTextures.x, strengthUv, mat.specularTextures.z > 0, mat, SpecularStrengthTextureRole, uvDx, uvDy).a;
-    }
+        mat.specularParams.w *= SampleMaterialMap((int)mat.specularTextures.x, mat.specularTextures.z > 0, mat, SpecularStrengthTextureRole, texCoord, uvDx, uvDy, biplanar).a;
     if (mat.specularTextures.y >= 0)
-    {
-        float2 colorUv = TransformMaterialUv(mat, texCoord, SpecularColorTextureRole);
-        mat.specularColor.rgb *= SampleFilteredMaterialTexture((int)mat.specularTextures.y, colorUv, mat.specularTextures.w > 0, mat, SpecularColorTextureRole, uvDx, uvDy).rgb;
-    }
+        mat.specularColor.rgb *= SampleMaterialMap((int)mat.specularTextures.y, mat.specularTextures.w > 0, mat, SpecularColorTextureRole, texCoord, uvDx, uvDy, biplanar).rgb;
     if (mat.metallicRoughnessTextures.x >= 0)
     {
-        float2 metallicRoughnessUv = TransformMaterialUv(mat, texCoord, MetallicRoughnessTextureRole);
-        float4 mr = SampleFilteredMaterialTexture((int)mat.metallicRoughnessTextures.x, metallicRoughnessUv, mat.metallicRoughnessTextures.y > 0, mat, MetallicRoughnessTextureRole, uvDx, uvDy);
+        float4 mr = SampleMaterialMap((int)mat.metallicRoughnessTextures.x, mat.metallicRoughnessTextures.y > 0, mat, MetallicRoughnessTextureRole, texCoord, uvDx, uvDy, biplanar);
         mat.specularParams.y *= mr.b;
         mat.specularParams.z *= mr.g;
     }

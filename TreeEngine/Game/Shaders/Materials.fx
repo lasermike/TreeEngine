@@ -55,6 +55,7 @@ struct ShaderMaterial
     float4 opticalParams; // x = IOR; y = transmission factor
     float4 normalMotion; // two UV velocities per second
     float4 tintTextures; // tint texture slot, clamp flag
+    float4 biplanarParams; // x = side-projection UV units per object unit (0 = off), y = blend sharpness
     float4 uvTransformRow0[6];
     float4 uvTransformRow1[6];
 };
@@ -86,6 +87,79 @@ void TransformNormalBasis(ShaderMaterial mat, inout float3 tangent, inout float3
         tangent = transformedTangent;
         bitangent = transformedBitangent;
     }
+}
+
+float2 TransformMaterialUvGradient(ShaderMaterial mat, float2 gradient, uint role)
+{
+    return float2(dot(mat.uvTransformRow0[role].xy, gradient), dot(mat.uvTransformRow1[role].xy, gradient));
+}
+
+// Biplanar mapping (scene "biplanar", after Inigo Quilez's biplanar mapping). The material's own UVs are the
+// top-down projection (Y); object-space X and Z projections cover steep faces, where a top-down projection
+// stretches. Each pixel blends the two axes its normal leans on most, so a map is read at most twice, and once
+// where one projection's weight is 1 (flat ground, sheer cliffs). Explicit gradients keep the mip level continuous
+// where the chosen axes change.
+struct Biplanar
+{
+    float2 uv[2];       // Before the material's per-role UV transform.
+    float2 uvDx[2];     // Screen-space derivatives of uv.
+    float2 uvDy[2];
+    float weight[2];    // Sum to 1; 0 skips the projection.
+    uint axis[2];       // 0 = X, 1 = Y (the material's UVs), 2 = Z.
+};
+
+// u runs along the other horizontal axis and v down the object's Y axis, so the texture stands upright.
+// Linear, so it also maps position derivatives to UV derivatives.
+float2 BiplanarSideUv(float3 position, uint axis, float uvPerUnit)
+{
+    return (axis == 0 ? float2(position.z, -position.y) : float2(position.x, -position.y)) * uvPerUnit;
+}
+
+Biplanar BiplanarSetup(ShaderMaterial mat, float3 positionL, float3 positionLDx, float3 positionLDy, float3 normalL,
+    float2 uv, float2 uvDx, float2 uvDy)
+{
+    const float3 n = abs(normalize(normalL));
+    // Ties go to the later axis for the largest and the earlier for the smallest, so the three always differ.
+    const uint major = n.x > n.y ? (n.x > n.z ? 0 : 2) : (n.y > n.z ? 1 : 2);
+    const uint minor = n.x <= n.y ? (n.x <= n.z ? 0 : 2) : (n.y <= n.z ? 1 : 2);
+    const uint median = 3 - major - minor;
+    // 1/sqrt(3) is the smallest a unit normal's largest component can be.
+    float2 weights = pow(saturate((float2(n[major], n[median]) - 0.5773f) / (1.0f - 0.5773f)), mat.biplanarParams.y);
+    weights.x = max(weights.x, 1e-4f);
+    weights /= weights.x + weights.y;
+
+    Biplanar result;
+    const uint axes[2] = { major, median };
+    [unroll] for (uint i = 0; i < 2; ++i)
+    {
+        result.axis[i] = axes[i];
+        result.weight[i] = weights[i];
+        if (axes[i] == 1)
+        {
+            result.uv[i] = uv;
+            result.uvDx[i] = uvDx;
+            result.uvDy[i] = uvDy;
+        }
+        else
+        {
+            result.uv[i] = BiplanarSideUv(positionL, axes[i], mat.biplanarParams.x);
+            result.uvDx[i] = BiplanarSideUv(positionLDx, axes[i], mat.biplanarParams.x);
+            result.uvDy[i] = BiplanarSideUv(positionLDy, axes[i], mat.biplanarParams.x);
+        }
+    }
+    return result;
+}
+
+// A side projection's normal-map frame in world space: tangent along +u, bitangent along +v, the convention the
+// glTF loader generates tangents in (GltfLoader.cpp GenerateTangents). upW is the object's +Y in world space.
+void BiplanarSideFrame(ShaderMaterial mat, uint axis, float3 normalL, float3 normalW, float3 upW,
+    out float3 tangent, out float3 bitangent)
+{
+    bitangent = normalize(-upW + normalW * dot(normalW, upW));
+    // cross(-Y, +X) = +Z is the X projection's u axis; cross(-Y, +Z) = -X is minus the Z projection's.
+    const float handedness = axis == 0 ? (normalL.x >= 0 ? 1.0f : -1.0f) : (normalL.z >= 0 ? -1.0f : 1.0f);
+    tangent = normalize(cross(bitangent, normalW)) * handedness;
+    TransformNormalBasis(mat, tangent, bitangent);
 }
 
 // Encode linear glTF lighting for the UNORM display targets.

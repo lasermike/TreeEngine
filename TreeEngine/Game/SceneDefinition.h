@@ -180,6 +180,11 @@ namespace SceneData
         std::string tintTexture;
         DirectX::XMFLOAT2 tintUvScale = { 1, 1 };
         DirectX::XMFLOAT2 tintUvOffset = { 0, 0 };
+        // "biplanar": one glTF material's maps are also projected along object-space X and Z (uvPerUnit UV units per
+        // object unit) and blended with its own UVs, the top-down projection, by surface normal. 0 = off.
+        std::string biplanarMaterial;
+        float biplanarUvPerUnit = 0;
+        float biplanarSharpness = 1;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<ModelDefinition>(*this); }
     };
 

@@ -679,7 +679,7 @@ namespace SceneData
                 }
                 else if (type == "model")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "forceLit", "normalAnimation", "materialTint" });
+                    Fields(value, path, { "id", "type", "transform", "source", "forceLit", "normalAnimation", "materialTint", "biplanar" });
                     auto model = std::make_unique<ModelDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     model->source = String(value["source"], path + ".source");
@@ -717,6 +717,24 @@ namespace SceneData
                         if (model->tintTexture.empty()) Invalid(tintPath + ".texture", "must not be empty");
                         if (tint.contains("uvScale")) model->tintUvScale = Vector2(tint["uvScale"], tintPath + ".uvScale");
                         if (tint.contains("uvOffset")) model->tintUvOffset = Vector2(tint["uvOffset"], tintPath + ".uvOffset");
+                    }
+                    if (value.contains("biplanar"))
+                    {
+                        const auto& biplanar = value["biplanar"];
+                        const auto biplanarPath = path + ".biplanar";
+                        Fields(biplanar, biplanarPath, { "material", "uvPerUnit", "sharpness" });
+                        for (auto key : { "material", "uvPerUnit" })
+                            if (!biplanar.contains(key)) Invalid(biplanarPath + "." + key, "required property");
+                        model->biplanarMaterial = String(biplanar["material"], biplanarPath + ".material");
+                        if (model->biplanarMaterial.empty()) Invalid(biplanarPath + ".material", "must not be empty");
+                        model->biplanarUvPerUnit = Number(biplanar["uvPerUnit"], biplanarPath + ".uvPerUnit");
+                        if (!(model->biplanarUvPerUnit > 0)) Invalid(biplanarPath + ".uvPerUnit", "must be positive");
+                        if (biplanar.contains("sharpness"))
+                        {
+                            model->biplanarSharpness = Number(biplanar["sharpness"], biplanarPath + ".sharpness");
+                            if (!(model->biplanarSharpness > 0 && model->biplanarSharpness <= 16))
+                                Invalid(biplanarPath + ".sharpness", "must be greater than 0 and at most 16");
+                        }
                     }
                     auto dot = model->source.find_last_of('.');
                     std::string extension = dot == std::string::npos
@@ -971,6 +989,9 @@ namespace SceneData
                 if (!model.tintMaterial.empty())
                     value["materialTint"] = { { "material", model.tintMaterial }, { "texture", model.tintTexture },
                         { "uvScale", VectorJson(model.tintUvScale) }, { "uvOffset", VectorJson(model.tintUvOffset) } };
+                if (!model.biplanarMaterial.empty())
+                    value["biplanar"] = { { "material", model.biplanarMaterial }, { "uvPerUnit", model.biplanarUvPerUnit },
+                        { "sharpness", model.biplanarSharpness } };
                 break;
             }
             default: throw std::runtime_error("Cannot serialize unsupported scene object");

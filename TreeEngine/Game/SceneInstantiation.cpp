@@ -359,6 +359,15 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                 parameters->tintUvScale = model.tintUvScale;
                 parameters->tintUvOffset = model.tintUvOffset;
             }
+            if (!model.biplanarMaterial.empty())
+            {
+                const auto matches = std::count_if(parameters->asset->materials.begin(), parameters->asset->materials.end(),
+                    [&](const auto& material) { return material.name == model.biplanarMaterial; });
+                if (matches != 1) throw std::runtime_error("Biplanar material must match exactly one glTF material: " + model.biplanarMaterial);
+                parameters->biplanarMaterial = model.biplanarMaterial;
+                parameters->biplanarUvPerUnit = model.biplanarUvPerUnit;
+                parameters->biplanarSharpness = model.biplanarSharpness;
+            }
             if (!model.animatedNormalMaterial.empty())
             {
                 int matches = 0;
@@ -677,6 +686,9 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
                 : RebaseAsset(modelParams.tintTexturePath, sourceFilename, destinationFilename);
             model.tintUvScale = modelParams.tintUvScale;
             model.tintUvOffset = modelParams.tintUvOffset;
+            model.biplanarMaterial = modelParams.biplanarMaterial;
+            model.biplanarUvPerUnit = modelParams.biplanarUvPerUnit;
+            model.biplanarSharpness = modelParams.biplanarSharpness;
             break;
         }
         default: throw std::runtime_error("Cannot save unsupported scene object");
