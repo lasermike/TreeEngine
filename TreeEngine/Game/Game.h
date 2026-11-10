@@ -203,6 +203,7 @@ private:
     bool                                m_renderToSharedTexture;
 
     bool                                m_resetTree;
+    std::map<std::string, DirectX::XMFLOAT2> m_debugUvEdits;
     //bool                                m_paused;
     //bool                                m_showShadowBuffer;
     //bool                                m_showDxrUav;

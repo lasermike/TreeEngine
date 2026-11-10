@@ -181,5 +181,9 @@ public:
 
     void SetPosition(XMVECTOR pos) { return XMStoreFloat3(&_position, pos); }
     void SetRotation(XMVECTOR rot) { return XMStoreFloat4(&_rotation, rot); }
+    void SetScale(XMVECTOR scale)
+    {
+        XMStoreFloat3(&_scale, scale);
+    }
 
 };

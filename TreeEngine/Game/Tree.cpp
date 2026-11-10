@@ -230,7 +230,8 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     const float poseTime = std::min(CalcTime(renderData.time), m_matureTime);
     m_reusePose = renderData.cacheTreePoses && m_poseValid && poseTime == m_lastPoseTime
         && XMVector3Equal(XMLoadFloat3(&_position), XMLoadFloat3(&m_lastPosePosition))
-        && XMVector4Equal(XMLoadFloat4(&_rotation), XMLoadFloat4(&m_lastPoseRotation));
+        && XMVector4Equal(XMLoadFloat4(&_rotation), XMLoadFloat4(&m_lastPoseRotation))
+        && XMVector3Equal(XMLoadFloat3(&_scale), XMLoadFloat3(&m_lastPoseScale));
     const bool reuseInstances = m_reusePose && startInstance == m_lastInstanceStart
         && _params->depthLOD == m_lastDepthLOD
         && XMVector3Equal(renderData.eyePos, XMLoadFloat3(&m_lastEyePosition));
@@ -292,6 +293,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         m_lastPoseTime = poseTime;
         m_lastPosePosition = _position;
         m_lastPoseRotation = _rotation;
+        m_lastPoseScale = _scale;
         m_poseValid = true;
         XMStoreFloat3(&m_lastEyePosition, renderData.eyePos);
         m_lastDepthLOD = _params->depthLOD;
@@ -477,7 +479,9 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
             localToWorld = localToWorld * XMMatrixTranslationFromVector(-base)
                 * XMMatrixRotationNormal(axis, m_leafTwists[frame.branch->id]) * XMMatrixTranslationFromVector(base);
         }
-        localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
+        localToWorld = localToWorld * XMMatrixTranslationFromVector(-XMLoadFloat3(&_position))
+            * XMMatrixAffineTransformation(XMLoadFloat3(&_scale), g_XMZero,
+                XMLoadFloat4(&_rotation), XMLoadFloat3(&_position));
         XMStoreFloat4x4(&pose.world, localToWorld);
     }
     if (!pose.renderable) return S_FALSE;
@@ -534,10 +538,13 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
     if (!m_reusePose)
     {
         XMMATRIX localToWorld = XMLoadFloat4x4(&pose.world);
-        XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMVector3Transform(XMVectorSet(-1.0f, -1.0f, -1.0f, 0), localToWorld),
-            XMLoadFloat3(&_boundingBox[0])));
-        XMStoreFloat3(&_boundingBox[1], XMVectorMax(XMVector3Transform(XMVectorSet(1.0f, 1.0f, 1.0f, 0), localToWorld),
-            XMLoadFloat3(&_boundingBox[1])));
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            const XMVECTOR point = XMVector3Transform(XMVectorSet(corner & 1 ? 1.0f : -1.0f,
+                corner & 2 ? 1.0f : -1.0f, corner & 4 ? 1.0f : -1.0f, 1), localToWorld);
+            XMStoreFloat3(&_boundingBox[0], XMVectorMin(point, XMLoadFloat3(&_boundingBox[0])));
+            XMStoreFloat3(&_boundingBox[1], XMVectorMax(point, XMLoadFloat3(&_boundingBox[1])));
+        }
     }
 
     return S_OK;
@@ -904,10 +911,9 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
     HRR(pFrameConfig->GetInstanceIndex(this, transformSlot));
     RenderData& renderData = pFrameConfig->GetRenderData();
 
-    // The source's branch matrices bake in its pose position and then its rotation.
-    // Rel maps them onto this instance: inverse(T(sourcePosition) * R(sourceRotation)) * S * R * T.
-    const XMMATRIX sourceFrame = XMMatrixMultiply(XMMatrixTranslationFromVector(XMLoadFloat3(&source.m_lastPosePosition)),
-        XMMatrixRotationQuaternion(XMLoadFloat4(&source.m_lastPoseRotation)));
+    // Remove the source's baked scale, rotation, and translation before applying this instance's pose.
+    const XMMATRIX sourceFrame = XMMatrixAffineTransformation(XMLoadFloat3(&source.m_lastPoseScale), g_XMZero,
+        XMLoadFloat4(&source.m_lastPoseRotation), XMLoadFloat3(&source.m_lastPosePosition));
     const XMMATRIX instanceWorld = XMMatrixAffineTransformation(XMLoadFloat3(&_scale), g_XMZero,
         XMLoadFloat4(&_rotation), XMLoadFloat3(&_position));
     const XMMATRIX rel = XMMatrixMultiply(XMMatrixInverse(nullptr, sourceFrame), instanceWorld);

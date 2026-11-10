@@ -679,7 +679,7 @@ namespace SceneData
                 }
                 else if (type == "model")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "forceLit", "normalAnimation", "materialTint" });
+                    Fields(value, path, { "id", "type", "transform", "source", "forceLit", "normalAnimation", "materialTint", "textureCoordScale" });
                     auto model = std::make_unique<ModelDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     model->source = String(value["source"], path + ".source");
@@ -908,6 +908,10 @@ namespace SceneData
                 continue;
             }
             Json value = { { "id", object->id }, { "transform", TransformJson(object->transform) } };
+            if (object->kind == ObjectKind::Model && (object->textureCoordScale.x != 1 || object->textureCoordScale.y != 1))
+            {
+                value["textureCoordScale"] = VectorJson(object->textureCoordScale);
+            }
             if (object->kind != ObjectKind::Model)
             {
                 value["textureCoordScale"] = VectorJson(object->textureCoordScale);

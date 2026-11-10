@@ -4,6 +4,7 @@
 #include "RenderData.h"
 #include "OpacityMicromapBaker.h"
 #include "UpscalerMath.h"
+#include "DebugVectorMath.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -703,6 +704,24 @@ int main(int argc, char** argv)
 {
     try
     {
+        using namespace DebugVectorMath;
+        for (const auto& angles : { XMFLOAT3(0, 0, 0), XMFLOAT3(25, -110, 40), XMFLOAT3(90, 30, 0), XMFLOAT3(-90, 30, 0) })
+        {
+            auto quaternion = FromDegrees(angles);
+            auto roundTrip = FromDegrees(ToDegrees(quaternion));
+            Check(std::abs(XMVectorGetX(XMVector4Dot(XMLoadFloat4(&quaternion), XMLoadFloat4(&roundTrip)))) > 0.9999f,
+                "debug Euler editor preserves quaternion orientation, including poles");
+            auto reflected = GizmoRotation(GizmoRotation(quaternion));
+            Check(XMVector4Equal(XMLoadFloat4(&reflected), XMLoadFloat4(&quaternion)), "gizmo quaternion reflection round trip");
+        }
+        float scale[] = { 2, -4, 6 };
+        Check(ScaleLinked(scale, 3, 0, 3) && scale[1] == -6 && scale[2] == 9, "linked scale preserves proportions and reflection");
+        float zero[] = { 0, 1, 2 };
+        Check(!ScaleLinked(zero, 3, 0, 2) && zero[1] == 1, "linked zero axis does not divide by zero");
+        XMFLOAT4 invalid(0, 0, 0, 0);
+        Check(!Normalize(invalid), "zero quaternion rejected");
+        const float copied[] = { 1.25f, -2.5f, 3 };
+        Check(Format("Tree / Position", copied, 3) == "Tree / Position: [1.25, -2.5, 3]", "clipboard includes field and components");
         TestSunShadowSettings();
         TestModelNormalAnimation();
         TestModelMaterialTint();
@@ -881,6 +900,11 @@ int main(int argc, char** argv)
         bad = modelJson; bad["objects"][0]["forceLit"] = "yes";
         Reject(bad.dump(), "forceLit");
         bad = modelJson; bad["objects"][0]["textureCoordScale"] = { 2, 2 };
+        auto uvModel = SceneData::ParseScene(bad.dump(), "test.scene.json");
+        auto uvRoundTrip = SceneData::ParseScene(SceneData::SerializeScene(uvModel), "test.scene.json");
+        Check(uvRoundTrip.objects[0]->textureCoordScale.x == 2 && uvRoundTrip.objects[0]->textureCoordScale.y == 2,
+            "model UV scale survives scene serialization");
+        bad["objects"][0]["textureCoordScale"] = { 2, "invalid" };
         Reject(bad.dump(), "textureCoordScale");
         bad = authored; bad["render"]["blurAmount"] = -0.1;
         Reject(bad.dump(), "blurAmount");

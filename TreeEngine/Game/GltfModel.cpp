@@ -46,6 +46,7 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
         }
         ShaderMaterial shaderMaterial = imported.shaderMaterial;
+        shaderMaterial.ApplyTextureCoordScale(_params->textureCoordScale.x, _params->textureCoordScale.y);
         const bool animatedNormal = !m_animatedNormalMaterial.empty() && imported.name == m_animatedNormalMaterial;
         if (animatedNormal)
         {
@@ -71,6 +72,10 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             shaderMaterial.flags.w = 0.0f;
         std::wstring name = assetName + L"#material" + std::to_wstring(i)
             + (m_forceLit ? L"#forceLit" : L"");
+        if (_params->textureCoordScale.x != 1 || _params->textureCoordScale.y != 1)
+        {
+            name += L"#uv" + std::to_wstring(_id);
+        }
         if (animatedNormal) name += L"#normalAnimation" + std::to_wstring(reinterpret_cast<uintptr_t>(this));
         if (tinted) name += L"#tint" + std::to_wstring(reinterpret_cast<uintptr_t>(this));
         HRR(renderManager.CreateMaterial(
