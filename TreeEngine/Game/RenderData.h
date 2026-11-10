@@ -99,6 +99,9 @@ struct RenderProfile
     bool builtStaticBLAS = false;   // The static-geometry BLAS was (re)built this frame.
     bool compactedStaticBLAS = false;
     std::uint64_t staticBlasBytes = 0;
+    std::uint64_t blasHeapBytes = 0;        // Dynamic BLAS heap: capacity, live allocations and the shared scratch.
+    std::uint64_t blasHeapLiveBytes = 0;
+    std::uint64_t blasScratchBytes = 0;
 };
 
 struct ProjectionData

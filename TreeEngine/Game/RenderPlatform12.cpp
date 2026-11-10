@@ -2979,23 +2979,148 @@ HRESULT RenderPlatform12::InstanceIndexBuffer(const InstanceIndexKey& key, UINT 
 // Every dynamic BLAS, for a new level or device; the GPU must be idle or the resources retired.
 void RenderPlatform12::ReleaseDynamicBlases()
 {
-    for (auto& entry : m_dynamicBlases)
-    {
-        Retire(entry.second.blas);
-        Retire(entry.second.scratch);
-    }
-    for (auto& entry : m_sharedBlases)
-    {
-        Retire(entry.second.blas);
-        Retire(entry.second.scratch);
-    }
     m_dynamicBlases.clear();
     m_sharedBlases.clear();
+    ReleaseBlasHeap();
+    Retire(m_blasScratch);
     for (auto& upload : m_ommRecordUpload)
     {
         Retire(upload.buffer);
         upload.mapped = nullptr;
         upload.capacity = 0;
+    }
+}
+
+// Every chunk of the BLAS heap; the GPU must be idle or the chunks retired (Retire releases them a frame later).
+void RenderPlatform12::ReleaseBlasHeap()
+{
+    for (BlasHeapChunk& chunk : m_blasHeap)
+        Retire(chunk.buffer);
+    m_blasHeap.clear();
+    m_pendingBlasFrees.clear();
+    m_blasHeapLiveBytes = 0;
+}
+
+// BLASes under 1 MB are pooled, first fit across the heap's chunks; a new pool chunk grows with the heap (4 MB, then
+// half its size, up to 64 MB). A larger BLAS gets a chunk of its own, exactly its size, released once it is freed:
+// pooling those fragmented the heap as trees grew. A new chunk takes the slot of a released one, so chunk indices
+// stay stable.
+HRESULT RenderPlatform12::AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasAllocation& allocation)
+{
+    const UINT64 alignment = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT;
+    bytes = (bytes + alignment - 1) & ~(alignment - 1);
+    const bool dedicated = bytes >= (UINT64(1) << 20);
+    for (int chunkIndex = 0; chunkIndex < static_cast<int>(m_blasHeap.size()) && !dedicated; ++chunkIndex)
+    {
+        BlasHeapChunk& chunk = m_blasHeap[chunkIndex];
+        if (!chunk.buffer)
+            continue;
+        for (auto range = chunk.freeRanges.begin(); range != chunk.freeRanges.end(); ++range)
+        {
+            if (range->second < bytes)
+                continue;
+            allocation.chunk = chunkIndex;
+            allocation.offset = range->first;
+            allocation.size = bytes;
+            allocation.address = chunk.buffer->GetGPUVirtualAddress() + range->first;
+            const UINT64 restOffset = range->first + bytes;
+            const UINT64 restBytes = range->second - bytes;
+            chunk.freeRanges.erase(range);
+            if (restBytes)
+                chunk.freeRanges.emplace(restOffset, restBytes);
+            m_blasHeapLiveBytes += bytes;
+            return S_OK;
+        }
+    }
+    UINT64 capacity = 0;
+    for (const BlasHeapChunk& chunk : m_blasHeap)
+        capacity += chunk.dedicated ? 0 : chunk.size;     // Released chunks have size 0.
+    const UINT64 chunkBytes = dedicated ? bytes : (std::min)(UINT64(64) << 20, (std::max)(UINT64(4) << 20, capacity / 2));
+    BlasHeapChunk chunk;
+    chunk.dedicated = dedicated;
+    chunk.size = chunkBytes;
+    const D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    const D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Buffer(chunkBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    HRR(device->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+        nullptr, IID_PPV_ARGS(&chunk.buffer)));
+    chunk.freeRanges.emplace(0, chunkBytes);
+    const auto emptySlot = std::find_if(m_blasHeap.begin(), m_blasHeap.end(), [](const BlasHeapChunk& slot) { return !slot.buffer; });
+    int chunkIndex = static_cast<int>(emptySlot - m_blasHeap.begin());
+    if (emptySlot != m_blasHeap.end())
+        *emptySlot = std::move(chunk);
+    else
+        m_blasHeap.push_back(std::move(chunk));
+    if (!dedicated)
+        return AllocateBlas(device, bytes, allocation);
+    BlasHeapChunk& owned = m_blasHeap[chunkIndex];
+    owned.freeRanges.clear();
+    allocation.chunk = chunkIndex;
+    allocation.offset = 0;
+    allocation.size = bytes;
+    allocation.address = owned.buffer->GetGPUVirtualAddress();
+    m_blasHeapLiveBytes += bytes;
+    return S_OK;
+}
+
+void RenderPlatform12::FreeBlas(BlasAllocation& allocation)
+{
+    if (allocation)
+        m_pendingBlasFrees.push_back({ allocation, m_blasFrame });
+    allocation = BlasAllocation();
+}
+
+void RenderPlatform12::ReclaimBlasFrees()
+{
+    for (auto pending = m_pendingBlasFrees.begin(); pending != m_pendingBlasFrees.end();)
+    {
+        if (pending->frame >= m_blasFrame)
+        {
+            ++pending;
+            continue;
+        }
+        const BlasAllocation& freed = pending->allocation;
+        auto& ranges = m_blasHeap[freed.chunk].freeRanges;
+        UINT64 offset = freed.offset;
+        UINT64 size = freed.size;
+        auto next = ranges.lower_bound(offset);
+        if (next != ranges.end() && offset + size == next->first)
+        {
+            size += next->second;
+            next = ranges.erase(next);
+        }
+        if (next != ranges.begin())
+        {
+            auto previous = std::prev(next);
+            if (previous->first + previous->second == offset)
+            {
+                offset = previous->first;
+                size += previous->second;
+                ranges.erase(previous);
+            }
+        }
+        ranges.emplace(offset, size);
+        m_blasHeapLiveBytes -= freed.size;
+        pending = m_pendingBlasFrees.erase(pending);
+    }
+    // A chunk with nothing left in it is released, unless it is the last one.
+    size_t poolChunks = std::count_if(m_blasHeap.begin(), m_blasHeap.end(),
+        [](const BlasHeapChunk& chunk) { return chunk.buffer && !chunk.dedicated; });
+    for (BlasHeapChunk& chunk : m_blasHeap)
+    {
+        const bool empty = chunk.buffer && chunk.freeRanges.size() == 1
+            && chunk.freeRanges.begin()->first == 0 && chunk.freeRanges.begin()->second == chunk.size;
+        if (!empty || (!chunk.dedicated && poolChunks <= 1))
+            continue;
+        const bool pendingInChunk = std::any_of(m_pendingBlasFrees.begin(), m_pendingBlasFrees.end(),
+            [&](const PendingBlasFree& free) { return &m_blasHeap[free.allocation.chunk] == &chunk; });
+        if (pendingInChunk)
+            continue;
+        Retire(chunk.buffer);
+        if (!chunk.dedicated)
+            --poolChunks;
+        chunk.size = 0;
+        chunk.dedicated = false;
+        chunk.freeRanges.clear();
     }
 }
 
@@ -3104,6 +3229,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     ProfileTimestamp(ProfilePass::BLAS, false);
 
     ++m_blasFrame;
+    ReclaimBlasFrees();
     const bool rebuildAll = forceRebuild || m_TLAS == nullptr;
 
     if (m_ommBuildPending)
@@ -3494,8 +3620,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         {
             if (m_blasFrame - entry->second.lastUsedFrame > kDynamicBlasRetireFrames)
             {
-                Retire(entry->second.blas);
-                Retire(entry->second.scratch);
+                FreeBlas(entry->second.blas);
                 entry = blases.erase(entry);
             }
             else
@@ -3527,7 +3652,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         for (const TlasSource& source : tlasSources)
         {
             TlasInstance instance;
-            instance.blas = source.blas->blas ? source.blas->blas->GetGPUVirtualAddress() : 0;
+            instance.blas = source.blas->blas.address;
             instance.firstGeometry = source.blas->firstGeometry;
             if (source.transformSlot != UINT_MAX && source.transformSlot < instanceCount)
             {
@@ -3555,12 +3680,16 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             return;
         const auto width = [](const CComPtr<ID3D12Resource>& resource) -> UINT64 { return resource ? resource->GetDesc().Width : 0; };
         UINT64 bytes = width(m_TLAS) + width(m_scratchTLAS) + width(m_staticBlas.blas);
-        for (const auto& entry : m_dynamicBlases)
-            bytes += width(entry.second.blas) + width(entry.second.scratch);
-        for (const auto& entry : m_sharedBlases)
-            bytes += width(entry.second.blas) + width(entry.second.scratch);
+        for (const BlasHeapChunk& chunk : m_blasHeap)
+            bytes += chunk.size;
+        bytes += width(m_blasScratch);
         profile.accelerationStructureBytes = bytes;
         profile.staticBlasBytes = width(m_staticBlas.blas);
+        profile.blasHeapBytes = 0;
+        for (const BlasHeapChunk& chunk : m_blasHeap)
+            profile.blasHeapBytes += chunk.size;
+        profile.blasHeapLiveBytes = m_blasHeapLiveBytes;
+        profile.blasScratchBytes = width(m_blasScratch);
         profile.tlasInstances = static_cast<UINT>(m_tlasState.size());
     };
 
@@ -3590,14 +3719,20 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     {
         cpuStart = std::chrono::steady_clock::now();
     }
-    const D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    // Plan this frame's builds: result space from the BLAS heap, and a range of the shared scratch buffer each, so the
+    // builds can run concurrently. A rebuild keeps its allocation when it still fits; the queue runs frames in order,
+    // so rebuilding into the BLAS the previous frame traced is as safe as updating it.
+    const UINT64 alignment = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT;
+    std::vector<D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS> buildInputs(owners.size());
+    std::vector<UINT64> scratchBytesNeeded(owners.size(), 0);
+    UINT64 largestScratch = 0;
     for (size_t ownerIndex = 0; ownerIndex < owners.size(); ++ownerIndex)
     {
         if (actions[ownerIndex] == BlasAction::Reuse)
             continue;
         DynamicBlas& owner = *owners[ownerIndex];
         const bool rebuild = actions[ownerIndex] == BlasAction::Rebuild;
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs = buildInputs[ownerIndex];
         inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
         inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
         if (!rebuild)
@@ -3605,33 +3740,69 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         inputs.NumDescs = static_cast<UINT>(owner.geometryDescs.size());
         inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
         inputs.pGeometryDescs = owner.geometryDescs.data();
+        UINT64 scratchBytes = owner.updateScratchBytes;
         if (rebuild)
         {
             D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO preBuildInfo = {};
             device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &preBuildInfo);
-            // Keep buffers that are large enough: recreating them took milliseconds on every rebuild. The queue runs
-            // frames in order, so rebuilding into the BLAS the previous frame traced is as safe as updating it.
-            const UINT64 scratchBytes = (std::max)(preBuildInfo.ScratchDataSizeInBytes, preBuildInfo.UpdateScratchDataSizeInBytes);
-            if (!owner.blas || owner.blas->GetDesc().Width < preBuildInfo.ResultDataMaxSizeInBytes)
+            if (!owner.blas || owner.blas.size < preBuildInfo.ResultDataMaxSizeInBytes)
             {
-                Retire(owner.blas);
-                D3D12_RESOURCE_DESC blasDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-                HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
-                    nullptr, IID_PPV_ARGS(&owner.blas)));
+                // A BLAS outgrowing its range (a growing tree) gets headroom, so it moves rarely; a first one fits exactly.
+                const UINT64 bytes = owner.blas ? preBuildInfo.ResultDataMaxSizeInBytes * 5 / 4 : preBuildInfo.ResultDataMaxSizeInBytes;
+                FreeBlas(owner.blas);
+                HRR(AllocateBlas(device, bytes, owner.blas));
             }
-            if (!owner.scratch || owner.scratch->GetDesc().Width < scratchBytes)
-            {
-                Retire(owner.scratch);
-                D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(scratchBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-                HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
-                    nullptr, IID_PPV_ARGS(&owner.scratch)));
-            }
+            scratchBytes = preBuildInfo.ScratchDataSizeInBytes;
+            owner.updateScratchBytes = preBuildInfo.UpdateScratchDataSizeInBytes;
+        }
+        scratchBytesNeeded[ownerIndex] = (scratchBytes + alignment - 1) & ~(alignment - 1);
+        largestScratch = (std::max)(largestScratch, scratchBytesNeeded[ownerIndex]);
+    }
+    // Scratch is shared within a budget: builds take consecutive ranges, and when the budget runs out (a first frame
+    // building every BLAS) a UAV barrier lets the next batch reuse it from the start.
+    const UINT64 scratchBudget = (std::max)(largestScratch, UINT64(4) << 20);
+    std::vector<UINT64> scratchOffsets(owners.size(), 0);
+    std::vector<bool> barrierBefore(owners.size(), false);
+    UINT64 scratchUsed = 0, scratchPeak = 0;
+    for (size_t ownerIndex = 0; ownerIndex < owners.size(); ++ownerIndex)
+    {
+        const UINT64 needed = scratchBytesNeeded[ownerIndex];
+        if (actions[ownerIndex] == BlasAction::Reuse)
+            continue;
+        if (scratchUsed + needed > scratchBudget)
+        {
+            barrierBefore[ownerIndex] = true;
+            scratchUsed = 0;
+        }
+        scratchOffsets[ownerIndex] = scratchUsed;
+        scratchUsed += needed;
+        scratchPeak = (std::max)(scratchPeak, scratchUsed);
+    }
+    if (scratchPeak > 0 && (!m_blasScratch || m_blasScratch->GetDesc().Width < scratchPeak))
+    {
+        Retire(m_blasScratch);
+        const UINT64 scratchCapacity = (std::max)(scratchPeak, UINT64(1) << 20);
+        const D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+        const D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(scratchCapacity, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
+            nullptr, IID_PPV_ARGS(&m_blasScratch)));
+    }
+    for (size_t ownerIndex = 0; ownerIndex < owners.size(); ++ownerIndex)
+    {
+        if (actions[ownerIndex] == BlasAction::Reuse)
+            continue;
+        DynamicBlas& owner = *owners[ownerIndex];
+        const bool rebuild = actions[ownerIndex] == BlasAction::Rebuild;
+        if (barrierBefore[ownerIndex])
+        {
+            const D3D12_RESOURCE_BARRIER scratchBarrier = CD3DX12_RESOURCE_BARRIER::UAV(m_blasScratch);
+            commandList->ResourceBarrier(1, &scratchBarrier);
         }
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
-        buildDesc.DestAccelerationStructureData = owner.blas->GetGPUVirtualAddress();
-        buildDesc.Inputs = inputs;
-        buildDesc.SourceAccelerationStructureData = rebuild ? 0 : owner.blas->GetGPUVirtualAddress();
-        buildDesc.ScratchAccelerationStructureData = owner.scratch->GetGPUVirtualAddress();
+        buildDesc.DestAccelerationStructureData = owner.blas.address;
+        buildDesc.Inputs = buildInputs[ownerIndex];
+        buildDesc.SourceAccelerationStructureData = rebuild ? 0 : owner.blas.address;
+        buildDesc.ScratchAccelerationStructureData = m_blasScratch->GetGPUVirtualAddress() + scratchOffsets[ownerIndex];
         commandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
         owner.built = true;
         owner.layoutHash = owner.currentHash;
@@ -3702,6 +3873,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     if (!m_TLAS || instanceTotal > m_tlasCapacity)
     {
         // Sized with headroom, so the TLAS buffers are recreated only when the instance count grows past it.
+        const D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
         const UINT capacity = (std::min)(MAX_INSTANCES_IN_TLAS, (std::max)(64u, instanceTotal + instanceTotal / 2));
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO tlasPrebuildInfo;
         topLevelBuildDesc.Inputs.NumDescs = capacity;
@@ -4351,6 +4523,10 @@ HRESULT RenderPlatform12::UninitDevice()
 
     m_dynamicBlases.clear();
     m_sharedBlases.clear();
+    m_blasHeap.clear();
+    m_pendingBlasFrees.clear();
+    m_blasHeapLiveBytes = 0;
+    m_blasScratch.Release();
     m_tlasState.clear();
     m_tlasCapacity = 0;
     m_staticBlas.Release();
@@ -4463,7 +4639,7 @@ HRESULT RenderPlatform12::BeginProfileFrame()
     profile.reusedBLAS = false;
     profile.builtStaticBLAS = profile.compactedStaticBLAS = false;
     profile.dynamicBlasBuilds = profile.dynamicBlasRefits = profile.dynamicBlasReuses = profile.tlasInstances = 0;
-    profile.staticBlasBytes = 0;
+    profile.staticBlasBytes = profile.blasHeapBytes = profile.blasHeapLiveBytes = profile.blasScratchBytes = 0;
     m_profileQueryMask = 0;
     ProfileTimestamp(ProfilePass::Frame, false);
     return S_OK;

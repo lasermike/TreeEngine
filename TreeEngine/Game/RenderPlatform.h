@@ -1027,10 +1027,45 @@ public:
     // Dynamic geometry has one BLAS per owning object (RenderData::currentDrawOwner at draw time, such as a tree),
     // so a tree that grows or changes LOD refits or rebuilds only its own BLAS. Snapshots and layout hashes leave out
     // world-vertex offsets, which move whenever an earlier record's vertex count changes.
+    // Dynamic and shared BLASes live in a pool of large buffers rather than a committed resource each: creating two
+    // resources per BLAS (result and scratch) dominated first-frame CPU time. Allocations are 256-byte aligned, as
+    // acceleration structures require. A freed range is reused from the next frame on: RenderProlog has waited for
+    // the frame that last traced it by then.
+    struct BlasAllocation
+    {
+        int chunk = -1;
+        UINT64 offset = 0;
+        UINT64 size = 0;
+        D3D12_GPU_VIRTUAL_ADDRESS address = 0;
+        explicit operator bool() const { return chunk >= 0; }
+    };
+    struct BlasHeapChunk
+    {
+        CComPtr<ID3D12Resource> buffer;
+        UINT64 size = 0;
+        std::map<UINT64, UINT64> freeRanges;            // Offset to size, coalesced.
+        bool dedicated = false;                         // Holds one large BLAS; released when it is freed.
+    };
+    struct PendingBlasFree
+    {
+        BlasAllocation allocation;
+        UINT64 frame = 0;                               // m_blasFrame when it was freed.
+    };
+    std::vector<BlasHeapChunk> m_blasHeap;
+    std::vector<PendingBlasFree> m_pendingBlasFrees;
+    UINT64 m_blasHeapLiveBytes = 0;
+    HRESULT AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasAllocation& allocation);
+    void FreeBlas(BlasAllocation& allocation);          // Deferred to the next frame.
+    void ReclaimBlasFrees();                            // Returns ranges freed in earlier frames to their chunks.
+    void ReleaseBlasHeap();
+    // Scratch for this frame's dynamic builds and refits: one buffer, a range per build. The previous frame's builds
+    // have finished when this frame's are recorded, so the buffer is reused every frame.
+    CComPtr<ID3D12Resource> m_blasScratch;
+
     struct DynamicBlas
     {
-        CComPtr<ID3D12Resource> blas;
-        CComPtr<ID3D12Resource> scratch;
+        BlasAllocation blas;
+        UINT64 updateScratchBytes = 0;                  // From the last rebuild's prebuild info; refits need this much.
         // Per micromap geometry, one micromap index per triangle of every instance. A build or update reads them from
         // m_ommRecordUpload, where they are copied each frame the BLAS is built or refit.
         std::vector<int> ommIndices;
