@@ -137,11 +137,17 @@ float3 LoadVertexPosition(uint vertexIndex)
     return pos.xyz;
 }
 
+// The hit's index in the per-geometry tables: each TLAS instance's InstanceID is its BLAS's first table entry.
+uint GeometryRecord()
+{
+    return InstanceID() + GeometryIndex();
+}
+
 // The hit's geometry, narrowed to its instance. A BLAS geometry holds a draw record's instances, each with
 // trianglesPerInstance triangles and vertexCount world vertices; primitiveId is the triangle within the instance.
 DxrGeometryInfo HitGeometry(out uint primitiveId)
 {
-    DxrGeometryInfo geometry = geometryInfoBuffer[GeometryIndex()];
+    DxrGeometryInfo geometry = geometryInfoBuffer[GeometryRecord()];
     const uint instance = PrimitiveIndex() / geometry.trianglesPerInstance;
     primitiveId = PrimitiveIndex() - instance * geometry.trianglesPerInstance;
     geometry.instanceIndex += instance;
@@ -220,7 +226,7 @@ float4 SampleMaterialMap(int slot, bool clampTexture, ShaderMaterial material, u
 [shader("anyhit")]
 void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    ShaderMaterial mat = materialBuffer[GeometryIndex()];
+    ShaderMaterial mat = materialBuffer[GeometryRecord()];
     uint primitiveId;
     DxrGeometryInfo geoInfo = HitGeometry(primitiveId);
 
@@ -313,7 +319,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
     // Look up per-geometry material and geometry info
-    ShaderMaterial mat = materialBuffer[GeometryIndex()];
+    ShaderMaterial mat = materialBuffer[GeometryRecord()];
     uint primitiveId;
     DxrGeometryInfo geoInfo = HitGeometry(primitiveId);
 

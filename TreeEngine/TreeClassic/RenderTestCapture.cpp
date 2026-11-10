@@ -448,7 +448,8 @@ namespace
                     { "rebuiltPoseBranches", profile.rebuiltPoseBranches }, { "reusedPoseBranches", profile.reusedPoseBranches },
                     { "poseCacheBytes", profile.poseCacheBytes }, { "drawUploadBytes", profile.drawUploadBytes },
                     { "accelerationStructureBytes", profile.accelerationStructureBytes },
-                    { "rebuiltBLAS", profile.rebuiltBLAS } });
+                    { "rebuiltBLAS", profile.rebuiltBLAS }, { "builtStaticBLAS", profile.builtStaticBLAS },
+                    { "compactedStaticBLAS", profile.compactedStaticBLAS }, { "staticBlasBytes", profile.staticBlasBytes } });
             }
             std::cerr << "Profiled " << request->scene << " / " << request->mode << ", "
                 << request->performanceFrames << " frames" << std::endl;
@@ -589,7 +590,8 @@ int RunRenderTestCapture(Game& game)
                         { "drawUploadCapacityBytes", profile.drawUploadCapacityBytes },
                         { "worldVertexCapacityBytes", profile.worldVertexCapacityBytes },
                         { "accelerationStructureBytes", profile.accelerationStructureBytes },
-                        { "rebuiltBLAS", profile.rebuiltBLAS }
+                        { "rebuiltBLAS", profile.rebuiltBLAS }, { "builtStaticBLAS", profile.builtStaticBLAS },
+                        { "compactedStaticBLAS", profile.compactedStaticBLAS }, { "staticBlasBytes", profile.staticBlasBytes }
                     });
                     const int adapterBytes = WideCharToMultiByte(CP_UTF8, 0, profile.adapter.c_str(), -1, nullptr, 0, nullptr, nullptr);
                     if (!adapterBytes) throw std::runtime_error("Cannot encode GPU adapter name as UTF-8");

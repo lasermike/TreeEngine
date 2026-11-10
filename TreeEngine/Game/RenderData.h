@@ -90,8 +90,11 @@ struct RenderProfile
     std::uint64_t drawUploadCapacityBytes = 0;
     std::uint64_t worldVertexCapacityBytes = 0;
     std::uint64_t accelerationStructureBytes = 0;
-    bool rebuiltBLAS = false;
+    bool rebuiltBLAS = false;       // The dynamic BLAS.
     bool reusedBLAS = false;
+    bool builtStaticBLAS = false;   // The static-geometry BLAS was (re)built this frame.
+    bool compactedStaticBLAS = false;
+    std::uint64_t staticBlasBytes = 0;
 };
 
 struct ProjectionData

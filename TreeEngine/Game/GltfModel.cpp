@@ -111,6 +111,8 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
                 meshes[part.primitiveIndex],
                 this,
                 &batch.renderUnit));
+            // glTF parts never deform; the DXR renderer keeps them in its static BLAS.
+            batch.renderUnit->staticRayTracingGeometry = true;
             batch.partIndices.push_back(partIndex);
             batchIndices.emplace(key, m_batches.size());
             m_batches.push_back(std::move(batch));

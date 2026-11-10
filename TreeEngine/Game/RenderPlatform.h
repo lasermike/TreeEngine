@@ -526,6 +526,8 @@ struct RenderUnit
 
     UINT                        totalMaxInstances; // TODO Needed?
     std::list<WorldObject*>     reservations;
+    // Geometry that doesn't deform or move from frame to frame (glTF models). DXR keeps it in its own BLAS, built once.
+    bool                        staticRayTracingGeometry = false;
 
 #if defined(TREE3D12)
 
@@ -1006,7 +1008,46 @@ public:
     CComPtr<ID3D12Resource>		m_scratchTLAS;
     CComPtr<ID3D12Resource>		m_BLAS;
     CComPtr<ID3D12Resource>		m_scratchBLAS;
+    // Two frames of TLAS instance descriptors, MAX_INSTANCES_IN_TLAS each, written alternately.
     UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesTLAS = nullptr;
+    UINT m_tlasUploadHalf = 0;
+    // What the current TLAS was built from; the TLAS is rebuilt when this changes or any BLAS was built.
+    struct TlasState
+    {
+        UINT dynamicGeometries = 0;
+        D3D12_GPU_VIRTUAL_ADDRESS dynamicBlas = 0;
+        D3D12_GPU_VIRTUAL_ADDRESS staticBlas = 0;
+        bool operator==(const TlasState& other) const
+        {
+            return dynamicGeometries == other.dynamicGeometries && dynamicBlas == other.dynamicBlas && staticBlas == other.staticBlas;
+        }
+    };
+    TlasState m_tlasState;
+
+    // Static geometry (RenderUnit::staticRayTracingGeometry, such as glTF terrain) has its own BLAS, built once
+    // for fast tracing and compacted the next frame, so dynamic geometry's updates and rebuilds leave it alone.
+    // It is rebuilt only when its inputs snapshot changes (an object moved, appeared or left).
+    struct StaticBlas
+    {
+        CComPtr<ID3D12Resource> blas;
+        CComPtr<ID3D12Resource> compactedSize;          // Post-build info, written by the build.
+        CComPtr<ID3D12Resource> compactedSizeReadback;  // Read when the next frame begins: the build has finished.
+        std::vector<BYTE> inputs;                       // Snapshot it was built from.
+        bool compactionPending = false;
+        void Release()
+        {
+            blas.Release();
+            inputs.clear();
+            compactionPending = false;
+        }
+    };
+    StaticBlas m_staticBlas;
+    std::vector<BYTE> m_currentStaticBlasInputs;
+    std::vector<bool> m_drawRecordStatic;               // Per m_drawRecords entry.
+    bool m_currentRenderUnitStatic = false;              // Set by SetRenderUnit.
+    std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> m_staticGeometryDescs;
+    HRESULT BuildStaticBlas(ID3D12Device5* device, UINT geometryCount);
+    HRESULT CompactStaticBlas(ID3D12Device5* device);
 
 
     // DXR buffers
@@ -1036,7 +1077,7 @@ public:
 
     ShaderBindingTable<TreeShaderRecord, 1, 2, 1> m_shaderBindingTable;
 
-    static const uint32_t MAX_INSTANCES_IN_TLAS = 1;
+    static const uint32_t MAX_INSTANCES_IN_TLAS = 2;  // The dynamic BLAS and the static BLAS.
 
     D3D12_RAYTRACING_GEOMETRY_DESC* m_bvhGeometryDescs;
 
