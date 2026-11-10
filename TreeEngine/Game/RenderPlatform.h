@@ -1010,13 +1010,23 @@ public:
     UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesTLAS = nullptr;
     UINT m_tlasUploadHalf = 0;
     UINT m_tlasCapacity = 0;                            // Instances m_TLAS and m_scratchTLAS are sized for.
-    // What the current TLAS was built from: each instance's BLAS and InstanceID. The TLAS is rebuilt when this
-    // changes or any BLAS was built or refit.
-    std::vector<std::pair<D3D12_GPU_VIRTUAL_ADDRESS, UINT>> m_tlasState;
+    // What the current TLAS was built from: each instance's BLAS, InstanceID and object-to-world transform. The
+    // TLAS is rebuilt when this changes or any BLAS was built or refit.
+    struct TlasInstance
+    {
+        D3D12_GPU_VIRTUAL_ADDRESS blas = 0;
+        UINT firstGeometry = 0;
+        float transform[3][4] = { { 1, 0, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0, 1, 0 } };
+        bool operator==(const TlasInstance& other) const
+        {
+            return blas == other.blas && firstGeometry == other.firstGeometry && memcmp(transform, other.transform, sizeof(transform)) == 0;
+        }
+    };
+    std::vector<TlasInstance> m_tlasState;
 
     // Dynamic geometry has one BLAS per owning object (RenderData::currentDrawOwner at draw time, such as a tree),
-    // so a tree that grows or changes LOD refits or rebuilds only its own BLAS. Snapshots and layout hashes use
-    // world-vertex offsets relative to the owner's first record, so other owners' changes don't touch it.
+    // so a tree that grows or changes LOD refits or rebuilds only its own BLAS. Snapshots and layout hashes leave out
+    // world-vertex offsets, which move whenever an earlier record's vertex count changes.
     struct DynamicBlas
     {
         CComPtr<ID3D12Resource> blas;
@@ -1032,13 +1042,21 @@ public:
         std::vector<size_t> records;                    // Indices into m_drawRecords, in draw order.
         std::vector<BYTE> currentInputs;
         size_t currentHash = 0;
-        UINT vbWorldBase = 0;
         UINT firstGeometry = 0;                         // Its first entry in the per-geometry tables.
         std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs;
         std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC> ommTriangles;
         std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC> ommLinkages;
     };
     std::unordered_map<const void*, DynamicBlas> m_dynamicBlases;
+    // Instanced draws (every record of an owner carries the same object transform, as instanceOf trees do): the
+    // deformation pass writes their vertices without it, owners drawing identical geometry (the same source layout)
+    // share one BLAS built from the first such owner's records, and each owner's TLAS instance carries its object
+    // transform. A layout switch or a moved instance then costs no BLAS work.
+    std::unordered_map<size_t, DynamicBlas> m_sharedBlases;
+    std::vector<UINT> m_drawRecordTransformSlot;        // Per record: its object transform, moved to the TLAS (UINT_MAX = none).
+    std::vector<size_t> m_drawRecordShareKey;           // Per record: its shared-geometry key (0 = not shared).
+    std::vector<bool> m_drawRecordDeform;               // Per record: whether the deformation pass writes its vertices.
+    void PrepareInstancedGeometry();
     // Upload space for this frame's micromap record indices, one persistently mapped buffer per frame in flight.
     struct OmmRecordUpload
     {

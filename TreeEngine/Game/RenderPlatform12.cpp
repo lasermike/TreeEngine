@@ -4,6 +4,7 @@
 #include "Settings.h"
 #include "OpacityMicromapBaker.h"
 #include <chrono>
+#include <unordered_set>
 #include <ppl.h>
 
 #include "DDSTextureLoader12.h"
@@ -2704,6 +2705,66 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
     return S_OK;
 }
 
+inline std::size_t hash_combine(std::size_t seed, std::size_t value) noexcept;
+
+// Finds instanced draws (an owner whose records all carry the same object transform) and moves their object
+// transform from the vertices to the TLAS: the records' objectTransformSlot is cleared, so the deformation pass writes
+// them in layout space. Owners drawing identical geometry (the same source layout, materials and instance slots) share
+// one key; only the first such owner's records are deformed and build the shared BLAS.
+void RenderPlatform12::PrepareInstancedGeometry()
+{
+    const size_t count = m_drawRecords.size();
+    m_drawRecordTransformSlot.assign(count, UINT_MAX);
+    m_drawRecordShareKey.assign(count, 0);
+    m_drawRecordDeform.assign(count, true);
+    if (m_drawRecordOwner.size() != count || m_drawRecordStatic.size() != count)
+        return;
+    std::unordered_map<const void*, std::vector<size_t>> ownerRecords;
+    std::vector<const void*> ownerOrder;
+    for (size_t recordIndex = 0; recordIndex < count; ++recordIndex)
+    {
+        if (!m_drawRecords[recordIndex].numInstances || m_drawRecordStatic[recordIndex])
+            continue;
+        auto& records = ownerRecords[m_drawRecordOwner[recordIndex]];
+        if (records.empty())
+            ownerOrder.push_back(m_drawRecordOwner[recordIndex]);
+        records.push_back(recordIndex);
+    }
+    std::unordered_set<size_t> keys;
+    for (const void* owner : ownerOrder)
+    {
+        const std::vector<size_t>& records = ownerRecords[owner];
+        const UINT slot = m_drawRecords[records.front()].objectTransformSlot;
+        if (slot == UINT_MAX || std::any_of(records.begin(), records.end(),
+            [&](size_t recordIndex) { return m_drawRecords[recordIndex].objectTransformSlot != slot; }))
+            continue;
+        size_t key = 0x5ad3a7e5ull;
+        for (const size_t recordIndex : records)
+        {
+            const DrawRecord& dr = m_drawRecords[recordIndex];
+            for (const UINT value : { dr.startingInstance, dr.numInstances, dr.indexBufferStart, dr.indexBufferCount, dr.vertexCount,
+                dr.baseVertexLocation, static_cast<UINT>(dr.inputLayout), static_cast<UINT>(dr.textureIndex) })
+                key = hash_combine(key, std::hash<UINT>{}(value));
+            // The material's bytes (FNV-1a): shared geometry also shares its per-geometry table entries.
+            size_t materialHash = 14695981039346656037ull;
+            const auto* materialBytes = reinterpret_cast<const unsigned char*>(&dr.material);
+            for (size_t i = 0; i < sizeof(dr.material); ++i)
+                materialHash = (materialHash ^ materialBytes[i]) * 1099511628211ull;
+            key = hash_combine(key, materialHash);
+        }
+        if (key == 0)
+            key = 1;
+        const bool first = keys.insert(key).second;
+        for (const size_t recordIndex : records)
+        {
+            m_drawRecordTransformSlot[recordIndex] = slot;
+            m_drawRecordShareKey[recordIndex] = key;
+            m_drawRecordDeform[recordIndex] = first;
+            m_drawRecords[recordIndex].objectTransformSlot = UINT_MAX;
+        }
+    }
+}
+
 HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 {
     HRESULT hr = S_OK;
@@ -2713,6 +2774,7 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     if (m_drawRecords.size() > drawRecordBufferSize / sizeof(DrawRecord))
         return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
 
+    PrepareInstancedGeometry();
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transform draw records to bottom level BVH mesh data");
 
 #if defined(TREE_XBOX)
@@ -2761,9 +2823,10 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     {
         DrawRecord& drawRecord = m_drawRecords[drawRecordIndex];
 
-        if (drawRecord.numInstances <= 0)
+        if (drawRecord.numInstances <= 0
+            || (drawRecordIndex < m_drawRecordDeform.size() && !m_drawRecordDeform[drawRecordIndex]))
         {
-            continue;
+            continue;   // Nothing to draw, or another instance of a shared layout whose first owner is deformed.
         }
 
         bool bSkinned = drawRecord.inputLayout == SKINNED_INPUT_LAYOUT;
@@ -2921,7 +2984,13 @@ void RenderPlatform12::ReleaseDynamicBlases()
         Retire(entry.second.blas);
         Retire(entry.second.scratch);
     }
+    for (auto& entry : m_sharedBlases)
+    {
+        Retire(entry.second.blas);
+        Retire(entry.second.scratch);
+    }
     m_dynamicBlases.clear();
+    m_sharedBlases.clear();
     for (auto& upload : m_ommRecordUpload)
     {
         Retire(upload.buffer);
@@ -2934,6 +3003,11 @@ void RenderPlatform12::ReleaseOpacityMicromaps()
 {
     // Micromap linkage can't change across an update, so every dynamic BLAS rebuilds.
     for (auto& entry : m_dynamicBlases)
+    {
+        entry.second.built = false;
+        entry.second.ommIndices.clear();
+    }
+    for (auto& entry : m_sharedBlases)
     {
         entry.second.built = false;
         entry.second.ommIndices.clear();
@@ -3066,24 +3140,48 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
 
     const auto snapshotStart = m_renderData->profile.enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
-    // Group records: static ones into the static BLAS, dynamic ones by owner, owners in order of first draw.
+    // Group records: static ones into the static BLAS, dynamic ones by owner (or shared layout), in order of first draw.
     // Each owner's snapshot compares what the deformation pass turns into world vertices, by value and in geometry
     // order: the vertex ranges, each instance's matrix, its skinning parent's and the object transform. Instance-slot
     // numbers are left out: instanced trees move to other slots when they switch between near and far layouts with
     // the same geometry, and a needless BLAS update can cost the driver tens of milliseconds. World-vertex offsets
-    // are relative to the owner's (or static geometry's) first record: a built BLAS keeps its own copy of the
-    // vertices, and an update may read them from a moved range. Scene updates write to ordinary CPU memory, avoiding
-    // slow reads from the upload heap.
+    // are left out too: records of all owners interleave in draw order, so one owner's vertex count moves everyone
+    // else's offsets, but a built BLAS keeps its own copy of the vertices and an update may read them from a moved
+    // range. Scene updates write to ordinary CPU memory, avoiding slow reads from the upload heap.
     m_currentStaticBlasInputs.clear();
-    std::vector<DynamicBlas*> owners;
+    std::vector<DynamicBlas*> owners;   // Each BLAS built from this frame's records once: owners' and shared layouts'.
     std::vector<size_t> staticRecords;
     const size_t instanceCount = m_cpuInstanceData.size();
     const InstancedData* instances = m_cpuInstanceData.data();
     bool snapshotValid = instances != nullptr && m_drawRecordStatic.size() == m_drawRecords.size()
         && m_drawRecordOwner.size() == m_drawRecords.size();
     const auto isStatic = [&](size_t recordIndex) { return recordIndex < m_drawRecordStatic.size() && m_drawRecordStatic[recordIndex]; };
+    // See PrepareInstancedGeometry: shared records belong to a shared layout BLAS, and only its first owner's records
+    // build it; every owner still gets a TLAS instance, in order of first draw.
+    const bool sharing = m_drawRecordShareKey.size() == m_drawRecords.size() && m_drawRecordDeform.size() == m_drawRecords.size()
+        && m_drawRecordTransformSlot.size() == m_drawRecords.size();
+    const auto shareKey = [&](size_t recordIndex) { return sharing ? m_drawRecordShareKey[recordIndex] : size_t(0); };
+    const auto drawOwner = [&](size_t recordIndex) { return recordIndex < m_drawRecordOwner.size() ? m_drawRecordOwner[recordIndex] : nullptr; };
+    const auto blasFor = [&](size_t recordIndex) -> DynamicBlas&
+    {
+        const size_t key = shareKey(recordIndex);
+        return key ? m_sharedBlases[key] : m_dynamicBlases[drawOwner(recordIndex)];
+    };
+    struct TlasSource
+    {
+        DynamicBlas* blas;
+        UINT transformSlot;     // Object transform's instance slot, or UINT_MAX for identity.
+    };
+    std::vector<TlasSource> tlasSources;
+    std::unordered_set<const void*> seenOwners;
+    // Records that only place an instance of a shared layout (not its first owner's) add a TLAS instance and nothing else.
+    const auto noteOwner = [&](size_t recordIndex)
+    {
+        if (seenOwners.insert(drawOwner(recordIndex)).second)
+            tlasSources.push_back({ &blasFor(recordIndex), sharing ? m_drawRecordTransformSlot[recordIndex] : UINT_MAX });
+        return !sharing || m_drawRecordDeform[recordIndex];
+    };
     const bool usesOpacityMicromaps = opacityMicromaps != nullptr;
-    UINT staticVbWorldBase = 0;
     for (size_t recordIndex = 0; recordIndex < m_drawRecords.size() && snapshotValid; ++recordIndex)
     {
         const DrawRecord& record = m_drawRecords[recordIndex];
@@ -3091,24 +3189,21 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             continue;
         std::vector<BYTE>* inputs = nullptr;
         size_t* hash = nullptr;
-        UINT vbWorldBase = 0;
         if (isStatic(recordIndex))
         {
-            if (staticRecords.empty())
-                staticVbWorldBase = record.vbWorldStart;
             staticRecords.push_back(recordIndex);
             inputs = &m_currentStaticBlasInputs;
-            vbWorldBase = staticVbWorldBase;
         }
         else
         {
-            DynamicBlas& owner = m_dynamicBlases[m_drawRecordOwner[recordIndex]];
+            if (!noteOwner(recordIndex))
+                continue;
+            DynamicBlas& owner = blasFor(recordIndex);
             if (owner.lastUsedFrame != m_blasFrame)
             {
                 owner.lastUsedFrame = m_blasFrame;
                 owner.records.clear();
                 owner.currentInputs.clear();
-                owner.vbWorldBase = record.vbWorldStart;
                 owner.currentHash = usesOpacityMicromaps ? 1 : 0;
                 owners.push_back(&owner);
                 owner.currentInputs.insert(owner.currentInputs.end(), reinterpret_cast<const BYTE*>(&usesOpacityMicromaps),
@@ -3117,7 +3212,6 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             owner.records.push_back(recordIndex);
             inputs = &owner.currentInputs;
             hash = &owner.currentHash;
-            vbWorldBase = owner.vbWorldBase;
         }
         const auto appendInput = [&](const void* data, size_t size)
         {
@@ -3125,14 +3219,13 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             inputs->resize(offset + size);
             memcpy(inputs->data() + offset, data, size);
         };
-        const UINT relativeVbWorldStart = record.vbWorldStart - vbWorldBase;
-        const UINT geometry[] = { record.numInstances, record.indexBufferCount, record.indexBufferStart, relativeVbWorldStart,
+        const UINT geometry[] = { record.numInstances, record.indexBufferCount, record.indexBufferStart,
             record.baseVertexLocation, record.vertexCount, static_cast<UINT>(record.inputLayout), record.objectTransformSlot != UINT_MAX };
         appendInput(geometry, sizeof(geometry));
         if (hash)
         {
             // What shapes the BLAS geometry descriptors, and the micromap linkage an update must keep.
-            for (const UINT value : { record.numInstances, record.indexBufferCount, record.indexBufferStart, relativeVbWorldStart,
+            for (const UINT value : { record.numInstances, record.indexBufferCount, record.indexBufferStart,
                 record.vertexCount, static_cast<UINT>(record.inputLayout), micromapLeaf(record) ? 1u : 0u })
                 *hash = hash_combine(*hash, std::hash<UINT>{}(value));
             if (opacityMicromaps)
@@ -3178,6 +3271,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         // Without a valid snapshot, rebuild every BLAS from the records as drawn.
         owners.clear();
         staticRecords.clear();
+        tlasSources.clear();
+        seenOwners.clear();
         for (size_t recordIndex = 0; recordIndex < m_drawRecords.size(); ++recordIndex)
         {
             if (!m_drawRecords[recordIndex].numInstances)
@@ -3187,8 +3282,9 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
                 staticRecords.push_back(recordIndex);
                 continue;
             }
-            const void* key = recordIndex < m_drawRecordOwner.size() ? m_drawRecordOwner[recordIndex] : nullptr;
-            DynamicBlas& owner = m_dynamicBlases[key];
+            if (!noteOwner(recordIndex))
+                continue;
+            DynamicBlas& owner = blasFor(recordIndex);
             if (owner.lastUsedFrame != m_blasFrame || std::find(owners.begin(), owners.end(), &owner) == owners.end())
             {
                 owner.lastUsedFrame = m_blasFrame;
@@ -3392,19 +3488,24 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     }
 
     // Owners that stopped drawing keep their BLAS for a few frames (they may be culled or hidden briefly).
-    for (auto entry = m_dynamicBlases.begin(); entry != m_dynamicBlases.end();)
+    const auto retireUnused = [&](auto& blases)
     {
-        if (m_blasFrame - entry->second.lastUsedFrame > kDynamicBlasRetireFrames)
+        for (auto entry = blases.begin(); entry != blases.end();)
         {
-            Retire(entry->second.blas);
-            Retire(entry->second.scratch);
-            entry = m_dynamicBlases.erase(entry);
+            if (m_blasFrame - entry->second.lastUsedFrame > kDynamicBlasRetireFrames)
+            {
+                Retire(entry->second.blas);
+                Retire(entry->second.scratch);
+                entry = blases.erase(entry);
+            }
+            else
+            {
+                ++entry;
+            }
         }
-        else
-        {
-            ++entry;
-        }
-    }
+    };
+    retireUnused(m_dynamicBlases);
+    retireUnused(m_sharedBlases);
 
     auto& profile = m_renderData->profile;
     for (const BlasAction action : actions)
@@ -3421,12 +3522,31 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     // rebuild below grows a BLAS, so the reuse test compares against the instances as they would be now.
     const auto currentTlasState = [&]()
     {
-        std::vector<std::pair<D3D12_GPU_VIRTUAL_ADDRESS, UINT>> state;
-        state.reserve(owners.size() + 1);
-        for (const DynamicBlas* owner : owners)
-            state.emplace_back(owner->blas ? owner->blas->GetGPUVirtualAddress() : 0, owner->firstGeometry);
+        std::vector<TlasInstance> state;
+        state.reserve(tlasSources.size() + 1);
+        for (const TlasSource& source : tlasSources)
+        {
+            TlasInstance instance;
+            instance.blas = source.blas->blas ? source.blas->blas->GetGPUVirtualAddress() : 0;
+            instance.firstGeometry = source.blas->firstGeometry;
+            if (source.transformSlot != UINT_MAX && source.transformSlot < instanceCount)
+            {
+                // InstancedData::World maps row vectors; the TLAS takes the transposed 3x4 for column vectors.
+                const XMFLOAT4X4& world = instances[source.transformSlot].World;
+                for (int row = 0; row < 3; ++row)
+                    for (int column = 0; column < 4; ++column)
+                        instance.transform[row][column] = world.m[column][row];
+            }
+            if (instance.blas)
+                state.push_back(instance);
+        }
         if (staticGeometryCount > 0 && m_staticBlas.blas)
-            state.emplace_back(m_staticBlas.blas->GetGPUVirtualAddress(), staticFirstGeometry);
+        {
+            TlasInstance instance;
+            instance.blas = m_staticBlas.blas->GetGPUVirtualAddress();
+            instance.firstGeometry = staticFirstGeometry;
+            state.push_back(instance);
+        }
         return state;
     };
     const auto recordAccelerationStructureBytes = [&]()
@@ -3436,6 +3556,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         const auto width = [](const CComPtr<ID3D12Resource>& resource) -> UINT64 { return resource ? resource->GetDesc().Width : 0; };
         UINT64 bytes = width(m_TLAS) + width(m_scratchTLAS) + width(m_staticBlas.blas);
         for (const auto& entry : m_dynamicBlases)
+            bytes += width(entry.second.blas) + width(entry.second.scratch);
+        for (const auto& entry : m_sharedBlases)
             bytes += width(entry.second.blas) + width(entry.second.scratch);
         profile.accelerationStructureBytes = bytes;
         profile.staticBlasBytes = width(m_staticBlas.blas);
@@ -3561,14 +3683,12 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     {
         D3D12_RAYTRACING_INSTANCE_DESC& desc = instanceDescs[firstDesc + i];
         ZeroMemory(&desc, sizeof(desc));
-        desc.AccelerationStructure = m_tlasState[i].first;
+        desc.AccelerationStructure = m_tlasState[i].blas;
         desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
         desc.InstanceContributionToHitGroupIndex = 0;
-        desc.InstanceID = m_tlasState[i].second;    // The hit shaders' geometry-table index is InstanceID() + GeometryIndex().
+        desc.InstanceID = m_tlasState[i].firstGeometry;    // The hit shaders' geometry-table index is InstanceID() + GeometryIndex().
         desc.InstanceMask = 0xFF;
-        desc.Transform[0][0] = 1.0f;
-        desc.Transform[1][1] = 1.0f;
-        desc.Transform[2][2] = 1.0f;
+        memcpy(desc.Transform, m_tlasState[i].transform, sizeof(desc.Transform));
     }
     m_instancesTLAS->Unmap();
     m_numInstancesInTLAS = instanceTotal;
@@ -4230,6 +4350,7 @@ HRESULT RenderPlatform12::UninitDevice()
     m_scratchTLAS.Release();
 
     m_dynamicBlases.clear();
+    m_sharedBlases.clear();
     m_tlasState.clear();
     m_tlasCapacity = 0;
     m_staticBlas.Release();

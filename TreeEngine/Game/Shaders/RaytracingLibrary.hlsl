@@ -129,6 +129,13 @@ uint LoadIndex(uint indexOffset, uint isSkinned)
         return indexBuffer.Load(indexOffset * 4);
 }
 
+// World-vertex buffer positions are in the BLAS's object space (layout space for instanced trees, whose TLAS
+// instance carries the object transform); this maps one to world space.
+float3 ObjectToWorldPosition(float3 position)
+{
+    return mul(float4(position, 1.0f), ObjectToWorld4x3());
+}
+
 float3 LoadVertexPosition(uint vertexIndex)
 {
     // VBWorld stores float4 per vertex (16 bytes stride)
@@ -163,9 +170,9 @@ void ComputeTextureFootprint(DxrGeometryInfo geometry, uint3 indices,
     float2 uv0, float2 uv1, float2 uv2, out float2 uvDx, out float2 uvDy, out float2 baryDx, out float2 baryDy)
 {
     uvDx = uvDy = baryDx = baryDy = 0.0f;
-    float3 p0 = LoadVertexPosition(geometry.vertexBufferOffset + indices.x);
-    float3 edge1 = LoadVertexPosition(geometry.vertexBufferOffset + indices.y) - p0;
-    float3 edge2 = LoadVertexPosition(geometry.vertexBufferOffset + indices.z) - p0;
+    float3 p0 = ObjectToWorldPosition(LoadVertexPosition(geometry.vertexBufferOffset + indices.x));
+    float3 edge1 = ObjectToWorldPosition(LoadVertexPosition(geometry.vertexBufferOffset + indices.y)) - p0;
+    float3 edge2 = ObjectToWorldPosition(LoadVertexPosition(geometry.vertexBufferOffset + indices.z)) - p0;
     float3 planeNormal = cross(edge1, edge2);
     float areaSquared = dot(planeNormal, planeNormal);
     if (areaSquared < 1e-16f)
@@ -364,12 +371,11 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
             normalL, texCoord, uvDx, uvDy);
     }
 
-    // Transform object-space normal to world space using instance world matrix
-    float4x4 worldMatrix = instanceDataBuffer[geoInfo.instanceIndex].World;
-    if (geoInfo.objectTransformSlot != NoObjectTransform)
-        worldMatrix = mul(worldMatrix, instanceDataBuffer[geoInfo.objectTransformSlot].World);
-    normal = normalize(mul(normal, (float3x3)worldMatrix));
-    tangent = normalize(mul(tangent, (float3x3)worldMatrix));
+    // Transform the mesh normal to world space: the instance's (branch's) matrix, then the TLAS instance's object
+    // transform (an instanced tree's placement; identity otherwise).
+    const float3x3 worldMatrix = mul((float3x3)instanceDataBuffer[geoInfo.instanceIndex].World, (float3x3)ObjectToWorld4x3());
+    normal = normalize(mul(normal, worldMatrix));
+    tangent = normalize(mul(tangent, worldMatrix));
     tangent = normalize(tangent - normal * dot(normal, tangent));
     float3 surfaceNormal = normal; // Keep texture normals out of the AO hemisphere.
 
@@ -377,7 +383,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     if (mat.normalTextures.x >= 0 && mat.biplanarParams.x > 0)
     {
         // Each projection's normal in its own frame, blended in world space; see Tree.hlsl ShadeSurface.
-        const float3 upW = normalize(mul(float3(0, 1, 0), (float3x3)worldMatrix));
+        const float3 upW = normalize(mul(float3(0, 1, 0), worldMatrix));
         float3 blended = 0;
         [unroll] for (uint i = 0; i < 2; ++i)
         {
@@ -499,9 +505,9 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float contactVisibility = 1;
     if (ambientOcclusionRadius > 0 && ambientOcclusionStrength > 0 && mat.opticalParams.y == 0)
     {
-        float3 p0 = LoadVertexPosition(geoInfo.vertexBufferOffset + i0);
-        float3 p1 = LoadVertexPosition(geoInfo.vertexBufferOffset + i1);
-        float3 p2 = LoadVertexPosition(geoInfo.vertexBufferOffset + i2);
+        float3 p0 = ObjectToWorldPosition(LoadVertexPosition(geoInfo.vertexBufferOffset + i0));
+        float3 p1 = ObjectToWorldPosition(LoadVertexPosition(geoInfo.vertexBufferOffset + i1));
+        float3 p2 = ObjectToWorldPosition(LoadVertexPosition(geoInfo.vertexBufferOffset + i2));
         float3 geometricNormal = normalize(cross(p1 - p0, p2 - p0));
         if (dot(geometricNormal, surfaceNormal) < 0)
             geometricNormal = -geometricNormal;
