@@ -13,7 +13,9 @@ GltfModel::GltfModel(GltfModelParams* parameters)
       m_normalVelocity1(parameters->normalVelocity1), m_normalVelocity2(parameters->normalVelocity2),
       m_normalStrength(parameters->normalStrength),
       m_tintMaterial(parameters->tintMaterial), m_tintTexture(parameters->tintTexture),
-      m_tintUvScale(parameters->tintUvScale), m_tintUvOffset(parameters->tintUvOffset)
+      m_tintUvScale(parameters->tintUvScale), m_tintUvOffset(parameters->tintUvOffset),
+      m_biplanarMaterial(parameters->biplanarMaterial), m_biplanarUvPerUnit(parameters->biplanarUvPerUnit),
+      m_biplanarSharpness(parameters->biplanarSharpness)
 {
 }
 
@@ -67,12 +69,16 @@ HRESULT GltfModel::InitGraphics(RenderManager& renderManager)
             HRR(renderManager.BindMaterialTexture(*m_tintTexture, TintTextureRole, shaderMaterial));
             SetMaterialUvTransform(shaderMaterial, TintTextureRole, m_tintUvOffset, 0, m_tintUvScale);
         }
+        const bool biplanar = m_biplanarUvPerUnit > 0 && imported.name == m_biplanarMaterial;
+        if (biplanar)
+            shaderMaterial.biplanarParams = XMFLOAT4(m_biplanarUvPerUnit, m_biplanarSharpness, 0, 0);
         if (m_forceLit)
             shaderMaterial.flags.w = 0.0f;
         std::wstring name = assetName + L"#material" + std::to_wstring(i)
             + (m_forceLit ? L"#forceLit" : L"");
         if (animatedNormal) name += L"#normalAnimation" + std::to_wstring(reinterpret_cast<uintptr_t>(this));
         if (tinted) name += L"#tint" + std::to_wstring(reinterpret_cast<uintptr_t>(this));
+        if (biplanar) name += L"#biplanar" + std::to_wstring(reinterpret_cast<uintptr_t>(this));
         HRR(renderManager.CreateMaterial(
             name.c_str(), texture, nullptr, nullptr, nullptr, nullptr,
             shaderMaterial, state, &materials[i]));

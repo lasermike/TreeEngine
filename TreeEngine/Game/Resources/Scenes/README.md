@@ -397,6 +397,8 @@ A model can specify "normalAnimation": {"material": "material name", "velocity1"
 
 A model can also specify "materialTint": {"material": "material name", "texture": "Terrain/tint.png", "uvScale": [su, sv], "uvOffset": [ou, ov]}. The texture multiplies that glTF material's base color by 2 x its RGB, so 0.5 leaves the color unchanged; it is read as linear data. Its UV is the model's UV times uvScale plus uvOffset (defaults 1 and 0), so a low-resolution tint can vary a tiled texture over a whole surface. Terra's terrain uses one to keep its baked weathering as broad light and dark variation over the tiled rock photoscan (`Tools/terra/fix_terra.py`).
 
+A model can also specify "biplanar": {"material": "material name", "uvPerUnit": 0.0483, "sharpness": 1} for a surface whose UVs are a top-down planar projection, such as Terra's terrain. On steep faces a top-down projection stretches the texture into vertical streaks, so that material's base color, normal, metallic-roughness and specular maps are also projected along the object's X and Z axes at uvPerUnit UV units per object-space unit (match the top-down projection's scale; required, positive), each through the material's own texture transform. Every pixel blends the two projections its normal leans on most, the model's own UVs serving as the Y projection, so flat ground keeps its current look and each map is read at most twice. Optional sharpness (greater than 0, at most 16, default 1) is the exponent on the blend weights; higher values narrow the transitions. The tint and normal animation still use the model's UVs only. Raster and DXR match.
+
 ## Alpha-tested surfaces
 
 Materials with `alphaMode: "mask"` (leaves, needles) are opaque where alpha reaches `alphaCutoff`. Ray tracing

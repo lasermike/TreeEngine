@@ -161,6 +161,9 @@ seams = len(U) - len(np.unique(np.round(P, 6), axis=0))
 scale = 1 / (hi - lo)
 print(f"FIX terrain UVs: planar fit u = {coef[0, 0]:.5f} x + {coef[1, 0]:.5f} z + {coef[2, 0]:.5f}, "
       f"v = {coef[0, 1]:.5f} x + {coef[1, 1]:.5f} z + {coef[2, 1]:.5f} ({seams} split seam vertices now share UVs)")
+# Scene "biplanar" uvPerUnit: the planar fit's UV units per object unit (sqrt of its 2x2 determinant), so the side
+# projections keep the top-down texel density.
+print(f"FIX biplanar uvPerUnit {np.sqrt(abs(np.linalg.det(coef[:2]))):.4f}")
 print(f"FIX tint: {valid.sum()} of {len(valid)} vertices sampled the bake; rock mean {rock_mean.round(4)}; "
       f"tint mean {tint.reshape(-1, 3).mean(axis=0).round(3)}")
 print(f"FIX materialTint uvScale [{scale[0]:.6f}, {scale[1]:.6f}] uvOffset [{-lo[0] * scale[0]:.6f}, {-lo[1] * scale[1]:.6f}]")

@@ -28,26 +28,43 @@ TextureCube txEnvironmentDiffuse : register(t7);
 TextureCube txEnvironmentSpecular : register(t8);
 Texture2D txTint : register(t10);
 
-ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv)
+// One projection of a material map, with explicit gradients (already scaled for the upscaling bias).
+float4 SampleMaterialMapGrad(Texture2D map, bool clampMap, ShaderMaterial material, uint role, float2 uv, float2 uvDx, float2 uvDy)
+{
+    const float2 roleUv = TransformMaterialUv(material, uv, role);
+    const float2 dx = TransformMaterialUvGradient(material, uvDx, role);
+    const float2 dy = TransformMaterialUvGradient(material, uvDy, role);
+    return clampMap ? map.SampleGrad(samLinearClamp, roleUv, dx, dy) : map.SampleGrad(samLinearWrap, roleUv, dx, dy);
+}
+
+// A material map through the model's UVs, or blended over the biplanar projections when the material has them.
+float4 SampleMaterialMap(Texture2D map, bool clampMap, ShaderMaterial material, uint role, float2 uv, Biplanar biplanar)
+{
+    if (material.biplanarParams.x <= 0)
+    {
+        const float2 roleUv = TransformMaterialUv(material, uv, role);
+        return clampMap ? map.SampleBias(samLinearClamp, roleUv, renderScale.x) : map.SampleBias(samLinearWrap, roleUv, renderScale.x);
+    }
+    float4 result = 0;
+    [unroll] for (uint i = 0; i < 2; ++i)
+        if (biplanar.weight[i] > 0)
+            result += biplanar.weight[i] * SampleMaterialMapGrad(map, clampMap, material, role,
+                biplanar.uv[i], biplanar.uvDx[i], biplanar.uvDy[i]);
+    return result;
+}
+
+ShaderMaterial SampleSpecularMaterial(ShaderMaterial material, float2 uv, Biplanar biplanar)
 {
     if (material.specularTextures.x >= 0)
-    {
-        float2 strengthUv = TransformMaterialUv(material, uv, SpecularStrengthTextureRole);
-        material.specularParams.w *= material.specularTextures.z > 0
-            ? txSpecular.SampleBias(samLinearClamp, strengthUv, renderScale.x).a : txSpecular.SampleBias(samLinearWrap, strengthUv, renderScale.x).a;
-    }
+        material.specularParams.w *= SampleMaterialMap(txSpecular, material.specularTextures.z > 0, material,
+            SpecularStrengthTextureRole, uv, biplanar).a;
     if (material.specularTextures.y >= 0)
-    {
-        float2 colorUv = TransformMaterialUv(material, uv, SpecularColorTextureRole);
-        material.specularColor.rgb *= material.specularTextures.w > 0
-            ? txSpecularColor.SampleBias(samLinearClamp, colorUv, renderScale.x).rgb : txSpecularColor.SampleBias(samLinearWrap, colorUv, renderScale.x).rgb;
-    }
+        material.specularColor.rgb *= SampleMaterialMap(txSpecularColor, material.specularTextures.w > 0, material,
+            SpecularColorTextureRole, uv, biplanar).rgb;
     if (material.metallicRoughnessTextures.x >= 0)
     {
-        float2 metallicRoughnessUv = TransformMaterialUv(material, uv, MetallicRoughnessTextureRole);
-        float4 mr = (material.metallicRoughnessTextures.y > 0
-            ? txMetallicRoughness.SampleBias(samLinearClamp, metallicRoughnessUv, renderScale.x)
-            : txMetallicRoughness.SampleBias(samLinearWrap, metallicRoughnessUv, renderScale.x));
+        float4 mr = SampleMaterialMap(txMetallicRoughness, material.metallicRoughnessTextures.y > 0, material,
+            MetallicRoughnessTextureRole, uv, biplanar);
         material.specularParams.y *= mr.b;
         material.specularParams.z *= mr.g;
     }
@@ -91,6 +108,15 @@ void ApplyObjectTransform(inout float3 position, inout float3 normal, inout floa
     position = mul(float4(position, 1.0f), objectTransform).xyz;
     normal = mul(normal, (float3x3) objectTransform);
     tangent = mul(tangent, (float3x3) objectTransform);
+}
+
+// The mesh's +Y in world space, through the instance and object transforms.
+float3 ObjectUpDirection(float4x4 world)
+{
+    float3 up = world[1].xyz;
+    if (objectTransformSlot != NoObjectTransform)
+        up = mul(up, (float3x3) InstanceBuffer[objectTransformSlot].World);
+    return normalize(up);
 }
 
 // Leaves from a texture atlas read their region from the instance slot AtlasRegion names.
@@ -152,7 +178,9 @@ struct PS_INPUT
     // Motion vectors: this frame's and last frame's clip positions, without jitter.
     float4 CurrentClip : TEXCOORD6;
     float4 PreviousClip : TEXCOORD7;
-    float3 PosL : TEXCOORD8;    // The mesh's own position, for the hashed alpha test.
+    float3 PosL : TEXCOORD8;    // The mesh's own position, for the hashed alpha test and biplanar mapping.
+    float3 NormL : TEXCOORD9;   // The mesh's own normal and the object's +Y in world space, for biplanar mapping.
+    float3 UpW : TEXCOORD10;
 };
 
 struct PS_OUTPUT
@@ -255,6 +283,8 @@ PS_INPUT VS(VS_INPUT input)
     ApplyObjectTransform(out0, worldNormal, worldTangent);
     output.PosW = out0;
     output.PosL = input.Pos;
+    output.NormL = input.NormalL;
+    output.UpW = ObjectUpDirection(world);
     SetMotionClips(output, out0,
         PreviousObjectTransform(mul(float4(input.Pos, 1.0f), PreviousWorld(input.PreviousSlot, world)).xyz));
 
@@ -288,6 +318,8 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     ApplyObjectTransform(skinnedPosition, worldNormal, worldTangent);
     output.PosW = skinnedPosition;
     output.PosL = input.Pos;
+    output.NormL = input.NormalL;
+    output.UpW = ObjectUpDirection(input.World);
     SetMotionClips(output, skinnedPosition, PreviousObjectTransform(PreviousSkinVertexPosition(input)));
 
     output.Pos = mul(float4(output.PosW, 1.0f), View);
@@ -328,13 +360,20 @@ float4 ShadeSurface(PS_INPUT input)
     float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
     float4 spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
 
+    Biplanar biplanar = (Biplanar)0;
+    if (mat.biplanarParams.x > 0)
+    {
+        // The upscaling bias SampleBias applies elsewhere, as a gradient scale.
+        const float gradientScale = exp2(renderScale.x);
+        biplanar = BiplanarSetup(mat, input.PosL, ddx(input.PosL) * gradientScale, ddy(input.PosL) * gradientScale,
+            input.NormL, input.Tex, ddx(input.Tex) * gradientScale, ddy(input.Tex) * gradientScale);
+    }
+
     float4 textureColor;
     if (mat.flags.y > 0)  //use texture
     {
         float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
-        textureColor = (mat.specularColor.w > 0
-            ? txDiffuse.SampleBias(samLinearClamp, baseColorUv, renderScale.x)
-            : txDiffuse.SampleBias(samLinearWrap, baseColorUv, renderScale.x));
+        textureColor = SampleMaterialMap(txDiffuse, mat.specularColor.w > 0, mat, BaseColorTextureRole, input.Tex, biplanar);
 
         if (mat.flags.z > 0)  // alpha test
         {
@@ -359,8 +398,34 @@ float4 ShadeSurface(PS_INPUT input)
         return color;
     }
 
-    ShaderMaterial sampledMaterial = SampleSpecularMaterial(mat, input.Tex);
-    if (mat.normalTextures.x >= 0)
+    ShaderMaterial sampledMaterial = SampleSpecularMaterial(mat, input.Tex, biplanar);
+    if (mat.normalTextures.x >= 0 && mat.biplanarParams.x > 0)
+    {
+        // Each projection's normal in its own frame, blended in world space. Normal animation isn't applied.
+        const float3 surfaceNormal = normalize(input.N);
+        float3 blended = 0;
+        [unroll] for (uint i = 0; i < 2; ++i)
+        {
+            if (biplanar.weight[i] <= 0)
+                continue;
+            float3 tangentNormal = SampleMaterialMapGrad(txNormal, mat.normalTextures.z > 0, mat, NormalTextureRole,
+                biplanar.uv[i], biplanar.uvDx[i], biplanar.uvDy[i]).xyz * 2.0f - 1.0f;
+            tangentNormal.xy *= mat.normalTextures.y;
+            float3 tangent, bitangent;
+            if (biplanar.axis[i] == 1)
+            {
+                tangent = normalize(input.T);
+                bitangent = normalize(input.B);
+                TransformNormalBasis(mat, tangent, bitangent);
+            }
+            else
+                BiplanarSideFrame(mat, biplanar.axis[i], input.NormL, surfaceNormal, normalize(input.UpW), tangent, bitangent);
+            blended += biplanar.weight[i]
+                * normalize(tangentNormal.x * tangent + tangentNormal.y * bitangent + tangentNormal.z * surfaceNormal);
+        }
+        normal = normalize(blended);
+    }
+    else if (mat.normalTextures.x >= 0)
     {
         float2 normalUv = TransformMaterialUv(mat, input.Tex, NormalTextureRole);
         float2 normalUv1 = normalUv + mat.normalMotion.xy * sceneTime.x;

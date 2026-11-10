@@ -59,6 +59,7 @@ struct ShaderMaterial
         opticalParams = XMFLOAT4(1.5f, 0, 0, 0);
         normalMotion = XMFLOAT4(0, 0, 0, 0);
         tintTextures = XMFLOAT4(-1, 0, 0, 0);
+        biplanarParams = XMFLOAT4(0, 1, 0, 0);
         for (int role = 0; role < MaterialTextureRoleCount; ++role)
         {
             uvTransformRow0[role] = XMFLOAT4(1, 0, 0, 0);
@@ -88,11 +89,14 @@ struct ShaderMaterial
     XMFLOAT4 opticalParams; // x = IOR; y = transmission factor
     XMFLOAT4 normalMotion; // two UV velocities per second
     XMFLOAT4 tintTextures; // tint texture slot, clamp flag
+    // Biplanar mapping (scene "biplanar"): x = UV units per object-space unit for the side projections (0 = off),
+    // y = blend sharpness. The model's own UVs stay the top-down projection; see Shaders/Materials.fx.
+    XMFLOAT4 biplanarParams;
     XMFLOAT4 uvTransformRow0[MaterialTextureRoleCount]; // xy = UV matrix row, z = U offset
     XMFLOAT4 uvTransformRow1[MaterialTextureRoleCount]; // xy = UV matrix row, z = V offset
 };
 
-static_assert(sizeof(ShaderMaterial) == 368, "ShaderMaterial must match Materials.fx");
+static_assert(sizeof(ShaderMaterial) == 384, "ShaderMaterial must match Materials.fx");
 
 struct CBMaterial
 {
