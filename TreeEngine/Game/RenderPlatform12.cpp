@@ -1198,16 +1198,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     GetDevice()->CreateShaderResourceView(m_DrawRecordsResource, &descDrawRecordsSrv, m_descriptorHeap.hCPU(DrawRecords_SrvHeapOffset));
 
-    m_previousDrawRecordHash = 0;
-    m_previousBlasInputs.clear();
-    m_currentBlasInputs.clear();
+    ReleaseDynamicBlases();
     m_cpuInstanceData.clear();
     m_mappedInstanceData = nullptr;
-
-    m_bvhGeometryDescs = new D3D12_RAYTRACING_GEOMETRY_DESC[maxInstances];
-    m_ommTriangleDescs.assign(maxInstances, {});
-    m_ommLinkageDescs.assign(maxInstances, {});
-    ZeroMemory(m_bvhGeometryDescs, sizeof(D3D12_RAYTRACING_GEOMETRY_DESC) * maxInstances);
 
     // Not a constant buffer: the TLAS reads tightly packed 64-byte descriptors, not 256-byte constant-buffer slots.
     m_instancesTLAS = new UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>(GetDevice(), MAX_INSTANCES_IN_TLAS * 2, false);
@@ -1529,9 +1522,6 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
         m_drawRecordUploads[frame].Release();
     }
 
-    SafeDelete(&m_bvhGeometryDescs);
-    m_ommTriangleDescs.clear();
-    m_ommLinkageDescs.clear();
     ReleaseOpacityMicromaps();
     // The GPU is idle (waited above), and a new level's meshes may reuse these index ranges.
     m_instanceIndexBuffers.clear();
@@ -1541,8 +1531,8 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     SafeDelete(&m_dxrMaterialBuffer);
     SafeDelete(&m_dxrGeometryInfoBuffer);
     SafeDelete(&m_instancesTLAS);
-    m_previousBlasInputs.clear();
-    m_currentBlasInputs.clear();
+    ReleaseDynamicBlases();
+    m_tlasState.clear();
     m_staticBlas.Release();
     m_currentStaticBlasInputs.clear();
 
@@ -1662,6 +1652,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
             texIdx,
             ObjectTransformSlot));
         m_drawRecordStatic.push_back(m_currentRenderUnitStatic);
+        m_drawRecordOwner.push_back(m_renderData->currentDrawOwner);
 
         m_nextVbWorldStart += static_cast<UINT>(vertexCount);
     }
@@ -2922,15 +2913,36 @@ HRESULT RenderPlatform12::InstanceIndexBuffer(const InstanceIndexKey& key, UINT 
     return S_OK;
 }
 
+// Every dynamic BLAS, for a new level or device; the GPU must be idle or the resources retired.
+void RenderPlatform12::ReleaseDynamicBlases()
+{
+    for (auto& entry : m_dynamicBlases)
+    {
+        Retire(entry.second.blas);
+        Retire(entry.second.scratch);
+    }
+    m_dynamicBlases.clear();
+    for (auto& upload : m_ommRecordUpload)
+    {
+        Retire(upload.buffer);
+        upload.mapped = nullptr;
+        upload.capacity = 0;
+    }
+}
+
 void RenderPlatform12::ReleaseOpacityMicromaps()
 {
-    m_previousBlasInputs.clear();
+    // Micromap linkage can't change across an update, so every dynamic BLAS rebuilds.
+    for (auto& entry : m_dynamicBlases)
+    {
+        entry.second.built = false;
+        entry.second.ommIndices.clear();
+    }
     m_ommArray.Release();
     m_ommScratch.Release();
     m_ommData.Release();
     m_ommDescs.Release();
     m_ommIndices.Release();
-    Retire(m_ommRecordIndices);
     m_ommTriangleIndexData.clear();
     m_ommCount = m_ommLevel = 0;
     m_ommBuildPending = false;
@@ -3017,138 +3029,14 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build bottom level Acceleration Structures");
     ProfileTimestamp(ProfilePass::BLAS, false);
 
-    bool freshBuild = forceRebuild || m_TLAS == nullptr;
+    ++m_blasFrame;
+    const bool rebuildAll = forceRebuild || m_TLAS == nullptr;
 
     if (m_ommBuildPending)
         HRR(RecordOpacityMicromapBuild());
     // Instances link micromaps through their slot's entry; the linkage must not change across BLAS updates.
     const int* opacityMicromaps = m_ommIndices && m_settings->m_opacityMicromaps ? m_renderData->instanceOpacityMicromap : nullptr;
 
-    const auto snapshotStart = m_renderData->profile.enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
-    // Compare what the deformation pass turns into world vertices, by value and in geometry order: the
-    // vertex ranges, each instance's matrix, its skinning parent's and the object transform. Instance-slot
-    // numbers are left out: instanced trees move to other slots when they switch between near and far
-    // layouts with the same geometry, and a needless BLAS update can cost the driver tens of milliseconds.
-    // Scene updates write to ordinary CPU memory, avoiding slow reads from the upload heap.
-    // Static records go to their own snapshot. A built BLAS holds its own copy of the vertices, so where static
-    // geometry sits in m_VBWorld doesn't matter to it, and their vbWorldStart is left out.
-    m_currentBlasInputs.clear();
-    m_currentStaticBlasInputs.clear();
-    std::vector<BYTE>* inputTarget = &m_currentBlasInputs;
-    const auto appendInput = [&](const void* data, size_t size)
-    {
-        const size_t offset = inputTarget->size();
-        inputTarget->resize(offset + size);
-        memcpy(inputTarget->data() + offset, data, size);
-    };
-    const bool usesOpacityMicromaps = opacityMicromaps != nullptr;
-    appendInput(&usesOpacityMicromaps, sizeof(usesOpacityMicromaps));
-    const size_t instanceCount = m_cpuInstanceData.size();
-    const InstancedData* instances = m_cpuInstanceData.data();
-    bool snapshotValid = instances != nullptr && m_drawRecordStatic.size() == m_drawRecords.size();
-    const auto isStatic = [&](size_t recordIndex) { return recordIndex < m_drawRecordStatic.size() && m_drawRecordStatic[recordIndex]; };
-    if (snapshotValid)
-    {
-        for (size_t recordIndex = 0; recordIndex < m_drawRecords.size(); ++recordIndex)
-        {
-            const DrawRecord& record = m_drawRecords[recordIndex];
-            inputTarget = isStatic(recordIndex) ? &m_currentStaticBlasInputs : &m_currentBlasInputs;
-            const UINT geometry[] = { record.numInstances, record.indexBufferCount, record.indexBufferStart,
-                isStatic(recordIndex) ? 0u : record.vbWorldStart,
-                record.baseVertexLocation, record.vertexCount, static_cast<UINT>(record.inputLayout), record.objectTransformSlot != UINT_MAX };
-            appendInput(geometry, sizeof(geometry));
-            if (record.startingInstance > instanceCount || record.numInstances > instanceCount - record.startingInstance)
-            {
-                snapshotValid = false;
-                break;
-            }
-            if (record.objectTransformSlot != UINT_MAX)
-            {
-                if (record.objectTransformSlot >= instanceCount)
-                {
-                    snapshotValid = false;
-                    break;
-                }
-                appendInput(&instances[record.objectTransformSlot].World, sizeof(XMFLOAT4X4));
-            }
-            for (UINT i = 0; i < record.numInstances; ++i)
-            {
-                const UINT slot = record.startingInstance + i;
-                const InstancedData& instance = instances[slot];
-                appendInput(&instance.World, sizeof(instance.World));
-                const bool skinnedToParent = record.inputLayout == SKINNED_INPUT_LAYOUT && instance.InstanceOffsetPrev != instance.InstanceOffset;
-                appendInput(&skinnedToParent, sizeof(skinnedToParent));
-                if (skinnedToParent)
-                {
-                    if (instance.InstanceOffsetPrev >= instanceCount)
-                    {
-                        snapshotValid = false;
-                        break;
-                    }
-                    appendInput(&instances[instance.InstanceOffsetPrev].World, sizeof(XMFLOAT4X4));
-                }
-                if (opacityMicromaps)
-                {
-                    appendInput(&opacityMicromaps[slot], sizeof(opacityMicromaps[slot]));
-                }
-            }
-            if (!snapshotValid)
-            {
-                break;
-            }
-        }
-    }
-    const bool unchangedInputs = snapshotValid && !m_previousBlasInputs.empty()
-        && m_currentBlasInputs == m_previousBlasInputs;
-    if (m_renderData->profile.enabled)
-    {
-        m_renderData->profile.blasSnapshotMs = std::chrono::duration<double, std::milli>(
-            std::chrono::steady_clock::now() - snapshotStart).count();
-    }
-
-    const bool profileCpu = m_renderData->profile.enabled;
-    auto cpuStart = profileCpu ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
-    auto elapsedCpuMs = [&]()
-    {
-        const auto now = std::chrono::steady_clock::now();
-        const double elapsed = std::chrono::duration<double, std::milli>(now - cpuStart).count();
-        cpuStart = now;
-        return elapsed;
-    };
-
-    // Hash the geometry layout to see whether the BLAS can be updated in place or must be rebuilt.
-    // Micromap entries are hashed in geometry order, since an update must keep the same linkage.
-    size_t currentHash = opacityMicromaps ? 1 : 0;
-
-    for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
-    {
-        if (isStatic(drawRecordIndex))
-            continue;
-        currentHash = hash_combine(currentHash, m_drawRecords[drawRecordIndex]);
-        const DrawRecord& dr = m_drawRecords[drawRecordIndex];
-        const bool alphaCutoutSprite = dr.inputLayout != SKINNED_INPUT_LAYOUT
-            && dr.indexBufferStart == m_spriteIndices.IndexOffset && dr.indexBufferCount == m_spriteIndices.IndexCount
-            && dr.material.flags.z > 0 && !(dr.material.flags.x > 0);
-        currentHash = hash_combine(currentHash, std::hash<bool>{}(alphaCutoutSprite));
-        if (!opacityMicromaps) continue;
-        for (UINT instanceIndex = 0; instanceIndex < dr.numInstances; instanceIndex++)
-            currentHash ^= std::hash<int>()(opacityMicromaps[dr.startingInstance + instanceIndex]) + 0x9e3779b9 + (currentHash << 6) + (currentHash >> 2);
-    }
-
-    if (currentHash != m_previousDrawRecordHash)
-    {
-        freshBuild = true;
-    }
-    
-    m_previousDrawRecordHash = currentHash;
-    if (profileCpu)
-    {
-        m_renderData->profile.blasHashMs = elapsedCpuMs();
-    }
-
-
-    // One BLAS geometry per draw record. The driver's CPU cost for a build grows with the geometry count (about
-    // 2.5 us per geometry until it warms up), so one per instance made rebuilds cost tens of milliseconds.
     // Alpha-masked sprites (leaves) keep only their front quad. The back quad is coplanar, so either could win a hit;
     // the closest-hit shader shades back-face hits with the flipped normal instead. Their any-hit doesn't cull back faces.
     const auto micromapLeaf = [&](const DrawRecord& dr)
@@ -3177,64 +3065,188 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     if (m_drawRecords.size() > m_maxBLASInstances)
         return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
 
-    if (freshBuild)
+    const auto snapshotStart = m_renderData->profile.enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+    // Group records: static ones into the static BLAS, dynamic ones by owner, owners in order of first draw.
+    // Each owner's snapshot compares what the deformation pass turns into world vertices, by value and in geometry
+    // order: the vertex ranges, each instance's matrix, its skinning parent's and the object transform. Instance-slot
+    // numbers are left out: instanced trees move to other slots when they switch between near and far layouts with
+    // the same geometry, and a needless BLAS update can cost the driver tens of milliseconds. World-vertex offsets
+    // are relative to the owner's (or static geometry's) first record: a built BLAS keeps its own copy of the
+    // vertices, and an update may read them from a moved range. Scene updates write to ordinary CPU memory, avoiding
+    // slow reads from the upload heap.
+    m_currentStaticBlasInputs.clear();
+    std::vector<DynamicBlas*> owners;
+    std::vector<size_t> staticRecords;
+    const size_t instanceCount = m_cpuInstanceData.size();
+    const InstancedData* instances = m_cpuInstanceData.data();
+    bool snapshotValid = instances != nullptr && m_drawRecordStatic.size() == m_drawRecords.size()
+        && m_drawRecordOwner.size() == m_drawRecords.size();
+    const auto isStatic = [&](size_t recordIndex) { return recordIndex < m_drawRecordStatic.size() && m_drawRecordStatic[recordIndex]; };
+    const bool usesOpacityMicromaps = opacityMicromaps != nullptr;
+    UINT staticVbWorldBase = 0;
+    for (size_t recordIndex = 0; recordIndex < m_drawRecords.size() && snapshotValid; ++recordIndex)
     {
-        // The micromap index of every triangle of every instance, in geometry order. Updates keep this linkage.
-        std::vector<int> recordIndices;
+        const DrawRecord& record = m_drawRecords[recordIndex];
+        if (!record.numInstances)
+            continue;
+        std::vector<BYTE>* inputs = nullptr;
+        size_t* hash = nullptr;
+        UINT vbWorldBase = 0;
+        if (isStatic(recordIndex))
+        {
+            if (staticRecords.empty())
+                staticVbWorldBase = record.vbWorldStart;
+            staticRecords.push_back(recordIndex);
+            inputs = &m_currentStaticBlasInputs;
+            vbWorldBase = staticVbWorldBase;
+        }
+        else
+        {
+            DynamicBlas& owner = m_dynamicBlases[m_drawRecordOwner[recordIndex]];
+            if (owner.lastUsedFrame != m_blasFrame)
+            {
+                owner.lastUsedFrame = m_blasFrame;
+                owner.records.clear();
+                owner.currentInputs.clear();
+                owner.vbWorldBase = record.vbWorldStart;
+                owner.currentHash = usesOpacityMicromaps ? 1 : 0;
+                owners.push_back(&owner);
+                owner.currentInputs.insert(owner.currentInputs.end(), reinterpret_cast<const BYTE*>(&usesOpacityMicromaps),
+                    reinterpret_cast<const BYTE*>(&usesOpacityMicromaps) + sizeof(usesOpacityMicromaps));
+            }
+            owner.records.push_back(recordIndex);
+            inputs = &owner.currentInputs;
+            hash = &owner.currentHash;
+            vbWorldBase = owner.vbWorldBase;
+        }
+        const auto appendInput = [&](const void* data, size_t size)
+        {
+            const size_t offset = inputs->size();
+            inputs->resize(offset + size);
+            memcpy(inputs->data() + offset, data, size);
+        };
+        const UINT relativeVbWorldStart = record.vbWorldStart - vbWorldBase;
+        const UINT geometry[] = { record.numInstances, record.indexBufferCount, record.indexBufferStart, relativeVbWorldStart,
+            record.baseVertexLocation, record.vertexCount, static_cast<UINT>(record.inputLayout), record.objectTransformSlot != UINT_MAX };
+        appendInput(geometry, sizeof(geometry));
+        if (hash)
+        {
+            // What shapes the BLAS geometry descriptors, and the micromap linkage an update must keep.
+            for (const UINT value : { record.numInstances, record.indexBufferCount, record.indexBufferStart, relativeVbWorldStart,
+                record.vertexCount, static_cast<UINT>(record.inputLayout), micromapLeaf(record) ? 1u : 0u })
+                *hash = hash_combine(*hash, std::hash<UINT>{}(value));
+            if (opacityMicromaps)
+                for (UINT instanceIndex = 0; instanceIndex < record.numInstances; instanceIndex++)
+                    *hash = hash_combine(*hash, std::hash<int>{}(opacityMicromaps[record.startingInstance + instanceIndex]));
+        }
+        if (record.startingInstance > instanceCount || record.numInstances > instanceCount - record.startingInstance)
+        {
+            snapshotValid = false;
+            break;
+        }
+        if (record.objectTransformSlot != UINT_MAX)
+        {
+            if (record.objectTransformSlot >= instanceCount)
+            {
+                snapshotValid = false;
+                break;
+            }
+            appendInput(&instances[record.objectTransformSlot].World, sizeof(XMFLOAT4X4));
+        }
+        for (UINT i = 0; i < record.numInstances && snapshotValid; ++i)
+        {
+            const UINT slot = record.startingInstance + i;
+            const InstancedData& instance = instances[slot];
+            appendInput(&instance.World, sizeof(instance.World));
+            const bool skinnedToParent = record.inputLayout == SKINNED_INPUT_LAYOUT && instance.InstanceOffsetPrev != instance.InstanceOffset;
+            appendInput(&skinnedToParent, sizeof(skinnedToParent));
+            if (skinnedToParent)
+            {
+                if (instance.InstanceOffsetPrev >= instanceCount)
+                {
+                    snapshotValid = false;
+                    break;
+                }
+                appendInput(&instances[instance.InstanceOffsetPrev].World, sizeof(XMFLOAT4X4));
+            }
+            if (opacityMicromaps)
+                appendInput(&opacityMicromaps[slot], sizeof(opacityMicromaps[slot]));
+        }
+    }
+    if (!snapshotValid)
+    {
+        // Without a valid snapshot, rebuild every BLAS from the records as drawn.
+        owners.clear();
+        staticRecords.clear();
         for (size_t recordIndex = 0; recordIndex < m_drawRecords.size(); ++recordIndex)
         {
-            const DrawRecord& dr = m_drawRecords[recordIndex];
-            if (!dr.numInstances || isStatic(recordIndex) || !linksMicromaps(dr))
+            if (!m_drawRecords[recordIndex].numInstances)
                 continue;
-            const UINT triangles = blasIndexCount(dr) / 3;
-            for (UINT instance = 0; instance < dr.numInstances; ++instance)
+            if (isStatic(recordIndex))
             {
-                const int entry = instanceMicromap(dr, instance);
-                for (UINT t = 0; t < triangles; ++t)
-                    recordIndices.push_back(entry >= 0 ? m_ommTriangleIndexData[entry + t]
-                        : D3D12_RAYTRACING_OPACITY_MICROMAP_SPECIAL_INDEX_FULLY_UNKNOWN_OPAQUE);
+                staticRecords.push_back(recordIndex);
+                continue;
             }
+            const void* key = recordIndex < m_drawRecordOwner.size() ? m_drawRecordOwner[recordIndex] : nullptr;
+            DynamicBlas& owner = m_dynamicBlases[key];
+            if (owner.lastUsedFrame != m_blasFrame || std::find(owners.begin(), owners.end(), &owner) == owners.end())
+            {
+                owner.lastUsedFrame = m_blasFrame;
+                owner.records.clear();
+                owner.currentInputs.clear();
+                owners.push_back(&owner);
+            }
+            owner.records.push_back(recordIndex);
         }
-        Retire(m_ommRecordIndices);
-        if (!recordIndices.empty())
-            HRR(CreateFilledUploadBuffer(GetDevice(), recordIndices.data(), recordIndices.size() * sizeof(int), &m_ommRecordIndices));
+    }
+    if (m_renderData->profile.enabled)
+    {
+        m_renderData->profile.blasSnapshotMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - snapshotStart).count();
     }
 
-    // Geometry order: the dynamic BLAS's geometries first, then the static BLAS's. The per-geometry tables follow
-    // the same order, and each TLAS instance's InstanceID is the table index of its BLAS's first geometry.
-    std::vector<size_t> geometryOrder;
-    geometryOrder.reserve(m_drawRecords.size());
-    for (int pass = 0; pass < 2; ++pass)
-        for (size_t recordIndex = 0; recordIndex < m_drawRecords.size(); ++recordIndex)
-            if (m_drawRecords[recordIndex].numInstances && isStatic(recordIndex) == (pass == 1))
-                geometryOrder.push_back(recordIndex);
-    m_staticGeometryDescs.clear();
-
-    UINT geometryDescIndex = 0;     // Index in the per-geometry tables.
-    UINT dynamicGeometryCount = 0;
-    UINT64 ommRecordOffset = 0;
-    for (const size_t recordIndex : geometryOrder)
+    const bool profileCpu = m_renderData->profile.enabled;
+    auto cpuStart = profileCpu ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+    auto elapsedCpuMs = [&]()
     {
-        const DrawRecord& dr = m_drawRecords[recordIndex];
-        const bool staticRecord = isStatic(recordIndex);
-        const UINT indexCount = blasIndexCount(dr);
-        if (staticRecord)
-            m_staticGeometryDescs.emplace_back();
-        else
-            ++dynamicGeometryCount;
-        D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = staticRecord
-            ? m_staticGeometryDescs.back() : m_bvhGeometryDescs[dynamicGeometryCount - 1];
+        const auto now = std::chrono::steady_clock::now();
+        const double elapsed = std::chrono::duration<double, std::milli>(now - cpuStart).count();
+        cpuStart = now;
+        return elapsed;
+    };
 
+    // Each owner is reused when its inputs are unchanged, refit when only vertices moved, rebuilt otherwise.
+    enum class BlasAction { Reuse, Refit, Rebuild };
+    std::vector<BlasAction> actions(owners.size());
+    for (size_t ownerIndex = 0; ownerIndex < owners.size(); ++ownerIndex)
+    {
+        DynamicBlas& owner = *owners[ownerIndex];
+        if (rebuildAll || !snapshotValid || !owner.built || owner.currentHash != owner.layoutHash)
+            actions[ownerIndex] = BlasAction::Rebuild;
+        else if (owner.currentInputs != owner.inputs)
+            actions[ownerIndex] = BlasAction::Refit;
+        else
+            actions[ownerIndex] = BlasAction::Reuse;
+    }
+    if (profileCpu)
+    {
+        m_renderData->profile.blasHashMs = elapsedCpuMs();
+    }
+
+    // Geometry descriptors and the per-geometry tables: owners' geometries in owner order, then the static BLAS's.
+    // Each TLAS instance's InstanceID is the table index of its BLAS's first geometry.
+    UINT geometryDescIndex = 0;     // Index in the per-geometry tables.
+    const auto describeRecord = [&](const DrawRecord& dr, D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc) -> HRESULT
+    {
+        const UINT indexCount = blasIndexCount(dr);
+        geometryDesc = {};
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
         geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
-
-        // Set explicitly: OmmTriangles.pTriangles shares this union slot from the previous frame.
         geometryDesc.Triangles.Transform3x4 = 0;
         geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
         geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + dr.vbWorldStart * sizeof(XMFLOAT4);
         geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(XMFLOAT4);
         geometryDesc.Triangles.VertexCount = dr.vertexCount * dr.numInstances;
-
         geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
         geometryDesc.Triangles.IndexCount = indexCount * dr.numInstances;
         const bool skinned = dr.inputLayout == SKINNED_INPUT_LAYOUT;
@@ -3252,27 +3264,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         assert(geometryDesc.Triangles.VertexBuffer.StartAddress + geometryDesc.Triangles.VertexCount * geometryDesc.Triangles.VertexBuffer.StrideInBytes
             <= m_VBWorld->GetGPUVirtualAddress() + vbWorldBufferSize);
 
-        if (!staticRecord && m_ommRecordIndices && linksMicromaps(dr))
-        {
-            // The same triangles, plus the record's run of the per-triangle micromap index buffer.
-            D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC& triangles = m_ommTriangleDescs[geometryDescIndex];
-            D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC& linkage = m_ommLinkageDescs[geometryDescIndex];
-            triangles = geometryDesc.Triangles;
-            linkage = {};
-            linkage.OpacityMicromapIndexBuffer.StartAddress = m_ommRecordIndices->GetGPUVirtualAddress() + ommRecordOffset;
-            linkage.OpacityMicromapIndexBuffer.StrideInBytes = sizeof(int);
-            linkage.OpacityMicromapIndexFormat = DXGI_FORMAT_R32_UINT;
-            linkage.OpacityMicromapArray = m_ommArray->GetGPUVirtualAddress();
-            geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
-            geometryDesc.OmmTriangles.pTriangles = &triangles;
-            geometryDesc.OmmTriangles.pOmmLinkage = &linkage;
-            ommRecordOffset += static_cast<UINT64>(geometryDesc.Triangles.IndexCount / 3) * sizeof(int);
-            assert(ommRecordOffset <= m_ommRecordIndices->GetDesc().Width);
-        }
-
         // Populate per-geometry material and geometry info for raytracing shaders
         m_dxrMaterialBuffer->CopyData(geometryDescIndex, dr.material);
-
         DxrGeometryInfo geoInfo = {};
         geoInfo.vertexBufferOffset = dr.vbWorldStart;
         geoInfo.indexBufferOffset = dr.indexBufferStart;
@@ -3284,21 +3277,110 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         geoInfo.objectTransformSlot = dr.objectTransformSlot;
         geoInfo.trianglesPerInstance = indexCount / 3;
         m_dxrGeometryInfoBuffer->CopyData(geometryDescIndex, geoInfo);
+        ++geometryDescIndex;
+        return S_OK;
+    };
 
-        geometryDescIndex++;
+    // Rebuilt owners recompute their micromap indices first, so this frame's upload space can be sized at once.
+    for (size_t ownerIndex = 0; ownerIndex < owners.size(); ++ownerIndex)
+    {
+        if (actions[ownerIndex] != BlasAction::Rebuild)
+            continue;
+        DynamicBlas& owner = *owners[ownerIndex];
+        // The micromap index of every triangle of every instance, in geometry order. Updates keep this linkage.
+        owner.ommIndices.clear();
+        for (const size_t recordIndex : owner.records)
+        {
+            const DrawRecord& dr = m_drawRecords[recordIndex];
+            if (!linksMicromaps(dr))
+                continue;
+            const UINT triangles = blasIndexCount(dr) / 3;
+            for (UINT instance = 0; instance < dr.numInstances; ++instance)
+            {
+                const int entry = instanceMicromap(dr, instance);
+                for (UINT t = 0; t < triangles; ++t)
+                    owner.ommIndices.push_back(entry >= 0 ? m_ommTriangleIndexData[entry + t]
+                        : D3D12_RAYTRACING_OPACITY_MICROMAP_SPECIAL_INDEX_FULLY_UNKNOWN_OPAQUE);
+            }
+        }
     }
+    UINT64 ommUploadBytes = 0;
+    for (size_t ownerIndex = 0; ownerIndex < owners.size(); ++ownerIndex)
+        if (actions[ownerIndex] != BlasAction::Reuse)
+            ommUploadBytes += owners[ownerIndex]->ommIndices.size() * sizeof(int);
+    OmmRecordUpload& ommUpload = m_ommRecordUpload[m_blasFrame & 1];
+    if (ommUploadBytes > ommUpload.capacity)
+    {
+        Retire(ommUpload.buffer);
+        ommUpload.capacity = (std::max)(ommUploadBytes + ommUploadBytes / 2, UINT64(64) * 1024);
+        const D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+        const D3D12_RESOURCE_DESC uploadDesc = CD3DX12_RESOURCE_DESC::Buffer(ommUpload.capacity);
+        HRR(GetDevice()->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE, &uploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr, IID_PPV_ARGS(&ommUpload.buffer)));
+        const D3D12_RANGE noRead = { 0, 0 };
+        HRR(ommUpload.buffer->Map(0, &noRead, reinterpret_cast<void**>(&ommUpload.mapped)));
+    }
+    UINT64 ommUploadOffset = 0;
+
+    for (size_t ownerIndex = 0; ownerIndex < owners.size(); ++ownerIndex)
+    {
+        DynamicBlas& owner = *owners[ownerIndex];
+        owner.firstGeometry = geometryDescIndex;
+        const size_t geometryCount = owner.records.size();
+        owner.geometryDescs.resize(geometryCount);
+        // Sized up front: the descriptors point into these.
+        owner.ommTriangles.resize(geometryCount);
+        owner.ommLinkages.resize(geometryCount);
+
+        // Built and refit BLASes read their micromap indices from this frame's upload space.
+        D3D12_GPU_VIRTUAL_ADDRESS ommIndicesAddress = 0;
+        if (actions[ownerIndex] != BlasAction::Reuse && !owner.ommIndices.empty())
+        {
+            const UINT64 bytes = owner.ommIndices.size() * sizeof(int);
+            if (ommUploadOffset + bytes > ommUpload.capacity)
+                return E_UNEXPECTED;    // Sized above for every built or refit owner.
+            memcpy(ommUpload.mapped + ommUploadOffset, owner.ommIndices.data(), bytes);
+            ommIndicesAddress = ommUpload.buffer->GetGPUVirtualAddress() + ommUploadOffset;
+            ommUploadOffset += bytes;
+        }
+
+        UINT64 ommRecordOffset = 0;
+        for (size_t geometry = 0; geometry < geometryCount; ++geometry)
+        {
+            const DrawRecord& dr = m_drawRecords[owner.records[geometry]];
+            D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc = owner.geometryDescs[geometry];
+            HRR(describeRecord(dr, geometryDesc));
+            if (ommIndicesAddress && linksMicromaps(dr))
+            {
+                // The same triangles, plus the record's run of the per-triangle micromap index buffer.
+                D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC& triangles = owner.ommTriangles[geometry];
+                D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC& linkage = owner.ommLinkages[geometry];
+                triangles = geometryDesc.Triangles;
+                linkage = {};
+                linkage.OpacityMicromapIndexBuffer.StartAddress = ommIndicesAddress + ommRecordOffset;
+                linkage.OpacityMicromapIndexBuffer.StrideInBytes = sizeof(int);
+                linkage.OpacityMicromapIndexFormat = DXGI_FORMAT_R32_UINT;
+                linkage.OpacityMicromapArray = m_ommArray->GetGPUVirtualAddress();
+                geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
+                geometryDesc.OmmTriangles.pTriangles = &triangles;
+                geometryDesc.OmmTriangles.pOmmLinkage = &linkage;
+                ommRecordOffset += static_cast<UINT64>(triangles.IndexCount / 3) * sizeof(int);
+                assert(ommRecordOffset <= owner.ommIndices.size() * sizeof(int));
+            }
+        }
+    }
+
+    const UINT staticFirstGeometry = geometryDescIndex;
+    m_staticGeometryDescs.resize(staticRecords.size());
+    for (size_t geometry = 0; geometry < staticRecords.size(); ++geometry)
+        HRR(describeRecord(m_drawRecords[staticRecords[geometry]], m_staticGeometryDescs[geometry]));
 
     if (profileCpu)
     {
         m_renderData->profile.blasDescriptorsMs = elapsedCpuMs();
     }
 
-    const UINT staticGeometryCount = static_cast<UINT>(m_staticGeometryDescs.size());
-    if (!m_BLAS)
-        freshBuild = true;
-    m_renderData->profile.rebuiltBLAS = dynamicGeometryCount > 0 && freshBuild;
-    // The dynamic BLAS is reused when its inputs are unchanged, refit when only vertices moved, rebuilt otherwise.
-    const bool reuseDynamic = dynamicGeometryCount == 0 || (!freshBuild && unchangedInputs);
+    const UINT staticGeometryCount = static_cast<UINT>(staticRecords.size());
     // The static BLAS is built when its inputs change and compacted the frame after; otherwise it is left alone.
     const bool buildStatic = staticGeometryCount > 0 && (forceRebuild || !snapshotValid || !m_staticBlas.blas
         || m_currentStaticBlasInputs != m_staticBlas.inputs);
@@ -3308,12 +3390,43 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         Retire(m_staticBlas.blas);
         m_staticBlas.Release();
     }
+
+    // Owners that stopped drawing keep their BLAS for a few frames (they may be culled or hidden briefly).
+    for (auto entry = m_dynamicBlases.begin(); entry != m_dynamicBlases.end();)
+    {
+        if (m_blasFrame - entry->second.lastUsedFrame > kDynamicBlasRetireFrames)
+        {
+            Retire(entry->second.blas);
+            Retire(entry->second.scratch);
+            entry = m_dynamicBlases.erase(entry);
+        }
+        else
+        {
+            ++entry;
+        }
+    }
+
+    auto& profile = m_renderData->profile;
+    for (const BlasAction action : actions)
+    {
+        profile.dynamicBlasBuilds += action == BlasAction::Rebuild;
+        profile.dynamicBlasRefits += action == BlasAction::Refit;
+        profile.dynamicBlasReuses += action == BlasAction::Reuse;
+    }
+    const bool anyDynamicWork = std::any_of(actions.begin(), actions.end(), [](BlasAction action) { return action != BlasAction::Reuse; });
+    profile.rebuiltBLAS = std::find(actions.begin(), actions.end(), BlasAction::Rebuild) != actions.end();
+    profile.reusedBLAS = !owners.empty() && !anyDynamicWork;
+
+    // This frame's TLAS instances: each owner's BLAS, then the static BLAS. Addresses are final only after any
+    // rebuild below grows a BLAS, so the reuse test compares against the instances as they would be now.
     const auto currentTlasState = [&]()
     {
-        TlasState state;
-        state.dynamicGeometries = dynamicGeometryCount;
-        state.dynamicBlas = dynamicGeometryCount && m_BLAS ? m_BLAS->GetGPUVirtualAddress() : 0;
-        state.staticBlas = staticGeometryCount && m_staticBlas.blas ? m_staticBlas.blas->GetGPUVirtualAddress() : 0;
+        std::vector<std::pair<D3D12_GPU_VIRTUAL_ADDRESS, UINT>> state;
+        state.reserve(owners.size() + 1);
+        for (const DynamicBlas* owner : owners)
+            state.emplace_back(owner->blas ? owner->blas->GetGPUVirtualAddress() : 0, owner->firstGeometry);
+        if (staticGeometryCount > 0 && m_staticBlas.blas)
+            state.emplace_back(m_staticBlas.blas->GetGPUVirtualAddress(), staticFirstGeometry);
         return state;
     };
     const auto recordAccelerationStructureBytes = [&]()
@@ -3321,16 +3434,18 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         if (!profileCpu)
             return;
         const auto width = [](const CComPtr<ID3D12Resource>& resource) -> UINT64 { return resource ? resource->GetDesc().Width : 0; };
-        m_renderData->profile.accelerationStructureBytes = width(m_BLAS) + width(m_TLAS) + width(m_scratchBLAS)
-            + width(m_scratchTLAS) + width(m_staticBlas.blas);
-        m_renderData->profile.staticBlasBytes = width(m_staticBlas.blas);
+        UINT64 bytes = width(m_TLAS) + width(m_scratchTLAS) + width(m_staticBlas.blas);
+        for (const auto& entry : m_dynamicBlases)
+            bytes += width(entry.second.blas) + width(entry.second.scratch);
+        profile.accelerationStructureBytes = bytes;
+        profile.staticBlasBytes = width(m_staticBlas.blas);
+        profile.tlasInstances = static_cast<UINT>(m_tlasState.size());
     };
 
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
-    m_renderData->profile.reusedBLAS = dynamicGeometryCount > 0 && reuseDynamic;
 
-    if (reuseDynamic && !buildStatic && !compactStatic && m_TLAS && currentTlasState() == m_tlasState)
+    if (!anyDynamicWork && !buildStatic && !compactStatic && m_TLAS && currentTlasState() == m_tlasState)
     {
         recordAccelerationStructureBytes();
         PIXEndEvent(GetCommandList());
@@ -3339,8 +3454,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         ProfileTimestamp(ProfilePass::TLAS, true);
         if (profileBlasCpu)
         {
-            m_renderData->profile.blasCpuMs = std::chrono::duration<double, std::milli>(
-                std::chrono::steady_clock::now() - blasCpuStart).count();
+            profile.blasCpuMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blasCpuStart).count();
         }
         return S_OK;
     }
@@ -3350,76 +3464,71 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     CComPtr<ID3D12GraphicsCommandList6> commandList;
     HRR(GetCommandList()->QueryInterface(__uuidof(ID3D12GraphicsCommandList6), (void**)&commandList));
 
-    if (!reuseDynamic)
+    if (profileCpu)
     {
-        if (snapshotValid)
+        cpuStart = std::chrono::steady_clock::now();
+    }
+    const D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    for (size_t ownerIndex = 0; ownerIndex < owners.size(); ++ownerIndex)
+    {
+        if (actions[ownerIndex] == BlasAction::Reuse)
+            continue;
+        DynamicBlas& owner = *owners[ownerIndex];
+        const bool rebuild = actions[ownerIndex] == BlasAction::Rebuild;
+        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+        inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+        inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+        if (!rebuild)
+            inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+        inputs.NumDescs = static_cast<UINT>(owner.geometryDescs.size());
+        inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+        inputs.pGeometryDescs = owner.geometryDescs.data();
+        if (rebuild)
         {
-            m_previousBlasInputs.swap(m_currentBlasInputs);
-        }
-        else
-        {
-            m_previousBlasInputs.clear();
-        }
-
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS rtInputs = { };
-        rtInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-        rtInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-        if (!freshBuild)
-        {
-            rtInputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-        }
-        rtInputs.NumDescs = dynamicGeometryCount;
-        rtInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-        rtInputs.pGeometryDescs = m_bvhGeometryDescs;
-
-        if (freshBuild)
-        {
-            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO preBuildInfo;
-            device->GetRaytracingAccelerationStructurePrebuildInfo(&rtInputs, &preBuildInfo);
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO preBuildInfo = {};
+            device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &preBuildInfo);
             // Keep buffers that are large enough: recreating them took milliseconds on every rebuild. The queue runs
             // frames in order, so rebuilding into the BLAS the previous frame traced is as safe as updating it.
             const UINT64 scratchBytes = (std::max)(preBuildInfo.ScratchDataSizeInBytes, preBuildInfo.UpdateScratchDataSizeInBytes);
-            D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-            if (!m_BLAS || m_BLAS->GetDesc().Width < preBuildInfo.ResultDataMaxSizeInBytes)
+            if (!owner.blas || owner.blas->GetDesc().Width < preBuildInfo.ResultDataMaxSizeInBytes)
             {
-                Retire(m_BLAS);
+                Retire(owner.blas);
                 D3D12_RESOURCE_DESC blasDesc = CD3DX12_RESOURCE_DESC::Buffer(preBuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
                 HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &blasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
-                    nullptr, __uuidof(ID3D12Resource), (void**)&m_BLAS));
+                    nullptr, IID_PPV_ARGS(&owner.blas)));
             }
-            if (!m_scratchBLAS || m_scratchBLAS->GetDesc().Width < scratchBytes)
+            if (!owner.scratch || owner.scratch->GetDesc().Width < scratchBytes)
             {
-                Retire(m_scratchBLAS);
+                Retire(owner.scratch);
                 D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(scratchBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
                 HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
-                    nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchBLAS));
+                    nullptr, IID_PPV_ARGS(&owner.scratch)));
             }
         }
-
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = { m_BLAS->GetGPUVirtualAddress(),
-                                                                                    rtInputs,
-                                                                                    freshBuild ? 0 : m_BLAS->GetGPUVirtualAddress(),
-                                                                                    m_scratchBLAS->GetGPUVirtualAddress() };
-        if (profileCpu)
-        {
-            cpuStart = std::chrono::steady_clock::now();
-        }
-        commandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-        if (profileCpu)
-        {
-            m_renderData->profile.blasSubmitMs = elapsedCpuMs();
-        }
+        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
+        buildDesc.DestAccelerationStructureData = owner.blas->GetGPUVirtualAddress();
+        buildDesc.Inputs = inputs;
+        buildDesc.SourceAccelerationStructureData = rebuild ? 0 : owner.blas->GetGPUVirtualAddress();
+        buildDesc.ScratchAccelerationStructureData = owner.scratch->GetGPUVirtualAddress();
+        commandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
+        owner.built = true;
+        owner.layoutHash = owner.currentHash;
+        owner.inputs.swap(owner.currentInputs);
+    }
+    if (profileCpu)
+    {
+        profile.blasSubmitMs = elapsedCpuMs();
     }
 
     if (buildStatic)
     {
         HRR(BuildStaticBlas(device, staticGeometryCount));
-        m_renderData->profile.builtStaticBLAS = true;
+        profile.builtStaticBLAS = true;
     }
     else if (compactStatic)
     {
         HRR(CompactStaticBlas(device));
-        m_renderData->profile.compactedStaticBLAS = true;
+        profile.compactedStaticBLAS = true;
     }
 
     D3D12_RESOURCE_BARRIER uavBarrier2 = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
@@ -3429,40 +3538,40 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     ProfileTimestamp(ProfilePass::BLAS, true);
     if (profileBlasCpu)
     {
-        m_renderData->profile.blasCpuMs = std::chrono::duration<double, std::milli>(
-            std::chrono::steady_clock::now() - blasCpuStart).count();
+        profile.blasCpuMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blasCpuStart).count();
     }
 
 
     ////// BUILD TOP ////
-    // Rebuilt, not updated: it holds at most MAX_INSTANCES_IN_TLAS instances, and they come and go.
+    // Rebuilt, not updated: instances come and go as owners appear, leave or change LOD.
     PIXBeginEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build top level Acceleration Structures");
     ProfileTimestamp(ProfilePass::TLAS, false);
+
+    m_tlasState = currentTlasState();
+    const UINT instanceTotal = static_cast<UINT>(m_tlasState.size());
+    if (instanceTotal > MAX_INSTANCES_IN_TLAS)
+        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
 
     // Alternate halves of the upload buffer, so this frame's descriptors never overwrite ones a frame in flight reads.
     m_tlasUploadHalf ^= 1;
     const UINT firstDesc = m_tlasUploadHalf * MAX_INSTANCES_IN_TLAS;
     D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
     HRR(m_instancesTLAS->Map(&instanceDescs));
-    m_numInstancesInTLAS = 0;
-    const auto addInstance = [&](D3D12_GPU_VIRTUAL_ADDRESS blas, UINT firstGeometry)
+    for (UINT i = 0; i < instanceTotal; ++i)
     {
-        D3D12_RAYTRACING_INSTANCE_DESC& desc = instanceDescs[firstDesc + m_numInstancesInTLAS++];
+        D3D12_RAYTRACING_INSTANCE_DESC& desc = instanceDescs[firstDesc + i];
         ZeroMemory(&desc, sizeof(desc));
-        desc.AccelerationStructure = blas;
+        desc.AccelerationStructure = m_tlasState[i].first;
         desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
         desc.InstanceContributionToHitGroupIndex = 0;
-        desc.InstanceID = firstGeometry;    // The hit shaders' geometry-table index is InstanceID() + GeometryIndex().
+        desc.InstanceID = m_tlasState[i].second;    // The hit shaders' geometry-table index is InstanceID() + GeometryIndex().
         desc.InstanceMask = 0xFF;
         desc.Transform[0][0] = 1.0f;
         desc.Transform[1][1] = 1.0f;
         desc.Transform[2][2] = 1.0f;
-    };
-    if (dynamicGeometryCount > 0)
-        addInstance(m_BLAS->GetGPUVirtualAddress(), 0);
-    if (staticGeometryCount > 0 && m_staticBlas.blas)
-        addInstance(m_staticBlas.blas->GetGPUVirtualAddress(), dynamicGeometryCount);
+    }
     m_instancesTLAS->Unmap();
+    m_numInstancesInTLAS = instanceTotal;
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
     topLevelBuildDesc.Inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
@@ -3470,26 +3579,25 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     topLevelBuildDesc.Inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
     topLevelBuildDesc.Inputs.InstanceDescs = m_instancesTLAS->GetGPUVirtualAddress(firstDesc);
 
-    if (!m_TLAS)
+    if (!m_TLAS || instanceTotal > m_tlasCapacity)
     {
-        // Create all the resources only once, even if we're going to rebuild the TLAS every frame.
+        // Sized with headroom, so the TLAS buffers are recreated only when the instance count grows past it.
+        const UINT capacity = (std::min)(MAX_INSTANCES_IN_TLAS, (std::max)(64u, instanceTotal + instanceTotal / 2));
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO tlasPrebuildInfo;
-        topLevelBuildDesc.Inputs.NumDescs = MAX_INSTANCES_IN_TLAS;  // Room for every instance.
+        topLevelBuildDesc.Inputs.NumDescs = capacity;
         device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelBuildDesc.Inputs, &tlasPrebuildInfo);
-
         D3D12_RESOURCE_DESC tlasDesc = CD3DX12_RESOURCE_DESC::Buffer(tlasPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
         D3D12_RESOURCE_DESC tlasScratchDesc = CD3DX12_RESOURCE_DESC::Buffer(tlasPrebuildInfo.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-        D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
+        Retire(m_TLAS);
+        Retire(m_scratchTLAS);
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_TLAS));
-
+            nullptr, IID_PPV_ARGS(&m_TLAS)));
         HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &tlasScratchDesc, D3D12_RESOURCE_STATE_COMMON,
-            nullptr, __uuidof(ID3D12Resource), (void**)&m_scratchTLAS));
+            nullptr, IID_PPV_ARGS(&m_scratchTLAS)));
+        m_tlasCapacity = capacity;
     }
 
-    topLevelBuildDesc.Inputs.NumDescs = m_numInstancesInTLAS;
+    topLevelBuildDesc.Inputs.NumDescs = instanceTotal;
     topLevelBuildDesc.DestAccelerationStructureData = m_TLAS->GetGPUVirtualAddress();
     topLevelBuildDesc.SourceAccelerationStructureData = 0;
     topLevelBuildDesc.ScratchAccelerationStructureData = m_scratchTLAS->GetGPUVirtualAddress();
@@ -3501,9 +3609,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     commandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
     if (profileCpu)
     {
-        m_renderData->profile.tlasSubmitMs = elapsedCpuMs();
+        profile.tlasSubmitMs = elapsedCpuMs();
     }
-    m_tlasState = currentTlasState();
 
     D3D12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
     commandList->ResourceBarrier(1, &uavBarrier);	// Need the top level build to finish before we can render with it...
@@ -4122,8 +4229,9 @@ HRESULT RenderPlatform12::UninitDevice()
     m_TLAS.Release();
     m_scratchTLAS.Release();
 
-    m_BLAS.Release();
-    m_scratchBLAS.Release();
+    m_dynamicBlases.clear();
+    m_tlasState.clear();
+    m_tlasCapacity = 0;
     m_staticBlas.Release();
     m_staticBlas.compactedSize.Release();
     m_staticBlas.compactedSizeReadback.Release();
@@ -4233,6 +4341,7 @@ HRESULT RenderPlatform12::BeginProfileFrame()
     profile.rebuiltBLAS = false;
     profile.reusedBLAS = false;
     profile.builtStaticBLAS = profile.compactedStaticBLAS = false;
+    profile.dynamicBlasBuilds = profile.dynamicBlasRefits = profile.dynamicBlasReuses = profile.tlasInstances = 0;
     profile.staticBlasBytes = 0;
     m_profileQueryMask = 0;
     ProfileTimestamp(ProfilePass::Frame, false);
@@ -4299,6 +4408,7 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     m_nextVbWorldStart = 0;
     m_drawRecords.clear();
     m_drawRecordStatic.clear();
+    m_drawRecordOwner.clear();
 
 #endif
 

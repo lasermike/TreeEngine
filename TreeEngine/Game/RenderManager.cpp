@@ -240,10 +240,12 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 
         if (numInstances > 0)
         {
+            m_renderData.currentDrawOwner = object;
             HRR(GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets.IndexCount, numInstances, ru->m_mesh->m_bufferOffsets.IndexOffset,
                 ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance, range.objectTransformSlot));
         }
     }
+    m_renderData.currentDrawOwner = nullptr;
     return S_OK;
 }
 

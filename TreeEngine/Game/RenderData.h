@@ -90,8 +90,12 @@ struct RenderProfile
     std::uint64_t drawUploadCapacityBytes = 0;
     std::uint64_t worldVertexCapacityBytes = 0;
     std::uint64_t accelerationStructureBytes = 0;
-    bool rebuiltBLAS = false;       // The dynamic BLAS.
-    bool reusedBLAS = false;
+    bool rebuiltBLAS = false;       // Any dynamic BLAS was rebuilt.
+    bool reusedBLAS = false;        // Every dynamic BLAS was reused.
+    UINT dynamicBlasBuilds = 0;     // Per-owner dynamic BLASes rebuilt, refit and reused this frame.
+    UINT dynamicBlasRefits = 0;
+    UINT dynamicBlasReuses = 0;
+    UINT tlasInstances = 0;
     bool builtStaticBLAS = false;   // The static-geometry BLAS was (re)built this frame.
     bool compactedStaticBLAS = false;
     std::uint64_t staticBlasBytes = 0;
@@ -156,6 +160,9 @@ struct RenderData : SceneRenderSettings
     bool                cacheTreePoses = true;
 
     RenderPass          currentPass;
+    // The object whose instances the current draw renders (set by RenderManager::Render); DXR groups each
+    // owner's dynamic geometry into its own BLAS.
+    const void*         currentDrawOwner = nullptr;
 
     // Shadows
     static const int    SMapWidth = 2048;

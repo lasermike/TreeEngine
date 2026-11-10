@@ -449,7 +449,9 @@ namespace
                     { "poseCacheBytes", profile.poseCacheBytes }, { "drawUploadBytes", profile.drawUploadBytes },
                     { "accelerationStructureBytes", profile.accelerationStructureBytes },
                     { "rebuiltBLAS", profile.rebuiltBLAS }, { "builtStaticBLAS", profile.builtStaticBLAS },
-                    { "compactedStaticBLAS", profile.compactedStaticBLAS }, { "staticBlasBytes", profile.staticBlasBytes } });
+                    { "compactedStaticBLAS", profile.compactedStaticBLAS }, { "staticBlasBytes", profile.staticBlasBytes }, { "dynamicBlasBuilds", profile.dynamicBlasBuilds },
+                    { "dynamicBlasRefits", profile.dynamicBlasRefits }, { "dynamicBlasReuses", profile.dynamicBlasReuses },
+                    { "tlasInstances", profile.tlasInstances } });
             }
             std::cerr << "Profiled " << request->scene << " / " << request->mode << ", "
                 << request->performanceFrames << " frames" << std::endl;
@@ -591,7 +593,9 @@ int RunRenderTestCapture(Game& game)
                         { "worldVertexCapacityBytes", profile.worldVertexCapacityBytes },
                         { "accelerationStructureBytes", profile.accelerationStructureBytes },
                         { "rebuiltBLAS", profile.rebuiltBLAS }, { "builtStaticBLAS", profile.builtStaticBLAS },
-                        { "compactedStaticBLAS", profile.compactedStaticBLAS }, { "staticBlasBytes", profile.staticBlasBytes }
+                        { "compactedStaticBLAS", profile.compactedStaticBLAS }, { "staticBlasBytes", profile.staticBlasBytes }, { "dynamicBlasBuilds", profile.dynamicBlasBuilds },
+                    { "dynamicBlasRefits", profile.dynamicBlasRefits }, { "dynamicBlasReuses", profile.dynamicBlasReuses },
+                    { "tlasInstances", profile.tlasInstances }
                     });
                     const int adapterBytes = WideCharToMultiByte(CP_UTF8, 0, profile.adapter.c_str(), -1, nullptr, 0, nullptr, nullptr);
                     if (!adapterBytes) throw std::runtime_error("Cannot encode GPU adapter name as UTF-8");

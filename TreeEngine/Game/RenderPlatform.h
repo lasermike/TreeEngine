@@ -1006,23 +1006,51 @@ public:
 
     CComPtr<ID3D12Resource>		m_TLAS;
     CComPtr<ID3D12Resource>		m_scratchTLAS;
-    CComPtr<ID3D12Resource>		m_BLAS;
-    CComPtr<ID3D12Resource>		m_scratchBLAS;
     // Two frames of TLAS instance descriptors, MAX_INSTANCES_IN_TLAS each, written alternately.
     UploadBuffer<D3D12_RAYTRACING_INSTANCE_DESC>* m_instancesTLAS = nullptr;
     UINT m_tlasUploadHalf = 0;
-    // What the current TLAS was built from; the TLAS is rebuilt when this changes or any BLAS was built.
-    struct TlasState
+    UINT m_tlasCapacity = 0;                            // Instances m_TLAS and m_scratchTLAS are sized for.
+    // What the current TLAS was built from: each instance's BLAS and InstanceID. The TLAS is rebuilt when this
+    // changes or any BLAS was built or refit.
+    std::vector<std::pair<D3D12_GPU_VIRTUAL_ADDRESS, UINT>> m_tlasState;
+
+    // Dynamic geometry has one BLAS per owning object (RenderData::currentDrawOwner at draw time, such as a tree),
+    // so a tree that grows or changes LOD refits or rebuilds only its own BLAS. Snapshots and layout hashes use
+    // world-vertex offsets relative to the owner's first record, so other owners' changes don't touch it.
+    struct DynamicBlas
     {
-        UINT dynamicGeometries = 0;
-        D3D12_GPU_VIRTUAL_ADDRESS dynamicBlas = 0;
-        D3D12_GPU_VIRTUAL_ADDRESS staticBlas = 0;
-        bool operator==(const TlasState& other) const
-        {
-            return dynamicGeometries == other.dynamicGeometries && dynamicBlas == other.dynamicBlas && staticBlas == other.staticBlas;
-        }
+        CComPtr<ID3D12Resource> blas;
+        CComPtr<ID3D12Resource> scratch;
+        // Per micromap geometry, one micromap index per triangle of every instance. A build or update reads them from
+        // m_ommRecordUpload, where they are copied each frame the BLAS is built or refit.
+        std::vector<int> ommIndices;
+        std::vector<BYTE> inputs;                       // Snapshot it was last built or refit from.
+        size_t layoutHash = 0;                          // A change forces a rebuild rather than a refit.
+        bool built = false;
+        UINT64 lastUsedFrame = 0;
+        // This frame's working state.
+        std::vector<size_t> records;                    // Indices into m_drawRecords, in draw order.
+        std::vector<BYTE> currentInputs;
+        size_t currentHash = 0;
+        UINT vbWorldBase = 0;
+        UINT firstGeometry = 0;                         // Its first entry in the per-geometry tables.
+        std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs;
+        std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC> ommTriangles;
+        std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC> ommLinkages;
     };
-    TlasState m_tlasState;
+    std::unordered_map<const void*, DynamicBlas> m_dynamicBlases;
+    // Upload space for this frame's micromap record indices, one persistently mapped buffer per frame in flight.
+    struct OmmRecordUpload
+    {
+        CComPtr<ID3D12Resource> buffer;
+        BYTE* mapped = nullptr;
+        UINT64 capacity = 0;
+    };
+    OmmRecordUpload m_ommRecordUpload[2];
+    std::vector<const void*> m_drawRecordOwner;         // Per m_drawRecords entry.
+    UINT64 m_blasFrame = 0;
+    static const UINT64 kDynamicBlasRetireFrames = 8;   // An owner's BLAS is released this many frames after its last draw.
+    void ReleaseDynamicBlases();
 
     // Static geometry (RenderUnit::staticRayTracingGeometry, such as glTF terrain) has its own BLAS, built once
     // for fast tracing and compacted the next frame, so dynamic geometry's updates and rebuilds leave it alone.
@@ -1077,9 +1105,8 @@ public:
 
     ShaderBindingTable<TreeShaderRecord, 1, 2, 1> m_shaderBindingTable;
 
-    static const uint32_t MAX_INSTANCES_IN_TLAS = 2;  // The dynamic BLAS and the static BLAS.
+    static const uint32_t MAX_INSTANCES_IN_TLAS = 65536;  // One per dynamic-geometry owner, plus the static BLAS.
 
-    D3D12_RAYTRACING_GEOMETRY_DESC* m_bvhGeometryDescs;
 
     // Opacity micromaps (DXR 1.2) for the current scene; see BuildOpacityMicromaps.
     CComPtr<ID3D12Resource>     m_ommArray;
@@ -1149,10 +1176,7 @@ public:
     HRESULT RenderSmaa(UINT width, UINT height);
     bool                        m_ommBuildPending = false;
     // Per BLAS geometry that links micromaps: the triangles and linkage its OMM_TRIANGLES desc points at.
-    std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC> m_ommTriangleDescs;
-    std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC> m_ommLinkageDescs;
     std::vector<int>            m_ommTriangleIndexData; // CPU copy of m_ommIndices.
-    CComPtr<ID3D12Resource>     m_ommRecordIndices; // Per micromap geometry: one micromap index per triangle of every instance.
     HRESULT RecordOpacityMicromapBuild();
     void ReleaseOpacityMicromaps();
 
@@ -1221,9 +1245,6 @@ public:
     UINT m_nextVbWorldStart = 0;
     static_assert(sizeof(DrawRecord) == 424, "DrawRecord must match Blur.hlsl");
     std::vector<DrawRecord> m_drawRecords;
-    size_t m_previousDrawRecordHash;
-    std::vector<BYTE> m_previousBlasInputs;
-    std::vector<BYTE> m_currentBlasInputs;
     std::vector<InstancedData> m_cpuInstanceData;
     InstancedData* m_mappedInstanceData = nullptr;
 

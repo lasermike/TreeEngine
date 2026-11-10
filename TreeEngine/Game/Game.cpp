@@ -1247,8 +1247,9 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             ImGui::Text("DXR draw records: %u", profile.drawRecords);
             ImGui::Text("DXR world / skinned vertices: %u / %u", profile.worldVertices, profile.skinnedVertices);
             ImGui::Text("Source index entries: %u; dispatch groups: %u", profile.indexEntries, profile.dispatchGroups);
-            ImGui::Text("Dynamic BLAS: %s", profile.drawRecords == 0 ? "Inactive" : profile.rebuiltBLAS ? "Rebuild"
-                : profile.reusedBLAS ? "Reused" : "Refit");
+            ImGui::Text("Dynamic BLASes rebuilt / refit / reused: %u / %u / %u", profile.dynamicBlasBuilds,
+                profile.dynamicBlasRefits, profile.dynamicBlasReuses);
+            ImGui::Text("TLAS instances: %u", profile.tlasInstances);
             ImGui::Text("Static BLAS: %s, %.1f MB", profile.builtStaticBLAS ? "Built" : profile.compactedStaticBLAS ? "Compacted" : "Reused",
                 profile.staticBlasBytes / (1024.0 * 1024.0));
 
