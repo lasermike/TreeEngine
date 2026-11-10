@@ -297,7 +297,7 @@ static void AddVelocityTarget(D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)
 }
 
 // Ray-traced vertices per frame, after instancing and double-sided expansion. Terra alone needs about 1.16 million.
-const UINT maxWorldVertices = 3000000;
+const UINT maxWorldVertices = 4194304;
 const uint64_t vbWorldBufferSize = sizeof(XMFLOAT4) * maxWorldVertices;
 
 UINT skinnedIndexBufferSize = 0;
