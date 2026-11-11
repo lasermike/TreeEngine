@@ -4,6 +4,7 @@
 #include "RenderData.h"
 #include "OpacityMicromapBaker.h"
 #include "UpscalerMath.h"
+#include "Lod.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -574,6 +575,63 @@ void TestOpacityMicromaps()
 int RunScenePersistenceTests();
 
 
+void TestLodSelection()
+{
+    Lod::Thresholds two;
+    two.distances = { 10, 40 };
+    Check(Lod::Select(0, two) == 0 && Lod::Select(9.99f, two) == 0 && Lod::Select(10, two) == 1
+        && Lod::Select(39, two) == 1 && Lod::Select(40, two) == 2 && Lod::Select(1000, two) == 2, "LOD levels are wrong");
+    Check(Lod::Select(15, two, 2.0f) == 0 && Lod::Select(25, two, 2.0f) == 1, "LOD distance scale is not applied");
+    Check(Lod::Select(10.5f, two, 1.0f, 0) == 1, "no hysteresis should switch at the threshold");
+    two.hysteresis = 0.1f;
+    Check(Lod::Select(10.5f, two, 1.0f, 0) == 0 && Lod::Select(11.5f, two, 1.0f, 0) == 1,
+        "hysteresis should hold level 0 until 10% past its distance");
+    Check(Lod::Select(9.5f, two, 1.0f, 1) == 1 && Lod::Select(8.5f, two, 1.0f, 1) == 0,
+        "hysteresis should hold level 1 until 10% inside its near distance");
+    Check(Lod::Select(43, two, 1.0f, 2) == 2 && Lod::Select(35, two, 1.0f, 2) == 1, "the last level's hysteresis is wrong");
+    Check(Lod::Select(100, two, 1.0f, 0) == 2, "a large jump should go straight to the right level");
+    Check(Lod::Valid(Lod::Thresholds()) && Lod::Valid(two), "valid thresholds were rejected");
+    Lod::Thresholds bad = two;
+    bad.distances = { 10, 10 };
+    Check(!Lod::Valid(bad), "non-ascending distances were accepted");
+    bad.distances = {};
+    Check(!Lod::Valid(bad), "empty distances were accepted");
+    bad.distances = { 10 };
+    bad.hysteresis = 0.6f;
+    Check(!Lod::Valid(bad), "hysteresis above 0.5 was accepted");
+}
+
+void TestTreeLodSettings()
+{
+    const std::string json = R"({"version":1,"name":"Lod","objects":[
+        {"id":"tree","type":"tree","lod":{"distances":[12,30],"hysteresis":0.2},"generator":{"axiom":"F"}},
+        {"id":"tree-2","instanceOf":"tree"},
+        {"id":"plain","type":"tree","generator":{"axiom":"F"}}]})";
+    auto scene = SceneData::ParseScene(json, "lod");
+    Check(scene.objects[0]->lod.distances == std::vector<float>{ 12, 30 } && scene.objects[0]->lod.hysteresis == 0.2f,
+        "lod settings were not parsed");
+    Check(scene.objects[1]->lod == scene.objects[0]->lod, "an instance did not inherit lod");
+    Check(scene.objects[2]->lod == Lod::Thresholds(), "lod did not default to 10 units without hysteresis");
+    const auto saved = Json::parse(SceneData::SerializeScene(scene));
+    Check(saved["objects"][0].contains("lod") && !saved["objects"][1].contains("lod") && !saved["objects"][2].contains("lod"),
+        "lod should be saved only where it differs from the default");
+    Check(SceneData::ParseScene(saved.dump(), "saved-lod").objects[0]->lod == scene.objects[0]->lod, "lod did not round-trip");
+    auto bad = Json::parse(json);
+    bad["objects"][0]["lod"]["distances"] = Json::array({ 30, 12 });
+    Reject(bad.dump(), ".lod");
+    bad = Json::parse(json);
+    bad["objects"][0]["lod"]["hysteresis"] = 0.9;
+    Reject(bad.dump(), ".lod");
+    bad = Json::parse(json);
+    bad["objects"][0]["lod"]["bias"] = 1;
+    Reject(bad.dump(), ".lod.bias");
+    bad = Json::parse(json);
+    bad["objects"][1]["lod"] = Json::object();
+    Reject(bad.dump(), "objects[1].lod");
+    bad = Json::parse(R"({"version":1,"name":"Lod","objects":[{"id":"box","type":"primitive","shape":"box","lod":{}}]})");
+    Reject(bad.dump(), "objects[0].lod");
+}
+
 void TestUpscalerMath()
 {
     using namespace UpscalerMath;
@@ -751,6 +809,8 @@ int main(int argc, char** argv)
         TestModelBiplanar();
         TestAmbientOcclusionSettings();
         TestUpscalerMath();
+        TestLodSelection();
+        TestTreeLodSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

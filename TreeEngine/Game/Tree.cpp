@@ -232,7 +232,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         && XMVector3Equal(XMLoadFloat3(&_position), XMLoadFloat3(&m_lastPosePosition))
         && XMVector4Equal(XMLoadFloat4(&_rotation), XMLoadFloat4(&m_lastPoseRotation));
     const bool reuseInstances = m_reusePose && startInstance == m_lastInstanceStart
-        && _params->depthLOD == m_lastDepthLOD
+        && _params->depthLOD == m_lastDepthLOD && renderData.lodDistanceScale == m_lastLodDistanceScale
         && XMVector3Equal(renderData.eyePos, XMLoadFloat3(&m_lastEyePosition));
 
     if (!reuseInstances)
@@ -296,6 +296,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         m_poseValid = true;
         XMStoreFloat3(&m_lastEyePosition, renderData.eyePos);
         m_lastDepthLOD = _params->depthLOD;
+        m_lastLodDistanceScale = renderData.lodDistanceScale;
         m_lastInstanceStart = startInstance;
     }
     else
@@ -449,9 +450,12 @@ TreeSegment Tree::SelectSegmentType(BranchInstance& frame, RenderData* pRenderDa
         return TreeSegment::LeafLOD0;
     }
 
+    // Full-detail sticks below depthLOD, and wherever the branch starts within the first LOD distance. Branches keep
+    // no level history, so there is no hysteresis here.
     bool useBranchLOD0 = _params->depthLOD != -1 &&
         (frame.branch->depth < _params->depthLOD ||
-            XMVectorGetX(XMVector3LengthSq(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)) < 100.0f);
+            Lod::Select(XMVectorGetX(XMVector3Length(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)),
+                _params->lod, pRenderData->lodDistanceScale) == 0);
 
     return useBranchLOD0 ? TreeSegment::BranchLOD0 : TreeSegment::BranchLOD1;
 }
@@ -944,9 +948,12 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
     XMStoreFloat3(&_boundingBox[0], boxMin);
     XMStoreFloat3(&_boundingBox[1], boxMax);
 
-    // Whole-instance LOD: full detail when any part of the box is within the 10-unit detail distance.
+    // Whole-instance LOD: full detail when any part of the box is within the first LOD distance. The instance
+    // remembers its level, so hysteresis keeps it from switching layouts back and forth at the threshold.
     const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, boxMin, boxMax);
-    const bool nearCamera = XMVectorGetX(XMVector3LengthSq(nearest - renderData.eyePos)) < 100.0f;
+    m_instanceLodLevel = Lod::Select(XMVectorGetX(XMVector3Length(nearest - renderData.eyePos)), _params->lod,
+        renderData.lodDistanceScale, m_instanceLodLevel);
+    const bool nearCamera = m_instanceLodLevel == 0;
     InstanceLayout& layout = source.m_instanceLayouts[nearCamera ? NearLayout : FarLayout];
     for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
     {

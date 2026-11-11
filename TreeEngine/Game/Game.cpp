@@ -1405,6 +1405,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         }
         ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
         ImGui::Checkbox("View culling", &m_settings.m_viewCulling);
+        ImGui::SliderFloat("LOD distance scale", &m_settings.m_lodDistanceScale, 0.25f, 4.0f, "%.2f");
         ImGui::Checkbox("HDR", &m_settings.m_hdr);
         if (m_settings.m_hdr)
         {
@@ -1568,6 +1569,14 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                     ImGui::Text("Scale: (%.3f, %.3f, %.3f)", params.scale.x, params.scale.y, params.scale.z);
                     ImGui::Text("UV scale: (%.3f, %.3f)", params.textureCoordScale.x, params.textureCoordScale.y);
                     ImGui::Text("Animation speed: %.3f; depth LOD: %d", params._animationSpeed, params.depthLOD);
+                    std::string lodDistances;
+                    for (const float distance : params.lod.distances)
+                    {
+                        char text[32];
+                        snprintf(text, sizeof(text), "%s%.2f", lodDistances.empty() ? "" : ", ", distance);
+                        lodDistances += text;
+                    }
+                    ImGui::Text("LOD distances: %s; hysteresis %.2f", lodDistances.c_str(), params.lod.hysteresis);
                     ImGui::Text("Cube map: %s", params.cubeMap ? "yes" : "no");
                     const auto* bounds = obj->GetBoundingBox();
                     ImGui::Text("Bounds: (%.3f, %.3f, %.3f) to (%.3f, %.3f, %.3f)",

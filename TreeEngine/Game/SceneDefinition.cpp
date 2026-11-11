@@ -280,6 +280,23 @@ namespace SceneData
             if (value.contains("animationSpeed")) result.animationSpeed = Number(value["animationSpeed"], path + ".animationSpeed");
             if (result.animationSpeed < 0) Invalid(path + ".animationSpeed", "must be nonnegative");
             if (value.contains("depthLOD")) result.depthLOD = Integer(value["depthLOD"], path + ".depthLOD", -1, 20);
+            if (value.contains("lod"))
+            {
+                const auto& lod = value["lod"];
+                const auto lodPath = path + ".lod";
+                Fields(lod, lodPath, { "distances", "hysteresis" });
+                if (lod.contains("distances"))
+                {
+                    const auto& distances = lod["distances"];
+                    if (!distances.is_array()) Invalid(lodPath + ".distances", "must be an array of distances");
+                    result.lod.distances.clear();
+                    for (size_t i = 0; i < distances.size(); ++i)
+                        result.lod.distances.push_back(Number(distances[i], lodPath + ".distances[" + std::to_string(i) + "]"));
+                }
+                if (lod.contains("hysteresis")) result.lod.hysteresis = Number(lod["hysteresis"], lodPath + ".hysteresis");
+                if (!Lod::Valid(result.lod))
+                    Invalid(lodPath, "distances must be 1 to 8 ascending positive values, and hysteresis from 0 to 0.5");
+            }
         }
 
         template<class T>
@@ -393,7 +410,7 @@ namespace SceneData
         std::unique_ptr<ObjectDefinition> ReadInstance(const Json& value, const std::string& path, const SceneDefinition& scene)
         {
             if (value.contains("type")) Invalid(path + ".type", "is inherited from instanceOf; remove it");
-            for (auto field : { "textureCoordScale", "animationSpeed", "depthLOD", "shape", "trunkShape", "leaves", "generator", "dataFile", "source", "forceLit" })
+            for (auto field : { "textureCoordScale", "animationSpeed", "depthLOD", "lod", "shape", "trunkShape", "leaves", "generator", "dataFile", "source", "forceLit" })
                 if (value.contains(field)) Invalid(path + "." + field, "is inherited from instanceOf; an instance sets only transform and materials");
             Fields(value, path, { "id", "instanceOf", "transform", "material", "materials" });
             if (!value.contains("id")) Invalid(path + ".id", "required property");
@@ -644,7 +661,7 @@ namespace SceneData
                 }
                 else if (type == "tree")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape", "materials", "leaves", "generator" });
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "lod", "trunkShape", "materials", "leaves", "generator" });
                     auto tree = std::make_unique<TreeDefinition>();
                     if (value.contains("trunkShape")) tree->trunkShape = ReadShape(value["trunkShape"], path + ".trunkShape");
                     if (tree->trunkShape != Shape::Cylinder && tree->trunkShape != Shape::SkinnedCylinder)
@@ -657,7 +674,7 @@ namespace SceneData
                 }
                 else if (type == "fixedTree")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "trunkShape", "materials", "leaves" });
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "lod", "trunkShape", "materials", "leaves" });
                     auto tree = std::make_unique<FixedTreeDefinition>();
                     if (value.contains("trunkShape")) tree->trunkShape = ReadShape(value["trunkShape"], path + ".trunkShape");
                     if (tree->trunkShape != Shape::Cylinder && tree->trunkShape != Shape::SkinnedCylinder)
@@ -668,7 +685,7 @@ namespace SceneData
                 }
                 else if (type == "graph")
                 {
-                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "dataFile", "materials", "leaves" });
+                    Fields(value, path, { "id", "type", "transform", "textureCoordScale", "animationSpeed", "depthLOD", "lod", "dataFile", "materials", "leaves" });
                     auto graph = std::make_unique<GraphDefinition>();
                     if (!value.contains("dataFile")) Invalid(path + ".dataFile", "required property");
                     graph->dataFile = String(value["dataFile"], path + ".dataFile");
@@ -931,6 +948,8 @@ namespace SceneData
                 value["textureCoordScale"] = VectorJson(object->textureCoordScale);
                 value["animationSpeed"] = object->animationSpeed;
                 value["depthLOD"] = object->depthLOD;
+                if (object->lod != Lod::Thresholds())
+                    value["lod"] = { { "distances", object->lod.distances }, { "hysteresis", object->lod.hysteresis } };
             }
             switch (object->kind)
             {

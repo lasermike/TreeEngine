@@ -103,6 +103,8 @@ private:
     bool m_reusePose = false;
     XMFLOAT3 m_lastEyePosition = {};
     int m_lastDepthLOD = 0;
+    float m_lastLodDistanceScale = 0;
+    int m_instanceLodLevel = -1;    // An instance's last whole-instance level, for hysteresis; -1 before the first.
     UINT m_lastInstanceStart = 0;
     UINT m_cachedLeafCount = 0;
     UINT m_cachedStickCount = 0;

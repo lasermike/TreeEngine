@@ -188,6 +188,7 @@ namespace
         parameters.textureCoordScale = definition.textureCoordScale;
         parameters._animationSpeed = definition.animationSpeed;
         parameters.depthLOD = definition.depthLOD;
+        parameters.lod = definition.lod;
     }
 
     double RandomSegmentLength(LSystemParams* parameters, double)
@@ -616,6 +617,7 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
         definition->textureCoordScale = params.textureCoordScale;
         definition->animationSpeed = params._animationSpeed;
         definition->depthLOD = params.depthLOD;
+        definition->lod = params.lod;
         switch (definition->kind)
         {
         case SceneData::ObjectKind::Primitive:

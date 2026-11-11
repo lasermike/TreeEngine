@@ -49,7 +49,8 @@ public:
     // cutoff where their texture is minified, so raster matches ray tracing's density at every distance
     // (see Shaders/SharedTypes.hlsli).
     bool m_hashedAlphaTest = true;
-    bool m_viewCulling = true;          // Skip raster draws of objects outside the view frustum (DXR still traces them).
+    bool m_viewCulling = true;
+    float m_lodDistanceScale = 1.0f;    // Multiplies every object's LOD distances; below 1 lowers detail sooner.          // Skip raster draws of objects outside the view frustum (DXR still traces them).
     // Camera motion vectors (Game/Shaders/MotionVectors.hlsl). A debug view replaces the scene color.
     enum class MotionView { Off, Motion, ReprojectedHistory, History };
     MotionView m_motionView = MotionView::Off;

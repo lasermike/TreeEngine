@@ -96,6 +96,13 @@ Every object supports `transform`, `textureCoordScale`, `animationSpeed`, and
 `depthLOD`. Defaults are position `[0,0,0]`, scale `[1,1,1]`, quaternion rotation
 `[0,0,0,1]`, UV scale `[1,1]`, animation speed `1`, and depth LOD `4`.
 
+Trees, fixed trees and graphs also take `"lod": {"distances": [10], "hysteresis": 0}` (those are the defaults).
+Level 0 is full detail, and each distance from the camera passed lowers the level by one; today a tree draws
+full-detail sticks at level 0 (per branch, from where the branch starts) and otherwise follows `depthLOD`. Distances
+must be 1 to 8 ascending positive values. `hysteresis` (0 to 0.5) is the fraction of a distance an instance must pass
+before it switches level, so instances near a threshold don't flicker; branches keep no history and ignore it. The
+debug UI's "LOD distance scale" multiplies every object's distances. Instances inherit `lod` from their source.
+
 Use `rotationDegrees: [pitch,yaw,roll]` for convenient Euler authoring, or
 `rotation: [x,y,z,w]` for a quaternion. Specify only one. Quaternions are preserved
 as authored, including the existing AI Tree camera rotation.
@@ -143,8 +150,9 @@ referenced object. An omitted transform is the identity, as for other objects.
   the CPU, regardless of branch count, and grows with the source. The GPU applies
   the instance's transform to the source's branch data in raster, shadow, and
   ray-tracing passes. An instance chooses its LOD as a whole: full-detail sticks
-  when its bounding box comes within 10 units of the camera, otherwise the
-  depth-only `depthLOD` rule. The source tree keeps its per-branch LOD.
+  when its bounding box comes within the tree's first `lod` distance of the
+  camera, otherwise the depth-only `depthLOD` rule. The source tree keeps its
+  per-branch LOD.
 - Primitive and model instances are ordinary objects built from the copied
   definition.
 - Saving writes instances back in this compact form, including only the

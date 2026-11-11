@@ -140,6 +140,7 @@ struct RenderData : SceneRenderSettings
     XMFLOAT4X4          projection;
     XMFLOAT4X4          view;
     XMVECTOR            eyePos;
+    float               lodDistanceScale = 1;   // Multiplies every LOD distance (Settings::m_lodDistanceScale).
 
     // Instance rendering
     InstancedData*      instanceData;

@@ -45,6 +45,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneRenderSettings.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfLoader.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Lod.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\MetalRoughSpheres.glb" />

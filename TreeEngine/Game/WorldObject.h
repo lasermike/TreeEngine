@@ -5,6 +5,7 @@
 #include <GeometryGenerator.h>
 #include "GltfLoader.h"
 #include "StockRenderStates.h"
+#include "Lod.h"
 #include <memory>
 
 class RenderManager;
@@ -68,6 +69,7 @@ public:
     GeneratorType generatorType;
     float _animationSpeed;
     int depthLOD;
+    Lod::Thresholds lod;        // Distance LOD (scene "lod"); trees: full-detail sticks within lod.distances[0].
     PrimitiveType primitiveType;
     bool cubeMap;
     std::vector<std::wstring> textureFilename;

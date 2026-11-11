@@ -181,6 +181,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 
 HRESULT RenderManager::BeginNewFrame()
 {
+    m_renderData.lodDistanceScale = m_settings->m_lodDistanceScale;
     D3DBuffer* buffer = m_instancedBuffer.Get(m_renderData.frame);
 
     InstancedData* dataView = nullptr;

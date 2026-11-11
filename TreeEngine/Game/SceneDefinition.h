@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DirectXMath.h>
+#include "Lod.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -92,6 +93,7 @@ namespace SceneData
         DirectX::XMFLOAT2 textureCoordScale = { 1, 1 };
         float animationSpeed = 1;
         int depthLOD = 4;
+        Lod::Thresholds lod;    // "lod": {"distances": [...], "hysteresis": h} on trees, fixed trees and graphs.
 
         // Instances: the ID of an earlier object this one copies. The parser fills every other field from that
         // object; an instance only authors its ID, transform, and the materials flagged below.
