@@ -1630,13 +1630,14 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                     }
                     ImGui::Text("Animation speed: %.3f; depth LOD: %d", params._animationSpeed, params.depthLOD);
                     std::string lodDistances;
-                    for (const float distance : params.lod.distances)
+                    for (const float distance : params.lod.ScreenSpace() ? params.lod.screenHeights : params.lod.distances)
                     {
                         char text[32];
                         snprintf(text, sizeof(text), "%s%.2f", lodDistances.empty() ? "" : ", ", distance);
                         lodDistances += text;
                     }
-                    ImGui::Text("LOD distances: %s; hysteresis %.2f", lodDistances.c_str(), params.lod.hysteresis);
+                    ImGui::Text(params.lod.ScreenSpace() ? "LOD screen heights (px): %s; hysteresis %.2f"
+                        : "LOD distances: %s; hysteresis %.2f", lodDistances.c_str(), params.lod.hysteresis);
                     ImGui::Text("Cube map: %s", params.cubeMap ? "yes" : "no");
                     const auto* bounds = obj->GetBoundingBox();
                     DebugVectorEditor::ReadOnly((prefix + "Bounds minimum").c_str(), &bounds[0].x, 3);

@@ -4710,6 +4710,8 @@ HRESULT RenderPlatform12::BeginProfileFrame()
     profile.builtStaticBLAS = profile.compactedStaticBLAS = false;
     profile.dynamicBlasBuilds = profile.dynamicBlasRefits = profile.dynamicBlasReuses = profile.tlasInstances = 0;
     profile.drawnObjects = profile.culledObjects = 0;
+    profile.lodLevelObjects.fill(0);
+    profile.drawnLeaves = profile.drawnSticks = 0;
     profile.staticBlasBytes = profile.blasHeapBytes = profile.blasHeapLiveBytes = profile.blasScratchBytes = 0;
     m_profileQueryMask = 0;
     ProfileTimestamp(ProfilePass::Frame, false);

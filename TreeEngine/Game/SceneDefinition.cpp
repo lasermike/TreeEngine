@@ -284,7 +284,9 @@ namespace SceneData
             {
                 const auto& lod = value["lod"];
                 const auto lodPath = path + ".lod";
-                Fields(lod, lodPath, { "distances", "hysteresis", "reduction" });
+                Fields(lod, lodPath, { "distances", "screenHeights", "hysteresis", "reduction" });
+                if (lod.contains("distances") && lod.contains("screenHeights"))
+                    Invalid(lodPath, "takes distances or screenHeights, not both");
                 if (lod.contains("distances"))
                 {
                     const auto& distances = lod["distances"];
@@ -292,6 +294,15 @@ namespace SceneData
                     result.lod.distances.clear();
                     for (size_t i = 0; i < distances.size(); ++i)
                         result.lod.distances.push_back(Number(distances[i], lodPath + ".distances[" + std::to_string(i) + "]"));
+                }
+                if (lod.contains("screenHeights"))
+                {
+                    const auto& heights = lod["screenHeights"];
+                    if (!heights.is_array()) Invalid(lodPath + ".screenHeights", "must be an array of pixel heights");
+                    std::vector<float> values;
+                    for (size_t i = 0; i < heights.size(); ++i)
+                        values.push_back(Number(heights[i], lodPath + ".screenHeights[" + std::to_string(i) + "]"));
+                    Lod::SetScreenHeights(result.lod, values);
                 }
                 if (lod.contains("hysteresis")) result.lod.hysteresis = Number(lod["hysteresis"], lodPath + ".hysteresis");
                 if (lod.contains("reduction"))
@@ -302,7 +313,8 @@ namespace SceneData
                     else Invalid(lodPath + ".reduction", "must be \"prune\" or \"merge\"");
                 }
                 if (!Lod::Valid(result.lod))
-                    Invalid(lodPath, "distances must be 1 to 8 ascending positive values, and hysteresis from 0 to 0.5");
+                    Invalid(lodPath, "distances must be 1 to 8 ascending positive values (screenHeights 1 to 8 descending), "
+                        "and hysteresis from 0 to 0.5");
             }
         }
 
@@ -960,8 +972,14 @@ namespace SceneData
                 value["animationSpeed"] = object->animationSpeed;
                 value["depthLOD"] = object->depthLOD;
                 if (object->lod != Lod::Thresholds())
-                    value["lod"] = { { "distances", object->lod.distances }, { "hysteresis", object->lod.hysteresis },
+                {
+                    value["lod"] = { { "hysteresis", object->lod.hysteresis },
                         { "reduction", object->lod.reduction == Lod::Reduction::Merge ? "merge" : "prune" } };
+                    if (object->lod.ScreenSpace())
+                        value["lod"]["screenHeights"] = object->lod.screenHeights;
+                    else
+                        value["lod"]["distances"] = object->lod.distances;
+                }
             }
             switch (object->kind)
             {

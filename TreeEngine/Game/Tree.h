@@ -104,7 +104,9 @@ private:
     bool m_reusePose = false;
     XMFLOAT3 m_lastEyePosition = {};
     int m_lastDepthLOD = 0;
-    float m_lastLodDistanceScale = 0;
+    float m_lodScale = 1;           // This frame's Lod::Scale for the tree (see LodScale).
+    float m_lastLodScale = 0;
+    float LodScale(const RenderData& renderData, const XMFLOAT3& boxMin, const XMFLOAT3& boxMax, bool boxValid) const;
     int m_instanceLodLevel = -1;    // An instance's last whole-instance level, for hysteresis; -1 before the first.
     UINT m_lastInstanceStart = 0;
     UINT m_cachedLeafCount = 0;

@@ -249,8 +249,11 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         && XMVector3Equal(XMLoadFloat3(&_position), XMLoadFloat3(&m_lastPosePosition))
         && XMVector4Equal(XMLoadFloat4(&_rotation), XMLoadFloat4(&m_lastPoseRotation))
         && XMVector3Equal(XMLoadFloat3(&_scale), XMLoadFloat3(&m_lastPoseScale));
+    // The LOD scale for this frame's per-branch and whole-tree levels. For screen heights it uses the box from the
+    // last pose (this frame's is built during the pass below).
+    m_lodScale = LodScale(renderData, _boundingBox[0], _boundingBox[1], m_boundsValid);
     const bool reuseInstances = m_reusePose && startInstance == m_lastInstanceStart
-        && _params->depthLOD == m_lastDepthLOD && renderData.lodDistanceScale == m_lastLodDistanceScale
+        && _params->depthLOD == m_lastDepthLOD && m_lodScale == m_lastLodScale
         && XMVector3Equal(renderData.eyePos, XMLoadFloat3(&m_lastEyePosition));
 
     if (!reuseInstances)
@@ -315,7 +318,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         m_poseValid = true;
         XMStoreFloat3(&m_lastEyePosition, renderData.eyePos);
         m_lastDepthLOD = _params->depthLOD;
-        m_lastLodDistanceScale = renderData.lodDistanceScale;
+        m_lastLodScale = m_lodScale;
         m_lastInstanceStart = startInstance;
     }
     else
@@ -352,9 +355,10 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     {
         const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, XMLoadFloat3(&_boundingBox[0]), XMLoadFloat3(&_boundingBox[1]));
         m_instanceLodLevel = Lod::Select(XMVectorGetX(XMVector3Length(nearest - renderData.eyePos)), _params->lod,
-            renderData.lodDistanceScale, m_instanceLodLevel);
+            m_lodScale, m_instanceLodLevel);
         if (m_instanceLodLevel >= static_cast<int>(FirstReducedLayout))
             reducedLayout = std::min<size_t>(m_instanceLodLevel, m_instanceLayouts.size() - 1);
+        renderData.profile.lodLevelObjects[std::min<size_t>(m_instanceLodLevel, renderData.profile.lodLevelObjects.size() - 1)]++;
     }
 
     // The layouts depend only on the pose, depth LOD and slots, so they are rebuilt only when those change, and only
@@ -379,9 +383,13 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         // The per-branch pass counted the full tree.
         renderData.frameStats[NUM_LEAVES_STAT].stat = renderData.frameStats[NUM_LEAVES_STAT].stat - m_cachedLeafCount + layout.leafCount;
         renderData.frameStats[NUM_STICKS_STAT].stat = renderData.frameStats[NUM_STICKS_STAT].stat - m_cachedStickCount + layout.stickCount;
+        renderData.profile.drawnLeaves += layout.leafCount;
+        renderData.profile.drawnSticks += layout.stickCount;
     }
     else
     {
+        renderData.profile.drawnLeaves += m_cachedLeafCount;
+        renderData.profile.drawnSticks += m_cachedStickCount;
         UINT segmentOffset = startInstance;
         for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
         {
@@ -482,6 +490,17 @@ const WorldObjectParams::LeafAtlasRegion* Tree::LeafRegion(const Branch* branch)
     return region < 0 ? nullptr : &_params->leafRegions[region];
 }
 
+float Tree::LodScale(const RenderData& renderData, const XMFLOAT3& boxMin, const XMFLOAT3& boxMax, bool boxValid) const
+{
+    // Screen heights size the tree by its box's largest extent (its height, for most trees). Before the first pose
+    // there is no box, so a nominal 10 m stands in for one frame.
+    float size = 10.0f;
+    if (boxValid)
+        size = std::max({ boxMax.x - boxMin.x, boxMax.y - boxMin.y, boxMax.z - boxMin.z });
+    return Lod::Scale(_params->lod, size, static_cast<float>(renderData.projectionData.screenHeight),
+        renderData.projectionData.fov, renderData.lodDistanceScale);
+}
+
 UINT Tree::AtlasRectStart(UINT startInstance) const
 {
     const UINT branches = _treeModel->treeData.numBranches;
@@ -518,7 +537,7 @@ TreeSegment Tree::SelectSegmentType(BranchInstance& frame, RenderData* pRenderDa
     bool useBranchLOD0 = _params->depthLOD != -1 &&
         (frame.branch->depth < _params->depthLOD ||
             Lod::Select(XMVectorGetX(XMVector3Length(XMLoadFloat3(&frame.startPosition) - pRenderData->eyePos)),
-                _params->lod, pRenderData->lodDistanceScale) == 0);
+                _params->lod, m_lodScale) == 0);
 
     return useBranchLOD0 ? TreeSegment::BranchLOD0 : TreeSegment::BranchLOD1;
 }
@@ -1167,8 +1186,11 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
     // Whole-instance LOD: full detail when any part of the box is within the first LOD distance. The instance
     // remembers its level, so hysteresis keeps it from switching layouts back and forth at the threshold.
     const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, boxMin, boxMax);
+    XMFLOAT3 boxCorners[2];
+    XMStoreFloat3(&boxCorners[0], boxMin);
+    XMStoreFloat3(&boxCorners[1], boxMax);
     m_instanceLodLevel = Lod::Select(XMVectorGetX(XMVector3Length(nearest - renderData.eyePos)), _params->lod,
-        renderData.lodDistanceScale, m_instanceLodLevel);
+        LodScale(renderData, boxCorners[0], boxCorners[1], m_boundsValid), m_instanceLodLevel);
     // Level 0 draws the near layout, 1 the far one, and each level beyond its reduced layout.
     const size_t layoutIndex = m_instanceLodLevel == 0 ? NearLayout : m_instanceLodLevel == 1 ? FarLayout
         : std::min<size_t>(m_instanceLodLevel, source.m_instanceLayouts.size() - 1);
@@ -1180,5 +1202,8 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
     }
     renderData.frameStats[NUM_LEAVES_STAT].stat += layout.leafCount;
     renderData.frameStats[NUM_STICKS_STAT].stat += layout.stickCount;
+    renderData.profile.lodLevelObjects[std::min<size_t>(m_instanceLodLevel, renderData.profile.lodLevelObjects.size() - 1)]++;
+    renderData.profile.drawnLeaves += layout.leafCount;
+    renderData.profile.drawnSticks += layout.stickCount;
     return S_OK;
 }

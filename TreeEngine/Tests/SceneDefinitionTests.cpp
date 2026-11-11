@@ -600,6 +600,25 @@ void TestLodSelection()
     bad.distances = { 10 };
     bad.hysteresis = 0.6f;
     Check(!Lod::Valid(bad), "hysteresis above 0.5 was accepted");
+
+    // Screen heights: a 10 m object on a 1000-pixel display with a 90-degree field of view projects to
+    // 10 * 1000 / (2 * d) pixels, so 100 pixels at 50 m and 50 pixels at 100 m.
+    Lod::Thresholds screen;
+    Lod::SetScreenHeights(screen, { 100, 50 });
+    Check(screen.ScreenSpace() && Lod::Valid(screen), "valid screen heights were rejected");
+    const float scale = Lod::Scale(screen, 10, 1000, 3.14159265f / 2, 1);
+    Check(Lod::Select(49, screen, scale) == 0 && Lod::Select(51, screen, scale) == 1 && Lod::Select(99, screen, scale) == 1
+        && Lod::Select(101, screen, scale) == 2, "screen-height levels are wrong");
+    Check(Lod::Select(99, screen, Lod::Scale(screen, 20, 1000, 3.14159265f / 2, 1)) == 0,
+        "a larger object should keep detail farther away");
+    Check(Lod::Select(99, screen, Lod::Scale(screen, 10, 2000, 3.14159265f / 2, 1)) == 0,
+        "a taller display should keep detail farther away");
+    Check(Lod::Scale(two, 10, 1000, 1, 2) == 2, "distance thresholds should only take the global scale");
+    Lod::Thresholds badScreen;
+    Lod::SetScreenHeights(badScreen, { 50, 100 });
+    Check(!Lod::Valid(badScreen), "ascending screen heights were accepted");
+    Lod::SetScreenHeights(badScreen, { 100, -50 });
+    Check(!Lod::Valid(badScreen), "negative screen heights were accepted");
 }
 
 void TestTreeLodSettings()
@@ -639,6 +658,24 @@ void TestTreeLodSettings()
     bad = Json::parse(json);
     bad["objects"][1]["lod"] = Json::object();
     Reject(bad.dump(), "objects[1].lod");
+
+    auto screen = Json::parse(json);
+    screen["objects"][0]["lod"].erase("distances");
+    screen["objects"][0]["lod"]["screenHeights"] = Json::array({ 400, 200, 100 });
+    auto screenScene = SceneData::ParseScene(screen.dump(), "lod-screen");
+    Check(screenScene.objects[0]->lod.screenHeights == std::vector<float>{ 400, 200, 100 }
+        && screenScene.objects[0]->lod.distances.size() == 3 && screenScene.objects[1]->lod == screenScene.objects[0]->lod,
+        "lod screen heights were not parsed");
+    const auto savedScreen = Json::parse(SceneData::SerializeScene(screenScene));
+    Check(savedScreen["objects"][0]["lod"].contains("screenHeights") && !savedScreen["objects"][0]["lod"].contains("distances")
+        && SceneData::ParseScene(savedScreen.dump(), "saved-screen").objects[0]->lod == screenScene.objects[0]->lod,
+        "lod screen heights did not round-trip");
+    bad = screen;
+    bad["objects"][0]["lod"]["screenHeights"] = Json::array({ 100, 200 });
+    Reject(bad.dump(), ".lod");
+    bad = screen;
+    bad["objects"][0]["lod"]["distances"] = Json::array({ 10 });
+    Reject(bad.dump(), ".lod");
     bad = Json::parse(R"({"version":1,"name":"Lod","objects":[{"id":"box","type":"primitive","shape":"box","lod":{}}]})");
     Reject(bad.dump(), "objects[0].lod");
 }

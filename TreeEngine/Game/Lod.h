@@ -7,6 +7,10 @@
 // thresholds, all scaled by one global setting (RenderData::lodDistanceScale, the debug UI's "LOD distance scale").
 // Level 0 is full detail; each threshold passed adds one. Objects that remember their last level can use hysteresis,
 // so one hovering near a threshold doesn't switch back and forth every frame.
+//
+// Thresholds can instead be screen heights: the object's projected size in display pixels, descending. They are kept
+// as distances for a unit-sized object on a unit-focal-length screen (1 / pixels), and Scale() turns those into the
+// object's distances from its size, the display height and the field of view, so Select works unchanged.
 namespace Lod
 {
     // How a tree drops detail at levels 2 and up (beyond its second distance): about half its leaves per level.
@@ -17,15 +21,38 @@ namespace Lod
     struct Thresholds
     {
         std::vector<float> distances = { 10.0f };  // Ascending, positive: level i while closer than distances[i].
+        std::vector<float> screenHeights;           // Or descending pixel sizes (see SetScreenHeights); empty for distances.
         float hysteresis = 0;                       // Fraction of a threshold to pass before leaving a level (0 to 0.5).
         Reduction reduction = Reduction::Prune;     // Trees only.
 
+        bool ScreenSpace() const { return !screenHeights.empty(); }
         bool operator==(const Thresholds& other) const
         {
-            return distances == other.distances && hysteresis == other.hysteresis && reduction == other.reduction;
+            return distances == other.distances && screenHeights == other.screenHeights && hysteresis == other.hysteresis
+                && reduction == other.reduction;
         }
         bool operator!=(const Thresholds& other) const { return !(*this == other); }
     };
+
+    // Screen-height thresholds: level i while the object's projected size is above heights[i] display pixels.
+    inline void SetScreenHeights(Thresholds& thresholds, const std::vector<float>& heights)
+    {
+        thresholds.screenHeights = heights;
+        thresholds.distances.clear();
+        for (const float height : heights)
+            thresholds.distances.push_back(height > 0 ? 1.0f / height : 0.0f);
+    }
+
+    // The scale Select takes for an object: the global scale, and for screen heights also the distance at which the
+    // object (its largest extent, objectSize) projects to one pixel on a display displayHeight pixels tall with this
+    // vertical field of view. Its projected size is objectSize * displayHeight / (2 * distance * tan(fov / 2)), so it
+    // is at most heights[i] exactly when distance >= (1 / heights[i]) * scale.
+    inline float Scale(const Thresholds& thresholds, float objectSize, float displayHeight, float verticalFov, float globalScale)
+    {
+        if (!thresholds.ScreenSpace())
+            return globalScale;
+        return objectSize * displayHeight / (2.0f * std::tan(verticalFov * 0.5f)) * globalScale;
+    }
 
     // The level at this distance: how many (scaled) thresholds it has passed. With a previous level (>= 0), the
     // object keeps it while within that level's band widened by the hysteresis.
@@ -43,9 +70,19 @@ namespace Lod
         return distance >= nearEdge && distance < farEdge ? previousLevel : level;
     }
 
-    // Whether thresholds are usable: 1 to 8 ascending, positive, finite distances; hysteresis in [0, 0.5].
+    // Whether thresholds are usable: 1 to 8 ascending, positive, finite distances (for screen heights, 1 to 8
+    // descending, positive, finite heights, with the distances SetScreenHeights makes); hysteresis in [0, 0.5].
     inline bool Valid(const Thresholds& thresholds)
     {
+        if (thresholds.ScreenSpace())
+        {
+            if (thresholds.screenHeights.size() != thresholds.distances.size())
+                return false;
+            for (size_t i = 0; i < thresholds.screenHeights.size(); ++i)
+                if (!std::isfinite(thresholds.screenHeights[i]) || !(thresholds.screenHeights[i] > 0)
+                    || thresholds.distances[i] != 1.0f / thresholds.screenHeights[i])
+                    return false;
+        }
         if (thresholds.distances.empty() || thresholds.distances.size() > 8)
             return false;
         float previous = 0;

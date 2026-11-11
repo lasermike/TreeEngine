@@ -98,6 +98,11 @@ struct RenderProfile
     UINT tlasInstances = 0;
     UINT drawnObjects = 0;          // Objects with instances in the regular pass, and those the view frustum culled.
     UINT culledObjects = 0;
+    // Trees choosing a whole-tree LOD level (instances, and trees with reduced layouts), per level; and the leaves and
+    // sticks all trees draw.
+    std::array<UINT, 9> lodLevelObjects = {};
+    UINT drawnLeaves = 0;
+    UINT drawnSticks = 0;
     bool builtStaticBLAS = false;   // The static-geometry BLAS was (re)built this frame.
     bool compactedStaticBLAS = false;
     std::uint64_t staticBlasBytes = 0;
