@@ -811,7 +811,8 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
 
     // Update chandfsges every frame CB.
     CBChangesEveryFrame cb;
-    cb.globalFlags = (m_renderData.pShadowMap && m_settings->m_shadowsEnabled ? 0x1 : 0x0)
+    // 0x1: raster shading samples the shadow map, which DXR mode doesn't render (its raster image is replaced).
+    cb.globalFlags = (m_renderData.pShadowMap && m_settings->m_shadowsEnabled && !m_settings->m_dxrEnabled ? 0x1 : 0x0)
         | (m_settings->m_shadowsEnabled ? 0x0 : 0x2)
         | (m_settings->m_hashedAlphaTest ? 0x4 : 0x0)
         | (m_renderData.hdrSceneColor ? 0x8 : 0x0);

@@ -1769,8 +1769,9 @@ void Game::ComputeGPU()
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeGPU");
 
-    //Render shadow map
-    if (m_gameData.useShadowMaps && m_settings.m_shadowsEnabled)
+    // Render the shadow map. DXR replaces the raster image and traces its own shadow rays, so it needs no shadow map,
+    // except to show the debug preview.
+    if (m_gameData.useShadowMaps && m_settings.m_shadowsEnabled && (!m_settings.m_dxrEnabled || m_settings.m_showShadowBuffer))
     {
         m_renderManager.RenderShadowMap();
     }
