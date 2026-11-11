@@ -103,7 +103,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 {
     HRR(CleanUpDeviceObjects());
     m_poseValid = false;
-    m_instanceLayoutsValid = false;
+    InvalidateInstanceLayouts();
 
     // Instances are never generated; they draw the source's meshes (set when the source was created).
     if (IsInstance())
@@ -342,31 +342,70 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         }
     }
 
-    UINT segmentOffset = startInstance;
-    for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+    // Whole-tree LOD for a tree with reduced layouts: like its instances, at a level beyond the second distance it draws
+    // that level's reduced layout (in its own world space, so with no object transform) in place of its own branches.
+    // The level comes from the nearest point of the box, with hysteresis. Per-branch pose work is unchanged.
+    size_t reducedLayout = 0;
+    if (InstanceLayoutCount() > FirstReducedLayout && m_boundsValid)
     {
-        InstanceDataArray& instanceData = m_segmentInstanceData[segmentIndex];
-        if (instanceData.size() > 0)
-        {
-            memcpy(dataView + segmentOffset, &instanceData[0], instanceData.size() * sizeof(InstancedData));
-            // Written where the instances land: skipped branches shift slots from the precounted InstanceOffset.
-            if (renderData.instanceOpacityMicromap)
-                std::copy(m_segmentOpacityMicromaps[segmentIndex].begin(), m_segmentOpacityMicromaps[segmentIndex].end(),
-                    renderData.instanceOpacityMicromap + segmentOffset);
-            LinkPreviousSlots(dataView, segmentOffset, m_segmentBranchIds[segmentIndex], m_slotHistory[0], renderData.frame);
-        }
-
-        pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, segmentOffset, (UINT)instanceData.size());
-        segmentOffset += (UINT)instanceData.size();
+        const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, XMLoadFloat3(&_boundingBox[0]), XMLoadFloat3(&_boundingBox[1]));
+        m_instanceLodLevel = Lod::Select(XMVectorGetX(XMVector3Length(nearest - renderData.eyePos)), _params->lod,
+            renderData.lodDistanceScale, m_instanceLodLevel);
+        if (m_instanceLodLevel >= static_cast<int>(FirstReducedLayout))
+            reducedLayout = std::min<size_t>(m_instanceLodLevel, m_instanceLayouts.size() - 1);
     }
 
+    // The layouts depend only on the pose, depth LOD and slots, so they are rebuilt only when those change, and only
+    // while something draws them: every layout for instances, otherwise just the one the tree draws (a posed tree
+    // would otherwise rebuild them all every frame).
+    if (!m_reusePose || m_instanceLayoutDepthLOD != _params->depthLOD || m_instanceLayoutStart != startInstance)
+        InvalidateInstanceLayouts();
     if (m_instanceCount > 0)
     {
-        // The layouts depend only on the pose and depth LOD, so they are rebuilt only when those change.
-        if (!m_reusePose || !m_instanceLayoutsValid || m_instanceLayoutDepthLOD != _params->depthLOD)
+        if (!m_instanceLayoutsValid)
             BuildInstanceLayouts(startInstance, renderData.instanceOpacityMicromap);
+    }
+    else if (reducedLayout != 0 && !m_instanceLayouts[reducedLayout].valid)
+        BuildInstanceLayouts(startInstance, renderData.instanceOpacityMicromap, reducedLayout);
+
+    if (reducedLayout != 0)
+    {
+        InstanceLayout& layout = m_instanceLayouts[reducedLayout];
+        for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+            pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, layout.start[segmentIndex],
+                static_cast<UINT>(layout.segments[segmentIndex].size()));
+        // The per-branch pass counted the full tree.
+        renderData.frameStats[NUM_LEAVES_STAT].stat = renderData.frameStats[NUM_LEAVES_STAT].stat - m_cachedLeafCount + layout.leafCount;
+        renderData.frameStats[NUM_STICKS_STAT].stat = renderData.frameStats[NUM_STICKS_STAT].stat - m_cachedStickCount + layout.stickCount;
+    }
+    else
+    {
+        UINT segmentOffset = startInstance;
+        for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+        {
+            InstanceDataArray& instanceData = m_segmentInstanceData[segmentIndex];
+            if (instanceData.size() > 0)
+            {
+                memcpy(dataView + segmentOffset, &instanceData[0], instanceData.size() * sizeof(InstancedData));
+                // Written where the instances land: skipped branches shift slots from the precounted InstanceOffset.
+                if (renderData.instanceOpacityMicromap)
+                    std::copy(m_segmentOpacityMicromaps[segmentIndex].begin(), m_segmentOpacityMicromaps[segmentIndex].end(),
+                        renderData.instanceOpacityMicromap + segmentOffset);
+                LinkPreviousSlots(dataView, segmentOffset, m_segmentBranchIds[segmentIndex], m_slotHistory[0], renderData.frame);
+            }
+
+            pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, segmentOffset, (UINT)instanceData.size());
+            segmentOffset += (UINT)instanceData.size();
+        }
+    }
+
+    if (m_instanceCount > 0 || reducedLayout != 0)
+    {
+        // With instances every layout is written; without, only the one the tree draws.
         for (size_t kind = 0; kind < m_instanceLayouts.size(); ++kind)
         {
+            if (m_instanceCount == 0 && kind != reducedLayout)
+                continue;
             InstanceLayout& layout = m_instanceLayouts[kind];
             for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
             {
@@ -374,6 +413,11 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
                 if (instanceData.size() > 0)
                 {
                     memcpy(dataView + layout.start[segmentIndex], &instanceData[0], instanceData.size() * sizeof(InstancedData));
+                    // Without instances the layout shares the tree's own slots, whose micromap entries the per-branch
+                    // path rewrites, so they are written whenever it draws.
+                    if (m_instanceCount == 0 && renderData.instanceOpacityMicromap)
+                        std::copy(layout.opacityMicromaps[segmentIndex].begin(), layout.opacityMicromaps[segmentIndex].end(),
+                            renderData.instanceOpacityMicromap + layout.start[segmentIndex]);
                     LinkPreviousSlots(dataView, layout.start[segmentIndex], layout.branchIds[segmentIndex],
                         m_slotHistory[1 + kind], renderData.frame);
                 }
@@ -982,13 +1026,23 @@ void Tree::CollectReducedLayout(int reduction)
         emit({ 0 }, -1);
 }
 
-void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
+void Tree::InvalidateInstanceLayouts()
+{
+    for (InstanceLayout& layout : m_instanceLayouts)
+        layout.valid = false;
+    m_instanceLayoutsValid = false;
+}
+
+void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps, size_t onlyKind)
 {
     const UINT branches = _treeModel->treeData.numBranches;
     std::vector<int> nodeOffsets;
     for (size_t kind = 0; kind < m_instanceLayouts.size(); ++kind)
     {
+        if (onlyKind != AllLayouts && kind != onlyKind)
+            continue;
         InstanceLayout& layout = m_instanceLayouts[kind];
+        layout.valid = true;
         if (kind < FirstReducedLayout)
             CollectFullLayout(static_cast<InstanceLayoutKind>(kind));
         else
@@ -998,13 +1052,15 @@ void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
         std::array<UINT, TreeSegmentCount> counts = {};
         for (const LayoutNode& node : m_layoutNodes)
             counts[TreeSegmentIndex(node.segment)]++;
-        UINT next = startInstance + branches * static_cast<UINT>(1 + kind);
+        // After the tree's own slots for instances; in them for a tree without (it draws one or the other).
+        UINT next = m_instanceCount > 0 ? startInstance + branches * static_cast<UINT>(1 + kind) : startInstance;
         for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
         {
             layout.start[segmentIndex] = next;
             next += counts[segmentIndex];
             layout.segments[segmentIndex].clear();
             layout.branchIds[segmentIndex].clear();
+            layout.opacityMicromaps[segmentIndex].clear();
         }
 
         // Emit with skinning links into this layout's own slots. Parents precede their children.
@@ -1023,16 +1079,19 @@ void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
             data.InstanceOffsetPrev = node.parent >= 0 ? nodeOffsets[node.parent] : offset;
             layout.segments[segmentIndex].push_back(data);
             layout.branchIds[segmentIndex].push_back(node.branch->id);
+            layout.opacityMicromaps[segmentIndex].push_back(LeafOpacityMicromap(node.branch));
             if (opacityMicromaps)
-                opacityMicromaps[offset] = LeafOpacityMicromap(node.branch);
+                opacityMicromaps[offset] = layout.opacityMicromaps[segmentIndex].back();
             nodeOffsets[i] = offset;
 
             if (node.branch->geometryType == Leaf) layout.leafCount++;
             else if (node.branch->geometryType == Stick) layout.stickCount++;
         }
     }
-    m_instanceLayoutsValid = true;
+    if (onlyKind == AllLayouts)
+        m_instanceLayoutsValid = true;
     m_instanceLayoutDepthLOD = _params->depthLOD;
+    m_instanceLayoutStart = startInstance;
 }
 
 // Points each instance written at firstSlot at the same branch's slot last frame and records this frame's slots.

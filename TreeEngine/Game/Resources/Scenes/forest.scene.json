@@ -43154,6 +43154,1779 @@
      0.846
     ]
    }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     99.0,
+     0.5,
+     -33.0
+    ],
+    "rotationDegrees": [
+     0,
+     346.4,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25,
+    "regions": {
+     "willow-a": 1,
+     "willow-b": 1,
+     "willow-c": 1,
+     "willow-d": 1,
+     "willow-e": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(14) T(1)] [Y(140) Z(20) T(0.85)] [Y(250) Z(11) T(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "segmentLengthBehavior": "randomAddition",
+    "rules": [
+     {
+      "input": "T(s)",
+      "output": "!(s * 1) F(1.25 * s) [Y(70) Z(40) W(s * 0.55)] [Y(250) Z(35) W(s * 0.5)] [Y(160) Z(45) W(s * 0.45)] Y(110) z(3) T(s * 0.8)"
+     },
+     {
+      "input": "W(s)",
+      "output": "!(s * 0.5) F(s + 0.25) [Y(90) Z(25) V(s * 0.6)] [Y(270) Z(30) V(s * 0.5)] Z(7) W(s * 0.75)"
+     },
+     {
+      "input": "V(s)",
+      "output": "!(s * 0.35) F(0.22) [Z(40) L(0.15)] [Y(180) Z(40) L(0.15)] [Y(90) Z(45) L(0.14)] [Y(270) Z(45) L(0.14)] Z(12) V(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-0",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     81.0,
+     0.5,
+     -81.0
+    ],
+    "rotationDegrees": [
+     0,
+     253.7,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25,
+    "regions": {
+     "willow-a": 1,
+     "willow-b": 1,
+     "willow-c": 1,
+     "willow-d": 1,
+     "willow-e": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(14) T(1)] [Y(140) Z(20) T(0.85)] [Y(250) Z(11) T(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "segmentLengthBehavior": "randomAddition",
+    "rules": [
+     {
+      "input": "T(s)",
+      "output": "!(s * 1) F(1.25 * s) [Y(70) Z(40) W(s * 0.55)] [Y(250) Z(35) W(s * 0.5)] [Y(160) Z(45) W(s * 0.45)] Y(110) z(3) T(s * 0.8)"
+     },
+     {
+      "input": "W(s)",
+      "output": "!(s * 0.5) F(s + 0.25) [Y(90) Z(25) V(s * 0.6)] [Y(270) Z(30) V(s * 0.5)] Z(7) W(s * 0.75)"
+     },
+     {
+      "input": "V(s)",
+      "output": "!(s * 0.35) F(0.22) [Z(40) L(0.15)] [Y(180) Z(40) L(0.15)] [Y(90) Z(45) L(0.14)] [Y(270) Z(45) L(0.14)] Z(12) V(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-1",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -69.0,
+     0.5,
+     -93.0
+    ],
+    "rotationDegrees": [
+     0,
+     89.1,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "cottonwood-twig": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.4) Y(20) [Z(30) A(1)] [Y(125) Z(34) A(0.9)] [Y(245) Z(27) A(0.95)] Z(5) A(0.8)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.16,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.7) F(1.5 * s) [Y(90) Z(32) B(s * 0.6)] [Y(270) Z(36) B(s * 0.55)] Y(137) z(6) A(s * 0.78)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.4) [Y(60) Z(40) C(s * 0.6)] [Y(240) Z(45) C(s * 0.5)] Y(97) Z(8) B(s * 0.75)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.45) F(s + 0.25) [Z(35) L(0.8)] [Y(180) Z(40) L(0.75)] Y(120) C(s * 0.7)"
+     }
+    ]
+   },
+   "id": "standalone-2",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     9.0,
+     0.5,
+     -75.0
+    ],
+    "rotationDegrees": [
+     0,
+     144.3,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "cylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "oak-a": 1,
+     "oak-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(8) O(1)] [Y(70) Z(15) O(0.85)] [Y(150) Z(10) O(0.95)] [Y(230) Z(18) O(0.8)] [Y(300) Z(12) O(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.035,
+    "rules": [
+     {
+      "input": "O(s)",
+      "output": "!(s * 1) F(0.45 * s) [Y(60) Z(45) K(s * 0.5)] [Y(240) Z(40) K(s * 0.45)] Y(97) z(3) O(s * 0.85)"
+     },
+     {
+      "input": "K(s)",
+      "output": "!(s * 0.5) F(0.15) [Z(45) L(0.15)] [Y(120) Z(45) L(0.14)] [Y(240) Z(45) L(0.15)] Y(60) K(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-3",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     111.0,
+     0.5,
+     -9.0
+    ],
+    "rotationDegrees": [
+     0,
+     175.5,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "cottonwood-twig": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.4) Y(20) [Z(30) A(1)] [Y(125) Z(34) A(0.9)] [Y(245) Z(27) A(0.95)] Z(5) A(0.8)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.16,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.7) F(1.5 * s) [Y(90) Z(32) B(s * 0.6)] [Y(270) Z(36) B(s * 0.55)] Y(137) z(6) A(s * 0.78)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.4) [Y(60) Z(40) C(s * 0.6)] [Y(240) Z(45) C(s * 0.5)] Y(97) Z(8) B(s * 0.75)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.45) F(s + 0.25) [Z(35) L(0.8)] [Y(180) Z(40) L(0.75)] Y(120) C(s * 0.7)"
+     }
+    ]
+   },
+   "id": "standalone-4",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     9.0,
+     0.5,
+     3.0
+    ],
+    "rotationDegrees": [
+     0,
+     206.3,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-5",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -111.0,
+     0.5,
+     -105.0
+    ],
+    "rotationDegrees": [
+     0,
+     174.6,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-6",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     111.0,
+     0.5,
+     57.0
+    ],
+    "rotationDegrees": [
+     0,
+     96.0,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "cottonwood-twig": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.4) Y(20) [Z(30) A(1)] [Y(125) Z(34) A(0.9)] [Y(245) Z(27) A(0.95)] Z(5) A(0.8)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.16,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.7) F(1.5 * s) [Y(90) Z(32) B(s * 0.6)] [Y(270) Z(36) B(s * 0.55)] Y(137) z(6) A(s * 0.78)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.4) [Y(60) Z(40) C(s * 0.6)] [Y(240) Z(45) C(s * 0.5)] Y(97) Z(8) B(s * 0.75)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.45) F(s + 0.25) [Z(35) L(0.8)] [Y(180) Z(40) L(0.75)] Y(120) C(s * 0.7)"
+     }
+    ]
+   },
+   "id": "standalone-7",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     27.0,
+     0.5,
+     -3.0
+    ],
+    "rotationDegrees": [
+     0,
+     324.7,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-8",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -123.0,
+     0.5,
+     69.0
+    ],
+    "rotationDegrees": [
+     0,
+     40.9,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-9",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -21.0,
+     0.5,
+     -105.0
+    ],
+    "rotationDegrees": [
+     0,
+     357.0,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 70,
+    "sizeVariation": 0.25,
+    "regions": {
+     "ash-a": 1,
+     "ash-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.2) A(1)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.8) F(0.9 * s) [Z(38) B(s * 0.65)] [Y(180) Z(38) B(s * 0.65)] Y(90) A(s * 0.85)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.2) [Z(42) C(s * 0.6)] [Y(180) Z(42) C(s * 0.6)] Y(90) z(4) B(s * 0.78)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.4) F(0.25) [Z(40) L(0.4)] [Y(180) Z(40) L(0.38)] Y(90) C(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-10",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     27.0,
+     0.5,
+     -27.0
+    ],
+    "rotationDegrees": [
+     0,
+     223.3,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "cottonwood-twig": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.4) Y(20) [Z(30) A(1)] [Y(125) Z(34) A(0.9)] [Y(245) Z(27) A(0.95)] Z(5) A(0.8)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.16,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.7) F(1.5 * s) [Y(90) Z(32) B(s * 0.6)] [Y(270) Z(36) B(s * 0.55)] Y(137) z(6) A(s * 0.78)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.4) [Y(60) Z(40) C(s * 0.6)] [Y(240) Z(45) C(s * 0.5)] Y(97) Z(8) B(s * 0.75)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.45) F(s + 0.25) [Z(35) L(0.8)] [Y(180) Z(40) L(0.75)] Y(120) C(s * 0.7)"
+     }
+    ]
+   },
+   "id": "standalone-11",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     111.0,
+     0.5,
+     -105.0
+    ],
+    "rotationDegrees": [
+     0,
+     237.9,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-12",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     51.0,
+     0.5,
+     -69.0
+    ],
+    "rotationDegrees": [
+     0,
+     248.9,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 70,
+    "sizeVariation": 0.25,
+    "regions": {
+     "ash-a": 1,
+     "ash-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.2) A(1)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.8) F(0.9 * s) [Z(38) B(s * 0.65)] [Y(180) Z(38) B(s * 0.65)] Y(90) A(s * 0.85)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.2) [Z(42) C(s * 0.6)] [Y(180) Z(42) C(s * 0.6)] Y(90) z(4) B(s * 0.78)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.4) F(0.25) [Z(40) L(0.4)] [Y(180) Z(40) L(0.38)] Y(90) C(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-13",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -99.0,
+     0.5,
+     117.0
+    ],
+    "rotationDegrees": [
+     0,
+     233.9,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-14",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -9.0,
+     0.5,
+     27.0
+    ],
+    "rotationDegrees": [
+     0,
+     291.0,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25,
+    "regions": {
+     "willow-a": 1,
+     "willow-b": 1,
+     "willow-c": 1,
+     "willow-d": 1,
+     "willow-e": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(14) T(1)] [Y(140) Z(20) T(0.85)] [Y(250) Z(11) T(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "segmentLengthBehavior": "randomAddition",
+    "rules": [
+     {
+      "input": "T(s)",
+      "output": "!(s * 1) F(1.25 * s) [Y(70) Z(40) W(s * 0.55)] [Y(250) Z(35) W(s * 0.5)] [Y(160) Z(45) W(s * 0.45)] Y(110) z(3) T(s * 0.8)"
+     },
+     {
+      "input": "W(s)",
+      "output": "!(s * 0.5) F(s + 0.25) [Y(90) Z(25) V(s * 0.6)] [Y(270) Z(30) V(s * 0.5)] Z(7) W(s * 0.75)"
+     },
+     {
+      "input": "V(s)",
+      "output": "!(s * 0.35) F(0.22) [Z(40) L(0.15)] [Y(180) Z(40) L(0.15)] [Y(90) Z(45) L(0.14)] [Y(270) Z(45) L(0.14)] Z(12) V(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-15",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     117.0,
+     0.5,
+     -117.0
+    ],
+    "rotationDegrees": [
+     0,
+     194.3,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "cylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "oak-a": 1,
+     "oak-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(8) O(1)] [Y(70) Z(15) O(0.85)] [Y(150) Z(10) O(0.95)] [Y(230) Z(18) O(0.8)] [Y(300) Z(12) O(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.035,
+    "rules": [
+     {
+      "input": "O(s)",
+      "output": "!(s * 1) F(0.45 * s) [Y(60) Z(45) K(s * 0.5)] [Y(240) Z(40) K(s * 0.45)] Y(97) z(3) O(s * 0.85)"
+     },
+     {
+      "input": "K(s)",
+      "output": "!(s * 0.5) F(0.15) [Z(45) L(0.15)] [Y(120) Z(45) L(0.14)] [Y(240) Z(45) L(0.15)] Y(60) K(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-16",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -69.0,
+     0.5,
+     3.0
+    ],
+    "rotationDegrees": [
+     0,
+     252.7,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "cottonwood-twig": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.4) Y(20) [Z(30) A(1)] [Y(125) Z(34) A(0.9)] [Y(245) Z(27) A(0.95)] Z(5) A(0.8)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.16,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.7) F(1.5 * s) [Y(90) Z(32) B(s * 0.6)] [Y(270) Z(36) B(s * 0.55)] Y(137) z(6) A(s * 0.78)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.4) [Y(60) Z(40) C(s * 0.6)] [Y(240) Z(45) C(s * 0.5)] Y(97) Z(8) B(s * 0.75)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.45) F(s + 0.25) [Z(35) L(0.8)] [Y(180) Z(40) L(0.75)] Y(120) C(s * 0.7)"
+     }
+    ]
+   },
+   "id": "standalone-17",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -117.0,
+     0.5,
+     129.0
+    ],
+    "rotationDegrees": [
+     0,
+     309.7,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25,
+    "regions": {
+     "willow-a": 1,
+     "willow-b": 1,
+     "willow-c": 1,
+     "willow-d": 1,
+     "willow-e": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(14) T(1)] [Y(140) Z(20) T(0.85)] [Y(250) Z(11) T(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "segmentLengthBehavior": "randomAddition",
+    "rules": [
+     {
+      "input": "T(s)",
+      "output": "!(s * 1) F(1.25 * s) [Y(70) Z(40) W(s * 0.55)] [Y(250) Z(35) W(s * 0.5)] [Y(160) Z(45) W(s * 0.45)] Y(110) z(3) T(s * 0.8)"
+     },
+     {
+      "input": "W(s)",
+      "output": "!(s * 0.5) F(s + 0.25) [Y(90) Z(25) V(s * 0.6)] [Y(270) Z(30) V(s * 0.5)] Z(7) W(s * 0.75)"
+     },
+     {
+      "input": "V(s)",
+      "output": "!(s * 0.35) F(0.22) [Z(40) L(0.15)] [Y(180) Z(40) L(0.15)] [Y(90) Z(45) L(0.14)] [Y(270) Z(45) L(0.14)] Z(12) V(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-18",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -87.0,
+     0.5,
+     69.0
+    ],
+    "rotationDegrees": [
+     0,
+     210.4,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-19",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -129.0,
+     0.5,
+     -51.0
+    ],
+    "rotationDegrees": [
+     0,
+     200.6,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-20",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -93.0,
+     0.5,
+     -93.0
+    ],
+    "rotationDegrees": [
+     0,
+     57.0,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-pine",
+    "leaf": "pinyon-needles"
+   },
+   "leaves": {
+    "atlas": "plants-12",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25
+   },
+   "generator": {
+    "axiom": "!(1) F(0.9) Y(30) [Z(25) P(1)] [Y(150) Z(32) P(0.9)] [Y(260) Z(22) P(0.95)]",
+    "angle": 0.017453292519943295,
+    "iterations": 7,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "P(s)",
+      "output": "!(s * 0.7) F(0.45 * s) [Y(40) Z(55) Q(s * 0.6)] [Y(160) Z(50) Q(s * 0.55)] [Y(280) Z(58) Q(s * 0.5)] Y(97) z(4) P(s * 0.85)"
+     },
+     {
+      "input": "Q(s)",
+      "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-21",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -15.0,
+     0.5,
+     -105.0
+    ],
+    "rotationDegrees": [
+     0,
+     191.5,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "cylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "oak-a": 1,
+     "oak-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(8) O(1)] [Y(70) Z(15) O(0.85)] [Y(150) Z(10) O(0.95)] [Y(230) Z(18) O(0.8)] [Y(300) Z(12) O(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.035,
+    "rules": [
+     {
+      "input": "O(s)",
+      "output": "!(s * 1) F(0.45 * s) [Y(60) Z(45) K(s * 0.5)] [Y(240) Z(40) K(s * 0.45)] Y(97) z(3) O(s * 0.85)"
+     },
+     {
+      "input": "K(s)",
+      "output": "!(s * 0.5) F(0.15) [Z(45) L(0.15)] [Y(120) Z(45) L(0.14)] [Y(240) Z(45) L(0.15)] Y(60) K(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-22",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     123.0,
+     0.5,
+     57.0
+    ],
+    "rotationDegrees": [
+     0,
+     128.5,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 70,
+    "sizeVariation": 0.25,
+    "regions": {
+     "ash-a": 1,
+     "ash-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.2) A(1)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.8) F(0.9 * s) [Z(38) B(s * 0.65)] [Y(180) Z(38) B(s * 0.65)] Y(90) A(s * 0.85)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.2) [Z(42) C(s * 0.6)] [Y(180) Z(42) C(s * 0.6)] Y(90) z(4) B(s * 0.78)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.4) F(0.25) [Z(40) L(0.4)] [Y(180) Z(40) L(0.38)] Y(90) C(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-23",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -27.0,
+     0.5,
+     99.0
+    ],
+    "rotationDegrees": [
+     0,
+     178.1,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "cylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "sumac": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(20) S(1)] [Y(60) Z(35) S(0.8)] [Y(120) Z(25) S(0.9)] [Y(180) Z(40) S(0.75)] [Y(240) Z(30) S(0.85)] [Y(300) Z(45) S(0.7)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.012,
+    "rules": [
+     {
+      "input": "S(s)",
+      "output": "!(s * 1) F(0.27 * s) [Y(90) Z(50) M(s * 0.6)] Y(137) Z(4) S(s * 0.82)"
+     },
+     {
+      "input": "M(s)",
+      "output": "!(s * 0.5) F(0.1) [Z(45) L(0.11)] [Y(180) Z(45) L(0.11)] [Y(90) Z(30) L(0.1)] M(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-24",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     135.0,
+     0.5,
+     -81.0
+    ],
+    "rotationDegrees": [
+     0,
+     111.2,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "cylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "oak-a": 1,
+     "oak-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(8) O(1)] [Y(70) Z(15) O(0.85)] [Y(150) Z(10) O(0.95)] [Y(230) Z(18) O(0.8)] [Y(300) Z(12) O(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.035,
+    "rules": [
+     {
+      "input": "O(s)",
+      "output": "!(s * 1) F(0.45 * s) [Y(60) Z(45) K(s * 0.5)] [Y(240) Z(40) K(s * 0.45)] Y(97) z(3) O(s * 0.85)"
+     },
+     {
+      "input": "K(s)",
+      "output": "!(s * 0.5) F(0.15) [Z(45) L(0.15)] [Y(120) Z(45) L(0.14)] [Y(240) Z(45) L(0.15)] Y(60) K(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-25",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -117.0,
+     0.5,
+     15.0
+    ],
+    "rotationDegrees": [
+     0,
+     102.4,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 70,
+    "sizeVariation": 0.25,
+    "regions": {
+     "ash-a": 1,
+     "ash-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "!(1) F(2.2) A(1)",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "rules": [
+     {
+      "input": "A(s)",
+      "output": "!(s * 0.8) F(0.9 * s) [Z(38) B(s * 0.65)] [Y(180) Z(38) B(s * 0.65)] Y(90) A(s * 0.85)"
+     },
+     {
+      "input": "B(s)",
+      "output": "!(s * 0.55) F(s + 0.2) [Z(42) C(s * 0.6)] [Y(180) Z(42) C(s * 0.6)] Y(90) z(4) B(s * 0.78)"
+     },
+     {
+      "input": "C(s)",
+      "output": "!(s * 0.4) F(0.25) [Z(40) L(0.4)] [Y(180) Z(40) L(0.38)] Y(90) C(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-26",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     -63.0,
+     0.5,
+     -111.0
+    ],
+    "rotationDegrees": [
+     0,
+     290.9,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "cylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "sumac": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(20) S(1)] [Y(60) Z(35) S(0.8)] [Y(120) Z(25) S(0.9)] [Y(180) Z(40) S(0.75)] [Y(240) Z(30) S(0.85)] [Y(300) Z(45) S(0.7)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.012,
+    "rules": [
+     {
+      "input": "S(s)",
+      "output": "!(s * 1) F(0.27 * s) [Y(90) Z(50) M(s * 0.6)] Y(137) Z(4) S(s * 0.82)"
+     },
+     {
+      "input": "M(s)",
+      "output": "!(s * 0.5) F(0.1) [Z(45) L(0.11)] [Y(180) Z(45) L(0.11)] [Y(90) Z(30) L(0.1)] M(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-27",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     15.0,
+     0.5,
+     117.0
+    ],
+    "rotationDegrees": [
+     0,
+     252.5,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "cylinder",
+   "materials": {
+    "trunk": "bark-furrowed",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 80,
+    "sizeVariation": 0.3,
+    "regions": {
+     "oak-a": 1,
+     "oak-b": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(8) O(1)] [Y(70) Z(15) O(0.85)] [Y(150) Z(10) O(0.95)] [Y(230) Z(18) O(0.8)] [Y(300) Z(12) O(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.035,
+    "rules": [
+     {
+      "input": "O(s)",
+      "output": "!(s * 1) F(0.45 * s) [Y(60) Z(45) K(s * 0.5)] [Y(240) Z(40) K(s * 0.45)] Y(97) z(3) O(s * 0.85)"
+     },
+     {
+      "input": "K(s)",
+      "output": "!(s * 0.5) F(0.15) [Z(45) L(0.15)] [Y(120) Z(45) L(0.14)] [Y(240) Z(45) L(0.15)] Y(60) K(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-28",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
+  },
+  {
+   "type": "tree",
+   "transform": {
+    "position": [
+     45.0,
+     0.5,
+     -39.0
+    ],
+    "rotationDegrees": [
+     0,
+     87.8,
+     0
+    ]
+   },
+   "animationSpeed": 10,
+   "trunkShape": "skinnedCylinder",
+   "materials": {
+    "trunk": "bark-willow",
+    "leaf": "canyon-leaves"
+   },
+   "leaves": {
+    "atlas": "canyon-leaves",
+    "twistDegrees": 60,
+    "sizeVariation": 0.25,
+    "regions": {
+     "willow-a": 1,
+     "willow-b": 1,
+     "willow-c": 1,
+     "willow-d": 1,
+     "willow-e": 1
+    }
+   },
+   "generator": {
+    "axiom": "[Z(14) T(1)] [Y(140) Z(20) T(0.85)] [Y(250) Z(11) T(0.9)]",
+    "angle": 0.017453292519943295,
+    "iterations": 6,
+    "segmentLength": 1,
+    "thickness": 0.12,
+    "segmentLengthBehavior": "randomAddition",
+    "rules": [
+     {
+      "input": "T(s)",
+      "output": "!(s * 1) F(1.25 * s) [Y(70) Z(40) W(s * 0.55)] [Y(250) Z(35) W(s * 0.5)] [Y(160) Z(45) W(s * 0.45)] Y(110) z(3) T(s * 0.8)"
+     },
+     {
+      "input": "W(s)",
+      "output": "!(s * 0.5) F(s + 0.25) [Y(90) Z(25) V(s * 0.6)] [Y(270) Z(30) V(s * 0.5)] Z(7) W(s * 0.75)"
+     },
+     {
+      "input": "V(s)",
+      "output": "!(s * 0.35) F(0.22) [Z(40) L(0.15)] [Y(180) Z(40) L(0.15)] [Y(90) Z(45) L(0.14)] [Y(270) Z(45) L(0.14)] Z(12) V(s * 0.8)"
+     }
+    ]
+   },
+   "id": "standalone-29",
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
+   }
   }
  ]
 }

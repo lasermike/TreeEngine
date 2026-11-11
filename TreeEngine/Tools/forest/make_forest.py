@@ -3,11 +3,12 @@
 The source trees, materials, leaf atlases, light and environment come from leaf-atlases.scene.json. The instances
 sit on a jittered grid with a seeded random species, yaw and scale, so the scene is the same every time it is made.
 
-    python make_forest.py [--count 2000] [--spacing 6] [--seed 7] [--lod 10,30,60,120] [--reduction prune|merge]
+    python make_forest.py [--count 2000] [--standalone 30] [--spacing 6] [--seed 7] [--lod 10,30,60,120] [--reduction prune|merge]
                           [--id Forest] [--output ../../Game/Resources/Scenes/forest.scene.json]
 
 --lod sets the source trees' (and so the instances') LOD distances: an instance draws full-detail sticks within the
 first, the far layout to the second, and one reduced layout per distance after that (see the Scenes README).
+--standalone adds non-instanced copies of the sources among the instances, which draw their own reduced layouts.
 """
 import argparse
 import json
@@ -23,6 +24,8 @@ SPECIES = ['fremont-cottonwood', 'goodding-willow', 'velvet-ash', 'pinyon-pine',
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--count', type=int, default=2000, help='instanced trees (the sources are extra)')
+    parser.add_argument('--standalone', type=int, default=30,
+                        help='extra non-instanced trees among the instances (each its own copy of a source)')
     parser.add_argument('--spacing', type=float, default=6.0, help='grid spacing in meters')
     parser.add_argument('--seed', type=int, default=7)
     parser.add_argument('--lod', default='10,30,60,120', help='comma-separated LOD distances for the source trees')
@@ -52,6 +55,7 @@ def main():
         source['transform']['position'] = [(index - (len(SPECIES) - 1) / 2) * 5.0, 0.5, -extent / 2 - 8]
         source['lod'] = {'distances': [float(d) for d in args.lod.split(',')], 'hysteresis': 0.1, 'reduction': args.reduction}
         objects.append(source)
+    lod = {'distances': [float(d) for d in args.lod.split(',')], 'hysteresis': 0.1, 'reduction': args.reduction}
     for i in range(args.count):
         row, column = divmod(i, side)
         x = (column + 0.5) * args.spacing - extent / 2 + random.uniform(-0.35, 0.35) * args.spacing
@@ -62,6 +66,21 @@ def main():
             'transform': {'position': [round(x, 3), 0.5, round(z, 3)], 'rotationDegrees': [0, round(random.uniform(0, 360), 1), 0],
                           'scale': [scale, scale, scale]},
         })
+    # Non-instanced trees between the grid cells (a separate random stream, so the instances stay the same). Each
+    # computes its own pose and, far enough away, draws its own reduced layout.
+    standalone = random.Random(args.seed + 1)
+    for i in range(args.standalone):
+        tree = json.loads(json.dumps(sources[standalone.choice(SPECIES)]))
+        tree.pop('id', None)
+        cell = standalone.randrange(args.count)
+        row, column = divmod(cell, side)
+        x = (column + 1.0) * args.spacing - extent / 2
+        z = (row + 1.0) * args.spacing - extent / 2
+        tree['id'] = f'standalone-{i}'
+        tree['transform'] = dict(tree.get('transform', {}), position=[round(x, 3), 0.5, round(z, 3)],
+                                 rotationDegrees=[0, round(standalone.uniform(0, 360), 1), 0])
+        tree['lod'] = lod
+        objects.append(tree)
 
     scene = {
         'version': base['version'], 'id': args.id, 'name': f'{args.id} - {args.count} instanced canyon trees ({args.reduction})',
@@ -73,7 +92,7 @@ def main():
     with open(args.output, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(scene, f, indent=1)
         f.write('\n')
-    print(f'{args.output}: {len(SPECIES)} sources, {args.count} instances over {extent:.0f} m, lod {args.lod} ({args.reduction})')
+    print(f'{args.output}: {len(SPECIES)} sources, {args.count} instances, {args.standalone} standalone over {extent:.0f} m, lod {args.lod} ({args.reduction})')
 
 
 if __name__ == '__main__':

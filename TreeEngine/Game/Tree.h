@@ -122,9 +122,11 @@ private:
     {
         std::array<InstanceDataArray, TreeSegmentCount> segments;
         std::array<std::vector<int>, TreeSegmentCount> branchIds; // Per instance in segments.
+        std::array<std::vector<int>, TreeSegmentCount> opacityMicromaps; // Per instance in segments.
         std::array<UINT, TreeSegmentCount> start = {};
         UINT leafCount = 0;
         UINT stickCount = 0;
+        bool valid = false;     // Built for the current pose (a tree without instances builds only the one it draws).
     };
     std::vector<InstanceLayout> m_instanceLayouts;
     // A layout's branches before slots are assigned, parents before children.
@@ -157,10 +159,13 @@ private:
     bool m_boundsValid = false;
     bool m_instanceLayoutsValid = false;
     int m_instanceLayoutDepthLOD = 0;
+    UINT m_instanceLayoutStart = 0;
 
     Tree* InstanceSource() const { return static_cast<Tree*>(_params->instanceSource); }
     TreeSegment SelectLayoutSegment(const Branch* branch, bool nearLayout) const;
-    void BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps);
+    static constexpr size_t AllLayouts = SIZE_MAX;
+    void BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps, size_t onlyKind = AllLayouts);
+    void InvalidateInstanceLayouts();
     HRESULT ComputeInstanceConstants(IRenderFrame* pFrameConfig);
 
     HRESULT ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRenderData);
