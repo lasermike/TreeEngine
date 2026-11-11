@@ -240,11 +240,9 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         m_cachedLeafCount = m_cachedStickCount = 0;
         if (!m_reusePose)
         {
-            _boundingBox[0] = XMFLOAT3(-1, -1, -1);
-            _boundingBox[1] = XMFLOAT3(1, 1, 1);
-            m_cullBox[0] = XMFLOAT3(FLT_MAX, FLT_MAX, FLT_MAX);
-            m_cullBox[1] = XMFLOAT3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-            m_cullBoxValid = false;
+            _boundingBox[0] = XMFLOAT3(FLT_MAX, FLT_MAX, FLT_MAX);
+            _boundingBox[1] = XMFLOAT3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+            m_boundsValid = false;
             for (int i = 0; i < NUM_EXTENTS; i++)
                 _extents[i] = XMFLOAT3(0, 0, 0);
         }
@@ -533,24 +531,18 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeBranchInstanceData");
 
-    //Compute bounding box
+    // Bounding box: the union of every drawn branch's mesh bounds. Each branch mesh fits a unit cube about its origin,
+    // whose world box is its center plus, per world axis, the sum of the absolute row components (row vectors map
+    // through the matrix's rows).
     if (!m_reusePose)
     {
-        XMMATRIX localToWorld = XMLoadFloat4x4(&pose.world);
-        XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMVector3Transform(XMVectorSet(-1.0f, -1.0f, -1.0f, 0), localToWorld),
-            XMLoadFloat3(&_boundingBox[0])));
-        XMStoreFloat3(&_boundingBox[1], XMVectorMax(XMVector3Transform(XMVectorSet(1.0f, 1.0f, 1.0f, 0), localToWorld),
-            XMLoadFloat3(&_boundingBox[1])));
-
-        // The world box of the unit cube about the branch's origin: its center plus, per world axis, the sum of the
-        // absolute row components (row vectors map through the matrix's rows).
         const XMFLOAT4X4& m = pose.world;
         const XMVECTOR center = XMVectorSet(m._41, m._42, m._43, 0);
         const XMVECTOR extent = XMVectorSet(fabsf(m._11) + fabsf(m._21) + fabsf(m._31),
             fabsf(m._12) + fabsf(m._22) + fabsf(m._32), fabsf(m._13) + fabsf(m._23) + fabsf(m._33), 0);
-        XMStoreFloat3(&m_cullBox[0], XMVectorMin(XMLoadFloat3(&m_cullBox[0]), XMVectorSubtract(center, extent)));
-        XMStoreFloat3(&m_cullBox[1], XMVectorMax(XMLoadFloat3(&m_cullBox[1]), XMVectorAdd(center, extent)));
-        m_cullBoxValid = true;
+        XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMLoadFloat3(&_boundingBox[0]), XMVectorSubtract(center, extent)));
+        XMStoreFloat3(&_boundingBox[1], XMVectorMax(XMLoadFloat3(&_boundingBox[1]), XMVectorAdd(center, extent)));
+        m_boundsValid = true;
     }
 
     return S_OK;
@@ -946,24 +938,11 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
         boxMin = XMVectorMin(boxMin, point);
         boxMax = XMVectorMax(boxMax, point);
     }
+    m_boundsValid = source.m_boundsValid;
+    if (!m_boundsValid)
+        boxMin = boxMax = rel.r[3];     // Nothing drawn yet: an empty box at the instance's origin.
     XMStoreFloat3(&_boundingBox[0], boxMin);
     XMStoreFloat3(&_boundingBox[1], boxMax);
-
-    // View-culling bounds: the source's cull box carried through Rel the same way.
-    m_cullBoxValid = source.m_cullBoxValid;
-    if (m_cullBoxValid)
-    {
-        XMVECTOR cullMin = g_XMFltMax, cullMax = -g_XMFltMax.v;
-        for (int corner = 0; corner < 8; ++corner)
-        {
-            const XMVECTOR point = XMVector3Transform(XMVectorSet(source.m_cullBox[corner & 1].x,
-                source.m_cullBox[(corner >> 1) & 1].y, source.m_cullBox[corner >> 2].z, 1), rel);
-            cullMin = XMVectorMin(cullMin, point);
-            cullMax = XMVectorMax(cullMax, point);
-        }
-        XMStoreFloat3(&m_cullBox[0], cullMin);
-        XMStoreFloat3(&m_cullBox[1], cullMax);
-    }
 
     // Whole-instance LOD: full detail when any part of the box is within the 10-unit detail distance.
     const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, boxMin, boxMax);
