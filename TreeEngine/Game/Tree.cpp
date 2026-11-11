@@ -256,11 +256,26 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     // The LOD scale for this frame's per-branch and whole-tree levels. For screen heights it uses the box from the
     // last pose (this frame's is built during the pass below).
     m_lodScale = LodScale(renderData, _boundingBox[0], _boundingBox[1], m_boundsValid);
-    const bool reuseInstances = m_reusePose && startInstance == m_lastInstanceStart
+
+    // Whole-tree LOD for a tree with reduced layouts (see below). With the pose reused, the level comes from the last
+    // pose's box before the per-branch pass, and a tree drawing a reduced layout skips that pass: the layouts come from
+    // the pose, not the per-branch instances, which are most of a large tree's CPU work while the camera moves.
+    bool levelChosen = false;
+    if (m_reusePose && m_boundsValid && InstanceLayoutCount() > FirstReducedLayout)
+    {
+        const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, XMLoadFloat3(&_boundingBox[0]), XMLoadFloat3(&_boundingBox[1]));
+        m_instanceLodLevel = Lod::Select(XMVectorGetX(XMVector3Length(nearest - renderData.eyePos)), _params->lod,
+            m_lodScale, m_instanceLodLevel);
+        levelChosen = true;
+    }
+    const bool skipBranches = levelChosen && m_instanceLodLevel >= static_cast<int>(FirstReducedLayout);
+    const bool reuseInstances = m_reusePose && m_branchInstancesValid && startInstance == m_lastInstanceStart
         && _params->depthLOD == m_lastDepthLOD && m_lodScale == m_lastLodScale
         && XMVector3Equal(renderData.eyePos, XMLoadFloat3(&m_lastEyePosition));
 
-    if (!reuseInstances)
+    if (skipBranches)
+        m_branchInstancesValid = false;     // Rebuilt when the tree next draws its own branches.
+    else if (!reuseInstances)
     {
         m_cachedLeafCount = m_cachedStickCount = 0;
         if (!m_reusePose)
@@ -324,6 +339,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         m_lastDepthLOD = _params->depthLOD;
         m_lastLodScale = m_lodScale;
         m_lastInstanceStart = startInstance;
+        m_branchInstancesValid = true;
     }
     else
     {
@@ -356,13 +372,16 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 
     // Whole-tree LOD for a tree with reduced layouts: like its instances, at a level beyond the second distance it draws
     // that level's reduced layout (in its own world space, so with no object transform) in place of its own branches.
-    // The level comes from the nearest point of the box, with hysteresis. Per-branch pose work is unchanged.
+    // The level comes from the nearest point of the box, with hysteresis (chosen above when the pose was reused).
     size_t reducedLayout = 0;
     if (InstanceLayoutCount() > FirstReducedLayout && m_boundsValid)
     {
-        const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, XMLoadFloat3(&_boundingBox[0]), XMLoadFloat3(&_boundingBox[1]));
-        m_instanceLodLevel = Lod::Select(XMVectorGetX(XMVector3Length(nearest - renderData.eyePos)), _params->lod,
-            m_lodScale, m_instanceLodLevel);
+        if (!levelChosen)
+        {
+            const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, XMLoadFloat3(&_boundingBox[0]), XMLoadFloat3(&_boundingBox[1]));
+            m_instanceLodLevel = Lod::Select(XMVectorGetX(XMVector3Length(nearest - renderData.eyePos)), _params->lod,
+                m_lodScale, m_instanceLodLevel);
+        }
         if (m_instanceLodLevel >= static_cast<int>(FirstReducedLayout))
             reducedLayout = std::min<size_t>(m_instanceLodLevel, m_instanceLayouts.size() - 1);
         m_profileLevel = m_instanceLodLevel;
@@ -387,9 +406,10 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
             pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, layout.start[segmentIndex],
                 static_cast<UINT>(layout.segments[segmentIndex].size()));
-        // The per-branch pass counted the full tree.
-        renderData.frameStats[NUM_LEAVES_STAT].stat = renderData.frameStats[NUM_LEAVES_STAT].stat - m_cachedLeafCount + layout.leafCount;
-        renderData.frameStats[NUM_STICKS_STAT].stat = renderData.frameStats[NUM_STICKS_STAT].stat - m_cachedStickCount + layout.stickCount;
+        // The per-branch pass, unless skipped, counted the full tree.
+        const UINT countedLeaves = skipBranches ? 0 : m_cachedLeafCount, countedSticks = skipBranches ? 0 : m_cachedStickCount;
+        renderData.frameStats[NUM_LEAVES_STAT].stat = renderData.frameStats[NUM_LEAVES_STAT].stat - countedLeaves + layout.leafCount;
+        renderData.frameStats[NUM_STICKS_STAT].stat = renderData.frameStats[NUM_STICKS_STAT].stat - countedSticks + layout.stickCount;
         m_profileLeaves = layout.leafCount;
         m_profileSticks = layout.stickCount;
     }

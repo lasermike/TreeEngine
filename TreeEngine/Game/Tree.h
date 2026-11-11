@@ -102,6 +102,7 @@ private:
     XMFLOAT3 m_lastPoseScale = XMFLOAT3(1, 1, 1);
     bool m_poseValid = false;
     bool m_reusePose = false;
+    bool m_branchInstancesValid = false;    // m_segmentInstanceData holds this pose's per-branch instances.
     XMFLOAT3 m_lastEyePosition = {};
     int m_lastDepthLOD = 0;
     float m_lodScale = 1;           // This frame's Lod::Scale for the tree (see LodScale).
