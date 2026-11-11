@@ -344,23 +344,11 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
-float4 ShadeSurface(PS_INPUT input)
+// The surface's base color, and its alpha test: clips the pixel where the material's alpha test rejects it. ShadeSurface
+// and PSDepthMotion share it, so DXR mode's depth and motion vectors follow the same leaf shapes as raster.
+float4 SampleBaseColor(PS_INPUT input, out Biplanar biplanar)
 {
-    // The toEye vector is used in lighting.
-    float3 toEye = normalize(input.ViewDirection);
-
-    //transforms world=>tangent space
-    float3x3 TBN = float3x3(normalize(input.T), normalize(input.B), normalize(input.N));
-
-    // Transform tangent normal to world normal	
-    float3 normal = mul(float3(0,0,1), TBN);
-
-    // Start with a sum of zero. 
-    float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    float4 spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
-
-    Biplanar biplanar = (Biplanar)0;
+    biplanar = (Biplanar)0;
     if (mat.biplanarParams.x > 0)
     {
         // The upscaling bias SampleBias applies elsewhere, as a gradient scale.
@@ -385,6 +373,27 @@ float4 ShadeSurface(PS_INPUT input)
     }
     else
         textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    return textureColor;
+}
+
+float4 ShadeSurface(PS_INPUT input)
+{
+    // The toEye vector is used in lighting.
+    float3 toEye = normalize(input.ViewDirection);
+
+    //transforms world=>tangent space
+    float3x3 TBN = float3x3(normalize(input.T), normalize(input.B), normalize(input.N));
+
+    // Transform tangent normal to world normal	
+    float3 normal = mul(float3(0,0,1), TBN);
+
+    // Start with a sum of zero. 
+    float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    float4 spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+    Biplanar biplanar;
+    float4 textureColor = SampleBaseColor(input, biplanar);
     if (mat.tintTextures.x >= 0)
     {
         const float2 tintUv = TransformMaterialUv(mat, input.Tex, TintTextureRole);
@@ -500,6 +509,24 @@ float4 ShadeSurface(PS_INPUT input)
 
 // Scene color and object motion. Interpolated clip positions keep the velocity exact across the triangle; an unmoved
 // surface has identical clip positions and so exactly zero velocity.
+// DXR mode's main pass: the ray-traced image replaces this pass's color, so only depth (from rasterization) and motion
+// vectors are needed. Alpha-tested materials still sample their base color to clip; nothing else is shaded, and the
+// pipeline masks the color writes.
+PS_OUTPUT PSDepthMotion(PS_INPUT input)
+{
+    if (mat.flags.y > 0 && mat.flags.z > 0)
+    {
+        Biplanar biplanar;
+        SampleBaseColor(input, biplanar);
+    }
+    PS_OUTPUT output;
+    output.Color = 0;
+    const float2 current = input.CurrentClip.xy / input.CurrentClip.w;
+    const float2 previous = input.PreviousClip.xy / input.PreviousClip.w;
+    output.Velocity = (previous - current) * float2(0.5f, -0.5f);
+    return output;
+}
+
 PS_OUTPUT PS(PS_INPUT input)
 {
     PS_OUTPUT output;

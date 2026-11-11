@@ -3,6 +3,7 @@ ATGFont.hlsl,ps,FontPixelShader
 Tree.hlsl,vs,VS
 Tree.hlsl,vs,VSSkinned
 Tree.hlsl,ps,PS
+Tree.hlsl,ps,PSDepthMotion
 Tree.hlsl,vs,DrawScreenQuadVS
 Tree.hlsl,ps,DrawR8ScreenQuadPS
 Tree.hlsl,ps,DrawRGBScreenQuadPS

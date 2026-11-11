@@ -533,6 +533,10 @@ struct RenderUnit
 
     ID3D12PipelineState*        m_pipelineStates[NUM_RENDER_PASSES];
     ID3D12PipelineState*        m_hdrPipelineState = nullptr;   // The regular pass into the HDR scene target.
+    // DXR mode's regular pass (into the LDR or HDR target): depth and motion vectors only, as its color is replaced by
+    // the ray-traced image. Null for units with their own pixel shader (the sky), which keep their usual pipeline.
+    ID3D12PipelineState*        m_dxrPipelineState = nullptr;
+    ID3D12PipelineState*        m_dxrHdrPipelineState = nullptr;
     int                         id;
     static int                  s_nextId;
 
@@ -732,6 +736,7 @@ public:
     PixelShader*                       m_pixelShader;
     VertexShader*                      m_shadowVertexShader;
     PixelShader*                       m_shadowPixelShader;
+    PixelShader*                       m_depthMotionPixelShader = nullptr;   // PSDepthMotion: DXR mode's regular pass.
     VertexShader*                      m_drawScreenVertexShader;
     PixelShader*                       m_drawR8ScreenPixelShader;
     PixelShader*                       m_drawRGBScreenPixelShader;

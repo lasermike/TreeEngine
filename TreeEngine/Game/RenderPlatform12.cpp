@@ -695,6 +695,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     m_pixelShader = nullptr;
     HRR(LoadVertexShader(L"VS.cso", &m_vertexShader));
     HRR(LoadPixelShader(L"PS.cso", &m_pixelShader));
+    m_depthMotionPixelShader = nullptr;
+    HRR(LoadPixelShader(L"PSDepthMotion.cso", &m_depthMotionPixelShader));
 
     // Load shadow shaders
     m_shadowVertexShader = nullptr;
@@ -1427,6 +1429,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
 
     m_vertexShader = nullptr;
     m_pixelShader = nullptr;
+    m_depthMotionPixelShader = nullptr;
     m_shadowVertexShader = nullptr;
     m_shadowPixelShader = nullptr;
     m_drawScreenVertexShader = nullptr;
@@ -1578,8 +1581,22 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     CD3DX12_GPU_DESCRIPTOR_HANDLE specularRange(ru->m_material->m_cbvSrvHeapTable, 2, m_descriptorHeap.GetIncrementSize());
     GetCommandList()->SetGraphicsRootDescriptorTable(SpecularSrvTableRootSignatureParam, specularRange);
 
-    GetCommandList()->SetPipelineState(pass == RegularPass && m_renderData->hdrSceneColor && ru->m_hdrPipelineState
-        ? ru->m_hdrPipelineState : ru->m_pipelineStates[pass]);
+    // In DXR mode the regular pass only needs depth and motion vectors: the ray-traced image replaces its color.
+    ID3D12PipelineState* pipelineState = ru->m_pipelineStates[pass];
+    if (pass == RegularPass)
+    {
+        const bool hdr = m_renderData->hdrSceneColor;
+#if defined(DXR_ENABLED)
+        const bool dxr = m_dxrEnabledThisFrame;
+#else
+        const bool dxr = false;
+#endif
+        if (dxr && ru->m_dxrPipelineState)
+            pipelineState = hdr ? ru->m_dxrHdrPipelineState : ru->m_dxrPipelineState;
+        else if (hdr && ru->m_hdrPipelineState)
+            pipelineState = ru->m_hdrPipelineState;
+    }
+    GetCommandList()->SetPipelineState(pipelineState);
 
     // Set vertex/index buffers
     D3D12_VERTEX_BUFFER_VIEW buffers[2] = {};
@@ -2130,6 +2147,25 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
         pipelineStateHdr->SetName(L"Render Unit pso (HDR)");
     }
 
+    // DXR mode's regular pass, for units drawn with the standard pixel shader: depth and motion vectors only.
+    ID3D12PipelineState* pipelineStateDxr = nullptr;
+    ID3D12PipelineState* pipelineStateDxrHdr = nullptr;
+    if (material->m_pixelShader == m_pixelShader && m_depthMotionPixelShader)
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC dxrDesc = psoDesc;
+#if defined(TREE_XBOX)
+        dxrDesc.PS = { m_depthMotionPixelShader->shader.data(), m_depthMotionPixelShader->shader.size() };
+#else
+        dxrDesc.PS = CD3DX12_SHADER_BYTECODE(m_depthMotionPixelShader->shader);
+#endif
+        dxrDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = 0;
+        HRR(GetDevice()->CreateGraphicsPipelineState(&dxrDesc, IID_PPV_ARGS(&pipelineStateDxr)));
+        pipelineStateDxr->SetName(L"Render Unit pso (DXR depth and motion)");
+        dxrDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        HRR(GetDevice()->CreateGraphicsPipelineState(&dxrDesc, IID_PPV_ARGS(&pipelineStateDxrHdr)));
+        pipelineStateDxrHdr->SetName(L"Render Unit pso (DXR depth and motion, HDR)");
+    }
+
     // Shadow pass PSO
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
     shadowPsoDesc.RasterizerState.DepthBias = 100000;
@@ -2156,6 +2192,8 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
     *renderUnit = new RenderUnit(material, mesh, pipelineStates);
     (*renderUnit)->m_hdrPipelineState = pipelineStateHdr;
+    (*renderUnit)->m_dxrPipelineState = pipelineStateDxr;
+    (*renderUnit)->m_dxrHdrPipelineState = pipelineStateDxrHdr;
     m_gameLevelRenderUnits.push_back(*renderUnit);
 
     CHAR name[32];
@@ -2165,6 +2203,13 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     m_gameLevelPSOs[name] = pipelineStateShadowMap;
     sprintf_s(name, "%dH", (*renderUnit)->id);
     m_gameLevelPSOs[name] = pipelineStateHdr;
+    if (pipelineStateDxr)
+    {
+        sprintf_s(name, "%dD", (*renderUnit)->id);
+        m_gameLevelPSOs[name] = pipelineStateDxr;
+        sprintf_s(name, "%dDH", (*renderUnit)->id);
+        m_gameLevelPSOs[name] = pipelineStateDxrHdr;
+    }
 
     return S_OK;
 }
