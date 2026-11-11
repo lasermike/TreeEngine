@@ -15,6 +15,7 @@
     { "id": "LoadTerra", "scene": "LoadTerra", "type": "steady" },
     { "id": "LoadTreeScene", "scene": "LoadTreeScene", "type": "steady" },
     { "id": "LoadTrees", "scene": "LoadTrees", "type": "steady" },
+    { "id": "Forest", "scene": "Forest", "type": "steady" },
     {
       "id": "LeafAtlases-pan",
       "scene": "LeafAtlases",

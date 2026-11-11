@@ -1091,7 +1091,7 @@ public:
     std::vector<UINT> m_drawRecordTransformSlot;        // Per record: its object transform, moved to the TLAS (UINT_MAX = none).
     std::vector<size_t> m_drawRecordShareKey;           // Per record: its shared-geometry key (0 = not shared).
     std::vector<bool> m_drawRecordDeform;               // Per record: whether the deformation pass writes its vertices.
-    void PrepareInstancedGeometry();
+    HRESULT PrepareInstancedGeometry();
     // Upload space for this frame's micromap record indices, one persistently mapped buffer per frame in flight.
     struct OmmRecordUpload
     {
@@ -1298,6 +1298,9 @@ public:
     UINT m_nextVbWorldStart = 0;
     static_assert(sizeof(DrawRecord) == 424, "DrawRecord must match Blur.hlsl");
     std::vector<DrawRecord> m_drawRecords;
+    // The records the deformation pass writes, compacted for upload: instance draws that only place another copy of a
+    // shared layout aren't uploaded, so the draw-record buffer's capacity limits distinct geometry, not tree count.
+    std::vector<DrawRecord> m_deformRecords;
     std::vector<InstancedData> m_cpuInstanceData;
     InstancedData* m_mappedInstanceData = nullptr;
 

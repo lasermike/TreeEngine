@@ -1638,15 +1638,17 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 
         INT texIdx = (m_currentMaterial && m_currentMaterial->m_texture) ? (INT)m_currentMaterial->m_texture->textureSlot : -1;
         const UINT64 vertexCount = static_cast<UINT64>(m_currentMesh->m_bufferOffsets.VertexCount) * InstanceCount;
-        if (vertexCount > maxWorldVertices - m_nextVbWorldStart
-            || m_drawRecords.size() >= m_DrawRecordsResource->GetDesc().Width / sizeof(DrawRecord))
+        // A draw with an object transform (an instanced tree) gets its world-vertex range in PrepareInstancedGeometry,
+        // and only when it is the copy of its layout that is deformed; thousands of instances share a few ranges.
+        const bool instanced = ObjectTransformSlot != UINT_MAX;
+        if (!instanced && vertexCount > maxWorldVertices - m_nextVbWorldStart)
             return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
         m_drawRecords.push_back(DrawRecord(StartIndexLocation,
             IndexCountPerInstance,
             StartInstanceLocation,
             InstanceCount,
             BaseVertexLocation,
-            m_nextVbWorldStart,
+            instanced ? UINT_MAX : m_nextVbWorldStart,
             m_currentMesh->m_bufferOffsets.VertexCount,
             m_currentMesh,
             m_currentMaterial ? m_currentMaterial->m_shaderMaterial : ShaderMaterial(),
@@ -1655,7 +1657,8 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
         m_drawRecordStatic.push_back(m_currentRenderUnitStatic);
         m_drawRecordOwner.push_back(m_renderData->currentDrawOwner);
 
-        m_nextVbWorldStart += static_cast<UINT>(vertexCount);
+        if (!instanced)
+            m_nextVbWorldStart += static_cast<UINT>(vertexCount);
     }
 #endif
 
@@ -2713,14 +2716,15 @@ inline std::size_t hash_combine(std::size_t seed, std::size_t value) noexcept;
 // transform from the vertices to the TLAS: the records' objectTransformSlot is cleared, so the deformation pass writes
 // them in layout space. Owners drawing identical geometry (the same source layout, materials and instance slots) share
 // one key; only the first such owner's records are deformed and build the shared BLAS.
-void RenderPlatform12::PrepareInstancedGeometry()
+HRESULT RenderPlatform12::PrepareInstancedGeometry()
 {
     const size_t count = m_drawRecords.size();
     m_drawRecordTransformSlot.assign(count, UINT_MAX);
     m_drawRecordShareKey.assign(count, 0);
     m_drawRecordDeform.assign(count, true);
+    m_deformRecords.clear();
     if (m_drawRecordOwner.size() != count || m_drawRecordStatic.size() != count)
-        return;
+        return E_UNEXPECTED;
     std::unordered_map<const void*, std::vector<size_t>> ownerRecords;
     std::vector<const void*> ownerOrder;
     for (size_t recordIndex = 0; recordIndex < count; ++recordIndex)
@@ -2765,6 +2769,33 @@ void RenderPlatform12::PrepareInstancedGeometry()
             m_drawRecords[recordIndex].objectTransformSlot = UINT_MAX;
         }
     }
+
+    // World-vertex ranges for instance draws that are deformed (the first copy of a shared layout, or one whose
+    // owner mixed object transforms); the other copies have nothing written and keep no range.
+    for (size_t recordIndex = 0; recordIndex < count; ++recordIndex)
+    {
+        DrawRecord& record = m_drawRecords[recordIndex];
+        if (record.vbWorldStart != UINT_MAX)
+            continue;
+        if (!record.numInstances || !m_drawRecordDeform[recordIndex])
+        {
+            record.vbWorldStart = 0;
+            continue;
+        }
+        const UINT64 vertexCount = static_cast<UINT64>(record.vertexCount) * record.numInstances;
+        if (vertexCount > maxWorldVertices - m_nextVbWorldStart)
+            return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+        record.vbWorldStart = m_nextVbWorldStart;
+        m_nextVbWorldStart += static_cast<UINT>(vertexCount);
+    }
+
+    // The records the deformation pass writes, in order.
+    for (size_t recordIndex = 0; recordIndex < count; ++recordIndex)
+        if (m_drawRecords[recordIndex].numInstances && m_drawRecordDeform[recordIndex])
+            m_deformRecords.push_back(m_drawRecords[recordIndex]);
+    if (m_deformRecords.size() > m_DrawRecordsResource->GetDesc().Width / sizeof(DrawRecord))
+        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+    return S_OK;
 }
 
 HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
@@ -2773,10 +2804,7 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     auto uploadStart = std::chrono::steady_clock::now();
 
     const size_t drawRecordBufferSize = static_cast<size_t>(m_DrawRecordsResource->GetDesc().Width);
-    if (m_drawRecords.size() > drawRecordBufferSize / sizeof(DrawRecord))
-        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
-
-    PrepareInstancedGeometry();
+    HRR(PrepareInstancedGeometry());
     PIXBeginEvent(GetCommandList(), TREE_COLOR_DRAW_TEXT, L"Transform draw records to bottom level BVH mesh data");
 
 #if defined(TREE_XBOX)
@@ -2784,14 +2812,14 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
 
     DrawRecord* pDrawRecords = nullptr;
     m_DrawRecordsResource->Map(0, nullptr, ((void**)&pDrawRecords));
-    memcpy(pDrawRecords, m_drawRecords.data(), sizeof(DrawRecord) * m_drawRecords.size());
+    memcpy(pDrawRecords, m_deformRecords.data(), sizeof(DrawRecord) * m_deformRecords.size());
     m_DrawRecordsResource->Unmap(0, nullptr);
 #else
     // The existing frame fence protects reuse of this upload slot.
-    const size_t liveBytes = sizeof(DrawRecord) * m_drawRecords.size();
+    const size_t liveBytes = sizeof(DrawRecord) * m_deformRecords.size();
     if (liveBytes)
     {
-        memcpy(m_drawRecordUploadData[m_frameIndex], m_drawRecords.data(), liveBytes);
+        memcpy(m_drawRecordUploadData[m_frameIndex], m_deformRecords.data(), liveBytes);
         if (m_drawRecordState != D3D12_RESOURCE_STATE_COPY_DEST)
             GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
                 m_DrawRecordsResource, m_drawRecordState, D3D12_RESOURCE_STATE_COPY_DEST));
@@ -2807,7 +2835,7 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     {
         m_renderData->profile.drawUploadMs = std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - uploadStart).count();
-        m_renderData->profile.drawUploadBytes = m_drawRecords.size() * sizeof(DrawRecord);
+        m_renderData->profile.drawUploadBytes = m_deformRecords.size() * sizeof(DrawRecord);
         m_renderData->profile.drawUploadCapacityBytes = FrameCount * drawRecordBufferSize;
         m_renderData->profile.worldVertexCapacityBytes = vbWorldBufferSize;
     }
@@ -2821,15 +2849,10 @@ HRESULT RenderPlatform12::BuildAccelerationStructure(bool buildEveryFrame)
     GetCommandList()->SetComputeRootDescriptorTable(2, m_descriptorHeap.hGPU(DxrVB_UavHeapOffset));
     GetCommandList()->SetComputeRootDescriptorTable(4, m_renderData->instanceBuffer->srvViewGpu);
 
-    for (int drawRecordIndex = 0; drawRecordIndex < m_drawRecords.size(); drawRecordIndex++)
+    // Every uploaded record is deformed: PrepareInstancedGeometry left out empty draws and the copies of shared layouts.
+    for (int drawRecordIndex = 0; drawRecordIndex < static_cast<int>(m_deformRecords.size()); drawRecordIndex++)
     {
-        DrawRecord& drawRecord = m_drawRecords[drawRecordIndex];
-
-        if (drawRecord.numInstances <= 0
-            || (drawRecordIndex < m_drawRecordDeform.size() && !m_drawRecordDeform[drawRecordIndex]))
-        {
-            continue;   // Nothing to draw, or another instance of a shared layout whose first owner is deformed.
-        }
+        const DrawRecord& drawRecord = m_deformRecords[drawRecordIndex];
 
         bool bSkinned = drawRecord.inputLayout == SKINNED_INPUT_LAYOUT;
 
@@ -3264,8 +3287,6 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
                 return true;
         return false;
     };
-    if (m_drawRecords.size() > m_maxBLASInstances)
-        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
 
     const auto snapshotStart = m_renderData->profile.enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     // Group records: static ones into the static BLAS, dynamic ones by owner (or shared layout), in order of first draw.
@@ -3462,6 +3483,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     UINT geometryDescIndex = 0;     // Index in the per-geometry tables.
     const auto describeRecord = [&](const DrawRecord& dr, D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc) -> HRESULT
     {
+        if (geometryDescIndex >= m_maxBLASInstances)
+            return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);  // The per-geometry tables are full.
         const UINT indexCount = blasIndexCount(dr);
         geometryDesc = {};
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
