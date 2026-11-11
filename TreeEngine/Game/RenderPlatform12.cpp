@@ -1551,7 +1551,34 @@ HRESULT RenderPlatform12::EndFrame(D3DBuffer* buffer)
 #if defined(DXR_ENABLED)
     if (m_mappedInstanceData && !m_cpuInstanceData.empty())
     {
-        memcpy(m_mappedInstanceData, m_cpuInstanceData.data(), m_cpuInstanceData.size() * sizeof(InstancedData));
+        const auto uploadStart = std::chrono::steady_clock::now();
+        // Only the slots this frame's draws read (the rest of a reservation is unwritten), or all of them.
+        std::uint64_t uploaded = 0;
+        const auto* ranges = m_renderData->instanceUploadRanges;
+        if (ranges)
+        {
+            const UINT slots = static_cast<UINT>(m_cpuInstanceData.size());
+            for (const auto& range : *ranges)
+            {
+                const UINT begin = std::min(range.first, slots), end = std::min(range.second, slots);
+                if (begin < end)
+                {
+                    memcpy(m_mappedInstanceData + begin, m_cpuInstanceData.data() + begin, (end - begin) * sizeof(InstancedData));
+                    uploaded += (end - begin) * sizeof(InstancedData);
+                }
+            }
+        }
+        else
+        {
+            memcpy(m_mappedInstanceData, m_cpuInstanceData.data(), m_cpuInstanceData.size() * sizeof(InstancedData));
+            uploaded = m_cpuInstanceData.size() * sizeof(InstancedData);
+        }
+        if (m_renderData->profile.enabled)
+        {
+            m_renderData->profile.instanceUploadMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - uploadStart).count();
+            m_renderData->profile.instanceUploadBytes = uploaded;
+        }
     }
     m_mappedInstanceData = nullptr;
 #endif
@@ -1673,6 +1700,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
             ObjectTransformSlot));
         m_drawRecordStatic.push_back(m_currentRenderUnitStatic);
         m_drawRecordOwner.push_back(m_renderData->currentDrawOwner);
+        m_drawRecordMaterial.push_back(m_currentMaterial);
 
         if (!instanced)
             m_nextVbWorldStart += static_cast<UINT>(vertexCount);
@@ -2768,8 +2796,22 @@ HRESULT RenderPlatform12::PrepareInstancedGeometry()
     m_drawRecordShareKey.assign(count, 0);
     m_drawRecordDeform.assign(count, true);
     m_deformRecords.clear();
-    if (m_drawRecordOwner.size() != count || m_drawRecordStatic.size() != count)
+    if (m_drawRecordOwner.size() != count || m_drawRecordStatic.size() != count || m_drawRecordMaterial.size() != count)
         return E_UNEXPECTED;
+    // The material's bytes (FNV-1a), hashed once per material this frame: thousands of instance records share a few.
+    std::unordered_map<const void*, size_t> materialHashes;
+    const auto materialHash = [&](size_t recordIndex)
+    {
+        auto found = materialHashes.find(m_drawRecordMaterial[recordIndex]);
+        if (found != materialHashes.end())
+            return found->second;
+        size_t hash = 14695981039346656037ull;
+        const auto* materialBytes = reinterpret_cast<const unsigned char*>(&m_drawRecords[recordIndex].material);
+        for (size_t i = 0; i < sizeof(ShaderMaterial); ++i)
+            hash = (hash ^ materialBytes[i]) * 1099511628211ull;
+        materialHashes.emplace(m_drawRecordMaterial[recordIndex], hash);
+        return hash;
+    };
     std::unordered_map<const void*, std::vector<size_t>> ownerRecords;
     std::vector<const void*> ownerOrder;
     for (size_t recordIndex = 0; recordIndex < count; ++recordIndex)
@@ -2796,12 +2838,8 @@ HRESULT RenderPlatform12::PrepareInstancedGeometry()
             for (const UINT value : { dr.startingInstance, dr.numInstances, dr.indexBufferStart, dr.indexBufferCount, dr.vertexCount,
                 dr.baseVertexLocation, static_cast<UINT>(dr.inputLayout), static_cast<UINT>(dr.textureIndex) })
                 key = hash_combine(key, std::hash<UINT>{}(value));
-            // The material's bytes (FNV-1a): shared geometry also shares its per-geometry table entries.
-            size_t materialHash = 14695981039346656037ull;
-            const auto* materialBytes = reinterpret_cast<const unsigned char*>(&dr.material);
-            for (size_t i = 0; i < sizeof(dr.material); ++i)
-                materialHash = (materialHash ^ materialBytes[i]) * 1099511628211ull;
-            key = hash_combine(key, materialHash);
+            // Shared geometry also shares its per-geometry table entries, so the material is part of the key.
+            key = hash_combine(key, materialHash(recordIndex));
         }
         if (key == 0)
             key = 1;
@@ -4779,6 +4817,7 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     m_drawRecords.clear();
     m_drawRecordStatic.clear();
     m_drawRecordOwner.clear();
+    m_drawRecordMaterial.clear();
 
 #endif
 

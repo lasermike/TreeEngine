@@ -1106,6 +1106,7 @@ public:
     };
     OmmRecordUpload m_ommRecordUpload[2];
     std::vector<const void*> m_drawRecordOwner;         // Per m_drawRecords entry.
+    std::vector<const void*> m_drawRecordMaterial;      // Per m_drawRecords entry: the Material drawn, or null.
     UINT64 m_blasFrame = 0;
     static const UINT64 kDynamicBlasRetireFrames = 8;   // An owner's BLAS is released this many frames after its last draw.
     void ReleaseDynamicBlases();

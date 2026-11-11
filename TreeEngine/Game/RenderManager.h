@@ -65,6 +65,9 @@ class RenderManager : public IRenderFrame
 
     std::list<RenderUnit*>                          m_renderUnits;
     std::map<WorldObject*, UINT>                    m_objectToInstanceBufferOffset;  // Filled in during scene initialization
+    // Each object's instance-buffer reservation, in slot order, and the ranges copied to the GPU this frame.
+    std::vector<std::pair<WorldObject*, std::pair<UINT, UINT>>> m_instanceReservations;
+    std::vector<std::pair<UINT, UINT>>              m_instanceUploadRanges;
     UINT                                            m_nextInstanceBufferOffset;		 // Used during initialization
 
     // Filled in each frame by each world object via SetInstances()

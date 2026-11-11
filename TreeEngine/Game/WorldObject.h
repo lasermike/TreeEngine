@@ -174,6 +174,13 @@ public:
     virtual unsigned int GetMaxInstances() { return 0; }
     // Instances drawn per frame, which can exceed the instance-buffer slots an instanced object reserves.
     virtual unsigned int GetMaxDrawnInstances() { return GetMaxInstances(); }
+    // The instance-buffer slots this frame's draws read, as [begin, end) ranges in increasing order, out of the
+    // object's reservation [start, start + count). Only these are copied to the GPU each frame. The default is the
+    // whole reservation; objects that leave much of theirs unwritten list exactly what they wrote.
+    virtual void AppendInstanceUploadRanges(UINT start, UINT count, UINT /*frame*/, std::vector<std::pair<UINT, UINT>>& ranges)
+    {
+        if (count) ranges.emplace_back(start, start + count);
+    }
     bool IsInstance() const { return _params->instanceSource != nullptr; }
     XMFLOAT3* GetBoundingBox() { return _boundingBox; }
     // Conservative world-space bounds of everything the object draws, for view culling. Objects without them

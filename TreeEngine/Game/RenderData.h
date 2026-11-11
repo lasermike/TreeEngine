@@ -103,6 +103,8 @@ struct RenderProfile
     std::array<UINT, 9> lodLevelObjects = {};
     UINT drawnLeaves = 0;
     UINT drawnSticks = 0;
+    double instanceUploadMs = 0;            // Copying the CPU instance array into the frame's instance buffer.
+    std::uint64_t instanceUploadBytes = 0;
     bool builtStaticBLAS = false;   // The static-geometry BLAS was (re)built this frame.
     bool compactedStaticBLAS = false;
     std::uint64_t staticBlasBytes = 0;
@@ -146,6 +148,9 @@ struct RenderData : SceneRenderSettings
     XMFLOAT4X4          view;
     XMVECTOR            eyePos;
     float               lodDistanceScale = 1;   // Multiplies every LOD distance (Settings::m_lodDistanceScale).
+    // The instance slots to copy to the GPU this frame ([begin, end) ranges; see WorldObject::AppendInstanceUploadRanges),
+    // or null to copy every slot.
+    const std::vector<std::pair<UINT, UINT>>* instanceUploadRanges = nullptr;
 
     // Instance rendering
     InstancedData*      instanceData;

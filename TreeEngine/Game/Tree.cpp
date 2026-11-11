@@ -222,6 +222,10 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 
 void Tree::AccumulateProfile(RenderProfile& profile) const
 {
+    if (m_profileLevel >= 0)
+        profile.lodLevelObjects[std::min<size_t>(m_profileLevel, profile.lodLevelObjects.size() - 1)]++;
+    profile.drawnLeaves += m_profileLeaves;
+    profile.drawnSticks += m_profileSticks;
     if (_params->instanceSource) return; // Instances reuse the source's pose.
     profile.poseCacheBytes += m_branchPoses.capacity() * sizeof(BranchPose);
     if (m_reusePose) profile.reusedPoseBranches += m_numBranchInstances;
@@ -330,11 +334,14 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 
     PIXEndEvent();
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Compute Constants memcpy");
+    m_uploadRanges.clear();
+    m_profileLevel = -1;
 
     // The atlas rects that leaves' AtlasRegion values point at, rewritten every frame like the rest of the buffer.
     if (!m_leafRegions.empty())
     {
         UINT slot = AtlasRectStart(startInstance);
+        m_uploadRanges.emplace_back(slot, slot + static_cast<UINT>(_params->leafRegions.size()));
         for (const auto& region : _params->leafRegions)
         {
             InstancedData rect = {};
@@ -358,7 +365,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
             m_lodScale, m_instanceLodLevel);
         if (m_instanceLodLevel >= static_cast<int>(FirstReducedLayout))
             reducedLayout = std::min<size_t>(m_instanceLodLevel, m_instanceLayouts.size() - 1);
-        renderData.profile.lodLevelObjects[std::min<size_t>(m_instanceLodLevel, renderData.profile.lodLevelObjects.size() - 1)]++;
+        m_profileLevel = m_instanceLodLevel;
     }
 
     // The layouts depend only on the pose, depth LOD and slots, so they are rebuilt only when those change, and only
@@ -383,13 +390,13 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         // The per-branch pass counted the full tree.
         renderData.frameStats[NUM_LEAVES_STAT].stat = renderData.frameStats[NUM_LEAVES_STAT].stat - m_cachedLeafCount + layout.leafCount;
         renderData.frameStats[NUM_STICKS_STAT].stat = renderData.frameStats[NUM_STICKS_STAT].stat - m_cachedStickCount + layout.stickCount;
-        renderData.profile.drawnLeaves += layout.leafCount;
-        renderData.profile.drawnSticks += layout.stickCount;
+        m_profileLeaves = layout.leafCount;
+        m_profileSticks = layout.stickCount;
     }
     else
     {
-        renderData.profile.drawnLeaves += m_cachedLeafCount;
-        renderData.profile.drawnSticks += m_cachedStickCount;
+        m_profileLeaves = m_cachedLeafCount;
+        m_profileSticks = m_cachedStickCount;
         UINT segmentOffset = startInstance;
         for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
         {
@@ -407,6 +414,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
             pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, segmentOffset, (UINT)instanceData.size());
             segmentOffset += (UINT)instanceData.size();
         }
+        m_uploadRanges.emplace_back(startInstance, segmentOffset);
     }
 
     if (m_instanceCount > 0 || reducedLayout != 0)
@@ -417,6 +425,9 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
             if (m_instanceCount == 0 && kind != reducedLayout)
                 continue;
             InstanceLayout& layout = m_instanceLayouts[kind];
+            // A layout's segments are contiguous, in segment order.
+            m_uploadRanges.emplace_back(layout.start[0],
+                layout.start[TreeSegmentCount - 1] + static_cast<UINT>(layout.segments[TreeSegmentCount - 1].size()));
             for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
             {
                 InstanceDataArray& instanceData = layout.segments[segmentIndex];
@@ -434,6 +445,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
             }
         }
     }
+    m_uploadRangesFrame = renderData.frame;
 
     PIXEndEvent();
 
@@ -499,6 +511,22 @@ float Tree::LodScale(const RenderData& renderData, const XMFLOAT3& boxMin, const
         size = std::max({ boxMax.x - boxMin.x, boxMax.y - boxMin.y, boxMax.z - boxMin.z });
     return Lod::Scale(_params->lod, size, static_cast<float>(renderData.projectionData.screenHeight),
         renderData.projectionData.fov, renderData.lodDistanceScale);
+}
+
+void Tree::AppendInstanceUploadRanges(UINT start, UINT count, UINT frame, std::vector<std::pair<UINT, UINT>>& ranges)
+{
+    // Instances write only their transform slot (their whole reservation); a tree that has not recorded this frame's
+    // writes falls back to its whole reservation.
+    if (IsInstance() || m_uploadRangesFrame != frame)
+    {
+        WorldObject::AppendInstanceUploadRanges(start, count, frame, ranges);
+        return;
+    }
+    // Recorded as written (atlas rects first, at the end of the reservation); listed in slot order.
+    const size_t first = ranges.size();
+    for (const auto& range : m_uploadRanges)
+        ranges.push_back(range);
+    std::sort(ranges.begin() + first, ranges.end());
 }
 
 UINT Tree::AtlasRectStart(UINT startInstance) const
@@ -938,7 +966,35 @@ void Tree::CollectReducedLayout(int reduction)
     const bool merge = _params->lod.reduction == Lod::Reduction::Merge;
     const int leafGroup = 1 << reduction;   // Leaves merged into one, or kept one in this many.
     const float leafScale = sqrtf(static_cast<float>(leafGroup));
-    const XMMATRIX rotation = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
+    // Maps a branch transform from ComputeTransformationsManual to the pose's world space, as
+    // ComputeBranchInstanceSkinningMatrix does: scaled and rotated about the tree's position.
+    const XMMATRIX poseFrame = XMMatrixTranslationFromVector(-XMLoadFloat3(&_position))
+        * XMMatrixAffineTransformation(XMLoadFloat3(&_scale), g_XMZero, XMLoadFloat4(&_rotation), XMLoadFloat3(&_position));
+
+    // Sticks narrower than a fraction of a pixel where this layout starts to be used are dropped (their leaves stay,
+    // linked to the nearest kept parent). The layout is first drawn at the level's threshold: distances[reduction] on
+    // a reference 1080-pixel display with the default 45-degree field of view, or for screen heights, when the tree is
+    // screenHeights[reduction] pixels tall.
+    float minStickWidth = 0;
+    if (static_cast<size_t>(reduction) < _params->lod.distances.size())
+    {
+        float worldPerPixel;
+        if (_params->lod.ScreenSpace())
+        {
+            const float size = m_boundsValid ? std::max({ _boundingBox[1].x - _boundingBox[0].x,
+                _boundingBox[1].y - _boundingBox[0].y, _boundingBox[1].z - _boundingBox[0].z }) : 0.0f;
+            worldPerPixel = size / _params->lod.screenHeights[reduction];
+        }
+        else
+            worldPerPixel = _params->lod.distances[reduction] * 2.0f * tanf(XM_PIDIV4 * 0.5f) / 1080.0f;
+        minStickWidth = worldPerPixel * MinStickPixels;
+    }
+    // A stick's width: the larger of its pose's two cross-section axes (the unit mesh spans one unit across).
+    const auto stickWidth = [](const XMFLOAT4X4& world)
+    {
+        return std::max(XMVectorGetX(XMVector3Length(XMVectorSet(world._11, world._12, world._13, 0))),
+            XMVectorGetX(XMVector3Length(XMVectorSet(world._31, world._32, world._33, 0))));
+    };
 
     const auto renderable = [&](int frame) { return m_branchPoses[m_treeFrames[frame].branch->id].renderable; };
     const auto addNode = [&](const XMFLOAT4X4& world, const Branch* branch, int parent)
@@ -995,7 +1051,8 @@ void Tree::CollectReducedLayout(int reduction)
         if (group.size() == 1)
         {
             // A branch kept as it is, unless pruning drops it for being among the finest twigs.
-            if (renderable(group[0]) && !(reduced && !merge))
+            if (renderable(group[0]) && !(reduced && !merge)
+                && stickWidth(m_branchPoses[first.branch->id].world) >= minStickWidth)
                 node = addNode(m_branchPoses[first.branch->id].world, first.branch, parentNode);
         }
         else
@@ -1019,8 +1076,9 @@ void Tree::CollectReducedLayout(int reduction)
             if (ComputeTransformationsManual(&transform, merged) == S_OK)
             {
                 XMFLOAT4X4 world;
-                XMStoreFloat4x4(&world, XMMatrixMultiply(transform, rotation));
-                node = addNode(world, first.branch, parentNode);
+                XMStoreFloat4x4(&world, XMMatrixMultiply(transform, poseFrame));
+                if (stickWidth(world) >= minStickWidth)
+                    node = addNode(world, first.branch, parentNode);
             }
         }
 
@@ -1202,8 +1260,8 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
     }
     renderData.frameStats[NUM_LEAVES_STAT].stat += layout.leafCount;
     renderData.frameStats[NUM_STICKS_STAT].stat += layout.stickCount;
-    renderData.profile.lodLevelObjects[std::min<size_t>(m_instanceLodLevel, renderData.profile.lodLevelObjects.size() - 1)]++;
-    renderData.profile.drawnLeaves += layout.leafCount;
-    renderData.profile.drawnSticks += layout.stickCount;
+    m_profileLevel = m_instanceLodLevel;
+    m_profileLeaves = layout.leafCount;
+    m_profileSticks = layout.stickCount;
     return S_OK;
 }

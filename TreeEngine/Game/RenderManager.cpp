@@ -171,6 +171,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_meshes.clear();
     m_renderUnits.clear();
     m_objectToInstanceBufferOffset.clear();
+    m_instanceReservations.clear();
     m_nextInstanceBufferOffset = 0;
     m_perFrameInstanceData.clear();
     m_vertexShaders.clear();
@@ -195,6 +196,27 @@ HRESULT RenderManager::BeginNewFrame()
 
 HRESULT RenderManager::EndFrame()
 {
+    // The slots this frame's draws read, merged: reservations are in slot order and each object lists its ranges in
+    // order, so adjacent ranges join as they arrive.
+    m_instanceUploadRanges.clear();
+    std::vector<std::pair<UINT, UINT>> objectRanges;
+    for (const auto& reservation : m_instanceReservations)
+    {
+        objectRanges.clear();
+        reservation.first->AppendInstanceUploadRanges(reservation.second.first, reservation.second.second, m_renderData.frame,
+            objectRanges);
+        for (const auto& range : objectRanges)
+        {
+            if (range.first >= range.second)
+                continue;
+            if (!m_instanceUploadRanges.empty() && range.first <= m_instanceUploadRanges.back().second
+                && range.first >= m_instanceUploadRanges.back().first)
+                m_instanceUploadRanges.back().second = std::max(m_instanceUploadRanges.back().second, range.second);
+            else
+                m_instanceUploadRanges.push_back(range);
+        }
+    }
+    m_renderData.instanceUploadRanges = &m_instanceUploadRanges;
     return GetPlatform()->EndFrame(m_instancedBuffer.Get(m_renderData.frame));
 }
 
@@ -701,6 +723,7 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
     if (m_objectToInstanceBufferOffset.find(object) == m_objectToInstanceBufferOffset.end())
     {
         m_objectToInstanceBufferOffset[object] = m_nextInstanceBufferOffset;
+        m_instanceReservations.push_back({ object, { m_nextInstanceBufferOffset, object->GetMaxInstances() } });
         m_nextInstanceBufferOffset += object->GetMaxInstances();
     }
 

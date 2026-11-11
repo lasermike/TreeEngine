@@ -455,7 +455,7 @@ namespace
                     { "dynamicBlasRefits", profile.dynamicBlasRefits }, { "dynamicBlasReuses", profile.dynamicBlasReuses },
                     { "tlasInstances", profile.tlasInstances }, { "blasHeapBytes", profile.blasHeapBytes },
                     { "blasHeapLiveBytes", profile.blasHeapLiveBytes }, { "blasScratchBytes", profile.blasScratchBytes },
-                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks } });
+                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes } });
             }
             std::cerr << "Profiled " << request->scene << " / " << request->mode << ", "
                 << request->performanceFrames << " frames" << std::endl;
@@ -602,7 +602,7 @@ int RunRenderTestCapture(Game& game)
                     { "dynamicBlasRefits", profile.dynamicBlasRefits }, { "dynamicBlasReuses", profile.dynamicBlasReuses },
                     { "tlasInstances", profile.tlasInstances }, { "blasHeapBytes", profile.blasHeapBytes },
                     { "blasHeapLiveBytes", profile.blasHeapLiveBytes }, { "blasScratchBytes", profile.blasScratchBytes },
-                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }
+                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }
                     });
                     const int adapterBytes = WideCharToMultiByte(CP_UTF8, 0, profile.adapter.c_str(), -1, nullptr, 0, nullptr, nullptr);
                     if (!adapterBytes) throw std::runtime_error("Cannot encode GPU adapter name as UTF-8");

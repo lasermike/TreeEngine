@@ -109,6 +109,13 @@ private:
     float LodScale(const RenderData& renderData, const XMFLOAT3& boxMin, const XMFLOAT3& boxMax, bool boxValid) const;
     int m_instanceLodLevel = -1;    // An instance's last whole-instance level, for hysteresis; -1 before the first.
     UINT m_lastInstanceStart = 0;
+    // The instance slots written this frame (see AppendInstanceUploadRanges), and the frame they were written for.
+    std::vector<std::pair<UINT, UINT>> m_uploadRanges;
+    UINT m_uploadRangesFrame = UINT_MAX;
+    // This frame's whole-tree LOD level (-1 for none) and the leaves and sticks drawn, for the profile.
+    int m_profileLevel = -1;
+    UINT m_profileLeaves = 0;
+    UINT m_profileSticks = 0;
     UINT m_cachedLeafCount = 0;
     UINT m_cachedStickCount = 0;
 
@@ -145,6 +152,8 @@ private:
     std::vector<int> m_branchHeights;               // Per branch ID: the longest path down to a tip (a leaf is 0).
     void CollectFullLayout(InstanceLayoutKind kind);
     void CollectReducedLayout(int reduction);
+    // Reduced layouts drop sticks narrower than this many pixels where they are first drawn.
+    static constexpr float MinStickPixels = 0.5f;
 
     // Motion vectors: each branch's instance slot in the last two frames, for the tree's own instances and for each
     // layout. Branch slots shift as branches appear or change segment type, so InstancedData::PreviousSlot is looked
@@ -191,6 +200,7 @@ public:
 
     virtual HRESULT ComputeConstants(IRenderFrame* pFrameConfig) override;
     void AccumulateProfile(RenderProfile& profile) const;
+    void AppendInstanceUploadRanges(UINT start, UINT count, UINT frame, std::vector<std::pair<UINT, UINT>>& ranges) override;
     virtual unsigned int GetNumInstances();
     virtual unsigned int GetMaxInstances();
     unsigned int GetMaxDrawnInstances() override;
