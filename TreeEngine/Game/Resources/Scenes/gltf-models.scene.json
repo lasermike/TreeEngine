@@ -49,8 +49,7 @@
       "id": "treeengine-tree",
       "type": "fixedTree",
       "transform": {
-        "position": [0.5, 0.5, -1.5],
-        "scale": [0.6, 0.6, 0.6]
+        "position": [0.5, 0.5, -1.5]
       },
       "depthLOD": 2,
       "trunkShape": "skinnedCylinder"

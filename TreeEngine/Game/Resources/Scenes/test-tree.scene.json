@@ -30,8 +30,7 @@
       "id": "test-tree",
       "type": "tree",
       "transform": {
-        "position": [0, 0.5, 0],
-        "scale": [0.5, 0.5, 0.5]
+        "position": [0, 0.5, 0]
       },
       "animationSpeed": 5,
       "depthLOD": 1,

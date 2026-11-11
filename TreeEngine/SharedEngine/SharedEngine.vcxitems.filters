@@ -111,6 +111,10 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Lod.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugVectorMath.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugGizmoAdapter.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugVectorEditor.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Resources">
