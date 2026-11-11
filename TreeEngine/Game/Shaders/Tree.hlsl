@@ -78,10 +78,33 @@ StructuredBuffer<InstancedData> PreviousInstanceBuffer : register(t9);
 
 // Per-draw object transform for instanced objects: an instance-buffer slot whose World is
 // applied after each instance's own World. NoObjectTransform leaves the vertex untouched.
+// A batched draw (batchLayoutSize > 0) draws several objects that share an instance range (a tree layout): instance i
+// is slot batchLayoutStart + i % batchLayoutSize of the range, for the object whose transform slot is entry
+// i / batchLayoutSize of the list at batchListStart (four entries per instance slot, in InstancedData's uint fields).
 cbuffer cbObjectTransform : register(b4)
 {
     uint objectTransformSlot;
+    uint batchLayoutStart;
+    uint batchLayoutSize;
+    uint batchListStart;
 };
+
+// This vertex's object transform slot: objectTransformSlot, or for a batched draw its object's (see BeginInstance).
+static uint objectSlot;
+
+uint BatchedObjectSlot(uint instanceID)
+{
+    const uint copy = instanceID / batchLayoutSize;
+    const InstancedData list = InstanceBuffer[batchListStart + copy / 4];
+    const uint lane = copy % 4;
+    if (lane == 0)
+        return list.InstanceOffset;
+    if (lane == 1)
+        return list.InstanceOffsetPrev;
+    if (lane == 2)
+        return list.AtlasRegion;
+    return list.PreviousSlot;
+}
 
 // Last frame's matrix for an instance whose slot last frame was previousSlot; current when it has no history.
 float4x4 PreviousWorld(uint previousSlot, float4x4 current)
@@ -94,17 +117,17 @@ float4x4 PreviousWorld(uint previousSlot, float4x4 current)
 // ApplyObjectTransform's position with last frame's object transform.
 float3 PreviousObjectTransform(float3 position)
 {
-    if (objectTransformSlot == NoObjectTransform)
+    if (objectSlot == NoObjectTransform)
         return position;
-    const InstancedData objectTransform = InstanceBuffer[objectTransformSlot];
+    const InstancedData objectTransform = InstanceBuffer[objectSlot];
     return mul(float4(position, 1.0f), PreviousWorld(objectTransform.PreviousSlot, objectTransform.World)).xyz;
 }
 
 void ApplyObjectTransform(inout float3 position, inout float3 normal, inout float3 tangent)
 {
-    if (objectTransformSlot == NoObjectTransform)
+    if (objectSlot == NoObjectTransform)
         return;
-    float4x4 objectTransform = InstanceBuffer[objectTransformSlot].World;
+    float4x4 objectTransform = InstanceBuffer[objectSlot].World;
     position = mul(float4(position, 1.0f), objectTransform).xyz;
     normal = mul(normal, (float3x3) objectTransform);
     tangent = mul(tangent, (float3x3) objectTransform);
@@ -114,8 +137,8 @@ void ApplyObjectTransform(inout float3 position, inout float3 normal, inout floa
 float3 ObjectUpDirection(float4x4 world)
 {
     float3 up = world[1].xyz;
-    if (objectTransformSlot != NoObjectTransform)
-        up = mul(up, (float3x3) InstanceBuffer[objectTransformSlot].World);
+    if (objectSlot != NoObjectTransform)
+        up = mul(up, (float3x3) InstanceBuffer[objectSlot].World);
     return normalize(up);
 }
 
@@ -145,6 +168,7 @@ struct VS_INPUT
     uint  AtlasRegion : ATLASREGION;
     uint  PreviousSlot : PREVIOUSSLOT;
     uint  VertexID : SV_VertexID;
+    uint  InstanceID : SV_InstanceID;
 };
 
 //--------------------------------------------------------------------------------------
@@ -163,7 +187,36 @@ struct VS_SKINNED_INPUT
     uint  AtlasRegion : ATLASREGION;
     uint  PreviousSlot : PREVIOUSSLOT;
     uint  VertexID : SV_VertexID;
+    uint  InstanceID : SV_InstanceID;
 };
+
+// Sets objectSlot and, for a batched draw, replaces the per-instance inputs (the input assembler steps through the
+// instance buffer from the range's start, which is right only for the first object) with the range's slot.
+void BeginInstance(inout VS_INPUT input)
+{
+    objectSlot = objectTransformSlot;
+    if (batchLayoutSize == 0)
+        return;
+    objectSlot = BatchedObjectSlot(input.InstanceID);
+    const InstancedData instance = InstanceBuffer[batchLayoutStart + input.InstanceID % batchLayoutSize];
+    input.World = instance.World;
+    input.AtlasRegion = instance.AtlasRegion;
+    input.PreviousSlot = instance.PreviousSlot;
+}
+
+void BeginInstance(inout VS_SKINNED_INPUT input)
+{
+    objectSlot = objectTransformSlot;
+    if (batchLayoutSize == 0)
+        return;
+    objectSlot = BatchedObjectSlot(input.InstanceID);
+    const InstancedData instance = InstanceBuffer[batchLayoutStart + input.InstanceID % batchLayoutSize];
+    input.World = instance.World;
+    input.InstanceOffset = instance.InstanceOffset;
+    input.InstanceOffsetPrev = instance.InstanceOffsetPrev;
+    input.AtlasRegion = instance.AtlasRegion;
+    input.PreviousSlot = instance.PreviousSlot;
+}
 
 struct PS_INPUT
 {
@@ -273,6 +326,7 @@ PS_OUTPUT SkyBoxPS(PS_INPUT pin)
 //--------------------------------------------------------------------------------------
 PS_INPUT VS(VS_INPUT input)
 {
+    BeginInstance(input);
     PS_INPUT output = (PS_INPUT)0;
 
     float4x4 world = input.World;
@@ -309,6 +363,7 @@ PS_INPUT VS(VS_INPUT input)
 
 PS_INPUT VSSkinned(VS_SKINNED_INPUT input)  
 {
+    BeginInstance(input);
     PS_INPUT output = (PS_INPUT)0;
 
     float4x3 world = (float4x3) input.World;
@@ -549,6 +604,7 @@ struct ShadowMapVertexOut
 
 ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 {
+    BeginInstance(input);
     ShadowMapVertexOut output;
 
     float3 position = mul(float4(input.Pos, 1.0f), input.World).xyz;
@@ -564,6 +620,7 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
 
 ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
 { 
+    BeginInstance(input);
     ShadowMapVertexOut output;
 
     float3 position = SkinVertexPosition(input);

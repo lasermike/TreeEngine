@@ -53,6 +53,10 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # and DXR, culling on and off; every pair must match exactly, and the scenes with many objects must cull some.
 .\Tests\RenderRegression\test-view-culling.ps1
 
+# Batched instance draws: Instancing and Forest from their start and turned three ways, raster and DXR, batching on
+# and off; every pair must match (RMS at most 0.001, for draw-order ties), and batching must draw something.
+.\Tests\RenderRegression\test-instance-batching.ps1
+
 # Edit, save, reload, restart, and compare scene appearance in both modes.
 # Uses an isolated runtime copy; never modifies the deployment's UserScenes.
 .\Tests\RenderRegression\test-scene-persistence.ps1

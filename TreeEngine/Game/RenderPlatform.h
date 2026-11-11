@@ -525,7 +525,7 @@ struct RenderUnit
     Mesh*                       m_mesh;
 
     UINT                        totalMaxInstances; // TODO Needed?
-    std::list<WorldObject*>     reservations;
+    std::vector<WorldObject*>   reservations;
     // Geometry that doesn't deform or move from frame to frame (glTF models). DXR keeps it in its own BLAS, built once.
     bool                        staticRayTracingGeometry = false;
 
@@ -696,6 +696,14 @@ public:
     virtual HRESULT SetRenderPhase(RenderState state) = 0;
 
     virtual HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot) = 0;
+    // One draw of `copies` objects that share the instance range [layoutStart, layoutStart + layoutSize), with their object
+    // transform slots. The platform writes the slots into the frame's instance buffer from slot listStart (four per slot,
+    // in InstancedData's uint fields; see Shaders/Tree.hlsl), as draws are recorded after the frame's instance upload.
+    // It only rasterizes. Platforms without batched draws return E_NOTIMPL.
+    virtual HRESULT DrawBatched(UINT /*indexCount*/, UINT /*startIndex*/, INT /*baseVertex*/, UINT /*layoutStart*/,
+        UINT /*layoutSize*/, const UINT* /*transformSlots*/, UINT /*copies*/, UINT /*listStart*/) { return E_NOTIMPL; }
+    // Whether this pass's draws are recorded for ray tracing, so a batched object must still issue its own (culled) draw.
+    virtual bool RecordsDraws(RenderPass /*pass*/) const { return false; }
 
     virtual HRESULT BeginDrawText() = 0;
     virtual HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText) = 0;
@@ -946,6 +954,9 @@ public:
     HRESULT SetRenderPhase(RenderState state);
 
     HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
+    HRESULT DrawBatched(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize,
+        const UINT* transformSlots, UINT copies, UINT listStart) override;
+    bool RecordsDraws(RenderPass pass) const override;
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -1107,6 +1118,13 @@ public:
     OmmRecordUpload m_ommRecordUpload[2];
     std::vector<const void*> m_drawRecordOwner;         // Per m_drawRecords entry.
     std::vector<const void*> m_drawRecordMaterial;      // Per m_drawRecords entry: the Material drawn, or null.
+    // PrepareInstancedGeometry's scratch, kept between frames: owners numbered in order of first draw, each record's
+    // owner number, and the records grouped by owner (owner i's are m_ownerRecords[start[i], start[i + 1])).
+    std::unordered_map<const void*, UINT> m_ownerIndex;
+    std::vector<UINT> m_recordOwnerIndex;
+    std::vector<UINT> m_ownerRecordStart;
+    std::vector<UINT> m_ownerRecordFill;
+    std::vector<size_t> m_ownerRecords;
     UINT64 m_blasFrame = 0;
     static const UINT64 kDynamicBlasRetireFrames = 8;   // An owner's BLAS is released this many frames after its last draw.
     void ReleaseDynamicBlases();
@@ -1507,6 +1525,8 @@ typedef HRESULT (*RenderSceneSetupFunc)(RenderPass pass, InstanceBufferRing* ins
 typedef HRESULT (*SetRenderPhaseFunc)(RenderState state);
 
 typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
+typedef HRESULT (*DrawBatchedFunc)(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize, const UINT* transformSlots, UINT copies, UINT listStart);
+typedef bool (*RecordsDrawsFunc)(RenderPass pass);
 
 typedef HRESULT (*BeginDrawTextFunc)();
 typedef HRESULT (*DrawText2Func)(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -1568,6 +1588,8 @@ class RenderPlatformDLL : public RenderPlatform
     SetRenderPhaseFunc SetRenderPhaseFuncPtr;
 
     DrawIndexedInstancedFunc DrawIndexedInstancedFuncPtr;
+    DrawBatchedFunc DrawBatchedFuncPtr = nullptr;       // Optional: platforms without batched draws don't export them.
+    RecordsDrawsFunc RecordsDrawsFuncPtr = nullptr;
 
     BeginDrawTextFunc BeginDrawTextFuncPtr;
     DrawText2Func DrawText2FuncPtr;
@@ -1639,6 +1661,13 @@ public:
     {
         return DrawIndexedInstancedFuncPtr(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation, ObjectTransformSlot);
     }
+    HRESULT DrawBatched(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize,
+        const UINT* transformSlots, UINT copies, UINT listStart) override
+    {
+        return DrawBatchedFuncPtr ? DrawBatchedFuncPtr(indexCount, startIndex, baseVertex, layoutStart, layoutSize,
+            transformSlots, copies, listStart) : E_NOTIMPL;
+    }
+    bool RecordsDraws(RenderPass pass) const override { return RecordsDrawsFuncPtr && RecordsDrawsFuncPtr(pass); }
 
     HRESULT BeginDrawText() { return BeginDrawTextFuncPtr(); }
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText) { return DrawText2FuncPtr(sx, sy, dwColor, strText); }

@@ -59,6 +59,7 @@ struct RenderTestRequest
     std::string antialiasing = "none"; // "none" or "smaa"; none keeps gold images independent of the app default.
     bool hashedAlphaTest = true;       // "alphaTest": "hashed" (default) or "cutoff" (the material's alpha cutoff).
     bool viewCulling = true;           // "viewCulling": false rasterizes objects outside the view frustum too.
+    bool batchInstances = true;        // "batchInstances": false draws each instanced object on its own.
     bool hdr = false;                  // Defaults for every capture; see RenderTestPoint.
     std::string tonemap = "clamp";
     float exposure = 0;

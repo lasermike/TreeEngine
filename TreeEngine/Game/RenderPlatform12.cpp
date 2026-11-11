@@ -473,7 +473,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     rootParameters[BranchDataRootSignatureParam].InitAsShaderResourceView(BranchDataRootSignatureShaderSlot);
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
-    rootParameters[ObjectTransformRootSignatureParam].InitAsConstants(1, 4 /* b4 */, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+    // cbObjectTransform (Shaders/Tree.hlsl): the object transform slot and a batched draw's range and list.
+    rootParameters[ObjectTransformRootSignatureParam].InitAsConstants(4, 4 /* b4 */, 0, D3D12_SHADER_VISIBILITY_VERTEX);
     // Last frame's instance buffer, for motion vectors.
     rootParameters[PreviousInstancesRootSignatureParam].InitAsShaderResourceView(PreviousInstancesRootSignatureShaderSlot, 0,
         D3D12_SHADER_VISIBILITY_VERTEX);
@@ -1651,11 +1652,16 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     UINT StartInstanceLocation,
     UINT ObjectTransformSlot)
 {
-    // UINT_MAX selects the identity transform; instanced trees pass their transform's instance-buffer slot.
-    GetCommandList()->SetGraphicsRoot32BitConstant(ObjectTransformRootSignatureParam, ObjectTransformSlot, 0);
+    // UINT_MAX selects the identity transform; instanced trees pass their transform's instance-buffer slot. A draw that is
+    // only recorded for DXR (culled) sets nothing.
+    if (!m_renderData->currentDrawCulled)
+    {
+        const UINT constants[4] = { ObjectTransformSlot, 0, 0, 0 };
+        GetCommandList()->SetGraphicsRoot32BitConstants(ObjectTransformRootSignatureParam, 4, constants, 0);
+    }
 #if defined(DXR_ENABLED)
     if (m_dxrEnabledThisFrame
-        && m_renderData->currentPass == RegularPass)
+        && m_renderData->currentPass == RegularPass && !m_renderData->currentDrawRasterOnly)
     {
         if (m_currentMaterial && m_currentMaterial->m_isSkybox)
         {
@@ -1711,6 +1717,47 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     if (!m_renderData->currentDrawCulled)
         GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
     return S_OK;
+}
+
+HRESULT RenderPlatform12::DrawBatched(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize,
+    const UINT* transformSlots, UINT copies, UINT listStart)
+{
+    if (layoutSize == 0 || copies == 0)
+        return S_OK;
+    // The slot list goes straight into this frame's instance buffer (an upload heap the GPU reads once the frame's
+    // commands are submitted): the CPU instance array was already copied to it.
+    const UINT listSlots = (copies + 3) / 4;
+    ID3D12Resource* buffer = m_currentInstanceBuffer ? m_currentInstanceBuffer->buffer : nullptr;
+    if (!buffer || static_cast<UINT64>(listStart + listSlots) * sizeof(InstancedData) > buffer->GetDesc().Width)
+        return E_INVALIDARG;
+    InstancedData* mapped = nullptr;
+    const CD3DX12_RANGE noRead(0, 0);
+    HRR(buffer->Map(0, &noRead, reinterpret_cast<void**>(&mapped)));
+    for (UINT slot = 0; slot < listSlots; ++slot)
+    {
+        InstancedData list = {};
+        UINT* lanes[4] = { &list.InstanceOffset, &list.InstanceOffsetPrev, &list.AtlasRegion, &list.PreviousSlot };
+        for (UINT lane = 0; lane < 4; ++lane)
+            *lanes[lane] = slot * 4 + lane < copies ? transformSlots[slot * 4 + lane] : UINT_MAX;
+        mapped[listStart + slot] = list;
+    }
+    const CD3DX12_RANGE written(listStart * sizeof(InstancedData), (listStart + listSlots) * sizeof(InstancedData));
+    buffer->Unmap(0, &written);
+
+    const UINT constants[4] = { UINT_MAX, layoutStart, layoutSize, listStart };
+    GetCommandList()->SetGraphicsRoot32BitConstants(ObjectTransformRootSignatureParam, 4, constants, 0);
+    GetCommandList()->DrawIndexedInstanced(indexCount, layoutSize * copies, startIndex, baseVertex, layoutStart);
+    return S_OK;
+}
+
+bool RenderPlatform12::RecordsDraws(RenderPass pass) const
+{
+#if defined(DXR_ENABLED)
+    return m_dxrEnabledThisFrame && pass == RegularPass;
+#else
+    (void)pass;
+    return false;
+#endif
 }
 
 #if !defined(TREE_XBOX)
@@ -2800,40 +2847,73 @@ HRESULT RenderPlatform12::PrepareInstancedGeometry()
         return E_UNEXPECTED;
     // The material's bytes (FNV-1a), hashed once per material this frame: thousands of instance records share a few.
     std::unordered_map<const void*, size_t> materialHashes;
+    const void* lastMaterial = nullptr;     // Consecutive records (one unit's objects) nearly always share a material.
+    size_t lastMaterialHash = 0;
     const auto materialHash = [&](size_t recordIndex)
     {
+        if (lastMaterial && m_drawRecordMaterial[recordIndex] == lastMaterial)
+            return lastMaterialHash;
         auto found = materialHashes.find(m_drawRecordMaterial[recordIndex]);
         if (found != materialHashes.end())
+        {
+            lastMaterial = found->first;
+            lastMaterialHash = found->second;
             return found->second;
+        }
         size_t hash = 14695981039346656037ull;
         const auto* materialBytes = reinterpret_cast<const unsigned char*>(&m_drawRecords[recordIndex].material);
         for (size_t i = 0; i < sizeof(ShaderMaterial); ++i)
             hash = (hash ^ materialBytes[i]) * 1099511628211ull;
         materialHashes.emplace(m_drawRecordMaterial[recordIndex], hash);
+        lastMaterial = m_drawRecordMaterial[recordIndex];
+        lastMaterialHash = hash;
         return hash;
     };
-    std::unordered_map<const void*, std::vector<size_t>> ownerRecords;
-    std::vector<const void*> ownerOrder;
+
+    // Each owner's records, in order, grouped without a container per owner (thousands of instances draw a few records
+    // each): owners are numbered in order of first draw, then a stable counting sort lays their records out together.
+    m_ownerIndex.clear();
+    m_recordOwnerIndex.assign(count, UINT_MAX);
+    m_ownerRecordStart.clear();
     for (size_t recordIndex = 0; recordIndex < count; ++recordIndex)
     {
         if (!m_drawRecords[recordIndex].numInstances || m_drawRecordStatic[recordIndex])
             continue;
-        auto& records = ownerRecords[m_drawRecordOwner[recordIndex]];
-        if (records.empty())
-            ownerOrder.push_back(m_drawRecordOwner[recordIndex]);
-        records.push_back(recordIndex);
+        const auto inserted = m_ownerIndex.emplace(m_drawRecordOwner[recordIndex], static_cast<UINT>(m_ownerRecordStart.size()));
+        if (inserted.second)
+            m_ownerRecordStart.push_back(0);
+        const UINT owner = inserted.first->second;
+        m_recordOwnerIndex[recordIndex] = owner;
+        ++m_ownerRecordStart[owner];
     }
-    std::unordered_set<size_t> keys;
-    for (const void* owner : ownerOrder)
+    const size_t owners = m_ownerRecordStart.size();
+    UINT total = 0;
+    for (UINT& start : m_ownerRecordStart)
     {
-        const std::vector<size_t>& records = ownerRecords[owner];
-        const UINT slot = m_drawRecords[records.front()].objectTransformSlot;
-        if (slot == UINT_MAX || std::any_of(records.begin(), records.end(),
+        const UINT records = start;
+        start = total;
+        total += records;
+    }
+    m_ownerRecordStart.push_back(total);
+    m_ownerRecords.resize(total);
+    m_ownerRecordFill.assign(m_ownerRecordStart.begin(), m_ownerRecordStart.end() - 1);
+    for (size_t recordIndex = 0; recordIndex < count; ++recordIndex)
+        if (m_recordOwnerIndex[recordIndex] != UINT_MAX)
+            m_ownerRecords[m_ownerRecordFill[m_recordOwnerIndex[recordIndex]]++] = recordIndex;
+
+    std::unordered_set<size_t> keys;
+    for (size_t owner = 0; owner < owners; ++owner)
+    {
+        const auto records = std::make_pair(m_ownerRecords.begin() + m_ownerRecordStart[owner],
+            m_ownerRecords.begin() + m_ownerRecordStart[owner + 1]);
+        const UINT slot = m_drawRecords[*records.first].objectTransformSlot;
+        if (slot == UINT_MAX || std::any_of(records.first, records.second,
             [&](size_t recordIndex) { return m_drawRecords[recordIndex].objectTransformSlot != slot; }))
             continue;
         size_t key = 0x5ad3a7e5ull;
-        for (const size_t recordIndex : records)
+        for (auto record = records.first; record != records.second; ++record)
         {
+            const size_t recordIndex = *record;
             const DrawRecord& dr = m_drawRecords[recordIndex];
             for (const UINT value : { dr.startingInstance, dr.numInstances, dr.indexBufferStart, dr.indexBufferCount, dr.vertexCount,
                 dr.baseVertexLocation, static_cast<UINT>(dr.inputLayout), static_cast<UINT>(dr.textureIndex) })
@@ -2844,8 +2924,9 @@ HRESULT RenderPlatform12::PrepareInstancedGeometry()
         if (key == 0)
             key = 1;
         const bool first = keys.insert(key).second;
-        for (const size_t recordIndex : records)
+        for (auto record = records.first; record != records.second; ++record)
         {
+            const size_t recordIndex = *record;
             m_drawRecordTransformSlot[recordIndex] = slot;
             m_drawRecordShareKey[recordIndex] = key;
             m_drawRecordDeform[recordIndex] = first;
@@ -3406,10 +3487,24 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     };
     std::vector<TlasSource> tlasSources;
     std::unordered_set<const void*> seenOwners;
+    // PrepareInstancedGeometry numbered this frame's owners; a flag per number finds each owner's first record.
+    const bool ownerNumbers = m_recordOwnerIndex.size() == m_drawRecords.size();
+    std::vector<char> seenOwnerNumbers(ownerNumbers ? m_ownerRecordStart.size() : 0, 0);
+    const auto firstOfOwner = [&](size_t recordIndex)
+    {
+        if (ownerNumbers && m_recordOwnerIndex[recordIndex] != UINT_MAX)
+        {
+            char& seen = seenOwnerNumbers[m_recordOwnerIndex[recordIndex]];
+            const bool first = !seen;
+            seen = 1;
+            return first;
+        }
+        return seenOwners.insert(drawOwner(recordIndex)).second;
+    };
     // Records that only place an instance of a shared layout (not its first owner's) add a TLAS instance and nothing else.
     const auto noteOwner = [&](size_t recordIndex)
     {
-        if (seenOwners.insert(drawOwner(recordIndex)).second)
+        if (firstOfOwner(recordIndex))
             tlasSources.push_back({ &blasFor(recordIndex), sharing ? m_drawRecordTransformSlot[recordIndex] : UINT_MAX });
         return !sharing || m_drawRecordDeform[recordIndex];
     };
@@ -3505,6 +3600,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         staticRecords.clear();
         tlasSources.clear();
         seenOwners.clear();
+        std::fill(seenOwnerNumbers.begin(), seenOwnerNumbers.end(), 0);
         for (size_t recordIndex = 0; recordIndex < m_drawRecords.size(); ++recordIndex)
         {
             if (!m_drawRecords[recordIndex].numInstances)

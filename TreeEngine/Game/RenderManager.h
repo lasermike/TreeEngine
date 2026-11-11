@@ -68,6 +68,19 @@ class RenderManager : public IRenderFrame
     // Each object's instance-buffer reservation, in slot order, and the ranges copied to the GPU this frame.
     std::vector<std::pair<WorldObject*, std::pair<UINT, UINT>>> m_instanceReservations;
     std::vector<std::pair<UINT, UINT>>              m_instanceUploadRanges;
+    // Batched draws (see Render): this frame's object transform lists go in instance slots after every reservation,
+    // written by the platform as draws are recorded.
+    struct InstanceBatch
+    {
+        UINT start = 0;
+        UINT count = 0;
+        std::vector<UINT> transformSlots;
+    };
+    std::vector<InstanceBatch>                      m_instanceBatches;  // Reused; the first m_usedInstanceBatches are live.
+    size_t                                          m_usedInstanceBatches = 0;
+    UINT                                            m_batchListStart = 0;       // First slot of the list region.
+    UINT                                            m_batchListCapacity = 0;    // Slots in it.
+    UINT                                            m_batchListUsed = 0;        // Slots written this frame.
     UINT                                            m_nextInstanceBufferOffset;		 // Used during initialization
 
     // Filled in each frame by each world object via SetInstances()
@@ -77,7 +90,14 @@ class RenderManager : public IRenderFrame
         UINT count = 0;
         UINT objectTransformSlot = UINT_MAX;
     };
-    std::map<RenderUnit*, std::map<WorldObject*, InstanceRange>> m_perFrameInstanceData;
+    // Each unit's per-frame ranges, in the order of its reservations, and where each object's is. Entries are made at
+    // reservation, so concurrent SetInstances calls only find and write existing ones.
+    struct UnitInstances
+    {
+        std::vector<InstanceRange> ranges;
+        std::unordered_map<WorldObject*, size_t> index;
+    };
+    std::unordered_map<RenderUnit*, UnitInstances> m_perFrameInstanceData;
 
     RenderData                                      m_renderData;
 
@@ -175,7 +195,7 @@ public:
     HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
     // View culling for the regular pass: the frustum's planes this frame and each object's visibility.
     XMFLOAT4 m_cullingPlanes[5] = {};
-    std::unordered_map<WorldObject*, bool> m_visibility;
+    UINT m_cullingEpoch = 0;    // Bumped with each frustum; see WorldObject::m_cullingEpoch.
     void UpdateCullingFrustum();
     bool IsVisible(WorldObject* object);
 

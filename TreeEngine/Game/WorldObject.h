@@ -186,6 +186,9 @@ public:
     // Conservative world-space bounds of everything the object draws, for view culling. Objects without them
     // (the default) are never culled.
     virtual bool GetCullBounds(XMFLOAT3 bounds[2]) const { return false; }
+    // RenderManager::IsVisible's answer, cached for the culling epoch it was found in.
+    UINT m_cullingEpoch = UINT_MAX;
+    bool m_visible = true;
     XMVECTOR GetExtents(Extent extent);
     XMVECTOR GetPosition() { return XMLoadFloat3(&_position); }
     XMVECTOR GetRotation() { return XMLoadFloat4(&_rotation); }

@@ -101,9 +101,18 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
             MaxSceneTextures + 1, &m_environmentSpecular));
     }
 
-    if (maxInstances > 0)
+    // Room after the reservations for batched draws' object transform lists, four per slot: every instanced object
+    // in the shadow and regular passes, plus a partial slot per batch.
+    UINT instancedObjects = 0;
+    for (WorldObject* object : scene.Children())
+        instancedObjects += object->IsInstance() ? 1 : 0;
+    m_batchListStart = maxInstances;
+    m_batchListCapacity = instancedObjects ? 2 * ((instancedObjects + 3) / 4 + 1024) : 0;
+    m_batchListUsed = 0;
+    const UINT bufferInstances = maxInstances + m_batchListCapacity;
+    if (bufferInstances > 0)
     {
-        HRR(m_instancedBuffer.Create(sizeof(InstancedData) * maxInstances, maxInstances, GetPlatform()));
+        HRR(m_instancedBuffer.Create(sizeof(InstancedData) * bufferInstances, bufferInstances, GetPlatform()));
     }
     m_instanceOpacityMicromap.assign(maxInstances, -1);
     m_renderData.instanceOpacityMicromap = m_instanceOpacityMicromap.empty() ? nullptr : m_instanceOpacityMicromap.data();
@@ -184,9 +193,11 @@ HRESULT RenderManager::BeginNewFrame()
 {
     m_renderData.lodDistanceScale = m_settings->m_lodDistanceScale;
     D3DBuffer* buffer = m_instancedBuffer.Get(m_renderData.frame);
+    m_batchListUsed = 0;
 
     InstancedData* dataView = nullptr;
     HRR(GetPlatform()->BeginNewFrame(true, buffer, &dataView));
+    m_renderData.profile.batchedDraws = m_renderData.profile.batchedObjects = 0;
 
     //m_renderData.instanceData = dataView;
     //m_renderData.instanceBuffer = buffer;
@@ -239,15 +250,14 @@ void RenderManager::UpdateCullingFrustum()
     const XMVECTOR planes[] = { XMVectorAdd(w, x), XMVectorSubtract(w, x), XMVectorAdd(w, y), XMVectorSubtract(w, y), w };
     for (int i = 0; i < 5; ++i)
         XMStoreFloat4(&m_cullingPlanes[i], planes[i]);
-    m_visibility.clear();
+    ++m_cullingEpoch;
 }
 
 // Whether an object can be seen: its cull bounds intersect the view frustum, or it has none.
 bool RenderManager::IsVisible(WorldObject* object)
 {
-    const auto known = m_visibility.find(object);
-    if (known != m_visibility.end())
-        return known->second;
+    if (object->m_cullingEpoch == m_cullingEpoch)
+        return object->m_visible;
     XMFLOAT3 bounds[2];
     bool visible = true;
     if (object->GetCullBounds(bounds))
@@ -265,7 +275,8 @@ bool RenderManager::IsVisible(WorldObject* object)
             }
         }
     }
-    m_visibility.emplace(object, visible);
+    object->m_cullingEpoch = m_cullingEpoch;
+    object->m_visible = visible;
     m_renderData.profile.drawnObjects += visible;
     m_renderData.profile.culledObjects += !visible;
     return visible;
@@ -296,14 +307,25 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
 HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
 {
     HRR(GetPlatform()->SetRenderUnit(ru, pass));
+    const auto& offsets = ru->m_mesh->m_bufferOffsets;
 
-    for (auto object : ru->reservations)
+    // Instanced objects (those with an object transform: instanced trees) that draw the same instance range (a layout)
+    // are rasterized in one batched draw, so thousands of instances cost a draw per layout instead of one each. DXR
+    // still records each object's own draw (culled, so it isn't rasterized). Blended units keep their draw order.
+    const bool batching = m_settings->m_batchInstances && m_batchListCapacity > 0
+        && ru->m_material->m_renderState.blendState == StockBlendStates::Overwrite;
+    const bool recordEach = batching && GetPlatform()->RecordsDraws(pass);
+    m_usedInstanceBatches = 0;
+
+    const std::vector<InstanceRange>& ranges = m_perFrameInstanceData[ru].ranges;
+    for (size_t reservation = 0; reservation < ru->reservations.size(); ++reservation)
     {
+        WorldObject* object = ru->reservations[reservation];
         if (pass == ShadowMapPass && (object->GetObjectType() == ObjectType_Primitive
             || ru->m_material->m_shaderMaterial.opticalParams.y > 0.0f))
             continue;
 
-        const InstanceRange& range = m_perFrameInstanceData[ru][object];
+        const InstanceRange& range = ranges[reservation];
         UINT startInstance = range.start;
         UINT numInstances = range.count;
 
@@ -311,10 +333,65 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
         {
             m_renderData.currentDrawOwner = object;
             m_renderData.currentDrawCulled = pass == RegularPass && m_settings->m_viewCulling && !IsVisible(object);
-            HRR(GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets.IndexCount, numInstances, ru->m_mesh->m_bufferOffsets.IndexOffset,
-                ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance, range.objectTransformSlot));
+            if (batching && range.objectTransformSlot != UINT_MAX)
+            {
+                if (recordEach)
+                {
+                    const bool culled = m_renderData.currentDrawCulled;
+                    m_renderData.currentDrawCulled = true;
+                    HRR(GetPlatform()->DrawIndexedInstanced(offsets.IndexCount, numInstances, offsets.IndexOffset,
+                        offsets.VertexOffset, startInstance, range.objectTransformSlot));
+                    m_renderData.currentDrawCulled = culled;
+                }
+                if (m_renderData.currentDrawCulled)
+                    continue;
+                InstanceBatch* batch = nullptr;
+                for (size_t i = 0; i < m_usedInstanceBatches && !batch; ++i)
+                    if (m_instanceBatches[i].start == startInstance && m_instanceBatches[i].count == numInstances)
+                        batch = &m_instanceBatches[i];
+                if (!batch)
+                {
+                    if (m_usedInstanceBatches == m_instanceBatches.size())
+                        m_instanceBatches.emplace_back();
+                    batch = &m_instanceBatches[m_usedInstanceBatches++];
+                    batch->start = startInstance;
+                    batch->count = numInstances;
+                    batch->transformSlots.clear();
+                }
+                batch->transformSlots.push_back(range.objectTransformSlot);
+                continue;
+            }
+            HRR(GetPlatform()->DrawIndexedInstanced(offsets.IndexCount, numInstances, offsets.IndexOffset,
+                offsets.VertexOffset, startInstance, range.objectTransformSlot));
         }
     }
+
+    // Each batch's object transform slots go in the list region (the platform writes them, four per instance slot),
+    // then one draw covers the batch.
+    m_renderData.currentDrawCulled = false;
+    m_renderData.currentDrawRasterOnly = true;
+    for (size_t i = 0; i < m_usedInstanceBatches; ++i)
+    {
+        const InstanceBatch& batch = m_instanceBatches[i];
+        const UINT copies = static_cast<UINT>(batch.transformSlots.size());
+        const UINT listSlots = (copies + 3) / 4;
+        if (m_batchListUsed + listSlots <= m_batchListCapacity
+            && SUCCEEDED(GetPlatform()->DrawBatched(offsets.IndexCount, offsets.IndexOffset, offsets.VertexOffset,
+                batch.start, batch.count, batch.transformSlots.data(), copies, m_batchListStart + m_batchListUsed)))
+        {
+            m_batchListUsed += listSlots;
+            ++m_renderData.profile.batchedDraws;
+            m_renderData.profile.batchedObjects += copies;
+        }
+        else
+        {
+            // No room for the list (or no batched draws on this platform): draw each object on its own.
+            for (const UINT transformSlot : batch.transformSlots)
+                HRR(GetPlatform()->DrawIndexedInstanced(offsets.IndexCount, batch.count, offsets.IndexOffset,
+                    offsets.VertexOffset, batch.start, transformSlot));
+        }
+    }
+    m_renderData.currentDrawRasterOnly = false;
     m_renderData.currentDrawOwner = nullptr;
     m_renderData.currentDrawCulled = false;
     return S_OK;
@@ -732,8 +809,10 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
     unit->totalMaxInstances += object->GetMaxInstances(); // TODO needed?
 
     // Add per frame reservation
-    ASSERT(m_perFrameInstanceData[unit].find(object) == m_perFrameInstanceData[unit].end());
-    m_perFrameInstanceData[unit][object] = InstanceRange();
+    UnitInstances& unitInstances = m_perFrameInstanceData[unit];
+    ASSERT(unitInstances.index.find(object) == unitInstances.index.end());
+    unitInstances.index[object] = unitInstances.ranges.size();
+    unitInstances.ranges.push_back(InstanceRange());
 
     *ppRenderUnit = unit;
 
@@ -743,8 +822,14 @@ HRESULT RenderManager::ReserveRenderUnit(Material* material, Mesh* mesh, WorldOb
 HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
     UINT objectTransformSlot)
 {
-    // Keys are reserved up front, so concurrent ComputeConstants calls only write existing entries.
-    InstanceRange& range = m_perFrameInstanceData[renderUnit][object];
+    // Entries are made at reservation, so concurrent ComputeConstants calls only find and write existing ones.
+    const auto unit = m_perFrameInstanceData.find(renderUnit);
+    if (unit == m_perFrameInstanceData.end())
+        return E_INVALIDARG;
+    const auto entry = unit->second.index.find(object);
+    if (entry == unit->second.index.end())
+        return E_INVALIDARG;
+    InstanceRange& range = unit->second.ranges[entry->second];
     range.start = startInstance;
     range.count = numInstances;
     range.objectTransformSlot = objectTransformSlot;
@@ -1032,6 +1117,9 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data, Settings*
     ASSIGN_FUNC(SetRenderPhase);
 
     ASSIGN_FUNC(DrawIndexedInstanced);
+    // Optional exports (no assert): without them objects draw one at a time.
+    DrawBatchedFuncPtr = (DrawBatchedFunc) ::GetProcAddress(module, "DrawBatched");
+    RecordsDrawsFuncPtr = (RecordsDrawsFunc) ::GetProcAddress(module, "RecordsDraws");
 
     ASSIGN_FUNC(BeginDrawText);
     ASSIGN_FUNC(DrawText2);

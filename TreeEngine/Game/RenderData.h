@@ -103,6 +103,8 @@ struct RenderProfile
     std::array<UINT, 9> lodLevelObjects = {};
     UINT drawnLeaves = 0;
     UINT drawnSticks = 0;
+    UINT batchedDraws = 0;                  // Batched instance draws, and the objects they drew (see RenderManager::Render).
+    UINT batchedObjects = 0;
     double instanceUploadMs = 0;            // Copying the CPU instance array into the frame's instance buffer.
     std::uint64_t instanceUploadBytes = 0;
     bool builtStaticBLAS = false;   // The static-geometry BLAS was (re)built this frame.
@@ -181,6 +183,8 @@ struct RenderData : SceneRenderSettings
     const void*         currentDrawOwner = nullptr;
     // The current draw's object is outside the view frustum: the renderer records it for DXR but doesn't rasterize it.
     bool                currentDrawCulled = false;
+    // The current draw is rasterized only: its objects were already recorded for DXR (see RenderManager::Render).
+    bool                currentDrawRasterOnly = false;
 
     // Shadows
     static const int    SMapWidth = 2048;

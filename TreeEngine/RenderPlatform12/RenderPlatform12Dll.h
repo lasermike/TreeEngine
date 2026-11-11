@@ -44,6 +44,8 @@ RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing*
 RENDERPLATFORM_API HRESULT SetRenderPhase(RenderState state);
 
 RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
+RENDERPLATFORM_API HRESULT DrawBatched(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize, const UINT* transformSlots, UINT copies, UINT listStart);
+RENDERPLATFORM_API bool RecordsDraws(RenderPass pass);
 
 RENDERPLATFORM_API HRESULT BeginDrawText();
 RENDERPLATFORM_API HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);

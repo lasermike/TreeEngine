@@ -1417,6 +1417,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         }
         ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
         ImGui::Checkbox("View culling", &m_settings.m_viewCulling);
+        ImGui::Checkbox("Batch instances", &m_settings.m_batchInstances);
         ImGui::SliderFloat("LOD distance scale", &m_settings.m_lodDistanceScale, 0.25f, 4.0f, "%.2f");
         ImGui::Checkbox("HDR", &m_settings.m_hdr);
         if (m_settings.m_hdr)
