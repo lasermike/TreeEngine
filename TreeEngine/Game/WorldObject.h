@@ -174,6 +174,9 @@ public:
     virtual unsigned int GetMaxDrawnInstances() { return GetMaxInstances(); }
     bool IsInstance() const { return _params->instanceSource != nullptr; }
     XMFLOAT3* GetBoundingBox() { return _boundingBox; }
+    // Conservative world-space bounds of everything the object draws, for view culling. Objects without them
+    // (the default) are never culled.
+    virtual bool GetCullBounds(XMFLOAT3 bounds[2]) const { return false; }
     XMVECTOR GetExtents(Extent extent);
     XMVECTOR GetPosition() { return XMLoadFloat3(&_position); }
     XMVECTOR GetRotation() { return XMLoadFloat4(&_rotation); }

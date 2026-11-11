@@ -171,6 +171,7 @@ HRESULT GltfModel::ComputeConstants(IRenderFrame* frame)
     }
     XMStoreFloat3(&_boundingBox[0], boundsMin);
     XMStoreFloat3(&_boundingBox[1], boundsMax);
+    m_boundsValid = true;
     return S_OK;
 }
 

@@ -49,6 +49,10 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Camera motion vectors and jitter in LeafAtlasTest and AI Tree, raster and DXR.
 .\Tests\RenderRegression\test-motion-vectors.ps1
 
+# View culling: AI Tree, Instancing, LeafAtlases, Terra and Trees from their start and turned four ways, raster
+# and DXR, culling on and off; every pair must match exactly, and the scenes with many objects must cull some.
+.\Tests\RenderRegression\test-view-culling.ps1
+
 # Edit, save, reload, restart, and compare scene appearance in both modes.
 # Uses an isolated runtime copy; never modifies the deployment's UserScenes.
 .\Tests\RenderRegression\test-scene-persistence.ps1
@@ -208,6 +212,8 @@ The native `--render-test <request.json>` request also accepts:
 - `benchmarkTimeStep`: finite nonnegative seconds, default 0. Warmup holds the
   requested time; timed frames advance from that time by this step. The final
   screenshot returns to the original requested time and is not a timed sample.
+- `viewCulling`: default true, like the app. False rasterizes objects outside the view frustum too (DXR traces
+  every object either way); profile samples report `drawnObjects` and `culledObjects`.
 - Per-capture `showShadowBuffer`: default false. Shows the shadow-map preview for that capture.
 - Per-capture `poseCache`: default true. False forces the CPU reference pose to
   be recomputed, allowing same-process A/B comparisons.

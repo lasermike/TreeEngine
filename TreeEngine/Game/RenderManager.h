@@ -5,6 +5,7 @@
 #include "StockRenderStates.h"
 #include "OpacityMicromapBaker.h"
 #include <memory>
+#include <unordered_map>
 
 class WorldObject;
 class Settings;
@@ -169,6 +170,12 @@ public:
         const GeometryBufferData::BufferOffsets* bufferIndices, InputLayouts inputLayout, Mesh** newMesh);
 
     HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
+    // View culling for the regular pass: the frustum's planes this frame and each object's visibility.
+    XMFLOAT4 m_cullingPlanes[5] = {};
+    std::unordered_map<WorldObject*, bool> m_visibility;
+    void UpdateCullingFrustum();
+    bool IsVisible(WorldObject* object);
+
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
         UINT objectTransformSlot = UINT_MAX);
     HRESULT GetInstanceIndex(WorldObject* object, UINT&);

@@ -52,6 +52,7 @@ class GltfModel : public WorldObject
     float m_biplanarUvPerUnit;
     float m_biplanarSharpness;
     std::vector<RenderBatch> m_batches;
+    bool m_boundsValid = false;
 
 public:
     explicit GltfModel(GltfModelParams* parameters);
@@ -60,6 +61,13 @@ public:
     void AppendGeometry(GeometryBufferData& geometryData) override;
     HRESULT InitGraphics(RenderManager& renderManager) override;
     HRESULT ComputeConstants(IRenderFrame* frame) override;
+    bool GetCullBounds(XMFLOAT3 bounds[2]) const override
+    {
+        if (!m_boundsValid) return false;
+        bounds[0] = _boundingBox[0];
+        bounds[1] = _boundingBox[1];
+        return true;
+    }
     unsigned int GetNumInstances() override;
     unsigned int GetMaxInstances() override;
 };

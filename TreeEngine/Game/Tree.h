@@ -134,6 +134,10 @@ private:
     void LinkPreviousSlots(InstancedData* instances, UINT firstSlot, const std::vector<int>& branchIds,
         SlotHistory& history, UINT frame);
     int m_instanceCount = 0;
+    // View-culling bounds: the union of every drawn branch's mesh bounds (a unit cube about its origin holds each
+    // branch mesh), in world space. _boundingBox is coarser and also fits the shadow map, so it is left as it was.
+    XMFLOAT3 m_cullBox[2] = {};
+    bool m_cullBoxValid = false;
     bool m_instanceLayoutsValid = false;
     int m_instanceLayoutDepthLOD = 0;
 
@@ -165,6 +169,13 @@ public:
     virtual unsigned int GetNumInstances();
     virtual unsigned int GetMaxInstances();
     unsigned int GetMaxDrawnInstances() override;
+    bool GetCullBounds(XMFLOAT3 bounds[2]) const override
+    {
+        if (!m_cullBoxValid) return false;
+        bounds[0] = m_cullBox[0];
+        bounds[1] = m_cullBox[1];
+        return true;
+    }
 
     // Called once per instance before graphics are initialized; reserves the instance layouts.
     void RegisterInstance() { ++m_instanceCount; }

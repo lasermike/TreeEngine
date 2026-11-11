@@ -96,6 +96,8 @@ struct RenderProfile
     UINT dynamicBlasRefits = 0;
     UINT dynamicBlasReuses = 0;
     UINT tlasInstances = 0;
+    UINT drawnObjects = 0;          // Objects with instances in the regular pass, and those the view frustum culled.
+    UINT culledObjects = 0;
     bool builtStaticBLAS = false;   // The static-geometry BLAS was (re)built this frame.
     bool compactedStaticBLAS = false;
     std::uint64_t staticBlasBytes = 0;
@@ -166,6 +168,8 @@ struct RenderData : SceneRenderSettings
     // The object whose instances the current draw renders (set by RenderManager::Render); DXR groups each
     // owner's dynamic geometry into its own BLAS.
     const void*         currentDrawOwner = nullptr;
+    // The current draw's object is outside the view frustum: the renderer records it for DXR but doesn't rasterize it.
+    bool                currentDrawCulled = false;
 
     // Shadows
     static const int    SMapWidth = 2048;

@@ -204,9 +204,55 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 }
 
 
+// The view frustum's side planes and the plane through the eye (points in front have w > 0), from the view-projection
+// matrix (Gribb and Hartmann). Near and far are left out: the near plane is close to the eye plane, and far is distant.
+void RenderManager::UpdateCullingFrustum()
+{
+    const XMMATRIX viewProjection = XMMatrixMultiply(XMLoadFloat4x4(&m_renderData.view), XMLoadFloat4x4(&m_renderData.projection));
+    XMFLOAT4X4 m;
+    XMStoreFloat4x4(&m, viewProjection);
+    const auto column = [&](int c) { return XMVectorSet(m.m[0][c], m.m[1][c], m.m[2][c], m.m[3][c]); };
+    const XMVECTOR x = column(0), y = column(1), w = column(3);
+    const XMVECTOR planes[] = { XMVectorAdd(w, x), XMVectorSubtract(w, x), XMVectorAdd(w, y), XMVectorSubtract(w, y), w };
+    for (int i = 0; i < 5; ++i)
+        XMStoreFloat4(&m_cullingPlanes[i], planes[i]);
+    m_visibility.clear();
+}
+
+// Whether an object can be seen: its cull bounds intersect the view frustum, or it has none.
+bool RenderManager::IsVisible(WorldObject* object)
+{
+    const auto known = m_visibility.find(object);
+    if (known != m_visibility.end())
+        return known->second;
+    XMFLOAT3 bounds[2];
+    bool visible = true;
+    if (object->GetCullBounds(bounds))
+    {
+        for (const XMFLOAT4& plane : m_cullingPlanes)
+        {
+            // The box corner farthest along the plane's normal; outside if even that is behind the plane.
+            const float px = plane.x >= 0 ? bounds[1].x : bounds[0].x;
+            const float py = plane.y >= 0 ? bounds[1].y : bounds[0].y;
+            const float pz = plane.z >= 0 ? bounds[1].z : bounds[0].z;
+            if (plane.x * px + plane.y * py + plane.z * pz + plane.w < 0)
+            {
+                visible = false;
+                break;
+            }
+        }
+    }
+    m_visibility.emplace(object, visible);
+    m_renderData.profile.drawnObjects += visible;
+    m_renderData.profile.culledObjects += !visible;
+    return visible;
+}
+
 HRESULT RenderManager::RenderScene(RenderPass pass)
 {
     HRR(GetPlatform()->RenderSceneSetup(pass, &m_instancedBuffer));
+    if (pass == RegularPass)
+        UpdateCullingFrustum();
 
     // Opaque geometry must populate color and depth before transparent surfaces.
     // Keep the shadow pass ordering unchanged.
@@ -241,11 +287,13 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
         if (numInstances > 0)
         {
             m_renderData.currentDrawOwner = object;
+            m_renderData.currentDrawCulled = pass == RegularPass && m_settings->m_viewCulling && !IsVisible(object);
             HRR(GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets.IndexCount, numInstances, ru->m_mesh->m_bufferOffsets.IndexOffset,
                 ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance, range.objectTransformSlot));
         }
     }
     m_renderData.currentDrawOwner = nullptr;
+    m_renderData.currentDrawCulled = false;
     return S_OK;
 }
 

@@ -1659,7 +1659,9 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     }
 #endif
 
-    GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+    // A culled object is outside the view: DXR still traces it (above), but there is nothing to rasterize.
+    if (!m_renderData->currentDrawCulled)
+        GetCommandList()->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
     return S_OK;
 }
 
@@ -4639,6 +4641,7 @@ HRESULT RenderPlatform12::BeginProfileFrame()
     profile.reusedBLAS = false;
     profile.builtStaticBLAS = profile.compactedStaticBLAS = false;
     profile.dynamicBlasBuilds = profile.dynamicBlasRefits = profile.dynamicBlasReuses = profile.tlasInstances = 0;
+    profile.drawnObjects = profile.culledObjects = 0;
     profile.staticBlasBytes = profile.blasHeapBytes = profile.blasHeapLiveBytes = profile.blasScratchBytes = 0;
     m_profileQueryMask = 0;
     ProfileTimestamp(ProfilePass::Frame, false);

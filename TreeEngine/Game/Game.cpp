@@ -1244,6 +1244,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
             ImGui::SeparatorText("Work");
             ImGui::Text("Pose branches rebuilt / reused: %u / %u", profile.rebuiltPoseBranches, profile.reusedPoseBranches);
+            ImGui::Text("Objects drawn / culled: %u / %u", profile.drawnObjects, profile.culledObjects);
             ImGui::Text("DXR draw records: %u", profile.drawRecords);
             ImGui::Text("DXR world / skinned vertices: %u / %u", profile.worldVertices, profile.skinnedVertices);
             ImGui::Text("Source index entries: %u; dispatch groups: %u", profile.indexEntries, profile.dispatchGroups);
@@ -1403,6 +1404,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                 ImGui::SliderFloat("Sharpness", &m_settings.m_upscalerSharpness, 0.0f, 1.0f, "%.2f");
         }
         ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
+        ImGui::Checkbox("View culling", &m_settings.m_viewCulling);
         ImGui::Checkbox("HDR", &m_settings.m_hdr);
         if (m_settings.m_hdr)
         {
