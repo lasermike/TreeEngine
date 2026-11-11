@@ -5,6 +5,7 @@
 #include "RenderManager.h"
 #include "MathHelper.h"
 #include <directxcolors.h>
+#include <functional>
 
 using namespace DirectX;
 
@@ -73,6 +74,22 @@ void Tree::Create(TreeModelGenerator* generator)
     {
         _params->_animationSpeed = _treeModel->treeData.numLevels / 10.0f;
     }
+
+    // Each branch's height above the tips, for reduced layouts, which merge or drop the branches nearest the tips.
+    m_branchHeights.assign(branches, 0);
+    std::function<int(int)> height = [&](int index) -> int
+    {
+        const Branch& branch = _treeModel->treeData.pBranches[index];
+        int tallest = -1;
+        for (const int child : branch.children)
+            if (child > 0 && child < branches)
+                tallest = std::max(tallest, height(child));
+        return m_branchHeights[index] = tallest + 1;
+    };
+    if (branches > 0)
+        height(_treeModel->trunk->id);
+    m_instanceLayouts.assign(InstanceLayoutCount(), InstanceLayout());
+    m_slotHistory.assign(1 + InstanceLayoutCount(), SlotHistory());
 
     if (_params->meshes.size() == 0)
     {
@@ -348,7 +365,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         // The layouts depend only on the pose and depth LOD, so they are rebuilt only when those change.
         if (!m_reusePose || !m_instanceLayoutsValid || m_instanceLayoutDepthLOD != _params->depthLOD)
             BuildInstanceLayouts(startInstance, renderData.instanceOpacityMicromap);
-        for (int kind = 0; kind < InstanceLayoutCount; ++kind)
+        for (size_t kind = 0; kind < m_instanceLayouts.size(); ++kind)
         {
             InstanceLayout& layout = m_instanceLayouts[kind];
             for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
@@ -422,7 +439,7 @@ const WorldObjectParams::LeafAtlasRegion* Tree::LeafRegion(const Branch* branch)
 UINT Tree::AtlasRectStart(UINT startInstance) const
 {
     const UINT branches = _treeModel->treeData.numBranches;
-    return startInstance + (m_instanceCount > 0 ? branches * (1 + InstanceLayoutCount) : branches);
+    return startInstance + (m_instanceCount > 0 ? branches * static_cast<UINT>(1 + InstanceLayoutCount()) : branches);
 }
 
 int Tree::LeafOpacityMicromap(const Branch* branch) const
@@ -783,7 +800,7 @@ unsigned int Tree::GetMaxInstances()
         return 0;
     const unsigned int branches = _treeModel->treeData.numBranches;
     const unsigned int atlasRects = static_cast<unsigned int>(_params->leafRegions.size());
-    return (m_instanceCount > 0 ? branches * (1 + InstanceLayoutCount) : branches) + atlasRects;
+    return (m_instanceCount > 0 ? branches * static_cast<unsigned int>(1 + InstanceLayoutCount()) : branches) + atlasRects;
 }
 
 unsigned int Tree::GetMaxDrawnInstances()
@@ -812,36 +829,176 @@ unsigned int Tree::GetNumInstances()
         return 0;
 }
 
-TreeSegment Tree::SelectLayoutSegment(const BranchInstance& frame, InstanceLayoutKind layout) const
+TreeSegment Tree::SelectLayoutSegment(const Branch* branch, bool nearLayout) const
 {
-    if (frame.branch->geometryType == Leaf)
+    if (branch->geometryType == Leaf)
         return TreeSegment::LeafLOD0;
     if (_params->depthLOD == -1)
         return TreeSegment::BranchLOD1;
-    // Matches SelectSegmentType with every branch beyond (far) or within (near) the 10-unit detail distance.
-    return layout == NearLayout || frame.branch->depth < _params->depthLOD ? TreeSegment::BranchLOD0 : TreeSegment::BranchLOD1;
+    // Matches SelectSegmentType with every branch beyond (far) or within (near) the first LOD distance.
+    return nearLayout || branch->depth < _params->depthLOD ? TreeSegment::BranchLOD0 : TreeSegment::BranchLOD1;
+}
+
+// The near and far layouts: every drawn branch at its pose.
+void Tree::CollectFullLayout(InstanceLayoutKind kind)
+{
+    m_layoutNodes.clear();
+    std::vector<int> frameNode(m_numBranchInstances, -1);
+    for (int i = 0; i < m_numBranchInstances; ++i)
+    {
+        const BranchInstance& frame = m_treeFrames[i];
+        if (!m_branchPoses[frame.branch->id].renderable)
+            continue;
+        const int parent = frame.parent ? frameNode[frame.parent - &m_treeFrames[0]] : -1;
+        frameNode[i] = static_cast<int>(m_layoutNodes.size());
+        m_layoutNodes.push_back({ m_branchPoses[frame.branch->id].world, frame.branch, parent,
+            SelectLayoutSegment(frame.branch, kind == NearLayout) });
+    }
+}
+
+// A reduced layout, `reduction` levels below the far one (about half the leaves per level; see Lod::Reduction).
+// Branches near the tips (height below the reduction) are merged in groups, or pruned, and the remaining leaves grow
+// to keep the total leaf area.
+void Tree::CollectReducedLayout(int reduction)
+{
+    m_layoutNodes.clear();
+    m_frameChildren.assign(m_numBranchInstances, std::vector<int>());
+    for (int i = 1; i < m_numBranchInstances; ++i)
+        if (m_treeFrames[i].parent)
+            m_frameChildren[m_treeFrames[i].parent - &m_treeFrames[0]].push_back(i);
+    const bool merge = _params->lod.reduction == Lod::Reduction::Merge;
+    const int leafGroup = 1 << reduction;   // Leaves merged into one, or kept one in this many.
+    const float leafScale = sqrtf(static_cast<float>(leafGroup));
+    const XMMATRIX rotation = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
+
+    const auto renderable = [&](int frame) { return m_branchPoses[m_treeFrames[frame].branch->id].renderable; };
+    const auto addNode = [&](const XMFLOAT4X4& world, const Branch* branch, int parent)
+    {
+        m_layoutNodes.push_back({ world, branch, parent, SelectLayoutSegment(branch, false) });
+        return static_cast<int>(m_layoutNodes.size()) - 1;
+    };
+    const auto scaledLeaf = [&](XMFLOAT4X4 world, XMVECTOR position)
+    {
+        // Grow the leaf about its center (its local origin): scale the rows that map its local axes.
+        for (int row = 0; row < 3; ++row)
+            for (int column = 0; column < 3; ++column)
+                world.m[row][column] *= leafScale;
+        XMStoreFloat3(reinterpret_cast<XMFLOAT3*>(&world.m[3][0]), position);
+        return world;
+    };
+
+    // Emits a group of sibling frames as one node, then its children, grouped the same way.
+    std::function<void(const std::vector<int>&, int)> emit = [&](const std::vector<int>& group, int parentNode)
+    {
+        int node = parentNode;
+        const BranchInstance& first = m_treeFrames[group[0]];
+        const bool leaf = first.branch->geometryType == Leaf;
+        const bool reduced = m_branchHeights[first.branch->id] < reduction;
+        if (leaf)
+        {
+            if (merge)
+            {
+                // One leaf for the group, at their average position, with the first leaf's orientation.
+                XMVECTOR center = XMVectorZero();
+                int count = 0;
+                for (const int frame : group)
+                    if (renderable(frame))
+                    {
+                        center += XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&m_branchPoses[m_treeFrames[frame].branch->id].world.m[3][0]));
+                        ++count;
+                    }
+                const int representative = renderable(group[0]) ? group[0] : -1;
+                if (count > 0 && representative >= 0)
+                    addNode(scaledLeaf(m_branchPoses[first.branch->id].world, center / static_cast<float>(count)), first.branch, parentNode);
+            }
+            else if (renderable(group[0]))
+            {
+                // Keep a fixed one leaf in leafGroup, by its ID.
+                const uint32_t hash = static_cast<uint32_t>(first.branch->id) * 2654435761u;
+                if ((hash >> 8) % static_cast<uint32_t>(leafGroup) == 0)
+                {
+                    const XMFLOAT4X4& world = m_branchPoses[first.branch->id].world;
+                    addNode(scaledLeaf(world, XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&world.m[3][0]))), first.branch, parentNode);
+                }
+            }
+            return;
+        }
+        if (group.size() == 1)
+        {
+            // A branch kept as it is, unless pruning drops it for being among the finest twigs.
+            if (renderable(group[0]) && !(reduced && !merge))
+                node = addNode(m_branchPoses[first.branch->id].world, first.branch, parentNode);
+        }
+        else
+        {
+            // One twig from the average of the group's starts and ends, with their combined cross-section.
+            XMVECTOR start = XMVectorZero(), end = XMVectorZero();
+            float area = 0;
+            for (const int frame : group)
+            {
+                const BranchInstance& member = m_treeFrames[frame];
+                start += XMLoadFloat3(&member.startPosition);
+                end += XMLoadFloat3(&member.endPosition);
+                area += member.scale.x * member.scale.x;
+            }
+            BranchInstance merged = first;
+            XMStoreFloat3(&merged.startPosition, start / static_cast<float>(group.size()));
+            XMStoreFloat3(&merged.endPosition, end / static_cast<float>(group.size()));
+            const float thickness = sqrtf(area);
+            merged.scale = XMFLOAT3(thickness, XMVectorGetX(XMVector3Length(XMLoadFloat3(&merged.endPosition) - XMLoadFloat3(&merged.startPosition))), thickness);
+            XMMATRIX transform;
+            if (ComputeTransformationsManual(&transform, merged) == S_OK)
+            {
+                XMFLOAT4X4 world;
+                XMStoreFloat4x4(&world, XMMatrixMultiply(transform, rotation));
+                node = addNode(world, first.branch, parentNode);
+            }
+        }
+
+        // Children of every frame in the group: leaves near the tips go in groups of leafGroup (merge) or one by one
+        // (prune); twigs below the reduction height go in pairs when merging; everything else on its own.
+        std::vector<int> leaves, twigs;
+        std::vector<std::vector<int>> groups;
+        for (const int frame : group)
+            for (const int child : m_frameChildren[frame])
+            {
+                const Branch* branch = m_treeFrames[child].branch;
+                if (branch->geometryType == Leaf)
+                    leaves.push_back(child);
+                else if (merge && m_branchHeights[branch->id] < reduction)
+                    twigs.push_back(child);
+                else
+                    groups.push_back({ child });
+            }
+        for (size_t i = 0; i < twigs.size(); i += 2)
+            groups.push_back(std::vector<int>(twigs.begin() + i, twigs.begin() + std::min(i + 2, twigs.size())));
+        const size_t leafStep = merge ? static_cast<size_t>(leafGroup) : 1;
+        for (size_t i = 0; i < leaves.size(); i += leafStep)
+            groups.push_back(std::vector<int>(leaves.begin() + i, leaves.begin() + std::min(i + leafStep, leaves.size())));
+        for (const auto& childGroup : groups)
+            emit(childGroup, node);
+    };
+    if (m_numBranchInstances > 0)
+        emit({ 0 }, -1);
 }
 
 void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
 {
     const UINT branches = _treeModel->treeData.numBranches;
-    if (m_layoutOffsets.size() < static_cast<size_t>(m_numBranchInstances))
-        m_layoutOffsets.resize(m_numBranchInstances);
-
-    for (int kind = 0; kind < InstanceLayoutCount; ++kind)
+    std::vector<int> nodeOffsets;
+    for (size_t kind = 0; kind < m_instanceLayouts.size(); ++kind)
     {
         InstanceLayout& layout = m_instanceLayouts[kind];
-        const auto layoutKind = static_cast<InstanceLayoutKind>(kind);
+        if (kind < FirstReducedLayout)
+            CollectFullLayout(static_cast<InstanceLayoutKind>(kind));
+        else
+            CollectReducedLayout(static_cast<int>(kind - FirstReducedLayout + 1));
 
         // Count per segment so each segment's range is contiguous.
         std::array<UINT, TreeSegmentCount> counts = {};
-        for (int i = 0; i < m_numBranchInstances; ++i)
-        {
-            const BranchInstance& frame = m_treeFrames[i];
-            if (m_branchPoses[frame.branch->id].renderable)
-                counts[TreeSegmentIndex(SelectLayoutSegment(frame, layoutKind))]++;
-        }
-        UINT next = startInstance + branches * (1 + kind);
+        for (const LayoutNode& node : m_layoutNodes)
+            counts[TreeSegmentIndex(node.segment)]++;
+        UINT next = startInstance + branches * static_cast<UINT>(1 + kind);
         for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
         {
             layout.start[segmentIndex] = next;
@@ -852,31 +1009,26 @@ void Tree::BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps)
 
         // Emit with skinning links into this layout's own slots. Parents precede their children.
         layout.leafCount = layout.stickCount = 0;
-        for (int i = 0; i < m_numBranchInstances; ++i)
+        nodeOffsets.assign(m_layoutNodes.size(), 0);
+        for (size_t i = 0; i < m_layoutNodes.size(); ++i)
         {
-            const BranchInstance& frame = m_treeFrames[i];
-            m_layoutOffsets[i] = -1;
-            const BranchPose& pose = m_branchPoses[frame.branch->id];
-            if (!pose.renderable)
-                continue;
-            const TreeSegment segment = SelectLayoutSegment(frame, layoutKind);
-            const size_t segmentIndex = TreeSegmentIndex(segment);
+            const LayoutNode& node = m_layoutNodes[i];
+            const size_t segmentIndex = TreeSegmentIndex(node.segment);
             const UINT offset = layout.start[segmentIndex] + layout.segments[segmentIndex].size();
-            const int parent = frame.parent ? static_cast<int>(frame.parent - &m_treeFrames[0]) : -1;
 
             InstancedData data = {};
-            data.World = pose.world;
-            data.AtlasRegion = AtlasRegionSlot(startInstance, frame.branch);
+            data.World = node.world;
+            data.AtlasRegion = AtlasRegionSlot(startInstance, node.branch);
             data.InstanceOffset = offset;
-            data.InstanceOffsetPrev = parent >= 0 && m_layoutOffsets[parent] >= 0 ? m_layoutOffsets[parent] : offset;
+            data.InstanceOffsetPrev = node.parent >= 0 ? nodeOffsets[node.parent] : offset;
             layout.segments[segmentIndex].push_back(data);
-            layout.branchIds[segmentIndex].push_back(frame.branch->id);
+            layout.branchIds[segmentIndex].push_back(node.branch->id);
             if (opacityMicromaps)
-                opacityMicromaps[offset] = LeafOpacityMicromap(frame.branch);
-            m_layoutOffsets[i] = static_cast<int>(offset);
+                opacityMicromaps[offset] = LeafOpacityMicromap(node.branch);
+            nodeOffsets[i] = offset;
 
-            if (frame.branch->geometryType == Leaf) layout.leafCount++;
-            else if (frame.branch->geometryType == Stick) layout.stickCount++;
+            if (node.branch->geometryType == Leaf) layout.leafCount++;
+            else if (node.branch->geometryType == Stick) layout.stickCount++;
         }
     }
     m_instanceLayoutsValid = true;
@@ -953,8 +1105,10 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
     const XMVECTOR nearest = XMVectorClamp(renderData.eyePos, boxMin, boxMax);
     m_instanceLodLevel = Lod::Select(XMVectorGetX(XMVector3Length(nearest - renderData.eyePos)), _params->lod,
         renderData.lodDistanceScale, m_instanceLodLevel);
-    const bool nearCamera = m_instanceLodLevel == 0;
-    InstanceLayout& layout = source.m_instanceLayouts[nearCamera ? NearLayout : FarLayout];
+    // Level 0 draws the near layout, 1 the far one, and each level beyond its reduced layout.
+    const size_t layoutIndex = m_instanceLodLevel == 0 ? NearLayout : m_instanceLodLevel == 1 ? FarLayout
+        : std::min<size_t>(m_instanceLodLevel, source.m_instanceLayouts.size() - 1);
+    InstanceLayout& layout = source.m_instanceLayouts[layoutIndex];
     for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
     {
         pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, layout.start[segmentIndex],

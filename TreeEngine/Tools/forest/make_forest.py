@@ -3,7 +3,11 @@
 The source trees, materials, leaf atlases, light and environment come from leaf-atlases.scene.json. The instances
 sit on a jittered grid with a seeded random species, yaw and scale, so the scene is the same every time it is made.
 
-    python make_forest.py [--count 2000] [--spacing 6] [--seed 7] [--output ../../Game/Resources/Scenes/forest.scene.json]
+    python make_forest.py [--count 2000] [--spacing 6] [--seed 7] [--lod 10,30,60,120] [--reduction prune|merge]
+                          [--id Forest] [--output ../../Game/Resources/Scenes/forest.scene.json]
+
+--lod sets the source trees' (and so the instances') LOD distances: an instance draws full-detail sticks within the
+first, the far layout to the second, and one reduced layout per distance after that (see the Scenes README).
 """
 import argparse
 import json
@@ -21,6 +25,9 @@ def main():
     parser.add_argument('--count', type=int, default=2000, help='instanced trees (the sources are extra)')
     parser.add_argument('--spacing', type=float, default=6.0, help='grid spacing in meters')
     parser.add_argument('--seed', type=int, default=7)
+    parser.add_argument('--lod', default='10,30,60,120', help='comma-separated LOD distances for the source trees')
+    parser.add_argument('--reduction', choices=['prune', 'merge'], default='prune')
+    parser.add_argument('--id', default='Forest', help='scene ID (for side-by-side variants)')
     parser.add_argument('--output', default=os.path.join(SCENES, 'forest.scene.json'))
     args = parser.parse_args()
 
@@ -43,6 +50,7 @@ def main():
         source = json.loads(json.dumps(sources[species]))
         source['transform'] = dict(source.get('transform', {}))
         source['transform']['position'] = [(index - (len(SPECIES) - 1) / 2) * 5.0, 0.5, -extent / 2 - 8]
+        source['lod'] = {'distances': [float(d) for d in args.lod.split(',')], 'hysteresis': 0.1, 'reduction': args.reduction}
         objects.append(source)
     for i in range(args.count):
         row, column = divmod(i, side)
@@ -56,7 +64,7 @@ def main():
         })
 
     scene = {
-        'version': base['version'], 'id': 'Forest', 'name': f'Forest - {args.count} instanced canyon trees',
+        'version': base['version'], 'id': args.id, 'name': f'{args.id} - {args.count} instanced canyon trees ({args.reduction})',
         # From the sources' row, looking into the forest.
         'camera': {'position': [0, 6, -extent / 2 - 22], 'rotationDegrees': [8, 0, 0]},
         'render': dict(base['render'], farClippingPlane=max(300, extent * 1.6)),
@@ -65,7 +73,7 @@ def main():
     with open(args.output, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(scene, f, indent=1)
         f.write('\n')
-    print(f'{args.output}: {len(SPECIES)} sources, {args.count} instances over {extent:.0f} m')
+    print(f'{args.output}: {len(SPECIES)} sources, {args.count} instances over {extent:.0f} m, lod {args.lod} ({args.reduction})')
 
 
 if __name__ == '__main__':

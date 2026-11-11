@@ -284,7 +284,7 @@ namespace SceneData
             {
                 const auto& lod = value["lod"];
                 const auto lodPath = path + ".lod";
-                Fields(lod, lodPath, { "distances", "hysteresis" });
+                Fields(lod, lodPath, { "distances", "hysteresis", "reduction" });
                 if (lod.contains("distances"))
                 {
                     const auto& distances = lod["distances"];
@@ -294,6 +294,13 @@ namespace SceneData
                         result.lod.distances.push_back(Number(distances[i], lodPath + ".distances[" + std::to_string(i) + "]"));
                 }
                 if (lod.contains("hysteresis")) result.lod.hysteresis = Number(lod["hysteresis"], lodPath + ".hysteresis");
+                if (lod.contains("reduction"))
+                {
+                    const std::string reduction = String(lod["reduction"], lodPath + ".reduction");
+                    if (reduction == "prune") result.lod.reduction = Lod::Reduction::Prune;
+                    else if (reduction == "merge") result.lod.reduction = Lod::Reduction::Merge;
+                    else Invalid(lodPath + ".reduction", "must be \"prune\" or \"merge\"");
+                }
                 if (!Lod::Valid(result.lod))
                     Invalid(lodPath, "distances must be 1 to 8 ascending positive values, and hysteresis from 0 to 0.5");
             }
@@ -949,7 +956,8 @@ namespace SceneData
                 value["animationSpeed"] = object->animationSpeed;
                 value["depthLOD"] = object->depthLOD;
                 if (object->lod != Lod::Thresholds())
-                    value["lod"] = { { "distances", object->lod.distances }, { "hysteresis", object->lod.hysteresis } };
+                    value["lod"] = { { "distances", object->lod.distances }, { "hysteresis", object->lod.hysteresis },
+                        { "reduction", object->lod.reduction == Lod::Reduction::Merge ? "merge" : "prune" } };
             }
             switch (object->kind)
             {

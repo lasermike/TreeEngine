@@ -9,12 +9,21 @@
 // so one hovering near a threshold doesn't switch back and forth every frame.
 namespace Lod
 {
+    // How a tree drops detail at levels 2 and up (beyond its second distance): about half its leaves per level.
+    // Merge replaces groups of sibling leaves (and, from level 3, pairs of sibling twigs) with one at their average
+    // position; prune keeps a fixed subset of leaves (and drops the finest twigs). Kept leaves grow to keep leaf area.
+    enum class Reduction { Prune, Merge };
+
     struct Thresholds
     {
         std::vector<float> distances = { 10.0f };  // Ascending, positive: level i while closer than distances[i].
         float hysteresis = 0;                       // Fraction of a threshold to pass before leaving a level (0 to 0.5).
+        Reduction reduction = Reduction::Prune;     // Trees only.
 
-        bool operator==(const Thresholds& other) const { return distances == other.distances && hysteresis == other.hysteresis; }
+        bool operator==(const Thresholds& other) const
+        {
+            return distances == other.distances && hysteresis == other.hysteresis && reduction == other.reduction;
+        }
         bool operator!=(const Thresholds& other) const { return !(*this == other); }
     };
 

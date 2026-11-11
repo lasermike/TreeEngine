@@ -1,7 +1,7 @@
 {
  "version": 1,
  "id": "Forest",
- "name": "Forest - 2000 instanced canyon trees",
+ "name": "Forest - 2000 instanced canyon trees (prune)",
  "camera": {
   "position": [
    0,
@@ -871,6 +871,16 @@
       "output": "!(s * 0.45) F(s + 0.25) [Z(35) L(0.8)] [Y(180) Z(40) L(0.75)] Y(120) C(s * 0.7)"
      }
     ]
+   },
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
    }
   },
   {
@@ -922,6 +932,16 @@
       "output": "!(s * 0.35) F(0.22) [Z(40) L(0.15)] [Y(180) Z(40) L(0.15)] [Y(90) Z(45) L(0.14)] [Y(270) Z(45) L(0.14)] Z(12) V(s * 0.8)"
      }
     ]
+   },
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
    }
   },
   {
@@ -969,6 +989,16 @@
       "output": "!(s * 0.4) F(0.25) [Z(40) L(0.4)] [Y(180) Z(40) L(0.38)] Y(90) C(s * 0.8)"
      }
     ]
+   },
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
    }
   },
   {
@@ -1008,6 +1038,16 @@
       "output": "!(s * 0.5) F(0.3 * s) [Z(30) L(0.3)] [Y(90) Z(35) L(0.28)] [Y(180) Z(30) L(0.3)] [Y(270) Z(40) L(0.27)] [Y(45) Z(50) Q(s * 0.55)] Y(80) Z(6) Q(s * 0.8)"
      }
     ]
+   },
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
    }
   },
   {
@@ -1051,6 +1091,16 @@
       "output": "!(s * 0.5) F(0.15) [Z(45) L(0.15)] [Y(120) Z(45) L(0.14)] [Y(240) Z(45) L(0.15)] Y(60) K(s * 0.8)"
      }
     ]
+   },
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
    }
   },
   {
@@ -1093,6 +1143,16 @@
       "output": "!(s * 0.5) F(0.1) [Z(45) L(0.11)] [Y(180) Z(45) L(0.11)] [Y(90) Z(30) L(0.1)] M(s * 0.8)"
      }
     ]
+   },
+   "lod": {
+    "distances": [
+     10.0,
+     30.0,
+     60.0,
+     120.0
+    ],
+    "hysteresis": 0.1,
+    "reduction": "prune"
    }
   },
   {

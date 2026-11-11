@@ -109,10 +109,15 @@ private:
     UINT m_cachedLeafCount = 0;
     UINT m_cachedStickCount = 0;
 
-    // Instancing. A source tree with instances publishes two camera-independent branch layouts after its own:
-    // far (depth-only LOD) and near (every stick at full detail). Each instance draws one of them with its own
-    // object transform, so instances need no per-branch CPU work.
-    enum InstanceLayoutKind { FarLayout, NearLayout, InstanceLayoutCount };
+    // Instancing. A source tree with instances publishes camera-independent branch layouts after its own: far
+    // (depth-only LOD) and near (every stick at full detail), then one reduced layout per lod distance beyond the
+    // second (see Lod::Reduction). Each instance draws one with its own object transform, chosen by its LOD level,
+    // so instances need no per-branch CPU work.
+    enum InstanceLayoutKind { FarLayout = 0, NearLayout = 1, FirstReducedLayout = 2 };
+    size_t InstanceLayoutCount() const
+    {
+        return FirstReducedLayout + (_params->lod.distances.size() > 1 ? _params->lod.distances.size() - 1 : 0);
+    }
     struct InstanceLayout
     {
         std::array<InstanceDataArray, TreeSegmentCount> segments;
@@ -121,8 +126,20 @@ private:
         UINT leafCount = 0;
         UINT stickCount = 0;
     };
-    std::array<InstanceLayout, InstanceLayoutCount> m_instanceLayouts;
-    std::vector<int> m_layoutOffsets; // Scratch: each branch frame's slot in the layout being built.
+    std::vector<InstanceLayout> m_instanceLayouts;
+    // A layout's branches before slots are assigned, parents before children.
+    struct LayoutNode
+    {
+        XMFLOAT4X4 world;
+        const Branch* branch;   // The branch it draws, or the first of those it merges.
+        int parent;             // Index in the node list, or -1.
+        TreeSegment segment;
+    };
+    std::vector<LayoutNode> m_layoutNodes;          // Scratch for BuildInstanceLayouts.
+    std::vector<std::vector<int>> m_frameChildren;  // Scratch: each branch frame's child frames.
+    std::vector<int> m_branchHeights;               // Per branch ID: the longest path down to a tip (a leaf is 0).
+    void CollectFullLayout(InstanceLayoutKind kind);
+    void CollectReducedLayout(int reduction);
 
     // Motion vectors: each branch's instance slot in the last two frames, for the tree's own instances and for each
     // layout. Branch slots shift as branches appear or change segment type, so InstancedData::PreviousSlot is looked
@@ -132,7 +149,7 @@ private:
         std::vector<UINT> slots[2];
         std::vector<UINT> frames[2]; // Frame number plus one; zero is never written.
     };
-    std::array<SlotHistory, 1 + InstanceLayoutCount> m_slotHistory;
+    std::vector<SlotHistory> m_slotHistory;         // The tree's own instances, then each layout.
     void LinkPreviousSlots(InstancedData* instances, UINT firstSlot, const std::vector<int>& branchIds,
         SlotHistory& history, UINT frame);
     int m_instanceCount = 0;
@@ -142,7 +159,7 @@ private:
     int m_instanceLayoutDepthLOD = 0;
 
     Tree* InstanceSource() const { return static_cast<Tree*>(_params->instanceSource); }
-    TreeSegment SelectLayoutSegment(const BranchInstance& frame, InstanceLayoutKind layout) const;
+    TreeSegment SelectLayoutSegment(const Branch* branch, bool nearLayout) const;
     void BuildInstanceLayouts(UINT startInstance, int* opacityMicromaps);
     HRESULT ComputeInstanceConstants(IRenderFrame* pFrameConfig);
 

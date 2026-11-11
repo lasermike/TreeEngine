@@ -626,6 +626,16 @@ void TestTreeLodSettings()
     bad["objects"][0]["lod"]["bias"] = 1;
     Reject(bad.dump(), ".lod.bias");
     bad = Json::parse(json);
+    bad["objects"][0]["lod"]["reduction"] = "collapse";
+    Reject(bad.dump(), ".lod.reduction");
+    auto merged = Json::parse(json);
+    merged["objects"][0]["lod"]["reduction"] = "merge";
+    auto mergedScene = SceneData::ParseScene(merged.dump(), "lod-merge");
+    Check(mergedScene.objects[0]->lod.reduction == Lod::Reduction::Merge && scene.objects[0]->lod.reduction == Lod::Reduction::Prune,
+        "lod reduction was not parsed");
+    Check(SceneData::ParseScene(SceneData::SerializeScene(mergedScene), "saved-merge").objects[0]->lod.reduction == Lod::Reduction::Merge,
+        "lod reduction did not round-trip");
+    bad = Json::parse(json);
     bad["objects"][1]["lod"] = Json::object();
     Reject(bad.dump(), "objects[1].lod");
     bad = Json::parse(R"({"version":1,"name":"Lod","objects":[{"id":"box","type":"primitive","shape":"box","lod":{}}]})");
