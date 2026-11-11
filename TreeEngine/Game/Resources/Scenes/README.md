@@ -487,3 +487,13 @@ linear image. Upscalers (DLSS, FSR) will take this HDR image as their input.
 ## Sun shadow softness
 
 The directional light can specify "angularDiameterDegrees" (0 to 10, default 0) and "shadowSamples" (1 to 32, default 8). A positive angle with more than one sample traces the apparent sun disk in DXR; zero keeps hard shadows. The angle is the sun's full angular diameter. Raster shadow maps retain their existing filtering. Soft sun sampling applies to directly visible surfaces; secondary reflection and transmission hits use a single shadow ray to limit cost. More samples increase ray tracing cost.
+
+L-system rotations support an optional second parameter for symmetric pseudo-random
+angle spread: Z(38,8) samples 30 through 46 angle units independently for each
+expanded occurrence. The spread uses the same generator.angle units as the first
+parameter. A fixed local seed makes regeneration repeatable; one-parameter
+rotations are unchanged. Use a nonnegative spread. X(0,10) adds a small random tilt.
+
+F and L also accept an optional fractional length spread: F(0.5,0.2) varies
+length from 0.4 to 0.6 per occurrence, using a separate fixed local seed.
+Use a spread from 0 to less than 1 to retain positive lengths.

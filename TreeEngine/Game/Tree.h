@@ -99,6 +99,7 @@ private:
     float m_lastPoseTime = 0;
     XMFLOAT3 m_lastPosePosition = {};
     XMFLOAT4 m_lastPoseRotation = {};
+    XMFLOAT3 m_lastPoseScale = XMFLOAT3(1, 1, 1);
     bool m_poseValid = false;
     bool m_reusePose = false;
     XMFLOAT3 m_lastEyePosition = {};

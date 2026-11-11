@@ -22,6 +22,7 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "implot.h"
+#include "DebugVectorEditor.h"
 
 using namespace DirectX;
 
@@ -319,6 +320,8 @@ HRESULT Game::RefreshScenes()
 
 HRESULT Game::LoadScene(const std::string& name)
 {
+    DebugVectorEditor::Reset();
+    m_debugUvEdits.clear();
     auto nextScene = std::make_unique<SceneRoot>();
     SceneRenderSettings nextSettings = m_renderManager.GetSceneSettings();
     GameData nextData;
@@ -769,7 +772,7 @@ void ShowMaterialVector(const char* label, const XMFLOAT4& value)
     ImGui::TableSetColumnIndex(0);
     ImGui::TextUnformatted(label);
     ImGui::TableSetColumnIndex(1);
-    ImGui::Text("(%.3f, %.3f, %.3f, %.3f)", value.x, value.y, value.z, value.w);
+    DebugVectorEditor::ReadOnly(label, &value.x, 4);
 }
 
 void ShowProperty(const char* label, const std::string& value)
@@ -1278,9 +1281,19 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             ApplySceneCamera(m_sceneDefinition, *m_player, m_timeCurrent);
 
         // Camera
-        ImGui::PushItemWidth(200);
-        ImGui::DragFloat3("Camera Position", (float*)m_player->GetEyePositionPtr(), 0.5f);
-        ImGui::DragFloat3("Camera Orientation", (float*)m_player->GetEyeRotationPtr(), 0.01f);
+        using DebugVectorEditor::Edit;
+        using DebugVectorEditor::Tools;
+        XMFLOAT4 cameraRotation;
+        XMStoreFloat4(&cameraRotation, m_player->GetRotation());
+        if (Edit("Camera Position", m_player->GetEyePositionPtr(), 3, 0.1f, Tools::Camera, &cameraRotation))
+        {
+            m_player->SetRotation(XMLoadFloat4(&cameraRotation));
+        }
+        XMFLOAT3 cameraAngles(0, 0, 0);
+        if (Edit("Camera Orientation (degrees)", &cameraAngles.x, 3, 0.25f, Tools::Rotation, &cameraRotation))
+        {
+            m_player->SetRotation(XMLoadFloat4(&cameraRotation));
+        }
 
         auto& renderData = m_renderManager.GetRenderData();
         auto& lightDirection = renderData.dirLights[0].Direction;
@@ -1288,7 +1301,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         XMFLOAT3 lightPosition = renderData.shadowLightPosition;
         if (!renderData.shadowLightPositionOverride)
             XMStoreFloat3(&lightPosition, -2.0f * renderData.mSceneBounds.Radius * XMLoadFloat3(&lightDirection));
-        if (ImGui::DragFloat3("Light Position", &lightPosition.x, 0.1f))
+        if (Edit("Light Position", &lightPosition.x, 3, 0.1f, Tools::LightPosition,
+            nullptr, &cameraRotation, &renderData.mSceneBounds.Center))
         {
             XMVECTOR towardCenter = sceneCenter - XMLoadFloat3(&lightPosition);
             if (XMVectorGetX(XMVector3LengthSq(towardCenter)) > 1e-6f)
@@ -1299,7 +1313,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             }
         }
         XMFLOAT3 oldLightDirection = lightDirection;
-        if (ImGui::DragFloat3("Light Direction", &lightDirection.x, 0.01f))
+        if (Edit("Light Direction", &lightDirection.x, 3, 0.01f, Tools::Direction))
         {
             XMVECTOR editedDirection = XMLoadFloat3(&lightDirection);
             if (XMVectorGetX(XMVector3LengthSq(editedDirection)) > 1e-6f)
@@ -1315,12 +1329,12 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             else
                 lightDirection = oldLightDirection;
         }
-        ImGui::PopItemWidth();
 
     }
 
     if (ImGui::CollapsingHeader("Settings", ImGuiTreeNodeFlags_DefaultOpen))
     {
+        ImGui::SeparatorText("Common");
 #if defined(TREENGINE_WIN32)
         {
             // Window client sizes of common game resolutions. The window resizes at the start of the next frame.
@@ -1356,9 +1370,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             }
         }
 #endif
-        ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
         ImGui::Checkbox("Enable shadows", &m_settings.m_shadowsEnabled);
-        ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
         auto& sceneRenderSettings = m_renderManager.GetRenderData();
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         int antialiasing = static_cast<int>(m_settings.m_antialiasing);
@@ -1418,7 +1430,13 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         if (ImGui::Combo("Motion vectors", &motionView, "Off\0Motion\0Reprojected history\0History\0"))
             m_settings.m_motionView = static_cast<Settings::MotionView>(motionView);
         ImGui::SliderFloat("Blur Amount", &sceneRenderSettings.blurAmount, 0.0f, 2.5f, "%.2f");
+        ImGui::SliderFloat("Water motion speed", &m_settings.m_waterMotionSpeed, 0.0f, 4.0f, "%.2fx");
+        ImGui::Checkbox("Show Performance Graphs", &m_settings.m_showPerfGraph);
+
+        ImGui::SeparatorText("DXR");
         ImGui::Checkbox("Enable DXR", &m_settings.m_dxrEnabled);
+        if (!m_settings.m_dxrEnabled) ImGui::TextDisabled("Enable DXR to use these options.");
+        ImGui::BeginDisabled(!m_settings.m_dxrEnabled);
         const auto& micromaps = sceneRenderSettings.opacityMicromaps;
         if (micromaps.supported)
         {
@@ -1435,11 +1453,18 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         }
         else
             ImGui::TextDisabled("Opacity micromaps: needs DXR tier 1.2");
-        ImGui::SliderFloat("Water motion speed", &m_settings.m_waterMotionSpeed, 0.0f, 4.0f, "%.2fx");
         ImGui::Checkbox("Trace transmissive reflections", &m_settings.m_waterReflections);
         if (m_settings.m_waterReflections)
             ImGui::SliderInt("Reflection rays", &m_settings.m_waterReflectionRays, 1, 32);
-        ImGui::Checkbox("Show Performance Graphs", &m_settings.m_showPerfGraph);
+        ImGui::EndDisabled();
+
+        ImGui::SeparatorText("Raster");
+        if (m_settings.m_dxrEnabled) ImGui::TextDisabled("Disable DXR to use these options.");
+        ImGui::BeginDisabled(m_settings.m_dxrEnabled);
+        ImGui::Checkbox("Show Shadow Map buffer", &m_settings.m_showShadowBuffer);
+        ImGui::Checkbox("Use Wireframe", &m_settings.m_wireframe);
+        ImGui::Checkbox("Hashed alpha test", &m_settings.m_hashedAlphaTest);
+        ImGui::EndDisabled();
     }
 
     int nextInputBuffer = 0;
@@ -1563,11 +1588,46 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                     if (params.generatorType == PrimitiveGeneratorType)
                         ImGui::Text("Primitive: %s", s_szPrimitiveTypeNames[params.primitiveType]);
                     ImGui::Text("Instances: %u (maximum %u)", obj->GetNumInstances(), obj->GetMaxInstances());
-                    ImGui::Text("Position: (%.3f, %.3f, %.3f)", params.position.x, params.position.y, params.position.z);
-                    ImGui::Text("Rotation quaternion: (%.3f, %.3f, %.3f, %.3f)",
-                        params.rotation.x, params.rotation.y, params.rotation.z, params.rotation.w);
-                    ImGui::Text("Scale: (%.3f, %.3f, %.3f)", params.scale.x, params.scale.y, params.scale.z);
-                    ImGui::Text("UV scale: (%.3f, %.3f)", params.textureCoordScale.x, params.textureCoordScale.y);
+                    using DebugVectorEditor::Edit;
+                    using DebugVectorEditor::Tools;
+                    XMFLOAT3 position, scale, angles(0, 0, 0);
+                    XMFLOAT4 rotation, cameraRotation;
+                    XMStoreFloat3(&position, obj->GetPosition());
+                    XMStoreFloat3(&scale, obj->GetScale());
+                    XMStoreFloat4(&rotation, obj->GetRotation());
+                    XMStoreFloat4(&cameraRotation, m_player->GetRotation());
+                    const std::string prefix = std::string(objectName) + " / ";
+                    if (Edit("Position", &position.x, 3, 0.1f, Tools::Position, nullptr, &cameraRotation,
+                        nullptr, (prefix + "Position").c_str()))
+                    {
+                        obj->SetPosition(XMLoadFloat3(&position));
+                        params.position = position;
+                    }
+                    if (Edit("Rotation (degrees)", &angles.x, 3, 0.25f, Tools::Rotation, &rotation,
+                        nullptr, nullptr, (prefix + "Rotation (degrees)").c_str()))
+                    {
+                        obj->SetRotation(XMLoadFloat4(&rotation));
+                        params.rotation = rotation;
+                    }
+                    if (Edit("Scale", &scale.x, 3, 0.01f, Tools::Scale, nullptr, nullptr, nullptr, (prefix + "Scale").c_str()))
+                    {
+                        if (std::abs(scale.x) > 1e-6f && std::abs(scale.y) > 1e-6f && std::abs(scale.z) > 1e-6f)
+                        {
+                            obj->SetScale(XMLoadFloat3(&scale));
+                            params.scale = scale;
+                        }
+                    }
+                    const auto authoredObject = std::find_if(m_sceneDefinition.objects.begin(), m_sceneDefinition.objects.end(),
+                        [&params](const auto& entry) { return entry->id == params.name; });
+                    if (authoredObject != m_sceneDefinition.objects.end() && !(*authoredObject)->instanceOf.empty())
+                    {
+                        ImGui::TextDisabled("Editing UV scale makes this instance independent.");
+                    }
+                    if (Edit("UV Scale", &params.textureCoordScale.x, 2, 0.01f, Tools::Scale,
+                        nullptr, nullptr, nullptr, (prefix + "UV Scale").c_str()))
+                    {
+                        m_debugUvEdits[params.name] = params.textureCoordScale;
+                    }
                     ImGui::Text("Animation speed: %.3f; depth LOD: %d", params._animationSpeed, params.depthLOD);
                     std::string lodDistances;
                     for (const float distance : params.lod.distances)
@@ -1579,8 +1639,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                     ImGui::Text("LOD distances: %s; hysteresis %.2f", lodDistances.c_str(), params.lod.hysteresis);
                     ImGui::Text("Cube map: %s", params.cubeMap ? "yes" : "no");
                     const auto* bounds = obj->GetBoundingBox();
-                    ImGui::Text("Bounds: (%.3f, %.3f, %.3f) to (%.3f, %.3f, %.3f)",
-                        bounds[0].x, bounds[0].y, bounds[0].z, bounds[1].x, bounds[1].y, bounds[1].z);
+                    DebugVectorEditor::ReadOnly((prefix + "Bounds minimum").c_str(), &bounds[0].x, 3);
+                    DebugVectorEditor::ReadOnly((prefix + "Bounds maximum").c_str(), &bounds[1].x, 3);
                     if (params.generatorType == ModelGeneratorType)
                     {
                         const auto& model = static_cast<const GltfModelParams&>(params);
@@ -1748,14 +1808,53 @@ void Game::ApplyPendingWindowSize()
 void Game::ComputeCPU()
 {
     ApplyPendingWindowSize();
+    // Material bindings are shared and immutable while a frame is in flight. Rebuild after the edit gesture,
+    // using authored values, so UV scaling never compounds or mutates another object's material.
+    if (!m_debugUvEdits.empty() && !ImGui::IsAnyItemActive() && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    {
+        try
+        {
+            auto definition = CaptureScene(m_sceneDefinition, *m_pScene, m_renderManager.GetSceneSettings(),
+                *m_player, m_gameData, m_sceneFilename, m_sceneFilename);
+            for (auto& object : definition.objects)
+            {
+                const auto edit = m_debugUvEdits.find(object->id);
+                if (edit == m_debugUvEdits.end()) continue;
+                // UV scale is inherited by instances in the file format. Materialize this one object so
+                // its edit can be saved without changing its source or introducing a new schema field.
+                object->instanceOf.clear();
+                object->textureCoordScale = edit->second;
+            }
+            auto next = std::make_unique<SceneRoot>();
+            auto settings = m_renderManager.GetSceneSettings();
+            GameData data;
+            InstantiateScene(definition, *next, settings, *m_player, data, m_sceneFilename);
+            m_pScene->DeleteAllChildren();
+            m_renderManager.UninitGameLevelGraphics();
+            delete m_pScene;
+            m_pScene = next.release();
+            m_sceneDefinition = std::move(definition);
+            m_gameData = data;
+            m_renderManager.ApplySceneSettings(settings);
+            m_resetTree = true;
+            DebugVectorEditor::Reset();
+        }
+        catch (const std::exception& error)
+        {
+            m_sceneError = error.what();
+        }
+        m_debugUvEdits.clear();
+    }
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Frame begin");
     PIXScopedEvent(TREE_COLOR_DRAW_TEXT, L"ComputeCPU");
 
     FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
 
-    m_player->HandleInput(inputData.key);
-
-    HandleInput(inputData.key);
+    if (!ImGui::GetCurrentContext() || (!ImGui::GetIO().WantCaptureKeyboard && !ImGui::GetIO().WantCaptureMouse))
+    {
+        m_player->HandleInput(inputData.key);
+        HandleInput(inputData.key);
+    }
 
     m_timer.Tick([&]()
     {

@@ -330,6 +330,8 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
     stack<BuildState> stateStack;
     int pos = 0;
     string done, unknown;
+    unsigned int angleSeed = 2166136261u;
+    unsigned int lengthSeed = 2246822519u;
     for (auto cmdIt = axiom.begin(); cmdIt != axiom.end(); cmdIt++)
     {
         Command command = {};
@@ -342,6 +344,15 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         if (command.params[0].paramType == PT_DOUBLE)
         {
             magnitude = command.params[0].doubleVal;
+        }
+
+        // Sample at interpretation time so every expanded occurrence varies.
+        // A local seed keeps regeneration independent of global rand() calls.
+        if (command.numParams == 2 && string("&Y^y<\\X>/x+Z-z").find(command.symbol) != string::npos)
+        {
+            angleSeed = angleSeed * 1664525u + 1013904223u;
+            const double sample = double(angleSeed >> 8) / 16777215.0;
+            magnitude += (sample * 2.0 - 1.0) * command.params[1].doubleVal;
         }
 
         XMMATRIX rotateMat;
@@ -386,6 +397,13 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
         case 'F':
         case 'L':
             {
+                // Optional fractional length spread, independent of angle sampling.
+                if (command.numParams == 2)
+                {
+                    lengthSeed = lengthSeed * 1664525u + 1013904223u;
+                    const double sample = double(lengthSeed >> 8) / 16777215.0;
+                    magnitude *= 1.0 + (sample * 2.0 - 1.0) * command.params[1].doubleVal;
+                }
                 magnitude *= _params.SegmentLength(&_params, magnitude);
 
                 XMVECTOR axis = XMVector3Transform(initialDirection, currentState.matDir);

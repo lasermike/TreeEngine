@@ -247,7 +247,8 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
     const float poseTime = std::min(CalcTime(renderData.time), m_matureTime);
     m_reusePose = renderData.cacheTreePoses && m_poseValid && poseTime == m_lastPoseTime
         && XMVector3Equal(XMLoadFloat3(&_position), XMLoadFloat3(&m_lastPosePosition))
-        && XMVector4Equal(XMLoadFloat4(&_rotation), XMLoadFloat4(&m_lastPoseRotation));
+        && XMVector4Equal(XMLoadFloat4(&_rotation), XMLoadFloat4(&m_lastPoseRotation))
+        && XMVector3Equal(XMLoadFloat3(&_scale), XMLoadFloat3(&m_lastPoseScale));
     const bool reuseInstances = m_reusePose && startInstance == m_lastInstanceStart
         && _params->depthLOD == m_lastDepthLOD && renderData.lodDistanceScale == m_lastLodDistanceScale
         && XMVector3Equal(renderData.eyePos, XMLoadFloat3(&m_lastEyePosition));
@@ -310,6 +311,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
         m_lastPoseTime = poseTime;
         m_lastPosePosition = _position;
         m_lastPoseRotation = _rotation;
+        m_lastPoseScale = _scale;
         m_poseValid = true;
         XMStoreFloat3(&m_lastEyePosition, renderData.eyePos);
         m_lastDepthLOD = _params->depthLOD;
@@ -543,7 +545,9 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
             localToWorld = localToWorld * XMMatrixTranslationFromVector(-base)
                 * XMMatrixRotationNormal(axis, m_leafTwists[frame.branch->id]) * XMMatrixTranslationFromVector(base);
         }
-        localToWorld = XMMatrixMultiply(localToWorld, XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation)));
+        localToWorld = localToWorld * XMMatrixTranslationFromVector(-XMLoadFloat3(&_position))
+            * XMMatrixAffineTransformation(XMLoadFloat3(&_scale), g_XMZero,
+                XMLoadFloat4(&_rotation), XMLoadFloat3(&_position));
         XMStoreFloat4x4(&pose.world, localToWorld);
     }
     if (!pose.renderable) return S_FALSE;
@@ -601,12 +605,14 @@ HRESULT Tree::ComputeBranchInstanceSkinningMatrix(BranchInstance& frame, RenderD
     // through the matrix's rows).
     if (!m_reusePose)
     {
-        const XMFLOAT4X4& m = pose.world;
-        const XMVECTOR center = XMVectorSet(m._41, m._42, m._43, 0);
-        const XMVECTOR extent = XMVectorSet(fabsf(m._11) + fabsf(m._21) + fabsf(m._31),
-            fabsf(m._12) + fabsf(m._22) + fabsf(m._32), fabsf(m._13) + fabsf(m._23) + fabsf(m._33), 0);
-        XMStoreFloat3(&_boundingBox[0], XMVectorMin(XMLoadFloat3(&_boundingBox[0]), XMVectorSubtract(center, extent)));
-        XMStoreFloat3(&_boundingBox[1], XMVectorMax(XMLoadFloat3(&_boundingBox[1]), XMVectorAdd(center, extent)));
+        XMMATRIX localToWorld = XMLoadFloat4x4(&pose.world);
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            const XMVECTOR point = XMVector3Transform(XMVectorSet(corner & 1 ? 1.0f : -1.0f,
+                corner & 2 ? 1.0f : -1.0f, corner & 4 ? 1.0f : -1.0f, 1), localToWorld);
+            XMStoreFloat3(&_boundingBox[0], XMVectorMin(point, XMLoadFloat3(&_boundingBox[0])));
+            XMStoreFloat3(&_boundingBox[1], XMVectorMax(point, XMLoadFloat3(&_boundingBox[1])));
+        }
         m_boundsValid = true;
     }
 
@@ -1124,10 +1130,9 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
     HRR(pFrameConfig->GetInstanceIndex(this, transformSlot));
     RenderData& renderData = pFrameConfig->GetRenderData();
 
-    // The source's branch matrices bake in its pose position and then its rotation.
-    // Rel maps them onto this instance: inverse(T(sourcePosition) * R(sourceRotation)) * S * R * T.
-    const XMMATRIX sourceFrame = XMMatrixMultiply(XMMatrixTranslationFromVector(XMLoadFloat3(&source.m_lastPosePosition)),
-        XMMatrixRotationQuaternion(XMLoadFloat4(&source.m_lastPoseRotation)));
+    // Remove the source's baked scale, rotation, and translation before applying this instance's pose.
+    const XMMATRIX sourceFrame = XMMatrixAffineTransformation(XMLoadFloat3(&source.m_lastPoseScale), g_XMZero,
+        XMLoadFloat4(&source.m_lastPoseRotation), XMLoadFloat3(&source.m_lastPosePosition));
     const XMMATRIX instanceWorld = XMMatrixAffineTransformation(XMLoadFloat3(&_scale), g_XMZero,
         XMLoadFloat4(&_rotation), XMLoadFloat3(&_position));
     const XMMATRIX rel = XMMatrixMultiply(XMMatrixInverse(nullptr, sourceFrame), instanceWorld);

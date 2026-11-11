@@ -15,6 +15,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Game.cpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugVectorMath.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugGizmoAdapter.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugVectorEditor.h" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GameLoader.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\OpacityMicromapBaker.cpp" />
