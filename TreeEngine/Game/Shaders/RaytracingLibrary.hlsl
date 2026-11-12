@@ -144,6 +144,20 @@ float3 LoadVertexPosition(uint vertexIndex)
     return pos.xyz;
 }
 
+// Ray lengths: camera rays reach the far plane (at least 200 m), and shadow, reflection and transmission rays as far
+// (at least 100 m), so a large terrain shades and shadows to the horizon.
+float PrimaryRayLength() { return max(200.0f, renderScale.z); }
+float SecondaryRayLength() { return max(100.0f, renderScale.z); }
+
+// A hit triangle's vertex position (in the BLAS's object space): from the world-vertex buffer, or for pooled geometry
+// from the original vertex buffer, where it is already world space.
+float3 LoadHitPosition(DxrGeometryInfo geometry, uint index)
+{
+    if (geometry.vertexBufferOffset == PooledVertices)
+        return asfloat(originalVertexBuffer.Load3((geometry.baseVertexLocation + index) * SIMPLE_VERTEX_STRIDE));
+    return LoadVertexPosition(geometry.vertexBufferOffset + index);
+}
+
 // The hit's index in the per-geometry tables: each TLAS instance's InstanceID is its BLAS's first table entry.
 uint GeometryRecord()
 {
@@ -170,9 +184,9 @@ void ComputeTextureFootprint(DxrGeometryInfo geometry, uint3 indices,
     float2 uv0, float2 uv1, float2 uv2, out float2 uvDx, out float2 uvDy, out float2 baryDx, out float2 baryDy)
 {
     uvDx = uvDy = baryDx = baryDy = 0.0f;
-    float3 p0 = ObjectToWorldPosition(LoadVertexPosition(geometry.vertexBufferOffset + indices.x));
-    float3 edge1 = ObjectToWorldPosition(LoadVertexPosition(geometry.vertexBufferOffset + indices.y)) - p0;
-    float3 edge2 = ObjectToWorldPosition(LoadVertexPosition(geometry.vertexBufferOffset + indices.z)) - p0;
+    float3 p0 = ObjectToWorldPosition(LoadHitPosition(geometry, indices.x));
+    float3 edge1 = ObjectToWorldPosition(LoadHitPosition(geometry, indices.y)) - p0;
+    float3 edge2 = ObjectToWorldPosition(LoadHitPosition(geometry, indices.z)) - p0;
     float3 planeNormal = cross(edge1, edge2);
     float areaSquared = dot(planeNormal, planeNormal);
     if (areaSquared < 1e-16f)
@@ -473,7 +487,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     shadowRay.Origin = hitPos + normal * 0.001f;  // Offset to avoid self-intersection
     shadowRay.Direction = lightDir;
     shadowRay.TMin = 0.001;
-    shadowRay.TMax = 100.0;
+    shadowRay.TMax = SecondaryRayLength();
 
     // Shadow ray payload: initialized to 0 (in shadow).
     // If the ray misses all geometry, ShadowMissShader sets it to 1 (lit).
@@ -526,9 +540,9 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     // hit were most of the ray time in scenes with water, for no visible difference in the blurred reflection.
     if (ambientOcclusionRadius > 0 && ambientOcclusionStrength > 0 && mat.opticalParams.y == 0 && payload.isShadow != 3)
     {
-        float3 p0 = ObjectToWorldPosition(LoadVertexPosition(geoInfo.vertexBufferOffset + i0));
-        float3 p1 = ObjectToWorldPosition(LoadVertexPosition(geoInfo.vertexBufferOffset + i1));
-        float3 p2 = ObjectToWorldPosition(LoadVertexPosition(geoInfo.vertexBufferOffset + i2));
+        float3 p0 = ObjectToWorldPosition(LoadHitPosition(geoInfo, i0));
+        float3 p1 = ObjectToWorldPosition(LoadHitPosition(geoInfo, i1));
+        float3 p2 = ObjectToWorldPosition(LoadHitPosition(geoInfo, i2));
         float3 geometricNormal = normalize(cross(p1 - p0, p2 - p0));
         if (dot(geometricNormal, surfaceNormal) < 0)
             geometricNormal = -geometricNormal;
@@ -553,7 +567,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         transmittedRay.Origin = hitPos + direction * 0.001f;
         transmittedRay.Direction = direction;
         transmittedRay.TMin = 0.001f;
-        transmittedRay.TMax = 100.0f;
+        transmittedRay.TMax = SecondaryRayLength();
         RayPayload transmitted = { float4(0, 0, 0, 1), payload.depth + 1, 0 };
         TraceRay(Scene, rayFlags, RayFadeMask(DispatchRaysIndex().xy), 0, 0, 1, transmittedRay, transmitted);
         float3 specularIbl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
@@ -568,7 +582,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
             RayDesc reflectedRay;
             reflectedRay.Origin = hitPos + faceNormal * 0.002f;
             reflectedRay.TMin = 0.001f;
-            reflectedRay.TMax = 100.0f;
+            reflectedRay.TMax = SecondaryRayLength();
             float3 axis = abs(faceNormal.y) < 0.99f ? float3(0, 1, 0) : float3(1, 0, 0);
             float3 tangentR = normalize(cross(axis, faceNormal));
             float3 bitangentR = cross(faceNormal, tangentR);
@@ -677,7 +691,7 @@ void RayGenerationShader()
     ray.Origin = origin;
     ray.Direction = direction;
     ray.TMin = 0.001;
-    ray.TMax = 200.0;
+    ray.TMax = PrimaryRayLength();
     RayPayload payload = { float4(0, 0, 0, 1), 0, 0 };
 
     uint missShaderIndex = 1;

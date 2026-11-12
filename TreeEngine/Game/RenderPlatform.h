@@ -528,6 +528,10 @@ struct RenderUnit
     std::vector<WorldObject*>   reservations;
     // Geometry that doesn't deform or move from frame to frame (glTF models). DXR keeps it in its own BLAS, built once.
     bool                        staticRayTracingGeometry = false;
+    // Draws whose vertices are already world space in the vertex buffer and drawn once each (terrain nodes, from a slot
+    // pool). DXR builds a BLAS per draw owner straight from the vertex buffer, skipping the deformation pass; it is
+    // rebuilt only when the owner's vertex range changes.
+    bool                        pooledRayTracingGeometry = false;
 
 #if defined(TREE3D12)
 
@@ -1133,6 +1137,31 @@ public:
     // share one BLAS built from the first such owner's records, and each owner's TLAS instance carries its object
     // transform. A layout switch or a moved instance then costs no BLAS work.
     std::unordered_map<size_t, DynamicBlas> m_sharedBlases;
+    // Pooled geometry (RenderUnit::pooledRayTracingGeometry): this frame's draws, and a BLAS per owner built from the
+    // vertex buffer for fast tracing. Its TLAS instance is untransformed; the hit shaders read its positions from the
+    // vertex buffer too (DxrGeometryInfo::vertexBufferOffset is PooledVertices).
+    struct PooledDraw
+    {
+        const void* owner = nullptr;
+        UINT baseVertex = 0;
+        UINT vertexCount = 0;
+        UINT indexStart = 0;
+        UINT indexCount = 0;
+        UINT startInstance = 0;
+        ShaderMaterial material;
+        INT textureIndex = -1;
+    };
+    struct PooledBlas
+    {
+        BlasAllocation blas;
+        UINT baseVertex = UINT_MAX, vertexCount = 0, indexStart = 0, indexCount = 0;
+        bool opaque = false;
+        UINT64 lastUsedFrame = 0;
+        UINT firstGeometry = 0;
+    };
+    std::vector<PooledDraw> m_pooledDraws;
+    std::unordered_map<const void*, PooledBlas> m_pooledBlases;
+    bool m_currentRenderUnitPooled = false;             // Set by SetRenderUnit.
     std::vector<UINT> m_drawRecordTransformSlot;        // Per record: its object transform, moved to the TLAS (UINT_MAX = none).
     std::vector<size_t> m_drawRecordShareKey;           // Per record: its shared-geometry key (0 = not shared).
     std::vector<bool> m_drawRecordDeform;               // Per record: whether the deformation pass writes its vertices.
@@ -1194,6 +1223,7 @@ public:
     // Per-geometry material and geometry info buffers for raytracing
     UploadBuffer<ShaderMaterial>* m_dxrMaterialBuffer;
 
+    static const UINT PooledVertices = UINT_MAX;   // DxrGeometryInfo::vertexBufferOffset: positions are in the vertex buffer.
     struct DxrGeometryInfo
     {
         UINT vertexBufferOffset;

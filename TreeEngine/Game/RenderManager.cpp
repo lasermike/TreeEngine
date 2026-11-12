@@ -438,10 +438,13 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
         }
     }
 
-    // Draws of their own (AddDraw: terrain nodes), each culled by its bounds. They are raster-only for now.
+    // Draws of their own (AddDraw: terrain nodes), each culled by its bounds. A culled draw is still issued when the
+    // pass is recorded for ray tracing (it isn't rasterized), so DXR traces everything.
+    const bool recordsDraws = !m_renderData.picking && GetPlatform()->RecordsDraws(pass);
     for (const ExtraDraw& draw : m_perFrameInstanceData[ru].draws)
     {
-        if (m_settings->m_viewCulling && (pass == RegularPass || pass == ShadowMapPass) && !IsVisible(draw.bounds))
+        const bool culled = m_settings->m_viewCulling && (pass == RegularPass || pass == ShadowMapPass) && !IsVisible(draw.bounds);
+        if (culled && !recordsDraws)
             continue;
         m_renderData.currentDrawOwner = draw.owner;
         if (m_renderData.picking)
@@ -456,13 +459,12 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
             }
             else m_renderData.pickObjectId = found->second;
         }
-        if (pass == RegularPass && !m_renderData.picking)
+        if (pass == RegularPass && !m_renderData.picking && !culled)
             ++m_renderData.profile.terrainDrawnNodes;
-        m_renderData.currentDrawCulled = false;
-        m_renderData.currentDrawRasterOnly = true;
+        m_renderData.currentDrawCulled = culled;
         HRR(GetPlatform()->DrawIndexedInstanced(offsets.IndexCount, draw.count, offsets.IndexOffset, draw.baseVertex,
             draw.start, UINT_MAX));
-        m_renderData.currentDrawRasterOnly = false;
+        m_renderData.currentDrawCulled = false;
     }
 
     // Each batch's object transform slots go in the list region (the platform writes them, four per instance slot),

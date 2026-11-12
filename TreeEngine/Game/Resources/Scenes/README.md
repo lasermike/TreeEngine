@@ -157,6 +157,10 @@ or GIS elevation data). It requires `source`, the package directory, such as
   each about 215 KB of vertex buffer, reserved at load.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
+Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,
+reflection and transmission rays as far (at least 100 m), so a large terrain
+should set the far plane to how far it should be seen and shadowed.
+
 Terrain cannot be instanced. The `LoadTerrainHills` scene shows a
 1 km procedural package.
 

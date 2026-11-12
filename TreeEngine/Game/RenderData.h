@@ -111,6 +111,7 @@ struct RenderProfile
     UINT terrainDrawnNodes = 0;             // and loaded this frame.
     UINT terrainResidentNodes = 0;
     UINT terrainLoadedNodes = 0;
+    UINT pooledBlasBuilds = 0;              // DXR: BLASes built this frame for pooled geometry (terrain nodes).
     UINT batchedDraws = 0;                  // Batched instance draws, and the objects they drew (see RenderManager::Render).
     UINT batchedObjects = 0;
     double instanceUploadMs = 0;            // Copying the CPU instance array into the frame's instance buffer.

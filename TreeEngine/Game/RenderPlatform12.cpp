@@ -1662,6 +1662,7 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
     m_currentMaterial = ru->m_material;
 #if defined(DXR_ENABLED)
     m_currentRenderUnitStatic = ru->staticRayTracingGeometry;
+    m_currentRenderUnitPooled = ru->pooledRayTracingGeometry;
 #endif
 
     return S_OK;
@@ -1710,6 +1711,23 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
         }
 
         INT texIdx = (m_currentMaterial && m_currentMaterial->m_texture) ? (INT)m_currentMaterial->m_texture->textureSlot : -1;
+        if (m_currentRenderUnitPooled)
+        {
+            // Its vertices are world space already: no world-vertex range, and a BLAS of its own (BuildBLASandTLAS).
+            PooledDraw draw;
+            draw.owner = m_renderData->currentDrawOwner;
+            draw.baseVertex = static_cast<UINT>(BaseVertexLocation);
+            draw.vertexCount = m_currentMesh->m_bufferOffsets.VertexCount;
+            draw.indexStart = StartIndexLocation;
+            draw.indexCount = IndexCountPerInstance;
+            draw.startInstance = StartInstanceLocation;
+            draw.material = m_currentMaterial ? m_currentMaterial->m_shaderMaterial : ShaderMaterial();
+            draw.textureIndex = texIdx;
+            if (draw.owner && InstanceCount == 1)
+                m_pooledDraws.push_back(draw);
+        }
+        else
+        {
         const UINT64 vertexCount = static_cast<UINT64>(m_currentMesh->m_bufferOffsets.VertexCount) * InstanceCount;
         // A draw with an object transform (an instanced tree) gets its world-vertex range in PrepareInstancedGeometry,
         // and only when it is the copy of its layout that is deformed; thousands of instances share a few ranges.
@@ -1733,6 +1751,7 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
 
         if (!instanced)
             m_nextVbWorldStart += static_cast<UINT>(vertexCount);
+        }
     }
 #endif
 
@@ -3281,6 +3300,7 @@ void RenderPlatform12::ReleaseDynamicBlases()
 {
     m_dynamicBlases.clear();
     m_sharedBlases.clear();
+    m_pooledBlases.clear();
     ReleaseBlasHeap();
     Retire(m_blasScratch);
     for (auto& upload : m_ommRecordUpload)
@@ -3912,6 +3932,52 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     for (size_t geometry = 0; geometry < staticRecords.size(); ++geometry)
         HRR(describeRecord(m_drawRecords[staticRecords[geometry]], m_staticGeometryDescs[geometry]));
 
+    // Pooled draws (terrain nodes): one geometry and one BLAS each, read straight from the vertex buffer. A BLAS is
+    // rebuilt when its owner's vertex range changes (the node loaded into another slot), else reused.
+    std::vector<PooledBlas*> pooledSources;
+    std::vector<size_t> pooledBuilds;               // Indices into m_pooledDraws.
+    std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> pooledDescs(m_pooledDraws.size());
+    for (size_t drawIndex = 0; drawIndex < m_pooledDraws.size(); ++drawIndex)
+    {
+        const PooledDraw& draw = m_pooledDraws[drawIndex];
+        PooledBlas& pooled = m_pooledBlases[draw.owner];
+        if (pooled.lastUsedFrame == m_blasFrame)
+            continue;                               // Drawn twice this frame: one instance is enough.
+        if (geometryDescIndex >= m_maxBLASInstances)
+            return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+        pooled.lastUsedFrame = m_blasFrame;
+        pooled.firstGeometry = geometryDescIndex;
+        const bool opaque = m_settings->m_rayOpaqueGeometry && draw.material.flags.z == 0 && draw.material.flags.x == 0
+            && draw.material.opticalParams.y == 0;
+        D3D12_RAYTRACING_GEOMETRY_DESC& desc = pooledDescs[drawIndex];
+        desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+        desc.Flags = opaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+        desc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+        desc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer.buffer->GetGPUVirtualAddress() + UINT64(draw.baseVertex) * sizeof(SimpleVertex);
+        desc.Triangles.VertexBuffer.StrideInBytes = sizeof(SimpleVertex);
+        desc.Triangles.VertexCount = draw.vertexCount;
+        desc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+        desc.Triangles.IndexCount = draw.indexCount;
+        desc.Triangles.IndexBuffer = m_indexBuffer.buffer->GetGPUVirtualAddress() + UINT64(draw.indexStart) * sizeof(UINT);
+        m_dxrMaterialBuffer->CopyData(geometryDescIndex, draw.material);
+        DxrGeometryInfo geoInfo = {};
+        geoInfo.vertexBufferOffset = PooledVertices;
+        geoInfo.indexBufferOffset = draw.indexStart;
+        geoInfo.vertexCount = draw.vertexCount;
+        geoInfo.baseVertexLocation = draw.baseVertex;
+        geoInfo.textureIndex = draw.textureIndex;
+        geoInfo.isSkinned = 0;
+        geoInfo.instanceIndex = draw.startInstance;
+        geoInfo.objectTransformSlot = UINT_MAX;
+        geoInfo.trianglesPerInstance = draw.indexCount / 3;
+        m_dxrGeometryInfoBuffer->CopyData(geometryDescIndex, geoInfo);
+        ++geometryDescIndex;
+        if (rebuildAll || !pooled.blas || pooled.baseVertex != draw.baseVertex || pooled.vertexCount != draw.vertexCount
+            || pooled.indexStart != draw.indexStart || pooled.indexCount != draw.indexCount || pooled.opaque != opaque)
+            pooledBuilds.push_back(drawIndex);
+        pooledSources.push_back(&pooled);
+    }
+
     if (profileCpu)
     {
         m_renderData->profile.blasDescriptorsMs = elapsedCpuMs();
@@ -3946,6 +4012,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     };
     retireUnused(m_dynamicBlases);
     retireUnused(m_sharedBlases);
+    retireUnused(m_pooledBlases);
+    m_renderData->profile.pooledBlasBuilds = static_cast<UINT>(pooledBuilds.size());
 
     auto& profile = m_renderData->profile;
     for (const BlasAction action : actions)
@@ -3988,6 +4056,14 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             instance.firstGeometry = staticFirstGeometry;
             state.push_back(instance);
         }
+        for (const PooledBlas* pooled : pooledSources)
+        {
+            TlasInstance instance;
+            instance.blas = pooled->blas.address;
+            instance.firstGeometry = pooled->firstGeometry;
+            if (instance.blas)
+                state.push_back(instance);
+        }
         return state;
     };
     const auto recordAccelerationStructureBytes = [&]()
@@ -4012,7 +4088,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
-    if (!anyDynamicWork && !buildStatic && !compactStatic && m_TLAS && currentTlasState() == m_tlasState)
+    if (!anyDynamicWork && !buildStatic && !compactStatic && pooledBuilds.empty() && m_TLAS && currentTlasState() == m_tlasState)
     {
         recordAccelerationStructureBytes();
         PIXEndEvent(GetCommandList());
@@ -4123,6 +4199,72 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         owner.built = true;
         owner.layoutHash = owner.currentHash;
         owner.inputs.swap(owner.currentInputs);
+    }
+    if (!pooledBuilds.empty())
+    {
+        // Pooled builds, for fast tracing; they share the scratch buffer after the dynamic builds, so wait for those.
+        PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build pooled BLASes");
+        std::vector<UINT64> pooledScratch(pooledBuilds.size());
+        std::vector<D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS> pooledInputs(pooledBuilds.size());
+        UINT64 pooledLargest = 0;
+        for (size_t i = 0; i < pooledBuilds.size(); ++i)
+        {
+            const PooledDraw& draw = m_pooledDraws[pooledBuilds[i]];
+            PooledBlas& pooled = m_pooledBlases[draw.owner];
+            D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs = pooledInputs[i];
+            inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+            inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+            inputs.NumDescs = 1;
+            inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+            inputs.pGeometryDescs = &pooledDescs[pooledBuilds[i]];
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
+            device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+            if (!pooled.blas || pooled.blas.size < info.ResultDataMaxSizeInBytes)
+            {
+                FreeBlas(pooled.blas);
+                HRR(AllocateBlas(device, info.ResultDataMaxSizeInBytes, pooled.blas));
+            }
+            pooledScratch[i] = (info.ScratchDataSizeInBytes + alignment - 1) & ~(alignment - 1);
+            pooledLargest = (std::max)(pooledLargest, pooledScratch[i]);
+        }
+        const UINT64 pooledBudget = (std::max)(pooledLargest, UINT64(4) << 20);
+        if (!m_blasScratch || m_blasScratch->GetDesc().Width < pooledBudget)
+        {
+            Retire(m_blasScratch);
+            const D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+            const D3D12_RESOURCE_DESC scratchDesc = CD3DX12_RESOURCE_DESC::Buffer(pooledBudget, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            HRR(device->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &scratchDesc, D3D12_RESOURCE_STATE_COMMON,
+                nullptr, IID_PPV_ARGS(&m_blasScratch)));
+        }
+        else if (anyDynamicWork)
+        {
+            const D3D12_RESOURCE_BARRIER scratchBarrier = CD3DX12_RESOURCE_BARRIER::UAV(m_blasScratch);
+            commandList->ResourceBarrier(1, &scratchBarrier);
+        }
+        UINT64 used = 0;
+        const UINT64 scratchCapacity = m_blasScratch->GetDesc().Width;
+        for (size_t i = 0; i < pooledBuilds.size(); ++i)
+        {
+            const PooledDraw& draw = m_pooledDraws[pooledBuilds[i]];
+            PooledBlas& pooled = m_pooledBlases[draw.owner];
+            if (used + pooledScratch[i] > scratchCapacity)
+            {
+                const D3D12_RESOURCE_BARRIER scratchBarrier = CD3DX12_RESOURCE_BARRIER::UAV(m_blasScratch);
+                commandList->ResourceBarrier(1, &scratchBarrier);
+                used = 0;
+            }
+            D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
+            buildDesc.DestAccelerationStructureData = pooled.blas.address;
+            buildDesc.Inputs = pooledInputs[i];
+            buildDesc.ScratchAccelerationStructureData = m_blasScratch->GetGPUVirtualAddress() + used;
+            commandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
+            used += pooledScratch[i];
+            pooled.baseVertex = draw.baseVertex;
+            pooled.vertexCount = draw.vertexCount;
+            pooled.indexStart = draw.indexStart;
+            pooled.indexCount = draw.indexCount;
+            pooled.opaque = pooledDescs[pooledBuilds[i]].Flags == D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+        }
     }
     if (profileCpu)
     {
@@ -5038,6 +5180,7 @@ HRESULT RenderPlatform12::BeginNewFrame(bool resetCommandList, D3DBuffer* buffer
     m_drawRecordStatic.clear();
     m_drawRecordOwner.clear();
     m_drawRecordMaterial.clear();
+    m_pooledDraws.clear();
 
 #endif
 
@@ -5488,7 +5631,7 @@ void RenderPlatform12::SetFrameSceneData(CBChangesEveryFrame* cb)
 {
     // The backend's bias, also at native: TAA's is 0 there, FSR (NativeAA) asks for -1.
     const float bias = m_upscaler ? m_upscaler->MipBias(m_renderSize, m_displaySize) : 0.0f;
-    cb->renderScale = XMFLOAT4(bias, std::exp2(bias), 0, 0);
+    cb->renderScale = XMFLOAT4(bias, std::exp2(bias), m_renderData->projectionData.farClippingPlane, 0);
     m_constBufferChangesEveryFrame->CopyData(0, *cb);
 }
 
@@ -5647,7 +5790,7 @@ HRESULT RenderPlatform12::RenderPostProcess()
 #if defined(DXR_ENABLED)
 
     if (m_dxrEnabledThisFrame &&
-        m_drawRecords.size() > 0)
+        (m_drawRecords.size() > 0 || !m_pooledDraws.empty()))
     {
         HRR(BuildAccelerationStructure(true));
         ProfileTimestamp(ProfilePass::Rays, false);

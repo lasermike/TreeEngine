@@ -89,6 +89,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
     HRR(renderManager.CreateMesh(name, renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
         renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), &m_offsets, BASIC_INPUT_LAYOUT, &mesh));
     HRR(renderManager.ReserveRenderUnit(material, mesh, this, &m_renderUnit));
+    m_renderUnit->pooledRayTracingGeometry = true;
 
     // A fresh vertex buffer: every slot is empty.
     m_slots.assign(Params().slots, Slot());
@@ -268,8 +269,9 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
     {
         XMFLOAT3 bounds[2];
         NodeBounds(selected.first, bounds);
+        const uint32_t node = m_slots[selected.second].node;
         HRR(frame->AddDraw(m_renderUnit, this, instance, 1, static_cast<INT>(m_offsets.VertexOffset + selected.second * VerticesPerNode),
-            &m_slots[selected.second], bounds));
+            &m_nodeOwners[node], bounds));
         // The scene box (which reaches shadow casters toward the sun) takes the terrain near the camera only.
         if (bounds[1].x > eye.x - 512 && bounds[0].x < eye.x + 512 && bounds[1].z > eye.z - 512 && bounds[0].z < eye.z + 512)
         {

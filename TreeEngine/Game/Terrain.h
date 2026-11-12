@@ -41,6 +41,8 @@ public:
     HRESULT ComputeConstants(IRenderFrame* frame) override;
     unsigned int GetNumInstances() override { return 1; }
     unsigned int GetMaxInstances() override { return 1; }
+    // Each drawn node is a ray-tracing geometry of its own.
+    unsigned int GetMaxDrawnInstances() override { return Params().slots; }
 
     // The terrain's height at world (x, z) from the package's finest level, bilinear between samples; false outside
     // the terrain or when the block can't be read. Reads the package (not thread safe with itself).
@@ -81,4 +83,6 @@ private:
     std::vector<uint16_t> m_block;
     std::vector<SimpleVertex> m_vertices;
     std::unordered_map<uint64_t, std::vector<uint16_t>> m_heightBlocks;     // HeightAt's cache of finest blocks.
+    // A unique address per node, its DXR owner: a node's BLAS stays valid while the node keeps its slot.
+    std::unordered_map<uint32_t, char> m_nodeOwners;
 };

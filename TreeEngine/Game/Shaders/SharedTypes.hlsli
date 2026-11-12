@@ -22,6 +22,10 @@ float2 ApplyAtlasRect(float2 uv, float4 atlasRect)
 // Object-transform slot meaning "no per-draw object transform" (matches UINT_MAX on the CPU).
 static const uint NoObjectTransform = 0xFFFFFFFF;
 
+// DxrGeometryInfo::vertexBufferOffset for pooled geometry (terrain nodes): its world-space positions are in the original
+// vertex buffer at baseVertexLocation, not in the world-vertex buffer.
+static const uint PooledVertices = 0xFFFFFFFF;
+
 struct DxrGeometryInfo
 {
     uint vertexBufferOffset;
@@ -63,7 +67,8 @@ cbuffer cbChangesEveryFrame : register(b2)
     uint reflectionRayCount;
     float4 sceneTime; // x is simulation time in seconds, y the frame number mod 1024, z contact probes' full-count distance
     float4 sunShadowParams; // x: tan(angular radius), y: sample count; z: contact probes, w: their flags (1 rotate, 2 opaque)
-    float4 renderScale;     // x: texture LOD bias while upscaling (0 at native), y: 2^x; see Game/Upscaler.h
+    float4 renderScale;     // x: texture LOD bias while upscaling (0 at native), y: 2^x; see Game/Upscaler.h;
+                            // z: the camera's far plane, which bounds ray lengths (PrimaryRayLength, SecondaryRayLength)
     matrix shadowCascadeMatrix[4];  // World to each raster shadow cascade's own [0, 1] texture space and depth.
     float4 shadowCascadeParams;     // x: cascades, y: shadow map texel (atlas UV), z: cascade texel (cascade UV)
     float4 shadowCascadeNormalOffset;   // Per cascade: meters to move the lookup along the surface normal.
