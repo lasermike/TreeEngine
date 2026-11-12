@@ -4,6 +4,7 @@
 #include "RenderManager.h"
 #include "ThreadPool.h"
 #include "Tree.h"
+#include "Terrain.h"
 #include <chrono>
 
 SceneRoot::~SceneRoot()
@@ -99,6 +100,7 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool, boo
 
     for (auto& phase : _updatePhases)
         phase.clear();
+    profile.terrainNodes = profile.terrainResidentNodes = profile.terrainLoadedNodes = 0;
     for (WorldObject* child : _children)
         _updatePhases[child->IsInstance() ? 1 : 0].push_back(child);
     for (const auto& phase : _updatePhases)
@@ -114,6 +116,13 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool, boo
         bbmax = XMVectorMax(bbmax, XMLoadFloat3(&c->GetBoundingBox()[1]));
         if (profile.enabled && c->GetObjectType() == ObjectType_Tree)
             static_cast<Tree*>(c)->AccumulateProfile(profile);
+        if (c->GetObjectType() == ObjectType_Terrain)
+        {
+            const Terrain& terrain = *static_cast<Terrain*>(c);
+            profile.terrainNodes += terrain.SelectedNodes();
+            profile.terrainResidentNodes += terrain.ResidentNodes();
+            profile.terrainLoadedNodes += terrain.LoadedThisFrame();
+        }
     }
 
     XMStoreFloat3(&_boundingBox[0], bbmin);

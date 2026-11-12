@@ -752,6 +752,7 @@ const char s_szObjectTypeNames[ObjectType_MAX + 1][32] =
     STR(ObjectType_Tree),
     STR(ObjectType_Graph),
     STR(ObjectType_Model),
+    STR(ObjectType_Terrain),
 };
 
 const char s_szPrimitiveTypeNames[PrimitiveType_MAX + 1][32] =
@@ -776,6 +777,7 @@ const char* GeneratorTypeName(GeneratorType type)
     case LSystemGeneratorType: return "L-system";
     case GraphGeneratorType: return "Graph";
     case ModelGeneratorType: return "glTF model";
+    case TerrainGeneratorType: return "Terrain";
     }
     return "Unknown";
 }

@@ -196,6 +196,8 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_instanceReservations.clear();
     m_nextInstanceBufferOffset = 0;
     m_perFrameInstanceData.clear();
+    m_vertexUploads.clear();
+    m_vertexUploadData.clear();
     m_vertexShaders.clear();
     m_pixelShaders.clear();
 
@@ -212,6 +214,9 @@ HRESULT RenderManager::BeginNewFrame()
     InstancedData* dataView = nullptr;
     HRR(GetPlatform()->BeginNewFrame(true, buffer, &dataView));
     m_renderData.profile.batchedDraws = m_renderData.profile.batchedObjects = m_renderData.profile.fadingObjects = 0;
+    m_renderData.profile.terrainDrawnNodes = 0;
+    for (auto& unit : m_perFrameInstanceData)
+        unit.second.draws.clear();
 
     //m_renderData.instanceData = dataView;
     //m_renderData.instanceBuffer = buffer;
@@ -242,6 +247,16 @@ HRESULT RenderManager::EndFrame()
         }
     }
     m_renderData.instanceUploadRanges = &m_instanceUploadRanges;
+
+    // Vertices objects wrote this frame (terrain nodes), copied into the vertex buffer ahead of the frame's draws.
+    if (!m_vertexUploads.empty())
+    {
+        const HRESULT uploaded = GetPlatform()->UploadVertices(m_vertexUploads.data(), static_cast<UINT>(m_vertexUploads.size()),
+            m_vertexUploadData.data());
+        m_vertexUploads.clear();
+        m_vertexUploadData.clear();
+        HRR(uploaded);
+    }
     return GetPlatform()->EndFrame(m_instancedBuffer.Get(m_renderData.frame));
 }
 
@@ -285,29 +300,29 @@ void RenderManager::UpdateCullingPlanes(const XMFLOAT4X4& m, bool orthographic)
     ++m_cullingEpoch;
 }
 
+// Whether a world-space box intersects the culling frustum.
+bool RenderManager::IsVisible(const XMFLOAT3 bounds[2]) const
+{
+    for (UINT planeIndex = 0; planeIndex < m_cullingPlaneCount; ++planeIndex)
+    {
+        const XMFLOAT4& plane = m_cullingPlanes[planeIndex];
+        // The box corner farthest along the plane's normal; outside if even that is behind the plane.
+        const float px = plane.x >= 0 ? bounds[1].x : bounds[0].x;
+        const float py = plane.y >= 0 ? bounds[1].y : bounds[0].y;
+        const float pz = plane.z >= 0 ? bounds[1].z : bounds[0].z;
+        if (plane.x * px + plane.y * py + plane.z * pz + plane.w < 0)
+            return false;
+    }
+    return true;
+}
+
 // Whether an object can be seen: its cull bounds intersect the view frustum, or it has none.
 bool RenderManager::IsVisible(WorldObject* object)
 {
     if (object->m_cullingEpoch == m_cullingEpoch)
         return object->m_visible;
     XMFLOAT3 bounds[2];
-    bool visible = true;
-    if (object->GetCullBounds(bounds))
-    {
-        for (UINT planeIndex = 0; planeIndex < m_cullingPlaneCount; ++planeIndex)
-        {
-            const XMFLOAT4& plane = m_cullingPlanes[planeIndex];
-            // The box corner farthest along the plane's normal; outside if even that is behind the plane.
-            const float px = plane.x >= 0 ? bounds[1].x : bounds[0].x;
-            const float py = plane.y >= 0 ? bounds[1].y : bounds[0].y;
-            const float pz = plane.z >= 0 ? bounds[1].z : bounds[0].z;
-            if (plane.x * px + plane.y * py + plane.z * pz + plane.w < 0)
-            {
-                visible = false;
-                break;
-            }
-        }
-    }
+    const bool visible = !object->GetCullBounds(bounds) || IsVisible(bounds);
     object->m_cullingEpoch = m_cullingEpoch;
     object->m_visible = visible;
     if (m_cullingForView)
@@ -421,6 +436,33 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
                 offsets.VertexOffset, startInstance, transformSlot));
         }
         }
+    }
+
+    // Draws of their own (AddDraw: terrain nodes), each culled by its bounds. They are raster-only for now.
+    for (const ExtraDraw& draw : m_perFrameInstanceData[ru].draws)
+    {
+        if (m_settings->m_viewCulling && (pass == RegularPass || pass == ShadowMapPass) && !IsVisible(draw.bounds))
+            continue;
+        m_renderData.currentDrawOwner = draw.owner;
+        if (m_renderData.picking)
+        {
+            auto& objects = m_renderData.pickObjects;
+            auto found = m_pickObjectIds.find(draw.object);
+            if (found == m_pickObjectIds.end())
+            {
+                objects.push_back(draw.object);
+                m_renderData.pickObjectId = static_cast<UINT>(objects.size());
+                m_pickObjectIds.emplace(draw.object, m_renderData.pickObjectId);
+            }
+            else m_renderData.pickObjectId = found->second;
+        }
+        if (pass == RegularPass && !m_renderData.picking)
+            ++m_renderData.profile.terrainDrawnNodes;
+        m_renderData.currentDrawCulled = false;
+        m_renderData.currentDrawRasterOnly = true;
+        HRR(GetPlatform()->DrawIndexedInstanced(offsets.IndexCount, draw.count, offsets.IndexOffset, draw.baseVertex,
+            draw.start, UINT_MAX));
+        m_renderData.currentDrawRasterOnly = false;
     }
 
     // Each batch's object transform slots go in the list region (the platform writes them, four per instance slot),
@@ -897,6 +939,36 @@ HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object,
     return S_OK;
 }
 
+HRESULT RenderManager::AddDraw(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT instanceCount,
+    INT baseVertex, const void* owner, const XMFLOAT3 bounds[2])
+{
+    if (!renderUnit || !instanceCount)
+        return S_OK;
+    ExtraDraw draw;
+    draw.object = object;
+    draw.start = startInstance;
+    draw.count = instanceCount;
+    draw.baseVertex = baseVertex;
+    draw.owner = owner;
+    draw.bounds[0] = bounds[0];
+    draw.bounds[1] = bounds[1];
+    std::lock_guard<std::mutex> lock(m_frameLock);
+    m_perFrameInstanceData[renderUnit].draws.push_back(draw);
+    return S_OK;
+}
+
+HRESULT RenderManager::UploadVertices(UINT firstVertex, const SimpleVertex* vertices, UINT count)
+{
+    if (!count)
+        return S_OK;
+    if (static_cast<UINT64>(firstVertex) + count > m_geometryData.vertices.size())
+        return E_INVALIDARG;
+    std::lock_guard<std::mutex> lock(m_frameLock);
+    m_vertexUploads.push_back({ firstVertex, static_cast<UINT>(m_vertexUploadData.size()), count });
+    m_vertexUploadData.insert(m_vertexUploadData.end(), vertices, vertices + count);
+    return S_OK;
+}
+
 HRESULT RenderManager::SetFadingInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
     UINT objectTransformSlot, const void* owner)
 {
@@ -1293,6 +1365,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data, Settings*
     // Optional exports (no assert): without them objects draw one at a time.
     DrawBatchedFuncPtr = (DrawBatchedFunc) ::GetProcAddress(module, "DrawBatched");
     RecordsDrawsFuncPtr = (RecordsDrawsFunc) ::GetProcAddress(module, "RecordsDraws");
+    UploadVerticesFuncPtr = (UploadVerticesFunc) ::GetProcAddress(module, "UploadVertices");
 
     ASSIGN_FUNC(BeginDrawText);
     ASSIGN_FUNC(DrawText2);

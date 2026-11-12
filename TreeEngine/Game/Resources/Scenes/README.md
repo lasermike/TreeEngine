@@ -144,6 +144,22 @@ It also supports optional `materials.trunk`/`materials.leaf` slots and `leaves`.
 A `model` requires `source`, a `.gltf` or `.glb` file, and supports optional
 `forceLit` plus its transform. Its asset owns its geometry and materials.
 
+A `terrain` draws a heightfield from a terrain package, a directory made by
+`Tools/terrain` (see its README for making one from a procedural map, a heightmap
+or GIS elevation data). It requires `source`, the package directory, such as
+`"Terrain/Hills.terrain"`, resolved like other assets. Optional fields:
+
+- `material`: a material reference, as for primitives. Its UVs are world meters
+  (u along x, v along -z), so `textureCoordScale` sets the tiling.
+- `lodRange` (1 to 16, default 2): a quadtree node splits into four finer ones
+  when the camera is within `lodRange` times its size. Higher is more detailed.
+- `slots` (16 to 4096, default 512): how many nodes can be resident at once,
+  each about 215 KB of vertex buffer, reserved at load.
+- `transform`: a position only; terrain cannot be rotated or scaled.
+
+Terrain cannot be instanced. The `LoadTerrainHills` scene shows a
+1 km procedural package.
+
 ### Instancing
 
 An object with `instanceOf` copies an earlier object by ID. It sets only `id`,

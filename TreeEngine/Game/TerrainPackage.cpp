@@ -67,6 +67,7 @@ std::string TerrainPackage::ManifestJson(const TerrainManifest& m)
     json["minHeight"] = m.minHeight;
     json["maxHeight"] = m.maxHeight;
     json["nodesFile"] = m.nodesFile;
+    json["boundsFile"] = m.boundsFile;
     json["source"] = nlohmann::ordered_json::parse(m.sourceJson.empty() ? "{}" : m.sourceJson, nullptr, false);
     if (json["source"].is_discarded())
         json["source"] = nlohmann::ordered_json::object();
@@ -106,12 +107,14 @@ bool TerrainPackage::ParseManifest(const std::string& text, TerrainManifest& m, 
     m.minHeight = json.value("minHeight", 0.0f);
     m.maxHeight = json.value("maxHeight", 0.0f);
     m.nodesFile = json.value("nodesFile", std::string("nodes.bin"));
+    m.boundsFile = json.value("boundsFile", std::string("bounds.bin"));
     m.sourceJson = json.contains("source") ? json["source"].dump() : "{}";
     if (!(m.worldSize > 0) || !(m.sampleSpacing > 0) || m.levels < 1 || m.levels > 16 || !(m.heightScale > 0)
         || std::fabs(m.worldSize - m.sampleSpacing * NodeQuads * double(1ll << (m.levels - 1))) > 1e-6 * m.worldSize
-        || m.nodesFile.empty() || m.nodesFile.find_first_of("/\\:") != std::string::npos)
+        || m.nodesFile.empty() || m.nodesFile.find_first_of("/\\:") != std::string::npos
+        || m.boundsFile.empty() || m.boundsFile.find_first_of("/\\:") != std::string::npos)
     {
-        error = "manifest.json has an inconsistent size, spacing, level count, height scale or nodes file";
+        error = "manifest.json has an inconsistent size, spacing, level count, height scale or file names";
         return false;
     }
     return true;
@@ -143,6 +146,14 @@ bool TerrainPackage::Open(const std::wstring& directory)
         m_error = m_manifest.nodesFile + " is shorter than its node count needs";
         return false;
     }
+    m_bounds.resize(size_t(2 * NodeCount(m_manifest.levels)));
+    std::ifstream bounds(Join(directory, m_manifest.boundsFile).c_str(), std::ios::binary);
+    if (!bounds.read(reinterpret_cast<char*>(m_bounds.data()), std::streamsize(m_bounds.size() * sizeof(uint16_t))))
+    {
+        Close();
+        m_error = "cannot read " + m_manifest.boundsFile;
+        return false;
+    }
     return true;
 }
 
@@ -151,6 +162,7 @@ void TerrainPackage::Close()
     if (m_nodes)
         fclose(m_nodes);
     m_nodes = nullptr;
+    m_bounds.clear();
 }
 
 bool TerrainPackage::ReadBlock(int level, int x, int z, uint16_t* samples) const
@@ -220,6 +232,48 @@ bool TerrainPackage::Write(const std::wstring& directory, const std::vector<floa
         error = "writing nodes.bin failed";
         return false;
     }
+    // Height bounds: each finest-level node's samples, then each level up from its four children.
+    std::vector<uint16_t> bounds(size_t(2 * NodeCount(levels)));
+    const auto quantize = [&](float height) { return (height - m.heightOffset) / m.heightScale; };
+    for (int level = levels - 1; level >= 0; --level)
+    {
+        const int side = 1 << level;
+        for (int nz = 0; nz < side; ++nz)
+            for (int nx = 0; nx < side; ++nx)
+            {
+                uint16_t* range = &bounds[size_t(2 * NodeIndex(level, nx, nz))];
+                if (level == levels - 1)
+                {
+                    float low = FLT_MAX, high = -FLT_MAX;
+                    for (int j = nz * NodeQuads; j <= (nz + 1) * NodeQuads; ++j)
+                        for (int i = nx * NodeQuads; i <= (nx + 1) * NodeQuads; ++i)
+                        {
+                            low = std::min(low, heights[size_t(j) * samples + i]);
+                            high = std::max(high, heights[size_t(j) * samples + i]);
+                        }
+                    range[0] = uint16_t(std::min(65535.0f, std::max(0.0f, std::floor(quantize(low)))));
+                    range[1] = uint16_t(std::min(65535.0f, std::max(0.0f, std::ceil(quantize(high)))));
+                    continue;
+                }
+                range[0] = 65535;
+                range[1] = 0;
+                for (int child = 0; child < 4; ++child)
+                {
+                    const uint16_t* c = &bounds[size_t(2 * NodeIndex(level + 1, 2 * nx + (child & 1), 2 * nz + (child >> 1)))];
+                    range[0] = std::min(range[0], c[0]);
+                    range[1] = std::max(range[1], c[1]);
+                }
+            }
+    }
+    std::ofstream boundsFile(Join(directory, m.boundsFile).c_str(), std::ios::binary);
+    boundsFile.write(reinterpret_cast<const char*>(bounds.data()), std::streamsize(bounds.size() * sizeof(uint16_t)));
+    if (!boundsFile)
+    {
+        error = "writing bounds.bin failed";
+        return false;
+    }
+    boundsFile.close();
+
     std::ofstream manifest(Join(directory, "manifest.json").c_str(), std::ios::binary);
     manifest << ManifestJson(m);
     if (!manifest)

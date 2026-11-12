@@ -627,6 +627,25 @@ void TestTerrainPackage()
             }
     }
     Check(!package.ReadBlock(3, 0, 0, block.data()) && !package.ReadBlock(1, 2, 0, block.data()), "terrain rejects nodes outside the tree");
+    // Node bounds cover the source heights in their area, at every level.
+    for (int level = 0; level < 3; ++level)
+    {
+        const int cells = NodeQuads << (2 - level);
+        for (int nz = 0; nz < (1 << level); ++nz)
+            for (int nx = 0; nx < (1 << level); ++nx)
+            {
+                const uint64_t node = TerrainPackage::NodeIndex(level, nx, nz);
+                float low = FLT_MAX, high = -FLT_MAX;
+                for (int j = nz * cells; j <= (nz + 1) * cells; ++j)
+                    for (int i = nx * cells; i <= (nx + 1) * cells; ++i)
+                    {
+                        low = std::min(low, heights[size_t(j) * samples + i]);
+                        high = std::max(high, heights[size_t(j) * samples + i]);
+                    }
+                Check(m.Height(package.MinValue(node)) <= low + 1e-3f && m.Height(package.MaxValue(node)) >= high - 1e-3f
+                    && m.Height(package.MaxValue(node)) - high < 2 * m.heightScale, "terrain node bounds cover their heights");
+            }
+    }
     package.Close();
 
     TerrainManifest parsed;
@@ -635,6 +654,7 @@ void TestTerrainPackage()
     Check(TerrainPackage::ParseManifest(TerrainPackage::ManifestJson(m), parsed, error) && parsed.levels == 3
         && parsed.heightOffset == m.heightOffset, "terrain manifest round trip");
     DeleteFileW((directory + L"\\nodes.bin").c_str());
+    DeleteFileW((directory + L"\\bounds.bin").c_str());
     DeleteFileW((directory + L"\\manifest.json").c_str());
     RemoveDirectoryW(directory.c_str());
 }
@@ -682,6 +702,43 @@ void TestLodSelection()
     Check(!Lod::Valid(badScreen), "ascending screen heights were accepted");
     Lod::SetScreenHeights(badScreen, { 100, -50 });
     Check(!Lod::Valid(badScreen), "negative screen heights were accepted");
+}
+
+void TestTerrainSettings()
+{
+    const std::string json = R"({"version":1,"name":"Terrain","materials":{"grass":{"baseColor":[0.2,0.3,0.1,1],"roughness":0.9}},
+        "objects":[{"id":"ground","type":"terrain","source":"Terrain/Hills.terrain","material":"grass","lodRange":3,"slots":256,
+        "transform":{"position":[0,-5,0]},"textureCoordScale":[0.25,0.25]},
+        {"id":"plain","type":"terrain","source":"Terrain/Hills.terrain"}]})";
+    auto scene = SceneData::ParseScene(json, "terrain");
+    const auto& ground = static_cast<const SceneData::TerrainDefinition&>(*scene.objects[0]);
+    Check(scene.objects[0]->kind == SceneData::ObjectKind::Terrain && ground.source == "Terrain/Hills.terrain" && ground.hasMaterial
+        && ground.lodRange == 3 && ground.slots == 256 && ground.transform.position.y == -5 && ground.textureCoordScale.x == 0.25f,
+        "terrain settings were not parsed");
+    const auto& plain = static_cast<const SceneData::TerrainDefinition&>(*scene.objects[1]);
+    Check(!plain.hasMaterial && plain.lodRange == 2 && plain.slots == 512, "terrain defaults changed");
+    const auto saved = Json::parse(SceneData::SerializeScene(scene));
+    Check(saved["objects"][0]["type"] == "terrain" && !saved["objects"][0].contains("depthLOD")
+        && !saved["objects"][1].contains("textureCoordScale"), "terrain saved fields it doesn't take");
+    const auto reparsed = SceneData::ParseScene(saved.dump(), "saved-terrain");
+    const auto& again = static_cast<const SceneData::TerrainDefinition&>(*reparsed.objects[0]);
+    Check(again.source == ground.source && again.lodRange == 3 && again.slots == 256 && again.hasMaterial
+        && again.textureCoordScale.x == 0.25f, "terrain did not round-trip");
+    auto bad = Json::parse(json);
+    bad["objects"][0].erase("source");
+    Reject(bad.dump(), ".source");
+    bad = Json::parse(json);
+    bad["objects"][0]["lodRange"] = 0.5;
+    Reject(bad.dump(), ".lodRange");
+    bad = Json::parse(json);
+    bad["objects"][0]["slots"] = 8;
+    Reject(bad.dump(), ".slots");
+    bad = Json::parse(json);
+    bad["objects"][0]["generator"] = Json::object();
+    Reject(bad.dump(), ".generator");
+    bad = Json::parse(json);
+    bad["objects"][1] = { { "id", "copy" }, { "instanceOf", "ground" } };
+    Reject(bad.dump(), ".instanceOf");
 }
 
 void TestTreeLodSettings()
@@ -941,6 +998,7 @@ int main(int argc, char** argv)
         TestLodSelection();
         TestTerrainPackage();
         TestTreeLodSettings();
+        TestTerrainSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

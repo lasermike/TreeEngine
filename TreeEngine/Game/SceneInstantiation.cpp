@@ -7,6 +7,7 @@
 #include "Tree.h"
 #include "Graph.h"
 #include "GltfModel.h"
+#include "Terrain.h"
 #include "LSystemModelGenerator.h"
 #include "Player.h"
 #include <cmath>
@@ -336,6 +337,31 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             linkTreeInstance(graph, *parameters);
             auto runtime = std::make_unique<Tree>(parameters.get());
             parameters.release();
+            objects.push_back(std::move(runtime));
+        }
+        else if (object->kind == SceneData::ObjectKind::Terrain)
+        {
+            const auto& terrain = static_cast<const SceneData::TerrainDefinition&>(*object);
+            const auto& t = terrain.transform;
+            if (t.rotation.x != 0 || t.rotation.y != 0 || t.rotation.z != 0 || t.scale.x != 1 || t.scale.y != 1 || t.scale.z != 1)
+                throw std::runtime_error("Object '" + terrain.id + "': terrain can be moved, but not rotated or scaled");
+            auto parameters = std::make_unique<TerrainParams>();
+            CommonParameters(terrain, *parameters);
+            parameters->source = terrain.source;
+            const std::string manifest = RuntimeDataFile(terrain.source + "/manifest.json", terrain.id, sceneFilename);
+            parameters->packageDirectory = SceneData::WidePath(SceneData::ParentPath(manifest));
+            parameters->lodRange = terrain.lodRange;
+            parameters->slots = static_cast<UINT>(terrain.slots);
+            if (terrain.hasMaterial)
+            {
+                parameters->textureFilename.push_back(L"");
+                parameters->materials.push_back(RuntimeMaterial(terrain.material));
+                parameters->materialTextures.push_back(RuntimeMaterialTextures(terrain.material, terrain.id, sceneFilename));
+            }
+            auto runtime = std::make_unique<Terrain>(parameters.get());
+            parameters.release();
+            if (!runtime->IsOpen())
+                throw std::runtime_error("Object '" + terrain.id + "': terrain package " + terrain.source + ": " + runtime->Error());
             objects.push_back(std::move(runtime));
         }
         else
@@ -691,6 +717,22 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             model.biplanarMaterial = modelParams.biplanarMaterial;
             model.biplanarUvPerUnit = modelParams.biplanarUvPerUnit;
             model.biplanarSharpness = modelParams.biplanarSharpness;
+            break;
+        }
+        case SceneData::ObjectKind::Terrain:
+        {
+            if (params.generatorType != TerrainGeneratorType) throw std::runtime_error("Object generator type changed");
+            auto& terrain = static_cast<SceneData::TerrainDefinition&>(*definition);
+            const auto& terrainParams = dynamic_cast<const TerrainParams&>(params);
+            const std::string manifest = RebaseAsset(terrainParams.source + "/manifest.json", sourceFilename, destinationFilename);
+            terrain.source = manifest.substr(0, manifest.find_last_of("/\\"));
+            terrain.lodRange = terrainParams.lodRange;
+            terrain.slots = static_cast<int>(terrainParams.slots);
+            if (!params.materials.empty())
+            {
+                terrain.hasMaterial = true;
+                terrain.material = CaptureMaterial(params, 0, sourceFilename, destinationFilename);
+            }
             break;
         }
         default: throw std::runtime_error("Cannot save unsupported scene object");

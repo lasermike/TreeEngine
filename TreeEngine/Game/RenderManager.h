@@ -5,6 +5,7 @@
 #include "StockRenderStates.h"
 #include "OpacityMicromapBaker.h"
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 
 class WorldObject;
@@ -47,6 +48,14 @@ interface IRenderFrame
         UINT objectTransformSlot, const void* owner) = 0;
     virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
     virtual RenderData& GetRenderData() = 0;
+    // A draw of its own this frame, beside the object's reservation: instances [startInstance, startInstance + count)
+    // of the unit's mesh from baseVertex, culled by its own world-space bounds, and its own DXR owner (any unique
+    // address). Terrain nodes draw this way. Safe to call from concurrent ComputeConstants.
+    virtual HRESULT AddDraw(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT instanceCount, INT baseVertex,
+        const void* owner, const XMFLOAT3 bounds[2]) = 0;
+    // Copies vertices into the shared vertex buffer at firstVertex before this frame draws (a region the object reserved
+    // in AppendGeometry). Safe to call from concurrent ComputeConstants.
+    virtual HRESULT UploadVertices(UINT firstVertex, const SimpleVertex* vertices, UINT count) = 0;
 };
 
 interface IDebugUI
@@ -101,11 +110,24 @@ class RenderManager : public IRenderFrame
     };
     // Each unit's per-frame ranges, in the order of its reservations, and where each object's is. Entries are made at
     // reservation, so concurrent SetInstances calls only find and write existing ones.
+    struct ExtraDraw
+    {
+        WorldObject* object = nullptr;
+        UINT start = 0;
+        UINT count = 0;
+        INT baseVertex = 0;
+        const void* owner = nullptr;
+        XMFLOAT3 bounds[2] = {};
+    };
     struct UnitInstances
     {
         std::vector<InstanceRange> ranges;
         std::unordered_map<WorldObject*, size_t> index;
+        std::vector<ExtraDraw> draws;       // This frame's AddDraw calls.
     };
+    std::mutex m_frameLock;                 // Guards draws and vertex uploads added from concurrent ComputeConstants.
+    std::vector<VertexUploadRegion> m_vertexUploads;
+    std::vector<SimpleVertex> m_vertexUploadData;
     std::unordered_map<RenderUnit*, UnitInstances> m_perFrameInstanceData;
 
     RenderData                                      m_renderData;
@@ -210,6 +232,7 @@ public:
     void UpdateCullingFrustum();
     void UpdateCullingPlanes(const XMFLOAT4X4& viewProjection, bool orthographic);
     bool IsVisible(WorldObject* object);
+    bool IsVisible(const XMFLOAT3 bounds[2]) const;
 
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
         UINT objectTransformSlot = UINT_MAX);
@@ -218,6 +241,9 @@ public:
 
         UINT objectTransformSlot, const void* owner);
     HRESULT GetInstanceIndex(WorldObject* object, UINT&);
+    HRESULT AddDraw(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT instanceCount, INT baseVertex,
+        const void* owner, const XMFLOAT3 bounds[2]) override;
+    HRESULT UploadVertices(UINT firstVertex, const SimpleVertex* vertices, UINT count) override;
 
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, SceneRoot& scene);
     virtual HRESULT UninitGameLevelGraphics();

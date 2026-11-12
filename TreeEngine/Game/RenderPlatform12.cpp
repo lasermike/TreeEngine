@@ -1773,6 +1773,35 @@ HRESULT RenderPlatform12::DrawBatched(UINT indexCount, UINT startIndex, INT base
     return S_OK;
 }
 
+static HRESULT CreateFilledUploadBuffer(ID3D12Device* device, const void* data, size_t size, ID3D12Resource** buffer);
+
+HRESULT RenderPlatform12::UploadVertices(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices)
+{
+    if (!regionCount)
+        return S_OK;
+    const UINT64 capacity = m_VBView.SizeInBytes / sizeof(SimpleVertex);
+    UINT64 total = 0;
+    for (UINT i = 0; i < regionCount; ++i)
+    {
+        if (static_cast<UINT64>(regions[i].firstVertex) + regions[i].count > capacity)
+            return E_INVALIDARG;
+        total = std::max<UINT64>(total, static_cast<UINT64>(regions[i].sourceVertex) + regions[i].count);
+    }
+    // One upload buffer for the frame's regions, released once the frame is done with it.
+    CComPtr<ID3D12Resource> staging;
+    HRR(CreateFilledUploadBuffer(GetDevice(), vertices, static_cast<size_t>(total * sizeof(SimpleVertex)), &staging));
+    PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Upload vertices");
+    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.buffer,
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST));
+    for (UINT i = 0; i < regionCount; ++i)
+        GetCommandList()->CopyBufferRegion(m_vertexBuffer.buffer, static_cast<UINT64>(regions[i].firstVertex) * sizeof(SimpleVertex),
+            staging, static_cast<UINT64>(regions[i].sourceVertex) * sizeof(SimpleVertex), static_cast<UINT64>(regions[i].count) * sizeof(SimpleVertex));
+    GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.buffer,
+        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+    Retire(staging);
+    return S_OK;
+}
+
 bool RenderPlatform12::RecordsDraws(RenderPass pass) const
 {
 #if defined(DXR_ENABLED)

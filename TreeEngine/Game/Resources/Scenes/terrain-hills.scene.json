@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "id": "LoadTerrainHills",
+  "priority": 0,
+  "name": "Terrain - procedural hills (1 km)",
+  "camera": {
+    "position": [0, 12, -380],
+    "rotationDegrees": [8, 0, 0]
+  },
+  "render": {
+    "clearColor": [0.48, 0.54, 0.58, 1],
+    "useShadowMaps": true,
+    "useAlphaBlendedRenderTarget": true,
+    "farClippingPlane": 2000,
+    "enablePostProcessing": false,
+    "blurAmount": 0,
+    "environment": {
+      "diffuse": "Environment/terra-daylight-diffuse.dds",
+      "specular": "Environment/terra-daylight-specular.dds"
+    },
+    "sky": {
+      "cubeMap": "Environment/terra-daylight-sky.dds"
+    },
+    "ambientOcclusion": {
+      "radius": 1.25,
+      "strength": 0.65
+    }
+  },
+  "light": {
+    "ambient": [0, 0, 0, 1],
+    "diffuse": [2.3, 2.3, 2.3, 1],
+    "specular": [2.3, 2.3, 2.3, 1],
+    "direction": [0.6259292648824133, -0.5141802822623909, 0.3133034947002239],
+    "angularDiameterDegrees": 2,
+    "shadowSamples": 8
+  },
+  "pointLightCount": 0,
+  "materials": {
+    "meadow": {
+      "baseColor": [0.16, 0.2, 0.08, 1],
+      "metallic": 0,
+      "roughness": 0.9,
+      "specular": 0.5
+    }
+  },
+  "objects": [
+    {
+      "id": "hills",
+      "type": "terrain",
+      "source": "Terrain/Hills.terrain",
+      "material": "meadow",
+      "lodRange": 2,
+      "slots": 128
+    }
+  ]
+}

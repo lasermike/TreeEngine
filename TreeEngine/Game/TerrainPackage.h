@@ -10,7 +10,9 @@
 // 2^k nodes, each covering worldSize / 2^k meters with NodeQuads x NodeQuads quads, so the finest level samples every
 // sampleSpacing meters. A node's block holds BlockSamples x BlockSamples heights: its (NodeQuads + 1)^2 vertices plus
 // a one-sample border on every side for normals, row-major from -x/-z, sampled from the finest grid (clamped at the
-// world's edge). Heights are uint16: height = heightOffset + value * heightScale.
+// world's edge). Heights are uint16: height = heightOffset + value * heightScale. bounds.bin holds each node's lowest
+// and highest height (two uint16 per node, in node order), over the finest samples in its area, so they bound every
+// level's geometry there.
 
 #include <cstdint>
 #include <cstdio>
@@ -39,6 +41,7 @@ struct TerrainManifest
     float heightScale = 1;          // Meters per unit.
     float minHeight = 0, maxHeight = 0;
     std::string nodesFile = "nodes.bin";
+    std::string boundsFile = "bounds.bin";
     std::string sourceJson = "{}";  // Where the heights came from (generator settings, GIS source, CRS, bounds).
 
     double NodeSize(int level) const { return worldSize / double(1ll << level); }
@@ -62,6 +65,9 @@ public:
     static uint64_t NodeCount(int levels);
     // Reads one node's block (BlockSamples^2 values). Safe to call from several threads.
     bool ReadBlock(int level, int x, int z, uint16_t* samples) const;
+    // A node's height range in package units (Manifest().Height converts), read at Open.
+    uint16_t MinValue(uint64_t node) const { return m_bounds[2 * node]; }
+    uint16_t MaxValue(uint64_t node) const { return m_bounds[2 * node + 1]; }
 
     // Writes a package from the finest grid: samples x samples heights (row-major from -x/-z), where
     // samples = NodeQuads * 2^(levels - 1) + 1. Returns false with an error message on failure.
@@ -77,5 +83,6 @@ private:
     TerrainManifest m_manifest;
     std::string m_error;
     FILE* m_nodes = nullptr;
+    std::vector<uint16_t> m_bounds;
     mutable std::mutex m_readLock;
 };

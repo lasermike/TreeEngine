@@ -65,7 +65,7 @@ nodes.
 | `nodeQuads`, `blockSamples`, `blockStride` | 64, 67, 9216: the block layout, checked against the engine's. |
 | `heightOffset`, `heightScale` | Height in meters = `heightOffset + value * heightScale`. |
 | `minHeight`, `maxHeight` | The height range, in meters. |
-| `nodesFile` | `nodes.bin`. |
+| `nodesFile`, `boundsFile` | `nodes.bin`, `bounds.bin`. |
 | `source` | Free-form: generator settings, or GIS file, CRS and bounds. |
 
 `nodes.bin` holds one block per node, each `blockStride` (9216) bytes so blocks start on 512-byte boundaries for
@@ -75,6 +75,10 @@ row-major by z, then x. So node (level, x, z) is at block `(4^level - 1) / 3 + z
 A block is 67 x 67 little-endian uint16 heights, row-major from -x/-z: the node's 65 x 65 vertices plus a one-sample
 border on every side, so normals at the node's edges match its neighbors'. Coarser levels point-sample the finest grid;
 samples past the world's edge repeat the edge.
+
+`bounds.bin` holds each node's lowest and highest height, two uint16 per node in the same order and units,
+taken over the finest samples in the node's area so they bound every level's geometry there. The engine reads it whole
+when it opens a package, to choose and cull nodes before their blocks load.
 
 Blocks are uncompressed for now. GDeflate compression (DirectStorage) would add a per-node offset table without
 changing the block contents.

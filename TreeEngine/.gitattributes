@@ -7,3 +7,4 @@
 *.dds filter=lfs diff=lfs merge=lfs -text
 *.jpeg filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text
+Game/Resources/Terrain/*.terrain/*.bin filter=lfs diff=lfs merge=lfs -text

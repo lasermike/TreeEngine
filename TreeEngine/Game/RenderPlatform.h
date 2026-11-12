@@ -705,6 +705,12 @@ public:
         UINT /*layoutSize*/, const UINT* /*transformSlots*/, UINT /*copies*/, UINT /*listStart*/) { return E_NOTIMPL; }
     // Whether this pass's draws are recorded for ray tracing, so a batched object must still issue its own (culled) draw.
     virtual bool RecordsDraws(RenderPass /*pass*/) const { return false; }
+    // Copies regions of `vertices` into the shared vertex buffer (PRIMITIVE_GEOMETRY_BUFFER) on this frame's command
+    // list, ahead of its draws. Platforms without it return E_NOTIMPL.
+    virtual HRESULT UploadVertices(const VertexUploadRegion* /*regions*/, UINT /*regionCount*/, const SimpleVertex* /*vertices*/)
+    {
+        return E_NOTIMPL;
+    }
 
     virtual HRESULT BeginDrawText() = 0;
     virtual HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText) = 0;
@@ -977,6 +983,7 @@ public:
     HRESULT DrawBatched(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize,
         const UINT* transformSlots, UINT copies, UINT listStart) override;
     bool RecordsDraws(RenderPass pass) const override;
+    HRESULT UploadVertices(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices) override;
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -1549,6 +1556,7 @@ typedef HRESULT (*SetRenderPhaseFunc)(RenderState state);
 typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
 typedef HRESULT (*DrawBatchedFunc)(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize, const UINT* transformSlots, UINT copies, UINT listStart);
 typedef bool (*RecordsDrawsFunc)(RenderPass pass);
+typedef HRESULT (*UploadVerticesFunc)(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices);
 
 typedef HRESULT (*BeginDrawTextFunc)();
 typedef HRESULT (*DrawText2Func)(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -1612,6 +1620,7 @@ class RenderPlatformDLL : public RenderPlatform
     DrawIndexedInstancedFunc DrawIndexedInstancedFuncPtr;
     DrawBatchedFunc DrawBatchedFuncPtr = nullptr;       // Optional: platforms without batched draws don't export them.
     RecordsDrawsFunc RecordsDrawsFuncPtr = nullptr;
+    UploadVerticesFunc UploadVerticesFuncPtr = nullptr;
 
     BeginDrawTextFunc BeginDrawTextFuncPtr;
     DrawText2Func DrawText2FuncPtr;
@@ -1690,6 +1699,10 @@ public:
             transformSlots, copies, listStart) : E_NOTIMPL;
     }
     bool RecordsDraws(RenderPass pass) const override { return RecordsDrawsFuncPtr && RecordsDrawsFuncPtr(pass); }
+    HRESULT UploadVertices(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices) override
+    {
+        return UploadVerticesFuncPtr ? UploadVerticesFuncPtr(regions, regionCount, vertices) : E_NOTIMPL;
+    }
 
     HRESULT BeginDrawText() { return BeginDrawTextFuncPtr(); }
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText) { return DrawText2FuncPtr(sx, sy, dwColor, strText); }

@@ -51,6 +51,14 @@ struct SkinnedVertex
 
 static_assert(sizeof(SimpleVertex) == 48 && sizeof(SkinnedVertex) == 60, "Vertex layout must match DXR shaders");
 
+// A run of vertices copied into the shared vertex buffer (RenderPlatform::UploadVertices).
+struct VertexUploadRegion
+{
+    UINT firstVertex;       // Destination, in the vertex buffer.
+    UINT sourceVertex;      // Source, in the call's vertex array.
+    UINT count;
+};
+
 struct GeometryBufferData
 {
     struct BufferOffsets

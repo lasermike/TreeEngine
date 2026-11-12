@@ -441,6 +441,7 @@ namespace SceneData
             for (const auto& existing : scene.objects)
                 if (existing->id == sourceId) source = existing.get();
             if (!source) Invalid(path + ".instanceOf", "unknown object '" + sourceId + "'; instances must follow the object they copy");
+            if (source->kind == ObjectKind::Terrain) Invalid(path + ".instanceOf", "terrain cannot be instanced");
 
             auto result = source->Clone();
             result->id = id;
@@ -713,6 +714,29 @@ namespace SceneData
                     ReadLeaves(value, path, scene, *graph);
                     object = std::move(graph);
                 }
+                else if (type == "terrain")
+                {
+                    Fields(value, path, { "id", "type", "transform", "source", "material", "textureCoordScale", "lodRange", "slots" });
+                    auto terrain = std::make_unique<TerrainDefinition>();
+                    if (!value.contains("source")) Invalid(path + ".source", "required property");
+                    terrain->source = String(value["source"], path + ".source");
+                    if (terrain->source.empty()) Invalid(path + ".source", "must not be empty");
+                    if (value.contains("material"))
+                    {
+                        terrain->hasMaterial = true;
+                        terrain->material = MaterialReference(value["material"], path + ".material", scene);
+                    }
+                    if (value.contains("lodRange"))
+                    {
+                        terrain->lodRange = Number(value["lodRange"], path + ".lodRange");
+                        if (!(terrain->lodRange >= 1 && terrain->lodRange <= 16)) Invalid(path + ".lodRange", "must be between 1 and 16");
+                    }
+                    if (value.contains("slots"))
+                    {
+                        terrain->slots = Integer(value["slots"], path + ".slots", 16, 4096);
+                    }
+                    object = std::move(terrain);
+                }
                 else if (type == "model")
                 {
                     Fields(value, path, { "id", "type", "transform", "source", "forceLit", "normalAnimation", "materialTint", "textureCoordScale", "biplanar" });
@@ -962,11 +986,12 @@ namespace SceneData
                 continue;
             }
             Json value = { { "id", object->id }, { "transform", TransformJson(object->transform) } };
-            if (object->kind == ObjectKind::Model && (object->textureCoordScale.x != 1 || object->textureCoordScale.y != 1))
+            const bool authoredOnly = object->kind == ObjectKind::Model || object->kind == ObjectKind::Terrain;
+            if (authoredOnly && (object->textureCoordScale.x != 1 || object->textureCoordScale.y != 1))
             {
                 value["textureCoordScale"] = VectorJson(object->textureCoordScale);
             }
-            if (object->kind != ObjectKind::Model)
+            if (!authoredOnly)
             {
                 value["textureCoordScale"] = VectorJson(object->textureCoordScale);
                 value["animationSpeed"] = object->animationSpeed;
@@ -1041,6 +1066,16 @@ namespace SceneData
                 if (!model.biplanarMaterial.empty())
                     value["biplanar"] = { { "material", model.biplanarMaterial }, { "uvPerUnit", model.biplanarUvPerUnit },
                         { "sharpness", model.biplanarSharpness } };
+                break;
+            }
+            case ObjectKind::Terrain:
+            {
+                const auto& terrain = dynamic_cast<const TerrainDefinition&>(*object);
+                value["type"] = "terrain";
+                value["source"] = terrain.source;
+                if (terrain.hasMaterial) value["material"] = MaterialJson(terrain.material);
+                value["lodRange"] = terrain.lodRange;
+                value["slots"] = terrain.slots;
                 break;
             }
             default: throw std::runtime_error("Cannot serialize unsupported scene object");

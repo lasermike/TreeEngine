@@ -80,7 +80,7 @@ namespace SceneData
     };
 
     enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite, Sphere };
-    enum class ObjectKind { Primitive, Tree, FixedTree, Graph, Model };
+    enum class ObjectKind { Primitive, Tree, FixedTree, Graph, Model, Terrain };
     enum class SegmentLengthBehavior { Constant, RandomAddition };
 
     struct ObjectDefinition
@@ -188,6 +188,18 @@ namespace SceneData
         float biplanarUvPerUnit = 0;
         float biplanarSharpness = 1;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<ModelDefinition>(*this); }
+    };
+
+    // A heightfield from a terrain package (Tools/terrain). Its transform may only move it.
+    struct TerrainDefinition : ObjectDefinition
+    {
+        TerrainDefinition() : ObjectDefinition(ObjectKind::Terrain) {}
+        std::string source;         // The package directory, such as "Terrain/Hills.terrain".
+        bool hasMaterial = false;
+        MaterialDefinition material;
+        float lodRange = 2;         // A node splits within lodRange x its size of the camera.
+        int slots = 512;            // Nodes resident at once (each about 215 KB of vertex buffer).
+        std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TerrainDefinition>(*this); }
     };
 
     struct DirectionalLightDefinition

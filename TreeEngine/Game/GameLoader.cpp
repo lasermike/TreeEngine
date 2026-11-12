@@ -77,7 +77,7 @@ void GameLoader::Regenerate(SceneRoot* pScene, SceneLoadProfile* profile)
             GraphModelGenerator graphGen(wop.GetGeneratorParameters());
             obj->Create(&graphGen);
         }
-        else if (genType == ModelGeneratorType)
+        else if (genType == ModelGeneratorType || genType == TerrainGeneratorType)
         {
             continue;
         }

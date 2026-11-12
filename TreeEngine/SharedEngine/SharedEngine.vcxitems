@@ -19,8 +19,9 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugGizmoAdapter.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugVectorEditor.h" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GameLoader.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TerrainPackage.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Terrain.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\OpacityMicromapBaker.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneCatalog.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.cpp" />
@@ -49,8 +50,9 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneRenderSettings.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfLoader.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Lod.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Lod.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TerrainPackage.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Terrain.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\MetalRoughSpheres.glb" />

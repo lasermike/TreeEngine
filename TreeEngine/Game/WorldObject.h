@@ -21,6 +21,7 @@ enum GeneratorType
     LSystemGeneratorType,
     GraphGeneratorType,
     ModelGeneratorType,
+    TerrainGeneratorType,
 };
 
 enum ObjectType
@@ -30,7 +31,8 @@ enum ObjectType
     ObjectType_Tree,
     ObjectType_Graph,
     ObjectType_Model,
-    ObjectType_MAX = ObjectType_Model
+    ObjectType_Terrain,
+    ObjectType_MAX = ObjectType_Terrain
 };
 
 enum Extent

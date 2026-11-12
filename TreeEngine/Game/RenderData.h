@@ -107,6 +107,10 @@ struct RenderProfile
     UINT drawnLeaves = 0;
     UINT drawnSticks = 0;
     UINT fadingObjects = 0;                 // Instanced trees crossfading between LOD layouts this frame.
+    UINT terrainNodes = 0;                  // Terrain: nodes chosen, drawn in the regular pass after culling, resident,
+    UINT terrainDrawnNodes = 0;             // and loaded this frame.
+    UINT terrainResidentNodes = 0;
+    UINT terrainLoadedNodes = 0;
     UINT batchedDraws = 0;                  // Batched instance draws, and the objects they drew (see RenderManager::Render).
     UINT batchedObjects = 0;
     double instanceUploadMs = 0;            // Copying the CPU instance array into the frame's instance buffer.
