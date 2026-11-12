@@ -6,6 +6,7 @@
 #include <string>
 #include <cstdint>
 #include "ObjectSelection.h"
+#include "SceneLoadProfile.h"
 #include "ObjectHighlight.h"
 
 class ShadowMap;
@@ -186,6 +187,7 @@ struct RenderData : SceneRenderSettings
     // owner's dynamic geometry into its own BLAS.
     const void*         currentDrawOwner = nullptr;
     ObjectSelection selection;
+    SceneLoadProfile loadProfile;
     std::vector<ObjectHighlight> highlights;
     bool picking = false;
     UINT pickObjectId = 0;

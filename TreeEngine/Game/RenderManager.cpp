@@ -81,14 +81,18 @@ HRESULT RenderManager::SetPlatform(HMODULE platformDLL)
 
 HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, SceneRoot& scene)
 {
+    SceneLoadScope timer(&m_renderData.loadProfile, "graphics.manager");
     HRR(UninitGameLevelGraphics());
 
     m_lastMaxInstances = maxInstances;
     m_lastUseShadowMaps = useShadowMaps;
  
     // Create vertices and indice for geometry
-    GeometryGenerator::BuildGeometryBuffers(m_geometryData);
-    scene.AppendGeometry(m_geometryData);
+    {
+        SceneLoadScope geometryTimer(&m_renderData.loadProfile, "graphics.geometry.cpu");
+        GeometryGenerator::BuildGeometryBuffers(m_geometryData);
+        scene.AppendGeometry(m_geometryData);
+    }
 
     // The platform sizes its ray-tracing geometry from instances drawn per frame, which instanced objects can make larger
     // than the instance-buffer slots they reserve.
@@ -134,6 +138,7 @@ HRESULT InstanceBufferRing::Create(const UINT sizeBytes, const UINT numInstances
 
 HRESULT RenderManager::UninitGameLevelGraphics()
 {
+    SceneLoadScope timer(&m_renderData.loadProfile, "graphics.cleanup");
     m_renderData.selection.Invalidate();
     m_renderData.highlights.clear();
     m_renderData.pickObjects.clear();
@@ -699,6 +704,7 @@ std::shared_ptr<OpacityMicromap::AlphaImage> RenderManager::LoadOpacityAlpha(con
 
 int RenderManager::RegisterLeafOpacity(const ShaderMaterial& material, const GltfTextureSource* baseColor, XMFLOAT4 atlasRect)
 {
+    SceneLoadScope timer(&m_renderData.loadProfile, "graphics.opacity.register");
     // Matches the any-hit alpha test: a base-color texture sampled at mip 0, compared with flags.z.
     const float cutoff = material.flags.z;
     // Not for alpha blending or transmission: their any-hit ignores hits for reasons other than alpha.
@@ -716,6 +722,7 @@ int RenderManager::RegisterLeafOpacity(const ShaderMaterial& material, const Glt
     if (found != m_ommEntries.end())
         return found->second;
     m_ommEntries[key] = -1;
+    SceneLoadScope bakeTimer(&m_renderData.loadProfile, "graphics.opacity.bake");
     const auto alpha = LoadOpacityAlpha(*baseColor, wrap);
     if (!alpha)
         return -1;
@@ -758,6 +765,7 @@ int RenderManager::RegisterLeafOpacity(const ShaderMaterial& material, const Glt
 
 HRESULT RenderManager::FinalizeOpacityMicromaps()
 {
+    SceneLoadScope timer(&m_renderData.loadProfile, "graphics.opacity.upload");
     if (m_ommTriangleIndices.empty())
         return S_OK;
     const HRESULT hr = GetPlatform()->BuildOpacityMicromaps(m_ommData.data(), m_ommData.size(), m_ommByteOffsets.data(),

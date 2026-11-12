@@ -404,6 +404,7 @@ HRESULT RenderPlatform12::ExecuteCurrentCommandList(bool waitOnFence)
 
 HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, GeometryBufferData& geometryData)
 {
+    SceneLoadScope timer(&m_renderData->loadProfile, "graphics.platform");
     if (geometryData.vertices.size() > UINT_MAX / sizeof(SimpleVertex) ||
         geometryData.vertices.size() > INT_MAX ||
         geometryData.indices.size() > UINT_MAX / sizeof(UINT) ||
@@ -1254,6 +1255,7 @@ LRESULT RenderPlatform12::Gui_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam,
 
 HRESULT RenderPlatform12::LoadVertexShader(const wchar_t* shaderFilename, VertexShader** shader)
 {
+    SceneLoadScope timer(&m_renderData->loadProfile, "graphics.shaders.vertex");
     VertexShader* vertexShader = new VertexShader();
 
 #if defined(TREE_XBOX)
@@ -1271,6 +1273,7 @@ HRESULT RenderPlatform12::LoadVertexShader(const wchar_t* shaderFilename, Vertex
 
 HRESULT RenderPlatform12::LoadPixelShader(const wchar_t* shaderFilename, PixelShader** shader)
 {
+    SceneLoadScope timer(&m_renderData->loadProfile, "graphics.shaders.pixel");
     PixelShader* pixelShader = new PixelShader();
 #if defined(TREE_XBOX)
     pixelShader->shader = RenderCommon::LoadData(shaderFilename);
@@ -1287,6 +1290,7 @@ HRESULT RenderPlatform12::LoadPixelShader(const wchar_t* shaderFilename, PixelSh
 
 HRESULT RenderPlatform12::LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader)
 {
+    SceneLoadScope timer(&m_renderData->loadProfile, "graphics.shaders.compute");
     ComputeShader* newShader = new ComputeShader();
 #if defined(TREE_XBOX)
     newShader->shader = RenderCommon::LoadData(shaderFilename);
@@ -1302,6 +1306,7 @@ HRESULT RenderPlatform12::LoadComputeShader(const wchar_t* shaderFilename, Compu
 
 HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numInstances, D3DBuffer** d3dBuffer)
 {
+    SceneLoadScope timer(&m_renderData->loadProfile, "graphics.instanceBuffers");
     D3DBuffer* newBuffer = new D3DBuffer();
 
     HRR(m_d3dDevice->CreateCommittedResource(
@@ -1340,6 +1345,7 @@ HRESULT RenderPlatform12::CreateD3DBuffer(const UINT sizeBytes, const UINT numIn
 
 void RenderPlatform12::WaitForGPUWork()
 {
+    SceneLoadScope timer(m_renderData ? &m_renderData->loadProfile : nullptr, "graphics.gpuWait");
     if (m_commandQueue)
     {
         IncrementFenceOnGPU();
@@ -1912,8 +1918,20 @@ static HRESULT CreateRgbaTextureFromBgraImage(ID3D12Device* device, ResourceUplo
 }
 #endif
 
+static std::string LoadTextureProfileName(const wchar_t* name)
+{
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, name, -1, nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) return "texture/unknown";
+    std::string text(bytes, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, name, -1, &text[0], bytes, nullptr, nullptr);
+    text.pop_back();
+    return "texture/" + text;
+}
+
 HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textureIndex, LoadedTexture** texture)
 {
+    SceneLoadScope timer(&m_renderData->loadProfile, "graphics.textures.file");
+    SceneLoadScope fileTimer(&m_renderData->loadProfile, LoadTextureProfileName(textureFilename));
     if (textureIndex < 0 || textureIndex >= maxTotalTexturesInScene + 2) return E_BOUNDS;
     CD3DX12_CPU_DESCRIPTOR_HANDLE newDescriptor(m_loadTextureHeap->GetCPUDescriptorHandleForHeapStart(), textureIndex, m_descriptorHeap.GetIncrementSize());
 
@@ -1936,7 +1954,10 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
         resourceUpload.Transition(wicTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         auto uploadFinished = resourceUpload.End(GetCommandQueue());
-        uploadFinished.get();
+        {
+            SceneLoadScope waitTimer(&m_renderData->loadProfile, "graphics.textures.uploadWait");
+            uploadFinished.get();
+        }
 
         const auto textureDesc = wicTexture->GetDesc();
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -1979,8 +2000,10 @@ HRESULT RenderPlatform12::LoadTexture(const wchar_t* textureFilename, int textur
     return S_OK;
 }
 
-HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* /*name*/, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** texture, int colorSpace)
+HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* name, const uint8_t* data, size_t dataSize, int textureIndex, LoadedTexture** texture, int colorSpace)
 {
+    SceneLoadScope timer(&m_renderData->loadProfile, "graphics.textures.memory");
+    SceneLoadScope fileTimer(&m_renderData->loadProfile, LoadTextureProfileName(name));
 #if defined(TREE_XBOX)
     return E_NOTIMPL;
 #else
@@ -2022,7 +2045,10 @@ HRESULT RenderPlatform12::LoadTextureFromMemory(const wchar_t* /*name*/, const u
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     auto uploadFinished = resourceUpload.End(GetCommandQueue());
-    uploadFinished.get();
+    {
+        SceneLoadScope waitTimer(&m_renderData->loadProfile, "graphics.textures.uploadWait");
+        uploadFinished.get();
+    }
 
     const auto textureDesc = wicTexture->GetDesc();
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -2191,6 +2217,12 @@ HRESULT RenderPlatform12::CreateMaterial(const wchar_t* name, LoadedTexture* tex
 
 HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, RenderUnit** renderUnit)
 {
+    SceneLoadScope timer(&m_renderData->loadProfile, "graphics.pipeline.units");
+    const auto createPipeline = [&](const D3D12_GRAPHICS_PIPELINE_STATE_DESC* desc, REFIID iid, void** output)
+    {
+        SceneLoadScope pipelineTimer(&m_renderData->loadProfile, "graphics.pipeline.create");
+        return GetDevice()->CreateGraphicsPipelineState(desc, iid, output);
+    };
     // create PSO
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     if (mesh->m_inputLayout == SKINNED_INPUT_LAYOUT)
@@ -2229,13 +2261,13 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     AddVelocityTarget(psoDesc);
 
     ID3D12PipelineState* pipelineState = nullptr;
-    HRR(GetDevice()->CreateGraphicsPipelineState(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&pipelineState));
+    HRR(createPipeline(&psoDesc, __uuidof(ID3D12PipelineState), (void**)&pipelineState));
     pipelineState->SetName(L"Render Unit pso");
     ID3D12PipelineState* pipelineStateHdr = nullptr;
     {
         D3D12_GRAPHICS_PIPELINE_STATE_DESC hdrDesc = psoDesc;
         hdrDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        HRR(GetDevice()->CreateGraphicsPipelineState(&hdrDesc, IID_PPV_ARGS(&pipelineStateHdr)));
+        HRR(createPipeline(&hdrDesc, IID_PPV_ARGS(&pipelineStateHdr)));
         pipelineStateHdr->SetName(L"Render Unit pso (HDR)");
     }
 
@@ -2251,10 +2283,10 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
         dxrDesc.PS = CD3DX12_SHADER_BYTECODE(m_depthMotionPixelShader->shader);
 #endif
         dxrDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = 0;
-        HRR(GetDevice()->CreateGraphicsPipelineState(&dxrDesc, IID_PPV_ARGS(&pipelineStateDxr)));
+        HRR(createPipeline(&dxrDesc, IID_PPV_ARGS(&pipelineStateDxr)));
         pipelineStateDxr->SetName(L"Render Unit pso (DXR depth and motion)");
         dxrDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        HRR(GetDevice()->CreateGraphicsPipelineState(&dxrDesc, IID_PPV_ARGS(&pipelineStateDxrHdr)));
+        HRR(createPipeline(&dxrDesc, IID_PPV_ARGS(&pipelineStateDxrHdr)));
         pipelineStateDxrHdr->SetName(L"Render Unit pso (DXR depth and motion, HDR)");
     }
 
@@ -2279,7 +2311,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     shadowPsoDesc.NumRenderTargets = 0;
 
     ID3D12PipelineState* pipelineStateShadowMap = nullptr;
-    HRR(GetDevice()->CreateGraphicsPipelineState(&shadowPsoDesc, __uuidof(ID3D12PipelineState), (void**)&pipelineStateShadowMap));
+    HRR(createPipeline(&shadowPsoDesc, __uuidof(ID3D12PipelineState), (void**)&pipelineStateShadowMap));
 
     ID3D12PipelineState* pipelineStates[NUM_RENDER_PASSES] = { pipelineState, pipelineStateShadowMap };
     *renderUnit = new RenderUnit(material, mesh, pipelineStates);
@@ -2296,7 +2328,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
         pickDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
         pickDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
         pickDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-        HRR(GetDevice()->CreateGraphicsPipelineState(&pickDesc, IID_PPV_ARGS(&(*renderUnit)->m_pickPipelineState)));
+        HRR(createPipeline(&pickDesc, IID_PPV_ARGS(&(*renderUnit)->m_pickPipelineState)));
         m_gameLevelPSOs[std::to_string((*renderUnit)->id) + "Pick"] = (*renderUnit)->m_pickPipelineState;
     }
     m_gameLevelRenderUnits.push_back(*renderUnit);

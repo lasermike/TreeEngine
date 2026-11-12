@@ -12,6 +12,7 @@
 #include "SceneInstantiation.h"
 #include "SceneRenderSettings.h"
 #include <stdexcept>
+#include "SceneLoadProfile.h"
 
 void GameData::ResetToDefaults()
 {
@@ -33,7 +34,7 @@ namespace
     }
 }
 
-void GameLoader::Regenerate(SceneRoot* pScene)
+void GameLoader::Regenerate(SceneRoot* pScene, SceneLoadProfile* profile)
 {
     if ((unsigned int)_currentSeed + 1 > _seeds.size())
     {
@@ -50,12 +51,14 @@ void GameLoader::Regenerate(SceneRoot* pScene)
         if (obj->IsInstance())
             continue;
 
+        SceneLoadScope objectTimer(profile, "generation.object/" + obj->GetParams().name);
+
         GeneratorType genType = obj->GetParams().generatorType;
         if (genType == LSystemGeneratorType)
         {
             WorldObjectParameters<LSystemParams>& wop = obj->GetParams<LSystemParams>();
 
-            LSystemModelGenerator generater(wop.GetGeneratorParameters()); // TODO
+            LSystemModelGenerator generater(wop.GetGeneratorParameters(), profile);
             obj->Create(&generater);
         }
         else if (genType == FixedTreeGeneratorType)
