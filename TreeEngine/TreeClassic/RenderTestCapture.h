@@ -72,6 +72,12 @@ struct RenderTestRequest
     bool batchInstances = true;        // "batchInstances": false draws each instanced object on its own.
     int shadowCascades = 3;            // "shadowCascades": raster shadow cascades, 1 to 4.
     float shadowDistance = 150.0f;     // "shadowDistance": how far raster shadows reach, in meters.
+    // Ray-cost diagnostics (see Settings::m_rayContactShading and the rest).
+    bool rayContactShading = true;     // "rayContactShading"
+    int raySunSamples = 0;             // "raySunSamples": 0 keeps the scene's
+    bool rayAlphaTest = true;          // "rayAlphaTest"
+    bool rayShadows = true;            // "rayShadows"
+    bool rayOpaqueGeometry = false;    // "rayOpaqueGeometry"
     int lodFadeFrames = 0;             // "lodFadeFrames": frames of LOD crossfade; 0 switches layouts at once.
     bool hdr = false;                  // Defaults for every capture; see RenderTestPoint.
     std::string tonemap = "clamp";

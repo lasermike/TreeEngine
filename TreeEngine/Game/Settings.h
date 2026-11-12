@@ -30,6 +30,14 @@ public:
     int m_shadowCascades = 3;
     float m_shadowDistance = 150.0f;
     bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
+    // Ray-tracing cost diagnostics (debug UI "Ray costs"; render-test fields ray*): turn one kind of ray work off to
+    // measure what it costs. Contact shading's probe rays, a sun-shadow sample count in place of the scene's (0 keeps
+    // it), the any-hit alpha test (off accepts every hit, so leaves become solid cards), and flagging geometry without
+    // an alpha test, blending or transmission opaque so it skips the any-hit shader (which also makes it two-sided).
+    bool m_rayContactShading = true;
+    int m_sunShadowSamplesOverride = 0;
+    bool m_rayAlphaTest = true;
+    bool m_rayOpaqueGeometry = false;
     // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
     // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.
     // Fsr: AMD FSR through the FidelityFX API (Game/UpscalerFsr.cpp), when its DLLs are next to the executable.

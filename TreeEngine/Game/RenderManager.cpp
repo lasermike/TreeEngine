@@ -994,18 +994,20 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
     cb.globalFlags = (m_renderData.pShadowMap && m_settings->m_shadowsEnabled && !m_settings->m_dxrEnabled ? 0x1 : 0x0)
         | (m_settings->m_shadowsEnabled ? 0x0 : 0x2)
         | (m_settings->m_hashedAlphaTest ? 0x4 : 0x0)
-        | (m_renderData.hdrSceneColor ? 0x8 : 0x0);
+        | (m_renderData.hdrSceneColor ? 0x8 : 0x0)
+        | (m_settings->m_rayAlphaTest ? 0x0 : 0x10);
     cb.light = m_renderData.dirLights[0];
     cb.numDirectionalLights = m_renderData.numDirectionalLights;
     cb.numPointLights = 0;
     XMScalarSinCos(&cb.environmentRotationSin, &cb.environmentRotationCos,
         XMConvertToRadians(m_renderData.environmentRotationDegrees));
     cb.ambientOcclusionRadius = m_renderData.ambientOcclusionRadius;
-    cb.ambientOcclusionStrength = m_renderData.ambientOcclusionStrength;
+    cb.ambientOcclusionStrength = m_settings->m_rayContactShading ? m_renderData.ambientOcclusionStrength : 0.0f;
     // y: the frame number (mod 1024), which varies the LOD crossfade dither each frame (see FadeDither).
     cb.sceneTime = XMFLOAT4(m_renderData.normalAnimationTime, static_cast<float>(m_renderData.frame & 1023), 0, 0);
     cb.sunShadowParams = XMFLOAT4(tanf(XMConvertToRadians(m_renderData.sunAngularDiameterDegrees) * 0.5f),
-        static_cast<float>(m_renderData.sunShadowSamples), 0, 0);
+        static_cast<float>(m_settings->m_sunShadowSamplesOverride > 0 ? m_settings->m_sunShadowSamplesOverride
+            : m_renderData.sunShadowSamples), 0, 0);
     const int reflectionRays = m_settings->m_waterReflectionRays;
     cb.reflectionRayCount = m_settings->m_waterReflections
         ? static_cast<UINT>(reflectionRays < 1 ? 1 : reflectionRays > 32 ? 32 : reflectionRays)

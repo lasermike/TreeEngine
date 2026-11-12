@@ -102,6 +102,14 @@ public:
         m_settings.m_fixedJitter[0] = jitterX;
         m_settings.m_fixedJitter[1] = jitterY;
     }
+    void SetRenderTestRays(bool contactShading, int sunSamples, bool alphaTest, bool shadows, bool opaqueGeometry)
+    {
+        m_settings.m_rayContactShading = contactShading;
+        m_settings.m_sunShadowSamplesOverride = sunSamples;
+        m_settings.m_rayAlphaTest = alphaTest;
+        m_settings.m_shadowsEnabled = shadows;
+        m_settings.m_rayOpaqueGeometry = opaqueGeometry;
+    }
     void SetRenderTestReflectionRays(int rays) {
         m_settings.m_waterReflections = rays > 0;
         if (rays > 0) m_settings.m_waterReflectionRays = rays;

@@ -51,7 +51,8 @@ cbuffer cbChangesEveryFrame : register(b2)
     float4 eyePos;
     matrix shadowMatrix;
     uint globalFlags;  // bit 0 = use shadow maps; bit 1 = disable ray-traced shadows; bit 2 = hashed alpha test (raster);
-                       // bit 3 = HDR scene color (linear light; tonemapped later)
+                       // bit 3 = HDR scene color (linear light; tonemapped later); bit 4 = rays accept every any-hit
+                       // (Settings::m_rayAlphaTest off, a cost diagnostic)
     int numDirectionalLights;
     int numPointLights;
     float environmentRotationCos;

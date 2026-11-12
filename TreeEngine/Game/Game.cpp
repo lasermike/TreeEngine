@@ -1475,6 +1475,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::SeparatorText("DXR");
         ImGui::Checkbox("Enable DXR", &m_settings.m_dxrEnabled);
         if (!m_settings.m_dxrEnabled) ImGui::TextDisabled("Enable DXR to use these options.");
+
         ImGui::BeginDisabled(!m_settings.m_dxrEnabled);
         const auto& micromaps = sceneRenderSettings.opacityMicromaps;
         if (micromaps.supported)
@@ -1495,6 +1496,14 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Trace transmissive reflections", &m_settings.m_waterReflections);
         if (m_settings.m_waterReflections)
             ImGui::SliderInt("Reflection rays", &m_settings.m_waterReflectionRays, 1, 32);
+        if (ImGui::TreeNode("Ray costs"))
+        {
+            ImGui::Checkbox("Contact shading rays", &m_settings.m_rayContactShading);
+            ImGui::SliderInt("Sun shadow samples (0: scene)", &m_settings.m_sunShadowSamplesOverride, 0, 32);
+            ImGui::Checkbox("Any-hit alpha test", &m_settings.m_rayAlphaTest);
+            ImGui::Checkbox("Opaque geometry skips any-hit", &m_settings.m_rayOpaqueGeometry);
+            ImGui::TreePop();
+        }
         ImGui::EndDisabled();
 
         ImGui::SeparatorText("Raster");

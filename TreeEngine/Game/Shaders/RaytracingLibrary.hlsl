@@ -233,6 +233,8 @@ float4 SampleMaterialMap(int slot, bool clampTexture, ShaderMaterial material, u
 [shader("anyhit")]
 void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
+    if (globalFlags & 0x10)
+        return;     // Cost diagnostic: every hit counts, as if alpha-tested surfaces were solid.
     ShaderMaterial mat = materialBuffer[GeometryRecord()];
     uint primitiveId;
     DxrGeometryInfo geoInfo = HitGeometry(primitiveId);
@@ -503,7 +505,9 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     float3 ibl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
         irradiance, prefiltered);
     float contactVisibility = 1;
-    if (ambientOcclusionRadius > 0 && ambientOcclusionStrength > 0 && mat.opticalParams.y == 0)
+    // Not on reflection samples (payload 3): each reflecting pixel averages up to 32 of them, so 16 contact probes at each
+    // hit were most of the ray time in scenes with water, for no visible difference in the blurred reflection.
+    if (ambientOcclusionRadius > 0 && ambientOcclusionStrength > 0 && mat.opticalParams.y == 0 && payload.isShadow != 3)
     {
         float3 p0 = ObjectToWorldPosition(LoadVertexPosition(geoInfo.vertexBufferOffset + i0));
         float3 p1 = ObjectToWorldPosition(LoadVertexPosition(geoInfo.vertexBufferOffset + i1));

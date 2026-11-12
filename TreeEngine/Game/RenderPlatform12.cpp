@@ -2862,6 +2862,11 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
 
 inline std::size_t hash_combine(std::size_t seed, std::size_t value) noexcept;
 
+// Settings::m_rayOpaqueGeometry: a record whose material has no alpha test, blending or transmission is flagged opaque, so
+// rays skip the any-hit shader on it (which for such geometry only culls back faces).
+#define OpaqueRayGeometry(dr) (m_settings->m_rayOpaqueGeometry && (dr).material.flags.z == 0 && (dr).material.flags.x == 0 \
+    && (dr).material.opticalParams.y == 0)
+
 // The TLAS instance mask of an object whose transform slot carries an LOD crossfade (InstancedData::AtlasRegion:
 // 0 for none, else the float bits of +t fading in or -t fading out, t in (0, 1)). Each ray picks one of seven buckets
 // (bits 1-7, from FadeDither in Shaders/SharedTypes.hlsli), and the layout fading in takes the first round(7t) of
@@ -3712,7 +3717,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         const UINT indexCount = blasIndexCount(dr);
         geometryDesc = {};
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-        geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+        geometryDesc.Flags = OpaqueRayGeometry(dr) ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
         geometryDesc.Triangles.Transform3x4 = 0;
         geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
         geometryDesc.Triangles.VertexBuffer.StartAddress = m_VBWorld->GetGPUVirtualAddress() + dr.vbWorldStart * sizeof(XMFLOAT4);
