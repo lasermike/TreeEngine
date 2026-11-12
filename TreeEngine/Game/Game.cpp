@@ -23,6 +23,7 @@
 #include "imgui_impl_win32.h"
 #include "implot.h"
 #include "DebugVectorEditor.h"
+#include "DebugObjectSelection.h"
 
 using namespace DirectX;
 
@@ -340,6 +341,8 @@ HRESULT Game::LoadScene(const std::string& name)
         m_sceneError = m_loader.GetLastError();
         return hr;
     }
+    m_renderManager.GetRenderData().selection.Invalidate(true);
+    m_renderManager.GetRenderData().highlights.clear();
     m_pScene->DeleteAllChildren();
     m_renderManager.UninitGameLevelGraphics();
     delete m_pScene;
@@ -1066,8 +1069,40 @@ int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
 
 
 
+void Game::UpdateObjectSelection()
+{
+    auto& data = m_renderManager.GetRenderData();
+    auto& selection = data.selection;
+    selection.ConsumeResults();
+    const auto* viewport = ImGui::GetMainViewport();
+    const auto& io = ImGui::GetIO();
+    if (!io.WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        const float u = (io.MousePos.x - viewport->Pos.x) / viewport->Size.x;
+        const float v = (io.MousePos.y - viewport->Pos.y) / viewport->Size.y;
+        if (u >= 0 && u < 1 && v >= 0 && v < 1)
+            selection.Click(u, v, io.KeyCtrl);
+    }
+    if (m_settings.m_showDebugUI && !m_selectionUIWasVisible)
+        selection.reveal = selection.latest;
+    m_selectionUIWasVisible = m_settings.m_showDebugUI;
+    data.highlights.clear();
+    for (auto* object : m_pScene->Children())
+    {
+        if (!selection.Contains(object)) continue;
+        ObjectHighlight highlight;
+        const auto* bounds = object->GetBoundingBox();
+        highlight.bounds[0] = bounds[0];
+        highlight.bounds[1] = bounds[1];
+        highlight.occlusion = m_settings.m_highlightsThroughGeometry
+            ? HighlightOcclusion::AlwaysVisible : HighlightOcclusion::SceneDepth;
+        data.highlights.push_back(highlight);
+    }
+}
+
 HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 {
+    UpdateObjectSelection();
     // The window procedure drops key presses while this is set, so it must clear whenever the window isn't drawn:
     // closing the window while it had keyboard focus would otherwise leave every key, Tab included, ignored.
     m_bDebugUIKeyCaptured = false;
@@ -1473,6 +1508,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
 
     int nextInputBuffer = 0;
 
+    auto& objectSelection = m_renderManager.GetRenderData().selection;
+    if (objectSelection.reveal) ImGui::SetNextItemOpen(true);
     if (ImGui::CollapsingHeader("Scene", ImGuiTreeNodeFlags_DefaultOpen))
     {
         // Scene select
@@ -1576,6 +1613,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         else if (!m_sceneStatus.empty()) ImGui::TextWrapped("%s", m_sceneStatus.c_str());
         for (const auto& diagnostic : m_loader.Catalog().Diagnostics())
             ImGui::TextWrapped("Discovery: %s", diagnostic.c_str());
+        ImGui::Checkbox("Show highlights through geometry", &m_settings.m_highlightsThroughGeometry);
+        if (objectSelection.reveal) ImGui::SetNextItemOpen(true);
         if (ImGui::TreeNodeEx("Objects", ImGuiTreeNodeFlags_DefaultOpen,
             "Objects (%zu)", m_pScene->Children().size()))
         {
@@ -1585,7 +1624,12 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                 ImGui::PushID(obj);
                 const char* objectName = params.name.empty()
                     ? s_szObjectTypeNames[obj->GetObjectType()] : params.name.c_str();
-                if (ImGui::TreeNodeEx("Object", ImGuiTreeNodeFlags_None, "%s", objectName))
+                const bool objectOpen = ImGui::TreeNodeEx("Object", ImGuiTreeNodeFlags_OpenOnArrow
+                    | (objectSelection.Contains(obj) ? ImGuiTreeNodeFlags_Selected : 0), "%s", objectName);
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
+                    objectSelection.SelectRow(obj, ImGui::GetIO().KeyCtrl);
+                DebugObjectSelection::RevealRow(obj, objectSelection);
+                if (objectOpen)
                 {
                     ImGui::Text("Object type: %s", s_szObjectTypeNames[obj->GetObjectType()]);
                     ImGui::Text("Generator: %s", GeneratorTypeName(params.generatorType));
@@ -1834,6 +1878,8 @@ void Game::ComputeCPU()
             auto settings = m_renderManager.GetSceneSettings();
             GameData data;
             InstantiateScene(definition, *next, settings, *m_player, data, m_sceneFilename);
+            m_renderManager.GetRenderData().selection.Invalidate(true);
+            m_renderManager.GetRenderData().highlights.clear();
             m_pScene->DeleteAllChildren();
             m_renderManager.UninitGameLevelGraphics();
             delete m_pScene;

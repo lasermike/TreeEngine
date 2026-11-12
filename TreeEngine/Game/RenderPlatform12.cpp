@@ -3,6 +3,7 @@
 #include "RenderPlatform.h"
 #include "Settings.h"
 #include "OpacityMicromapBaker.h"
+#include "HighlightGeometry.h"
 #include <chrono>
 #include <unordered_set>
 #include <ppl.h>
@@ -453,7 +454,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     //   cbuffer cbChangesPerPass : register(b1)
     //   cbuffer cbChangesEveryFrame : register(b2)
     //   cbuffer cbMaterial : register (b3)
-    //   cbuffer cbObjectTransform : register(b4) - one root constant per draw
+    //   cbuffer cbObjectTransform : register(b4) - object transform slot and picking ID per draw
 
     CD3DX12_DESCRIPTOR_RANGE ranges[5];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1 /* t1 */);
@@ -473,8 +474,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     rootParameters[BranchDataRootSignatureParam].InitAsShaderResourceView(BranchDataRootSignatureShaderSlot);
     rootParameters[ChangesPerPassRootSignatureParam].InitAsConstantBufferView(ChangesPerPassRootSignatureShaderSlot);
     rootParameters[ChangesEveryFrameRootSignatureParam].InitAsConstantBufferView(ChangesEveryFrameRootSignatureShaderSlot);
-    // cbObjectTransform (Shaders/Tree.hlsl): the object transform slot and a batched draw's range and list.
-    rootParameters[ObjectTransformRootSignatureParam].InitAsConstants(4, 4 /* b4 */, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+    // cbObjectTransform (Shaders/Tree.hlsl): the object transform slot, a batched draw's range and list, and the
+    // picking ID (read by the pick pixel shader, so visible to every stage).
+    rootParameters[ObjectTransformRootSignatureParam].InitAsConstants(5, 4 /* b4 */, 0, D3D12_SHADER_VISIBILITY_ALL);
     // Last frame's instance buffer, for motion vectors.
     rootParameters[PreviousInstancesRootSignatureParam].InitAsShaderResourceView(PreviousInstancesRootSignatureShaderSlot, 0,
         D3D12_SHADER_VISIBILITY_VERTEX);
@@ -698,6 +700,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     HRR(LoadPixelShader(L"PS.cso", &m_pixelShader));
     m_depthMotionPixelShader = nullptr;
     HRR(LoadPixelShader(L"PSDepthMotion.cso", &m_depthMotionPixelShader));
+    HRR(LoadPixelShader(L"PSPick.cso", &m_pickPixelShader));
 
     // Load shadow shaders
     m_shadowVertexShader = nullptr;
@@ -1398,6 +1401,15 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
     WaitForGPUWork();
+    m_pendingObjectPicks.clear();
+    m_pickTarget.Release();
+    m_pickDepth.Release();
+    m_pickRtvHeap.Release();
+    m_pickDsvHeap.Release();
+    m_pickPassRecorded = false;
+    m_highlightPipeline.Release();
+    m_highlightRootSignature.Release();
+    m_highlightDepthHeap.Release();
     if (imGuiInitialized)
     {
         const char* iniFilename = ImGui::GetIO().IniFilename;
@@ -1587,9 +1599,13 @@ HRESULT RenderPlatform12::EndFrame(D3DBuffer* buffer)
     return hr;
 }
 
+#include "ObjectPicking12.inl"
+#include "ObjectHighlight12.inl"
+
 HRESULT RenderPlatform12::RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer)
 {
     m_currentInstanceBuffer = instancedBuffer->Get(m_renderData->frame);
+    if (m_renderData->picking) HRR(BeginObjectPicking());
 
     return S_OK;
 }
@@ -1624,6 +1640,7 @@ HRESULT RenderPlatform12::SetRenderUnit(RenderUnit* ru, RenderPass pass)
         else if (hdr && ru->m_hdrPipelineState)
             pipelineState = ru->m_hdrPipelineState;
     }
+    if (m_renderData->picking) pipelineState = ru->m_pickPipelineState;
     GetCommandList()->SetPipelineState(pipelineState);
 
     // Set vertex/index buffers
@@ -1656,12 +1673,12 @@ HRESULT RenderPlatform12::DrawIndexedInstanced(
     // only recorded for DXR (culled) sets nothing.
     if (!m_renderData->currentDrawCulled)
     {
-        const UINT constants[4] = { ObjectTransformSlot, 0, 0, 0 };
-        GetCommandList()->SetGraphicsRoot32BitConstants(ObjectTransformRootSignatureParam, 4, constants, 0);
+        const UINT constants[5] = { ObjectTransformSlot, 0, 0, 0, m_renderData->pickObjectId };
+        GetCommandList()->SetGraphicsRoot32BitConstants(ObjectTransformRootSignatureParam, 5, constants, 0);
     }
 #if defined(DXR_ENABLED)
     if (m_dxrEnabledThisFrame
-        && m_renderData->currentPass == RegularPass && !m_renderData->currentDrawRasterOnly)
+        && m_renderData->currentPass == RegularPass && !m_renderData->currentDrawRasterOnly && !m_renderData->picking)
     {
         if (m_currentMaterial && m_currentMaterial->m_isSkybox)
         {
@@ -1744,8 +1761,8 @@ HRESULT RenderPlatform12::DrawBatched(UINT indexCount, UINT startIndex, INT base
     const CD3DX12_RANGE written(listStart * sizeof(InstancedData), (listStart + listSlots) * sizeof(InstancedData));
     buffer->Unmap(0, &written);
 
-    const UINT constants[4] = { UINT_MAX, layoutStart, layoutSize, listStart };
-    GetCommandList()->SetGraphicsRoot32BitConstants(ObjectTransformRootSignatureParam, 4, constants, 0);
+    const UINT constants[5] = { UINT_MAX, layoutStart, layoutSize, listStart, 0 };
+    GetCommandList()->SetGraphicsRoot32BitConstants(ObjectTransformRootSignatureParam, 5, constants, 0);
     GetCommandList()->DrawIndexedInstanced(indexCount, layoutSize * copies, startIndex, baseVertex, layoutStart);
     return S_OK;
 }
@@ -2269,6 +2286,19 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     (*renderUnit)->m_hdrPipelineState = pipelineStateHdr;
     (*renderUnit)->m_dxrPipelineState = pipelineStateDxr;
     (*renderUnit)->m_dxrHdrPipelineState = pipelineStateDxrHdr;
+    if (!material->m_isSkybox)
+    {
+        auto pickDesc = psoDesc;
+        pickDesc.PS = CD3DX12_SHADER_BYTECODE(m_pickPixelShader->shader);
+        pickDesc.NumRenderTargets = 1;
+        for (auto& format : pickDesc.RTVFormats) format = DXGI_FORMAT_UNKNOWN;
+        pickDesc.RTVFormats[0] = DXGI_FORMAT_R32_UINT;
+        pickDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+        pickDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+        pickDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+        HRR(GetDevice()->CreateGraphicsPipelineState(&pickDesc, IID_PPV_ARGS(&(*renderUnit)->m_pickPipelineState)));
+        m_gameLevelPSOs[std::to_string((*renderUnit)->id) + "Pick"] = (*renderUnit)->m_pickPipelineState;
+    }
     m_gameLevelRenderUnits.push_back(*renderUnit);
 
     CHAR name[32];
@@ -4989,6 +5019,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     ProfileTimestamp(ProfilePass::Main, false);
     // Ensure last frame is completed
     WaitOnFence();
+    HRR(ResolveObjectPicking());
     // Resources retired while recording the previous frame are no longer in use; this frame's wait one more.
     m_retiredResources.clear();
     m_retiredResources.swap(m_retiringResources);
@@ -5544,6 +5575,7 @@ HRESULT RenderPlatform12::RenderSmaa(UINT width, UINT height)
 HRESULT RenderPlatform12::RenderPostProcess()
 {
     HRESULT hr = S_OK;
+    HRR(FinishObjectPicking());
     ProfileTimestamp(ProfilePass::Main, true);
 
 #if defined(DXR_ENABLED)
@@ -5939,6 +5971,12 @@ HRESULT RenderPlatform12::RenderDebugUI()
 HRESULT RenderPlatform12::RenderEpilog(bool /*oculus*/, bool useShadowMaps, bool renderToSharedTexture)
 {
     HRESULT hr = S_OK;
+    HRR(DrawObjectHighlights());
+    if (imGuiInitialized)
+    {
+        ID3D12DescriptorHeap* heaps[] = { g_pd3dSrvDescHeap };
+        GetCommandList()->SetDescriptorHeaps(1, heaps);
+    }
 
     if (imGuiInitialized)
     {

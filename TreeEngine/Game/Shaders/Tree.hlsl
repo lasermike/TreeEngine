@@ -87,6 +87,7 @@ cbuffer cbObjectTransform : register(b4)
     uint batchLayoutStart;
     uint batchLayoutSize;
     uint batchListStart;
+    uint pickObjectId;
 };
 
 // This vertex's object transform slot: objectTransformSlot, or for a batched draw its object's (see BeginInstance).
@@ -469,6 +470,14 @@ float4 SampleBaseColor(PS_INPUT input, out Biplanar biplanar)
     else
         textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
     return textureColor;
+}
+
+uint PSPick(PS_INPUT input) : SV_Target0
+{
+    Biplanar biplanar;
+    float4 base = SampleBaseColor(input, biplanar);
+    clip(base.a * mat.Diffuse.a > 0 ? 1 : -1);
+    return pickObjectId;
 }
 
 float4 ShadeSurface(PS_INPUT input)

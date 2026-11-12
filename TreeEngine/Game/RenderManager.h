@@ -68,6 +68,7 @@ class RenderManager : public IRenderFrame
     std::map<wstring, PixelShader*>                 m_pixelShaders;
 
     std::list<RenderUnit*>                          m_renderUnits;
+    std::unordered_map<const void*, UINT> m_pickObjectIds;
     std::map<WorldObject*, UINT>                    m_objectToInstanceBufferOffset;  // Filled in during scene initialization
     // Each object's instance-buffer reservation, in slot order, and the ranges copied to the GPU this frame.
     std::vector<std::pair<WorldObject*, std::pair<UINT, UINT>>> m_instanceReservations;

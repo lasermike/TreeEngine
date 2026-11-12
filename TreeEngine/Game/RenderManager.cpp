@@ -134,6 +134,11 @@ HRESULT InstanceBufferRing::Create(const UINT sizeBytes, const UINT numInstances
 
 HRESULT RenderManager::UninitGameLevelGraphics()
 {
+    m_renderData.selection.Invalidate();
+    m_renderData.highlights.clear();
+    m_renderData.pickObjects.clear();
+    m_pickObjectIds.clear();
+    m_renderData.picking = false;
     HRR(GetPlatform()->UninitGameLevelGraphics());
 
     m_instancedBuffer.Release();
@@ -311,7 +316,7 @@ bool RenderManager::IsVisible(WorldObject* object)
 HRESULT RenderManager::RenderScene(RenderPass pass)
 {
     HRR(GetPlatform()->RenderSceneSetup(pass, &m_instancedBuffer));
-    if (pass == RegularPass)
+    if (pass == RegularPass && !m_renderData.picking)
         UpdateCullingFrustum();
 
     // Opaque geometry must populate color and depth before transparent surfaces.
@@ -320,6 +325,7 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     {
         for (RenderUnit* ru : m_renderUnits)
         {
+            if (m_renderData.picking && ru->m_material->m_isSkybox) continue;
             const bool blended = ru->m_material->m_renderState.blendState != StockBlendStates::Overwrite;
             if (pass == RegularPass && blended != (phase == 1))
                 continue;
@@ -338,7 +344,8 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
     // Instanced objects (those with an object transform: instanced trees) that draw the same instance range (a layout)
     // are rasterized in one batched draw, so thousands of instances cost a draw per layout instead of one each. DXR
     // still records each object's own draw (culled, so it isn't rasterized). Blended units keep their draw order.
-    const bool batching = m_settings->m_batchInstances && m_batchListCapacity > 0
+    // Picking draws each object with its own ID, so it doesn't batch.
+    const bool batching = m_settings->m_batchInstances && m_batchListCapacity > 0 && !m_renderData.picking
         && ru->m_material->m_renderState.blendState == StockBlendStates::Overwrite;
     const bool recordEach = batching && GetPlatform()->RecordsDraws(pass);
     m_usedInstanceBatches = 0;
@@ -362,6 +369,18 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
         if (numInstances > 0)
         {
             m_renderData.currentDrawOwner = part ? range.fadeOwner : object;
+            if (m_renderData.picking)
+            {
+                auto& objects = m_renderData.pickObjects;
+                auto found = m_pickObjectIds.find(object);
+                if (found == m_pickObjectIds.end())
+                {
+                    objects.push_back(object);
+                    m_renderData.pickObjectId = static_cast<UINT>(objects.size());
+                    m_pickObjectIds.emplace(object, m_renderData.pickObjectId);
+                }
+                else m_renderData.pickObjectId = found->second;
+            }
             // The regular pass culls against the view, each shadow cascade against its light-space box.
             m_renderData.currentDrawCulled = m_settings->m_viewCulling && (pass == RegularPass || pass == ShadowMapPass)
                 && !IsVisible(object);
@@ -914,6 +933,7 @@ HRESULT RenderManager::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pP
 
 HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
 {
+    m_renderData.selection.Invalidate();
     HRESULT hr = S_OK;
 
     // Release resources
@@ -1020,6 +1040,14 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
         DrawFrameStats();
     }
 
+    if (!m_renderData.selection.requests.empty())
+    {
+        m_renderData.picking = true;
+        m_renderData.pickObjects.clear();
+        m_pickObjectIds.clear();
+        HRC(RenderScene(RegularPass));
+        m_renderData.picking = false;
+    }
     HRC(GetPlatform()->RenderPostProcess());  // Does effects and then copies offscreen back to render target 
 
     HRC(GetPlatform()->RenderDebugUI());  // If ImGui is enabled it will be initialized here
@@ -1044,6 +1072,7 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
 
 
 Cleanup:
+    m_renderData.picking = false;
     if (FAILED(hr))
         m_settings->m_captureResult = hr;
     return;

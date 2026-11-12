@@ -85,6 +85,10 @@ public:
     void SetRenderTestBatchInstances(bool batch) { m_settings.m_batchInstances = batch; }
     void SetRenderTestLodFadeFrames(int frames) { m_settings.m_lodFadeFrames = frames; }
     void SetRenderTestShadows(int cascades, float distance) { m_settings.m_shadowCascades = cascades; m_settings.m_shadowDistance = distance; }
+    void SetRenderTestHighlightsThroughGeometry(bool enabled)
+    {
+        m_settings.m_highlightsThroughGeometry = enabled;
+    }
     void SetRenderTestRenderScale(float scale) { m_settings.m_renderScale = scale; }
     void SetRenderTestHdr(bool hdr, Settings::Tonemap tonemap, float exposure) {
         m_settings.m_hdr = hdr;
@@ -153,6 +157,8 @@ private:
     void Update(DX::StepTimer const& timer);
     HRESULT Regenerate();
     void HandleInput(bool key[512]);
+    void UpdateObjectSelection();
+    bool m_selectionUIWasVisible = false;
     void HandleGamepadInput(bool key[512]);
 
     HRESULT ReloadDevice();
