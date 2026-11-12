@@ -81,6 +81,7 @@ StructuredBuffer<InstancedData> PreviousInstanceBuffer : register(t9);
 cbuffer cbObjectTransform : register(b4)
 {
     uint objectTransformSlot;
+    uint pickObjectId;
 };
 
 // Last frame's matrix for an instance whose slot last frame was previousSlot; current when it has no history.
@@ -374,6 +375,14 @@ float4 SampleBaseColor(PS_INPUT input, out Biplanar biplanar)
     else
         textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
     return textureColor;
+}
+
+uint PSPick(PS_INPUT input) : SV_Target0
+{
+    Biplanar biplanar;
+    float4 base = SampleBaseColor(input, biplanar);
+    clip(base.a * mat.Diffuse.a > 0 ? 1 : -1);
+    return pickObjectId;
 }
 
 float4 ShadeSurface(PS_INPUT input)

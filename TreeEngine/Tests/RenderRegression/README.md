@@ -19,6 +19,10 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Verify DXR on/off/on in one process, with and without postprocessing.
 .\Tests\RenderRegression\test-dxr-toggle.ps1
 
+# Verify surface picking, Ctrl-click selection, alpha cutouts, instances, and highlight visibility.
+# Also covers viewport resizing, TAA upscaling, scene replacement, trees, and imported models.
+.\Tests\RenderRegression\test-object-selection.ps1
+
 # Resize the live window in raster and DXR, with and without postprocessing.
 .\Tests\RenderRegression\test-window-resize.ps1
 

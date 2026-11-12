@@ -7,6 +7,16 @@ class Game;
 
 struct RenderTestPoint
 {
+    struct SelectionClick
+    {
+        int frame = 1;
+        float u = 0, v = 0;
+        bool toggle = false;
+    };
+    std::vector<SelectionClick> selectionClicks;
+    bool checkSelection = false;
+    std::vector<std::string> expectedSelection;
+    bool highlightsThroughGeometry = true;
     double time;
     std::wstring filename;
     std::string mode;

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Label="Globals">
     <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
@@ -81,5 +81,13 @@
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\README.md" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\buildShaders.bat" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\commonshader.bat" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectSelection.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugObjectSelection.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectHighlight.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\HighlightGeometry.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectPicking12.inl" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectHighlight12.inl" />
   </ItemGroup>
 </Project>

@@ -35,6 +35,7 @@ class Primitive : public WorldObject
 {
     PrimitiveModel*    _model;
     RenderUnit* m_renderUnit;
+    XMFLOAT3 m_localBounds[2] = {};
 
 public:
     Primitive(WorldObjectParams* wop);

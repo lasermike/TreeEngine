@@ -533,6 +533,7 @@ struct RenderUnit
 
     ID3D12PipelineState*        m_pipelineStates[NUM_RENDER_PASSES];
     ID3D12PipelineState*        m_hdrPipelineState = nullptr;   // The regular pass into the HDR scene target.
+    ID3D12PipelineState*        m_pickPipelineState = nullptr;
     // DXR mode's regular pass (into the LDR or HDR target): depth and motion vectors only, as its color is replaced by
     // the ray-traced image. Null for units with their own pixel shader (the sky), which keep their usual pipeline.
     ID3D12PipelineState*        m_dxrPipelineState = nullptr;
@@ -737,6 +738,7 @@ public:
     VertexShader*                      m_shadowVertexShader;
     PixelShader*                       m_shadowPixelShader;
     PixelShader*                       m_depthMotionPixelShader = nullptr;   // PSDepthMotion: DXR mode's regular pass.
+    PixelShader*                       m_pickPixelShader = nullptr;
     VertexShader*                      m_drawScreenVertexShader;
     PixelShader*                       m_drawR8ScreenPixelShader;
     PixelShader*                       m_drawRGBScreenPixelShader;
@@ -769,6 +771,24 @@ private:
     D3D12_RESOURCE_DESC               m_pDepthStencilView;
 
     CComPtr<ID3D12RootSignature>       m_rootSignature;
+    CComPtr<ID3D12Resource> m_pickTarget, m_pickDepth;
+    CComPtr<ID3D12DescriptorHeap> m_pickRtvHeap, m_pickDsvHeap;
+    struct PendingObjectPick
+    {
+        ObjectPickRequest request;
+        std::vector<const void*> objects;
+        CComPtr<ID3D12Resource> readback;
+        UINT64 fence = 0;
+    };
+    std::deque<PendingObjectPick> m_pendingObjectPicks;
+    bool m_pickPassRecorded = false;
+    HRESULT BeginObjectPicking();
+    HRESULT FinishObjectPicking();
+    HRESULT ResolveObjectPicking();
+    CComPtr<ID3D12RootSignature> m_highlightRootSignature;
+    CComPtr<ID3D12PipelineState> m_highlightPipeline;
+    CComPtr<ID3D12DescriptorHeap> m_highlightDepthHeap;
+    HRESULT DrawObjectHighlights();
     CComPtr<ID3D12RootSignature>       m_computeRootSignature;
     CComPtr<ID3D12CommandQueue>        m_commandQueue;
 

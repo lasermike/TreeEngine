@@ -242,7 +242,9 @@ void ParseRenderTestCommandLine()
     }
     for (const auto& value : json.at("captures"))
     {
-        RenderTestPoint point = { value.at("time").get<double>(), Wide(value.at("filename").get<std::string>()) };
+        RenderTestPoint point;
+        point.time = value.at("time").get<double>();
+        point.filename = Wide(value.at("filename").get<std::string>());
         point.mode = value.value("mode", parsed->mode);
         if (value.contains("width") != value.contains("height"))
             throw std::runtime_error("Capture width and height must be specified together");
@@ -305,6 +307,27 @@ void ParseRenderTestCommandLine()
             || !std::isfinite(point.exposure) || std::abs(point.exposure) > 16)
             throw std::runtime_error("Capture tonemap must be \"clamp\", \"aces\" or \"agx\", and exposure a finite EV");
         point.renderScale = value.value("renderScale", parsed->renderScale);
+        point.highlightsThroughGeometry = value.value("highlightsThroughGeometry", true);
+        if (value.contains("expectedSelection"))
+        {
+            point.checkSelection = true;
+            point.expectedSelection = value.at("expectedSelection").get<std::vector<std::string>>();
+        }
+        if (value.contains("selectionClicks"))
+        {
+            for (const auto& click : value.at("selectionClicks"))
+            {
+                RenderTestPoint::SelectionClick entry;
+                entry.frame = click.value("frame", 1);
+                entry.u = click.at("u").get<float>();
+                entry.v = click.at("v").get<float>();
+                entry.toggle = click.value("ctrl", false);
+                if (entry.frame < 1 || entry.frame + 2 > parsed->warmupFrames + parsed->benchmarkFrames
+                    || !(entry.u >= 0 && entry.u < 1 && entry.v >= 0 && entry.v < 1))
+                    throw std::runtime_error("Selection clicks require valid viewport coordinates and two frames before capture");
+                point.selectionClicks.push_back(entry);
+            }
+        }
         if (!(point.renderScale >= 0.25f && point.renderScale <= 1.0f))
             throw std::runtime_error("Capture renderScale must be in [0.25, 1]");
         if (value.contains("previousTime"))
@@ -533,6 +556,7 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestViewCulling(request->viewCulling);
             game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
             game.SetRenderTestRenderScale(point.renderScale);
+            game.SetRenderTestHighlightsThroughGeometry(point.highlightsThroughGeometry);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion
                 : point.debugView == "reprojection" ? Settings::MotionView::ReprojectedHistory
@@ -571,6 +595,11 @@ int RunRenderTestCapture(Game& game)
                 if (point.hasPreviousCamera)
                     placeCamera(frame < captureFrame);
                 auto start = std::chrono::steady_clock::now();
+                for (const auto& click : point.selectionClicks)
+                {
+                    if (click.frame == frame)
+                        game.GetRenderManager().GetRenderData().selection.Click(click.u, click.v, click.toggle);
+                }
                 const double simulationTime = frame == captureFrame ? point.time
                     : point.hasPreviousTime ? point.previousTime
                     : point.time + std::max(0, frame - request->warmupFrames) * request->benchmarkTimeStep;
@@ -617,12 +646,18 @@ int RunRenderTestCapture(Game& game)
             if (projection.screenWidth != point.width || projection.screenHeight != point.height)
                 throw std::runtime_error("Render target did not follow the window size");
             const auto& renderData = game.GetRenderManager().GetRenderData();
+            std::vector<std::string> selectedNames;
+            for (const auto* object : renderData.selection.objects)
+                selectedNames.push_back(static_cast<WorldObject*>(const_cast<void*>(object))->GetParams().name);
+            if (point.checkSelection && selectedNames != point.expectedSelection)
+                throw std::runtime_error("Selection mismatch: " + nlohmann::json(selectedNames).dump()
+                    + "; expected " + nlohmann::json(point.expectedSelection).dump());
             report["captures"].push_back({ { "scene", currentScene }, { "antialiasing", point.antialiasing },
                 { "postProcessing", point.postProcessing }, { "time", point.time }, { "mode", point.mode },
                 { "width", point.width }, { "height", point.height }, { "renderScale", point.renderScale },
                 { "renderWidth", renderData.renderWidth }, { "renderHeight", renderData.renderHeight },
                 { "upscaler", std::string(renderData.upscalerStatus) }, { "success", true },
-                { "poseCache", point.poseCache }, { "samples", samples } });
+                { "poseCache", point.poseCache }, { "samples", samples }, { "selectedObjects", selectedNames } });
         }
         report["gpuPasses"] = { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays", "antialiasing" };
         report["success"] = true;

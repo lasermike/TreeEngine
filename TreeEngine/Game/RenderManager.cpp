@@ -122,6 +122,11 @@ HRESULT InstanceBufferRing::Create(const UINT sizeBytes, const UINT numInstances
 
 HRESULT RenderManager::UninitGameLevelGraphics()
 {
+    m_renderData.selection.Invalidate();
+    m_renderData.highlights.clear();
+    m_renderData.pickObjects.clear();
+    m_pickObjectIds.clear();
+    m_renderData.picking = false;
     HRR(GetPlatform()->UninitGameLevelGraphics());
 
     m_instancedBuffer.Release();
@@ -252,7 +257,7 @@ bool RenderManager::IsVisible(WorldObject* object)
 HRESULT RenderManager::RenderScene(RenderPass pass)
 {
     HRR(GetPlatform()->RenderSceneSetup(pass, &m_instancedBuffer));
-    if (pass == RegularPass)
+    if (pass == RegularPass && !m_renderData.picking)
         UpdateCullingFrustum();
 
     // Opaque geometry must populate color and depth before transparent surfaces.
@@ -261,6 +266,7 @@ HRESULT RenderManager::RenderScene(RenderPass pass)
     {
         for (RenderUnit* ru : m_renderUnits)
         {
+            if (m_renderData.picking && ru->m_material->m_isSkybox) continue;
             const bool blended = ru->m_material->m_renderState.blendState != StockBlendStates::Overwrite;
             if (pass == RegularPass && blended != (phase == 1))
                 continue;
@@ -288,6 +294,18 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
         if (numInstances > 0)
         {
             m_renderData.currentDrawOwner = object;
+            if (m_renderData.picking)
+            {
+                auto& objects = m_renderData.pickObjects;
+                auto found = m_pickObjectIds.find(object);
+                if (found == m_pickObjectIds.end())
+                {
+                    objects.push_back(object);
+                    m_renderData.pickObjectId = static_cast<UINT>(objects.size());
+                    m_pickObjectIds.emplace(object, m_renderData.pickObjectId);
+                }
+                else m_renderData.pickObjectId = found->second;
+            }
             m_renderData.currentDrawCulled = pass == RegularPass && m_settings->m_viewCulling && !IsVisible(object);
             HRR(GetPlatform()->DrawIndexedInstanced(ru->m_mesh->m_bufferOffsets.IndexCount, numInstances, ru->m_mesh->m_bufferOffsets.IndexOffset,
                 ru->m_mesh->m_bufferOffsets.VertexOffset, startInstance, range.objectTransformSlot));
@@ -755,6 +773,7 @@ HRESULT RenderManager::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4* pP
 
 HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool renderToSharedTexture)
 {
+    m_renderData.selection.Invalidate();
     HRESULT hr = S_OK;
 
     // Release resources
@@ -846,6 +865,14 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
         DrawFrameStats();
     }
 
+    if (!m_renderData.selection.requests.empty())
+    {
+        m_renderData.picking = true;
+        m_renderData.pickObjects.clear();
+        m_pickObjectIds.clear();
+        HRC(RenderScene(RegularPass));
+        m_renderData.picking = false;
+    }
     HRC(GetPlatform()->RenderPostProcess());  // Does effects and then copies offscreen back to render target 
 
     HRC(GetPlatform()->RenderDebugUI());  // If ImGui is enabled it will be initialized here
@@ -870,6 +897,7 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
 
 
 Cleanup:
+    m_renderData.picking = false;
     if (FAILED(hr))
         m_settings->m_captureResult = hr;
     return;

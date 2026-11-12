@@ -5,6 +5,8 @@
 #include <array>
 #include <string>
 #include <cstdint>
+#include "ObjectSelection.h"
+#include "ObjectHighlight.h"
 
 class ShadowMap;
 class UavBuffer;
@@ -169,6 +171,11 @@ struct RenderData : SceneRenderSettings
     // The object whose instances the current draw renders (set by RenderManager::Render); DXR groups each
     // owner's dynamic geometry into its own BLAS.
     const void*         currentDrawOwner = nullptr;
+    ObjectSelection selection;
+    std::vector<ObjectHighlight> highlights;
+    bool picking = false;
+    UINT pickObjectId = 0;
+    std::vector<const void*> pickObjects;
     // The current draw's object is outside the view frustum: the renderer records it for DXR but doesn't rasterize it.
     bool                currentDrawCulled = false;
 

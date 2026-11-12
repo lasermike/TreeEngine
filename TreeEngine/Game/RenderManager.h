@@ -64,6 +64,7 @@ class RenderManager : public IRenderFrame
     std::map<wstring, PixelShader*>                 m_pixelShaders;
 
     std::list<RenderUnit*>                          m_renderUnits;
+    std::unordered_map<const void*, UINT> m_pickObjectIds;
     std::map<WorldObject*, UINT>                    m_objectToInstanceBufferOffset;  // Filled in during scene initialization
     UINT                                            m_nextInstanceBufferOffset;		 // Used during initialization
 

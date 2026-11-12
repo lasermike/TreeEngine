@@ -82,6 +82,10 @@ public:
     void SetRenderTestAntialiasing(Settings::Antialiasing mode) { m_settings.m_antialiasing = mode; m_settings.m_showAntialiasingEdges = false; }
     void SetRenderTestHashedAlphaTest(bool hashed) { m_settings.m_hashedAlphaTest = hashed; }
     void SetRenderTestViewCulling(bool culling) { m_settings.m_viewCulling = culling; }
+    void SetRenderTestHighlightsThroughGeometry(bool enabled)
+    {
+        m_settings.m_highlightsThroughGeometry = enabled;
+    }
     void SetRenderTestRenderScale(float scale) { m_settings.m_renderScale = scale; }
     void SetRenderTestHdr(bool hdr, Settings::Tonemap tonemap, float exposure) {
         m_settings.m_hdr = hdr;
@@ -150,6 +154,8 @@ private:
     void Update(DX::StepTimer const& timer);
     HRESULT Regenerate();
     void HandleInput(bool key[512]);
+    void UpdateObjectSelection();
+    bool m_selectionUIWasVisible = false;
     void HandleGamepadInput(bool key[512]);
 
     HRESULT ReloadDevice();

@@ -4,6 +4,9 @@ Tree.hlsl,vs,VS
 Tree.hlsl,vs,VSSkinned
 Tree.hlsl,ps,PS
 Tree.hlsl,ps,PSDepthMotion
+Tree.hlsl,ps,PSPick
+ObjectHighlight.hlsl,vs,HighlightVS
+ObjectHighlight.hlsl,ps,HighlightPS
 Tree.hlsl,vs,DrawScreenQuadVS
 Tree.hlsl,ps,DrawR8ScreenQuadPS
 Tree.hlsl,ps,DrawRGBScreenQuadPS
