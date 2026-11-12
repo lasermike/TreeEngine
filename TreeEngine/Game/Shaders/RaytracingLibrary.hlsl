@@ -282,7 +282,24 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 // Local diffuse visibility with distance falloff and stable cosine-weighted probes.
 float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometricNormal)
 {
-    const uint sampleCount = 16;
+    // Settings::m_contactProbes and the rest (sunShadowParams.zw, sceneTime.z): the probe count, fewer beyond a distance,
+    // optionally rotated per pixel and frame, and optionally treating every surface as opaque.
+    uint sampleCount = sunShadowParams.z > 0 ? (uint)sunShadowParams.z : 16u;
+    if (sceneTime.z > 0)
+    {
+        const float distance = length(hit - eyePos.xyz);
+        if (distance > sceneTime.z)
+            sampleCount = max(2u, (uint)round(sampleCount * sceneTime.z / distance));
+    }
+    const uint probeFlags = (uint)sunShadowParams.w;
+    float angleOffset = 0, radiusOffset = 0.5f;
+    if (probeFlags & 1)
+    {
+        const uint3 h = HashPcg3d(uint3(DispatchRaysIndex().xy, (uint)sceneTime.y));
+        angleOffset = (h.x >> 8) * (6.28318531f / 16777216.0f);
+        radiusOffset = (h.y >> 8) * (1.0f / 16777216.0f);
+    }
+    const uint probeRayFlags = (probeFlags & 2) ? RAY_FLAG_FORCE_OPAQUE : RAY_FLAG_NONE;
     float3 tangent = normalize(cross(abs(surfaceNormal.y) < 0.99f
         ? float3(0, 1, 0) : float3(1, 0, 0), surfaceNormal));
     float3 bitangent = cross(surfaceNormal, tangent);
@@ -290,8 +307,8 @@ float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometri
     float bias = min(0.002f, ambientOcclusionRadius * 0.01f);
     for (uint i = 0; i < sampleCount; ++i)
     {
-        float diskRadiusSquared = (i + 0.5f) / sampleCount;
-        float angle = i * 2.39996323f;
+        float diskRadiusSquared = (i + radiusOffset) / sampleCount;
+        float angle = i * 2.39996323f + angleOffset;
         float2 disk = sqrt(diskRadiusSquared) * float2(cos(angle), sin(angle));
         float3 direction = disk.x * tangent + disk.y * bitangent
             + sqrt(1.0f - diskRadiusSquared) * surfaceNormal;
@@ -308,7 +325,7 @@ float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometri
         ray.TMax = ambientOcclusionRadius;
         RayPayload probe = { float4(1, 1, 1, 1), 0, 2 };
         // The closest hit records the distance: opacity micromaps can accept leaf hits without running any-hit.
-        TraceRay(Scene, RAY_FLAG_NONE, RayFadeMask(DispatchRaysIndex().xy), 0, 0, 0, ray, probe);
+        TraceRay(Scene, probeRayFlags, RayFadeMask(DispatchRaysIndex().xy), 0, 0, 0, ray, probe);
         visibility += smoothstep(0.0f, 1.0f, probe.color.x);
     }
     return lerp(1.0f, visibility / sampleCount, ambientOcclusionStrength);

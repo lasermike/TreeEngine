@@ -1004,10 +1004,14 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
     cb.ambientOcclusionRadius = m_renderData.ambientOcclusionRadius;
     cb.ambientOcclusionStrength = m_settings->m_rayContactShading ? m_renderData.ambientOcclusionStrength : 0.0f;
     // y: the frame number (mod 1024), which varies the LOD crossfade dither each frame (see FadeDither).
-    cb.sceneTime = XMFLOAT4(m_renderData.normalAnimationTime, static_cast<float>(m_renderData.frame & 1023), 0, 0);
+    // z: the distance beyond which contact shading casts fewer probes (see sunShadowParams.zw).
+    cb.sceneTime = XMFLOAT4(m_renderData.normalAnimationTime, static_cast<float>(m_renderData.frame & 1023),
+        m_settings->m_contactFullDistance, 0);
     cb.sunShadowParams = XMFLOAT4(tanf(XMConvertToRadians(m_renderData.sunAngularDiameterDegrees) * 0.5f),
         static_cast<float>(m_settings->m_sunShadowSamplesOverride > 0 ? m_settings->m_sunShadowSamplesOverride
-            : m_renderData.sunShadowSamples), 0, 0);
+            : m_renderData.sunShadowSamples),
+        static_cast<float>(std::min(std::max(m_settings->m_contactProbes, 1), 32)),
+        static_cast<float>((m_settings->m_contactRotate ? 1 : 0) | (m_settings->m_contactOpaqueProbes ? 2 : 0)));
     const int reflectionRays = m_settings->m_waterReflectionRays;
     cb.reflectionRayCount = m_settings->m_waterReflections
         ? static_cast<UINT>(reflectionRays < 1 ? 1 : reflectionRays > 32 ? 32 : reflectionRays)

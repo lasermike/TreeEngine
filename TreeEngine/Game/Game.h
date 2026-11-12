@@ -110,6 +110,13 @@ public:
         m_settings.m_shadowsEnabled = shadows;
         m_settings.m_rayOpaqueGeometry = opaqueGeometry;
     }
+    void SetRenderTestContactProbes(int probes, bool rotate, bool opaque, float fullDistance)
+    {
+        m_settings.m_contactProbes = probes;
+        m_settings.m_contactRotate = rotate;
+        m_settings.m_contactOpaqueProbes = opaque;
+        m_settings.m_contactFullDistance = fullDistance;
+    }
     void SetRenderTestReflectionRays(int rays) {
         m_settings.m_waterReflections = rays > 0;
         if (rays > 0) m_settings.m_waterReflectionRays = rays;

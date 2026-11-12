@@ -1502,6 +1502,10 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             ImGui::SliderInt("Sun shadow samples (0: scene)", &m_settings.m_sunShadowSamplesOverride, 0, 32);
             ImGui::Checkbox("Any-hit alpha test", &m_settings.m_rayAlphaTest);
             ImGui::Checkbox("Opaque geometry skips any-hit", &m_settings.m_rayOpaqueGeometry);
+            ImGui::SliderInt("Contact probes", &m_settings.m_contactProbes, 1, 32);
+            ImGui::Checkbox("Rotate contact probes (TAA)", &m_settings.m_contactRotate);
+            ImGui::Checkbox("Contact probes ignore alpha", &m_settings.m_contactOpaqueProbes);
+            ImGui::SliderFloat("Contact full-count distance (0: all)", &m_settings.m_contactFullDistance, 0.0f, 100.0f, "%.0f m");
             ImGui::TreePop();
         }
         ImGui::EndDisabled();

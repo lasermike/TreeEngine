@@ -78,6 +78,10 @@ struct RenderTestRequest
     bool rayAlphaTest = true;          // "rayAlphaTest"
     bool rayShadows = true;            // "rayShadows"
     bool rayOpaqueGeometry = false;    // "rayOpaqueGeometry"
+    int contactProbes = 8;             // "contactProbes"
+    bool contactRotate = false;        // "contactRotate"
+    bool contactOpaqueProbes = true;   // "contactOpaqueProbes"
+    float contactFullDistance = 15;    // "contactFullDistance"
     int lodFadeFrames = 0;             // "lodFadeFrames": frames of LOD crossfade; 0 switches layouts at once.
     bool hdr = false;                  // Defaults for every capture; see RenderTestPoint.
     std::string tonemap = "clamp";

@@ -38,6 +38,16 @@ public:
     int m_sunShadowSamplesOverride = 0;
     bool m_rayAlphaTest = true;
     bool m_rayOpaqueGeometry = false;
+    // Contact shading's probe rays (Shaders/RaytracingLibrary.hlsl ComputeContactVisibility): how many per hit, whether
+    // their directions rotate per pixel and frame (for TAA to accumulate), whether they treat every surface as opaque
+    // (no alpha test on leaves), and the distance beyond which fewer are cast (count x distance / hit distance, at
+    // least 2; 0 casts the full count everywhere).
+    // Default: 8 opaque probes, fewer beyond 15 m. Against 16 alpha-tested probes everywhere this cut ray time by
+    // 0.96 ms in Forest, 0.51 in AI Tree and 0.43 in LeafAtlases, with images within RMS 0.0021.
+    int m_contactProbes = 8;
+    bool m_contactRotate = false;
+    bool m_contactOpaqueProbes = true;
+    float m_contactFullDistance = 15;
     // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
     // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.
     // Fsr: AMD FSR through the FidelityFX API (Game/UpscalerFsr.cpp), when its DLLs are next to the executable.

@@ -54,8 +54,8 @@ struct CBChangesEveryFrame
     float ambientOcclusionRadius;
     float ambientOcclusionStrength;
     UINT reflectionRayCount;
-    XMFLOAT4 sceneTime; // x is simulation time in seconds, y the frame number mod 1024
-    XMFLOAT4 sunShadowParams; // x: tan(angular radius), y: sample count
+    XMFLOAT4 sceneTime; // x is simulation time in seconds, y the frame number mod 1024, z contact probes' full-count distance
+    XMFLOAT4 sunShadowParams; // x: tan(angular radius), y: sample count; z: contact probes, w: their flags (1 rotate, 2 opaque)
     XMFLOAT4 renderScale = XMFLOAT4(0, 1, 0, 0); // x: texture LOD bias while upscaling, y: 2^x (set by the platform)
     XMFLOAT4X4 shadowCascadeMatrix[4];  // World to each cascade's own [0, 1] texture space and depth.
     XMFLOAT4 shadowCascadeParams;       // x: cascades, y: shadow map texel (atlas UV), z: cascade texel (cascade UV)

@@ -178,6 +178,13 @@ void ParseRenderTestCommandLine()
     parsed->rayAlphaTest = json.value("rayAlphaTest", true);
     parsed->rayShadows = json.value("rayShadows", true);
     parsed->rayOpaqueGeometry = json.value("rayOpaqueGeometry", false);
+    parsed->contactProbes = json.value("contactProbes", 8);
+    parsed->contactRotate = json.value("contactRotate", false);
+    parsed->contactOpaqueProbes = json.value("contactOpaqueProbes", true);
+    parsed->contactFullDistance = json.value("contactFullDistance", 15.0f);
+    if (parsed->contactProbes < 1 || parsed->contactProbes > 32 || !std::isfinite(parsed->contactFullDistance)
+        || parsed->contactFullDistance < 0)
+        throw std::runtime_error("contactProbes must be 1 to 32 and contactFullDistance nonnegative");
     if (parsed->raySunSamples < 0 || parsed->raySunSamples > 32)
         throw std::runtime_error("raySunSamples must be 0 to 32");
     parsed->shadowCascades = json.value("shadowCascades", 3);
@@ -435,6 +442,8 @@ namespace
             game.SetRenderTestLodFadeFrames(request->lodFadeFrames);
             game.SetRenderTestRays(request->rayContactShading, request->raySunSamples, request->rayAlphaTest,
                 request->rayShadows, request->rayOpaqueGeometry);
+            game.SetRenderTestContactProbes(request->contactProbes, request->contactRotate, request->contactOpaqueProbes,
+                request->contactFullDistance);
             game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance);
             game.SetRenderTestHdr(request->hdr, TonemapSetting(request->tonemap), request->exposure);
             game.SetRenderTestRenderScale(request->renderScale);
@@ -578,6 +587,8 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestLodFadeFrames(request->lodFadeFrames);
             game.SetRenderTestRays(request->rayContactShading, request->raySunSamples, request->rayAlphaTest,
                 request->rayShadows, request->rayOpaqueGeometry);
+            game.SetRenderTestContactProbes(request->contactProbes, request->contactRotate, request->contactOpaqueProbes,
+                request->contactFullDistance);
             game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance);
             game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
             game.SetRenderTestRenderScale(point.renderScale);
