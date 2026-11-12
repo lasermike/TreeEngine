@@ -995,7 +995,11 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
         | (m_settings->m_shadowsEnabled ? 0x0 : 0x2)
         | (m_settings->m_hashedAlphaTest ? 0x4 : 0x0)
         | (m_renderData.hdrSceneColor ? 0x8 : 0x0)
-        | (m_settings->m_rayAlphaTest ? 0x0 : 0x10);
+        | (m_settings->m_rayAlphaTest ? 0x0 : 0x10)
+        | (m_settings->m_reflectionRotate || m_settings->m_antialiasing == Settings::Antialiasing::Taa
+            || m_settings->m_antialiasing == Settings::Antialiasing::Fsr || m_settings->m_antialiasing == Settings::Antialiasing::Dlss
+            ? 0x20 : 0x0)
+        | (m_settings->m_reflectionAdaptive ? 0x40 : 0x0);
     cb.light = m_renderData.dirLights[0];
     cb.numDirectionalLights = m_renderData.numDirectionalLights;
     cb.numPointLights = 0;

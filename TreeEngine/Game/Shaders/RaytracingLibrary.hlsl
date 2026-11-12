@@ -576,10 +576,22 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
             float countR = 0;
             float alphaR = max(roughness * roughness, 0.0001f);
             uint samples = min(reflectionRayCount, 32u);
+            // Settings::m_reflectionAdaptive: a smooth surface's lobe is narrow, so its samples nearly coincide; the count
+            // scales with roughness up to the full count at 0.5.
+            if (globalFlags & 0x40)
+                samples = clamp((uint)ceil(samples * saturate(roughness / 0.5f)), 1u, samples);
+            // Settings::m_reflectionRotate: a per-pixel, per-frame offset for TAA to accumulate.
+            float uOffset = 0.5f, phiOffset = 0;
+            if (globalFlags & 0x20)
+            {
+                const uint3 h = HashPcg3d(uint3(DispatchRaysIndex().xy, (uint)sceneTime.y + 7919u));
+                uOffset = (h.x >> 8) * (1.0f / 16777216.0f);
+                phiOffset = (h.y >> 8) * (6.28318531f / 16777216.0f);
+            }
             for (uint i = 0; i < samples; ++i)
             {
-                float u = (i + 0.5f) / samples;
-                float phi = i * 2.39996323f;
+                float u = (i + uOffset) / samples;
+                float phi = i * 2.39996323f + phiOffset;
                 float cosTheta = rsqrt(1.0f + alphaR * alphaR * u / (1.0f - u));
                 float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
                 float3 h = normalize(faceNormal * cosTheta + sinTheta *

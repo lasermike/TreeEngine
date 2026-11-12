@@ -79,6 +79,8 @@ struct RenderTestRequest
     bool rayShadows = true;            // "rayShadows"
     bool rayOpaqueGeometry = false;    // "rayOpaqueGeometry"
     int contactProbes = 8;             // "contactProbes"
+    bool reflectionRotate = false;     // "reflectionRotate"
+    bool reflectionAdaptive = true;    // "reflectionAdaptive"
     bool contactRotate = false;        // "contactRotate"
     bool contactOpaqueProbes = true;   // "contactOpaqueProbes"
     float contactFullDistance = 15;    // "contactFullDistance"

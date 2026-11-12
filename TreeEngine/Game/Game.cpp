@@ -1504,6 +1504,9 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
             ImGui::Checkbox("Opaque geometry skips any-hit", &m_settings.m_rayOpaqueGeometry);
             ImGui::SliderInt("Contact probes", &m_settings.m_contactProbes, 1, 32);
             ImGui::Checkbox("Rotate contact probes (TAA)", &m_settings.m_contactRotate);
+            ImGui::SliderInt("Water reflection rays", &m_settings.m_waterReflectionRays, 1, 32);
+            ImGui::Checkbox("Rotate reflection rays (TAA)", &m_settings.m_reflectionRotate);
+            ImGui::Checkbox("Reflection rays scale with roughness", &m_settings.m_reflectionAdaptive);
             ImGui::Checkbox("Contact probes ignore alpha", &m_settings.m_contactOpaqueProbes);
             ImGui::SliderFloat("Contact full-count distance (0: all)", &m_settings.m_contactFullDistance, 0.0f, 100.0f, "%.0f m");
             ImGui::TreePop();

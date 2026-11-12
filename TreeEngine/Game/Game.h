@@ -117,6 +117,11 @@ public:
         m_settings.m_contactOpaqueProbes = opaque;
         m_settings.m_contactFullDistance = fullDistance;
     }
+    void SetRenderTestReflectionSampling(bool rotate, bool adaptive)
+    {
+        m_settings.m_reflectionRotate = rotate;
+        m_settings.m_reflectionAdaptive = adaptive;
+    }
     void SetRenderTestReflectionRays(int rays) {
         m_settings.m_waterReflections = rays > 0;
         if (rays > 0) m_settings.m_waterReflectionRays = rays;

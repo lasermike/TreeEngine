@@ -179,6 +179,8 @@ void ParseRenderTestCommandLine()
     parsed->rayShadows = json.value("rayShadows", true);
     parsed->rayOpaqueGeometry = json.value("rayOpaqueGeometry", false);
     parsed->contactProbes = json.value("contactProbes", 8);
+    parsed->reflectionRotate = json.value("reflectionRotate", false);
+    parsed->reflectionAdaptive = json.value("reflectionAdaptive", true);
     parsed->contactRotate = json.value("contactRotate", false);
     parsed->contactOpaqueProbes = json.value("contactOpaqueProbes", true);
     parsed->contactFullDistance = json.value("contactFullDistance", 15.0f);
@@ -444,6 +446,7 @@ namespace
                 request->rayShadows, request->rayOpaqueGeometry);
             game.SetRenderTestContactProbes(request->contactProbes, request->contactRotate, request->contactOpaqueProbes,
                 request->contactFullDistance);
+            game.SetRenderTestReflectionSampling(request->reflectionRotate, request->reflectionAdaptive);
             game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance);
             game.SetRenderTestHdr(request->hdr, TonemapSetting(request->tonemap), request->exposure);
             game.SetRenderTestRenderScale(request->renderScale);
@@ -589,6 +592,7 @@ int RunRenderTestCapture(Game& game)
                 request->rayShadows, request->rayOpaqueGeometry);
             game.SetRenderTestContactProbes(request->contactProbes, request->contactRotate, request->contactOpaqueProbes,
                 request->contactFullDistance);
+            game.SetRenderTestReflectionSampling(request->reflectionRotate, request->reflectionAdaptive);
             game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance);
             game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
             game.SetRenderTestRenderScale(point.renderScale);

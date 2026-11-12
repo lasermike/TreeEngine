@@ -23,6 +23,11 @@ public:
     float m_waterMotionSpeed = 1.0f; // 0 freezes animated normal maps.
     bool m_waterReflections = true;
     int m_waterReflectionRays = 16;
+    // Reflection samples (Shaders/RaytracingLibrary.hlsl): scale their count with roughness (a smooth surface's narrow
+    // lobe needs few: the canyon water gets 4 of 16), and rotate them per pixel and frame for TAA to accumulate. Rotation
+    // is on whenever a temporal mode (TAA, FSR, DLSS) is; without one it would show as grain. m_reflectionRotate forces it.
+    bool m_reflectionRotate = false;
+    bool m_reflectionAdaptive = true;
     bool m_shadowsEnabled = true;
     // Raster shadow cascades (1 to RenderData::MaxShadowCascades) over the view out to m_shadowDistance meters.
     // Three by default: each cascade redraws its casters (about 0.3-0.45 ms in AI Tree and Forest), and two already
