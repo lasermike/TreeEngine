@@ -41,6 +41,17 @@
         { "time": 9, "position": [-11, 2.4, -14], "rotationDegrees": [-0.05, 0, 0] },
         { "time": 14, "position": [0, 2.4, -14], "rotationDegrees": [-0.05, 0, 0] }
       ]
+    },
+    { "id": "Valley", "scene": "Valley", "type": "steady" },
+    {
+      "id": "Valley-flight", "scene": "Valley", "type": "pacing", "startTime": 30, "duration": 20, "settleFrames": 30,
+      "camera": [
+        { "time": 0, "position": [-1540, 30, -1113.5], "rotationDegrees": [6, 78.4, 0] },
+        { "time": 5, "position": [-1040, 30, -1010.5], "rotationDegrees": [6, 39.3, 0] },
+        { "time": 10, "position": [-540, 30, -399.7], "rotationDegrees": [6, 36.5, 0] },
+        { "time": 15, "position": [-40, 30, 275.7], "rotationDegrees": [6, 60.9, 0] },
+        { "time": 20, "position": [460, 30, 553.7], "rotationDegrees": [6, 86.2, 0] }
+      ]
     }
   ]
 }

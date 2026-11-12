@@ -122,6 +122,17 @@ if ($Tests.Count) {
 }
 if (-not $selected.Count) { throw "No tests selected from $manifestPath." }
 
+# The Valley scene's terrain package (about 200 MB) isn't committed: Tools/terrain/make_valley.py makes it next to the
+# executable when a selected test needs it.
+if (@($selected | Where-Object { $_.scene -eq 'Valley' }).Count) {
+    $valleyPackage = Join-Path (Split-Path $Executable) 'Terrain\Valley.terrain'
+    if (-not (Test-Path -LiteralPath (Join-Path $valleyPackage 'manifest.json'))) {
+        Write-Host "Making the Valley terrain package in $valleyPackage..."
+        & python (Join-Path $workspaceRoot 'Tools\terrain\make_valley.py') --package-only --package-dir $valleyPackage
+        if ($LASTEXITCODE -ne 0) { throw 'Making the Valley terrain package failed.' }
+    }
+}
+
 # Run directory: <yyyyMMdd-HHmm>Z_<machine>_<label> in UTC, so directories sort by time. Underscores only
 # separate the parts. A numeric suffix is added if the directory already exists.
 $started = Get-Date

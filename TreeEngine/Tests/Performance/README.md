@@ -67,6 +67,11 @@ Close other GPU-heavy programs first. The script measures whatever else the mach
     `rotationDegrees` (pitch, yaw, roll) are like a scene's camera. Positions are interpolated
     linearly and rotations spherically.
 
+`Valley` and `Valley-flight` (an 8 km streamed terrain with 6000 instanced trees; a 20 s flight along its river at
+100-160 m/s) need the Valley terrain package, about 200 MB, which isn't committed: the runner makes it next to the
+executable with `Tools/terrain/make_valley.py --package-only` when it is missing. `make_valley.py` without options
+also makes it in `Game/Resources/Terrain` (copied by the build) and regenerates `valley.scene.json`.
+
 ## How a job runs
 
 Runs are the outer loop: run 1 measures every test and mode, then run 2, and so on. This spreads

@@ -146,8 +146,9 @@ float3 LoadVertexPosition(uint vertexIndex)
 }
 
 // Ray lengths: camera rays reach the far plane (at least 200 m), and shadow, reflection and transmission rays as far
-// (at least 100 m), so a large terrain shades and shadows to the horizon.
-float PrimaryRayLength() { return max(200.0f, renderScale.z); }
+// (at least 100 m), so a large terrain shades and shadows to the horizon. A camera ray reaches the plane, as raster
+// does, so it is longer the further it leans from the view axis (cosine: its direction dotted with the axis).
+float PrimaryRayLength(float cosine) { return max(200.0f, renderScale.z / max(cosine, 0.05f)); }
 float SecondaryRayLength() { return max(100.0f, renderScale.z); }
 
 // A hit triangle's vertex position (in the BLAS's object space): from the world-vertex buffer, or for pooled geometry
@@ -716,8 +717,11 @@ void RayGenerationShader()
     RayDesc ray;
     ray.Origin = origin;
     ray.Direction = direction;
+    // The view axis: from the eye through the screen's center.
+    const float4 center = mul(float4(0, 0, 0, 1), InverseViewProjection);
+    const float3 axis = normalize(center.xyz / center.w - origin);
     ray.TMin = 0.001;
-    ray.TMax = PrimaryRayLength();
+    ray.TMax = PrimaryRayLength(dot(direction, axis));
     RayPayload payload = { float4(0, 0, 0, 1), 0, 0 };
 
     uint missShaderIndex = 1;
