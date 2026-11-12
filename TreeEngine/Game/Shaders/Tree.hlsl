@@ -142,6 +142,37 @@ float3 ObjectUpDirection(float4x4 world)
     return normalize(up);
 }
 
+// Raster shadow cascades (RenderManager::BuildShadowTransform): the first cascade whose box holds the point, with a
+// 3x3 PCF inside its quadrant of the shadow map; lit outside them all. The lookup moves along the surface normal
+// (turned toward the light, for two-sided leaves) and compares with a depth bias, both sized to the cascade's texels.
+float CascadedShadowFactor(float3 positionW, float3 normalW)
+{
+    const uint cascades = (uint)shadowCascadeParams.x;
+    const float margin = 2.0f * shadowCascadeParams.z;     // Keeps the filter inside the cascade's quadrant.
+    const float3 towardLight = -normalize(light.Direction);
+    const float3 normal = dot(normalW, towardLight) < 0 ? -normalW : normalW;
+    [loop]
+    for (uint cascade = 0; cascade < cascades; ++cascade)
+    {
+        const float3 lookup = positionW + normal * shadowCascadeNormalOffset[cascade];
+        const float4 position = mul(float4(lookup, 1.0f), shadowCascadeMatrix[cascade]);
+        float3 uvz = position.xyz / position.w;
+        uvz.z -= shadowCascadeDepthBias[cascade];
+        if (any(uvz.xy < margin) || any(uvz.xy > 1.0f - margin) || uvz.z > 1.0f)
+            continue;
+        const float2 atlas = (uvz.xy + float2(cascade % 2, cascade / 2)) * 0.5f;
+        const float dx = shadowCascadeParams.y;
+        float lit = 0;
+        [unroll]
+        for (int y = -1; y <= 1; ++y)
+            [unroll]
+            for (int x = -1; x <= 1; ++x)
+                lit += txShadowMap.SampleCmpLevelZero(samShadowCompState, atlas + float2(x, y) * dx, uvz.z).r;
+        return lit / 9.0f;
+    }
+    return 1.0f;
+}
+
 // The object's LOD crossfade value, which its transform slot carries in AtlasRegion (float bits; 0 when not fading).
 float ObjectFade()
 {
@@ -525,7 +556,7 @@ float4 ShadeSurface(PS_INPUT input)
 
     if (globalFlags & 0x1)
     {
-        shadow[0] = CalcShadowFactor(samShadowCompState, txShadowMap, input.ShadowPosH);
+        shadow[0] = CascadedShadowFactor(input.PosW, normalize(input.N));
     }
 
     // Sum the light contribution from each light source.  

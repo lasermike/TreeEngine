@@ -189,8 +189,21 @@ struct RenderData : SceneRenderSettings
     bool                currentDrawRasterOnly = false;
 
     // Shadows
+    // Raster shadows: up to four cascades, each SMapWidth x SMapHeight, in the quadrants of one shadow map twice that
+    // size (cascade i at column i % 2, row i / 2). See RenderManager::BuildShadowTransform.
     static const int    SMapWidth = 2048;
     static const int    SMapHeight = 2048;
+    static const UINT   MaxShadowCascades = 4;
+    UINT                shadowCascadeCount = 1;
+    UINT                shadowCascade = 0;      // The cascade the shadow pass is drawing.
+    XMFLOAT4X4          cascadeView[MaxShadowCascades];
+    XMFLOAT4X4          cascadeProj[MaxShadowCascades];
+    XMFLOAT4X4          cascadeTransform[MaxShadowCascades];   // World to the cascade's own [0, 1] texture space and depth.
+    float               cascadeTexel[MaxShadowCascades] = {};   // A shadow-map texel's width in meters.
+    float               cascadeDepthRange[MaxShadowCascades] = {};  // The light-space depth range, in meters.
+    // The scene's bounds (SceneRoot::Update), which shadow casters can't lie outside.
+    XMFLOAT3            sceneBoxMin = XMFLOAT3(0, 0, 0);
+    XMFLOAT3            sceneBoxMax = XMFLOAT3(0, 0, 0);
     BoundingSphere      mSceneBounds;
     ShadowMap*          pShadowMap;        // Owned by Game
     UavBuffer*          pDxrOutBuffer;     // Filled by hit/miss shaders.  Owned by Game.
@@ -208,6 +221,12 @@ struct RenderData : SceneRenderSettings
         XMStoreFloat4x4(&lightView, XMMatrixIdentity());
         XMStoreFloat4x4(&lightProj, XMMatrixIdentity());
         XMStoreFloat4x4(&shadowTransform, XMMatrixIdentity());
+        for (UINT i = 0; i < MaxShadowCascades; ++i)
+        {
+            XMStoreFloat4x4(&cascadeView[i], XMMatrixIdentity());
+            XMStoreFloat4x4(&cascadeProj[i], XMMatrixIdentity());
+            XMStoreFloat4x4(&cascadeTransform[i], XMMatrixIdentity());
+        }
         instanceBuffer = nullptr;
     }
 };

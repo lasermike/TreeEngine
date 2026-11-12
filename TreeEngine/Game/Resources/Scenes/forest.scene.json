@@ -820,9 +820,9 @@
    "shape": "cylinderHD",
    "transform": {
     "scale": [
-     222.5,
+     445.0,
      0.01,
-     222.5
+     445.0
     ]
    },
    "material": "canyon-soil"

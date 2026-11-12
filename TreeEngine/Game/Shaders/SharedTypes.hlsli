@@ -62,6 +62,10 @@ cbuffer cbChangesEveryFrame : register(b2)
     float4 sceneTime; // x is simulation time in seconds
     float4 sunShadowParams; // x: tan(angular radius), y: sample count
     float4 renderScale;     // x: texture LOD bias while upscaling (0 at native), y: 2^x; see Game/Upscaler.h
+    matrix shadowCascadeMatrix[4];  // World to each raster shadow cascade's own [0, 1] texture space and depth.
+    float4 shadowCascadeParams;     // x: cascades, y: shadow map texel (atlas UV), z: cascade texel (cascade UV)
+    float4 shadowCascadeNormalOffset;   // Per cascade: meters to move the lookup along the surface normal.
+    float4 shadowCascadeDepthBias;      // Per cascade: depth bias in [0, 1] depth units.
 };
 
 // Hashed alpha testing for raster (Wyman and McGuire, "Hashed Alpha Testing", 2017). Ray tracing samples alpha at

@@ -60,6 +60,8 @@ struct RenderTestRequest
     bool hashedAlphaTest = true;       // "alphaTest": "hashed" (default) or "cutoff" (the material's alpha cutoff).
     bool viewCulling = true;           // "viewCulling": false rasterizes objects outside the view frustum too.
     bool batchInstances = true;        // "batchInstances": false draws each instanced object on its own.
+    int shadowCascades = 3;            // "shadowCascades": raster shadow cascades, 1 to 4.
+    float shadowDistance = 150.0f;     // "shadowDistance": how far raster shadows reach, in meters.
     int lodFadeFrames = 0;             // "lodFadeFrames": frames of LOD crossfade; 0 switches layouts at once.
     bool hdr = false;                  // Defaults for every capture; see RenderTestPoint.
     std::string tonemap = "clamp";

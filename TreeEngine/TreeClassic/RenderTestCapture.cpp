@@ -173,6 +173,10 @@ void ParseRenderTestCommandLine()
     parsed->viewCulling = json.value("viewCulling", true);
     parsed->batchInstances = json.value("batchInstances", true);
     parsed->lodFadeFrames = json.value("lodFadeFrames", 0);
+    parsed->shadowCascades = json.value("shadowCascades", 3);
+    parsed->shadowDistance = json.value("shadowDistance", 150.0f);
+    if (parsed->shadowCascades < 1 || parsed->shadowCascades > 4 || !std::isfinite(parsed->shadowDistance) || parsed->shadowDistance <= 0)
+        throw std::runtime_error("shadowCascades must be 1 to 4 and shadowDistance positive");
     if (parsed->lodFadeFrames < 0 || parsed->lodFadeFrames > 1000)
         throw std::runtime_error("lodFadeFrames must be 0 to 1000");
     parsed->hdr = json.value("hdr", false);
@@ -399,6 +403,7 @@ namespace
             game.SetRenderTestViewCulling(request->viewCulling);
             game.SetRenderTestBatchInstances(request->batchInstances);
             game.SetRenderTestLodFadeFrames(request->lodFadeFrames);
+            game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance);
             game.SetRenderTestHdr(request->hdr, TonemapSetting(request->tonemap), request->exposure);
             game.SetRenderTestRenderScale(request->renderScale);
             const int settleFrames = request->performanceSettleFrames;
@@ -539,6 +544,7 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestViewCulling(request->viewCulling);
             game.SetRenderTestBatchInstances(request->batchInstances);
             game.SetRenderTestLodFadeFrames(request->lodFadeFrames);
+            game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance);
             game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
             game.SetRenderTestRenderScale(point.renderScale);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;

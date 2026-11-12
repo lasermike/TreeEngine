@@ -24,6 +24,11 @@ public:
     bool m_waterReflections = true;
     int m_waterReflectionRays = 16;
     bool m_shadowsEnabled = true;
+    // Raster shadow cascades (1 to RenderData::MaxShadowCascades) over the view out to m_shadowDistance meters.
+    // Three by default: each cascade redraws its casters (about 0.3-0.45 ms in AI Tree and Forest), and two already
+    // give crisp leaf shadows close up.
+    int m_shadowCascades = 3;
+    float m_shadowDistance = 150.0f;
     bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
     // Anti-aliasing of the final image, raster or ray traced. TAA and upscalers will add modes.
     // Taa: temporal anti-aliasing (Shaders/Taa.hlsl), which turns on the camera jitter and the motion vectors.

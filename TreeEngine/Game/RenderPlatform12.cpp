@@ -895,9 +895,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // PSO for shadow map pass.
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
-    shadowPsoDesc.RasterizerState.DepthBias = 100000;
+    shadowPsoDesc.RasterizerState.DepthBias = 0;   // Each cascade biases in the shader (CascadedShadowFactor).
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
-    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 2.0f;
 #if defined(TREE_XBOX)
     psoDesc.VS = { m_shadowVertexShader->shader.data(), m_shadowVertexShader->shader.size() };
     psoDesc.PS = { m_shadowPixelShader->shader.data(),  m_shadowPixelShader->shader.size() };
@@ -1113,8 +1113,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
             m_descriptorHeap.hCPU(ShadowSrv_HeapOffset),
             m_descriptorHeap.hGPU(ShadowSrv_HeapOffset),
             shadowDsv,
-            m_renderData->SMapWidth,
-            m_renderData->SMapHeight);
+            2 * m_renderData->SMapWidth,       // Four cascades, one per quadrant.
+            2 * m_renderData->SMapHeight);
     }
 
 #if defined(DXR_ENABLED)
@@ -2243,9 +2243,9 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
 
     // Shadow pass PSO
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
-    shadowPsoDesc.RasterizerState.DepthBias = 100000;
+    shadowPsoDesc.RasterizerState.DepthBias = 0;   // Each cascade biases in the shader (CascadedShadowFactor).
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
-    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 2.0f;
 #if defined(TREE_XBOX)
     shadowPsoDesc.VS = { material->m_shadowVertexShader->shader.data(), material->m_shadowVertexShader->shader.size() };
     shadowPsoDesc.PS = { material->m_shadowPixelShader->shader.data(), material->m_shadowPixelShader->shader.size() };
@@ -4374,7 +4374,19 @@ HRESULT RenderPlatform12::UpdateViewProjection(XMFLOAT4X4* pViewMat, XMFLOAT4X4*
         cbChangesPerPass.previousInstancesValid = m_cameraHistoryValid && m_previousInstanceBuffer ? 1 : 0;
     }
 
-    int offset = shadowPass ? ShadowPass_CBSI : NormalPass_CBSI;
+    const UINT cascade = std::min(m_renderData->shadowCascade, RenderData::MaxShadowCascades - 1);
+    int offset = shadowPass ? ShadowPass_CBSI + cascade : NormalPass_CBSI;
+    if (shadowPass && m_renderData->pShadowMap)
+    {
+        // Each cascade draws into its quadrant of the shadow map.
+        const UINT size = m_renderData->pShadowMap->Width() / 2;
+        const D3D12_VIEWPORT viewport = { static_cast<float>((cascade % 2) * size), static_cast<float>((cascade / 2) * size),
+            static_cast<float>(size), static_cast<float>(size), 0.0f, 1.0f };
+        const D3D12_RECT scissor = { static_cast<LONG>((cascade % 2) * size), static_cast<LONG>((cascade / 2) * size),
+            static_cast<LONG>((cascade % 2 + 1) * size), static_cast<LONG>((cascade / 2 + 1) * size) };
+        GetCommandList()->RSSetViewports(1, &viewport);
+        GetCommandList()->RSSetScissorRects(1, &scissor);
+    }
     m_constBufferChangesPerPass->CopyData(offset, cbChangesPerPass);
     GetCommandList()->SetGraphicsRootConstantBufferView(ChangesPerPassRootSignatureParam, m_constBufferChangesPerPass->GetGPUVirtualAddress(offset));
 

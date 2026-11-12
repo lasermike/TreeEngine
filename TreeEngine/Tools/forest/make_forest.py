@@ -49,7 +49,8 @@ def main():
     extent = side * args.spacing
     objects = [{
         'id': 'ground', 'type': 'primitive', 'shape': 'cylinderHD',
-        'transform': {'scale': [extent * 0.75 + 20, 0.01, extent * 0.75 + 20]}, 'material': 'canyon-soil',
+        # The unit cylinder's radius is 0.5: this makes the ground's radius 0.75 x the grid width plus 20 m, past its corners.
+        'transform': {'scale': [2 * (extent * 0.75 + 20), 0.01, 2 * (extent * 0.75 + 20)]}, 'material': 'canyon-soil',
     }]
     if args.screen_heights:
         lod = {'screenHeights': [float(h) for h in args.screen_heights.split(',')]}

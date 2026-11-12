@@ -84,6 +84,7 @@ public:
     void SetRenderTestViewCulling(bool culling) { m_settings.m_viewCulling = culling; }
     void SetRenderTestBatchInstances(bool batch) { m_settings.m_batchInstances = batch; }
     void SetRenderTestLodFadeFrames(int frames) { m_settings.m_lodFadeFrames = frames; }
+    void SetRenderTestShadows(int cascades, float distance) { m_settings.m_shadowCascades = cascades; m_settings.m_shadowDistance = distance; }
     void SetRenderTestRenderScale(float scale) { m_settings.m_renderScale = scale; }
     void SetRenderTestHdr(bool hdr, Settings::Tonemap tonemap, float exposure) {
         m_settings.m_hdr = hdr;

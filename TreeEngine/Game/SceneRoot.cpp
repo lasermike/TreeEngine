@@ -115,6 +115,8 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool, boo
 
     XMStoreFloat3(&_boundingBox[0], bbmin);
     XMStoreFloat3(&_boundingBox[1], bbmax);
+    renderFrame.GetRenderData().sceneBoxMin = _boundingBox[0];
+    renderFrame.GetRenderData().sceneBoxMax = _boundingBox[1];
     if (profile.enabled)
         profile.sceneUpdateMs = std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - updateStart).count();

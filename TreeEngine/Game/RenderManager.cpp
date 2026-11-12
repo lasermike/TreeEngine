@@ -108,7 +108,9 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
         instancedObjects += object->IsInstance() ? 1 : 0;
     m_batchListStart = maxInstances;
     // Fading trees draw a second copy, so allow two per instanced object.
-    m_batchListCapacity = instancedObjects ? 2 * ((2 * instancedObjects + 3) / 4 + 1024) : 0;
+    // Every pass a frame draws: each shadow cascade and the regular pass.
+    m_batchListCapacity = instancedObjects
+        ? (RenderData::MaxShadowCascades + 1) * ((2 * instancedObjects + 3) / 4 + 1024) : 0;
     m_batchListUsed = 0;
     const UINT bufferInstances = maxInstances + m_batchListCapacity;
     if (bufferInstances > 0)
@@ -244,14 +246,32 @@ HRESULT RenderManager::GetInstanceIndex(WorldObject* object, UINT& startInstance
 // matrix (Gribb and Hartmann). Near and far are left out: the near plane is close to the eye plane, and far is distant.
 void RenderManager::UpdateCullingFrustum()
 {
-    const XMMATRIX viewProjection = XMMatrixMultiply(XMLoadFloat4x4(&m_renderData.view), XMLoadFloat4x4(&m_renderData.projection));
-    XMFLOAT4X4 m;
-    XMStoreFloat4x4(&m, viewProjection);
+    XMFLOAT4X4 viewProjection;
+    XMStoreFloat4x4(&viewProjection, XMMatrixMultiply(XMLoadFloat4x4(&m_renderData.view), XMLoadFloat4x4(&m_renderData.projection)));
+    UpdateCullingPlanes(viewProjection, false);
+    m_cullingForView = true;
+}
+
+// Culling planes from a view-projection matrix. Perspective: the four sides and the eye plane. Orthographic (a shadow
+// cascade, whose near plane already reaches every caster): the four sides, near and far.
+void RenderManager::UpdateCullingPlanes(const XMFLOAT4X4& m, bool orthographic)
+{
     const auto column = [&](int c) { return XMVectorSet(m.m[0][c], m.m[1][c], m.m[2][c], m.m[3][c]); };
-    const XMVECTOR x = column(0), y = column(1), w = column(3);
-    const XMVECTOR planes[] = { XMVectorAdd(w, x), XMVectorSubtract(w, x), XMVectorAdd(w, y), XMVectorSubtract(w, y), w };
-    for (int i = 0; i < 5; ++i)
-        XMStoreFloat4(&m_cullingPlanes[i], planes[i]);
+    const XMVECTOR x = column(0), y = column(1), z = column(2), w = column(3);
+    const XMVECTOR sides[] = { XMVectorAdd(w, x), XMVectorSubtract(w, x), XMVectorAdd(w, y), XMVectorSubtract(w, y) };
+    for (int i = 0; i < 4; ++i)
+        XMStoreFloat4(&m_cullingPlanes[i], sides[i]);
+    if (orthographic)
+    {
+        XMStoreFloat4(&m_cullingPlanes[4], z);
+        XMStoreFloat4(&m_cullingPlanes[5], XMVectorSubtract(w, z));
+        m_cullingPlaneCount = 6;
+    }
+    else
+    {
+        XMStoreFloat4(&m_cullingPlanes[4], w);
+        m_cullingPlaneCount = 5;
+    }
     ++m_cullingEpoch;
 }
 
@@ -264,8 +284,9 @@ bool RenderManager::IsVisible(WorldObject* object)
     bool visible = true;
     if (object->GetCullBounds(bounds))
     {
-        for (const XMFLOAT4& plane : m_cullingPlanes)
+        for (UINT planeIndex = 0; planeIndex < m_cullingPlaneCount; ++planeIndex)
         {
+            const XMFLOAT4& plane = m_cullingPlanes[planeIndex];
             // The box corner farthest along the plane's normal; outside if even that is behind the plane.
             const float px = plane.x >= 0 ? bounds[1].x : bounds[0].x;
             const float py = plane.y >= 0 ? bounds[1].y : bounds[0].y;
@@ -279,8 +300,11 @@ bool RenderManager::IsVisible(WorldObject* object)
     }
     object->m_cullingEpoch = m_cullingEpoch;
     object->m_visible = visible;
-    m_renderData.profile.drawnObjects += visible;
-    m_renderData.profile.culledObjects += !visible;
+    if (m_cullingForView)
+    {
+        m_renderData.profile.drawnObjects += visible;
+        m_renderData.profile.culledObjects += !visible;
+    }
     return visible;
 }
 
@@ -338,7 +362,9 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
         if (numInstances > 0)
         {
             m_renderData.currentDrawOwner = part ? range.fadeOwner : object;
-            m_renderData.currentDrawCulled = pass == RegularPass && m_settings->m_viewCulling && !IsVisible(object);
+            // The regular pass culls against the view, each shadow cascade against its light-space box.
+            m_renderData.currentDrawCulled = m_settings->m_viewCulling && (pass == RegularPass || pass == ShadowMapPass)
+                && !IsVisible(object);
             if (batching && transformSlot != UINT_MAX)
             {
                 if (recordEach)
@@ -968,6 +994,20 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
 
     XMStoreFloat4(&cb.eyePos, m_renderData.eyePos);
     cb.shadowMatrix = m_renderData.shadowTransform;
+    for (UINT i = 0; i < RenderData::MaxShadowCascades; ++i)
+        cb.shadowCascadeMatrix[i] = m_renderData.cascadeTransform[i];
+    const float atlasSize = 2.0f * RenderData::SMapWidth;
+    cb.shadowCascadeParams = XMFLOAT4(static_cast<float>(m_renderData.shadowCascadeCount), 1.0f / atlasSize,
+        1.0f / RenderData::SMapWidth, 0);
+    // Bias that scales with each cascade's texel: a normal offset of 1.5 texels, and a texel's worth of depth.
+    float normalOffset[4] = {}, depthBias[4] = {};
+    for (UINT i = 0; i < RenderData::MaxShadowCascades; ++i)
+    {
+        normalOffset[i] = 1.5f * m_renderData.cascadeTexel[i];
+        depthBias[i] = m_renderData.cascadeDepthRange[i] > 0 ? m_renderData.cascadeTexel[i] / m_renderData.cascadeDepthRange[i] : 0;
+    }
+    cb.shadowCascadeNormalOffset = XMFLOAT4(normalOffset);
+    cb.shadowCascadeDepthBias = XMFLOAT4(depthBias);
 
     GetPlatform()->SetFrameSceneData(&cb);
 
@@ -1053,53 +1093,113 @@ HRESULT RenderManager::RenderShadowMap()
     return S_OK;
 }
 
+// Raster shadow cascades. The view out to the shadow distance is split into slices (a blend of logarithmic and uniform
+// splits), and each cascade's light-space box is fitted to a bounding sphere of its slice: a sphere keeps the box's size
+// fixed as the camera turns, and its center snaps to whole shadow-map texels in light space, so shadows don't shimmer as
+// the camera moves. The box's near plane reaches back to the scene's bounds toward the light, so casters outside the
+// slice still cast into it.
 void RenderManager::BuildShadowTransform()
 {
-    // Only the first "main" light casts a shadow.
-    XMVECTOR lightDir = XMLoadFloat3(&GetRenderData().dirLights[0].Direction);
-    XMVECTOR targetPos = XMLoadFloat3(&GetRenderData().mSceneBounds.Center);
-    XMVECTOR lightPos = GetRenderData().shadowLightPositionOverride
-        ? XMLoadFloat3(&GetRenderData().shadowLightPosition)
-        : -2.0f * GetRenderData().mSceneBounds.Radius * lightDir;
+    RenderData& data = GetRenderData();
+    const UINT cascades = static_cast<UINT>(std::min(std::max(m_settings->m_shadowCascades, 1),
+        static_cast<int>(RenderData::MaxShadowCascades)));
+    data.shadowCascadeCount = cascades;
+
+    // The light's direction: the first directional light's, or toward the scene from the debug light position.
+    XMVECTOR lightDir = XMVector3Normalize(XMLoadFloat3(&data.dirLights[0].Direction));
+    if (data.shadowLightPositionOverride)
+    {
+        const XMVECTOR toScene = XMLoadFloat3(&data.mSceneBounds.Center) - XMLoadFloat3(&data.shadowLightPosition);
+        if (XMVectorGetX(XMVector3LengthSq(toScene)) > 1e-6f)
+            lightDir = XMVector3Normalize(toScene);
+    }
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-    if (fabsf(XMVectorGetX(XMVector3Dot(XMVector3Normalize(targetPos - lightPos), up))) > 0.99f)
+    if (fabsf(XMVectorGetY(lightDir)) > 0.99f)
         up = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+    const XMMATRIX lightView = XMMatrixLookToLH(XMVectorZero(), lightDir, up);
 
-    XMMATRIX V = XMMatrixLookAtLH(lightPos, targetPos, up);
+    // The scene's lowest light-space depth: where casters can start.
+    float sceneNear = FLT_MAX;
+    for (int corner = 0; corner < 8; ++corner)
+    {
+        const XMVECTOR point = XMVectorSet(corner & 1 ? data.sceneBoxMax.x : data.sceneBoxMin.x,
+            corner & 2 ? data.sceneBoxMax.y : data.sceneBoxMin.y, corner & 4 ? data.sceneBoxMax.z : data.sceneBoxMin.z, 1);
+        sceneNear = std::min(sceneNear, XMVectorGetZ(XMVector3TransformCoord(point, lightView)));
+    }
 
-    // Transform bounding sphere to light space.
-    XMFLOAT3 sphereCenterLS;
-    XMStoreFloat3(&sphereCenterLS, XMVector3TransformCoord(targetPos, V));
+    // The camera's slices.
+    const ProjectionData& projection = data.projectionData;
+    const float nearPlane = std::max(projection.nearClippingPlane, 0.01f);
+    const float farPlane = std::max(nearPlane + 1.0f, std::min(projection.farClippingPlane, m_settings->m_shadowDistance));
+    const float aspect = projection.screenHeight > 0 ? projection.screenWidth / static_cast<float>(projection.screenHeight) : 1.0f;
+    const float tanY = tanf(projection.fov * 0.5f), tanX = tanY * aspect;
+    const XMMATRIX inverseView = XMMatrixInverse(nullptr, XMLoadFloat4x4(&data.view));
+    const auto splitDepth = [&](UINT i)
+    {
+        const float t = static_cast<float>(i) / cascades;
+        const float logarithmic = nearPlane * powf(farPlane / nearPlane, t);
+        const float uniform = nearPlane + (farPlane - nearPlane) * t;
+        return 0.75f * logarithmic + 0.25f * uniform;
+    };
 
-    // Ortho frustum in light space encloses scene.
-    float l = sphereCenterLS.x - GetRenderData().mSceneBounds.Radius;
-    float b = sphereCenterLS.y - GetRenderData().mSceneBounds.Radius;
-    float n = sphereCenterLS.z - GetRenderData().mSceneBounds.Radius / 1.25f;
-    float r = sphereCenterLS.x + GetRenderData().mSceneBounds.Radius;
-    float t = sphereCenterLS.y + GetRenderData().mSceneBounds.Radius;
-    float f = sphereCenterLS.z + GetRenderData().mSceneBounds.Radius * 2.75f;
-    XMMATRIX P = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
+    // NDC [-1, 1] to texture [0, 1], y down.
+    const XMMATRIX toTexture(0.5f, 0.0f, 0.0f, 0.0f, 0.0f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 0.5f, 0.0f, 1.0f);
+    for (UINT cascade = 0; cascade < cascades; ++cascade)
+    {
+        const float sliceNear = splitDepth(cascade), sliceFar = splitDepth(cascade + 1);
+        XMVECTOR corners[8];
+        XMVECTOR center = XMVectorZero();
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            const float depth = corner & 4 ? sliceFar : sliceNear;
+            const XMVECTOR viewPoint = XMVectorSet((corner & 1 ? 1.0f : -1.0f) * tanX * depth,
+                (corner & 2 ? 1.0f : -1.0f) * tanY * depth, depth, 1);
+            corners[corner] = XMVector3TransformCoord(viewPoint, inverseView);
+            center += corners[corner];
+        }
+        center /= 8.0f;
+        float radius = 0;
+        for (const XMVECTOR& corner : corners)
+            radius = std::max(radius, XMVectorGetX(XMVector3Length(corner - center)));
+        radius = ceilf(radius * 16.0f) / 16.0f;     // Steady as the camera turns, despite rounding.
 
-    // Transform NDC space [-1,+1]^2 to texture space [0,1]^2
-    XMMATRIX T(
-        0.5f, 0.0f, 0.0f, 0.0f,
-        0.0f, -0.5f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, 0.0f, 1.0f);
+        // Snap the center to whole texels in light space.
+        XMFLOAT3 lightCenter;
+        XMStoreFloat3(&lightCenter, XMVector3TransformCoord(center, lightView));
+        const float texel = 2.0f * radius / RenderData::SMapWidth;
+        lightCenter.x = floorf(lightCenter.x / texel) * texel;
+        lightCenter.y = floorf(lightCenter.y / texel) * texel;
+        const float casterNear = std::min(lightCenter.z - radius, sceneNear) - 1.0f;
+        const XMMATRIX box = XMMatrixOrthographicOffCenterLH(lightCenter.x - radius, lightCenter.x + radius,
+            lightCenter.y - radius, lightCenter.y + radius, casterNear, lightCenter.z + radius);
 
-    XMMATRIX S = V*P*T;
+        data.cascadeTexel[cascade] = texel;
+        data.cascadeDepthRange[cascade] = lightCenter.z + radius - casterNear;
+        XMStoreFloat4x4(&data.cascadeView[cascade], lightView);
+        XMStoreFloat4x4(&data.cascadeProj[cascade], box);
+        XMStoreFloat4x4(&data.cascadeTransform[cascade], lightView * box * toTexture);
+    }
 
-    XMStoreFloat4x4(&GetRenderData().lightView, V);
-    XMStoreFloat4x4(&GetRenderData().lightProj, P);
-    XMStoreFloat4x4(&GetRenderData().shadowTransform, S);
+    XMStoreFloat4x4(&data.lightView, lightView);
+    XMStoreFloat4x4(&data.lightProj, XMLoadFloat4x4(&data.cascadeProj[0]));
+    XMStoreFloat4x4(&data.shadowTransform, XMLoadFloat4x4(&data.cascadeTransform[0]));
 }
 
 void RenderManager::DrawSceneToShadowMap()
 {
-    UpdateViewProjection(&GetRenderData().lightView, &GetRenderData().lightProj, true);
-
-    // Draw everything
-    HR(RenderScene(ShadowMapPass));
+    // Each cascade: its own light view and box, culling against that box, into its quadrant (see the platform's
+    // UpdateViewProjection).
+    for (UINT cascade = 0; cascade < m_renderData.shadowCascadeCount; ++cascade)
+    {
+        m_renderData.shadowCascade = cascade;
+        XMFLOAT4X4 viewProjection;
+        XMStoreFloat4x4(&viewProjection, XMLoadFloat4x4(&m_renderData.cascadeView[cascade]) * XMLoadFloat4x4(&m_renderData.cascadeProj[cascade]));
+        UpdateCullingPlanes(viewProjection, true);
+        m_cullingForView = false;
+        UpdateViewProjection(&m_renderData.cascadeView[cascade], &m_renderData.cascadeProj[cascade], true);
+        HR(RenderScene(ShadowMapPass));
+    }
+    m_renderData.shadowCascade = 0;
 
     UpdateViewProjection(&GetRenderData().view, &GetRenderData().projection, false);
 }

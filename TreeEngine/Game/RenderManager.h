@@ -202,9 +202,12 @@ public:
 
     HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
     // View culling for the regular pass: the frustum's planes this frame and each object's visibility.
-    XMFLOAT4 m_cullingPlanes[5] = {};
+    XMFLOAT4 m_cullingPlanes[6] = {};
+    UINT m_cullingPlaneCount = 5;
+    bool m_cullingForView = true;   // Culling for the regular pass, which the profile counts (not a shadow cascade).
     UINT m_cullingEpoch = 0;    // Bumped with each frustum; see WorldObject::m_cullingEpoch.
     void UpdateCullingFrustum();
+    void UpdateCullingPlanes(const XMFLOAT4X4& viewProjection, bool orthographic);
     bool IsVisible(WorldObject* object);
 
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,

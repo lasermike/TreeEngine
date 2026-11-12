@@ -815,8 +815,8 @@ private:
     enum ViewProjectionConstBufferSubIndex
     {
         NormalPass_CBSI,
-        ShadowPass_CBSI,
-        Count_CBSI
+        ShadowPass_CBSI,                                        // One per shadow cascade (RenderData::shadowCascade).
+        Count_CBSI = ShadowPass_CBSI + RenderData::MaxShadowCascades
     };
 
     UploadBuffer<CBNeverChanges>*      m_constBufferNeverChanges;
