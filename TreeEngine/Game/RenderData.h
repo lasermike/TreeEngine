@@ -103,6 +103,7 @@ struct RenderProfile
     std::array<UINT, 9> lodLevelObjects = {};
     UINT drawnLeaves = 0;
     UINT drawnSticks = 0;
+    UINT fadingObjects = 0;                 // Instanced trees crossfading between LOD layouts this frame.
     UINT batchedDraws = 0;                  // Batched instance draws, and the objects they drew (see RenderManager::Render).
     UINT batchedObjects = 0;
     double instanceUploadMs = 0;            // Copying the CPU instance array into the frame's instance buffer.
@@ -150,6 +151,7 @@ struct RenderData : SceneRenderSettings
     XMFLOAT4X4          view;
     XMVECTOR            eyePos;
     float               lodDistanceScale = 1;   // Multiplies every LOD distance (Settings::m_lodDistanceScale).
+    UINT                lodFadeFrames = 0;      // Settings::m_lodFadeFrames: frames of LOD crossfade, 0 for none.
     // The instance slots to copy to the GPU this frame ([begin, end) ranges; see WorldObject::AppendInstanceUploadRanges),
     // or null to copy every slot.
     const std::vector<std::pair<UINT, UINT>>* instanceUploadRanges = nullptr;

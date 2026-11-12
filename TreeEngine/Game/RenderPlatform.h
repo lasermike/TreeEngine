@@ -1033,9 +1033,11 @@ public:
         D3D12_GPU_VIRTUAL_ADDRESS blas = 0;
         UINT firstGeometry = 0;
         float transform[3][4] = { { 1, 0, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0, 1, 0 } };
+        UINT mask = 0xFF;   // See LodFadeMask.
         bool operator==(const TlasInstance& other) const
         {
-            return blas == other.blas && firstGeometry == other.firstGeometry && memcmp(transform, other.transform, sizeof(transform)) == 0;
+            return blas == other.blas && firstGeometry == other.firstGeometry && mask == other.mask
+                && memcmp(transform, other.transform, sizeof(transform)) == 0;
         }
     };
     std::vector<TlasInstance> m_tlasState;

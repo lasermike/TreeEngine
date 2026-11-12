@@ -41,6 +41,10 @@ interface IRenderFrame
     // UINT_MAX means identity.
     virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
         UINT objectTransformSlot = UINT_MAX) = 0;
+    // A second range the object draws this frame, after SetInstances (which clears it): the layout an instanced tree
+    // fades out of. It is its own DXR owner (owner, any unique address), so it gets its own TLAS instance.
+    virtual HRESULT SetFadingInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+        UINT objectTransformSlot, const void* owner) = 0;
     virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
     virtual RenderData& GetRenderData() = 0;
 };
@@ -89,6 +93,10 @@ class RenderManager : public IRenderFrame
         UINT start = 0;
         UINT count = 0;
         UINT objectTransformSlot = UINT_MAX;
+        UINT fadeStart = 0;                 // See IRenderFrame::SetFadingInstances; fadeCount 0 for none.
+        UINT fadeCount = 0;
+        UINT fadeTransformSlot = UINT_MAX;
+        const void* fadeOwner = nullptr;
     };
     // Each unit's per-frame ranges, in the order of its reservations, and where each object's is. Entries are made at
     // reservation, so concurrent SetInstances calls only find and write existing ones.
@@ -201,6 +209,10 @@ public:
 
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
         UINT objectTransformSlot = UINT_MAX);
+
+    HRESULT SetFadingInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+
+        UINT objectTransformSlot, const void* owner);
     HRESULT GetInstanceIndex(WorldObject* object, UINT&);
 
     HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, SceneRoot& scene);

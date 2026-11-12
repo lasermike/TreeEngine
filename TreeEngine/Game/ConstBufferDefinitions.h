@@ -54,7 +54,7 @@ struct CBChangesEveryFrame
     float ambientOcclusionRadius;
     float ambientOcclusionStrength;
     UINT reflectionRayCount;
-    XMFLOAT4 sceneTime; // x is simulation time in seconds
+    XMFLOAT4 sceneTime; // x is simulation time in seconds, y the frame number mod 1024
     XMFLOAT4 sunShadowParams; // x: tan(angular radius), y: sample count
     XMFLOAT4 renderScale = XMFLOAT4(0, 1, 0, 0); // x: texture LOD bias while upscaling, y: 2^x (set by the platform)
 };

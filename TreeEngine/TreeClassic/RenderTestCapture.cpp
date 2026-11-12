@@ -172,6 +172,9 @@ void ParseRenderTestCommandLine()
     parsed->hashedAlphaTest = alphaTest == "hashed";
     parsed->viewCulling = json.value("viewCulling", true);
     parsed->batchInstances = json.value("batchInstances", true);
+    parsed->lodFadeFrames = json.value("lodFadeFrames", 0);
+    if (parsed->lodFadeFrames < 0 || parsed->lodFadeFrames > 1000)
+        throw std::runtime_error("lodFadeFrames must be 0 to 1000");
     parsed->hdr = json.value("hdr", false);
     parsed->tonemap = json.value("tonemap", std::string("clamp"));
     parsed->exposure = json.value("exposure", 0.0f);
@@ -395,6 +398,7 @@ namespace
             game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
             game.SetRenderTestViewCulling(request->viewCulling);
             game.SetRenderTestBatchInstances(request->batchInstances);
+            game.SetRenderTestLodFadeFrames(request->lodFadeFrames);
             game.SetRenderTestHdr(request->hdr, TonemapSetting(request->tonemap), request->exposure);
             game.SetRenderTestRenderScale(request->renderScale);
             const int settleFrames = request->performanceSettleFrames;
@@ -457,7 +461,7 @@ namespace
                     { "dynamicBlasRefits", profile.dynamicBlasRefits }, { "dynamicBlasReuses", profile.dynamicBlasReuses },
                     { "tlasInstances", profile.tlasInstances }, { "blasHeapBytes", profile.blasHeapBytes },
                     { "blasHeapLiveBytes", profile.blasHeapLiveBytes }, { "blasScratchBytes", profile.blasScratchBytes },
-                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }, { "batchedDraws", profile.batchedDraws }, { "batchedObjects", profile.batchedObjects } });
+                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }, { "batchedDraws", profile.batchedDraws }, { "batchedObjects", profile.batchedObjects }, { "fadingObjects", profile.fadingObjects } });
             }
             std::cerr << "Profiled " << request->scene << " / " << request->mode << ", "
                 << request->performanceFrames << " frames" << std::endl;
@@ -534,6 +538,7 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestHashedAlphaTest(request->hashedAlphaTest);
             game.SetRenderTestViewCulling(request->viewCulling);
             game.SetRenderTestBatchInstances(request->batchInstances);
+            game.SetRenderTestLodFadeFrames(request->lodFadeFrames);
             game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
             game.SetRenderTestRenderScale(point.renderScale);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
@@ -605,7 +610,7 @@ int RunRenderTestCapture(Game& game)
                     { "dynamicBlasRefits", profile.dynamicBlasRefits }, { "dynamicBlasReuses", profile.dynamicBlasReuses },
                     { "tlasInstances", profile.tlasInstances }, { "blasHeapBytes", profile.blasHeapBytes },
                     { "blasHeapLiveBytes", profile.blasHeapLiveBytes }, { "blasScratchBytes", profile.blasScratchBytes },
-                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }, { "batchedDraws", profile.batchedDraws }, { "batchedObjects", profile.batchedObjects }
+                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }, { "batchedDraws", profile.batchedDraws }, { "batchedObjects", profile.batchedObjects }, { "fadingObjects", profile.fadingObjects }
                     });
                     const int adapterBytes = WideCharToMultiByte(CP_UTF8, 0, profile.adapter.c_str(), -1, nullptr, 0, nullptr, nullptr);
                     if (!adapterBytes) throw std::runtime_error("Cannot encode GPU adapter name as UTF-8");

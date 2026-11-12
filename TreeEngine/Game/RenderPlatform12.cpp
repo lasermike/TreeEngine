@@ -2832,6 +2832,21 @@ HRESULT RenderPlatform12::CreateRaytracingPipeline()
 
 inline std::size_t hash_combine(std::size_t seed, std::size_t value) noexcept;
 
+// The TLAS instance mask of an object whose transform slot carries an LOD crossfade (InstancedData::AtlasRegion:
+// 0 for none, else the float bits of +t fading in or -t fading out, t in (0, 1)). Each ray picks one of seven buckets
+// (bits 1-7, from FadeDither in Shaders/SharedTypes.hlsli), and the layout fading in takes the first round(7t) of
+// them, the one fading out the rest, so a ray sees exactly one. Everything else answers to every bucket.
+static UINT LodFadeMask(UINT fade)
+{
+    if (fade == 0)
+        return 0xFF;
+    float value;
+    memcpy(&value, &fade, sizeof(value));
+    const UINT buckets = static_cast<UINT>(std::lround(std::min(1.0f, std::fabs(value)) * 7.0f));
+    const UINT fadingIn = ((1u << buckets) - 1u) << 1;
+    return value > 0 ? fadingIn : 0xFEu & ~fadingIn;
+}
+
 // Finds instanced draws (an owner whose records all carry the same object transform) and moves their object
 // transform from the vertices to the TLAS: the records' objectTransformSlot is cleared, so the deformation pass writes
 // them in layout space. Owners drawing identical geometry (the same source layout, materials and instance slots) share
@@ -3865,6 +3880,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
                 for (int row = 0; row < 3; ++row)
                     for (int column = 0; column < 4; ++column)
                         instance.transform[row][column] = world.m[column][row];
+                instance.mask = LodFadeMask(instances[source.transformSlot].AtlasRegion);
             }
             if (instance.blas)
                 state.push_back(instance);
@@ -4062,7 +4078,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
         desc.InstanceContributionToHitGroupIndex = 0;
         desc.InstanceID = m_tlasState[i].firstGeometry;    // The hit shaders' geometry-table index is InstanceID() + GeometryIndex().
-        desc.InstanceMask = 0xFF;
+        desc.InstanceMask = m_tlasState[i].mask;
         memcpy(desc.Transform, m_tlasState[i].transform, sizeof(desc.Transform));
     }
     m_instancesTLAS->Unmap();

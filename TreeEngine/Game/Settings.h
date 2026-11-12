@@ -52,6 +52,10 @@ public:
     bool m_viewCulling = true;
     // Draw instanced objects that share an instance range (tree layouts) in one batched draw per range.
     bool m_batchInstances = true;
+    // Frames over which an instanced tree crossfades (dithered) from one LOD layout to the next; 0 switches at once.
+    // Off by default: with TAA, Forest's switches are already subtle, and while the camera moves fast a third of the
+    // trees can be mid-fade, drawing two layouts (Forest flight: raster GPU +2.3 ms at 24 frames).
+    int m_lodFadeFrames = 0;
     float m_lodDistanceScale = 1.0f;    // Multiplies every object's LOD distances; below 1 lowers detail sooner.          // Skip raster draws of objects outside the view frustum (DXR still traces them).
     // Camera motion vectors (Game/Shaders/MotionVectors.hlsl). A debug view replaces the scene color.
     enum class MotionView { Off, Motion, ReprojectedHistory, History };

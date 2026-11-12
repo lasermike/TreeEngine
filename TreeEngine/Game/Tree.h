@@ -109,6 +109,16 @@ private:
     float m_lastLodScale = 0;
     float LodScale(const RenderData& renderData, const XMFLOAT3& boxMin, const XMFLOAT3& boxMax, bool boxValid) const;
     int m_instanceLodLevel = -1;    // An instance's last whole-instance level, for hysteresis; -1 before the first.
+    // An instance's LOD crossfade: the layout it shows, the one it fades out of (SIZE_MAX for none) and the frame the
+    // fade began; the eye position last frame, to tell a camera cut (which switches at once) from movement. The fading
+    // copy is its own DXR owner (m_fadeOwner's address).
+    size_t m_shownLayout = SIZE_MAX;
+    size_t m_fadeFromLayout = SIZE_MAX;
+    UINT m_fadeStartFrame = 0;
+    XMFLOAT3 m_fadeEye = XMFLOAT3(FLT_MAX, FLT_MAX, FLT_MAX);
+    char m_fadeOwner = 0;
+    bool m_fading = false;          // Crossfading this frame, for the profile.
+    static constexpr float CameraCutDistance = 5.0f;  // Eye movement in one frame beyond which LOD switches don't fade.
     UINT m_lastInstanceStart = 0;
     // The instance slots written this frame (see AppendInstanceUploadRanges), and the frame they were written for.
     std::vector<std::pair<UINT, UINT>> m_uploadRanges;

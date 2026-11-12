@@ -222,6 +222,7 @@ HRESULT Tree::InitGraphics(RenderManager& renderManager)
 
 void Tree::AccumulateProfile(RenderProfile& profile) const
 {
+    profile.fadingObjects += m_fading ? 1 : 0;
     if (m_profileLevel >= 0)
         profile.lodLevelObjects[std::min<size_t>(m_profileLevel, profile.lodLevelObjects.size() - 1)]++;
     profile.drawnLeaves += m_profileLeaves;
@@ -912,7 +913,7 @@ HRESULT Tree::ComputeTransformationsManual(XMMATRIX* computedTransform, BranchIn
 unsigned int Tree::GetMaxInstances()
 {
     if (_params->instanceSource)
-        return 1; // The per-draw object transform.
+        return 2; // The per-draw object transform, and its copy for the layout fading out (see ComputeInstanceConstants).
     if (!_treeModel)
         return 0;
     const unsigned int branches = _treeModel->treeData.numBranches;
@@ -1238,6 +1239,11 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
     XMStoreFloat4x4(&data.World, rel);
     data.InstanceOffset = data.InstanceOffsetPrev = data.PreviousSlot = transformSlot;
     renderData.instanceData[transformSlot] = data;
+    // The copy for a layout fading out, written every frame so last frame's is always there for motion vectors.
+    const UINT fadeSlot = transformSlot + 1;
+    InstancedData fadeData = data;
+    fadeData.InstanceOffset = fadeData.InstanceOffsetPrev = fadeData.PreviousSlot = fadeSlot;
+    renderData.instanceData[fadeSlot] = fadeData;
 
     if (!source.m_instanceLayoutsValid)
     {
@@ -1278,6 +1284,42 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
         pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, layout.start[segmentIndex],
             static_cast<UINT>(layout.segments[segmentIndex].size()), transformSlot);
     }
+
+    // LOD crossfade: on a level change the old layout keeps drawing for lodFadeFrames, dithered out as the new one is
+    // dithered in (Shaders/Tree.hlsl FadeKeeps; DXR through instance masks, LodFadeMask). A camera cut, the first
+    // frame, or a fade length of 0 switches at once. A change during a fade restarts it from the layout shown.
+    const XMVECTOR eye = renderData.eyePos;
+    const bool cut = XMVectorGetX(XMVector3Length(eye - XMLoadFloat3(&m_fadeEye))) > CameraCutDistance;
+    XMStoreFloat3(&m_fadeEye, eye);
+    if (renderData.lodFadeFrames == 0 || cut)
+        m_fadeFromLayout = SIZE_MAX;
+    else if (m_shownLayout != SIZE_MAX && m_shownLayout != layoutIndex && m_shownLayout < source.m_instanceLayouts.size())
+    {
+        m_fadeFromLayout = m_shownLayout;
+        m_fadeStartFrame = renderData.frame;
+    }
+    m_shownLayout = layoutIndex;
+    float fade = 1;
+    if (m_fadeFromLayout != SIZE_MAX)
+    {
+        fade = static_cast<float>(renderData.frame - m_fadeStartFrame + 1) / renderData.lodFadeFrames;
+        if (fade >= 1 || m_fadeFromLayout == layoutIndex)
+        {
+            m_fadeFromLayout = SIZE_MAX;
+            fade = 1;
+        }
+    }
+    if (m_fadeFromLayout != SIZE_MAX)
+    {
+        const float fadeOut = -fade;
+        memcpy(&renderData.instanceData[transformSlot].AtlasRegion, &fade, sizeof(fade));
+        memcpy(&renderData.instanceData[fadeSlot].AtlasRegion, &fadeOut, sizeof(fadeOut));
+        InstanceLayout& from = source.m_instanceLayouts[m_fadeFromLayout];
+        for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+            pFrameConfig->SetFadingInstances(m_segmentRenderUnits[segmentIndex], this, from.start[segmentIndex],
+                static_cast<UINT>(from.segments[segmentIndex].size()), fadeSlot, &m_fadeOwner);
+    }
+    m_fading = m_fadeFromLayout != SIZE_MAX;
     renderData.frameStats[NUM_LEAVES_STAT].stat += layout.leafCount;
     renderData.frameStats[NUM_STICKS_STAT].stat += layout.stickCount;
     m_profileLevel = m_instanceLodLevel;

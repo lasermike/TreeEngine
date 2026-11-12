@@ -142,6 +142,12 @@ float3 ObjectUpDirection(float4x4 world)
     return normalize(up);
 }
 
+// The object's LOD crossfade value, which its transform slot carries in AtlasRegion (float bits; 0 when not fading).
+float ObjectFade()
+{
+    return objectSlot == NoObjectTransform ? 0 : asfloat(InstanceBuffer[objectSlot].AtlasRegion);
+}
+
 // Leaves from a texture atlas read their region from the instance slot AtlasRegion names.
 float2 AtlasUv(float2 uv, uint atlasRegion)
 {
@@ -234,6 +240,7 @@ struct PS_INPUT
     float3 PosL : TEXCOORD8;    // The mesh's own position, for the hashed alpha test and biplanar mapping.
     float3 NormL : TEXCOORD9;   // The mesh's own normal and the object's +Y in world space, for biplanar mapping.
     float3 UpW : TEXCOORD10;
+    nointerpolation float Fade : TEXCOORD11;  // LOD crossfade (see FadeKeeps); 0 when not fading.
 };
 
 struct PS_OUTPUT
@@ -339,6 +346,7 @@ PS_INPUT VS(VS_INPUT input)
     output.PosL = input.Pos;
     output.NormL = input.NormalL;
     output.UpW = ObjectUpDirection(world);
+    output.Fade = ObjectFade();
     SetMotionClips(output, out0,
         PreviousObjectTransform(mul(float4(input.Pos, 1.0f), PreviousWorld(input.PreviousSlot, world)).xyz));
 
@@ -375,6 +383,7 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     output.PosL = input.Pos;
     output.NormL = input.NormalL;
     output.UpW = ObjectUpDirection(input.World);
+    output.Fade = ObjectFade();
     SetMotionClips(output, skinnedPosition, PreviousObjectTransform(PreviousSkinVertexPosition(input)));
 
     output.Pos = mul(float4(output.PosW, 1.0f), View);
@@ -569,6 +578,7 @@ float4 ShadeSurface(PS_INPUT input)
 // pipeline masks the color writes.
 PS_OUTPUT PSDepthMotion(PS_INPUT input)
 {
+    clip(FadeKeeps(input.Fade, input.Pos.xy) ? 1 : -1);
     if (mat.flags.y > 0 && mat.flags.z > 0)
     {
         Biplanar biplanar;
@@ -584,6 +594,7 @@ PS_OUTPUT PSDepthMotion(PS_INPUT input)
 
 PS_OUTPUT PS(PS_INPUT input)
 {
+    clip(FadeKeeps(input.Fade, input.Pos.xy) ? 1 : -1);
     PS_OUTPUT output;
     output.Color = ShadeSurface(input);
     const float2 current = input.CurrentClip.xy / input.CurrentClip.w;
@@ -600,6 +611,7 @@ struct ShadowMapVertexOut
     float4 PosH : SV_POSITION;
     float2 Tex  : TEXCOORD;
     float3 PosL : POSITION;     // The mesh's own position, for the hashed alpha test.
+    nointerpolation float Fade : TEXCOORD1;   // LOD crossfade (see FadeKeeps).
 };
 
 ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
@@ -611,6 +623,7 @@ ShadowMapVertexOut BuildShadowMapVS(VS_INPUT input)
     float3 unusedNormal = 0, unusedTangent = 0;
     ApplyObjectTransform(position, unusedNormal, unusedTangent);
     output.PosL = input.Pos;
+    output.Fade = ObjectFade();
     float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
     output.Tex = AtlasUv(input.Tex, input.AtlasRegion);
@@ -627,6 +640,7 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
     float3 unusedNormal = 0, unusedTangent = 0;
     ApplyObjectTransform(position, unusedNormal, unusedTangent);
     output.PosL = input.Pos;
+    output.Fade = ObjectFade();
     float4 pos = mul(float4(position, 1.0f), View);
     output.PosH = mul(pos, Projection);
     output.Tex = input.Tex;
@@ -639,6 +653,8 @@ ShadowMapVertexOut BuildShadowMapVSSkinned(VS_SKINNED_INPUT input)
 // texture can use a NULL pixel shader for depth pass.
 void BuildShadowMapPS(ShadowMapVertexOut input)
 {
+    // Only alpha-tested materials have this pixel shader, so other surfaces' shadows don't fade.
+    clip(FadeKeeps(input.Fade, input.PosH.xy) ? 1 : -1);
     if (mat.flags.z > 0)  // clip alpha threshold
     {
         float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);

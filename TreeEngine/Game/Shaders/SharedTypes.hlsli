@@ -85,6 +85,30 @@ uint3 HashPcg3d(uint3 v)
     return v;
 }
 
+// LOD crossfade (Tree::ComputeInstanceConstants): a per-pixel threshold in [0, 1) that changes every frame, so TAA
+// averages the dithered layouts into a blend. Raster keeps a pixel of the layout fading in below the fade value t, and
+// of the one fading out at or above it; ray tracing picks one of seven instance-mask buckets with it (RayFadeMask).
+float FadeDither(uint2 pixel)
+{
+    const uint3 h = HashPcg3d(uint3(pixel, (uint)sceneTime.y));
+    return (h.x >> 8) * (1.0f / 16777216.0f);
+}
+
+// Whether a pixel of an object with this fade value (0: not fading, +t: fading in, -t: fading out) is drawn.
+bool FadeKeeps(float fade, float2 pixelPosition)
+{
+    if (fade == 0)
+        return true;
+    const float threshold = FadeDither(uint2(pixelPosition));
+    return fade > 0 ? threshold < fade : threshold >= -fade;
+}
+
+// The instance-inclusion mask for a ray from this pixel: one of the buckets 1-7 (see RenderPlatform12's LodFadeMask).
+uint RayFadeMask(uint2 pixel)
+{
+    return 1u << (1 + min(6u, (uint)(FadeDither(pixel) * 7.0f)));
+}
+
 float HashCell(float3 cell, int scale)
 {
     const uint3 h = HashPcg3d(uint3(int3(cell)) + (uint)scale * uint3(0x9E3779B9u, 0x85EBCA6Bu, 0xC2B2AE35u));

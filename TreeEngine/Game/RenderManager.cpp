@@ -107,7 +107,8 @@ HRESULT RenderManager::InitGameLevelGraphics(UINT maxInstances, bool useShadowMa
     for (WorldObject* object : scene.Children())
         instancedObjects += object->IsInstance() ? 1 : 0;
     m_batchListStart = maxInstances;
-    m_batchListCapacity = instancedObjects ? 2 * ((instancedObjects + 3) / 4 + 1024) : 0;
+    // Fading trees draw a second copy, so allow two per instanced object.
+    m_batchListCapacity = instancedObjects ? 2 * ((2 * instancedObjects + 3) / 4 + 1024) : 0;
     m_batchListUsed = 0;
     const UINT bufferInstances = maxInstances + m_batchListCapacity;
     if (bufferInstances > 0)
@@ -192,12 +193,13 @@ HRESULT RenderManager::UninitGameLevelGraphics()
 HRESULT RenderManager::BeginNewFrame()
 {
     m_renderData.lodDistanceScale = m_settings->m_lodDistanceScale;
+    m_renderData.lodFadeFrames = static_cast<UINT>(std::max(0, m_settings->m_lodFadeFrames));
     D3DBuffer* buffer = m_instancedBuffer.Get(m_renderData.frame);
     m_batchListUsed = 0;
 
     InstancedData* dataView = nullptr;
     HRR(GetPlatform()->BeginNewFrame(true, buffer, &dataView));
-    m_renderData.profile.batchedDraws = m_renderData.profile.batchedObjects = 0;
+    m_renderData.profile.batchedDraws = m_renderData.profile.batchedObjects = m_renderData.profile.fadingObjects = 0;
 
     //m_renderData.instanceData = dataView;
     //m_renderData.instanceBuffer = buffer;
@@ -326,21 +328,25 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
             continue;
 
         const InstanceRange& range = ranges[reservation];
-        UINT startInstance = range.start;
-        UINT numInstances = range.count;
+        // The object's own range, then the one it fades out of (a separate DXR owner), if any.
+        for (int part = 0; part < (range.fadeCount ? 2 : 1); ++part)
+        {
+        const UINT startInstance = part ? range.fadeStart : range.start;
+        const UINT numInstances = part ? range.fadeCount : range.count;
+        const UINT transformSlot = part ? range.fadeTransformSlot : range.objectTransformSlot;
 
         if (numInstances > 0)
         {
-            m_renderData.currentDrawOwner = object;
+            m_renderData.currentDrawOwner = part ? range.fadeOwner : object;
             m_renderData.currentDrawCulled = pass == RegularPass && m_settings->m_viewCulling && !IsVisible(object);
-            if (batching && range.objectTransformSlot != UINT_MAX)
+            if (batching && transformSlot != UINT_MAX)
             {
                 if (recordEach)
                 {
                     const bool culled = m_renderData.currentDrawCulled;
                     m_renderData.currentDrawCulled = true;
                     HRR(GetPlatform()->DrawIndexedInstanced(offsets.IndexCount, numInstances, offsets.IndexOffset,
-                        offsets.VertexOffset, startInstance, range.objectTransformSlot));
+                        offsets.VertexOffset, startInstance, transformSlot));
                     m_renderData.currentDrawCulled = culled;
                 }
                 if (m_renderData.currentDrawCulled)
@@ -358,11 +364,12 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
                     batch->count = numInstances;
                     batch->transformSlots.clear();
                 }
-                batch->transformSlots.push_back(range.objectTransformSlot);
+                batch->transformSlots.push_back(transformSlot);
                 continue;
             }
             HRR(GetPlatform()->DrawIndexedInstanced(offsets.IndexCount, numInstances, offsets.IndexOffset,
-                offsets.VertexOffset, startInstance, range.objectTransformSlot));
+                offsets.VertexOffset, startInstance, transformSlot));
+        }
         }
     }
 
@@ -833,6 +840,24 @@ HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object,
     range.start = startInstance;
     range.count = numInstances;
     range.objectTransformSlot = objectTransformSlot;
+    range.fadeCount = 0;
+    return S_OK;
+}
+
+HRESULT RenderManager::SetFadingInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+    UINT objectTransformSlot, const void* owner)
+{
+    const auto unit = m_perFrameInstanceData.find(renderUnit);
+    if (unit == m_perFrameInstanceData.end())
+        return E_INVALIDARG;
+    const auto entry = unit->second.index.find(object);
+    if (entry == unit->second.index.end())
+        return E_INVALIDARG;
+    InstanceRange& range = unit->second.ranges[entry->second];
+    range.fadeStart = startInstance;
+    range.fadeCount = numInstances;
+    range.fadeTransformSlot = objectTransformSlot;
+    range.fadeOwner = owner;
     return S_OK;
 }
 
@@ -931,7 +956,8 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
         XMConvertToRadians(m_renderData.environmentRotationDegrees));
     cb.ambientOcclusionRadius = m_renderData.ambientOcclusionRadius;
     cb.ambientOcclusionStrength = m_renderData.ambientOcclusionStrength;
-    cb.sceneTime = XMFLOAT4(m_renderData.normalAnimationTime, 0, 0, 0);
+    // y: the frame number (mod 1024), which varies the LOD crossfade dither each frame (see FadeDither).
+    cb.sceneTime = XMFLOAT4(m_renderData.normalAnimationTime, static_cast<float>(m_renderData.frame & 1023), 0, 0);
     cb.sunShadowParams = XMFLOAT4(tanf(XMConvertToRadians(m_renderData.sunAngularDiameterDegrees) * 0.5f),
         static_cast<float>(m_renderData.sunShadowSamples), 0, 0);
     const int reflectionRays = m_settings->m_waterReflectionRays;

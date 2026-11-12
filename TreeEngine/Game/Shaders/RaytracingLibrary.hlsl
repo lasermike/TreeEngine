@@ -306,7 +306,7 @@ float ComputeContactVisibility(float3 hit, float3 surfaceNormal, float3 geometri
         ray.TMax = ambientOcclusionRadius;
         RayPayload probe = { float4(1, 1, 1, 1), 0, 2 };
         // The closest hit records the distance: opacity micromaps can accept leaf hits without running any-hit.
-        TraceRay(Scene, RAY_FLAG_NONE, ~0, 0, 0, 0, ray, probe);
+        TraceRay(Scene, RAY_FLAG_NONE, RayFadeMask(DispatchRaysIndex().xy), 0, 0, 0, ray, probe);
         visibility += smoothstep(0.0f, 1.0f, probe.color.x);
     }
     return lerp(1.0f, visibility / sampleCount, ambientOcclusionStrength);
@@ -476,7 +476,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         RayPayload shadowPayload = { float4(0, 0, 0, 0), payload.depth + 1, 1 };
         TraceRay(Scene,
             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
-            ~0, 0, 0, 0, shadowRay, shadowPayload);
+            RayFadeMask(DispatchRaysIndex().xy), 0, 0, 0, shadowRay, shadowPayload);
         shadowFactor += shadowPayload.color.x;
     }
     if (!(globalFlags & 0x2)) shadowFactor /= sampleCount;
@@ -534,7 +534,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         transmittedRay.TMin = 0.001f;
         transmittedRay.TMax = 100.0f;
         RayPayload transmitted = { float4(0, 0, 0, 1), payload.depth + 1, 0 };
-        TraceRay(Scene, rayFlags, ~0, 0, 0, 1, transmittedRay, transmitted);
+        TraceRay(Scene, rayFlags, RayFadeMask(DispatchRaysIndex().xy), 0, 0, 1, transmittedRay, transmitted);
         float3 specularIbl = ComputeGltfEnvironmentLight(mat, textureColor, normal, toEye,
             float3(0, 0, 0), prefiltered);
         float3 reflection = ToSceneColor((shadowFactor * S).rgb + specularIbl);
@@ -566,7 +566,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
                 reflectedRay.Direction = reflect(incident, h);
                 if (dot(reflectedRay.Direction, faceNormal) <= 0) continue;
                 RayPayload sampleR = { float4(0, 0, 0, 1), payload.depth + 1, 3 };
-                TraceRay(Scene, rayFlags, ~0, 0, 0, 1, reflectedRay, sampleR);
+                TraceRay(Scene, rayFlags, RayFadeMask(DispatchRaysIndex().xy), 0, 0, 1, reflectedRay, sampleR);
                 sumR += sampleR.color.rgb;
                 countR += 1;
             }
@@ -648,7 +648,7 @@ void RayGenerationShader()
     RayPayload payload = { float4(0, 0, 0, 1), 0, 0 };
 
     uint missShaderIndex = 1;
-    TraceRay(Scene, rayFlags, ~0, 0, 0, missShaderIndex, ray, payload);
+    TraceRay(Scene, rayFlags, RayFadeMask(DispatchRaysIndex().xy), 0, 0, missShaderIndex, ray, payload);
 
     // Write final color from payload to output
     renderOutput[DispatchRaysIndex().xy] = payload.color;
