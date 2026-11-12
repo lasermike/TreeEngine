@@ -34,7 +34,8 @@
     <ClCompile Include="SceneDefinitionTests.cpp" />
     <ClCompile Include="ScenePersistenceTests.cpp" />
     <ClCompile Include="..\Game\GltfLoader.cpp" />
-    <ClCompile Include="..\Game\SceneDefinition.cpp" />
+    <ClCompile Include="..\Game\SceneDefinition.cpp" />
+    <ClCompile Include="..\Game\TerrainPackage.cpp" />
     <ClCompile Include="..\Game\SceneCatalog.cpp" />
     <ClCompile Include="..\Game\OpacityMicromapBaker.cpp" />
     <SceneJson Include="..\Game\Resources\Scenes\*.scene.json" />

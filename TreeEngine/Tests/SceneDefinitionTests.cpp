@@ -6,6 +6,7 @@
 #include "UpscalerMath.h"
 #include "DebugVectorMath.h"
 #include "Lod.h"
+#include "TerrainPackage.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -576,6 +577,68 @@ void TestOpacityMicromaps()
 int RunScenePersistenceTests();
 
 
+// Writes a small terrain package, reads it back, and checks block layout, borders, quantization and the manifest.
+void TestTerrainPackage()
+{
+    using namespace TerrainFormat;
+    Check(BlockStride % 512 == 0 && BlockStride >= BlockBytes, "terrain blocks are 512-byte aligned");
+    Check(TerrainPackage::LevelsFor(65) == 1 && TerrainPackage::LevelsFor(66) == 2 && TerrainPackage::LevelsFor(8193) == 8,
+        "terrain level count covers the samples");
+    Check(TerrainPackage::NodeIndex(0, 0, 0) == 0 && TerrainPackage::NodeIndex(1, 1, 0) == 2 && TerrainPackage::NodeIndex(2, 0, 1) == 9
+        && TerrainPackage::NodeCount(8) == 21845, "terrain node order is level by level, row-major");
+
+    const int samples = 257;    // Three levels.
+    const double spacing = 2.0;
+    std::vector<float> heights(size_t(samples) * samples);
+    for (int j = 0; j < samples; ++j)
+        for (int i = 0; i < samples; ++i)
+            heights[size_t(j) * samples + i] = float(-20 + 0.5 * i + 0.25 * j + 3 * std::sin(i * 0.1));
+    wchar_t temp[MAX_PATH];
+    GetTempPathW(MAX_PATH, temp);
+    const std::wstring directory = std::wstring(temp) + L"TreeTerrainTest" + std::to_wstring(GetCurrentProcessId());
+    std::string error;
+    Check(TerrainPackage::Write(directory, heights, samples, spacing, "{\"test\":1}", error), "terrain package write");
+    Check(!TerrainPackage::Write(directory + L"x", heights, samples - 1, spacing, "{}", error), "terrain write rejects a partial quadtree");
+
+    TerrainPackage package;
+    Check(package.Open(directory), "terrain package opens");
+    const TerrainManifest& m = package.Manifest();
+    Check(m.levels == 3 && m.worldSize == 512 && m.sampleSpacing == 2 && m.NodeSpacing(2) == 2 && m.NodeSpacing(0) == 8,
+        "terrain manifest extent and levels");
+    Check(m.sourceJson == "{\"test\":1}", "terrain manifest keeps its source");
+    std::vector<uint16_t> block(size_t(BlockSamples) * BlockSamples);
+    const float tolerance = m.heightScale * 0.51f;
+    for (int level = 0; level < 3; ++level)
+    {
+        const int step = 1 << (2 - level);
+        for (int nz = 0; nz < (1 << level); ++nz)
+            for (int nx = 0; nx < (1 << level); ++nx)
+            {
+                Check(package.ReadBlock(level, nx, nz, block.data()), "terrain block reads");
+                for (int b = 0; b < BlockSamples; ++b)
+                    for (int a = 0; a < BlockSamples; ++a)
+                    {
+                        const int i = std::min(std::max((nx * NodeQuads + a - 1) * step, 0), samples - 1);
+                        const int j = std::min(std::max((nz * NodeQuads + b - 1) * step, 0), samples - 1);
+                        const float expected = heights[size_t(j) * samples + i];
+                        if (std::abs(m.Height(block[size_t(b) * BlockSamples + a]) - expected) > tolerance)
+                            Check(false, "terrain block sample matches the source within quantization");
+                    }
+            }
+    }
+    Check(!package.ReadBlock(3, 0, 0, block.data()) && !package.ReadBlock(1, 2, 0, block.data()), "terrain rejects nodes outside the tree");
+    package.Close();
+
+    TerrainManifest parsed;
+    Check(!TerrainPackage::ParseManifest("{\"format\":\"TreeTerrain\",\"version\":1,\"nodeQuads\":32}", parsed, error),
+        "terrain manifest rejects another block layout");
+    Check(TerrainPackage::ParseManifest(TerrainPackage::ManifestJson(m), parsed, error) && parsed.levels == 3
+        && parsed.heightOffset == m.heightOffset, "terrain manifest round trip");
+    DeleteFileW((directory + L"\\nodes.bin").c_str());
+    DeleteFileW((directory + L"\\manifest.json").c_str());
+    RemoveDirectoryW(directory.c_str());
+}
+
 void TestLodSelection()
 {
     Lod::Thresholds two;
@@ -876,6 +939,7 @@ int main(int argc, char** argv)
         TestAmbientOcclusionSettings();
         TestUpscalerMath();
         TestLodSelection();
+        TestTerrainPackage();
         TestTreeLodSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
