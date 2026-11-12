@@ -200,7 +200,7 @@
   </ItemGroup>
   <ItemDefinitionGroup>
     <CustomBuild>
-      <AdditionalInputs>$(SolutionDir)Game\Shaders\buildShaders.bat;$(SolutionDir)Game\Shaders\shaderFiles.txt;$(SolutionDir)Game\Shaders\SharedTypes.hlsli;$(SolutionDir)Game\Shaders\Materials.fx;%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs>$(SolutionDir)Game\Shaders\buildShaders.bat;$(SolutionDir)Game\Shaders\shaderFiles.txt;$(SolutionDir)Game\Shaders\SharedTypes.hlsli;$(SolutionDir)Game\Shaders\Materials.fx;$(SolutionDir)Game\Shaders\Terrain.hlsli;%(AdditionalInputs)</AdditionalInputs>
     </CustomBuild>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

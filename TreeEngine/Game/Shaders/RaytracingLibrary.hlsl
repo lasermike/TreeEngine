@@ -25,6 +25,7 @@ ByteAddressBuffer skinnedVertexBuffer : register(t6); // SkinnedVertex (60 bytes
 StructuredBuffer<InstancedData> instanceDataBuffer : register(t7);
 ByteAddressBuffer skinnedIndexBuffer : register(t8); // Skinned index buffer
 Texture2D<float4> sceneTextures[32] : register(t9); // MaxSceneTextures in RenderPlatform.h
+StructuredBuffer<TerrainLayer> terrainLayers : register(t44);   // Terrain material layers; see Shaders/Terrain.hlsli.
 TextureCube<float4> skyTexture : register(t41);
 TextureCube<float4> environmentDiffuse : register(t42);
 TextureCube<float4> environmentSpecular : register(t43);
@@ -229,6 +230,14 @@ float4 SampleFilteredMaterialTexture(int slot, float2 uv, bool clampTexture,
         ? sceneTextures[NonUniformResourceIndex(slot)].SampleGrad(samLinearClamp, uv, dx, dy)
         : sceneTextures[NonUniformResourceIndex(slot)].SampleGrad(samLinear, uv, dx, dy);
 }
+
+float4 SampleTerrainTexture(int slot, bool clampMap, float2 uv, float2 uvDx, float2 uvDy)
+{
+    return clampMap ? sceneTextures[NonUniformResourceIndex(slot)].SampleGrad(samLinearClamp, uv, uvDx, uvDy)
+        : sceneTextures[NonUniformResourceIndex(slot)].SampleGrad(samLinear, uv, uvDx, uvDy);
+}
+
+#include "Terrain.hlsli"
 
 // A material map through the model's UVs, or blended over the biplanar projections when the material has them.
 float4 SampleMaterialMap(int slot, bool clampTexture, ShaderMaterial material, uint role, float2 uv,
@@ -470,6 +479,22 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         textureColor.rgb *= 2 * SampleFilteredMaterialTexture(int(mat.tintTextures.x), TransformMaterialUv(mat, texCoord, TintTextureRole),
             mat.tintTextures.y > 0, mat, TintTextureRole, uvDx, uvDy).rgb;
 
+    float skirtLift = 0;
+    if (IsTerrainMaterial(mat))
+    {
+        // Its layers, with the ray footprint carried to world space by barycentrics (terrain vertices are world space).
+        // A skirt seen through a crack is covered, and below lit, as its edge is (see TerrainMaterialHeight).
+        const float3 positionW = sv0.position * bary.x + sv1.position * bary.y + sv2.position * bary.z;
+        skirtLift = TerrainMaterialHeight(positionW, tangentData.w) - positionW.y;
+        const float3 edge1 = sv1.position - sv0.position;
+        const float3 edge2 = sv2.position - sv0.position;
+        const float3 binormal = normalize(cross(surfaceNormal, tangent)) * (tangentData.w < 0 ? -1.0f : 1.0f);
+        mat = TerrainSurface(mat, positionW, TerrainMaterialHeight(positionW, tangentData.w),
+            baryDx.x * edge1 + baryDx.y * edge2, baryDy.x * edge1 + baryDy.y * edge2,
+            surfaceNormal, tangent, binormal, texCoord, uvDx, uvDy, normal);
+        textureColor = float4(1, 1, 1, 1);
+    }
+
     if (mat.flags.w > 0)
     {
         payload.color = mat.Diffuse * textureColor;
@@ -480,6 +505,7 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 
     // Cast shadow ray toward the light
     float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+    hitPos.y += skirtLift;
     float3 lightDir = normalize(-light.Direction);
     float shadowFactor = (globalFlags & 0x2) ? 1.0f : 0.0f;
 

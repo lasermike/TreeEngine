@@ -6,6 +6,8 @@
 //                    [--spacing 1] [--height-scale 1] [--height-offset 0] [--nodata V] [--source-json JSON]
 //   TerrainTool info DIR
 //   TerrainTool heights DIR --in POINTS --out HEIGHTS     (lines of "x z" in meters -> one height per line)
+//   TerrainTool texture --out PREFIX --kind grass|rock|snow|dirt [--size 512] [--seed 1]
+//                       (tileable PREFIX_color.png, PREFIX_normal.png and PREFIX_mr.png for terrain layers)
 #include "pch.h"
 #include "TerrainPackage.h"
 
@@ -314,6 +316,158 @@ namespace
         return true;
     }
 
+    // Tileable gradient noise: the lattice wraps every `period` cells.
+    double PeriodicNoise(const Noise& noise, double x, double y, int period)
+    {
+        // Blend the four wrapped copies so the field repeats exactly at the period.
+        const double fx = x / period - std::floor(x / period), fy = y / period - std::floor(y / period);
+        const double px = fx * period, py = fy * period;
+        const double a = noise(px, py), b = noise(px - period, py), c = noise(px, py - period), d = noise(px - period, py - period);
+        return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+    }
+
+    double TileFbm(const Noise& noise, double u, double v, int basePeriod, int octaves, double gain = 0.5)
+    {
+        double sum = 0, amplitude = 1, norm = 0;
+        int period = basePeriod;
+        for (int o = 0; o < octaves; ++o)
+        {
+            sum += amplitude * PeriodicNoise(noise, u * period, v * period, period);
+            norm += amplitude;
+            amplitude *= gain;
+            period *= 2;
+        }
+        return sum / norm;
+    }
+
+    bool WritePng(const std::string& path, int size, const std::vector<uint8_t>& bgra)
+    {
+        CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        IWICImagingFactory* factory = nullptr;
+        IWICStream* stream = nullptr;
+        IWICBitmapEncoder* encoder = nullptr;
+        IWICBitmapFrameEncode* frame = nullptr;
+        WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
+        bool ok = SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory)))
+            && SUCCEEDED(factory->CreateStream(&stream))
+            && SUCCEEDED(stream->InitializeFromFilename(Wide(path).c_str(), GENERIC_WRITE))
+            && SUCCEEDED(factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder))
+            && SUCCEEDED(encoder->Initialize(stream, WICBitmapEncoderNoCache))
+            && SUCCEEDED(encoder->CreateNewFrame(&frame, nullptr))
+            && SUCCEEDED(frame->Initialize(nullptr))
+            && SUCCEEDED(frame->SetSize(size, size))
+            && SUCCEEDED(frame->SetPixelFormat(&format)) && format == GUID_WICPixelFormat32bppBGRA
+            && SUCCEEDED(frame->WritePixels(size, size * 4, UINT(bgra.size()), const_cast<BYTE*>(bgra.data())))
+            && SUCCEEDED(frame->Commit()) && SUCCEEDED(encoder->Commit());
+        if (frame) frame->Release();
+        if (encoder) encoder->Release();
+        if (stream) stream->Release();
+        if (factory) factory->Release();
+        return ok;
+    }
+
+    // Tileable surface maps for terrain layers: a height field drives the normal map, and color and roughness vary
+    // with it and with broader noise. Base color is sRGB; the normal map is tangent space with +Y up the image (glTF);
+    // the metallic-roughness map holds roughness in G and metallic (0) in B.
+    int Texture(const Args& args)
+    {
+        const std::string out = Text(args, "out"), kind = Text(args, "kind", "grass");
+        const int size = int(Number(args, "size", 512));
+        if (out.empty() || size < 16 || (size & (size - 1)) || (kind != "grass" && kind != "rock" && kind != "snow" && kind != "dirt"))
+        {
+            fprintf(stderr, "texture needs --out PREFIX, --kind grass|rock|snow|dirt and a power-of-two --size\n");
+            return 2;
+        }
+        const uint32_t seed = uint32_t(Number(args, "seed", 1));
+        const Noise noise(seed), detail(seed * 31u + 7u);
+        std::vector<double> height(size_t(size) * size), shade(size_t(size) * size);
+        ParallelRows(size, [&](int row)
+        {
+            const double v = (row + 0.5) / size;
+            for (int column = 0; column < size; ++column)
+            {
+                const double u = (column + 0.5) / size;
+                double h = 0, s = 0;
+                if (kind == "rock")
+                {
+                    // Strata (warped bands) and ridged cracks.
+                    const double warp = TileFbm(noise, u, v, 2, 4);
+                    const double bands = std::sin((v * 6 + warp * 1.2) * 6.2831853);
+                    const double cracks = 1 - std::fabs(TileFbm(detail, u, v, 8, 4));
+                    h = 0.45 * bands + 0.8 * std::pow(cracks, 6) + 0.35 * TileFbm(detail, u, v, 16, 4);
+                    s = 0.5 * TileFbm(noise, u, v, 4, 3) + 0.3 * bands;
+                }
+                else if (kind == "grass")
+                {
+                    // Short tufts over soft clumps.
+                    h = 0.6 * TileFbm(detail, u, v, 64, 3) + 0.4 * TileFbm(noise, u, v, 8, 3);
+                    s = TileFbm(noise, u, v, 4, 4);
+                }
+                else if (kind == "snow")
+                {
+                    h = 0.7 * TileFbm(noise, u, v, 4, 5, 0.45) + 0.1 * TileFbm(detail, u, v, 64, 2);
+                    s = TileFbm(noise, u, v, 2, 3);
+                }
+                else
+                {
+                    // Dirt: pebbles over a lumpy base.
+                    const double pebbles = std::pow(std::max(0.0, TileFbm(detail, u, v, 32, 2)), 2) * 3;
+                    h = 0.5 * TileFbm(noise, u, v, 8, 4) + pebbles;
+                    s = TileFbm(noise, u, v, 4, 3) + 0.5 * pebbles;
+                }
+                height[size_t(row) * size + column] = h;
+                shade[size_t(row) * size + column] = s;
+            }
+        });
+
+        const double bump = kind == "rock" ? 6.0 : kind == "dirt" ? 4.0 : kind == "grass" ? 3.0 : 1.5;
+        std::vector<uint8_t> color(size_t(size) * size * 4), normal(color.size()), mr(color.size());
+        const auto at = [&](const std::vector<double>& map, int row, int column)
+        {
+            return map[size_t((row + size) % size) * size + (column + size) % size];
+        };
+        const auto byte = [](double value) { return uint8_t(std::min(255.0, std::max(0.0, std::round(value * 255)))); };
+        const auto srgb = [&](double linear) { return byte(linear <= 0.0031308 ? 12.92 * linear : 1.055 * std::pow(linear, 1 / 2.4) - 0.055); };
+        for (int row = 0; row < size; ++row)
+            for (int column = 0; column < size; ++column)
+            {
+                const size_t i = (size_t(row) * size + column) * 4;
+                const double h = at(height, row, column), s = at(shade, row, column);
+                // Linear base color.
+                double r, g, b, roughness;
+                if (kind == "rock")      { const double t = 0.5 + 0.5 * s; r = 0.085 + 0.06 * t; g = 0.08 + 0.05 * t; b = 0.07 + 0.04 * t; roughness = 0.75 + 0.15 * h; }
+                else if (kind == "grass") { const double t = 0.5 + 0.5 * s; r = 0.05 + 0.05 * t; g = 0.10 + 0.06 * t; b = 0.025 + 0.015 * t; roughness = 0.9; }
+                else if (kind == "snow")  { const double t = 0.5 + 0.5 * s; r = 0.78 + 0.08 * t; g = 0.80 + 0.08 * t; b = 0.86 + 0.06 * t; roughness = 0.55 + 0.15 * t; }
+                else                      { const double t = 0.5 + 0.5 * s; r = 0.12 + 0.07 * t; g = 0.085 + 0.05 * t; b = 0.06 + 0.035 * t; roughness = 0.85; }
+                const double cavity = 0.75 + 0.25 * std::min(1.0, std::max(0.0, 0.5 + h));
+                color[i + 0] = srgb(b * cavity);
+                color[i + 1] = srgb(g * cavity);
+                color[i + 2] = srgb(r * cavity);
+                color[i + 3] = 255;
+                // Tangent space, +X right and +Y up the image.
+                const double dx = (at(height, row, column + 1) - at(height, row, column - 1)) * bump * size / 512.0;
+                const double dy = (at(height, row - 1, column) - at(height, row + 1, column)) * bump * size / 512.0;
+                const double length = std::sqrt(dx * dx + dy * dy + 1);
+                normal[i + 0] = byte(0.5 + 0.5 * (1 / length));
+                normal[i + 1] = byte(0.5 + 0.5 * (-dy / length));
+                normal[i + 2] = byte(0.5 + 0.5 * (-dx / length));
+                normal[i + 3] = 255;
+                mr[i + 0] = 0;
+                mr[i + 1] = byte(std::min(1.0, std::max(0.05, roughness)));
+                mr[i + 2] = 255;
+                mr[i + 3] = 255;
+            }
+        for (const auto& file : { std::make_pair(std::string("_color.png"), &color), std::make_pair(std::string("_normal.png"), &normal),
+            std::make_pair(std::string("_mr.png"), &mr) })
+            if (!WritePng(out + file.first, size, *file.second))
+            {
+                fprintf(stderr, "cannot write %s%s\n", out.c_str(), file.first.c_str());
+                return 1;
+            }
+        fprintf(stderr, "Wrote %s_color.png, _normal.png and _mr.png (%s, %d px)\n", out.c_str(), kind.c_str(), size);
+        return 0;
+    }
+
     int Info(const std::string& directory)
     {
         TerrainPackage package;
@@ -359,7 +513,7 @@ int main(int argc, char** argv)
 {
     if (argc < 2)
     {
-        fprintf(stderr, "TerrainTool generate|pack|info|heights ... (see Tools/terrain/README.md)\n");
+        fprintf(stderr, "TerrainTool generate|pack|info|heights|texture ... (see Tools/terrain/README.md)\n");
         return 2;
     }
     const std::string command = argv[1];
@@ -369,6 +523,7 @@ int main(int argc, char** argv)
     {
         if (command == "generate") return Generate(args);
         if (command == "pack") return Pack(args);
+        if (command == "texture") return Texture(args);
         if (command == "info" && positional.size() == 1) return Info(positional[0]);
         if (command == "heights" && positional.size() == 1) return Heights(positional[0], args);
     }

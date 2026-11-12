@@ -559,6 +559,7 @@ HRESULT Game::Regenerate()
     // Init new stuff
     HRR(m_pScene->InitGraphics(m_renderManager));
     HRR(m_renderManager.FinalizeOpacityMicromaps());
+    HRR(m_renderManager.FinalizeTerrainLayers());
     graphicsMs += ElapsedMs(start);
 
     // The first regenerate after a load completes it; later ones (edits, device reloads) are not loads.

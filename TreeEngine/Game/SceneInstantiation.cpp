@@ -358,6 +358,19 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                 parameters->materials.push_back(RuntimeMaterial(terrain.material));
                 parameters->materialTextures.push_back(RuntimeMaterialTextures(terrain.material, terrain.id, sceneFilename));
             }
+            for (const auto& layer : terrain.layers)
+            {
+                parameters->textureFilename.push_back(L"");
+                parameters->materials.push_back(RuntimeMaterial(layer.material));
+                parameters->materialTextures.push_back(RuntimeMaterialTextures(layer.material, terrain.id, sceneFilename));
+                TerrainLayerParams runtimeLayer;
+                runtimeLayer.tile = layer.tile;
+                runtimeLayer.biplanar = layer.biplanar;
+                runtimeLayer.height = XMFLOAT3(layer.height.x, layer.height.y, layer.heightBlend);
+                runtimeLayer.slope = XMFLOAT3(layer.slope.x, layer.slope.y, layer.slopeBlend);
+                runtimeLayer.noise = XMFLOAT3(layer.noiseHeight, layer.noiseSlope, layer.noiseScale);
+                parameters->layers.push_back(runtimeLayer);
+            }
             auto runtime = std::make_unique<Terrain>(parameters.get());
             parameters.release();
             if (!runtime->IsOpen())
@@ -728,7 +741,28 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             terrain.source = manifest.substr(0, manifest.find_last_of("/\\"));
             terrain.lodRange = terrainParams.lodRange;
             terrain.slots = static_cast<int>(terrainParams.slots);
-            if (!params.materials.empty())
+            terrain.layers.clear();
+            terrain.hasMaterial = false;
+            if (!terrainParams.layers.empty())
+            {
+                for (size_t i = 0; i < terrainParams.layers.size(); ++i)
+                {
+                    const auto& runtimeLayer = terrainParams.layers[i];
+                    SceneData::TerrainLayerDefinition layer;
+                    layer.material = CaptureMaterial(params, i, sourceFilename, destinationFilename);
+                    layer.tile = runtimeLayer.tile;
+                    layer.biplanar = runtimeLayer.biplanar;
+                    layer.height = XMFLOAT2(runtimeLayer.height.x, runtimeLayer.height.y);
+                    layer.heightBlend = runtimeLayer.height.z;
+                    layer.slope = XMFLOAT2(runtimeLayer.slope.x, runtimeLayer.slope.y);
+                    layer.slopeBlend = runtimeLayer.slope.z;
+                    layer.noiseHeight = runtimeLayer.noise.x;
+                    layer.noiseSlope = runtimeLayer.noise.y;
+                    layer.noiseScale = runtimeLayer.noise.z;
+                    terrain.layers.push_back(layer);
+                }
+            }
+            else if (!params.materials.empty())
             {
                 terrain.hasMaterial = true;
                 terrain.material = CaptureMaterial(params, 0, sourceFilename, destinationFilename);

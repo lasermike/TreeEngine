@@ -716,7 +716,7 @@ namespace SceneData
                 }
                 else if (type == "terrain")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "material", "textureCoordScale", "lodRange", "slots" });
+                    Fields(value, path, { "id", "type", "transform", "source", "material", "layers", "textureCoordScale", "lodRange", "slots" });
                     auto terrain = std::make_unique<TerrainDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     terrain->source = String(value["source"], path + ".source");
@@ -725,6 +725,67 @@ namespace SceneData
                     {
                         terrain->hasMaterial = true;
                         terrain->material = MaterialReference(value["material"], path + ".material", scene);
+                    }
+                    if (value.contains("layers"))
+                    {
+                        if (value.contains("material")) Invalid(path + ".layers", "give either material or layers");
+                        const auto& layers = value["layers"];
+                        if (!layers.is_array() || layers.empty() || layers.size() > 4) Invalid(path + ".layers", "expected one to four layers");
+                        for (size_t l = 0; l < layers.size(); ++l)
+                        {
+                            const auto& entry = layers[l];
+                            const auto layerPath = path + ".layers[" + std::to_string(l) + "]";
+                            Fields(entry, layerPath, { "material", "tile", "biplanar", "height", "heightBlend", "slope", "slopeBlend", "noise" });
+                            if (!entry.contains("material")) Invalid(layerPath + ".material", "required property");
+                            if (l == 0)
+                                for (auto rule : { "height", "heightBlend", "slope", "slopeBlend", "noise" })
+                                    if (entry.contains(rule)) Invalid(layerPath + "." + rule, "the first layer covers everything");
+                            TerrainLayerDefinition layer;
+                            layer.material = MaterialReference(entry["material"], layerPath + ".material", scene);
+                            const auto nonnegative = [&](const char* name, float& field)
+                            {
+                                if (!entry.contains(name)) return;
+                                field = Number(entry[name], layerPath + "." + name);
+                                if (!(field >= 0)) Invalid(layerPath + "." + name, "must not be negative");
+                            };
+                            if (entry.contains("tile"))
+                            {
+                                layer.tile = Number(entry["tile"], layerPath + ".tile");
+                                if (!(layer.tile > 0)) Invalid(layerPath + ".tile", "must be positive");
+                            }
+                            nonnegative("biplanar", layer.biplanar);
+                            if (layer.biplanar > 16) Invalid(layerPath + ".biplanar", "must be at most 16");
+                            if (entry.contains("height"))
+                            {
+                                layer.height = Vector2(entry["height"], layerPath + ".height");
+                                if (!(layer.height.x <= layer.height.y)) Invalid(layerPath + ".height", "expected [lowest, highest]");
+                            }
+                            nonnegative("heightBlend", layer.heightBlend);
+                            if (entry.contains("slope"))
+                            {
+                                layer.slope = Vector2(entry["slope"], layerPath + ".slope");
+                                if (!(layer.slope.x >= 0 && layer.slope.x <= layer.slope.y && layer.slope.y <= 90))
+                                    Invalid(layerPath + ".slope", "expected [least, most] degrees from flat, 0 to 90");
+                            }
+                            nonnegative("slopeBlend", layer.slopeBlend);
+                            if (entry.contains("noise"))
+                            {
+                                const auto& noise = entry["noise"];
+                                const auto noisePath = layerPath + ".noise";
+                                Fields(noise, noisePath, { "height", "slope", "scale" });
+                                const auto read = [&](const char* name, float& field)
+                                {
+                                    if (!noise.contains(name)) return;
+                                    field = Number(noise[name], noisePath + "." + name);
+                                    if (!(field >= 0)) Invalid(noisePath + "." + name, "must not be negative");
+                                };
+                                read("height", layer.noiseHeight);
+                                read("slope", layer.noiseSlope);
+                                read("scale", layer.noiseScale);
+                                if (!(layer.noiseScale > 0)) Invalid(noisePath + ".scale", "required and positive");
+                            }
+                            terrain->layers.push_back(layer);
+                        }
                     }
                     if (value.contains("lodRange"))
                     {
@@ -1074,6 +1135,23 @@ namespace SceneData
                 value["type"] = "terrain";
                 value["source"] = terrain.source;
                 if (terrain.hasMaterial) value["material"] = MaterialJson(terrain.material);
+                if (!terrain.layers.empty())
+                {
+                    value["layers"] = Json::array();
+                    const TerrainLayerDefinition defaults;
+                    for (const auto& layer : terrain.layers)
+                    {
+                        Json entry = { { "material", MaterialJson(layer.material) }, { "tile", layer.tile } };
+                        if (layer.biplanar > 0) entry["biplanar"] = layer.biplanar;
+                        if (layer.height.x != defaults.height.x || layer.height.y != defaults.height.y) entry["height"] = VectorJson(layer.height);
+                        if (layer.heightBlend > 0) entry["heightBlend"] = layer.heightBlend;
+                        if (layer.slope.x != defaults.slope.x || layer.slope.y != defaults.slope.y) entry["slope"] = VectorJson(layer.slope);
+                        if (layer.slopeBlend > 0) entry["slopeBlend"] = layer.slopeBlend;
+                        if (layer.noiseScale > 0)
+                            entry["noise"] = { { "height", layer.noiseHeight }, { "slope", layer.noiseSlope }, { "scale", layer.noiseScale } };
+                        value["layers"].push_back(std::move(entry));
+                    }
+                }
                 value["lodRange"] = terrain.lodRange;
                 value["slots"] = terrain.slots;
                 break;

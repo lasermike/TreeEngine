@@ -19,10 +19,22 @@ struct RenderUnit;
 // each frame the terrain uploads up to UploadBudget finished nodes, then asks for what this frame's selection lacked
 // (children it wanted to split into) and what it may want soon (children of nodes within PrefetchRange of splitting).
 // The first frame after loading, and every frame with RenderData::terrainStreaming off, loads synchronously instead.
+// A material layer's tiling and coverage (SceneData::TerrainLayerDefinition); its material is the params' material
+// slot of the same index.
+struct TerrainLayerParams
+{
+    float tile = 4;
+    float biplanar = 0;
+    XMFLOAT3 height = XMFLOAT3(-1e9f, 1e9f, 0);    // Lowest, highest, blend.
+    XMFLOAT3 slope = XMFLOAT3(0, 90, 0);
+    XMFLOAT3 noise = XMFLOAT3(0, 0, 0);            // Height shift, slope shift, cell size.
+};
+
 class TerrainParams : public WorldObjectParams
 {
 public:
     TerrainParams() : WorldObjectParams(TerrainGeneratorType) {}
+    std::vector<TerrainLayerParams> layers;     // Empty: the single material in slot 0.
     std::wstring packageDirectory;  // Resolved package directory.
     std::string source;             // As authored, for saving.
     float lodRange = 2.0f;          // A node splits within lodRange x its size of the camera.

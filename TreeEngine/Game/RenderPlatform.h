@@ -715,6 +715,9 @@ public:
     {
         return E_NOTIMPL;
     }
+    // The scene's terrain material layers (Shaders/Terrain.hlsli), read by raster and ray tracing. Platforms without
+    // them return E_NOTIMPL, and terrain draws its first layer's material only.
+    virtual HRESULT SetTerrainLayers(const TerrainLayerData* /*layers*/, UINT /*count*/) { return E_NOTIMPL; }
 
     virtual HRESULT BeginDrawText() = 0;
     virtual HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText) = 0;
@@ -988,6 +991,8 @@ public:
         const UINT* transformSlots, UINT copies, UINT listStart) override;
     bool RecordsDraws(RenderPass pass) const override;
     HRESULT UploadVertices(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices) override;
+    HRESULT SetTerrainLayers(const TerrainLayerData* layers, UINT count) override;
+    CComPtr<ID3D12Resource> m_terrainLayers;    // SetTerrainLayers' table, in an upload heap.
 
     HRESULT BeginDrawText();
     HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -1594,6 +1599,7 @@ typedef HRESULT (*DrawIndexedInstancedFunc)(UINT IndexCountPerInstance, UINT Ins
 typedef HRESULT (*DrawBatchedFunc)(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize, const UINT* transformSlots, UINT copies, UINT listStart);
 typedef bool (*RecordsDrawsFunc)(RenderPass pass);
 typedef HRESULT (*UploadVerticesFunc)(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices);
+typedef HRESULT (*SetTerrainLayersFunc)(const TerrainLayerData* layers, UINT count);
 
 typedef HRESULT (*BeginDrawTextFunc)();
 typedef HRESULT (*DrawText2Func)(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -1658,6 +1664,7 @@ class RenderPlatformDLL : public RenderPlatform
     DrawBatchedFunc DrawBatchedFuncPtr = nullptr;       // Optional: platforms without batched draws don't export them.
     RecordsDrawsFunc RecordsDrawsFuncPtr = nullptr;
     UploadVerticesFunc UploadVerticesFuncPtr = nullptr;
+    SetTerrainLayersFunc SetTerrainLayersFuncPtr = nullptr;
 
     BeginDrawTextFunc BeginDrawTextFuncPtr;
     DrawText2Func DrawText2FuncPtr;
@@ -1739,6 +1746,10 @@ public:
     HRESULT UploadVertices(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices) override
     {
         return UploadVerticesFuncPtr ? UploadVerticesFuncPtr(regions, regionCount, vertices) : E_NOTIMPL;
+    }
+    HRESULT SetTerrainLayers(const TerrainLayerData* layers, UINT count) override
+    {
+        return SetTerrainLayersFuncPtr ? SetTerrainLayersFuncPtr(layers, count) : E_NOTIMPL;
     }
 
     HRESULT BeginDrawText() { return BeginDrawTextFuncPtr(); }

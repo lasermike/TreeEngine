@@ -80,7 +80,44 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
     renderState.samplerState = StockSamplerStates::MinMagMipLinearUVWWrap;
     Material* material = nullptr;
     const auto* maps = _params->MaterialTextures(0);
-    if (maps && !maps->Empty())
+    if (!Params().layers.empty())
+    {
+        // Layers: each a material of its own in the scene's layer table, maps by texture slot; the draw's material
+        // only points at them (Shaders/Terrain.hlsli).
+        const auto& layers = Params().layers;
+        std::vector<TerrainLayerData> data(layers.size());
+        for (size_t i = 0; i < layers.size(); ++i)
+        {
+            ShaderMaterial layerMaterial = _params->materials[i];
+            layerMaterial.ApplyTextureCoordScale(1 / layers[i].tile, 1 / layers[i].tile);
+            if (layers[i].biplanar > 0)
+                layerMaterial.biplanarParams = XMFLOAT4(1, layers[i].biplanar, 0, 0);
+            if (const auto* layerMaps = _params->MaterialTextures(i))
+            {
+                HRR(renderManager.BindMaterialTextures(*layerMaps, layerMaterial));
+                if (layerMaps->roles[BaseColorTextureRole])
+                {
+                    LoadedTexture* texture = nullptr;
+                    int slot = -1;
+                    HRR(renderManager.LoadGltfTexture(*layerMaps->roles[BaseColorTextureRole], &texture, &slot));
+                    data[i].textures = XMFLOAT4(static_cast<float>(slot), layerMaterial.specularColor.w, 0, 0);
+                }
+            }
+            data[i].material = layerMaterial;
+            data[i].height = XMFLOAT4(layers[i].height.x, layers[i].height.y, layers[i].height.z, 0);
+            data[i].slope = XMFLOAT4(layers[i].slope.x, layers[i].slope.y, layers[i].slope.z, 0);
+            data[i].noise = XMFLOAT4(layers[i].noise.x, layers[i].noise.y, layers[i].noise.z, 0);
+        }
+        const UINT first = renderManager.RegisterTerrainLayers(data.data(), static_cast<UINT>(data.size()));
+        shaderMaterial = data[0].material;
+        shaderMaterial.flags.y = 0;
+        shaderMaterial.normalTextures.x = shaderMaterial.metallicRoughnessTextures.x = -1;
+        shaderMaterial.specularTextures.x = shaderMaterial.specularTextures.y = shaderMaterial.tintTextures.x = -1;
+        shaderMaterial.biplanarParams = XMFLOAT4(0, 1, static_cast<float>(first + 1), static_cast<float>(data.size()));
+        HRR(renderManager.CreateMaterial(name, static_cast<const wchar_t*>(nullptr), nullptr, nullptr, nullptr, nullptr,
+            shaderMaterial, renderState, &material));
+    }
+    else if (maps && !maps->Empty())
     {
         HRR(renderManager.BindMaterialTextures(*maps, shaderMaterial));
         HRR(renderManager.CreateMaterial(name, maps->roles[BaseColorTextureRole].get(), nullptr, nullptr, nullptr, nullptr,
@@ -163,6 +200,9 @@ void Terrain::BuildVertices(const Node& node, const uint16_t* block, SimpleVerte
             const int b = edge == 0 ? 0 : edge == 1 ? NodeQuads : k;
             SimpleVertex v = vertices[b * NodeVertices + a];
             v.Pos.y -= skirt;
+            // The drop rides in the tangent's w (its sign is the bitangent's), so layers cover a skirt seen through a
+            // crack as they cover its edge (Shaders/Terrain.hlsli).
+            v.TangentU.w = 1 + skirt;
             vertices[GridVertices + edge * NodeVertices + k] = v;
         }
 }

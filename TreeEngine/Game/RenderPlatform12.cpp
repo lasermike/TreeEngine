@@ -281,6 +281,8 @@ enum RootSignatureParams
     EnvironmentSrvTableRootSignatureParam,
     ObjectTransformRootSignatureParam,
     PreviousInstancesRootSignatureParam,
+    TerrainTexturesRootSignatureParam,      // The scene's textures by slot (the DXR texture slots), t0-t31 in space1.
+    TerrainLayersRootSignatureParam,        // Terrain material layers (t11); see Shaders/Terrain.hlsli.
 };
 
 // Velocity for pixels without object motion (NoObjectMotion in Shaders/SharedTypes.hlsli).
@@ -466,7 +468,9 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     CD3DX12_DESCRIPTOR_RANGE materialMapRanges[2] = { ranges[3], {} };
     materialMapRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 10 /* t10 */);
     ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 7 /* t7-t8 */);
-    CD3DX12_ROOT_PARAMETER rootParameters[10];
+    CD3DX12_DESCRIPTOR_RANGE terrainTextureRange;
+    terrainTextureRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, MaxSceneTextures, 0 /* t0 */, 1 /* space1 */);
+    CD3DX12_ROOT_PARAMETER rootParameters[12];
     rootParameters[EnvironmentSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[SpecularSrvTableRootSignatureParam].InitAsDescriptorTable(2, materialMapRanges, D3D12_SHADER_VISIBILITY_PIXEL);
     rootParameters[ShadowSrvTableRootSignatureParam].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -481,6 +485,8 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     // Last frame's instance buffer, for motion vectors.
     rootParameters[PreviousInstancesRootSignatureParam].InitAsShaderResourceView(PreviousInstancesRootSignatureShaderSlot, 0,
         D3D12_SHADER_VISIBILITY_VERTEX);
+    rootParameters[TerrainTexturesRootSignatureParam].InitAsDescriptorTable(1, &terrainTextureRange, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[TerrainLayersRootSignatureParam].InitAsShaderResourceView(11 /* t11 */, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
     D3D12_STATIC_SAMPLER_DESC sampler[5];
     sampler[0] = D3D12_STATIC_SAMPLER_DESC();
@@ -1790,6 +1796,25 @@ HRESULT RenderPlatform12::DrawBatched(UINT indexCount, UINT startIndex, INT base
     const UINT constants[5] = { UINT_MAX, layoutStart, layoutSize, listStart, 0 };
     GetCommandList()->SetGraphicsRoot32BitConstants(ObjectTransformRootSignatureParam, 5, constants, 0);
     GetCommandList()->DrawIndexedInstanced(indexCount, layoutSize * copies, startIndex, baseVertex, layoutStart);
+    return S_OK;
+}
+
+HRESULT RenderPlatform12::SetTerrainLayers(const TerrainLayerData* layers, UINT count)
+{
+    // Read by frames already recorded until they finish; Retire keeps the old table alive until then.
+    Retire(m_terrainLayers);
+    if (!count)
+        return S_OK;
+    const size_t bytes = sizeof(TerrainLayerData) * count;
+    const CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_UPLOAD);
+    const auto desc = CD3DX12_RESOURCE_DESC::Buffer(bytes);
+    HRR(GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr, IID_PPV_ARGS(&m_terrainLayers)));
+    void* mapped = nullptr;
+    const CD3DX12_RANGE noRead(0, 0);
+    HRR(m_terrainLayers->Map(0, &noRead, &mapped));
+    memcpy(mapped, layers, bytes);
+    m_terrainLayers->Unmap(0, nullptr);
     return S_OK;
 }
 
@@ -5220,6 +5245,10 @@ HRESULT RenderPlatform12::SetupGraphicsOnCommandList()
 
     // Set root signature constant buffers
     GetCommandList()->SetGraphicsRootShaderResourceView(BranchDataRootSignatureParam, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
+    // Terrain layers; without any, a valid buffer nothing reads.
+    GetCommandList()->SetGraphicsRootDescriptorTable(TerrainTexturesRootSignatureParam, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
+    GetCommandList()->SetGraphicsRootShaderResourceView(TerrainLayersRootSignatureParam, m_terrainLayers
+        ? m_terrainLayers->GetGPUVirtualAddress() : m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
     // Without last frame's instances, any valid buffer will do: the per-pass constants mark it invalid.
     GetCommandList()->SetGraphicsRootShaderResourceView(PreviousInstancesRootSignatureParam, (m_previousInstanceBuffer
         ? m_previousInstanceBuffer : m_renderData->instanceBuffer->buffer)->GetGPUVirtualAddress());
@@ -5851,6 +5880,8 @@ HRESULT RenderPlatform12::RenderPostProcess()
         commandList->SetComputeRootShaderResourceView(11, m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
         commandList->SetComputeRootShaderResourceView(12, m_skinnedIndexBuffer.buffer->GetGPUVirtualAddress());
         commandList->SetComputeRootDescriptorTable(13, m_descriptorHeap.hGPU(DxrTexture0_SrvHeapOffset));
+        commandList->SetComputeRootShaderResourceView(16, m_terrainLayers ? m_terrainLayers->GetGPUVirtualAddress()
+            : m_renderData->instanceBuffer->buffer->GetGPUVirtualAddress());
         commandList->SetComputeRootDescriptorTable(14, m_descriptorHeap.hGPU(DxrSky_SrvHeapOffset));
         commandList->SetComputeRootDescriptorTable(15, m_descriptorHeap.hGPU(EnvironmentDiffuse_SrvHeapOffset));
 

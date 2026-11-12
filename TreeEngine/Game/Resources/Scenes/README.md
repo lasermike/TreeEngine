@@ -151,6 +151,8 @@ or GIS elevation data). It requires `source`, the package directory, such as
 
 - `material`: a material reference, as for primitives. Its UVs are world meters
   (u along x, v along -z), so `textureCoordScale` sets the tiling.
+- `layers`: instead of `material`, one to four material layers blended by height
+  and slope (below).
 - `lodRange` (1 to 16, default 2): a quadtree node splits into four finer ones
   when the camera is within `lodRange` times its size. Higher is more detailed.
 - `slots` (16 to 4096, default 512): how many nodes can be resident at once,
@@ -161,8 +163,35 @@ Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shad
 reflection and transmission rays as far (at least 100 m), so a large terrain
 should set the far plane to how far it should be seen and shadowed.
 
+Each layer has a required `material` (a reference or inline material; base color,
+metallic-roughness and normal maps are used) and optional fields:
+
+- `tile` (default 4): meters per texture repeat.
+- `biplanar` (0 to 16, default 0): above 0, steep faces also take side
+  projections, blended this sharply, so rock doesn't stretch down cliffs.
+- `height` `[lowest, highest]` meters and `heightBlend`: the heights the layer
+  covers, fading in and out over `heightBlend` meters on each side.
+- `slope` `[least, most]` degrees from flat (0 to 90) and `slopeBlend`.
+- `noise` `{ "height": m, "slope": degrees, "scale": m }`: shifts the height and
+  slope limits by up to these amounts in noise cells `scale` meters across, so
+  edges wander.
+
+Later layers paint over earlier ones; the first covers everything and takes no
+rules. A typical terrain: grass, then rock on slopes over 30 degrees with
+`biplanar`, then snow above a height. The layers' maps count toward the 32 scene
+textures. `TerrainTool texture` makes tileable grass, rock, snow and dirt maps.
+
+```json
+"layers": [
+  { "material": "grass", "tile": 3 },
+  { "material": "rock", "tile": 6, "biplanar": 4, "slope": [30, 90], "slopeBlend": 5,
+    "noise": { "slope": 8, "scale": 12 } },
+  { "material": "snow", "height": [400, 10000], "heightBlend": 20, "noise": { "height": 30, "scale": 40 } }
+]
+```
+
 Terrain cannot be instanced. The `LoadTerrainHills` scene shows a
-1 km procedural package.
+1 km procedural package with grass, dirt in the hollows and rock on slopes.
 
 ### Instancing
 

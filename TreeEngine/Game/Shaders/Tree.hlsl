@@ -27,6 +27,17 @@ Texture2D txMetallicRoughness : register(t6);
 TextureCube txEnvironmentDiffuse : register(t7);
 TextureCube txEnvironmentSpecular : register(t8);
 Texture2D txTint : register(t10);
+// Terrain layers: the scene's textures by slot (the DXR texture slots) and the layer table; see Shaders/Terrain.hlsli.
+Texture2D terrainTextures[32] : register(t0, space1);   // MaxSceneTextures in RenderPlatform.h
+StructuredBuffer<TerrainLayer> terrainLayers : register(t11);
+
+float4 SampleTerrainTexture(int slot, bool clampMap, float2 uv, float2 uvDx, float2 uvDy)
+{
+    return clampMap ? terrainTextures[slot].SampleGrad(samLinearClamp, uv, uvDx, uvDy)
+        : terrainTextures[slot].SampleGrad(samLinearWrap, uv, uvDx, uvDy);
+}
+
+#include "Terrain.hlsli"
 
 // One projection of a material map, with explicit gradients (already scaled for the upscaling bias).
 float4 SampleMaterialMapGrad(Texture2D map, bool clampMap, ShaderMaterial material, uint role, float2 uv, float2 uvDx, float2 uvDy)
@@ -560,12 +571,27 @@ float4 ShadeSurface(PS_INPUT input)
         float3x3 normalTbn = float3x3(tangent, bitangent, normalize(input.N));
         normal = normalize(mul(tangentNormal, normalTbn));
     }
+    float3 shadowPosition = input.PosW;
+    if (IsTerrainMaterial(mat))
+    {
+        // Its layers, with gradients scaled for the upscaling bias as elsewhere; the terrain's vertices are world space.
+        // A skirt seen through a crack is covered and shadowed as its edge is (the bitangent's length is the tangent's
+        // w; see TerrainMaterialHeight).
+        const float gradientScale = exp2(renderScale.x);
+        shadowPosition.y = TerrainMaterialHeight(input.PosW, length(input.B));
+        sampledMaterial = TerrainSurface(mat, input.PosW, shadowPosition.y,
+            ddx(input.PosW) * gradientScale, ddy(input.PosW) * gradientScale,
+            normalize(input.N), normalize(input.T), normalize(input.B), input.Tex, ddx(input.Tex) * gradientScale,
+            ddy(input.Tex) * gradientScale, normal);
+        textureColor = float4(1, 1, 1, 1);
+    }
+
     // Only the first light casts a shadow.
     float3 shadow = float3(1.0f, 1.0f, 1.0f);
 
     if (globalFlags & 0x1)
     {
-        shadow[0] = CascadedShadowFactor(input.PosW, normalize(input.N));
+        shadow[0] = CascadedShadowFactor(shadowPosition, normalize(input.N));
     }
 
     // Sum the light contribution from each light source.  

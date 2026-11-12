@@ -190,13 +190,30 @@ namespace SceneData
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<ModelDefinition>(*this); }
     };
 
+    // One of a terrain's material layers: a material tiled every `tile` meters, covering heights and slopes in bands
+    // with soft edges that noise shifts. Later layers paint over earlier ones; the first covers everything.
+    struct TerrainLayerDefinition
+    {
+        MaterialDefinition material;
+        float tile = 4;                                 // Meters per texture repeat.
+        float biplanar = 0;                             // Above 0: steep faces use side projections, blended this sharply.
+        DirectX::XMFLOAT2 height = { -1e9f, 1e9f };     // Meters.
+        float heightBlend = 0;
+        DirectX::XMFLOAT2 slope = { 0, 90 };            // Degrees from flat.
+        float slopeBlend = 0;
+        float noiseHeight = 0;                          // Limits shift by up to this many meters,
+        float noiseSlope = 0;                           // and degrees,
+        float noiseScale = 0;                           // in noise cells this many meters across (0 = no noise).
+    };
+
     // A heightfield from a terrain package (Tools/terrain). Its transform may only move it.
     struct TerrainDefinition : ObjectDefinition
     {
         TerrainDefinition() : ObjectDefinition(ObjectKind::Terrain) {}
         std::string source;         // The package directory, such as "Terrain/Hills.terrain".
-        bool hasMaterial = false;
+        bool hasMaterial = false;   // A single material, or
         MaterialDefinition material;
+        std::vector<TerrainLayerDefinition> layers;     // up to four layers.
         float lodRange = 2;         // A node splits within lodRange x its size of the camera.
         int slots = 512;            // Nodes resident at once (each about 215 KB of vertex buffer).
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TerrainDefinition>(*this); }

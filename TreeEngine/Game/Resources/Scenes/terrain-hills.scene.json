@@ -2,13 +2,26 @@
   "version": 1,
   "id": "LoadTerrainHills",
   "priority": 0,
-  "name": "Terrain - procedural hills (1 km)",
+  "name": "Terrain - procedural hills (1 km), layered",
   "camera": {
-    "position": [0, 12, -380],
-    "rotationDegrees": [8, 0, 0]
+    "position": [
+      0,
+      12,
+      -380
+    ],
+    "rotationDegrees": [
+      8,
+      0,
+      0
+    ]
   },
   "render": {
-    "clearColor": [0.48, 0.54, 0.58, 1],
+    "clearColor": [
+      0.48,
+      0.54,
+      0.58,
+      1
+    ],
     "useShadowMaps": true,
     "useAlphaBlendedRenderTarget": true,
     "farClippingPlane": 2000,
@@ -27,20 +40,90 @@
     }
   },
   "light": {
-    "ambient": [0, 0, 0, 1],
-    "diffuse": [2.3, 2.3, 2.3, 1],
-    "specular": [2.3, 2.3, 2.3, 1],
-    "direction": [0.6259292648824133, -0.5141802822623909, 0.3133034947002239],
+    "ambient": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "diffuse": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "specular": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "direction": [
+      0.6259292648824133,
+      -0.5141802822623909,
+      0.3133034947002239
+    ],
     "angularDiameterDegrees": 2,
     "shadowSamples": 8
   },
   "pointLightCount": 0,
   "materials": {
     "meadow": {
-      "baseColor": [0.16, 0.2, 0.08, 1],
+      "baseColor": [
+        1,
+        1,
+        1,
+        1
+      ],
       "metallic": 0,
-      "roughness": 0.9,
-      "specular": 0.5
+      "roughness": 1,
+      "baseColorTexture": {
+        "source": "Terrain/Textures/grass_color.png"
+      },
+      "metallicRoughnessTexture": {
+        "source": "Terrain/Textures/grass_mr.png"
+      },
+      "normalTexture": {
+        "source": "Terrain/Textures/grass_normal.png"
+      }
+    },
+    "dirt": {
+      "baseColor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "baseColorTexture": {
+        "source": "Terrain/Textures/dirt_color.png"
+      },
+      "metallicRoughnessTexture": {
+        "source": "Terrain/Textures/dirt_mr.png"
+      },
+      "normalTexture": {
+        "source": "Terrain/Textures/dirt_normal.png"
+      }
+    },
+    "rock": {
+      "baseColor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "baseColorTexture": {
+        "source": "Terrain/Textures/rock_color.png"
+      },
+      "metallicRoughnessTexture": {
+        "source": "Terrain/Textures/rock_mr.png"
+      },
+      "normalTexture": {
+        "source": "Terrain/Textures/rock_normal.png"
+      }
     }
   },
   "objects": [
@@ -48,9 +131,41 @@
       "id": "hills",
       "type": "terrain",
       "source": "Terrain/Hills.terrain",
-      "material": "meadow",
       "lodRange": 2,
-      "slots": 128
+      "slots": 128,
+      "layers": [
+        {
+          "material": "meadow",
+          "tile": 3
+        },
+        {
+          "material": "dirt",
+          "tile": 4,
+          "height": [
+            -1000,
+            -24
+          ],
+          "heightBlend": 5,
+          "noise": {
+            "height": 6,
+            "scale": 25
+          }
+        },
+        {
+          "material": "rock",
+          "tile": 6,
+          "biplanar": 4,
+          "slope": [
+            20,
+            90
+          ],
+          "slopeBlend": 4,
+          "noise": {
+            "slope": 6,
+            "scale": 15
+          }
+        }
+      ]
     }
   ]
 }

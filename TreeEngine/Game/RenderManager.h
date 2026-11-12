@@ -128,6 +128,7 @@ class RenderManager : public IRenderFrame
     std::mutex m_frameLock;                 // Guards draws and vertex uploads added from concurrent ComputeConstants.
     std::vector<VertexUploadRegion> m_vertexUploads;
     std::vector<SimpleVertex> m_vertexUploadData;
+    std::vector<TerrainLayerData> m_terrainLayers;  // RegisterTerrainLayers.
     std::unordered_map<RenderUnit*, UnitInstances> m_perFrameInstanceData;
 
     RenderData                                      m_renderData;
@@ -216,6 +217,10 @@ public:
     int RegisterLeafOpacity(const ShaderMaterial& material, const GltfTextureSource* baseColor, XMFLOAT4 atlasRect);
     // Hands the scene's baked micromaps to the platform; call after the scene's objects initialize their graphics.
     HRESULT FinalizeOpacityMicromaps();
+    // Adds a terrain's material layers to the scene's table and returns the first's index; FinalizeTerrainLayers hands
+    // the table to the platform after the scene's objects initialize their graphics.
+    UINT RegisterTerrainLayers(const TerrainLayerData* layers, UINT count);
+    HRESULT FinalizeTerrainLayers();
     HRESULT CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,

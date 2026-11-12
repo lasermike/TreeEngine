@@ -198,6 +198,7 @@ HRESULT RenderManager::UninitGameLevelGraphics()
     m_perFrameInstanceData.clear();
     m_vertexUploads.clear();
     m_vertexUploadData.clear();
+    m_terrainLayers.clear();
     m_vertexShaders.clear();
     m_pixelShaders.clear();
 
@@ -812,6 +813,20 @@ int RenderManager::RegisterLeafOpacity(const ShaderMaterial& material, const Glt
     return first;
 }
 
+UINT RenderManager::RegisterTerrainLayers(const TerrainLayerData* layers, UINT count)
+{
+    const UINT first = static_cast<UINT>(m_terrainLayers.size());
+    m_terrainLayers.insert(m_terrainLayers.end(), layers, layers + count);
+    return first;
+}
+
+HRESULT RenderManager::FinalizeTerrainLayers()
+{
+    // Always set, so a scene without terrain layers drops the last scene's.
+    const HRESULT hr = GetPlatform()->SetTerrainLayers(m_terrainLayers.data(), static_cast<UINT>(m_terrainLayers.size()));
+    return hr == E_NOTIMPL ? S_OK : hr;
+}
+
 HRESULT RenderManager::FinalizeOpacityMicromaps()
 {
     SceneLoadScope timer(&m_renderData.loadProfile, "graphics.opacity.upload");
@@ -1373,6 +1388,7 @@ RenderPlatformDLL::RenderPlatformDLL(HMODULE module, RenderData* data, Settings*
     DrawBatchedFuncPtr = (DrawBatchedFunc) ::GetProcAddress(module, "DrawBatched");
     RecordsDrawsFuncPtr = (RecordsDrawsFunc) ::GetProcAddress(module, "RecordsDraws");
     UploadVerticesFuncPtr = (UploadVerticesFunc) ::GetProcAddress(module, "UploadVertices");
+    SetTerrainLayersFuncPtr = (SetTerrainLayersFunc) ::GetProcAddress(module, "SetTerrainLayers");
 
     ASSIGN_FUNC(BeginDrawText);
     ASSIGN_FUNC(DrawText2);

@@ -98,6 +98,17 @@ struct ShaderMaterial
 
 static_assert(sizeof(ShaderMaterial) == 384, "ShaderMaterial must match Materials.fx");
 
+// A terrain material layer for the shaders (TerrainLayer in Shaders/Materials.fx; see Shaders/Terrain.hlsli).
+struct TerrainLayerData
+{
+    ShaderMaterial material;                    // Its own maps (texture slots) and factors; tiling in its UV transform.
+    XMFLOAT4 textures = XMFLOAT4(-1, 0, 0, 0);  // x = base-color texture slot (-1 none), y = clamp flag.
+    XMFLOAT4 height = XMFLOAT4(-1e9f, 1e9f, 0, 0);  // Covers heights x..y meters, fading over z on each side.
+    XMFLOAT4 slope = XMFLOAT4(-1e9f, 1e9f, 0, 0);   // Covers slopes x..y degrees from flat, fading over z.
+    XMFLOAT4 noise = XMFLOAT4(0, 0, 0, 0);      // Limits shift by up to x meters / y degrees, in noise cells of z meters.
+};
+static_assert(sizeof(TerrainLayerData) == 448, "TerrainLayerData must match TerrainLayer in Materials.fx");
+
 struct CBMaterial
 {
     ShaderMaterial material;

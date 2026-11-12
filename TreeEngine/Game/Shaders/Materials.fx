@@ -60,6 +60,16 @@ struct ShaderMaterial
     float4 uvTransformRow1[6];
 };
 
+// A terrain material layer (Game/Terrain.h, Shaders/Terrain.hlsli; TerrainLayerData in Materials.h).
+struct TerrainLayer
+{
+    ShaderMaterial material;    // Its own maps (by texture slot) and factors; tiling in its UV transform.
+    float4 textures;            // x = base-color texture slot (-1 none), y = clamp flag.
+    float4 height;              // Covers heights x..y meters, fading over z on each side.
+    float4 slope;               // Covers slopes x..y degrees from flat, fading over z.
+    float4 noise;               // Shifts the height limits by up to x meters and the slope limits by y degrees, in cells of z meters.
+};
+
 static const uint BaseColorTextureRole = 0;
 static const uint MetallicRoughnessTextureRole = 1;
 static const uint NormalTextureRole = 2;

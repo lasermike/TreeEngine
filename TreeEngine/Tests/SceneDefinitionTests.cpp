@@ -739,6 +739,47 @@ void TestTerrainSettings()
     bad = Json::parse(json);
     bad["objects"][1] = { { "id", "copy" }, { "instanceOf", "ground" } };
     Reject(bad.dump(), ".instanceOf");
+
+    // Material layers.
+    const std::string layered = R"({"version":1,"name":"Layers","materials":{"grass":{"roughness":0.9},"rock":{"roughness":0.8}},
+        "objects":[{"id":"ground","type":"terrain","source":"Terrain/Hills.terrain","layers":[
+            {"material":"grass","tile":3},
+            {"material":"rock","tile":6,"biplanar":4,"slope":[30,90],"slopeBlend":5,"noise":{"slope":8,"scale":12}},
+            {"material":{"baseColor":[0.9,0.9,0.95,1]},"height":[400,10000],"heightBlend":20}]}]})";
+    auto layers = SceneData::ParseScene(layered, "layers");
+    const auto& layeredTerrain = static_cast<const SceneData::TerrainDefinition&>(*layers.objects[0]);
+    Check(layeredTerrain.layers.size() == 3 && !layeredTerrain.hasMaterial && layeredTerrain.layers[0].tile == 3
+        && layeredTerrain.layers[1].biplanar == 4 && layeredTerrain.layers[1].slope.x == 30 && layeredTerrain.layers[1].noiseSlope == 8
+        && layeredTerrain.layers[1].noiseScale == 12 && layeredTerrain.layers[2].height.x == 400 && layeredTerrain.layers[2].heightBlend == 20
+        && layeredTerrain.layers[2].tile == 4 && layeredTerrain.layers[0].slope.y == 90, "terrain layers were not parsed");
+    const auto savedLayers = Json::parse(SceneData::SerializeScene(layers));
+    const auto& savedLayer = savedLayers["objects"][0]["layers"];
+    Check(savedLayer.size() == 3 && !savedLayer[0].contains("height") && !savedLayer[0].contains("slope")
+        && savedLayer[1]["slope"][0] == 30 && savedLayer[2]["height"][0] == 400, "terrain layers saved defaults or lost rules");
+    const auto reparsedLayers = SceneData::ParseScene(savedLayers.dump(), "saved-layers");
+    const auto& again2 = static_cast<const SceneData::TerrainDefinition&>(*reparsedLayers.objects[0]);
+    Check(again2.layers.size() == 3, "terrain layers did not round-trip (count)");
+    Check(again2.layers[1].noiseScale == 12, "terrain layers did not round-trip (noise)");
+    Check(std::abs(again2.layers[2].material.baseColor.z - 0.95f) < 1e-6f, "terrain layers did not round-trip (material)");
+    auto badLayers = Json::parse(layered);
+    badLayers["objects"][0]["material"] = "grass";
+    Reject(badLayers.dump(), ".layers");
+    badLayers = Json::parse(layered);
+    badLayers["objects"][0]["layers"][0]["slope"] = Json::array({ 10, 90 });
+    Reject(badLayers.dump(), ".layers[0].slope");
+    badLayers = Json::parse(layered);
+    badLayers["objects"][0]["layers"][1]["slope"] = Json::array({ 50, 30 });
+    Reject(badLayers.dump(), ".layers[1].slope");
+    badLayers = Json::parse(layered);
+    badLayers["objects"][0]["layers"][1]["noise"].erase("scale");
+    Reject(badLayers.dump(), ".layers[1].noise.scale");
+    badLayers = Json::parse(layered);
+    badLayers["objects"][0]["layers"][1]["tile"] = 0;
+    Reject(badLayers.dump(), ".layers[1].tile");
+    badLayers = Json::parse(layered);
+    for (int i = 0; i < 2; ++i)
+        badLayers["objects"][0]["layers"].push_back(badLayers["objects"][0]["layers"][1]);
+    Reject(badLayers.dump(), ".layers");
 }
 
 void TestTreeLodSettings()
