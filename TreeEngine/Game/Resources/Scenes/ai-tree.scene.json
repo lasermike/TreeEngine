@@ -363,6 +363,19 @@
           -67.625
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
@@ -414,6 +427,19 @@
           -41.6508
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
@@ -460,6 +486,19 @@
           5.0075,
           -21.6807
         ]
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
       },
       "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
@@ -571,6 +610,19 @@
           -39.7229
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
@@ -610,6 +662,19 @@
           -14.8576
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
@@ -648,6 +713,19 @@
           8.0459,
           -17.9826
         ]
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
       },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
@@ -755,6 +833,19 @@
           -70.1857
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
       "materials": {
@@ -793,6 +884,19 @@
           7.0816,
           -58.998
         ]
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
       },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
@@ -1319,6 +1423,19 @@
           -65.0547
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
       "materials": {
@@ -1357,6 +1474,19 @@
           4.9396,
           -57.9065
         ]
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
       },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
@@ -1397,6 +1527,19 @@
           -37.0683
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
       "materials": {
@@ -1430,6 +1573,19 @@
           4.9923,
           -17.9616
         ]
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
       },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
@@ -1474,6 +1630,19 @@
           -17.9616
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
       "materials": {
@@ -1506,6 +1675,19 @@
           5.1344,
           -5.7407
         ]
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
       },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
@@ -2549,6 +2731,19 @@
           -14.6224
         ]
       },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
       "materials": {
@@ -2585,6 +2780,19 @@
           14.0263,
           -14.6224
         ]
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
       },
       "animationSpeed": 10,
       "trunkShape": "cylinder",
