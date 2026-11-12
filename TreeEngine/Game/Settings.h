@@ -84,6 +84,9 @@ public:
     // Off by default: with TAA, Forest's switches are already subtle, and while the camera moves fast a third of the
     // trees can be mid-fade, drawing two layouts (Forest flight: raster GPU +2.3 ms at 24 frames).
     int m_lodFadeFrames = 0;
+    // Terrain nodes load on a background thread and appear when ready (a coarser node draws meanwhile); off loads every
+    // node a frame needs before drawing it.
+    bool m_terrainStreaming = true;
     float m_lodDistanceScale = 1.0f;    // Multiplies every object's LOD distances; below 1 lowers detail sooner.          // Skip raster draws of objects outside the view frustum (DXR still traces them).
     // Camera motion vectors (Game/Shaders/MotionVectors.hlsl). A debug view replaces the scene color.
     enum class MotionView { Off, Motion, ReprojectedHistory, History };

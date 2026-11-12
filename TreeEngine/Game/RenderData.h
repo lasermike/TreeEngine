@@ -111,7 +111,11 @@ struct RenderProfile
     UINT terrainDrawnNodes = 0;             // and loaded this frame.
     UINT terrainResidentNodes = 0;
     UINT terrainLoadedNodes = 0;
-    UINT pooledBlasBuilds = 0;              // DXR: BLASes built this frame for pooled geometry (terrain nodes).
+    UINT terrainMissingNodes = 0;           // Splits held back by children still loading, and nodes queued or loading.
+    UINT terrainPendingNodes = 0;
+    UINT pooledBlasBuilds = 0;
+    double vertexUploadMs = 0;              // RenderManager::EndFrame's vertex uploads (terrain nodes): CPU time and bytes.
+    std::uint64_t vertexUploadBytes = 0;              // DXR: BLASes built this frame for pooled geometry (terrain nodes).
     UINT batchedDraws = 0;                  // Batched instance draws, and the objects they drew (see RenderManager::Render).
     UINT batchedObjects = 0;
     double instanceUploadMs = 0;            // Copying the CPU instance array into the frame's instance buffer.
@@ -160,6 +164,7 @@ struct RenderData : SceneRenderSettings
     XMVECTOR            eyePos;
     float               lodDistanceScale = 1;   // Multiplies every LOD distance (Settings::m_lodDistanceScale).
     UINT                lodFadeFrames = 0;      // Settings::m_lodFadeFrames: frames of LOD crossfade, 0 for none.
+    bool                terrainStreaming = true; // Settings::m_terrainStreaming.
     // The instance slots to copy to the GPU this frame ([begin, end) ranges; see WorldObject::AppendInstanceUploadRanges),
     // or null to copy every slot.
     const std::vector<std::pair<UINT, UINT>>* instanceUploadRanges = nullptr;

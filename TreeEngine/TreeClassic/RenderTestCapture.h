@@ -85,6 +85,7 @@ struct RenderTestRequest
     bool contactOpaqueProbes = true;   // "contactOpaqueProbes"
     float contactFullDistance = 15;    // "contactFullDistance"
     int lodFadeFrames = 0;             // "lodFadeFrames": frames of LOD crossfade; 0 switches layouts at once.
+    bool terrainStreaming = true;      // "terrainStreaming": false loads every terrain node a frame needs before drawing.
     bool hdr = false;                  // Defaults for every capture; see RenderTestPoint.
     std::string tonemap = "clamp";
     float exposure = 0;

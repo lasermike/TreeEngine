@@ -101,6 +101,7 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool, boo
     for (auto& phase : _updatePhases)
         phase.clear();
     profile.terrainNodes = profile.terrainResidentNodes = profile.terrainLoadedNodes = 0;
+    profile.terrainMissingNodes = profile.terrainPendingNodes = 0;
     for (WorldObject* child : _children)
         _updatePhases[child->IsInstance() ? 1 : 0].push_back(child);
     for (const auto& phase : _updatePhases)
@@ -122,6 +123,8 @@ HRESULT SceneRoot::Update(IRenderFrame& renderFrame, ThreadPool& threadPool, boo
             profile.terrainNodes += terrain.SelectedNodes();
             profile.terrainResidentNodes += terrain.ResidentNodes();
             profile.terrainLoadedNodes += terrain.LoadedThisFrame();
+            profile.terrainMissingNodes += terrain.MissingNodes();
+            profile.terrainPendingNodes += terrain.PendingNodes();
         }
     }
 

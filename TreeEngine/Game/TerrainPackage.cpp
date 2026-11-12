@@ -132,15 +132,12 @@ bool TerrainPackage::Open(const std::wstring& directory)
     }
     if (!ParseManifest(text, m_manifest, m_error))
         return false;
-    if (_wfopen_s(&m_nodes, Join(directory, m_manifest.nodesFile).c_str(), L"rb") != 0 || !m_nodes)
+    if (!m_nodes.Open(Join(directory, m_manifest.nodesFile)))
     {
-        m_nodes = nullptr;
         m_error = "cannot open " + m_manifest.nodesFile;
         return false;
     }
-    _fseeki64(m_nodes, 0, SEEK_END);
-    const int64_t size = _ftelli64(m_nodes);
-    if (size < int64_t(NodeCount(m_manifest.levels) * BlockStride))
+    if (m_nodes.Size() < NodeCount(m_manifest.levels) * BlockStride)
     {
         Close();
         m_error = m_manifest.nodesFile + " is shorter than its node count needs";
@@ -159,20 +156,15 @@ bool TerrainPackage::Open(const std::wstring& directory)
 
 void TerrainPackage::Close()
 {
-    if (m_nodes)
-        fclose(m_nodes);
-    m_nodes = nullptr;
+    m_nodes.Close();
     m_bounds.clear();
 }
 
 bool TerrainPackage::ReadBlock(int level, int x, int z, uint16_t* samples) const
 {
-    if (!m_nodes || level < 0 || level >= m_manifest.levels || x < 0 || z < 0 || x >= (1 << level) || z >= (1 << level))
+    if (!m_nodes.IsOpen() || level < 0 || level >= m_manifest.levels || x < 0 || z < 0 || x >= (1 << level) || z >= (1 << level))
         return false;
-    std::lock_guard<std::mutex> lock(m_readLock);
-    if (_fseeki64(m_nodes, int64_t(NodeIndex(level, x, z) * BlockStride), SEEK_SET) != 0)
-        return false;
-    return fread(samples, 1, BlockBytes, m_nodes) == BlockBytes;
+    return m_nodes.Read(NodeIndex(level, x, z) * BlockStride, samples, BlockBytes);
 }
 
 bool TerrainPackage::Write(const std::wstring& directory, const std::vector<float>& heights, int samples,

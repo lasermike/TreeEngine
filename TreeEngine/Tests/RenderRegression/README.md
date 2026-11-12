@@ -61,6 +61,10 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # and off; every pair must match (RMS at most 0.001, for draw-order ties), and batching must draw something.
 .\Tests\RenderRegression\test-instance-batching.ps1
 
+# Terrain streaming: a 650 m/s flight over a generated 4 km terrain, then a hold, raster and DXR, streaming on and
+# off. Every frame must draw terrain; once the camera stops nothing may still be loading; synchronous loads never wait.
+.\Tests\RenderRegression\test-terrain-streaming.ps1
+
 # Edit, save, reload, restart, and compare scene appearance in both modes.
 # Uses an isolated runtime copy; never modifies the deployment's UserScenes.
 .\Tests\RenderRegression\test-scene-persistence.ps1

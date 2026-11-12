@@ -1543,6 +1543,7 @@ HRESULT RenderPlatform12::UninitGameLevelGraphics()
             m_drawRecordUploads[frame]->Unmap(0, nullptr);
         m_drawRecordUploadData[frame] = nullptr;
         m_drawRecordUploads[frame].Release();
+        m_vertexStaging[frame] = VertexStaging();
     }
 
     ReleaseOpacityMicromaps();
@@ -1792,8 +1793,6 @@ HRESULT RenderPlatform12::DrawBatched(UINT indexCount, UINT startIndex, INT base
     return S_OK;
 }
 
-static HRESULT CreateFilledUploadBuffer(ID3D12Device* device, const void* data, size_t size, ID3D12Resource** buffer);
-
 HRESULT RenderPlatform12::UploadVertices(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices)
 {
     if (!regionCount)
@@ -1806,18 +1805,31 @@ HRESULT RenderPlatform12::UploadVertices(const VertexUploadRegion* regions, UINT
             return E_INVALIDARG;
         total = std::max<UINT64>(total, static_cast<UINT64>(regions[i].sourceVertex) + regions[i].count);
     }
-    // One upload buffer for the frame's regions, released once the frame is done with it.
-    CComPtr<ID3D12Resource> staging;
-    HRR(CreateFilledUploadBuffer(GetDevice(), vertices, static_cast<size_t>(total * sizeof(SimpleVertex)), &staging));
+    // The frame's staging buffer (one per frame in flight, persistently mapped; the frame fence protects its reuse),
+    // grown with headroom when a frame uploads more.
+    const UINT64 bytes = total * sizeof(SimpleVertex);
+    VertexStaging& staging = m_vertexStaging[m_frameIndex];
+    if (staging.capacity < bytes)
+    {
+        Retire(staging.buffer);
+        staging.mapped = nullptr;
+        staging.capacity = (std::max)(bytes + bytes / 2, UINT64(4) << 20);
+        const CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_UPLOAD);
+        const auto desc = CD3DX12_RESOURCE_DESC::Buffer(staging.capacity);
+        HRR(GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr, IID_PPV_ARGS(&staging.buffer)));
+        const CD3DX12_RANGE noRead(0, 0);
+        HRR(staging.buffer->Map(0, &noRead, reinterpret_cast<void**>(&staging.mapped)));
+    }
+    memcpy(staging.mapped, vertices, static_cast<size_t>(bytes));
     PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Upload vertices");
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.buffer,
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST));
     for (UINT i = 0; i < regionCount; ++i)
         GetCommandList()->CopyBufferRegion(m_vertexBuffer.buffer, static_cast<UINT64>(regions[i].firstVertex) * sizeof(SimpleVertex),
-            staging, static_cast<UINT64>(regions[i].sourceVertex) * sizeof(SimpleVertex), static_cast<UINT64>(regions[i].count) * sizeof(SimpleVertex));
+            staging.buffer, static_cast<UINT64>(regions[i].sourceVertex) * sizeof(SimpleVertex), static_cast<UINT64>(regions[i].count) * sizeof(SimpleVertex));
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.buffer,
         D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
-    Retire(staging);
     return S_OK;
 }
 

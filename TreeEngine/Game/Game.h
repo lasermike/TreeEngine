@@ -84,6 +84,7 @@ public:
     void SetRenderTestViewCulling(bool culling) { m_settings.m_viewCulling = culling; }
     void SetRenderTestBatchInstances(bool batch) { m_settings.m_batchInstances = batch; }
     void SetRenderTestLodFadeFrames(int frames) { m_settings.m_lodFadeFrames = frames; }
+    void SetRenderTestTerrainStreaming(bool streaming) { m_settings.m_terrainStreaming = streaming; }
     void SetRenderTestShadows(int cascades, float distance) { m_settings.m_shadowCascades = cascades; m_settings.m_shadowDistance = distance; }
     void SetRenderTestHighlightsThroughGeometry(bool enabled)
     {

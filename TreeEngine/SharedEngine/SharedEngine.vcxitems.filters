@@ -118,6 +118,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugVectorEditor.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Lod.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TerrainPackage.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\AssetReader.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Terrain.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectSelection.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugObjectSelection.h" />

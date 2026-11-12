@@ -20,6 +20,11 @@ Terrain::Terrain(TerrainParams* params) : WorldObject(params)
     }
 }
 
+Terrain::~Terrain()
+{
+    StopLoader();
+}
+
 void Terrain::AppendGeometry(GeometryBufferData& geometryData)
 {
     // The index pattern every node draws: the grid's quads, then each edge's skirt in both windings (a skirt hangs
@@ -99,11 +104,15 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
     m_resident.clear();
     m_split.clear();
     m_wasSplit.clear();
+    m_frame = 0;
+    if (m_open)
+        StartLoader();
     return S_OK;
 }
 
 HRESULT Terrain::CleanUpDeviceObjects()
 {
+    StopLoader();
     m_renderUnit = nullptr;
     m_resident.clear();
     m_slots.clear();
@@ -158,16 +167,48 @@ void Terrain::BuildVertices(const Node& node, const uint16_t* block, SimpleVerte
         }
 }
 
-// Makes a node resident, loading it into a free slot or the least recently used one not needed this frame.
-bool Terrain::Ensure(const Node& node, IRenderFrame* frame)
+float Terrain::Distance(const Node& node, const XMFLOAT3& eye) const
 {
-    const uint32_t index = static_cast<uint32_t>(TerrainPackage::NodeIndex(node.level, node.x, node.z));
+    XMFLOAT3 bounds[2];
+    NodeBounds(node, bounds);
+    const float dx = std::max({ bounds[0].x - eye.x, 0.0f, eye.x - bounds[1].x });
+    const float dy = std::max({ bounds[0].y - eye.y, 0.0f, eye.y - bounds[1].y });
+    const float dz = std::max({ bounds[0].z - eye.z, 0.0f, eye.z - bounds[1].z });
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+bool Terrain::Ensure(const Node& node, float priority, bool prefetch, IRenderFrame* frame)
+{
+    const uint32_t index = Index(node);
     const auto found = m_resident.find(index);
     if (found != m_resident.end())
     {
-        m_slots[found->second].lastUsed = m_frame;
+        (prefetch ? m_slots[found->second].lastPrefetched : m_slots[found->second].lastUsed) = m_frame;
         return true;
     }
+    if (m_synchronous)
+    {
+        if (prefetch || !m_package.ReadBlock(node.level, node.x, node.z, m_block.data()))
+            return false;
+        BuildVertices(node, m_block.data(), m_vertices.data());
+        return Place(node, m_vertices.data(), false, frame);
+    }
+    const auto wanted = m_wantedIndex.emplace(index, m_wanted.size());
+    if (wanted.second)
+        m_wanted.push_back({ node, priority, prefetch });
+    else
+    {
+        // Asked for again: keep the more urgent request.
+        LoadRequest& request = m_wanted[wanted.first->second];
+        request.priority = std::min(request.priority, priority);
+        request.prefetch = request.prefetch && prefetch;
+    }
+    return false;
+}
+
+bool Terrain::Place(const Node& node, const SimpleVertex* vertices, bool prefetch, IRenderFrame* frame)
+{
+    const uint32_t index = Index(node);
     UINT slot = UINT_MAX;
     if (!m_freeSlots.empty())
     {
@@ -176,59 +217,60 @@ bool Terrain::Ensure(const Node& node, IRenderFrame* frame)
     }
     else
     {
-        UINT oldest = m_frame;
+        // Slots needed since `keep` stay; of the rest, the least recently needed or prefetched goes.
+        const UINT keep = m_synchronous ? m_frame : m_frame - 1;
+        UINT oldest = UINT_MAX;
         for (UINT s = 0; s < m_slots.size(); ++s)
-            if (m_slots[s].lastUsed < oldest)
+        {
+            const UINT recent = std::max(m_slots[s].lastUsed, m_slots[s].lastPrefetched);
+            if (m_slots[s].lastUsed < keep && (!prefetch || recent < keep) && recent < oldest)
             {
-                oldest = m_slots[s].lastUsed;
+                oldest = recent;
                 slot = s;
             }
+        }
         if (slot == UINT_MAX)
             return false;
         m_resident.erase(m_slots[slot].node);
     }
-    if (!m_package.ReadBlock(node.level, node.x, node.z, m_block.data()))
-    {
-        m_slots[slot] = Slot();
-        m_freeSlots.push_back(slot);
-        return false;
-    }
-    BuildVertices(node, m_block.data(), m_vertices.data());
-    if (FAILED(frame->UploadVertices(m_offsets.VertexOffset + slot * VerticesPerNode, m_vertices.data(), VerticesPerNode)))
+    if (FAILED(frame->UploadVertices(m_offsets.VertexOffset + slot * VerticesPerNode, vertices, VerticesPerNode)))
     {
         m_slots[slot] = Slot();
         m_freeSlots.push_back(slot);
         return false;
     }
     m_slots[slot].node = index;
-    m_slots[slot].lastUsed = m_frame;
+    m_slots[slot].lastUsed = prefetch ? 0 : m_frame;
+    m_slots[slot].lastPrefetched = prefetch ? m_frame : 0;
     m_resident.emplace(index, slot);
     ++m_loadedThisFrame;
     return true;
 }
 
 // CDLOD selection: split while the camera is within the node's range (further for a node split last frame), and only
-// when all four children are resident; otherwise the node draws itself.
+// when all four children are resident; otherwise the node draws itself. Children wanted for a split load first (by
+// how deep inside its range the camera is), then those near their parent's range.
 void Terrain::Select(const Node& node, const XMFLOAT3& eye, IRenderFrame* frame)
 {
-    if (!Ensure(node, frame))
-        return;
-    const uint32_t index = static_cast<uint32_t>(TerrainPackage::NodeIndex(node.level, node.x, node.z));
+    const uint32_t index = Index(node);
     bool split = false;
     if (node.level + 1 < m_package.Manifest().levels)
     {
-        XMFLOAT3 bounds[2];
-        NodeBounds(node, bounds);
-        const float dx = std::max({ bounds[0].x - eye.x, 0.0f, eye.x - bounds[1].x });
-        const float dy = std::max({ bounds[0].y - eye.y, 0.0f, eye.y - bounds[1].y });
-        const float dz = std::max({ bounds[0].z - eye.z, 0.0f, eye.z - bounds[1].z });
-        const float range = Params().lodRange * static_cast<float>(m_package.Manifest().NodeSize(node.level))
-            * (m_wasSplit.count(index) ? 1 + Hysteresis : 1);
-        if (dx * dx + dy * dy + dz * dz < range * range)
+        const float distance = Distance(node, eye);
+        const float range = Params().lodRange * static_cast<float>(m_package.Manifest().NodeSize(node.level));
+        const float splitRange = range * (m_wasSplit.count(index) ? 1 + Hysteresis : 1);
+        if (distance < splitRange)
         {
             split = true;
-            for (int child = 0; child < 4 && split; ++child)
-                split = Ensure({ node.level + 1, 2 * node.x + (child & 1), 2 * node.z + (child >> 1) }, frame);
+            for (int child = 0; child < 4; ++child)
+                split = Ensure({ node.level + 1, 2 * node.x + (child & 1), 2 * node.z + (child >> 1) }, distance / range, false,
+                    frame) && split;
+            m_missing += split ? 0 : 1;
+        }
+        else if (distance < range * PrefetchRange)
+        {
+            for (int child = 0; child < 4; ++child)
+                Ensure({ node.level + 1, 2 * node.x + (child & 1), 2 * node.z + (child >> 1) }, 1 + distance / range, true, frame);
         }
     }
     if (split)
@@ -253,16 +295,23 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
     // Nodes draw through AddDraw, not the reservation's range.
     HRR(frame->SetInstances(m_renderUnit, this, instance, 0));
     m_selected.clear();
-    m_loadedThisFrame = 0;
+    m_loadedThisFrame = m_missing = 0;
     if (!m_open || m_slots.empty())
         return S_OK;
 
     ++m_frame;
+    // The first frame draws everything it needs; later ones stream unless streaming is off.
+    m_synchronous = m_frame == 1 || !frame->GetRenderData().terrainStreaming;
+    ApplyLoaded(frame);
     std::swap(m_split, m_wasSplit);
     m_split.clear();
+    m_wanted.clear();
+    m_wantedIndex.clear();
     XMFLOAT3 eye;
     XMStoreFloat3(&eye, frame->GetRenderData().eyePos);
-    Select({ 0, 0, 0 }, eye, frame);
+    if (Ensure({ 0, 0, 0 }, 0, false, frame))
+        Select({ 0, 0, 0 }, eye, frame);
+    PublishRequests();
 
     XMVECTOR minimum = XMVectorReplicate(FLT_MAX), maximum = XMVectorReplicate(-FLT_MAX);
     for (const auto& selected : m_selected)
@@ -285,6 +334,125 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
         XMStoreFloat3(&_boundingBox[1], maximum);
     }
     return S_OK;
+}
+
+void Terrain::StartLoader()
+{
+    StopLoader();
+    m_stopLoader = false;
+    m_loader = std::thread([this]() { LoaderMain(); });
+}
+
+void Terrain::StopLoader()
+{
+    if (m_loader.joinable())
+    {
+        {
+            std::lock_guard<std::mutex> lock(m_loadLock);
+            m_stopLoader = true;
+        }
+        m_loadWake.notify_all();
+        m_loader.join();
+    }
+    std::lock_guard<std::mutex> lock(m_loadLock);
+    m_queue.clear();
+    m_loading.clear();
+    m_loaded.clear();
+}
+
+// The loader thread: takes the best queued node, reads and builds it, and hands it back.
+void Terrain::LoaderMain()
+{
+    std::vector<uint16_t> block(size_t(BlockSamples) * BlockSamples);
+    for (;;)
+    {
+        LoadResult result;
+        {
+            std::unique_lock<std::mutex> lock(m_loadLock);
+            m_loadWake.wait(lock, [this]() { return m_stopLoader || !m_queue.empty(); });
+            if (m_stopLoader)
+                return;
+            result.node = m_queue.back().node;
+            result.prefetch = m_queue.back().prefetch;
+            m_queue.pop_back();
+            m_loading.insert(Index(result.node));
+            if (!m_spareVertices.empty())
+            {
+                result.vertices = std::move(m_spareVertices.back());
+                m_spareVertices.pop_back();
+            }
+        }
+        result.vertices.resize(VerticesPerNode);
+        result.ok = m_package.ReadBlock(result.node.level, result.node.x, result.node.z, block.data());
+        if (result.ok)
+            BuildVertices(result.node, block.data(), result.vertices.data());
+        std::lock_guard<std::mutex> lock(m_loadLock);
+        m_loading.erase(Index(result.node));
+        m_loaded.push_back(std::move(result));
+    }
+}
+
+// Uploads nodes the loader finished, up to the frame's budget (see Place for the slots they may take). A node that
+// finds no slot is dropped; the selection asks for it again if it still wants it.
+void Terrain::ApplyLoaded(IRenderFrame* frame)
+{
+    std::vector<LoadResult> loaded;
+    {
+        std::lock_guard<std::mutex> lock(m_loadLock);
+        loaded.swap(m_loaded);
+    }
+    size_t applied = 0;
+    for (; applied < loaded.size() && m_loadedThisFrame < UploadBudget; ++applied)
+    {
+        const LoadResult& result = loaded[applied];
+        if (result.ok && !m_resident.count(Index(result.node)))
+            Place(result.node, result.vertices.data(), result.prefetch, frame);
+    }
+    std::lock_guard<std::mutex> lock(m_loadLock);
+    // Over budget: back to the front of the finished list, for the next frame.
+    m_loaded.insert(m_loaded.begin(), std::make_move_iterator(loaded.begin() + applied), std::make_move_iterator(loaded.end()));
+    for (size_t i = 0; i < applied; ++i)
+        m_spareVertices.push_back(std::move(loaded[i].vertices));
+}
+
+// Replaces the loader's queue with this frame's requests (best last), leaving out nodes loading or finished, and
+// those no slot could take next frame (see Place): needed nodes up to the slots not needed lately, prefetches up to
+// those neither needed nor prefetched lately, after the needed ones.
+void Terrain::PublishRequests()
+{
+    // Needed before prefetched, then by priority; the best ends up last.
+    std::sort(m_wanted.begin(), m_wanted.end(), [](const LoadRequest& a, const LoadRequest& b)
+    {
+        return a.prefetch != b.prefetch ? a.prefetch : a.priority > b.priority;
+    });
+    size_t forNeeded = m_freeSlots.size(), forPrefetch = m_freeSlots.size();
+    for (const Slot& slot : m_slots)
+        if (slot.node != UINT32_MAX && slot.lastUsed < m_frame)
+        {
+            ++forNeeded;
+            forPrefetch += std::max(slot.lastUsed, slot.lastPrefetched) < m_frame ? 1 : 0;
+        }
+    {
+        std::lock_guard<std::mutex> lock(m_loadLock);
+        std::unordered_set<uint32_t> finished;
+        for (const LoadResult& result : m_loaded)
+            finished.insert(Index(result.node));
+        std::vector<LoadRequest> queue;
+        size_t needed = 0, prefetched = 0;
+        for (auto request = m_wanted.rbegin(); request != m_wanted.rend(); ++request)
+        {
+            const uint32_t index = Index(request->node);
+            if (m_loading.count(index) || finished.count(index))
+                continue;
+            if (request->prefetch ? needed + ++prefetched > forPrefetch : ++needed > forNeeded)
+                continue;
+            queue.push_back(*request);
+        }
+        m_queue.assign(queue.rbegin(), queue.rend());
+        m_pending = static_cast<UINT>(m_queue.size() + m_loading.size() + m_loaded.size());
+    }
+    if (!m_queue.empty())
+        m_loadWake.notify_one();
 }
 
 bool Terrain::HeightAt(float x, float z, float& height)

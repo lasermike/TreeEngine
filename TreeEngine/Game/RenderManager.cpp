@@ -208,6 +208,7 @@ HRESULT RenderManager::BeginNewFrame()
 {
     m_renderData.lodDistanceScale = m_settings->m_lodDistanceScale;
     m_renderData.lodFadeFrames = static_cast<UINT>(std::max(0, m_settings->m_lodFadeFrames));
+    m_renderData.terrainStreaming = m_settings->m_terrainStreaming;
     D3DBuffer* buffer = m_instancedBuffer.Get(m_renderData.frame);
     m_batchListUsed = 0;
 
@@ -249,12 +250,16 @@ HRESULT RenderManager::EndFrame()
     m_renderData.instanceUploadRanges = &m_instanceUploadRanges;
 
     // Vertices objects wrote this frame (terrain nodes), copied into the vertex buffer ahead of the frame's draws.
+    m_renderData.profile.vertexUploadMs = 0;
+    m_renderData.profile.vertexUploadBytes = m_vertexUploadData.size() * sizeof(SimpleVertex);
     if (!m_vertexUploads.empty())
     {
+        const auto uploadStart = std::chrono::steady_clock::now();
         const HRESULT uploaded = GetPlatform()->UploadVertices(m_vertexUploads.data(), static_cast<UINT>(m_vertexUploads.size()),
             m_vertexUploadData.data());
         m_vertexUploads.clear();
         m_vertexUploadData.clear();
+        m_renderData.profile.vertexUploadMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - uploadStart).count();
         HRR(uploaded);
     }
     return GetPlatform()->EndFrame(m_instancedBuffer.Get(m_renderData.frame));

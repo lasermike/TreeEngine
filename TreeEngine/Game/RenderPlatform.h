@@ -1033,6 +1033,13 @@ public:
     // TODO: move into interface
     HRESULT LoadComputeShader(const wchar_t* shaderFilename, ComputeShader** shader);
 
+    struct VertexStaging                                // UploadVertices' staging, per frame in flight.
+    {
+        CComPtr<ID3D12Resource> buffer;
+        BYTE* mapped = nullptr;
+        UINT64 capacity = 0;
+    };
+    VertexStaging               m_vertexStaging[FrameCount];
 #if defined(DXR_ENABLED)
 
     uint32_t m_numInstancesInTLAS;

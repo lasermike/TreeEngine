@@ -173,6 +173,7 @@ void ParseRenderTestCommandLine()
     parsed->viewCulling = json.value("viewCulling", true);
     parsed->batchInstances = json.value("batchInstances", true);
     parsed->lodFadeFrames = json.value("lodFadeFrames", 0);
+    parsed->terrainStreaming = json.value("terrainStreaming", true);
     parsed->rayContactShading = json.value("rayContactShading", true);
     parsed->raySunSamples = json.value("raySunSamples", 0);
     parsed->rayAlphaTest = json.value("rayAlphaTest", true);
@@ -442,6 +443,7 @@ namespace
             game.SetRenderTestViewCulling(request->viewCulling);
             game.SetRenderTestBatchInstances(request->batchInstances);
             game.SetRenderTestLodFadeFrames(request->lodFadeFrames);
+            game.SetRenderTestTerrainStreaming(request->terrainStreaming);
             game.SetRenderTestRays(request->rayContactShading, request->raySunSamples, request->rayAlphaTest,
                 request->rayShadows, request->rayOpaqueGeometry);
             game.SetRenderTestContactProbes(request->contactProbes, request->contactRotate, request->contactOpaqueProbes,
@@ -514,7 +516,7 @@ namespace
                     { "dynamicBlasRefits", profile.dynamicBlasRefits }, { "dynamicBlasReuses", profile.dynamicBlasReuses },
                     { "tlasInstances", profile.tlasInstances }, { "blasHeapBytes", profile.blasHeapBytes },
                     { "blasHeapLiveBytes", profile.blasHeapLiveBytes }, { "blasScratchBytes", profile.blasScratchBytes },
-                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }, { "batchedDraws", profile.batchedDraws }, { "batchedObjects", profile.batchedObjects }, { "fadingObjects", profile.fadingObjects }, { "terrainNodes", profile.terrainNodes }, { "terrainDrawnNodes", profile.terrainDrawnNodes }, { "terrainResidentNodes", profile.terrainResidentNodes }, { "terrainLoadedNodes", profile.terrainLoadedNodes }, { "pooledBlasBuilds", profile.pooledBlasBuilds } });
+                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }, { "batchedDraws", profile.batchedDraws }, { "batchedObjects", profile.batchedObjects }, { "fadingObjects", profile.fadingObjects }, { "terrainNodes", profile.terrainNodes }, { "terrainDrawnNodes", profile.terrainDrawnNodes }, { "terrainResidentNodes", profile.terrainResidentNodes }, { "terrainLoadedNodes", profile.terrainLoadedNodes }, { "pooledBlasBuilds", profile.pooledBlasBuilds }, { "terrainMissingNodes", profile.terrainMissingNodes }, { "terrainPendingNodes", profile.terrainPendingNodes }, { "vertexUploadMs", profile.vertexUploadMs }, { "vertexUploadBytes", profile.vertexUploadBytes } });
             }
             std::cerr << "Profiled " << request->scene << " / " << request->mode << ", "
                 << request->performanceFrames << " frames" << std::endl;
@@ -592,6 +594,7 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestViewCulling(request->viewCulling);
             game.SetRenderTestBatchInstances(request->batchInstances);
             game.SetRenderTestLodFadeFrames(request->lodFadeFrames);
+            game.SetRenderTestTerrainStreaming(request->terrainStreaming);
             game.SetRenderTestRays(request->rayContactShading, request->raySunSamples, request->rayAlphaTest,
                 request->rayShadows, request->rayOpaqueGeometry);
             game.SetRenderTestContactProbes(request->contactProbes, request->contactRotate, request->contactOpaqueProbes,
@@ -675,7 +678,7 @@ int RunRenderTestCapture(Game& game)
                     { "dynamicBlasRefits", profile.dynamicBlasRefits }, { "dynamicBlasReuses", profile.dynamicBlasReuses },
                     { "tlasInstances", profile.tlasInstances }, { "blasHeapBytes", profile.blasHeapBytes },
                     { "blasHeapLiveBytes", profile.blasHeapLiveBytes }, { "blasScratchBytes", profile.blasScratchBytes },
-                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }, { "batchedDraws", profile.batchedDraws }, { "batchedObjects", profile.batchedObjects }, { "fadingObjects", profile.fadingObjects }, { "terrainNodes", profile.terrainNodes }, { "terrainDrawnNodes", profile.terrainDrawnNodes }, { "terrainResidentNodes", profile.terrainResidentNodes }, { "terrainLoadedNodes", profile.terrainLoadedNodes }, { "pooledBlasBuilds", profile.pooledBlasBuilds }
+                    { "drawnObjects", profile.drawnObjects }, { "culledObjects", profile.culledObjects }, { "lodLevelObjects", profile.lodLevelObjects }, { "drawnLeaves", profile.drawnLeaves }, { "drawnSticks", profile.drawnSticks }, { "instanceUploadMs", profile.instanceUploadMs }, { "instanceUploadBytes", profile.instanceUploadBytes }, { "batchedDraws", profile.batchedDraws }, { "batchedObjects", profile.batchedObjects }, { "fadingObjects", profile.fadingObjects }, { "terrainNodes", profile.terrainNodes }, { "terrainDrawnNodes", profile.terrainDrawnNodes }, { "terrainResidentNodes", profile.terrainResidentNodes }, { "terrainLoadedNodes", profile.terrainLoadedNodes }, { "pooledBlasBuilds", profile.pooledBlasBuilds }, { "terrainMissingNodes", profile.terrainMissingNodes }, { "terrainPendingNodes", profile.terrainPendingNodes }, { "vertexUploadMs", profile.vertexUploadMs }, { "vertexUploadBytes", profile.vertexUploadBytes }
                     });
                     const int adapterBytes = WideCharToMultiByte(CP_UTF8, 0, profile.adapter.c_str(), -1, nullptr, 0, nullptr, nullptr);
                     if (!adapterBytes) throw std::runtime_error("Cannot encode GPU adapter name as UTF-8");

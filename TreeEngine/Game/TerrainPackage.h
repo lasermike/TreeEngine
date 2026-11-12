@@ -14,10 +14,8 @@
 // and highest height (two uint16 per node, in node order), over the finest samples in its area, so they bound every
 // level's geometry there.
 
+#include "AssetReader.h"
 #include <cstdint>
-#include <cstdio>
-#include <functional>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -63,7 +61,7 @@ public:
     // Blocks are stored level by level from the root, row-major (z, then x) within a level.
     static uint64_t NodeIndex(int level, int x, int z);
     static uint64_t NodeCount(int levels);
-    // Reads one node's block (BlockSamples^2 values). Safe to call from several threads.
+    // Reads one node's block (BlockSamples^2 values) through the package's asset reader. Safe from several threads.
     bool ReadBlock(int level, int x, int z, uint16_t* samples) const;
     // A node's height range in package units (Manifest().Height converts), read at Open.
     uint16_t MinValue(uint64_t node) const { return m_bounds[2 * node]; }
@@ -82,7 +80,6 @@ public:
 private:
     TerrainManifest m_manifest;
     std::string m_error;
-    FILE* m_nodes = nullptr;
+    FileAssetReader m_nodes;
     std::vector<uint16_t> m_bounds;
-    mutable std::mutex m_readLock;
 };
