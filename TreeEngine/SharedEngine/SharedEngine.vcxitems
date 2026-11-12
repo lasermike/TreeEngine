@@ -84,6 +84,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectSelection.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneLoadProfile.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugObjectSelection.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectHighlight.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\HighlightGeometry.h" />

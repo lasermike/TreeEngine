@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "LSystemModelGenerator.h"
 #include <stack>
+#include "SceneLoadProfile.h"
 
 double DefaultLength(LSystemParams* params, double cmdParam)
 {
@@ -13,7 +14,8 @@ LSystemParams::LSystemParams() :
     SegmentLength = DefaultLength;
 };
 
-LSystemModelGenerator::LSystemModelGenerator(LSystemParams& params) : TreeModelGenerator(), _params(params)
+LSystemModelGenerator::LSystemModelGenerator(LSystemParams& params, SceneLoadProfile* profile)
+    : TreeModelGenerator(), _params(params), m_loadProfile(profile)
 {
 }
 
@@ -211,6 +213,7 @@ void replaceAll(std::vector<Command>& inputOutputCmds, const Command& searchCmd,
 
 TreeModel* LSystemModelGenerator::Create()
 {
+    SceneLoadScope rewriteTimer(m_loadProfile, "generation.lsystem.rewrite");
     string axiom = _params._axiom;
 
     // Tokenize axiom string
@@ -255,46 +258,20 @@ TreeModel* LSystemModelGenerator::Create()
         }
     }
 
+    rewriteTimer.Finish();
     // One branch per F or L, plus the trunk.
     int branchCount = 1;
     for (const auto& cmd : inputOutputCmds)
         if (cmd.symbol == 'F' || cmd.symbol == 'L') ++branchCount;
     _model = new TreeModel(branchCount);
 
-    std::stringstream ss;
-
-    for (auto& outputCmd : inputOutputCmds)
-    {
-        ss << outputCmd.symbol;
-        for (int p = 0; p < outputCmd.numParams; p++)
-        {
-            if (outputCmd.params[p].paramType != PT_NONE)
-            {
-                assert(outputCmd.params[p].paramType == PT_DOUBLE);
-                if (p == 0)
-                    ss << '(';
-                else
-                    ss << ',';
-
-                ss << outputCmd.params[p].doubleVal;
-
-                if (p == outputCmd.numParams - 1)
-                    ss << ')';
-            }
-        }
-    }
-
-    string finalResult = ss.str();
-
-    OutputDebugStringA(finalResult.c_str());
-    OutputDebugStringA("\n");
-
-    CreateSkeleton(finalResult);
+    SceneLoadScope skeletonTimer(m_loadProfile, "generation.lsystem.skeleton");
+    CreateSkeleton(inputOutputCmds);
 
     return _model;
 }
 
-void LSystemModelGenerator::CreateSkeleton(string& axiom)
+void LSystemModelGenerator::CreateSkeleton(const std::vector<Command>& commands)
 {
     // Constants
     XMFLOAT3 xAxis(1, 0, 0);
@@ -328,18 +305,12 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
 
     BuildState currentState = initialState;
     stack<BuildState> stateStack;
-    int pos = 0;
-    string done, unknown;
+    string unknown;
     unsigned int angleSeed = 2166136261u;
     unsigned int lengthSeed = 2246822519u;
-    for (auto cmdIt = axiom.begin(); cmdIt != axiom.end(); cmdIt++)
+    // Interpret expanded commands directly, retaining their numeric precision.
+    for (const auto& command : commands)
     {
-        Command command = {};
-        if (!GetCommand(cmdIt, axiom.end(), PT_DOUBLE, &command))
-        {
-            assert(false);
-        }
-
         double magnitude = 1.0f;
         if (command.params[0].paramType == PT_DOUBLE)
         {
@@ -446,9 +417,6 @@ void LSystemModelGenerator::CreateSkeleton(string& axiom)
             unknown.push_back(command.symbol);
             break;
         }
-
-        pos++;
-        done.push_back(command.symbol);
     }
 
     LOG(unknown.c_str());

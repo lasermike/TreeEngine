@@ -457,6 +457,10 @@ namespace
                     if (!load.complete) throw std::runtime_error("Scene load timing is incomplete");
                     report["sceneLoad"] = { { "totalMs", load.TotalMs() }, { "definitionMs", load.definitionMs },
                         { "generationMs", load.generationMs }, { "graphicsMs", load.graphicsMs } };
+                    report["sceneLoad"]["scopes"] = nlohmann::json::object();
+                    for (const auto& entry : game.GetRenderManager().GetRenderData().loadProfile.scopes)
+                        report["sceneLoad"]["scopes"][entry.first] = {
+                            { "ms", entry.second.milliseconds }, { "calls", entry.second.calls } };
                     report["adapter"] = Utf8(profile.adapter);
                     report["renderWidth"] = game.GetRenderManager().GetRenderData().renderWidth;
                     report["renderHeight"] = game.GetRenderManager().GetRenderData().renderHeight;

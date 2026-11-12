@@ -5,6 +5,7 @@
 class SceneRoot;
 struct SceneRenderSettings;
 class Player;
+struct SceneLoadProfile;
 
 struct GameData
 {
@@ -34,7 +35,7 @@ public:
         SceneData::SceneDefinition* definition = nullptr, std::string* filename = nullptr);
     HRESULT Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData,
         SceneData::SceneDefinition* definition = nullptr, std::string* filename = nullptr);
-    void Regenerate(SceneRoot* pScene);
+    void Regenerate(SceneRoot* pScene, SceneLoadProfile* profile = nullptr);
 
     int _currentSeed;
     int GetNumScenes();

@@ -55,8 +55,11 @@ void SceneRoot::AppendGeometry(GeometryBufferData& geometryData)
 
 HRESULT SceneRoot::InitGraphics(RenderManager& renderManager)
 {
+    SceneLoadScope timer(&renderManager.GetRenderData().loadProfile, "graphics.objects");
     for (auto i : _children)
     {
+        SceneLoadScope objectTimer(&renderManager.GetRenderData().loadProfile,
+            i->IsInstance() ? "graphics.object/instances" : "graphics.object/" + i->GetParams().name);
         HRR(i->InitGraphics(renderManager));
     }
 

@@ -530,6 +530,17 @@ HRESULT Game::ReloadDevice()
 HRESULT Game::Regenerate()
 {
     HRESULT hr = S_OK;
+    auto& profile = m_renderManager.GetRenderData().loadProfile;
+    profile.scopes.clear();
+    profile.enabled = m_renderManager.GetRenderData().profile.enabled;
+    struct StopProfiling
+    {
+        SceneLoadProfile& profile;
+        ~StopProfiling()
+        {
+            profile.enabled = false;
+        }
+    } stopProfiling{ profile };
 
     // Clear old stuff
     auto start = std::chrono::steady_clock::now();
@@ -538,7 +549,7 @@ HRESULT Game::Regenerate()
     double graphicsMs = ElapsedMs(start);
 
     start = std::chrono::steady_clock::now();
-    m_loader.Regenerate(m_pScene);
+    m_loader.Regenerate(m_pScene, &profile);
     const double generationMs = ElapsedMs(start);
 
     // Init render manager
