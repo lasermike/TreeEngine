@@ -15,6 +15,7 @@ Examples:
 Plain heightmaps without georeferencing (16-bit PNG, RAW) go straight to TerrainTool pack; see README.md.
 """
 import argparse
+import array
 import json
 import os
 import shutil
@@ -44,6 +45,23 @@ def require(tool):
 def run(command):
     print('>', ' '.join(f'"{c}"' if ' ' in c else c for c in command))
     subprocess.run(command, check=True)
+
+
+def check_coverage(raw, count, source, bounds, crs):
+    """Stops when the source has no heights in the area, and warns when it covers only part of it (the rest becomes
+    flat ground at the lowest height)."""
+    heights = array.array('f')
+    with open(raw, 'rb') as f:
+        heights.fromfile(f, count)
+    missing = sum(1 for h in heights if not (-1e30 < h < 1e30))
+    if missing == count:
+        sys.exit(f'{source} has no heights in this area. If it is a VRT, check that its tiles are where it says '
+                 f'(gdalinfo lists them, with an error for each one missing; gdalbuildvrt with absolute paths avoids '
+                 f'this), and that the area {bounds} ({crs}) overlaps the tiles (gdalinfo prints their corners in '
+                 f'latitude and longitude).')
+    if missing:
+        print(f'warning: {100 * missing / count:.0f}% of the area has no source heights and will be flat at the lowest '
+              f'height; get more tiles, or move --center or shrink --size to fit the data', file=sys.stderr)
 
 
 def utm_crs(latitude, longitude):
@@ -96,6 +114,7 @@ def main():
         width, height = info['size']
         raw = os.path.join(work, 'heights.raw')
         run(['gdal_translate', '-of', 'ENVI', '-ot', 'Float32', warped, raw])
+        check_coverage(raw, width * height, args.source, bounds, crs)
         source = {
             'importer': 'import_heightmap.py',
             'file': os.path.basename(args.source),
@@ -115,4 +134,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as error:
+        sys.exit(f'{os.path.basename(error.cmd[0])} failed (exit {error.returncode}); see its messages above')
