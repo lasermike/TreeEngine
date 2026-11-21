@@ -2,7 +2,7 @@
   "version": 1,
   "id": "Instancing",
   "name": "Instancing",
-  "priority": 1,
+  "priority": 5,
   "camera": {
     "position": [0, 2.2, -7]
   },

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "LoadTerrainHills",
-  "priority": 0,
+  "priority": 1,
   "name": "Terrain - procedural hills (1 km), layered",
   "camera": {
     "position": [

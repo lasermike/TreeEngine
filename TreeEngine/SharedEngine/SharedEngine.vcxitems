@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Label="Globals">
     <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
@@ -70,17 +70,27 @@
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\terra.glb" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\ai-tree.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\curves.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\forest.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\gltf-models.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\graph.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\hungerford.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\instancing.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\leaf-atlas-test.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\leaf-atlases.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\metal-rough-spheres-no-textures.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\metal-rough-spheres.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\normal-tangent-mirror-test.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\pbr-materials.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\sea.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\simple-box.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\specular-test.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\terra.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\terrain-hills.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-block.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-tree.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\tree.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\trees.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\valley.scene.json" />
     <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\LICENSE" />
     <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\NOTICE.txt" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
