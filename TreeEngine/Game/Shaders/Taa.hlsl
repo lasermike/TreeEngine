@@ -107,7 +107,7 @@ void TaaResolveCS(uint3 id : SV_DispatchThreadID)
 
     // The 3x3 neighborhood's color moments, and its nearest pixel for the velocity.
     float3 current = 0, m1 = 0, m2 = 0;
-    float nearestDepth = 2;
+    float nearestDepth = -1;    // Depth is reversed: nearer is larger.
     int2 nearest = int2(id.xy);
     [unroll] for (int y = -1; y <= 1; ++y)
     {
@@ -120,7 +120,7 @@ void TaaResolveCS(uint3 id : SV_DispatchThreadID)
             m1 += color;
             m2 += color * color;
             const float depth = Depth.Load(int3(pixel, 0));
-            if (depth < nearestDepth)
+            if (depth > nearestDepth)
             {
                 nearestDepth = depth;
                 nearest = pixel;
@@ -172,7 +172,7 @@ void TaauResolveCS(uint3 id : SV_DispatchThreadID)
 
     float3 filtered = 0, m1 = 0, m2 = 0;
     float weightSum = 0, nearestWeight = 0;
-    float nearestDepth = 2;
+    float nearestDepth = -1;    // Depth is reversed: nearer is larger.
     int2 nearest = clamp(center, 0, last);
     [unroll] for (int y = -1; y <= 1; ++y)
     {
@@ -189,7 +189,7 @@ void TaauResolveCS(uint3 id : SV_DispatchThreadID)
             m1 += color;
             m2 += color * color;
             const float depth = Depth.Load(int3(pixel, 0));
-            if (depth < nearestDepth)
+            if (depth > nearestDepth)
             {
                 nearestDepth = depth;
                 nearest = pixel;

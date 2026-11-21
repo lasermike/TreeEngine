@@ -29,7 +29,8 @@ float4 HighlightPS(HighlightVertex input) : SV_Target
         sceneDepth.GetDimensions(width, height);
         int2 pixel = clamp(int2((input.position.xy * inverseDisplaySize + jitterUv) * float2(width, height)),
             int2(0, 0), int2(width - 1, height - 1));
-        clip(sceneDepth.Load(int3(pixel, 0)) + 0.00001f - input.position.z);
+        // Reversed depth: the highlight shows where it is at least as near (as large) as the scene.
+        clip(input.position.z + 0.00001f - sceneDepth.Load(int3(pixel, 0)));
     }
     return input.color;
 }

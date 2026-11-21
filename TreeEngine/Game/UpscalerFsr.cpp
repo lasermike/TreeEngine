@@ -136,7 +136,7 @@ namespace
                 create.header.pNext = &version.header;
                 // Exposure is applied by the tonemap pass after upscaling, so FSR estimates its own. Without HDR the
                 // color is display-encoded (sRGB-like), which FSR must know.
-                create.flags = FFX_UPSCALE_ENABLE_AUTO_EXPOSURE
+                create.flags = FFX_UPSCALE_ENABLE_AUTO_EXPOSURE | FFX_UPSCALE_ENABLE_DEPTH_INVERTED
                     | (hdr ? FFX_UPSCALE_ENABLE_HIGH_DYNAMIC_RANGE : FFX_UPSCALE_ENABLE_NON_LINEAR_COLORSPACE);
 #if defined(_DEBUG)
                 create.flags |= FFX_UPSCALE_ENABLE_DEBUG_CHECKING;

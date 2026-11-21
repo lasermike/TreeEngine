@@ -30,7 +30,7 @@ HRESULT RenderPlatform12::BeginObjectPicking()
         desc.Format = DXGI_FORMAT_D32_FLOAT;
         desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
         clear.Format = DXGI_FORMAT_D32_FLOAT;
-        clear.DepthStencil.Depth = 1;
+        clear.DepthStencil.Depth = SceneDepthClear;
         HRR(GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
             D3D12_RESOURCE_STATE_DEPTH_WRITE, &clear, IID_PPV_ARGS(&m_pickDepth)));
         GetDevice()->CreateDepthStencilView(m_pickDepth, nullptr, m_pickDsvHeap->GetCPUDescriptorHandleForHeapStart());
@@ -39,7 +39,7 @@ HRESULT RenderPlatform12::BeginObjectPicking()
     const auto dsv = m_pickDsvHeap->GetCPUDescriptorHandleForHeapStart();
     const float clear[4] = {};
     GetCommandList()->ClearRenderTargetView(rtv, clear, 0, nullptr);
-    GetCommandList()->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
+    GetCommandList()->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, SceneDepthClear, 0, 0, nullptr);
     GetCommandList()->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
     m_pickPassRecorded = true;
     return S_OK;
