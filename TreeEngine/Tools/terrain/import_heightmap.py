@@ -60,7 +60,7 @@ def check_coverage(raw, count, source, bounds, crs):
                  f'this), and that the area {bounds} ({crs}) overlaps the tiles (gdalinfo prints their corners in '
                  f'latitude and longitude).')
     if missing:
-        print(f'warning: {100 * missing / count:.0f}% of the area has no source heights and will be flat at the lowest '
+        print(f'warning: {100 * missing / count:.1f}% of the area has no source heights and will be flat at the lowest '
               f'height; get more tiles, or move --center or shrink --size to fit the data', file=sys.stderr)
 
 
@@ -124,8 +124,8 @@ def main():
             'resampling': args.resampling,
             'size': [width, height],
         }
-        # Raster rows run north to south and package rows run from -z, so north is -z.
-        source['north'] = '-z'
+        # TerrainTool pack puts the raster's top row (north) at +z, with east at +x (the engine is left-handed, y up).
+        source['north'] = '+z'
         run([tool, 'pack', '--out', args.output, '--raw', raw, '--width', str(width), '--height', str(height),
              '--type', 'f32', '--nodata', '-3.4e38', '--spacing', str(args.spacing),
              '--height-scale', str(args.height_scale), '--height-offset', str(args.height_offset),

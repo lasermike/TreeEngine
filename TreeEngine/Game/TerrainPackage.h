@@ -6,7 +6,7 @@
 // the Terrain object. See Tools/terrain/README.md for the format.
 //
 // A package is a directory holding manifest.json and nodes.bin. The world is a square of worldSize meters centered on
-// the origin (x and z from -worldSize/2 to +worldSize/2). Level 0 is the root node covering it all; level k has 2^k x
+// the origin (x and z from -worldSize/2 to +worldSize/2). Imported maps have east at +x and north at +z. Level 0 is the root node covering it all; level k has 2^k x
 // 2^k nodes, each covering worldSize / 2^k meters with NodeQuads x NodeQuads quads, so the finest level samples every
 // sampleSpacing meters. A node's block holds BlockSamples x BlockSamples heights: its (NodeQuads + 1)^2 vertices plus
 // a one-sample border on every side for normals, row-major from -x/-z, sampled from the finest grid (clamped at the

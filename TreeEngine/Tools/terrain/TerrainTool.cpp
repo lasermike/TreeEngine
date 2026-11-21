@@ -273,12 +273,13 @@ namespace
         for (size_t i = 0; i < values.size(); ++i)
             if (missing[i]) { values[i] = lowest; ++filled; }
 
-        // Pad to a whole quadtree (64 * 2^n + 1 samples per side), repeating the edge.
+        // Pad to a whole quadtree (64 * 2^n + 1 samples per side), repeating the edge. The image's top row is north,
+        // and the engine is left-handed with y up: north is +z (east +x), so rows go in from the bottom (-z) up.
         const int samples = TerrainFormat::NodeQuads * (1 << (TerrainPackage::LevelsFor(std::max(width, height)) - 1)) + 1;
         std::vector<float> heights(size_t(samples) * samples);
         for (int j = 0; j < samples; ++j)
             for (int i = 0; i < samples; ++i)
-                heights[size_t(j) * samples + i] = values[size_t(std::min(j, height - 1)) * width + std::min(i, width - 1)];
+                heights[size_t(j) * samples + i] = values[size_t(std::max(height - 1 - j, 0)) * width + std::min(i, width - 1)];
         const double spacing = Number(args, "spacing", 1.0);
         std::string source = Text(args, "source-json", "{}");
         if (!TerrainPackage::Write(Wide(out), heights, samples, spacing, source, error))

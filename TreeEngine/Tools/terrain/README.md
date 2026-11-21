@@ -37,7 +37,7 @@ python import_heightmap.py dem.tif Alps.terrain --crs EPSG:32632 --bounds 410000
 
 With `--center`, the target CRS defaults to that point's UTM zone, so the package is in meters. Mosaics of several
 tiles work through a GDAL VRT (`gdalbuildvrt all.vrt *.tif`). Cells with no data take the lowest valid height. The
-source file, CRS, bounds and spacing are recorded in the manifest's `source`; north is -z.
+source file, CRS, bounds and spacing are recorded in the manifest's `source`. North is +z and east +x.
 
 **Plain heightmaps** (from a terrain editor, World Machine, Gaea, and so on):
 
@@ -46,7 +46,8 @@ TerrainTool pack --out Island.terrain --png height.png --spacing 1 --height-scal
 TerrainTool pack --out Island.terrain --raw height.r32 --width 4097 --height 4097 --type f32 --spacing 0.5
 ```
 
-Height in meters is `height-offset + height-scale * value`. Rasters that are not 64 * 2^n + 1 samples per side are
+Height in meters is `height-offset + height-scale * value`. The image's top row is north (+z) and its left column west
+(-x), so the terrain seen from above with +z up matches the image; the engine is left-handed with y up. Rasters that are not 64 * 2^n + 1 samples per side are
 padded to the next size by repeating their edge.
 
 **Layer textures.** `TerrainTool texture --out Textures/rock --kind rock --size 512 --seed 3` writes
