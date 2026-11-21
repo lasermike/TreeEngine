@@ -126,6 +126,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\HighlightGeometry.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectPicking12.inl" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectHighlight12.inl" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneLoadProfile.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Resources">
