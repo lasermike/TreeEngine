@@ -193,6 +193,26 @@ textures. `TerrainTool texture` makes tileable grass, rock, snow and dirt maps.
 Terrain cannot be instanced. The `LoadTerrainHills` scene shows a
 1 km procedural package with grass, dirt in the hollows and rock on slopes.
 
+A `water` object is a flat water surface centered on its transform's position,
+whose y is the mean water height (it can be moved, not rotated or scaled). Fields:
+
+- `size` `[x, z]` meters (default `[100, 100]`) and `tile` (meters per normal-map
+  repeat, default 4).
+- `material`: a material reference. Without one it is clear seawater (transmissive,
+  IOR 1.333, roughness 0.12). A `normalTexture` gives it ripples;
+  `Terrain/Textures/water_ripple_normal.png` is AI Tree's.
+- `ripples` `{ "velocity1": [u, v], "velocity2": [u, v], "strength": s }`: two
+  drifting copies of the normal map, in repeats per second; `strength` (0 to 16)
+  multiplies the normal scale.
+- `tide` `{ "range": m, "period": s, "phase": s }`: the surface rises and falls
+  `range / 2` either side of the mean with simulation time (period default
+  44712 s, a 12.42-hour semidiurnal tide).
+
+Water draws like a primitive in raster and DXR, and casts no raster shadow.
+Elevation surveys record water as a flat surface rather than its bottom, so for
+tides import terrain with `--water-level` (`Tools/terrain/README.md`), which
+carves a sloping seabed under it. The `Hungerford` scene shows both.
+
 ### Instancing
 
 An object with `instanceOf` copies an earlier object by ID. It sets only `id`,

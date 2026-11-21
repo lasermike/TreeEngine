@@ -8,6 +8,7 @@
 #include "Graph.h"
 #include "GltfModel.h"
 #include "Terrain.h"
+#include "Water.h"
 #include "LSystemModelGenerator.h"
 #include "Player.h"
 #include <cmath>
@@ -336,6 +337,46 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             ApplyLeafAtlas(graph.leaves, definition, *parameters);
             linkTreeInstance(graph, *parameters);
             auto runtime = std::make_unique<Tree>(parameters.get());
+            parameters.release();
+            objects.push_back(std::move(runtime));
+        }
+        else if (object->kind == SceneData::ObjectKind::Water)
+        {
+            const auto& water = static_cast<const SceneData::WaterDefinition&>(*object);
+            const auto& t = water.transform;
+            if (t.rotation.x != 0 || t.rotation.y != 0 || t.rotation.z != 0 || t.scale.x != 1 || t.scale.y != 1 || t.scale.z != 1)
+                throw std::runtime_error("Object '" + water.id + "': water can be moved, but not rotated or scaled");
+            auto parameters = std::make_unique<WaterParams>();
+            CommonParameters(water, *parameters);
+            parameters->primitiveType = PrimitiveType_Box;
+            parameters->size = water.size;
+            parameters->tile = water.tile;
+            parameters->level = t.position.y;
+            parameters->rippleVelocity1 = water.rippleVelocity1;
+            parameters->rippleVelocity2 = water.rippleVelocity2;
+            parameters->rippleStrength = water.rippleStrength;
+            parameters->tideRange = water.tideRange;
+            parameters->tidePeriod = water.tidePeriod;
+            parameters->tidePhase = water.tidePhase;
+            parameters->textureFilename.push_back(L"");
+            if (water.hasMaterial)
+            {
+                parameters->materials.push_back(RuntimeMaterial(water.material));
+                parameters->materialTextures.push_back(RuntimeMaterialTextures(water.material, water.id, sceneFilename));
+            }
+            else
+            {
+                // Clear seawater, as AI Tree's river: transmissive, smooth, faintly green.
+                SceneData::MaterialDefinition seawater;
+                seawater.baseColor = XMFLOAT4(0.6f, 0.78f, 0.73f, 1);
+                seawater.metallic = 0;
+                seawater.roughness = 0.12f;
+                seawater.ior = 1.333f;
+                seawater.transmission = 0.85f;
+                parameters->materials.push_back(RuntimeMaterial(seawater));
+                parameters->materialTextures.push_back(RuntimeMaterialTextures(seawater, water.id, sceneFilename));
+            }
+            auto runtime = std::make_unique<Water>(parameters.get());
             parameters.release();
             objects.push_back(std::move(runtime));
         }
@@ -730,6 +771,27 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             model.biplanarMaterial = modelParams.biplanarMaterial;
             model.biplanarUvPerUnit = modelParams.biplanarUvPerUnit;
             model.biplanarSharpness = modelParams.biplanarSharpness;
+            break;
+        }
+        case SceneData::ObjectKind::Water:
+        {
+            if (params.generatorType != PrimitiveGeneratorType) throw std::runtime_error("Object generator type changed");
+            auto& water = static_cast<SceneData::WaterDefinition&>(*definition);
+            const auto& waterParams = dynamic_cast<const WaterParams&>(params);
+            // The authored mean height and size, not the tide's current height or the plane's scale.
+            definition->transform.position.y = waterParams.level;
+            definition->transform.scale = XMFLOAT3(1, 1, 1);
+            definition->textureCoordScale = XMFLOAT2(1, 1);
+            water.size = waterParams.size;
+            water.tile = waterParams.tile;
+            water.rippleVelocity1 = waterParams.rippleVelocity1;
+            water.rippleVelocity2 = waterParams.rippleVelocity2;
+            water.rippleStrength = waterParams.rippleStrength;
+            water.tideRange = waterParams.tideRange;
+            water.tidePeriod = waterParams.tidePeriod;
+            water.tidePhase = waterParams.tidePhase;
+            if (water.hasMaterial && !params.materials.empty())
+                water.material = CaptureMaterial(params, 0, sourceFilename, destinationFilename);
             break;
         }
         case SceneData::ObjectKind::Terrain:

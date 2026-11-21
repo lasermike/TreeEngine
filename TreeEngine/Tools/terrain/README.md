@@ -35,6 +35,15 @@ python import_heightmap.py dem.tif Alps.terrain --center 46.55 8.05 --size 4096 
 python import_heightmap.py dem.tif Alps.terrain --crs EPSG:32632 --bounds 410000 5150000 418192 5158192 --spacing 1
 ```
 
+Several sources can be given, oldest first: later ones win where they have data, so a full-coverage older survey can
+sit under a newer partial one (they may differ in CRS and resolution).
+
+Surveys see a water surface, not the bottom, and hydro-flattened DTMs make each water body one flat sheet at the level
+it was flown at. `--water-level M` turns ground at or below `M` meters into a seabed that deepens with distance from
+dry ground (`--water-slope`, meters per meter, default 0.05) down to `--water-depth` (default 8 m) below the level,
+so a `water` object's tide can uncover the shallows. Hungerford uses `--water-level 1.9 --water-slope 0.04
+--water-depth 10`.
+
 With `--center`, the target CRS defaults to that point's UTM zone, so the package is in meters. Mosaics of several
 tiles work through a GDAL VRT (`gdalbuildvrt all.vrt *.tif`). Cells with no data take the lowest valid height. The
 source file, CRS, bounds and spacing are recorded in the manifest's `source`. North is +z and east +x.

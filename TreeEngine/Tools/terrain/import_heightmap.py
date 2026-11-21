@@ -87,6 +87,11 @@ def main():
     parser.add_argument('--resampling', default='cubic', help='gdalwarp resampling (default cubic)')
     parser.add_argument('--height-scale', type=float, default=1.0, help='meters per raster unit (default 1)')
     parser.add_argument('--height-offset', type=float, default=0.0, help='meters added after scaling (default 0)')
+    parser.add_argument('--water-level', type=float,
+                        help='meters: ground at or below is water, carved into a seabed sloping from the shore '
+                             '(surveys see the water surface, not the bottom)')
+    parser.add_argument('--water-slope', type=float, default=0.05, help='seabed meters per meter from shore (default 0.05)')
+    parser.add_argument('--water-depth', type=float, default=8, help='deepest seabed below --water-level (default 8 m)')
     parser.add_argument('--tool', help='path to TerrainTool.exe')
     args = parser.parse_args()
 
@@ -129,12 +134,16 @@ def main():
             'resampling': args.resampling,
             'size': [width, height],
         }
+        if args.water_level is not None:
+            source['seabed'] = {'waterLevel': args.water_level, 'slope': args.water_slope, 'depth': args.water_depth}
         # TerrainTool pack puts the raster's top row (north) at +z, with east at +x (the engine is left-handed, y up).
         source['north'] = '+z'
         run([tool, 'pack', '--out', args.output, '--raw', raw, '--width', str(width), '--height', str(height),
              '--type', 'f32', '--nodata', '-3.4e38', '--spacing', str(args.spacing),
              '--height-scale', str(args.height_scale), '--height-offset', str(args.height_offset),
-             '--source-json', json.dumps(source, separators=(',', ':'))])
+             '--source-json', json.dumps(source, separators=(',', ':'))]
+            + ([] if args.water_level is None else ['--water-level', str(args.water_level), '--water-slope',
+                                                     str(args.water_slope), '--water-depth', str(args.water_depth)]))
     run([tool, 'info', args.output])
 
 

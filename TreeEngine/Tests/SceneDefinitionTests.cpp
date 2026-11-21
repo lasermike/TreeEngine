@@ -782,6 +782,36 @@ void TestTerrainSettings()
     Reject(badLayers.dump(), ".layers");
 }
 
+void TestWaterSettings()
+{
+    const std::string json = R"({"version":1,"name":"Water","objects":[
+        {"id":"inlet","type":"water","transform":{"position":[0,1.5,0]},"size":[4096,2048],"tile":8,
+         "ripples":{"velocity1":[0,-0.1],"velocity2":[0.004,-0.095],"strength":2.5},"tide":{"range":4,"period":600,"phase":30}},
+        {"id":"pond","type":"water"}]})";
+    const auto scene = SceneData::ParseScene(json, "water");
+    const auto& inlet = static_cast<const SceneData::WaterDefinition&>(*scene.objects[0]);
+    Check(inlet.kind == SceneData::ObjectKind::Water && inlet.size.y == 2048 && inlet.tile == 8 && inlet.hasRipples
+        && inlet.rippleStrength == 2.5f && inlet.tideRange == 4 && inlet.tidePeriod == 600 && inlet.tidePhase == 30
+        && inlet.transform.position.y == 1.5f, "water settings were not parsed");
+    const auto& pond = static_cast<const SceneData::WaterDefinition&>(*scene.objects[1]);
+    Check(!pond.hasMaterial && !pond.hasRipples && pond.tideRange == 0 && pond.tidePeriod == 44712, "water defaults changed");
+    const auto saved = Json::parse(SceneData::SerializeScene(scene));
+    Check(saved["objects"][0]["tide"]["period"] == 600 && !saved["objects"][1].contains("tide")
+        && !saved["objects"][1].contains("ripples") && !saved["objects"][0].contains("depthLOD"), "water saved the wrong fields");
+    const auto reparsed = SceneData::ParseScene(saved.dump(), "saved-water");
+    const auto& again = static_cast<const SceneData::WaterDefinition&>(*reparsed.objects[0]);
+    Check(again.tideRange == 4 && again.rippleVelocity2.x == 0.004f && again.size.x == 4096, "water did not round-trip");
+    auto bad = Json::parse(json);
+    bad["objects"][0]["tide"]["period"] = 0;
+    Reject(bad.dump(), ".tide.period");
+    bad = Json::parse(json);
+    bad["objects"][0]["size"] = Json::array({ 0, 10 });
+    Reject(bad.dump(), ".size");
+    bad = Json::parse(json);
+    bad["objects"][1] = { { "id", "copy" }, { "instanceOf", "inlet" } };
+    Reject(bad.dump(), ".instanceOf");
+}
+
 void TestTreeLodSettings()
 {
     const std::string json = R"({"version":1,"name":"Lod","objects":[
@@ -1040,6 +1070,7 @@ int main(int argc, char** argv)
         TestTerrainPackage();
         TestTreeLodSettings();
         TestTerrainSettings();
+        TestWaterSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

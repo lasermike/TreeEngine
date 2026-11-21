@@ -7,9 +7,9 @@
   "nodeQuads": 64,
   "blockSamples": 67,
   "blockStride": 9216,
-  "heightOffset": 0.6812606453895569,
-  "heightScale": 0.0011024032719433308,
-  "minHeight": 0.6812606453895569,
+  "heightOffset": -8.100000381469727,
+  "heightScale": 0.0012363967252895236,
+  "minHeight": -8.100000381469727,
   "maxHeight": 72.92726135253906,
   "nodesFile": "nodes.bin",
   "boundsFile": "bounds.bin",
@@ -33,6 +33,11 @@
       4096,
       4096
     ],
+    "seabed": {
+      "waterLevel": 1.9,
+      "slope": 0.04,
+      "depth": 10.0
+    },
     "north": "+z"
   }
 }

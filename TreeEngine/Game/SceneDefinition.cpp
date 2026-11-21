@@ -441,7 +441,8 @@ namespace SceneData
             for (const auto& existing : scene.objects)
                 if (existing->id == sourceId) source = existing.get();
             if (!source) Invalid(path + ".instanceOf", "unknown object '" + sourceId + "'; instances must follow the object they copy");
-            if (source->kind == ObjectKind::Terrain) Invalid(path + ".instanceOf", "terrain cannot be instanced");
+            if (source->kind == ObjectKind::Terrain || source->kind == ObjectKind::Water)
+                Invalid(path + ".instanceOf", "terrain and water cannot be instanced");
 
             auto result = source->Clone();
             result->id = id;
@@ -713,6 +714,58 @@ namespace SceneData
                     ReadTreeMaterials(value, path, scene, *graph);
                     ReadLeaves(value, path, scene, *graph);
                     object = std::move(graph);
+                }
+                else if (type == "water")
+                {
+                    Fields(value, path, { "id", "type", "transform", "size", "material", "tile", "ripples", "tide" });
+                    auto water = std::make_unique<WaterDefinition>();
+                    if (value.contains("size"))
+                    {
+                        water->size = Vector2(value["size"], path + ".size");
+                        if (!(water->size.x > 0 && water->size.y > 0)) Invalid(path + ".size", "must be positive");
+                    }
+                    if (value.contains("material"))
+                    {
+                        water->hasMaterial = true;
+                        water->material = MaterialReference(value["material"], path + ".material", scene);
+                    }
+                    if (value.contains("tile"))
+                    {
+                        water->tile = Number(value["tile"], path + ".tile");
+                        if (!(water->tile > 0)) Invalid(path + ".tile", "must be positive");
+                    }
+                    if (value.contains("ripples"))
+                    {
+                        const auto& ripples = value["ripples"];
+                        const auto ripplesPath = path + ".ripples";
+                        Fields(ripples, ripplesPath, { "velocity1", "velocity2", "strength" });
+                        water->hasRipples = true;
+                        if (ripples.contains("velocity1")) water->rippleVelocity1 = Vector2(ripples["velocity1"], ripplesPath + ".velocity1");
+                        if (ripples.contains("velocity2")) water->rippleVelocity2 = Vector2(ripples["velocity2"], ripplesPath + ".velocity2");
+                        if (ripples.contains("strength"))
+                        {
+                            water->rippleStrength = Number(ripples["strength"], ripplesPath + ".strength");
+                            if (!(water->rippleStrength >= 0 && water->rippleStrength <= 16)) Invalid(ripplesPath + ".strength", "must be between 0 and 16");
+                        }
+                    }
+                    if (value.contains("tide"))
+                    {
+                        const auto& tide = value["tide"];
+                        const auto tidePath = path + ".tide";
+                        Fields(tide, tidePath, { "range", "period", "phase" });
+                        if (tide.contains("range"))
+                        {
+                            water->tideRange = Number(tide["range"], tidePath + ".range");
+                            if (!(water->tideRange >= 0)) Invalid(tidePath + ".range", "must not be negative");
+                        }
+                        if (tide.contains("period"))
+                        {
+                            water->tidePeriod = Number(tide["period"], tidePath + ".period");
+                            if (!(water->tidePeriod > 0)) Invalid(tidePath + ".period", "must be positive");
+                        }
+                        if (tide.contains("phase")) water->tidePhase = Number(tide["phase"], tidePath + ".phase");
+                    }
+                    object = std::move(water);
                 }
                 else if (type == "terrain")
                 {
@@ -1047,7 +1100,8 @@ namespace SceneData
                 continue;
             }
             Json value = { { "id", object->id }, { "transform", TransformJson(object->transform) } };
-            const bool authoredOnly = object->kind == ObjectKind::Model || object->kind == ObjectKind::Terrain;
+            const bool authoredOnly = object->kind == ObjectKind::Model || object->kind == ObjectKind::Terrain
+                || object->kind == ObjectKind::Water;
             if (authoredOnly && (object->textureCoordScale.x != 1 || object->textureCoordScale.y != 1))
             {
                 value["textureCoordScale"] = VectorJson(object->textureCoordScale);
@@ -1127,6 +1181,20 @@ namespace SceneData
                 if (!model.biplanarMaterial.empty())
                     value["biplanar"] = { { "material", model.biplanarMaterial }, { "uvPerUnit", model.biplanarUvPerUnit },
                         { "sharpness", model.biplanarSharpness } };
+                break;
+            }
+            case ObjectKind::Water:
+            {
+                const auto& water = dynamic_cast<const WaterDefinition&>(*object);
+                value["type"] = "water";
+                value["size"] = VectorJson(water.size);
+                if (water.hasMaterial) value["material"] = MaterialJson(water.material);
+                value["tile"] = water.tile;
+                if (water.hasRipples)
+                    value["ripples"] = { { "velocity1", VectorJson(water.rippleVelocity1) },
+                        { "velocity2", VectorJson(water.rippleVelocity2) }, { "strength", water.rippleStrength } };
+                if (water.tideRange > 0)
+                    value["tide"] = { { "range", water.tideRange }, { "period", water.tidePeriod }, { "phase", water.tidePhase } };
                 break;
             }
             case ObjectKind::Terrain:

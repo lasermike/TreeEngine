@@ -4,6 +4,7 @@
 //   TerrainTool generate --out DIR [--preset valley|hills|flat] [--size 8192] [--spacing 1] [--seed 7] [--relief 600]
 //   TerrainTool pack --out DIR (--raw FILE --width W --height H [--type f32|u16|i16] | --png FILE)
 //                    [--spacing 1] [--height-scale 1] [--height-offset 0] [--nodata V] [--source-json JSON]
+//                    [--water-level M [--water-slope 0.05] [--water-depth 8]]   (carve a seabed under flat water)
 //   TerrainTool info DIR
 //   TerrainTool heights DIR --in POINTS --out HEIGHTS     (lines of "x z" in meters -> one height per line)
 //   TerrainTool texture --out PREFIX --kind grass|rock|snow|dirt [--size 512] [--seed 1]
@@ -272,6 +273,46 @@ namespace
         size_t filled = 0;
         for (size_t i = 0; i < values.size(); ++i)
             if (missing[i]) { values[i] = lowest; ++filled; }
+
+        // A seabed under water. Elevation surveys see a water surface, not the bottom (and hydro-flattened DTMs make it
+        // one flat sheet), so water couldn't drop below it. Ground at or below --water-level is water: it sinks with
+        // distance from the nearest dry ground, --water-slope meters per meter, down to --water-depth below the level.
+        if (args.count("water-level"))
+        {
+            const float level = float(Number(args, "water-level", 0));
+            const double slope = Number(args, "water-slope", 0.05), depth = Number(args, "water-depth", 8);
+            const double spacingMeters = Number(args, "spacing", 1.0);
+            // Two-pass chamfer distance transform (3-4 weights) to dry ground, in samples.
+            const float unreached = 1e30f;
+            std::vector<float> distance(values.size());
+            for (size_t i = 0; i < values.size(); ++i)
+                distance[i] = values[i] <= level ? unreached : 0;
+            const auto relax = [&](int x, int y, int dx, int dy, float weight)
+            {
+                const int nx = x + dx, ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) return;
+                float& d = distance[size_t(y) * width + x];
+                d = std::min(d, distance[size_t(ny) * width + nx] + weight);
+            };
+            for (int y = 0; y < height; ++y)
+                for (int x = 0; x < width; ++x)
+                {
+                    relax(x, y, -1, 0, 1); relax(x, y, 0, -1, 1); relax(x, y, -1, -1, 1.4142f); relax(x, y, 1, -1, 1.4142f);
+                }
+            for (int y = height - 1; y >= 0; --y)
+                for (int x = width - 1; x >= 0; --x)
+                {
+                    relax(x, y, 1, 0, 1); relax(x, y, 0, 1, 1); relax(x, y, 1, 1, 1.4142f); relax(x, y, -1, 1, 1.4142f);
+                }
+            size_t carved = 0;
+            for (size_t i = 0; i < values.size(); ++i)
+                if (values[i] <= level && distance[i] < unreached)
+                {
+                    values[i] = float(std::min<double>(values[i], level - std::min(depth, slope * distance[i] * spacingMeters)));
+                    ++carved;
+                }
+            fprintf(stderr, "Carved %zu water samples below %.2f m (slope %.3f, at most %.1f m deep)\n", carved, level, slope, depth);
+        }
 
         // Pad to a whole quadtree (64 * 2^n + 1 samples per side), repeating the edge. The image's top row is north,
         // and the engine is left-handed with y up: north is +z (east +x), so rows go in from the bottom (-z) up.

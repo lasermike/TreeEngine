@@ -80,7 +80,7 @@ namespace SceneData
     };
 
     enum class Shape { Box, Cylinder, CylinderLD, CylinderHD, SkinnedCylinder, Sprite, Sphere };
-    enum class ObjectKind { Primitive, Tree, FixedTree, Graph, Model, Terrain };
+    enum class ObjectKind { Primitive, Tree, FixedTree, Graph, Model, Terrain, Water };
     enum class SegmentLengthBehavior { Constant, RandomAddition };
 
     struct ObjectDefinition
@@ -217,6 +217,25 @@ namespace SceneData
         float lodRange = 2;         // A node splits within lodRange x its size of the camera.
         int slots = 512;            // Nodes resident at once (each about 215 KB of vertex buffer).
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TerrainDefinition>(*this); }
+    };
+
+    // A water surface: a flat plane centered on the transform's position (its y is the mean height), optionally
+    // rising and falling with a tide, with ripples drifting its normal map. The transform may only move it.
+    struct WaterDefinition : ObjectDefinition
+    {
+        WaterDefinition() : ObjectDefinition(ObjectKind::Water) {}
+        DirectX::XMFLOAT2 size = { 100, 100 };      // Meters along x and z.
+        bool hasMaterial = false;                   // Without one, clear seawater.
+        MaterialDefinition material;
+        float tile = 4;                             // Meters per texture repeat.
+        bool hasRipples = false;
+        DirectX::XMFLOAT2 rippleVelocity1 = { 0, 0 };   // Texture repeats per second.
+        DirectX::XMFLOAT2 rippleVelocity2 = { 0, 0 };
+        float rippleStrength = 1;                   // Multiplies the normal map's scale.
+        float tideRange = 0;                        // Meters from low to high water; 0 = still.
+        float tidePeriod = 44712;                   // Seconds (12.42 hours).
+        float tidePhase = 0;                        // Seconds.
+        std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<WaterDefinition>(*this); }
     };
 
     struct DirectionalLightDefinition

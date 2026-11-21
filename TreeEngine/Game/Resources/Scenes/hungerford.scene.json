@@ -124,6 +124,22 @@
       "normalTexture": {
         "source": "Terrain/Textures/rock_normal.png"
       }
+    },
+    "seawater": {
+      "baseColor": [
+        0.6,
+        0.78,
+        0.73,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.12,
+      "ior": 1.333,
+      "transmission": 0.85,
+      "normalTexture": {
+        "source": "Terrain/Textures/water_ripple_normal.png",
+        "scale": 0.1
+      }
     }
   },
   "objects": [
@@ -166,6 +182,39 @@
           }
         }
       ]
+    },
+    {
+      "id": "inlet",
+      "type": "water",
+      "transform": {
+        "position": [
+          0,
+          1.8,
+          0
+        ]
+      },
+      "size": [
+        4096,
+        4096
+      ],
+      "material": "seawater",
+      "tile": 8,
+      "ripples": {
+        "velocity1": [
+          0,
+          -0.1
+        ],
+        "velocity2": [
+          0.004,
+          -0.095
+        ],
+        "strength": 2.5
+      },
+      "tide": {
+        "range": 4.0,
+        "period": 44712,
+        "phase": 0
+      }
     }
   ]
 }

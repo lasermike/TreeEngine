@@ -97,6 +97,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TerrainPackage.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Terrain.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Water.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\OpacityMicromapBaker.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneCatalog.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.cpp" />
@@ -120,6 +121,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TerrainPackage.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\AssetReader.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Terrain.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Water.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectSelection.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugObjectSelection.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectHighlight.h" />
