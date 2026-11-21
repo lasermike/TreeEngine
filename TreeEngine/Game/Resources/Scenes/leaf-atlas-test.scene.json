@@ -2,6 +2,7 @@
   "version": 1,
   "id": "LeafAtlasTest",
   "name": "Leaf Atlas Test",
+  "priority": 2,
   "camera": {
     "position": [
       0,

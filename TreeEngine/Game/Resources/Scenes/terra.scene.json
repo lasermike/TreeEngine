@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "LoadTerra",
-  "priority": 0,
+  "priority": 2,
   "name": "Terra - Blender lighting comparison",
   "camera": {
     "position": [

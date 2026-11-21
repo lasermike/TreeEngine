@@ -2,6 +2,7 @@
   "version": 1,
   "id": "LeafAtlases",
   "name": "Leaf Atlases - canyon plants",
+  "priority": 2,
   "camera": {
     "position": [
       0,
