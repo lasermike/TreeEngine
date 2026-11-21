@@ -9,6 +9,10 @@ Examples:
   # A 4 km square at 1 m around a point, in that area's UTM zone.
   import_heightmap.py dem.tif out/Valley.terrain --center 46.55 8.05 --size 4096 --spacing 1
 
+  # Several surveys stacked, later ones over earlier ones where they have data (an old full-coverage one under a
+  # newer partial one): give each source in that order.
+  import_heightmap.py old.vrt newer.vrt newest.vrt out/Area.terrain --center 47.2 -122.9 --size 4096
+
   # The whole raster, reprojected to EPSG:32632, at 2 m.
   import_heightmap.py dem.tif out/Alps.terrain --crs EPSG:32632 --spacing 2
 
@@ -71,7 +75,8 @@ def utm_crs(latitude, longitude):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('source', help='input raster')
+    parser.add_argument('sources', nargs='+', metavar='source',
+                        help='input rasters; where they overlap, later ones win (they may differ in CRS and resolution)')
     parser.add_argument('output', help='package directory to write (for example Scenes/Terrain/Name.terrain)')
     parser.add_argument('--spacing', type=float, default=1.0, help='meters between samples (default 1)')
     parser.add_argument('--crs', help='target metric CRS (default: the UTM zone of --center, or the source CRS)')
@@ -109,15 +114,15 @@ def main():
             command += ['-t_srs', crs]
         if bounds:
             command += ['-te'] + [str(v) for v in bounds]
-        run(command + [args.source, warped])
+        run(command + args.sources + [warped])
         info = json.loads(subprocess.run(['gdalinfo', '-json', warped], capture_output=True, text=True, check=True).stdout)
         width, height = info['size']
         raw = os.path.join(work, 'heights.raw')
         run(['gdal_translate', '-of', 'ENVI', '-ot', 'Float32', warped, raw])
-        check_coverage(raw, width * height, args.source, bounds, crs)
+        check_coverage(raw, width * height, ', '.join(args.sources), bounds, crs)
         source = {
             'importer': 'import_heightmap.py',
-            'file': os.path.basename(args.source),
+            'files': [os.path.basename(source) for source in args.sources],
             'crs': crs or 'source',
             'bounds': bounds,
             'spacing': args.spacing,
