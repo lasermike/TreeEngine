@@ -1,4 +1,4 @@
-//=============================================================================
+﻿//=============================================================================
 // Performs a separable Guassian blur with a blur radius up to 5 pixels.
 //=============================================================================
  
@@ -26,7 +26,7 @@ cbuffer cbSettings : register(b0)
     float w10;
 };
 
-static const int gMaxBlurRadius = 3;
+static const int gMaxBlurRadius = 5;
 
 // Compute Root Sig (Blur)
 Texture2D gInput            : register(t0);
@@ -46,14 +46,10 @@ struct DrawRecord
     uint vertexCount;
     uint inputLayout;
 
-    // Material data (ShaderMaterial + textureIndex) — not used by compute shader
-    // but must match C++ struct layout for correct structured buffer stride
-    float4 matAmbient;
-    float4 matDiffuse;
-    float4 matSpecular;
-    float4 matReflect;
-    float4 matFlags;
+    // The C++ record's material, so the structured buffer stride matches (not read by these shaders).
+    ShaderMaterial material;
     int textureIndex;
+    uint objectTransformSlot;
 };
 
 struct SimpleVertex
@@ -61,7 +57,7 @@ struct SimpleVertex
     float3 Pos;
     float3 Normal;
     float2 Tex;
-    float3 TangentU;
+    float4 TangentU;
 };
 
 struct SkinnedVertex
@@ -69,7 +65,7 @@ struct SkinnedVertex
     float3 Pos : POSITION;
     float3 NormalL : NORMAL;
     float2 Tex : TEXCOORD0;
-    float3 TangentL : TANGENT;
+    float4 TangentL : TANGENT;
     float  InstanceWeight1 : BLENDWEIGHT0;
     float  InstanceWeight2 : BLENDWEIGHT1;
     float  InstanceWeight3 : BLENDWEIGHT2;
@@ -93,65 +89,61 @@ StructuredBuffer<InstancedData> InstanceBuffer : register(t3);
                                 "DescriptorTable(CBV(b1, numDescriptors=1)), " \
 
 [RootSignature(ComputeRootSignature)]
-[numthreads(32, 32, 1)]
+[numthreads(128, 1, 1)]
 void VSasCS(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
 {
-    // thread X = index buffer index
-    // thread Y = instance
-    // thread Z = 
     DrawRecord drawRecord = drawRecords[gBlurRadius];
 
-    if (dispatchThreadID.x < drawRecord.indexBufferCount
-        && dispatchThreadID.y < drawRecord.numInstances
-    )
+    if (dispatchThreadID.x < drawRecord.vertexCount * drawRecord.numInstances)
     {
-        uint vertexIndex = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.x];
+        uint vertexIndex = dispatchThreadID.x % drawRecord.vertexCount;
+        uint instanceIndex = dispatchThreadID.x / drawRecord.vertexCount;
         float3 vertex = simpleVertices.Load(drawRecord.baseVertexLocation + vertexIndex).Pos;
 
-        int inputInstance = drawRecord.startingInstance + dispatchThreadID.y;
+        int inputInstance = drawRecord.startingInstance + instanceIndex;
         float4x3 world = (float4x3) InstanceBuffer[inputInstance].World;
 
         float3 out0 = mul(float4(vertex, 1.0f), world);
+        if (drawRecord.objectTransformSlot != NoObjectTransform)
+            out0 = mul(float4(out0, 1.0f), InstanceBuffer[drawRecord.objectTransformSlot].World).xyz;
 
-        uint vbOutIndex = drawRecord.vbWorldStart + (drawRecord.vertexCount * dispatchThreadID.y) + vertexIndex;
+        uint vbOutIndex = drawRecord.vbWorldStart + dispatchThreadID.x;
         outputVertices[vbOutIndex] = float4(out0, 1);
     }
 }
 
 
 [RootSignature(ComputeRootSignature)]
-[numthreads(32, 32, 1)]
+[numthreads(128, 1, 1)]
 void VSasCSSkinned(int3 groupThreadID : SV_GroupThreadID, int3 dispatchThreadID : SV_DispatchThreadID, int3 groupID : SV_GroupID)
 {
-    // thread X = index buffer index
-    // thread Y = instance
-    // thread Z = 0
     DrawRecord drawRecord = drawRecords[gBlurRadius];
 
-    if (dispatchThreadID.x < drawRecord.indexBufferCount
-        && dispatchThreadID.y < drawRecord.numInstances
-        )
+    if (dispatchThreadID.x < drawRecord.vertexCount * drawRecord.numInstances)
     {
-        uint vertexIndex = staticIndices[drawRecord.indexBufferStart + dispatchThreadID.x];
-        float3 vertex = skinnedVertices.Load(drawRecord.baseVertexLocation + vertexIndex).Pos;
+        uint vertexIndex = dispatchThreadID.x % drawRecord.vertexCount;
+        uint instanceIndex = dispatchThreadID.x / drawRecord.vertexCount;
+        SkinnedVertex vertex = skinnedVertices.Load(drawRecord.baseVertexLocation + vertexIndex);
 
         // Current vertex
-        int inputInstance = drawRecord.startingInstance + dispatchThreadID.y;
-        float4x3 world = (float4x3) InstanceBuffer[inputInstance].World;
+        int inputInstance = drawRecord.startingInstance + instanceIndex;
+        InstancedData instance = InstanceBuffer[inputInstance];
+        float4x3 world = (float4x3) instance.World;
 
-        float3 out0 = mul(float4(vertex, 1.0f), world);
-/* TEMP
-        // Prev vertex
-        int prevInstance = max(0, inputInstance - 1);
-        float4x3 worldPrev = (float4x3) InstanceBuffer[prevInstance].World;
+        float3 out0 = mul(float4(vertex.Pos, 1.0f), world);
 
-        float3 inputPosPrev = float3(vertex.x, 0.5f, vertex.z); // assume(!) skinned cylinder always 1 unit tall, centered on origin
-        float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
+        if (instance.InstanceOffsetPrev != instance.InstanceOffset)
+        {
+            float4x3 worldPrev = (float4x3) InstanceBuffer[instance.InstanceOffsetPrev].World;
+            float3 inputPosPrev = float3(vertex.Pos.x, 0.5f, vertex.Pos.z);
+            float3 outPrev = mul(float4(inputPosPrev, 1.0f), worldPrev).xyz;
 
-        float instanceWeight = skinnedVertices.Load(drawRecord.baseVertexLocation + index).InstanceWeight1;
-        //out0 = lerp(outPrev, out0, instanceWeight);
-*/
-        uint vbOutIndex = drawRecord.vbWorldStart + (drawRecord.vertexCount * dispatchThreadID.y) + vertexIndex;
+            out0 = lerp(outPrev, out0, vertex.InstanceWeight1);
+        }
+        if (drawRecord.objectTransformSlot != NoObjectTransform)
+            out0 = mul(float4(out0, 1.0f), InstanceBuffer[drawRecord.objectTransformSlot].World).xyz;
+
+        uint vbOutIndex = drawRecord.vbWorldStart + dispatchThreadID.x;
         outputVertices[vbOutIndex] = float4(out0, 1);
     }
 }

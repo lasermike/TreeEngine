@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "id": "LoadTerra",
+  "priority": 0,
+  "name": "Terra - Blender lighting comparison",
+  "camera": {
+    "position": [
+      15,
+      13.5,
+      -79
+    ],
+    "rotationDegrees": [
+      -0.223,
+      -9.43,
+      0
+    ]
+  },
+  "render": {
+    "clearColor": [
+      0.48,
+      0.54,
+      0.58,
+      1
+    ],
+    "useShadowMaps": true,
+    "useAlphaBlendedRenderTarget": true,
+    "farClippingPlane": 800,
+    "enablePostProcessing": false,
+    "blurAmount": 0,
+    "environment": {
+      "diffuse": "Environment/terra-daylight-diffuse.dds",
+      "specular": "Environment/terra-daylight-specular.dds"
+    },
+    "sky": {
+      "cubeMap": "Environment/terra-daylight-sky.dds"
+    },
+    "ambientOcclusion": {
+      "radius": 1.25,
+      "strength": 0.65
+    }
+  },
+  "light": {
+    "ambient": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "diffuse": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "specular": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "direction": [
+      0.6259292648824133,
+      -0.7141802822623909,
+      0.3133034947002239
+    ],
+    "angularDiameterDegrees": 2,
+    "shadowSamples": 8
+  },
+  "pointLightCount": 0,
+  "objects": [
+    {
+      "id": "canyon",
+      "type": "model",
+      "source": "Models/Gltf/terra.glb",
+      "transform": {
+        "scale": [
+          50,
+          50,
+          50
+        ]
+      },
+      "normalAnimation": {
+        "material": "River water - glTF transmission",
+        "velocity1": [
+          0.0,
+          -0.1
+        ],
+        "velocity2": [
+          0.004,
+          -0.095
+        ],
+        "strength": 2.5
+      },
+      "materialTint": {
+        "material": "Limestone - baked weathering",
+        "texture": "Terrain/terra-weathering-tint.png",
+        "uvScale": [
+          6.906996,
+          4.992965
+        ],
+        "uvOffset": [
+          -2.966357,
+          -1.991996
+        ]
+      },
+      "biplanar": {
+        "material": "Limestone - baked weathering",
+        "uvPerUnit": 0.0483,
+        "sharpness": 1
+      }
+    }
+  ]
+}

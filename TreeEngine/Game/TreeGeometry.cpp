@@ -25,7 +25,6 @@ TreeGeometry::TreeGeometry(TreeModel* model)
 	_trunkMaterial.Ambient = XMFLOAT4(.5f, .5f, .5f, 1.0f);
 	//XMStoreFloat4(&_trunkMaterial.Diffuse, Colors::RosyBrown); 
 	_trunkMaterial.Diffuse = XMFLOAT4(1.0f, .7f, .3f, 1.0f);
-	_trunkMaterial.Specular = XMFLOAT4(.4f, .4f, .4f, 1.0f);
 	_trunkMaterial.flags.y = false; //true; //useTextures  TODO
 }
 

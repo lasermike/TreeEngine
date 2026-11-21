@@ -39,6 +39,12 @@
     <ClInclude Include="..\Game\RenderPlatform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\Game\Upscaler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Game\UpscalerMath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\Game\ScreenGrab12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -87,6 +93,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\RenderPlatform12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\UpscalerTaa.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\UpscalerFsr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Game\UpscalerDlss.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\Game\ScreenGrab12.cpp">

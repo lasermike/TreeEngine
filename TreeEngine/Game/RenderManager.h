@@ -3,9 +3,16 @@
 #include "RenderData.h"
 #include "RenderPlatform.h"
 #include "StockRenderStates.h"
+#include "OpacityMicromapBaker.h"
+#include <memory>
+#include <mutex>
+#include <unordered_map>
 
 class WorldObject;
 class Settings;
+class SceneRoot;
+struct GltfTextureSource;
+struct MaterialTextureSources;
 
 enum DisplayMode
 {
@@ -31,9 +38,24 @@ enum ShaderType
 
 interface IRenderFrame
 {
-    virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
+    // objectTransformSlot is the instance-buffer slot of a transform applied on the GPU after each instance's World;
+    // UINT_MAX means identity.
+    virtual HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+        UINT objectTransformSlot = UINT_MAX) = 0;
+    // A second range the object draws this frame, after SetInstances (which clears it): the layout an instanced tree
+    // fades out of. It is its own DXR owner (owner, any unique address), so it gets its own TLAS instance.
+    virtual HRESULT SetFadingInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+        UINT objectTransformSlot, const void* owner) = 0;
     virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
     virtual RenderData& GetRenderData() = 0;
+    // A draw of its own this frame, beside the object's reservation: instances [startInstance, startInstance + count)
+    // of the unit's mesh from baseVertex, culled by its own world-space bounds, and its own DXR owner (any unique
+    // address). Terrain nodes draw this way. Safe to call from concurrent ComputeConstants.
+    virtual HRESULT AddDraw(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT instanceCount, INT baseVertex,
+        const void* owner, const XMFLOAT3 bounds[2]) = 0;
+    // Copies vertices into the shared vertex buffer at firstVertex before this frame draws (a region the object reserved
+    // in AppendGeometry). Safe to call from concurrent ComputeConstants.
+    virtual HRESULT UploadVertices(UINT firstVertex, const SimpleVertex* vertices, UINT count) = 0;
 };
 
 interface IDebugUI
@@ -47,16 +69,67 @@ class RenderManager : public IRenderFrame
     std::map<wstring, Material*>                    m_materials;
     std::map<wstring, Mesh>                         m_meshes;
     std::map<wstring, LoadedTexture*>               m_textures;
+    LoadedTexture*                                m_environmentDiffuse = nullptr;
+    LoadedTexture*                                m_environmentSpecular = nullptr;
+    std::map<std::wstring, int> m_gltfTextureSlots;
 
     std::map<wstring, VertexShader*>                m_vertexShaders;
     std::map<wstring, PixelShader*>                 m_pixelShaders;
 
     std::list<RenderUnit*>                          m_renderUnits;
+    std::unordered_map<const void*, UINT> m_pickObjectIds;
     std::map<WorldObject*, UINT>                    m_objectToInstanceBufferOffset;  // Filled in during scene initialization
+    // Each object's instance-buffer reservation, in slot order, and the ranges copied to the GPU this frame.
+    std::vector<std::pair<WorldObject*, std::pair<UINT, UINT>>> m_instanceReservations;
+    std::vector<std::pair<UINT, UINT>>              m_instanceUploadRanges;
+    // Batched draws (see Render): this frame's object transform lists go in instance slots after every reservation,
+    // written by the platform as draws are recorded.
+    struct InstanceBatch
+    {
+        UINT start = 0;
+        UINT count = 0;
+        std::vector<UINT> transformSlots;
+    };
+    std::vector<InstanceBatch>                      m_instanceBatches;  // Reused; the first m_usedInstanceBatches are live.
+    size_t                                          m_usedInstanceBatches = 0;
+    UINT                                            m_batchListStart = 0;       // First slot of the list region.
+    UINT                                            m_batchListCapacity = 0;    // Slots in it.
+    UINT                                            m_batchListUsed = 0;        // Slots written this frame.
     UINT                                            m_nextInstanceBufferOffset;		 // Used during initialization
 
     // Filled in each frame by each world object via SetInstances()
-    std::map<RenderUnit*, std::map<WorldObject*, std::pair<UINT, UINT>>> m_perFrameInstanceData;
+    struct InstanceRange
+    {
+        UINT start = 0;
+        UINT count = 0;
+        UINT objectTransformSlot = UINT_MAX;
+        UINT fadeStart = 0;                 // See IRenderFrame::SetFadingInstances; fadeCount 0 for none.
+        UINT fadeCount = 0;
+        UINT fadeTransformSlot = UINT_MAX;
+        const void* fadeOwner = nullptr;
+    };
+    // Each unit's per-frame ranges, in the order of its reservations, and where each object's is. Entries are made at
+    // reservation, so concurrent SetInstances calls only find and write existing ones.
+    struct ExtraDraw
+    {
+        WorldObject* object = nullptr;
+        UINT start = 0;
+        UINT count = 0;
+        INT baseVertex = 0;
+        const void* owner = nullptr;
+        XMFLOAT3 bounds[2] = {};
+    };
+    struct UnitInstances
+    {
+        std::vector<InstanceRange> ranges;
+        std::unordered_map<WorldObject*, size_t> index;
+        std::vector<ExtraDraw> draws;       // This frame's AddDraw calls.
+    };
+    std::mutex m_frameLock;                 // Guards draws and vertex uploads added from concurrent ComputeConstants.
+    std::vector<VertexUploadRegion> m_vertexUploads;
+    std::vector<SimpleVertex> m_vertexUploadData;
+    std::vector<TerrainLayerData> m_terrainLayers;  // RegisterTerrainLayers.
+    std::unordered_map<RenderUnit*, UnitInstances> m_perFrameInstanceData;
 
     RenderData                                      m_renderData;
 
@@ -71,13 +144,22 @@ class RenderManager : public IRenderFrame
 
     // App resources.
 
-    DoubleBuffer                        m_instancedBuffer;
+    InstanceBufferRing                        m_instancedBuffer;
 
     GeometryGenerator                   m_geometryGenerator;
     GeometryBufferData                  m_geometryData;
 
     int m_lastMaxInstances;
     bool m_lastUseShadowMaps;
+
+    // Opacity micromaps for the scene's alpha-tested leaves (see RegisterLeafOpacity).
+    std::vector<int> m_instanceOpacityMicromap; // Per instance slot; RenderData::instanceOpacityMicromap points here.
+    std::vector<uint8_t> m_ommData;
+    std::vector<UINT> m_ommByteOffsets;
+    std::vector<int> m_ommTriangleIndices;      // Per baked triangle: a micromap index or a special index.
+    std::map<std::wstring, int> m_ommEntries;   // Bake key -> first triangle entry, or -1.
+    std::map<std::wstring, std::shared_ptr<OpacityMicromap::AlphaImage>> m_ommAlpha; // Decoded mip-0 alpha.
+    std::shared_ptr<OpacityMicromap::AlphaImage> LoadOpacityAlpha(const GltfTextureSource& texture, bool wrap);
 
     DirectionalLight                    m_light;  // Doesn't belong here, will move later
 
@@ -104,6 +186,9 @@ public:
     RenderPlatform* GetPlatformBase() { return m_platform; }
 
     RenderData& GetRenderData() { return m_renderData; }
+    const SceneRenderSettings& GetSceneSettings() const { return m_renderData; }
+    const std::list<RenderUnit*>& GetRenderUnits() const { return m_renderUnits; }
+    void ApplySceneSettings(const SceneRenderSettings& settings);
 
     RenderPlatform* GetPlatform() { return (RenderPlatform*)m_platform; }
 
@@ -120,14 +205,52 @@ public:
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename, 
                            const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename, 
                            ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
+    HRESULT LoadGltfTexture(const GltfTextureSource& source, LoadedTexture** texture, int* textureSlot = nullptr);
+    LoadedTexture* FindLoadedGltfTexture(const GltfTextureSource& source) const;
+    // Loads a non-base-color material map and stores its slot in the shader material.
+    HRESULT BindMaterialTexture(const GltfTextureSource& source, MaterialTextureRole role, ShaderMaterial& shaderMaterial);
+    HRESULT BindMaterialTextures(const MaterialTextureSources& sources, ShaderMaterial& shaderMaterial);
+    // Bakes opacity micromaps for the leaf sprite drawn with an alpha-masked material (after its textures are bound)
+    // and an atlas rect, and returns its first entry for RenderData::instanceOpacityMicromap, or -1 when it can't:
+    // no DXR tier 1.2, no alpha mask, or a base-color map that is not a memory-backed PNG or JPEG.
+    // Identical requests share one entry.
+    int RegisterLeafOpacity(const ShaderMaterial& material, const GltfTextureSource* baseColor, XMFLOAT4 atlasRect);
+    // Hands the scene's baked micromaps to the platform; call after the scene's objects initialize their graphics.
+    HRESULT FinalizeOpacityMicromaps();
+    // Adds a terrain's material layers to the scene's table and returns the first's index; FinalizeTerrainLayers hands
+    // the table to the platform after the scene's objects initialize their graphics.
+    UINT RegisterTerrainLayers(const TerrainLayerData* layers, UINT count);
+    HRESULT FinalizeTerrainLayers();
+    HRESULT CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
+                           const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,
+                           const wchar_t* shadowVertexShaderFilename, const wchar_t* shadowPixelShaderFilename,
+                           ShaderMaterial& shaderMaterial, StockRenderState state, Material** newMaterial);
     HRESULT CreateMesh(const wchar_t* name, D3DBuffer* vertexBuffer, D3DBuffer* indexBuffer,
         const GeometryBufferData::BufferOffsets* bufferIndices, InputLayouts inputLayout, Mesh** newMesh);
 
     HRESULT ReserveRenderUnit(Material* material, Mesh* mesh, WorldObject* object, RenderUnit** ppRenderUnit);
-    HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
-    HRESULT GetInstanceIndex(WorldObject* object, UINT&);
+    // View culling for the regular pass: the frustum's planes this frame and each object's visibility.
+    XMFLOAT4 m_cullingPlanes[6] = {};
+    UINT m_cullingPlaneCount = 5;
+    bool m_cullingForView = true;   // Culling for the regular pass, which the profile counts (not a shadow cascade).
+    UINT m_cullingEpoch = 0;    // Bumped with each frustum; see WorldObject::m_cullingEpoch.
+    void UpdateCullingFrustum();
+    void UpdateCullingPlanes(const XMFLOAT4X4& viewProjection, bool orthographic);
+    bool IsVisible(WorldObject* object);
+    bool IsVisible(const XMFLOAT3 bounds[2]) const;
 
-    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps);
+    HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+        UINT objectTransformSlot = UINT_MAX);
+
+    HRESULT SetFadingInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
+
+        UINT objectTransformSlot, const void* owner);
+    HRESULT GetInstanceIndex(WorldObject* object, UINT&);
+    HRESULT AddDraw(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT instanceCount, INT baseVertex,
+        const void* owner, const XMFLOAT3 bounds[2]) override;
+    HRESULT UploadVertices(UINT firstVertex, const SimpleVertex* vertices, UINT count) override;
+
+    HRESULT InitGameLevelGraphics(UINT maxInstances, bool useShadowMaps, SceneRoot& scene);
     virtual HRESULT UninitGameLevelGraphics();
 
     HRESULT BeginNewFrame();
@@ -141,4 +264,3 @@ public:
 
     HRESULT ChangePlatform(int platform);
 };
-

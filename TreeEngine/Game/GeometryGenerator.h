@@ -16,6 +16,7 @@
 
 #include "pch.h"
 #include <directxmath.h>
+#include <set>
 #include <vector>
 
 enum PrimitiveType
@@ -27,7 +28,8 @@ enum PrimitiveType
     PrimitiveType_FSQuad,
     PrimitiveType_SkinnedCylinder,
     PrimitiveType_Sprite,
-    PrimitiveType_MAX = PrimitiveType_Sprite
+    PrimitiveType_Sphere,
+    PrimitiveType_MAX = PrimitiveType_Sphere
 };
 
 struct SimpleVertex
@@ -35,7 +37,7 @@ struct SimpleVertex
     XMFLOAT3 Pos;
     XMFLOAT3 Normal;
     XMFLOAT2 Tex;
-    XMFLOAT3 TangentU;
+    XMFLOAT4 TangentU;
 };
 
 struct SkinnedVertex
@@ -43,8 +45,18 @@ struct SkinnedVertex
     XMFLOAT3 Pos;
     XMFLOAT3 Normal;
     XMFLOAT2 Tex;
-    XMFLOAT3 TangentU;
+    XMFLOAT4 TangentU;
     XMFLOAT3 InstanceWeights;
+};
+
+static_assert(sizeof(SimpleVertex) == 48 && sizeof(SkinnedVertex) == 60, "Vertex layout must match DXR shaders");
+
+// A run of vertices copied into the shared vertex buffer (RenderPlatform::UploadVertices).
+struct VertexUploadRegion
+{
+    UINT firstVertex;       // Destination, in the vertex buffer.
+    UINT sourceVertex;      // Source, in the call's vertex array.
+    UINT count;
 };
 
 struct GeometryBufferData
@@ -64,12 +76,14 @@ struct GeometryBufferData
     BufferOffsets fsQuadIndices;
     BufferOffsets skinnedCylinderIndices;
     BufferOffsets spriteIndices;
+    BufferOffsets sphereIndices;
 
     std::vector<SimpleVertex> vertices;
     std::vector<UINT> indices;
 
     std::vector<SkinnedVertex> skinnedVertices;
     std::vector<UINT> skinnedIndices;
+    std::set<const void*> appendedAssets;
 
 
     GeometryBufferData() : vertices(), indices()
@@ -78,6 +92,7 @@ struct GeometryBufferData
         ZeroMemory(&cylinderIndices, sizeof(BufferOffsets));
         ZeroMemory(&cylinderLDIndices, sizeof(BufferOffsets));
         ZeroMemory(&fsQuadIndices, sizeof(BufferOffsets));
+        ZeroMemory(&sphereIndices, sizeof(BufferOffsets));
     }
 
     void Release()
@@ -86,6 +101,7 @@ struct GeometryBufferData
         indices.clear();
         skinnedVertices.clear();
         skinnedIndices.clear();
+        appendedAssets.clear();
     }
 
     const BufferOffsets* const GetBufferOffsets(PrimitiveType primType)
@@ -107,6 +123,9 @@ struct GeometryBufferData
             break;
         case PrimitiveType_Sprite:
             pBufferOffsets = &this->spriteIndices;
+            break;
+        case PrimitiveType_Sphere:
+            pBufferOffsets = &this->sphereIndices;
             break;
         case PrimitiveType_SkinnedCylinder:
             pBufferOffsets = &this->skinnedCylinderIndices;
@@ -213,4 +232,3 @@ private:
     void BuildCylinderTopCap(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, MeshData& meshData);
     void BuildCylinderBottomCap(float bottomRadius, float topRadius, float height, UINT sliceCount, UINT stackCount, MeshData& meshData);
 };
-

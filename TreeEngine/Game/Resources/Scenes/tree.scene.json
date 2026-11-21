@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "id": "LoadTreeScene",
+  "name": "Tree",
+  "priority": 1,
+  "camera": {
+    "position": [1.11395788, 0.711319208, 2.05959034],
+    "rotation": [0.00989040267, 0.978999615, 0.0489907376, 0]
+  },
+  "render": {
+    "clearColor": [0, 0, 0.5019608, 1],
+    "sky": { "cubeMap": "cube.dds", "rotationDegrees": 135 }
+  },
+  "light": {
+    "ambient": [0.6, 0.6, 0.6, 1],
+    "diffuse": [3.14159, 3.14159, 3.14159, 1],
+    "specular": [0.6, 0.6, 0.6, 1],
+    "direction": [-0.7, -0.7, 0.7]
+  },
+  "pointLightCount": 1,
+  "materials": {
+    "bark": {
+      "baseColor": [0.73, 0.48, 0.24, 1],
+      "metallic": 0,
+      "roughness": 0.8,
+      "baseColorTexture": { "source": "Bark_0005_diffuse.dds" }
+    },
+    "needles": {
+      "metallic": 0,
+      "roughness": 0.8,
+      "alphaMode": "mask",
+      "alphaCutoff": 1,
+      "baseColorTexture": { "source": "FirBranchWithNeedles.dds" }
+    },
+    "ground": {
+      "baseColor": [0.6, 0.6, 0.6, 1],
+      "metallic": 0,
+      "roughness": 0.6,
+      "baseColorTexture": { "source": "snow.dds" }
+    },
+    "axis-red": { "baseColor": [1, 0, 0, 1], "unlit": true },
+    "axis-green": { "baseColor": [0, 0.2158605, 0, 1], "unlit": true },
+    "axis-blue": { "baseColor": [0, 0, 1, 1], "unlit": true }
+  },
+  "objects": [
+    {
+      "id": "tree",
+      "type": "tree",
+      "transform": { "position": [0, 0.1, -2] },
+      "animationSpeed": 15,
+      "depthLOD": 1,
+      "trunkShape": "skinnedCylinder",
+      "materials": { "trunk": "bark", "leaf": "needles" },
+      "generator": {
+        "axiom": "F(50) T(100,.1)",
+        "angle": 6.283185307179586,
+        "iterations": 14,
+        "segmentLength": 0.01,
+        "thickness": 0.08,
+        "rules": [
+          {
+            "input": "T(t,r)",
+            "output": "[Y(r ) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) [Y(r + .33) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) [Y(r + .66) z(0.2) !(.006 * t) B(t * .5)] !(t * 0.01) F(t * 0.1) T(t * 0.9,r + .24) "
+          },
+          {
+            "input": "B(b)",
+            "output": "!(.002 * b) F(b * .2) [!(.02) $(1) x(0.1) F(b * 0.75)] [!(.02) $(1) x(-0.1) F(b * 0.75)] B(b * 0.95) "
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "scale": [25, 0.01, 25] },
+      "material": "ground"
+    },
+    {
+      "id": "axis-x",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "position": [-3.5, 0, 0], "scale": [0.1, 1, 0.1], "rotationDegrees": [0, 0, 90] },
+      "material": "axis-red"
+    },
+    {
+      "id": "axis-y",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "position": [-4, 0.5, 0], "scale": [0.1, 1, 0.1] },
+      "material": "axis-green"
+    },
+    {
+      "id": "axis-z",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": { "position": [-4, 0, 0.5], "scale": [0.1, 1, 0.1], "rotationDegrees": [90, 0, 0] },
+      "material": "axis-blue"
+    }
+  ]
+}

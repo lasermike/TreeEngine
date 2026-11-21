@@ -1,5 +1,7 @@
 # Copilot Instructions for TreeEngine
 
+For a higher-level overview (key interfaces, active vs. inactive projects, external dependencies), see `ARCHITECTURE.md` at the repo root.
+
 ## Build
 
 TreeEngine uses MSBuild via Visual Studio 2022. Open `TreeEngine/TreeEngine.sln` for the main engine solution.
@@ -8,21 +10,44 @@ TreeEngine uses MSBuild via Visual Studio 2022. Open `TreeEngine/TreeEngine.sln`
 - `Debug|x64` / `Release|x64` — Win32 desktop (TreeClassic)
 - `Debug|x64` / `Release|x64` — UWP (TreePC, requires Windows 10 SDK)
 - `Debug|Gaming.Xbox.Scarlett.x64` / `Debug|Gaming.Xbox.XboxOne.x64` — Xbox (TreeXbox, requires GDK)
-- `Debug12` / `Release` variants toggle between DX11 and DX12 code paths.  Deprecated.
 
 Of these configurations, only `Debug|x64` and `Release|x64` are actively maintained. The UWP and Xbox targets are not currently built or tested.  UWP will likely be deprecated in the future.
 
+Build through the solution, not individual project files:
 
-**Shader compilation:** `TreeEngine/Game/Shaders/buildShaders.bat` compiles HLSL → `.cso` via `fxc.exe`/`dxc.exe`. PostBuild steps in vcxproj files also handle this.
+```powershell
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$msbuild = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+& $msbuild TreeEngine\TreeEngine.sln /t:Build /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo
+& $msbuild TreeEngine\TreeEngine.sln /t:Build /p:Configuration=Release /p:Platform=x64 /v:minimal /nologo
+```
 
-There are no automated tests or CI pipelines.
+Desktop solution mappings include TreeClassic in both configurations and exclude Xbox projects, so desktop builds do not require the GDK.
+
+**Desktop outputs:** TreeClassic, RenderPlatform12, and SceneDefinitionTests use
+`bin\$(Platform)\$(Configuration)\` and `obj\$(Platform)\$(Configuration)\`
+under their respective project directories. TreeClassic's bin directory is the
+runnable deployment, including the matching renderer DLL/PDB, shaders, resources,
+and runtime dependencies. SceneDefinitionTests remains Debug-only.
+
+The tracked TreeClassic debugger working directory is `$(OutDir)`. Existing
+checkouts may have an ignored `TreeClassic.vcxproj.user` overriding it with the
+old external path; remove that override or set it to `$(OutDir)`. Old external
+Binaries/Intermediates artifacts and `Tests\build` are no longer used by these
+desktop builds. Inspect exact generated subdirectories and obtain explicit
+approval before deleting them; do not delete shared roots or legacy outputs.
+Unsupported project/configuration output paths remain unchanged.
+
+**Shader compilation:** `TreeEngine/Game/Shaders/buildShaders.bat` compiles HLSL → `.cso` via `fxc.exe`/`dxc.exe`. Desktop builds use `/Od` for Debug and `/O3` for Release, including embedded DXR libraries, while retaining debug information and row-major matrices. Compilation/deployment failures fail the build; desktop project dependencies include the script and shared shader inputs.
+
+**Tests:** The Debug solution builds `TreeEngine\Tests\bin\x64\Debug\SceneDefinitionTests.exe`. Deterministic GPU image tests, comparison-math tests, DXR toggling, and tree pose-cache/capacity tests live in `TreeEngine\Tests\RenderRegression`. See its README for commands, profiling, and known baseline limitations. These require the deployed resources and, for rendering, a DX12/DXR-capable GPU. There is no CI pipeline.
 
 ## Simulation
 TreeEngine is a plant and tree growth simulator.  Plants are defined by L-Systems (in `LSystemModelGenerator.cpp`) and grow over time based on growth rules.  The simulation runs in real-time, with the main loop updating plant growth, physics, and rendering each frame.
 
 The main simulation loop is in `Game.cpp` (`Game::Update()`), which updates the scene graph, runs procedural generation, and handles input.
 
-A number of pre-defined scenes are used for testing.  The scenes are defined in the GameLoader.cpp file as methods prefixed with "Load".  Scene objects are intitialized with a set of parameters.  For plants and trees, an axiom and a set of production rules are defined.  The L-System generator then iteratively applies the production rules to grow the plant over time.  The product rules are loosely based on the research paper "The Algorithmic Beauty of Plants" by Przemyslaw Prusinkiewicz and Aristid Lindenmayer.
+A number of pre-defined scenes are used for testing.  The scenes are defined as JSON files in `TreeEngine/Game/Resources/Scenes/*.scene.json` (schema in that folder's `README.md`); their IDs keep the old `Load*` loader names.  Scene objects are intitialized with a set of parameters, and materials use glTF-style metallic-roughness properties.  For plants and trees, an axiom and a set of production rules are defined.  The L-System generator then iteratively applies the production rules to grow the plant over time.  The product rules are loosely based on the research paper "The Algorithmic Beauty of Plants" by Przemyslaw Prusinkiewicz and Aristid Lindenmayer.
 
 ## Architecture
 
@@ -91,4 +116,3 @@ Key points for window/input changes:
 - **WM_DPICHANGED** resizes the window to the OS-suggested rect so it stays correctly sized when dragged between monitors with different DPI
 - `RenderManager::OnResize()` calls `ReleaseSwapChainResources()` before `RenderPlatform12::OnResize()`, so the swap chain is fully recreated each resize
 - ImGui gets display size from `GetClientRect()` every frame in `ImGui_ImplWin32_NewFrame()` and mouse coordinates from `WM_MOUSEMOVE` via `GET_X_LPARAM`/`GET_Y_LPARAM` — both must be in the same coordinate space as the swap chain to avoid click offset bugs
-

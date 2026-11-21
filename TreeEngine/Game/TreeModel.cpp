@@ -2,12 +2,13 @@
 #include "TreeModel.h"
 
 
-TreeModel::TreeModel(void) 
+TreeModel::TreeModel(int branchCapacity) 
 {
     trunk = nullptr;
     treeData.numBranches = 0;
     treeData.numLevels = 0;
-    treeData.pBranches = new Branch[maxBranches];
+    treeData.branchCapacity = branchCapacity;
+    treeData.pBranches = new Branch[branchCapacity];
     treeData.pLevels = new BranchLevelData[maxLevels];
 
 }

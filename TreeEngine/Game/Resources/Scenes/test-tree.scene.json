@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "id": "LoadTestTree",
+  "name": "Test Tree",
+  "priority": 1,
+  "camera": {
+    "position": [0, 1.5, -6]
+  },
+  "render": {
+    "clearColor": [0.8039216, 0.3607843, 0.3607843, 1]
+  },
+  "light": {
+    "ambient": [0.5, 0.5, 0.5, 1],
+    "diffuse": [3.14159, 3.14159, 3.14159, 1],
+    "specular": [0.6, 0.6, 0.6, 1],
+    "direction": [-0.7, -0.7, 0.7]
+  },
+  "materials": {
+    "trunk": { "baseColor": [0, 1, 0, 1], "metallic": 0, "roughness": 0.8 },
+    "needles": {
+      "metallic": 0,
+      "roughness": 0.8,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.6,
+      "baseColorTexture": { "source": "FirBranchWithNeedles.dds" }
+    }
+  },
+  "objects": [
+    {
+      "id": "test-tree",
+      "type": "tree",
+      "transform": {
+        "position": [0, 0.5, 0]
+      },
+      "animationSpeed": 5,
+      "depthLOD": 1,
+      "trunkShape": "skinnedCylinder",
+      "materials": { "trunk": "trunk", "leaf": "needles" },
+      "generator": {
+        "axiom": "F(20) A",
+        "angle": 0.7853981633974483,
+        "iterations": 1,
+        "segmentLength": 0.01,
+        "thickness": 0.04,
+        "rules": [
+          {
+            "input": "A",
+            "output": "F(10) [z(0.33074) F(25) z(1) F(30) A] [Z(0.33074)F(50)A] "
+          }
+        ]
+      }
+    }
+  ]
+}

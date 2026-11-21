@@ -5,6 +5,13 @@
 
 Branch* TreeModelGenerator::AddBranch(Branch* parent, XMFLOAT4& start, XMFLOAT4& end, GeometryType geometryType, float thickness)
 {
+    // A full model drops further branches; generators continue from the parent.
+    if (_model->treeData.numBranches >= _model->treeData.branchCapacity)
+    {
+        if (_model->treeData.droppedBranches++ == 0)
+            OutputDebugStringA("Tree model is full; further branches are dropped.\n");
+        return parent;
+    }
     int id = _model->treeData.numBranches++;
     Branch* child = &_model->treeData.pBranches[id];
 

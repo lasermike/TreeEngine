@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Label="Globals">
     <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
@@ -15,8 +15,20 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Game.cpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugVectorMath.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugGizmoAdapter.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugVectorEditor.h" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GameLoader.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\TerrainPackage.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Terrain.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Water.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\OpacityMicromapBaker.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneCatalog.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GeometryGenerator.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GltfLoader.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Graph.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\LSystemModelGenerator.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Materials.cpp" />
@@ -32,8 +44,58 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\WorldObject.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneDefinition.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\OpacityMicromapBaker.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneCatalog.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneRenderSettings.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfLoader.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\GltfModel.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Lod.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TerrainPackage.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\AssetReader.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Terrain.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Water.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\MetalRoughSpheres.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\MetalRoughSpheresNoTextures.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\NormalTangentMirrorTest.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\pond_with_waterfalls.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\rocklandscape.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\SpecularTest.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\static-scene.bin" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\static-scene.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\static-scene.gltf" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\terra.glb" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\ai-tree.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\curves.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\gltf-models.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\graph.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\metal-rough-spheres-no-textures.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\metal-rough-spheres.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\normal-tangent-mirror-test.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\sea.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\simple-box.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-block.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\test-tree.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\tree.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\trees.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\LICENSE" />
+    <None Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\NOTICE.txt" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\CopyResources.cmd" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\*.scene.json" />
+    <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Scenes\README.md" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\buildShaders.bat" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Shaders\commonshader.bat" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectSelection.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SceneLoadProfile.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\DebugObjectSelection.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectHighlight.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\HighlightGeometry.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectPicking12.inl" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\ObjectHighlight12.inl" />
   </ItemGroup>
 </Project>

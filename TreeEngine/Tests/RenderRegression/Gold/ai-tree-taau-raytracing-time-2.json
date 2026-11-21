@@ -1,0 +1,1 @@
+{"scene":"LoadAITree","mode":"raytracing","time":5,"width":640,"height":480,"seed":12345,"warmupFrames":40,"postProcessing":true,"antialiasing":"taa","hdr":true,"tonemap":"agx","exposure":0,"renderScale":0.5}

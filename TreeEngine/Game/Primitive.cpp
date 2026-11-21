@@ -26,16 +26,12 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
 
     if (_params->materials.size() < 1)
     {
-        ShaderMaterial mat;
-        mat.Ambient = XMFLOAT4(.5, .5, .5, 1);
-        mat.Diffuse = XMFLOAT4(0, 1.0f, 0, 1);
-        mat.Specular = XMFLOAT4(.3f, .3f, .3f, 4.0f);
-        mat.Reflect = XMFLOAT4(0, 0, 0, 1);
-        mat.flags.y = 1; //1 for textured; 
-        _params->materials.push_back(mat);
+        // Default: rough green PBR material over the snow texture. The small red/blue
+        // components reproduce the former Phong default's white specular wash.
+        HRR(AddDefaultPbrMaterial(*_params, XMFLOAT4(0.076f, 1, 0.076f, 1), 0.6f, L"snow.dds"));
     }
 
-    // Default textures
+    // Default texture for programmatically supplied legacy materials
     if (_params->textureFilename.size() < 1)
     {
         _params->textureFilename.push_back(L"snow.dds");
@@ -55,11 +51,35 @@ HRESULT Primitive::InitGraphics(RenderManager& renderManager)
     swprintf(resourceName, 64, L"primitive%d", _id);
 
     // Create material, mesh, and reserve render unit
+    ShaderMaterial shaderMaterial = _params->materials[0];
+    shaderMaterial.ApplyTextureCoordScale(_params->textureCoordScale.x, _params->textureCoordScale.y);
     Material* newMaterial = nullptr;
-    renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, _params->materials[0], StockRenderState(), &newMaterial);
+    StockRenderState renderState;
+    if (_params->cubeMap)
+        renderState.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
+    ApplyPbrRenderState(shaderMaterial, renderState);
+    const auto* maps = _params->MaterialTextures(0);
+    if (maps && !maps->Empty())
+    {
+        HRR(renderManager.BindMaterialTextures(*maps, shaderMaterial));
+        HRR(renderManager.CreateMaterial(resourceName, maps->roles[BaseColorTextureRole].get(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, shaderMaterial, renderState, &newMaterial));
+    }
+    else
+        renderManager.CreateMaterial(resourceName, _params->textureFilename[0].c_str(), vsFilename.c_str(), psFilename.c_str(), nullptr, nullptr, shaderMaterial, renderState, &newMaterial);
+    newMaterial->m_isSkybox = _params->cubeMap;
 
     Mesh* newMesh = nullptr;
     const GeometryBufferData::BufferOffsets* pBufferOffsets = renderManager.GetGeometryBufferData().GetBufferOffsets(_model->GetPrimitiveType());
+    XMVECTOR minimum = XMVectorReplicate(FLT_MAX), maximum = XMVectorReplicate(-FLT_MAX);
+    const auto& vertices = renderManager.GetGeometryBufferData().vertices;
+    for (UINT i = 0; i < pBufferOffsets->VertexCount; ++i)
+    {
+        const auto point = XMLoadFloat3(&vertices[pBufferOffsets->VertexOffset + i].Pos);
+        minimum = XMVectorMin(minimum, point);
+        maximum = XMVectorMax(maximum, point);
+    }
+    XMStoreFloat3(&m_localBounds[0], minimum);
+    XMStoreFloat3(&m_localBounds[1], maximum);
     renderManager.CreateMesh(resourceName,
                              renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
                              renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
@@ -88,8 +108,19 @@ HRESULT Primitive::ComputeConstants(IRenderFrame* pFrameConfig)
     XMMATRIX transform = XMMatrixTransformation(vScaleCenter, vCenter, vScale, vScaleCenter, vQuat, vStart);
 
     XMStoreFloat4x4(&firstDataView->World, transform);
+    XMVECTOR minimum = XMVectorReplicate(FLT_MAX), maximum = XMVectorReplicate(-FLT_MAX);
+    for (UINT corner = 0; corner < 8; ++corner)
+    {
+        const auto point = XMVector3TransformCoord(XMVectorSet(m_localBounds[corner & 1].x,
+            m_localBounds[(corner >> 1) & 1].y, m_localBounds[(corner >> 2) & 1].z, 1), transform);
+        minimum = XMVectorMin(minimum, point);
+        maximum = XMVectorMax(maximum, point);
+    }
+    XMStoreFloat3(&_boundingBox[0], minimum);
+    XMStoreFloat3(&_boundingBox[1], maximum);
     firstDataView[0].InstanceOffset = startInstance;
+    firstDataView[0].AtlasRegion = 0;
+    firstDataView[0].PreviousSlot = startInstance;
 
     return S_OK;
 }
-

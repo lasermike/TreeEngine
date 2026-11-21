@@ -1,0 +1,22 @@
+{
+  "format": "TreeTerrain",
+  "version": 1,
+  "worldSize": 1024.0,
+  "sampleSpacing": 2.0,
+  "levels": 4,
+  "nodeQuads": 64,
+  "blockSamples": 67,
+  "blockStride": 9216,
+  "heightOffset": -43.500343322753906,
+  "heightScale": 0.0014621287118643522,
+  "minHeight": -43.500343322753906,
+  "maxHeight": 52.320255279541016,
+  "nodesFile": "nodes.bin",
+  "boundsFile": "bounds.bin",
+  "source": {
+    "generator": "TerrainTool generate",
+    "preset": "hills",
+    "seed": 3,
+    "relief": 900
+  }
+}

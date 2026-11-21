@@ -7,6 +7,13 @@
 #include "GeometryGenerator.h"
 #include <algorithm>
 
+namespace
+{
+    XMFLOAT4 TangentWithDefaultSign(const XMFLOAT3& tangent)
+    {
+        return XMFLOAT4(tangent.x, tangent.y, tangent.z, 1.0f);
+    }
+}
 
 void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
 {
@@ -99,9 +106,19 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     data.spriteIndices.IndexOffset = data.fsQuadIndices.IndexOffset + data.fsQuadIndices.IndexCount;
     data.spriteIndices.IndexCount = (UINT)sprite.Indices.size();
 
+    // Sphere (unit diameter, like the box and cylinders)
+    GeometryGenerator::MeshData sphere;
+    geoGen.CreateSphere(0.5f, 48, 32, sphere);
+
+    data.sphereIndices.VertexCount = (UINT)sphere.Vertices.size();
+    data.sphereIndices.VertexOffset = (UINT)(data.spriteIndices.VertexOffset + sprite.Vertices.size());
+    data.sphereIndices.IndexOffset = data.spriteIndices.IndexOffset + data.spriteIndices.IndexCount;
+    data.sphereIndices.IndexCount = (UINT)sphere.Indices.size();
+
     // Finalize everything
-    UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size() + cylinderLD.Vertices.size() + 
-                                    cylinderHD.Vertices.size() + fsQuad.Vertices.size() + sprite.Vertices.size());
+    UINT totalVertexCount = (UINT) (box.Vertices.size() + cylinder.Vertices.size() + cylinderLD.Vertices.size() +
+                                    cylinderHD.Vertices.size() + fsQuad.Vertices.size() + sprite.Vertices.size() +
+                                    sphere.Vertices.size());
 
     // Extract the vertex elements we are interested in and pack the
     // vertices of all the meshes into one vertex buffer.
@@ -119,7 +136,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = box.Vertices[i].Position;
         data.vertices[k].Normal = box.Vertices[i].Normal;
         data.vertices[k].Tex = box.Vertices[i].TexC;
-        data.vertices[k].TangentU = box.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(box.Vertices[i].TangentU);
         //data.vertices[k].InstanceWeights = box.Vertices[i].InstanceWeights;
     }
 
@@ -128,12 +145,12 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = cylinder.Vertices[i].Position;
         data.vertices[k].Normal = cylinder.Vertices[i].Normal;
         data.vertices[k].Tex = cylinder.Vertices[i].TexC;
-        data.vertices[k].TangentU = cylinder.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(cylinder.Vertices[i].TangentU);
 
         data.skinnedVertices[i].Pos = cylinder.Vertices[i].Position;
         data.skinnedVertices[i].Normal = cylinder.Vertices[i].Normal;
         data.skinnedVertices[i].Tex = cylinder.Vertices[i].TexC;
-        data.skinnedVertices[i].TangentU = cylinder.Vertices[i].TangentU;
+        data.skinnedVertices[i].TangentU = TangentWithDefaultSign(cylinder.Vertices[i].TangentU);
         data.skinnedVertices[i].InstanceWeights = cylinder.Vertices[i].InstanceWeights;
     }
 
@@ -142,7 +159,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = cylinderLD.Vertices[i].Position;
         data.vertices[k].Normal = cylinderLD.Vertices[i].Normal;
         data.vertices[k].Tex = cylinderLD.Vertices[i].TexC;
-        data.vertices[k].TangentU = cylinderLD.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(cylinderLD.Vertices[i].TangentU);
         //data.vertices[k].InstanceWeights = cylinderLD.Vertices[i].InstanceWeights;
     }
 
@@ -151,7 +168,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = cylinderHD.Vertices[i].Position;
         data.vertices[k].Normal = cylinderHD.Vertices[i].Normal;
         data.vertices[k].Tex = cylinderHD.Vertices[i].TexC;
-        data.vertices[k].TangentU = cylinderHD.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(cylinderHD.Vertices[i].TangentU);
         //data.vertices[k].InstanceWeights = cylinderHD.Vertices[i].InstanceWeights;
     }
 
@@ -160,7 +177,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = fsQuad.Vertices[i].Position;
         data.vertices[k].Normal = fsQuad.Vertices[i].Normal;
         data.vertices[k].Tex = fsQuad.Vertices[i].TexC;
-        data.vertices[k].TangentU = fsQuad.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(fsQuad.Vertices[i].TangentU);
         //data.vertices[k].InstanceWeights = fsQuad.Vertices[i].InstanceWeights;
     }
 
@@ -169,7 +186,15 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
         data.vertices[k].Pos = sprite.Vertices[i].Position;
         data.vertices[k].Normal = sprite.Vertices[i].Normal;
         data.vertices[k].Tex = sprite.Vertices[i].TexC;
-        data.vertices[k].TangentU = sprite.Vertices[i].TangentU;
+        data.vertices[k].TangentU = TangentWithDefaultSign(sprite.Vertices[i].TangentU);
+    }
+
+    for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
+    {
+        data.vertices[k].Pos = sphere.Vertices[i].Position;
+        data.vertices[k].Normal = sphere.Vertices[i].Normal;
+        data.vertices[k].Tex = sphere.Vertices[i].TexC;
+        data.vertices[k].TangentU = TangentWithDefaultSign(sphere.Vertices[i].TangentU);
     }
 
     //
@@ -182,6 +207,7 @@ void GeometryGenerator::BuildGeometryBuffers(GeometryBufferData& data)
     data.indices.insert(data.indices.end(), cylinderHD.Indices.begin(), cylinderHD.Indices.end());
     data.indices.insert(data.indices.end(), fsQuad.Indices.begin(), fsQuad.Indices.end());
     data.indices.insert(data.indices.end(), sprite.Indices.begin(), sprite.Indices.end());
+    data.indices.insert(data.indices.end(), sphere.Indices.begin(), sphere.Indices.end());
 
     data.skinnedIndices.insert(data.skinnedIndices.end(), cylinder.Indices.begin(), cylinder.Indices.end());
 }

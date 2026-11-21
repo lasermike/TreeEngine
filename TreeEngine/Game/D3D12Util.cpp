@@ -2467,14 +2467,14 @@ HRESULT CreateBuffer(
     const BYTE* const pInitialData,
     ID3D12Resource **ppBuffer)
 {
-    D3D12_RESOURCE_STATES initialUsage = pInitialData ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
     const D3D12_HEAP_PROPERTIES defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
  
+    // Buffers are always created in COMMON; the copy below promotes this one to COPY_DEST implicitly.
     XSF_RETURN_IF_FAILED(pDevice->CreateCommittedResource(
         &defaultHeapProperties,
         D3D12_HEAP_FLAG_NONE,
         &desc,
-        initialUsage,
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr,
         IID_GRAPHICS_PPV_ARGS(ppBuffer)));
 
@@ -2486,7 +2486,7 @@ HRESULT CreateBuffer(
             XSF_SAFE_RELEASE(*ppBuffer);
             return hr;
         }
-        XSF::ResourceBarrier(pCmdList, *ppBuffer, initialUsage, D3D12_RESOURCE_STATE_COMMON);
+        XSF::ResourceBarrier(pCmdList, *ppBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
     }
 
     return S_OK;

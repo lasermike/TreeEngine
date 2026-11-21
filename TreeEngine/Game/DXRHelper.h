@@ -31,6 +31,11 @@ class ShaderBindingTable
 	static_assert(sizeof(T) % D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT == 0, "Shader record must be a multiple of D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT bytes");
 
 public:
+    void Reset()
+    {
+        m_shaderBindingTableBuffer = DirectX::GraphicsResource();
+    }
+
 	ShaderBindingTable<T, NumRayGen, NumMissShader, NumHitGroup>()
 	{
 		m_rayGenRecords = new T[NumRayGen];

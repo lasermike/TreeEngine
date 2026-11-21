@@ -69,16 +69,18 @@ struct TreeData
 {
     int numBranches;
     int numLevels;
+    int branchCapacity; // Length of pBranches.
+    int droppedBranches; // Branches AddBranch refused because the model was full.
     Branch* pBranches;  
     BranchLevelData* pLevels;
 
-    TreeData() : numBranches(0), numLevels(0), pBranches(nullptr), pLevels(nullptr) { }
+    TreeData() : numBranches(0), numLevels(0), branchCapacity(0), droppedBranches(0), pBranches(nullptr), pLevels(nullptr) { }
 };
 
 class TreeModel : public Model
 {
 public:
-    TreeModel(void);
+    explicit TreeModel(int branchCapacity = maxBranches);
     ~TreeModel(void);
 
     static const int maxLevels = 6;

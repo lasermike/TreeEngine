@@ -24,6 +24,17 @@ interface IGameInputReading;
 struct ImGuiInputTextCallbackData;
 
 
+// Wall-clock cost of the most recent scene load, measured on the CPU.
+struct SceneLoadTiming
+{
+    double definitionMs = 0; // Read the scene file and build its objects, textures, and models.
+    double generationMs = 0; // Generate trees and other procedural geometry (GameLoader::Regenerate).
+    double graphicsMs = 0;   // Release the old level and create GPU buffers, materials, and pipelines.
+    bool complete = false;   // Generation and graphics have run since the load.
+
+    double TotalMs() const { return definitionMs + generationMs + graphicsMs; }
+};
+
 class Game : public IDebugUI
 {
 public:
@@ -55,6 +66,7 @@ public:
     RenderManager& GetRenderManager() { return m_renderManager; }
 
     Player* GetPlayer() { return m_player; }
+    SceneRoot& GetScene() { return *m_pScene; }
 
     // Allow SSE members
     void* operator new(size_t size) 
@@ -65,7 +77,77 @@ public:
 
     HRESULT Initialize(bool renderToSharedTexture);
 
+    void SetRenderTestWaterMotionSpeed(float speed) { m_settings.m_waterMotionSpeed = speed; }
+    void SetRenderTestOpacityMicromaps(bool enabled) { m_settings.m_opacityMicromaps = enabled; }
+    void SetRenderTestAntialiasing(Settings::Antialiasing mode) { m_settings.m_antialiasing = mode; m_settings.m_showAntialiasingEdges = false; }
+    void SetRenderTestHashedAlphaTest(bool hashed) { m_settings.m_hashedAlphaTest = hashed; }
+    void SetRenderTestViewCulling(bool culling) { m_settings.m_viewCulling = culling; }
+    void SetRenderTestBatchInstances(bool batch) { m_settings.m_batchInstances = batch; }
+    void SetRenderTestLodFadeFrames(int frames) { m_settings.m_lodFadeFrames = frames; }
+    void SetRenderTestTerrainStreaming(bool streaming) { m_settings.m_terrainStreaming = streaming; }
+    void SetRenderTestShadows(int cascades, float distance) { m_settings.m_shadowCascades = cascades; m_settings.m_shadowDistance = distance; }
+    void SetRenderTestHighlightsThroughGeometry(bool enabled)
+    {
+        m_settings.m_highlightsThroughGeometry = enabled;
+    }
+    void SetRenderTestRenderScale(float scale) { m_settings.m_renderScale = scale; }
+    void SetRenderTestHdr(bool hdr, Settings::Tonemap tonemap, float exposure) {
+        m_settings.m_hdr = hdr;
+        m_settings.m_tonemap = tonemap;
+        m_settings.m_exposure = exposure;
+    }
+    void SetRenderTestMotion(Settings::MotionView view, bool hasJitter, float jitterX, float jitterY) {
+        m_settings.m_motionView = view;
+        m_settings.m_jitter = false;
+        m_settings.m_hasFixedJitter = hasJitter;
+        m_settings.m_fixedJitter[0] = jitterX;
+        m_settings.m_fixedJitter[1] = jitterY;
+    }
+    void SetRenderTestRays(bool contactShading, int sunSamples, bool alphaTest, bool shadows, bool opaqueGeometry)
+    {
+        m_settings.m_rayContactShading = contactShading;
+        m_settings.m_sunShadowSamplesOverride = sunSamples;
+        m_settings.m_rayAlphaTest = alphaTest;
+        m_settings.m_shadowsEnabled = shadows;
+        m_settings.m_rayOpaqueGeometry = opaqueGeometry;
+    }
+    void SetRenderTestContactProbes(int probes, bool rotate, bool opaque, float fullDistance)
+    {
+        m_settings.m_contactProbes = probes;
+        m_settings.m_contactRotate = rotate;
+        m_settings.m_contactOpaqueProbes = opaque;
+        m_settings.m_contactFullDistance = fullDistance;
+    }
+    void SetRenderTestReflectionSampling(bool rotate, bool adaptive)
+    {
+        m_settings.m_reflectionRotate = rotate;
+        m_settings.m_reflectionAdaptive = adaptive;
+    }
+    void SetRenderTestReflectionRays(int rays) {
+        m_settings.m_waterReflections = rays > 0;
+        if (rays > 0) m_settings.m_waterReflectionRays = rays;
+    }
+    void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile = false, bool showShadowBuffer = false);
+    HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {}, bool overrideSceneCamera = false);
+    // Render tests update objects on one thread for repeatable images; performance runs use every core.
+    // Call before Initialize.
+    void SetRenderTestUsesAllCores(bool allCores) { m_renderTestAllCores = allCores; }
+    // Before Initialize: DRED is chosen when the device is created.
+    void SetRenderTestDiagnostics(bool dred, const std::wstring& dredReportPath)
+    {
+        m_settings.m_enableDred = dred;
+        m_settings.m_dredReportPath = dredReportPath;
+    }
+    unsigned GetWorkerThreadCount() const { return m_workerThreadCount; }
+    const SceneLoadTiming& GetSceneLoadTiming() const { return m_sceneLoadTiming; }
+
     HRESULT UpdateDebugUI(ImGuiContext* imGuiContext);
+    void ResetDebugUI();
+    // Call between frames, as the UI's deferred scene operations do.
+    HRESULT LoadScene(const std::string& name);
+    HRESULT RefreshScenes();
+    HRESULT SaveScene(const std::string& displayName = {}, const std::string& filenameStem = {}, bool overwrite = false);
+    const std::string& GetSceneError() const { return m_sceneError; }
 
     bool DebugUIKeyCaptured()
     {
@@ -77,6 +159,8 @@ public:
     {
         m_hwnd = hwnd;
     }
+
+    HWND GetWindow() const { return m_hwnd; }
 
     HRESULT Initialize();
 
@@ -92,8 +176,10 @@ public:
 private:
 
     void Update(DX::StepTimer const& timer);
-    void Regenerate();
+    HRESULT Regenerate();
     void HandleInput(bool key[512]);
+    void UpdateObjectSelection();
+    bool m_selectionUIWasVisible = false;
     void HandleGamepadInput(bool key[512]);
 
     HRESULT ReloadDevice();
@@ -121,6 +207,23 @@ private:
     double                               m_timeStart;
     double                               m_timeCurrent;
     int                                  m_currentScene;
+    SceneData::SceneDefinition m_sceneDefinition;
+    std::string m_sceneFilename;
+    bool m_sceneIsUser = false;
+    std::string m_sceneError;
+    std::string m_sceneStatus;
+    std::string m_sceneSelection;
+    std::string m_sceneLoadRequest;
+    bool m_sceneRefreshRequested = false;
+    bool m_sceneSaveRequested = false;
+    bool m_sceneSaveAs = false;
+    bool m_sceneSaveOverwrite = false;
+    bool m_sceneConfirmSave = false;
+    std::string m_pendingSaveName;
+    std::string m_pendingSaveStem;
+    std::string m_pendingSavePath;
+    char m_saveSceneName[256] = {};
+    char m_saveSceneStem[256] = {};
     bool                                 m_advanceScene;
     int                                  m_advanceSceneAmount;
     bool                                 m_reloadDevice;
@@ -131,6 +234,7 @@ private:
     bool                                m_renderToSharedTexture;
 
     bool                                m_resetTree;
+    std::map<std::string, DirectX::XMFLOAT2> m_debugUvEdits;
     //bool                                m_paused;
     //bool                                m_showShadowBuffer;
     //bool                                m_showDxrUav;
@@ -139,8 +243,19 @@ private:
     bool                                m_is12Driver;
     bool                                m_rotateLights;
     GameData                            m_gameData;
+    bool m_renderTestMode = false;
+    bool m_renderTestAllCores = false;
+    unsigned m_workerThreadCount = 0;
+    std::string m_renderTestScene;
+    SceneLoadTiming m_sceneLoadTiming;
+    bool m_profilingEnabled = false;
+    RenderProfile m_lastProfile;
 
     bool                                m_bDebugUIKeyCaptured;
+    // A window client size chosen in the debug UI, applied at the start of the next frame (resizing rebuilds the
+    // swap chain, which must not happen while a frame is being recorded). Zero when none is pending.
+    UINT                                m_pendingWindowWidth = 0, m_pendingWindowHeight = 0;
+    void ApplyPendingWindowSize();
 
     //static const int                    kNumFrameTimeLogEntries = 4000;
     //double                              m_frameTimeLog[kNumFrameTimeLogEntries];
@@ -162,5 +277,3 @@ private:
 #endif
 
 };
-
-

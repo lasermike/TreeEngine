@@ -182,7 +182,7 @@ static const D3D12_SAMPLER_DESC s_StockSamplerTypes[] =
         D3D12_TEXTURE_ADDRESS_MODE_CLAMP,               // W address clamping
         0.0F,                                           // Mip LOD bias
         0,                                              // Max Anisotropy - applies if using ANISOTROPIC filtering only
-        D3D12_COMPARISON_FUNC_ALWAYS,                   // Comparison Func - always pass
+        D3D12_COMPARISON_FUNC_NEVER,                    // Not used for non-comparison filters
         { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
         0.0F,                                           // MinLOD
         D3D12_FLOAT32_MAX                               // MaxLOD
@@ -196,7 +196,7 @@ static const D3D12_SAMPLER_DESC s_StockSamplerTypes[] =
         D3D12_TEXTURE_ADDRESS_MODE_CLAMP,               // W address clamping
         0.0F,                                           // Mip LOD bias
         0,                                              // Max Anisotropy - applies if using ANISOTROPIC filtering only
-        D3D12_COMPARISON_FUNC_ALWAYS,                   // Comparison Func - always pass
+        D3D12_COMPARISON_FUNC_NEVER,                    // Not used for non-comparison filters
         { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
         0.0F,                                           // MinLOD
         D3D12_FLOAT32_MAX                               // MaxLOD
@@ -210,7 +210,7 @@ static const D3D12_SAMPLER_DESC s_StockSamplerTypes[] =
         D3D12_TEXTURE_ADDRESS_MODE_CLAMP,               // W address clamping
         0.0F,                                           // Mip LOD bias
         0,                                              // Max Anisotropy - applies if using ANISOTROPIC filtering only
-        D3D12_COMPARISON_FUNC_ALWAYS,                   // Comparison Func - always pass
+        D3D12_COMPARISON_FUNC_NEVER,                    // Not used for non-comparison filters
         { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
         0.0F,                                           // MinLOD
         D3D12_FLOAT32_MAX                               // MaxLOD
@@ -224,7 +224,7 @@ static const D3D12_SAMPLER_DESC s_StockSamplerTypes[] =
         D3D12_TEXTURE_ADDRESS_MODE_WRAP,                // W address clamping
         0.0F,                                           // Mip LOD bias
         0,                                              // Max Anisotropy - applies if using ANISOTROPIC filtering only
-        D3D12_COMPARISON_FUNC_ALWAYS,                   // Comparison Func - always pass
+        D3D12_COMPARISON_FUNC_NEVER,                    // Not used for non-comparison filters
         { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
         0.0F,                                           // MinLOD
         D3D12_FLOAT32_MAX                               // MaxLOD
@@ -238,7 +238,7 @@ static const D3D12_SAMPLER_DESC s_StockSamplerTypes[] =
         D3D12_TEXTURE_ADDRESS_MODE_WRAP,                // W address clamping
         0.0F,                                           // Mip LOD bias
         0,                                              // Max Anisotropy - applies if using ANISOTROPIC filtering only
-        D3D12_COMPARISON_FUNC_ALWAYS,                   // Comparison Func - always pass
+        D3D12_COMPARISON_FUNC_NEVER,                    // Not used for non-comparison filters
         { 0.0F, 0.0F, 0.0F, 0.0F },                     // BorderColor float values - used if D3D11_TEXTURE_ADDRESS_BORDER is set.
         0.0F,                                           // MinLOD
         D3D12_FLOAT32_MAX                               // MaxLOD

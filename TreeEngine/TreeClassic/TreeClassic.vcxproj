@@ -1,15 +1,7 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.props')" />
+  <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.722.0-preview\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.722.0-preview\build\native\Microsoft.Direct3D.D3D12.props')" />
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug12|Win32">
-      <Configuration>Debug12</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug12|x64">
-      <Configuration>Debug12</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
@@ -41,12 +33,6 @@
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
@@ -55,10 +41,6 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PlatformToolset>v145</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|x64'" Label="Configuration">
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -72,9 +54,6 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug12|Win32'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -82,14 +61,16 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>.;..\Game\.;..\Inc;$(WindowsSDK_IncludePath);$(SolutionDir)imgui;$(VC_IncludePath);</IncludePath>
     <LibraryPath>..\TreeClassic\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
-    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
-    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+    <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>.;..\Game\.;..\Inc;$(WindowsSDK_IncludePath);$(SolutionDir)imgui;$(VC_IncludePath);</IncludePath>
     <LibraryPath>..\TreeClassic\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
-    <OutDir>$(SolutionDir)..\..\Binaries\$(Configuration)\$(Platform)\$(ProjectName)\</OutDir>
-    <IntDir>$(SolutionDir)..\..\Intermediates\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+    <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <!-- common settings -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -103,9 +84,6 @@
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>Lib\x64\Debug</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -118,9 +96,6 @@
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>Lib\x64\Release</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>call ..\Game\PostBuild.cmd ..\..\..\binaries\$(ConfigurationName)\x64 $(OutDir) RenderPlatform12</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="..\Game\graphdata.txt" />
@@ -131,6 +106,7 @@
     <Import Project="..\SharedEngine\SharedEngine.vcxitems" Label="Shared" />
   </ImportGroup>
   <ItemGroup>
+    <ClInclude Include="RenderTestCapture.h" />
     <ClCompile Include="..\ImGui\implot.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -140,6 +116,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TreeClassic.cpp" />
+    <ClCompile Include="RenderTestCapture.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
@@ -174,32 +151,137 @@
   <ItemGroup>
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\ATGFont.hlsl">
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tree.hlsl">
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(FullPath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
     <CustomBuild Include="$(SolutionDir)\Game\Shaders\Blur.hlsl">
       <FileType>Document</FileType>
       <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Smaa.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <AdditionalInputs>$(SolutionDir)\ThirdParty\SMAA\SMAA.hlsl</AdditionalInputs>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Taa.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\Tonemap.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\MotionVectors.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <AdditionalInputs>$(SolutionDir)\Game\Shaders\MotionCommon.hlsli</AdditionalInputs>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\MotionDebug.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <AdditionalInputs>$(SolutionDir)\Game\Shaders\MotionCommon.hlsli</AdditionalInputs>
+      <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="$(SolutionDir)\Game\Shaders\ObjectHighlight.hlsl">
+      <FileType>Document</FileType>
+      <Command>call $(SolutionDir)\Game\Shaders\buildShaders.bat "$(ShaderCompiler)" $(OutDir) "$(LayoutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <Command Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')">call "$(SolutionDir)Game\Shaders\buildShaders.bat" "$(ShaderCompiler)" "$(OutDir)" "$(OutDir)Image\Loose" "%(Fullpath)" "$(Platform)" "$(Configuration)" shaderFiles.txt</Command>
+      <AdditionalInputs>$(SolutionDir)\Game\Shaders\MotionCommon.hlsli</AdditionalInputs>
       <Outputs>$(OutDir)\%(Filename)%(Extension).txt</Outputs>
     </CustomBuild>
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <CustomBuild>
+      <AdditionalInputs>$(SolutionDir)Game\Shaders\buildShaders.bat;$(SolutionDir)Game\Shaders\shaderFiles.txt;$(SolutionDir)Game\Shaders\SharedTypes.hlsli;$(SolutionDir)Game\Shaders\Materials.fx;%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets')" />
-    <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.targets')" />
+    <Import Project="..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
+    <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.722.0-preview\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.722.0-preview\build\native\Microsoft.Direct3D.D3D12.targets')" />
   </ImportGroup>
+  <ItemGroup>
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Resources\**\*.*" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\graphdata.txt" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Courier_New_11.tga" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Arial_16.abc" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Arial_16.tga" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\bark2.dds" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Bark_0005_diffuse.dds" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\Courier_New_11.abc" />
+    <GameResource Include="$(MSBuildProjectDirectory)\..\Game\snow.dds" />
+    <UpToDateCheckInput Include="@(GameResource)" />
+    <UpToDateCheckInput Include="$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd"
+                           Condition="'$(Platform)'!='x64' Or ('$(Configuration)'!='Debug' And '$(Configuration)'!='Release')" />
+    <UpToDateCheckOutput Include="$(IntDir)CopyResources.stamp"
+                            Condition="'$(Platform)'!='x64' Or ('$(Configuration)'!='Debug' And '$(Configuration)'!='Release')" />
+    <UpToDateCheckOutput Include="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
+                            Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')" />
+  </ItemGroup>
+  <Target Name="CopyGameResourcesWhenChanged"
+          AfterTargets="Build"
+          Condition="'$(Platform)'!='x64' Or ('$(Configuration)'!='Debug' And '$(Configuration)'!='Release')"
+          Inputs="@(GameResource);$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd"
+          Outputs="$(IntDir)CopyResources.stamp">
+    <MakeDir Directories="$(IntDir)" />
+    <Exec Command="call &quot;$(MSBuildProjectDirectory)\..\Game\CopyResources.cmd&quot; &quot;$(OutDir).&quot;" />
+    <Touch Files="$(IntDir)CopyResources.stamp" AlwaysCreate="true" />
+  </Target>
+  <Target Name="CopyDesktopGameResourcesWhenChanged"
+          AfterTargets="Build"
+          Condition="'$(Platform)'=='x64' And ('$(Configuration)'=='Debug' Or '$(Configuration)'=='Release')"
+          Inputs="@(GameResource)"
+          Outputs="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')">
+    <Copy SourceFiles="@(GameResource)"
+          DestinationFiles="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <FileWrites Include="@(GameResource->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
+  </Target>
+  <!-- Upscaler runtimes, next to the executable where they are looked for: AMD FidelityFX for FSR (the loader and the
+       upscaler DLL; ThirdParty/FidelityFX/README.md) and NVIDIA DLSS (ThirdParty/DLSS/README.md). -->
+  <ItemGroup>
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\FidelityFX\signedbin\amd_fidelityfx_loader_dx12.dll" />
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\FidelityFX\signedbin\amd_fidelityfx_upscaler_dx12.dll" />
+    <UpscalerRuntime Include="$(MSBuildProjectDirectory)\..\ThirdParty\DLSS\bin\nvngx_dlss.dll" />
+    <UpToDateCheckInput Include="@(UpscalerRuntime)" />
+  </ItemGroup>
+  <Target Name="CopyUpscalerRuntimes"
+          AfterTargets="Build"
+          Condition="'$(Platform)'=='x64'"
+          Inputs="@(UpscalerRuntime)"
+          Outputs="@(UpscalerRuntime->'$(OutDir)%(Filename)%(Extension)')">
+    <Copy SourceFiles="@(UpscalerRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <FileWrites Include="@(UpscalerRuntime->'$(OutDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
+  </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.190604001\build\WinPixEventRuntime.targets'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.D3D12.1.610.2\build\native\Microsoft.Direct3D.D3D12.targets'))" />
+    <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.Direct3D.D3D12.1.722.0-preview\build\native\Microsoft.Direct3D.D3D12.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.D3D12.1.722.0-preview\build\native\Microsoft.Direct3D.D3D12.props'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.Direct3D.D3D12.1.722.0-preview\build\native\Microsoft.Direct3D.D3D12.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.D3D12.1.722.0-preview\build\native\Microsoft.Direct3D.D3D12.targets'))" />
   </Target>
 </Project>

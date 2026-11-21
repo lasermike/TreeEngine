@@ -50,14 +50,18 @@ struct BuildState
     }
 };
 
+struct SceneLoadProfile;
+struct Command;
+
 class LSystemModelGenerator : public TreeModelGenerator
 {
     LSystemParams _params;
+    SceneLoadProfile* m_loadProfile;
 
 public:
-    LSystemModelGenerator(LSystemParams& params);
+    LSystemModelGenerator(LSystemParams& params, SceneLoadProfile* profile = nullptr);
     TreeModel* Create();
 
 protected:
-    void CreateSkeleton(string& cmd);
+    void CreateSkeleton(const std::vector<Command>& commands);
 };

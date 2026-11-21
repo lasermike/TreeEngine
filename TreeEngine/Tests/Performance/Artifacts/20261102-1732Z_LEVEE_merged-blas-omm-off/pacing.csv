@@ -1,0 +1,7 @@
+﻿"test","scene","mode","run","success","processMs","frameP50Ms","frameP90Ms","frameP99Ms","frameMaxMs","frameMeanMs","spikes","over33Ms","spikeExcessMs","rebuiltBLASFrames","maxBlasCpuMs"
+"LeafAtlases-pan","LeafAtlases","raytracing","1","True","3029.0216","3.0994","3.546","5.0312","5.3714","3.2039255","0","0","0","48","1.0003"
+"LeafAtlases-grow-pan","LeafAtlases","raytracing","1","True","3771.1041","3.0743","3.8378","6.9104","7.5392","3.2660580952381","0","0","0","149","1.6259"
+"LeafAtlases-pan","LeafAtlases","raytracing","2","True","3003.0983","3.093","3.5263","4.9908","5.6933","3.15654283333333","0","0","0","48","0.9227"
+"LeafAtlases-grow-pan","LeafAtlases","raytracing","2","True","3789.3444","3.0992","3.9093","6.9636","7.2959","3.29663964285714","0","0","0","149","1.6539"
+"LeafAtlases-pan","LeafAtlases","raytracing","3","True","3005.3835","3.1099","3.5125","4.9498","5.1951","3.1677155","0","0","0","48","0.9921"
+"LeafAtlases-grow-pan","LeafAtlases","raytracing","3","True","3748.2843","3.0706","3.8667","6.8591","7.2671","3.25155095238096","0","0","0","149","1.5145"

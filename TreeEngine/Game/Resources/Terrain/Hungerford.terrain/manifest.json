@@ -1,0 +1,43 @@
+{
+  "format": "TreeTerrain",
+  "version": 1,
+  "worldSize": 4096.0,
+  "sampleSpacing": 1.0,
+  "levels": 7,
+  "nodeQuads": 64,
+  "blockSamples": 67,
+  "blockStride": 9216,
+  "heightOffset": -8.100000381469727,
+  "heightScale": 0.0012363967252895236,
+  "minHeight": -8.100000381469727,
+  "maxHeight": 72.92726135253906,
+  "nodesFile": "nodes.bin",
+  "boundsFile": "bounds.bin",
+  "source": {
+    "importer": "import_heightmap.py",
+    "files": [
+      "hp___datasetsA_puget_lowlands_2005_dtm.vrt",
+      "hp___datasetsA_olympics_south_opsw_2019_dtm.vrt",
+      "hp___datasetsC_mason_county_refresh24_2025_dtm.vrt"
+    ],
+    "crs": "EPSG:32610",
+    "bounds": [
+      502495.724802749,
+      5226332.5807443,
+      506591.724802749,
+      5230428.5807443
+    ],
+    "spacing": 1.0,
+    "resampling": "cubic",
+    "size": [
+      4096,
+      4096
+    ],
+    "seabed": {
+      "waterLevel": 1.9,
+      "slope": 0.04,
+      "depth": 10.0
+    },
+    "north": "+z"
+  }
+}

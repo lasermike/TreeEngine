@@ -40,10 +40,14 @@ RENDERPLATFORM_API HRESULT RenderPostProcess();
 RENDERPLATFORM_API HRESULT RenderDebugUI();
 RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool renderToSharedTexture);
 
-RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer);
+RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer);
 RENDERPLATFORM_API HRESULT SetRenderPhase(RenderState state);
 
-RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
+RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot);
+RENDERPLATFORM_API HRESULT DrawBatched(UINT indexCount, UINT startIndex, INT baseVertex, UINT layoutStart, UINT layoutSize, const UINT* transformSlots, UINT copies, UINT listStart);
+RENDERPLATFORM_API HRESULT UploadVertices(const VertexUploadRegion* regions, UINT regionCount, const SimpleVertex* vertices);
+RENDERPLATFORM_API HRESULT SetTerrainLayers(const TerrainLayerData* layers, UINT count);
+RENDERPLATFORM_API bool RecordsDraws(RenderPass pass);
 
 RENDERPLATFORM_API HRESULT BeginDrawText();
 RENDERPLATFORM_API HRESULT DrawText2(FLOAT sx, FLOAT sy, DWORD dwColor, _In_z_ const WCHAR* strText);
@@ -68,6 +72,7 @@ RENDERPLATFORM_API D3DBuffer* GetVertexBuffer(GeometryBuffer geometryBuffer);
 RENDERPLATFORM_API D3DBuffer* GetIndexBuffer(GeometryBuffer geometryBuffer);
 
 RENDERPLATFORM_API HRESULT GetImGuiContext(ImGuiContext** imguiContext, ImPlotContext** implotContext);
+RENDERPLATFORM_API HRESULT GetDebugTexturePreview(const LoadedTexture* texture, uint64_t* id, UINT* width, UINT* height);
 
 RENDERPLATFORM_API HRESULT GetViewport(Viewport& viewport);
 

@@ -95,7 +95,7 @@ RENDERPLATFORM_API HRESULT RenderEpilog(bool oculus, bool useShadowMaps, bool re
     return m_pPlatform->RenderEpilog(oculus, useShadowMaps, renderToSharedTexture);
 }
 
-RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, DoubleBuffer* instancedBuffer)
+RENDERPLATFORM_API HRESULT RenderSceneSetup(RenderPass pass, InstanceBufferRing* instancedBuffer)
 {
     return m_pPlatform->RenderSceneSetup(pass, instancedBuffer);
 }
@@ -105,9 +105,9 @@ RENDERPLATFORM_API HRESULT SetRenderPhase(RenderState state)
     return m_pPlatform->SetRenderPhase(state);
 }
 
-RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation)
+RENDERPLATFORM_API HRESULT DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation, UINT ObjectTransformSlot)
 {
-    return m_pPlatform->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation,  BaseVertexLocation, StartInstanceLocation);
+    return m_pPlatform->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation, ObjectTransformSlot);
 }
 
 RENDERPLATFORM_API HRESULT BeginDrawText()

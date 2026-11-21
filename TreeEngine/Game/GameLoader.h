@@ -1,8 +1,11 @@
 #pragma once
+#include "SceneCatalog.h"
+#include "SceneDefinition.h"
 
 class SceneRoot;
-struct RenderData;
+struct SceneRenderSettings;
 class Player;
+struct SceneLoadProfile;
 
 struct GameData
 {
@@ -25,10 +28,21 @@ class GameLoader
 public:
     GameLoader();
 
-    void Load(char* name, SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData);
-    void Load(int sceneNum, SceneRoot* scene, RenderData* renderData, Player* player, GameData* gameData);
-    void Regenerate(SceneRoot* pScene);
+    HRESULT InitializeScenes(const std::string& contentDirectory);
+    HRESULT RefreshScenes();
+    const SceneData::SceneCatalog& Catalog() const { return m_catalog; }
+    HRESULT Load(const char* name, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData,
+        SceneData::SceneDefinition* definition = nullptr, std::string* filename = nullptr);
+    HRESULT Load(int sceneNum, SceneRoot* scene, SceneRenderSettings* renderSettings, Player* player, GameData* gameData,
+        SceneData::SceneDefinition* definition = nullptr, std::string* filename = nullptr);
+    void Regenerate(SceneRoot* pScene, SceneLoadProfile* profile = nullptr);
 
     int _currentSeed;
     int GetNumScenes();
+    const char* GetSceneName(int sceneNum) const;
+    const std::string& GetLastError() const { return m_lastError; }
+
+private:
+    std::string m_lastError;
+    SceneData::SceneCatalog m_catalog;
 };

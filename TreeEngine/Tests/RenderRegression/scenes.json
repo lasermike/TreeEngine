@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "width": 640,
+  "height": 480,
+  "seed": 12345,
+  "warmupFrames": 3,
+  "postProcessing": true,
+  "modes": ["raster", "raytracing"],
+  "times": [0, 1, 5],
+  "rmsTolerance": 0.002,
+  "maxErrorTolerance": 1.0,
+  "scenes": [
+    { "id": "tree", "name": "LoadTreeScene" },
+    { "id": "test-tree", "name": "LoadTestTree" },
+    { "id": "sea", "name": "LoadSeaScene" },
+    { "id": "curves", "name": "LoadCurvesScene" },
+    { "id": "trees", "name": "LoadTrees" },
+    { "id": "test-block", "name": "LoadTestBlock" },
+    { "id": "graph", "name": "LoadGraph" },
+    { "id": "simple-box", "name": "LoadSimpleBox" },
+    { "id": "ai-tree", "name": "LoadAITree", "antialiasing": "taa", "hdr": true, "tonemap": "agx", "warmupFrames": 16 },
+    { "id": "ai-tree-taau", "name": "LoadAITree", "antialiasing": "taa", "hdr": true, "tonemap": "agx", "renderScale": 0.5, "warmupFrames": 40 },
+    { "id": "ai-tree-fsr", "name": "LoadAITree", "antialiasing": "fsr", "hdr": true, "tonemap": "agx", "renderScale": 0.5, "warmupFrames": 40 },
+    { "id": "ai-tree-dlss", "name": "LoadAITree", "antialiasing": "dlss", "hdr": true, "tonemap": "agx", "renderScale": 0.5, "warmupFrames": 40 },
+    { "id": "gltf-models", "name": "LoadGltfDemo" },
+    { "id": "instancing", "name": "Instancing" },
+    { "id": "leaf-atlas-test", "name": "LeafAtlasTest" },
+    { "id": "leaf-atlas-test-smaa", "name": "LeafAtlasTest", "antialiasing": "smaa" },
+    { "id": "tree-smaa", "name": "LoadTreeScene", "antialiasing": "smaa" },
+    { "id": "terrain-hills", "name": "LoadTerrainHills" }
+  ]
+}

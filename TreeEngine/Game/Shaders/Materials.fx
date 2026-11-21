@@ -1,4 +1,4 @@
-//***************************************************************************************
+﻿//***************************************************************************************
 // LightHelper.fx by Frank Luna (C) 2011 All Rights Reserved.
 //
 // Structures and functions for lighting calculations.
@@ -46,158 +46,217 @@ struct ShaderMaterial
 {
     float4 Ambient;
     float4 Diffuse;
-    float4 Specular; // w = SpecPower
-    float4 Reflect;
-    float4 flags; // x = n/a, y = bool useTexture, z = float clip alpha threshold
+    float4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
+    float4 specularParams; // x = C++ PBR marker (unused here), metallic, roughness, specularFactor
+    float4 specularColor; // linear RGB factor; w = base-color clamp
+    float4 specularTextures; // strength/color slots; z/w = clamp flags
+    float4 normalTextures; // normal texture slot, scale, clamp flag
+    float4 metallicRoughnessTextures; // texture slot, clamp flag
+    float4 opticalParams; // x = IOR; y = transmission factor
+    float4 normalMotion; // two UV velocities per second
+    float4 tintTextures; // tint texture slot, clamp flag
+    float4 biplanarParams; // x = side-projection UV units per object unit (0 = off), y = blend sharpness
+    float4 uvTransformRow0[6];
+    float4 uvTransformRow1[6];
 };
 
-//---------------------------------------------------------------------------------------
-// Computes the ambient, diffuse, and specular terms in the lighting equation
-// from a directional light.  We need to output the terms separately because
-// later we will modify the individual terms.
-//---------------------------------------------------------------------------------------
-void ComputeDirectionalLight(ShaderMaterial mat, float4 textureColor, DirectionalLight L,
-    float3 normal, float3 toEye,
-    out float4 ambient,
-    out float4 diffuse,
-    out float4 spec)
+// A terrain material layer (Game/Terrain.h, Shaders/Terrain.hlsli; TerrainLayerData in Materials.h).
+struct TerrainLayer
 {
-    // Initialize outputs.
-    ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    ShaderMaterial material;    // Its own maps (by texture slot) and factors; tiling in its UV transform.
+    float4 textures;            // x = base-color texture slot (-1 none), y = clamp flag.
+    float4 height;              // Covers heights x..y meters, fading over z on each side.
+    float4 slope;               // Covers slopes x..y degrees from flat, fading over z.
+    float4 noise;               // Shifts the height limits by up to x meters and the slope limits by y degrees, in cells of z meters.
+};
 
-    // The light vector aims opposite the direction the light rays travel.
-    float3 lightVec = -L.Direction;
+static const uint BaseColorTextureRole = 0;
+static const uint MetallicRoughnessTextureRole = 1;
+static const uint NormalTextureRole = 2;
+static const uint SpecularStrengthTextureRole = 3;
+static const uint SpecularColorTextureRole = 4;
+static const uint TintTextureRole = 5;      // Base color x 2 x tint.rgb; linear data.
 
-    // Add ambient term.
-    ambient = mat.Ambient * L.Ambient * textureColor;
+float2 TransformMaterialUv(ShaderMaterial mat, float2 uv, uint role)
+{
+    float3 coordinate = float3(uv, 1.0f);
+    return float2(dot(coordinate, mat.uvTransformRow0[role].xyz),
+        dot(coordinate, mat.uvTransformRow1[role].xyz));
+}
 
-    // Add diffuse and specular term, provided the surface is in 
-    // the line of site of the light.
-
-    float diffuseFactor = dot(lightVec, normal);
-
-    // Flatten to avoid dynamic branching.
-    [flatten]
-    if (diffuseFactor > 0.0f)
+void TransformNormalBasis(ShaderMaterial mat, inout float3 tangent, inout float3 bitangent)
+{
+    float2 row0 = mat.uvTransformRow0[NormalTextureRole].xy;
+    float2 row1 = mat.uvTransformRow1[NormalTextureRole].xy;
+    float determinant = row0.x * row1.y - row0.y * row1.x;
+    if (abs(determinant) > 1e-8f)
     {
-        float3 v = reflect(-lightVec, normal);
-        float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
-
-        diffuse = diffuseFactor * mat.Diffuse * L.Diffuse * textureColor;
-        spec = specFactor * mat.Specular * L.Specular * textureColor;
+        float orientation = determinant < 0.0f ? -1.0f : 1.0f;
+        float3 transformedTangent = normalize(row1.y * tangent - row1.x * bitangent) * orientation;
+        float3 transformedBitangent = normalize(-row0.y * tangent + row0.x * bitangent) * orientation;
+        tangent = transformedTangent;
+        bitangent = transformedBitangent;
     }
 }
 
-//---------------------------------------------------------------------------------------
-// Computes the ambient, diffuse, and specular terms in the lighting equation
-// from a point light.  We need to output the terms separately because
-// later we will modify the individual terms.
-//---------------------------------------------------------------------------------------
-void ComputePointLight(ShaderMaterial mat, PointLight L, float3 pos, float3 normal, float3 toEye,
-    out float4 ambient, out float4 diffuse, out float4 spec)
+float2 TransformMaterialUvGradient(ShaderMaterial mat, float2 gradient, uint role)
 {
-    // Initialize outputs.
-    ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    return float2(dot(mat.uvTransformRow0[role].xy, gradient), dot(mat.uvTransformRow1[role].xy, gradient));
+}
 
-    // The vector from the surface to the light.
-    float3 lightVec = L.Position - pos;
+// Biplanar mapping (scene "biplanar", after Inigo Quilez's biplanar mapping). The material's own UVs are the
+// top-down projection (Y); object-space X and Z projections cover steep faces, where a top-down projection
+// stretches. Each pixel blends the two axes its normal leans on most, so a map is read at most twice, and once
+// where one projection's weight is 1 (flat ground, sheer cliffs). Explicit gradients keep the mip level continuous
+// where the chosen axes change.
+struct Biplanar
+{
+    float2 uv[2];       // Before the material's per-role UV transform.
+    float2 uvDx[2];     // Screen-space derivatives of uv.
+    float2 uvDy[2];
+    float weight[2];    // Sum to 1; 0 skips the projection.
+    uint axis[2];       // 0 = X, 1 = Y (the material's UVs), 2 = Z.
+};
 
-    // The distance from surface to light.
-    float d = length(lightVec);
+// u runs along the other horizontal axis and v down the object's Y axis, so the texture stands upright.
+// Linear, so it also maps position derivatives to UV derivatives.
+float2 BiplanarSideUv(float3 position, uint axis, float uvPerUnit)
+{
+    return (axis == 0 ? float2(position.z, -position.y) : float2(position.x, -position.y)) * uvPerUnit;
+}
 
-    // Range test.
-    if (d > L.Range)
-        return;
+Biplanar BiplanarSetup(ShaderMaterial mat, float3 positionL, float3 positionLDx, float3 positionLDy, float3 normalL,
+    float2 uv, float2 uvDx, float2 uvDy)
+{
+    const float3 n = abs(normalize(normalL));
+    // Ties go to the later axis for the largest and the earlier for the smallest, so the three always differ.
+    const uint major = n.x > n.y ? (n.x > n.z ? 0 : 2) : (n.y > n.z ? 1 : 2);
+    const uint minor = n.x <= n.y ? (n.x <= n.z ? 0 : 2) : (n.y <= n.z ? 1 : 2);
+    const uint median = 3 - major - minor;
+    // 1/sqrt(3) is the smallest a unit normal's largest component can be.
+    float2 weights = pow(saturate((float2(n[major], n[median]) - 0.5773f) / (1.0f - 0.5773f)), mat.biplanarParams.y);
+    weights.x = max(weights.x, 1e-4f);
+    weights /= weights.x + weights.y;
 
-    // Normalize the light vector.
-    lightVec /= d;
-
-    // Ambient term.
-    ambient = mat.Ambient * L.Ambient;
-
-    // Add diffuse and specular term, provided the surface is in 
-    // the line of site of the light.
-
-    float diffuseFactor = dot(lightVec, normal);
-
-    // Flatten to avoid dynamic branching.
-    [flatten]
-    if (diffuseFactor > 0.0f)
+    Biplanar result;
+    const uint axes[2] = { major, median };
+    [unroll] for (uint i = 0; i < 2; ++i)
     {
-        float3 v = reflect(-lightVec, normal);
-        float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
-
-        diffuse = diffuseFactor * mat.Diffuse * L.Diffuse;
-        spec = specFactor * mat.Specular * L.Specular;
+        result.axis[i] = axes[i];
+        result.weight[i] = weights[i];
+        if (axes[i] == 1)
+        {
+            result.uv[i] = uv;
+            result.uvDx[i] = uvDx;
+            result.uvDy[i] = uvDy;
+        }
+        else
+        {
+            result.uv[i] = BiplanarSideUv(positionL, axes[i], mat.biplanarParams.x);
+            result.uvDx[i] = BiplanarSideUv(positionLDx, axes[i], mat.biplanarParams.x);
+            result.uvDy[i] = BiplanarSideUv(positionLDy, axes[i], mat.biplanarParams.x);
+        }
     }
+    return result;
+}
 
-    // Attenuate
-    float att = 1.0f / dot(L.Att, float3(1.0f, d, d*d));
+// A side projection's normal-map frame in world space: tangent along +u, bitangent along +v, the convention the
+// glTF loader generates tangents in (GltfLoader.cpp GenerateTangents). upW is the object's +Y in world space.
+void BiplanarSideFrame(ShaderMaterial mat, uint axis, float3 normalL, float3 normalW, float3 upW,
+    out float3 tangent, out float3 bitangent)
+{
+    bitangent = normalize(-upW + normalW * dot(normalW, upW));
+    // cross(-Y, +X) = +Z is the X projection's u axis; cross(-Y, +Z) = -X is minus the Z projection's.
+    const float handedness = axis == 0 ? (normalL.x >= 0 ? 1.0f : -1.0f) : (normalL.z >= 0 ? -1.0f : 1.0f);
+    tangent = normalize(cross(bitangent, normalW)) * handedness;
+    TransformNormalBasis(mat, tangent, bitangent);
+}
 
-    diffuse *= att;
-    spec *= att;
+// Encode linear glTF lighting for the UNORM display targets.
+float EncodeGltfSrgbChannel(float linearColor)
+{
+    float value = max(linearColor, 0.0f);
+    return value <= 0.0031308f ? value * 12.92f : 1.055f * pow(value, 1.0f / 2.4f) - 0.055f;
+}
+
+float3 EncodeGltfDisplayColor(float3 linearColor)
+{
+    return float3(EncodeGltfSrgbChannel(linearColor.r),
+        EncodeGltfSrgbChannel(linearColor.g), EncodeGltfSrgbChannel(linearColor.b));
 }
 
 //---------------------------------------------------------------------------------------
-// Computes the ambient, diffuse, and specular terms in the lighting equation
-// from a spotlight.  We need to output the terms separately because
-// later we will modify the individual terms.
+// Computes the ambient, diffuse, and specular terms for glTF directional lighting.
 //---------------------------------------------------------------------------------------
-void ComputeSpotLight(ShaderMaterial mat, SpotLight L, float3 pos, float3 normal, float3 toEye,
-    out float4 ambient, out float4 diffuse, out float4 spec)
+// KHR_materials_ior and KHR_materials_specular dielectric Fresnel, with GGX and correlated Smith visibility.
+// Texture factors are applied to a local material before this shared raster/DXR function.
+float ComputeDielectricF0(float ior)
 {
-    // Initialize outputs.
-    ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
-
-    // The vector from the surface to the light.
-    float3 lightVec = L.Position - pos;
-
-    // The distance from surface to light.
-    float d = length(lightVec);
-
-    // Range test.
-    if (d > L.Range)
-        return;
-
-    // Normalize the light vector.
-    lightVec /= d;
-
-    // Ambient term.
-    ambient = mat.Ambient * L.Ambient;
-
-    // Add diffuse and specular term, provided the surface is in 
-    // the line of site of the light.
-
-    float diffuseFactor = dot(lightVec, normal);
-
-    // Flatten to avoid dynamic branching.
-    [flatten]
-    if (diffuseFactor > 0.0f)
-    {
-        float3 v = reflect(-lightVec, normal);
-        float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
-
-        diffuse = diffuseFactor * mat.Diffuse * L.Diffuse;
-        spec = specFactor * mat.Specular * L.Specular;
-    }
-
-    // Scale by spotlight factor and attenuate.
-    float spot = pow(max(dot(-lightVec, L.Direction), 0.0f), L.Spot);
-
-    // Scale by spotlight factor and attenuate.
-    float att = spot / dot(L.Att, float3(1.0f, d, d*d));
-
-    ambient *= spot;
-    diffuse *= att;
-    spec *= att;
+    if (ior == 0.0f) return 1.0f; // KHR_materials_ior compatibility mode.
+    float ratio = (ior - 1.0f) / (ior + 1.0f);
+    return ratio * ratio;
 }
 
+void ComputeDirectionalLight(ShaderMaterial mat, float4 textureColor, DirectionalLight light,
+    float3 normal, float3 toEye, out float4 ambient, out float4 diffuse, out float4 spec)
+{
+    const float pi = 3.14159265359f;
+    float metallic = saturate(mat.specularParams.y);
+    float roughness = max(saturate(mat.specularParams.z), 0.045f);
+    float strength = saturate(mat.specularParams.w);
+    float3 baseColor = mat.Diffuse.rgb * textureColor.rgb;
+    float3 dielectricF0 = min(ComputeDielectricF0(mat.opticalParams.x) * mat.specularColor.rgb, 1.0f) * strength;
+    float3 f0 = lerp(dielectricF0, baseColor, metallic);
+    float f90 = lerp(strength, 1.0f, metallic);
+    float3 N = normalize(normal);
+    float3 V = normalize(toEye);
+    float3 L = normalize(-light.Direction);
+    float nl = saturate(dot(N, L));
+    float nv = saturate(dot(N, V));
+    float3 halfVector = L + V;
+    float3 H = halfVector * rsqrt(max(dot(halfVector, halfVector), 1e-8f));
+    float nh = saturate(dot(N, H));
+    float vh = saturate(dot(V, H));
+    float fresnelWeight = pow(1.0f - vh, 5.0f);
+    float3 F = lerp(f0, f90.xxx, fresnelWeight);
+    float3 dielectricF = lerp(dielectricF0, strength.xxx, fresnelWeight);
+    float diffuseWeight = (1.0f - max(dielectricF.r, max(dielectricF.g, dielectricF.b))) * (1.0f - metallic);
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    float denominator = nh * nh * (alpha2 - 1.0f) + 1.0f;
+    float D = alpha2 / (pi * denominator * denominator);
+    float visibility = 0.5f / max(
+        nl * sqrt(nv * nv * (1.0f - alpha2) + alpha2) +
+        nv * sqrt(nl * nl * (1.0f - alpha2) + alpha2), 1e-6f);
+    // Existing ambient light is an artistic approximation, not an environment BRDF.
+    ambient = float4(mat.Ambient.rgb * textureColor.rgb * light.Ambient.rgb * (1.0f - metallic), 1);
+    diffuse = float4(diffuseWeight * baseColor * light.Diffuse.rgb * (nl / pi), 0);
+    spec = float4(F * D * visibility * nl * light.Specular.rgb * (nv > 0 ? 1.0f : 0.0f), 0);
+}
+
+float3 ComputeGltfEnvironmentLight(ShaderMaterial mat, float4 textureColor,
+    float3 normal, float3 toEye, float3 irradiance, float3 prefiltered)
+{
+    float metallic = saturate(mat.specularParams.y);
+    float roughness = saturate(mat.specularParams.z);
+    float3 baseColor = mat.Diffuse.rgb * textureColor.rgb;
+    float strength = saturate(mat.specularParams.w);
+    float3 dielectricF0 = min(ComputeDielectricF0(mat.opticalParams.x) * mat.specularColor.rgb, 1.0f) * strength;
+    float3 f0 = lerp(dielectricF0, baseColor, metallic);
+    float f90 = lerp(strength, 1.0f, metallic);
+    float nv = saturate(dot(normalize(normal), normalize(toEye)));
+    float fresnelWeight = pow(1.0f - nv, 5.0f);
+    float3 dielectricF = lerp(dielectricF0, strength.xxx, fresnelWeight);
+    float diffuseWeight = (1.0f - max(dielectricF.r, max(dielectricF.g, dielectricF.b))) * (1.0f - metallic);
+
+    // Analytic split-sum BRDF approximation for the GGX-prefiltered environment.
+    float4 r = roughness * float4(-1.0f, -0.0275f, -0.572f, 0.022f)
+        + float4(1.0f, 0.0425f, 1.04f, -0.04f);
+    float a004 = min(r.x * r.x, exp2(-9.28f * nv)) * r.x + r.y;
+    float2 brdf = float2(-1.04f, 1.04f) * a004 + r.zw;
+    return irradiance * (diffuseWeight * baseColor)
+        + prefiltered * (f0 * brdf.x + f90 * brdf.y);
+}
 
 //---------------------------------------------------------------------------------------
 // Performs shadowmap test to determine if a pixel is in shadow.
