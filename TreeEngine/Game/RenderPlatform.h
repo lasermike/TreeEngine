@@ -1106,6 +1106,7 @@ public:
         UINT64 size = 0;
         std::map<UINT64, UINT64> freeRanges;            // Offset to size, coalesced.
         bool dedicated = false;                         // Holds one large BLAS; released when it is freed.
+        bool compacted = false;                         // Holds only compacted BLASes, which are never rebuilt in place.
     };
     struct PendingBlasFree
     {
@@ -1115,7 +1116,9 @@ public:
     std::vector<BlasHeapChunk> m_blasHeap;
     std::vector<PendingBlasFree> m_pendingBlasFrees;
     UINT64 m_blasHeapLiveBytes = 0;
-    HRESULT AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasAllocation& allocation);
+    // Compacted BLASes go in chunks of their own, so the full-size builds they were copied from leave chunks that
+    // empty out and are released, instead of holes between long-lived compacted ones.
+    HRESULT AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasAllocation& allocation, bool compacted = false);
     void FreeBlas(BlasAllocation& allocation);          // Deferred to the next frame.
     void ReclaimBlasFrees();                            // Returns ranges freed in earlier frames to their chunks.
     void ReleaseBlasHeap();
@@ -1170,9 +1173,20 @@ public:
         bool opaque = false;
         UINT64 lastUsedFrame = 0;
         UINT firstGeometry = 0;
+        UINT64 builtFrame = 0;                          // m_blasFrame of its last build.
+        bool compacted = false;
     };
     std::vector<PooledDraw> m_pooledDraws;
     std::unordered_map<const void*, PooledBlas> m_pooledBlases;
+    // Pooled BLASes are built with ALLOW_COMPACTION, each build writing its compacted size to a slot of
+    // m_pooledCompactedSizes, which is copied to the readback buffer. The next frame (RenderProlog has waited for this
+    // one) copies each BLAS still as built into an allocation of that size and frees the original.
+    CComPtr<ID3D12Resource> m_pooledCompactedSizes;
+    CComPtr<ID3D12Resource> m_pooledCompactedSizesReadback;
+    UINT m_pooledCompactedSizesCapacity = 0;            // Slots in both buffers.
+    std::vector<const void*> m_pooledCompactionOwners;  // Last frame's builds, by slot.
+    UINT64 m_pooledCompactionFrame = 0;                 // m_blasFrame of those builds.
+    HRESULT CompactPooledBlases(ID3D12Device5* device, ID3D12GraphicsCommandList4* commandList);
     bool m_currentRenderUnitPooled = false;             // Set by SetRenderUnit.
     std::vector<UINT> m_drawRecordTransformSlot;        // Per record: its object transform, moved to the TLAS (UINT_MAX = none).
     std::vector<size_t> m_drawRecordShareKey;           // Per record: its shared-geometry key (0 = not shared).

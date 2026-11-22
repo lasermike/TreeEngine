@@ -3362,6 +3362,7 @@ void RenderPlatform12::ReleaseDynamicBlases()
     m_dynamicBlases.clear();
     m_sharedBlases.clear();
     m_pooledBlases.clear();
+    m_pooledCompactionOwners.clear();
     ReleaseBlasHeap();
     Retire(m_blasScratch);
     for (auto& upload : m_ommRecordUpload)
@@ -3385,8 +3386,8 @@ void RenderPlatform12::ReleaseBlasHeap()
 // BLASes under 1 MB are pooled, first fit across the heap's chunks; a new pool chunk grows with the heap (4 MB, then
 // half its size, up to 64 MB). A larger BLAS gets a chunk of its own, exactly its size, released once it is freed:
 // pooling those fragmented the heap as trees grew. A new chunk takes the slot of a released one, so chunk indices
-// stay stable.
-HRESULT RenderPlatform12::AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasAllocation& allocation)
+// stay stable. Compacted BLASes are pooled apart from the rest (see the declaration).
+HRESULT RenderPlatform12::AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasAllocation& allocation, bool compacted)
 {
     const UINT64 alignment = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT;
     bytes = (bytes + alignment - 1) & ~(alignment - 1);
@@ -3394,7 +3395,7 @@ HRESULT RenderPlatform12::AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasA
     for (int chunkIndex = 0; chunkIndex < static_cast<int>(m_blasHeap.size()) && !dedicated; ++chunkIndex)
     {
         BlasHeapChunk& chunk = m_blasHeap[chunkIndex];
-        if (!chunk.buffer)
+        if (!chunk.buffer || chunk.dedicated || chunk.compacted != compacted)
             continue;
         for (auto range = chunk.freeRanges.begin(); range != chunk.freeRanges.end(); ++range)
         {
@@ -3415,10 +3416,11 @@ HRESULT RenderPlatform12::AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasA
     }
     UINT64 capacity = 0;
     for (const BlasHeapChunk& chunk : m_blasHeap)
-        capacity += chunk.dedicated ? 0 : chunk.size;     // Released chunks have size 0.
+        capacity += chunk.dedicated || chunk.compacted != compacted ? 0 : chunk.size;     // Released chunks have size 0.
     const UINT64 chunkBytes = dedicated ? bytes : (std::min)(UINT64(64) << 20, (std::max)(UINT64(4) << 20, capacity / 2));
     BlasHeapChunk chunk;
     chunk.dedicated = dedicated;
+    chunk.compacted = compacted && !dedicated;
     chunk.size = chunkBytes;
     const D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
     const D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Buffer(chunkBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
@@ -3432,7 +3434,7 @@ HRESULT RenderPlatform12::AllocateBlas(ID3D12Device* device, UINT64 bytes, BlasA
     else
         m_blasHeap.push_back(std::move(chunk));
     if (!dedicated)
-        return AllocateBlas(device, bytes, allocation);
+        return AllocateBlas(device, bytes, allocation, compacted);
     BlasHeapChunk& owned = m_blasHeap[chunkIndex];
     owned.freeRanges.clear();
     allocation.chunk = chunkIndex;
@@ -3483,14 +3485,15 @@ void RenderPlatform12::ReclaimBlasFrees()
         m_blasHeapLiveBytes -= freed.size;
         pending = m_pendingBlasFrees.erase(pending);
     }
-    // A chunk with nothing left in it is released, unless it is the last one.
-    size_t poolChunks = std::count_if(m_blasHeap.begin(), m_blasHeap.end(),
-        [](const BlasHeapChunk& chunk) { return chunk.buffer && !chunk.dedicated; });
+    // A chunk with nothing left in it is released, unless it is the last one of its kind (compacted or not).
+    size_t poolChunks[2] = {};
+    for (const BlasHeapChunk& chunk : m_blasHeap)
+        poolChunks[chunk.compacted] += chunk.buffer && !chunk.dedicated;
     for (BlasHeapChunk& chunk : m_blasHeap)
     {
         const bool empty = chunk.buffer && chunk.freeRanges.size() == 1
             && chunk.freeRanges.begin()->first == 0 && chunk.freeRanges.begin()->second == chunk.size;
-        if (!empty || (!chunk.dedicated && poolChunks <= 1))
+        if (!empty || (!chunk.dedicated && poolChunks[chunk.compacted] <= 1))
             continue;
         const bool pendingInChunk = std::any_of(m_pendingBlasFrees.begin(), m_pendingBlasFrees.end(),
             [&](const PendingBlasFree& free) { return &m_blasHeap[free.allocation.chunk] == &chunk; });
@@ -3498,9 +3501,10 @@ void RenderPlatform12::ReclaimBlasFrees()
             continue;
         Retire(chunk.buffer);
         if (!chunk.dedicated)
-            --poolChunks;
+            --poolChunks[chunk.compacted];
         chunk.size = 0;
         chunk.dedicated = false;
+        chunk.compacted = false;
         chunk.freeRanges.clear();
     }
 }
@@ -3611,6 +3615,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
 
     ++m_blasFrame;
     ReclaimBlasFrees();
+    m_renderData->profile.pooledBlasCompactions = 0;
+    m_renderData->profile.pooledBlasCompactedBytes = 0;
     const bool rebuildAll = forceRebuild || m_TLAS == nullptr;
 
     if (m_ommBuildPending)
@@ -4149,7 +4155,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         m_VBWorld, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
-    if (!anyDynamicWork && !buildStatic && !compactStatic && pooledBuilds.empty() && m_TLAS && currentTlasState() == m_tlasState)
+    if (!anyDynamicWork && !buildStatic && !compactStatic && pooledBuilds.empty() && m_pooledCompactionOwners.empty()
+        && m_TLAS && currentTlasState() == m_tlasState)
     {
         recordAccelerationStructureBytes();
         PIXEndEvent(GetCommandList());
@@ -4261,10 +4268,31 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         owner.layoutHash = owner.currentHash;
         owner.inputs.swap(owner.currentInputs);
     }
+    // Last frame's pooled builds are compacted first: this frame's builds overwrite the sizes they were read from.
+    // An owner rebuilt this frame is skipped (its build has a newer builtFrame by the time sizes are read again).
+    for (const size_t drawIndex : pooledBuilds)
+        m_pooledBlases[m_pooledDraws[drawIndex].owner].builtFrame = m_blasFrame;
+    HRR(CompactPooledBlases(device, commandList));
     if (!pooledBuilds.empty())
     {
         // Pooled builds, for fast tracing; they share the scratch buffer after the dynamic builds, so wait for those.
         PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build pooled BLASes");
+        if (m_pooledCompactedSizesCapacity < pooledBuilds.size())
+        {
+            // Compaction above has read the old readback buffer; retiring keeps both alive until the GPU is done.
+            Retire(m_pooledCompactedSizes);
+            Retire(m_pooledCompactedSizesReadback);
+            const UINT capacity = (std::max)(256u, static_cast<UINT>(pooledBuilds.size() + pooledBuilds.size() / 2));
+            const D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+            const D3D12_RESOURCE_DESC sizesDesc = CD3DX12_RESOURCE_DESC::Buffer(capacity * sizeof(UINT64), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            HRR(device->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &sizesDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                nullptr, IID_PPV_ARGS(&m_pooledCompactedSizes)));
+            const D3D12_HEAP_PROPERTIES readbackHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+            const D3D12_RESOURCE_DESC readbackDesc = CD3DX12_RESOURCE_DESC::Buffer(capacity * sizeof(UINT64));
+            HRR(device->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+                nullptr, IID_PPV_ARGS(&m_pooledCompactedSizesReadback)));
+            m_pooledCompactedSizesCapacity = capacity;
+        }
         std::vector<UINT64> pooledScratch(pooledBuilds.size());
         std::vector<D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS> pooledInputs(pooledBuilds.size());
         UINT64 pooledLargest = 0;
@@ -4274,7 +4302,8 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             PooledBlas& pooled = m_pooledBlases[draw.owner];
             D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs = pooledInputs[i];
             inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-            inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+            inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE
+                | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
             inputs.NumDescs = 1;
             inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
             inputs.pGeometryDescs = &pooledDescs[pooledBuilds[i]];
@@ -4318,14 +4347,32 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
             buildDesc.DestAccelerationStructureData = pooled.blas.address;
             buildDesc.Inputs = pooledInputs[i];
             buildDesc.ScratchAccelerationStructureData = m_blasScratch->GetGPUVirtualAddress() + used;
-            commandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
+            const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC postbuild = {
+                m_pooledCompactedSizes->GetGPUVirtualAddress() + i * sizeof(UINT64),
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE };
+            commandList->BuildRaytracingAccelerationStructure(&buildDesc, 1, &postbuild);
             used += pooledScratch[i];
+            pooled.compacted = false;
             pooled.baseVertex = draw.baseVertex;
             pooled.vertexCount = draw.vertexCount;
             pooled.indexStart = draw.indexStart;
             pooled.indexCount = draw.indexCount;
             pooled.opaque = pooledDescs[pooledBuilds[i]].Flags == D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
         }
+        // The compacted sizes, read back for next frame's compaction.
+        const UINT64 sizeBytes = pooledBuilds.size() * sizeof(UINT64);
+        D3D12_RESOURCE_BARRIER toCopy[] = {
+            CD3DX12_RESOURCE_BARRIER::UAV(m_pooledCompactedSizes),
+            CD3DX12_RESOURCE_BARRIER::Transition(m_pooledCompactedSizes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE) };
+        commandList->ResourceBarrier(_countof(toCopy), toCopy);
+        commandList->CopyBufferRegion(m_pooledCompactedSizesReadback, 0, m_pooledCompactedSizes, 0, sizeBytes);
+        const D3D12_RESOURCE_BARRIER back = CD3DX12_RESOURCE_BARRIER::Transition(m_pooledCompactedSizes,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        commandList->ResourceBarrier(1, &back);
+        m_pooledCompactionOwners.clear();
+        for (const size_t drawIndex : pooledBuilds)
+            m_pooledCompactionOwners.push_back(m_pooledDraws[drawIndex].owner);
+        m_pooledCompactionFrame = m_blasFrame;
     }
     if (profileCpu)
     {
@@ -4491,6 +4538,48 @@ HRESULT RenderPlatform12::BuildStaticBlas(ID3D12Device5* device, UINT geometryCo
 
     m_staticBlas.inputs = m_currentStaticBlasInputs;
     m_staticBlas.compactionPending = true;
+    return S_OK;
+}
+
+// Copies each pooled BLAS built last frame, and not rebuilt or retired since, into a BLAS-heap allocation of its
+// compacted size, read back from that build (RenderProlog has waited for the frame), and frees the original. The
+// copies are recorded before the TLAS build, which reads the new addresses.
+HRESULT RenderPlatform12::CompactPooledBlases(ID3D12Device5* device, ID3D12GraphicsCommandList4* commandList)
+{
+    if (m_pooledCompactionOwners.empty())
+        return S_OK;
+    PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Compact pooled BLASes");
+    std::vector<const void*> owners;
+    owners.swap(m_pooledCompactionOwners);
+    UINT64* sizes = nullptr;
+    const D3D12_RANGE readRange = { 0, owners.size() * sizeof(UINT64) };
+    HRR(m_pooledCompactedSizesReadback->Map(0, &readRange, reinterpret_cast<void**>(&sizes)));
+    std::vector<UINT64> compactedBytes(sizes, sizes + owners.size());
+    const D3D12_RANGE noWrite = { 0, 0 };
+    m_pooledCompactedSizesReadback->Unmap(0, &noWrite);
+    UINT compactions = 0;
+    UINT64 savedBytes = 0;
+    for (size_t slot = 0; slot < owners.size(); ++slot)
+    {
+        const auto entry = m_pooledBlases.find(owners[slot]);
+        if (entry == m_pooledBlases.end())
+            continue;                                   // Retired.
+        PooledBlas& pooled = entry->second;
+        const UINT64 bytes = compactedBytes[slot];
+        if (!pooled.blas || pooled.compacted || pooled.builtFrame != m_pooledCompactionFrame || bytes == 0 || bytes >= pooled.blas.size)
+            continue;
+        BlasAllocation compacted;
+        HRR(AllocateBlas(device, bytes, compacted, true));
+        commandList->CopyRaytracingAccelerationStructure(compacted.address, pooled.blas.address,
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_COMPACT);
+        savedBytes += pooled.blas.size - compacted.size;
+        FreeBlas(pooled.blas);
+        pooled.blas = compacted;
+        pooled.compacted = true;
+        ++compactions;
+    }
+    m_renderData->profile.pooledBlasCompactions = compactions;
+    m_renderData->profile.pooledBlasCompactedBytes = savedBytes;
     return S_OK;
 }
 
