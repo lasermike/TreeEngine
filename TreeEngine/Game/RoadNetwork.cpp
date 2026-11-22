@@ -66,7 +66,8 @@ namespace
 
 namespace Roads
 {
-    bool PackageFrame(const std::string& sourceJson, std::string& crs, double& originX, double& originY, std::string& error)
+    bool PackageFrame(const std::string& sourceJson, double worldSize, std::string& crs, double& originX, double& originY,
+        std::string& error)
     {
         const Json source = Json::parse(sourceJson, nullptr, false);
         if (source.is_discarded() || !source.is_object() || !source.contains("crs") || !source["crs"].is_string()
@@ -82,9 +83,23 @@ namespace Roads
                 error = "the terrain package's source bounds aren't numbers";
                 return false;
             }
+        const double xmin = bounds[0].get<double>(), ymin = bounds[1].get<double>();
+        const double xmax = bounds[2].get<double>(), ymax = bounds[3].get<double>();
+        double columns = 0, rows = 0;
+        if (source.contains("size") && source["size"].is_array() && source["size"].size() == 2
+            && source["size"][0].is_number() && source["size"][1].is_number())
+        {
+            columns = source["size"][0].get<double>();
+            rows = source["size"][1].get<double>();
+        }
+        if (!(columns >= 1 && rows >= 1 && xmax > xmin && ymax > ymin && worldSize > 0))
+        {
+            error = "the terrain package's source has no raster size, so roads can't be placed on it";
+            return false;
+        }
         crs = NormalizeCrs(source["crs"].get<std::string>());
-        originX = (bounds[0].get<double>() + bounds[2].get<double>()) / 2;
-        originY = (bounds[1].get<double>() + bounds[3].get<double>()) / 2;
+        originX = xmin + 0.5 * (xmax - xmin) / columns + worldSize / 2;
+        originY = ymin + 0.5 * (ymax - ymin) / rows + worldSize / 2;
         return true;
     }
 
@@ -126,15 +141,22 @@ namespace Roads
             if (!feature.contains("geometry") || !feature["geometry"].is_object())
                 Fail(where + ".geometry", "required");
             const auto& geometry = feature["geometry"];
-            const std::string type = geometry.value("type", "");
+            const std::string type = geometry.contains("type") && geometry["type"].is_string() ? geometry["type"].get<std::string>() : "";
+            if (type != "LineString" && type != "MultiLineString")
+                Fail(where + ".geometry", "a " + kind + " must be a LineString or MultiLineString");
+            if (!geometry.contains("coordinates") || !geometry["coordinates"].is_array())
+                Fail(where + ".geometry.coordinates", "required, an array");
+            const auto& coordinates = geometry["coordinates"];
             std::vector<Json> parts;
             if (type == "LineString")
-                parts.push_back(geometry["coordinates"]);
-            else if (type == "MultiLineString" && geometry["coordinates"].is_array())
-                for (const auto& part : geometry["coordinates"])
-                    parts.push_back(part);
+                parts.push_back(coordinates);
             else
-                Fail(where + ".geometry", "a " + kind + " must be a LineString or MultiLineString");
+            {
+                if (coordinates.empty())
+                    Fail(where + ".geometry.coordinates", "a MultiLineString needs at least one line");
+                for (const auto& part : coordinates)
+                    parts.push_back(part);
+            }
 
             Line line;
             line.kind = kind == "road" ? Kind::Road : Kind::Driveway;

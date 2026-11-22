@@ -34,9 +34,12 @@ namespace Roads
         std::vector<Line> lines;
     };
 
-    // The origin of a package's coordinates in its CRS (the center of its manifest's source.bounds) and the CRS, from
-    // the manifest's source JSON; false with `error` when it has none.
-    bool PackageFrame(const std::string& sourceJson, std::string& crs, double& originX, double& originY, std::string& error);
+    // The origin of a package's coordinates in its CRS, and the CRS, from its manifest's source JSON and world size;
+    // false with `error` when the source has no CRS and bounds. TerrainTool pack puts the source raster's southwest
+    // pixel center at the package's -x/-z corner and pads north and east, so the origin is that pixel center plus
+    // half the world (not the bounds' center).
+    bool PackageFrame(const std::string& sourceJson, double worldSize, std::string& crs, double& originX, double& originY,
+        std::string& error);
 
     // Parses a roads file's text. Its CRS must be `crs`; coordinates become package coordinates about the origin.
     // Throws std::runtime_error naming the feature and property at fault.

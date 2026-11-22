@@ -124,7 +124,11 @@ aerial imagery for editing. Each feature's `properties`:
 
 Widths come from the surface and owner: county paved 6 m with 0.6 m shoulders (6.6 m and 1.2 m at 40 mph and up),
 county gravel 5 m, private paved 4 m, private gravel 3.6 m, driveways 3 m; county roads get 0.5 to 0.6 m deep ditches.
-A terrain object names its roads file with `roads` (Scenes README).
+A terrain object names its roads file with `roads` (Scenes README). Every line is clipped to what the package's
+heights cover. Its package coordinates are about the packed grid's center: TerrainTool puts the source raster's
+southwest pixel center at the package's -x/-z corner and pads north and east, so that center is not the source
+bounds' center. `python -I -B test_import_roads.py` checks the importer's geometry (junctions, clipping, driveway
+joins) on synthetic data.
 
 **Layer textures.** `TerrainTool texture --out Textures/rock --kind rock --size 512 --seed 3` writes
 `rock_color.png` (sRGB), `rock_normal.png` (tangent space, +Y up the image) and `rock_mr.png` (roughness in G,

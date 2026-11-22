@@ -909,10 +909,18 @@ void TestRoadNetwork()
 {
     std::string crs, error;
     double originX = 0, originY = 0;
-    Check(Roads::PackageFrame(R"({"crs":"EPSG:32610","bounds":[1000,2000,1100,2300]})", crs, originX, originY, error)
-        && crs == "EPSG:32610" && originX == 1050 && originY == 2150, "the package frame was not read");
-    Check(!Roads::PackageFrame(R"({"preset":"hills"})", crs, originX, originY, error) && !error.empty(),
+    // A 100 x 300 m source at 1 m packs into a 512 m world (513 samples), padded north and east: the southwest pixel
+    // center (1000.5, 2000.5) is the package's -x/-z corner, so the origin is 256 m further on each axis.
+    Check(Roads::PackageFrame(R"({"crs":"EPSG:32610","bounds":[1000,2000,1100,2300],"size":[100,300]})", 512, crs,
+        originX, originY, error) && crs == "EPSG:32610" && originX == 1256.5 && originY == 2256.5,
+        "the package frame was not read from the packed grid");
+    Check(Roads::PackageFrame(R"({"crs":"urn:ogc:def:crs:EPSG::32610","bounds":[0,0,2048,1024],"size":[2048,1024]})",
+        2048, crs, originX, originY, error) && originX == 1024.5 && originY == 1024.5 && crs == "EPSG:32610",
+        "a padded rectangular source's origin is wrong");
+    Check(!Roads::PackageFrame(R"({"preset":"hills"})", 512, crs, originX, originY, error) && !error.empty(),
         "a procedural package was given a frame");
+    Check(!Roads::PackageFrame(R"({"crs":"EPSG:32610","bounds":[1000,2000,1100,2300]})", 512, crs, originX, originY, error),
+        "a source without a raster size was given a frame");
 
     const std::string file = R"({"type":"FeatureCollection",
         "crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:EPSG::32610"}},
@@ -959,6 +967,18 @@ void TestRoadNetwork()
     bad = Json::parse(file);
     bad["features"][0]["geometry"]["coordinates"] = Json::array({ Json::array({ 1050, 2150 }) });
     rejects(bad.dump(), "at least two points");
+    bad = Json::parse(file);
+    bad["features"][0]["geometry"].erase("coordinates");
+    rejects(bad.dump(), "features[0] (county-1).geometry.coordinates");
+    bad = Json::parse(file);
+    bad["features"][1]["geometry"].erase("coordinates");
+    rejects(bad.dump(), "features[1] (osm-way-7).geometry.coordinates");
+    bad = Json::parse(file);
+    bad["features"][1]["geometry"]["coordinates"] = Json::array();
+    rejects(bad.dump(), "at least one line");
+    bad = Json::parse(file);
+    bad["features"][0]["geometry"]["type"] = 7;
+    rejects(bad.dump(), "features[0] (county-1).geometry");
     rejects("[]", "FeatureCollection");
 
     // The scene field, saved and parsed again.

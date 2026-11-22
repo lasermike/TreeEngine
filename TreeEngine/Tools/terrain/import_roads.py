@@ -67,11 +67,17 @@ class Package:
         if not source.get('crs') or not source.get('bounds'):
             sys.exit(f'{directory}: the manifest has no source.crs and source.bounds (import it with import_heightmap.py)')
         self.crs = source['crs']
-        self.bounds = source['bounds']                  # xmin, ymin, xmax, ymax in the CRS
-        self.cx = (self.bounds[0] + self.bounds[2]) / 2
-        self.cy = (self.bounds[1] + self.bounds[3]) / 2
+        self.bounds = source['bounds']                  # xmin, ymin, xmax, ymax of the source raster, in the CRS
         self.world = manifest['worldSize']
         self.spacing = manifest['sampleSpacing']
+        # TerrainTool pack puts the raster's southwest pixel center at the package's -x/-z corner and pads north and
+        # east to a whole quadtree, so the package's origin (its center) is that corner plus half the world.
+        size = source.get('size') or [round((self.bounds[2] - self.bounds[0]) / self.spacing),
+                                      round((self.bounds[3] - self.bounds[1]) / self.spacing)]
+        self.cx = self.bounds[0] + 0.5 * (self.bounds[2] - self.bounds[0]) / size[0] + self.world / 2
+        self.cy = self.bounds[1] + 0.5 * (self.bounds[3] - self.bounds[1]) / size[1] + self.world / 2
+        # What the heights cover, in the CRS: the clip for every imported line.
+        self.extent = (self.cx - self.world / 2, self.cy - self.world / 2, self.cx + self.world / 2, self.cy + self.world / 2)
         levels = manifest['levels']
         quads, block, stride = manifest['nodeQuads'], manifest['blockSamples'], manifest['blockStride']
         finest = levels - 1
@@ -100,7 +106,8 @@ class Package:
         return float((h[i, j] * (1 - fx) + h[i, j + 1] * fx) * (1 - fz) + (h[i + 1, j] * (1 - fx) + h[i + 1, j + 1] * fx) * fz)
 
     def contains(self, x, y, margin=0):
-        return (self.bounds[0] + margin <= x <= self.bounds[2] - margin) and (self.bounds[1] + margin <= y <= self.bounds[3] - margin)
+        e = self.extent
+        return (e[0] + margin <= x <= e[2] - margin) and (e[1] + margin <= y <= e[3] - margin)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -121,7 +128,7 @@ def county_layer(cache, name, package):
         zipfile.ZipFile(archive).extractall(folder)
     with tempfile.TemporaryDirectory() as work:
         out = os.path.join(work, name + '.geojson')
-        b = package.bounds
+        b = package.extent
         run(['ogr2ogr', '-f', 'GeoJSON', '-t_srs', package.crs, '-spat', str(b[0]), str(b[1]), str(b[2]), str(b[3]),
              '-spat_srs', package.crs, '-clipdst', str(b[0]), str(b[1]), str(b[2]), str(b[3]), out, path])
         return json.load(open(out))['features']
@@ -155,6 +162,44 @@ def osm_ways(cache, package):
 
 # ---------------------------------------------------------------------------------------------------------------
 # Geometry.
+
+def clip_line(line, extent):
+    """The parts of a polyline inside a rectangle (xmin, ymin, xmax, ymax), each a list of two or more points."""
+    xmin, ymin, xmax, ymax = extent
+    parts, current = [], []
+    for (ax, ay), (bx, by) in zip(line, line[1:]):
+        t0, t1, dx, dy = 0.0, 1.0, bx - ax, by - ay
+        inside = True
+        for p, q in ((-dx, ax - xmin), (dx, xmax - ax), (-dy, ay - ymin), (dy, ymax - ay)):
+            if p == 0:
+                if q < 0:
+                    inside = False
+                    break
+            else:
+                t = q / p
+                if p < 0:
+                    t0 = max(t0, t)
+                else:
+                    t1 = min(t1, t)
+        if not inside or t0 > t1:
+            if len(current) >= 2:
+                parts.append(current)
+            current = []
+            continue
+        start = (ax + dx * t0, ay + dy * t0)
+        end = (ax + dx * t1, ay + dy * t1)
+        if not current or math.hypot(current[-1][0] - start[0], current[-1][1] - start[1]) > 1e-6:
+            if len(current) >= 2:
+                parts.append(current)
+            current = [start]
+        current.append(end)
+        if t1 < 1:
+            parts.append(current)
+            current = []
+    if len(current) >= 2:
+        parts.append(current)
+    return [p for p in parts if sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(p, p[1:])) > 0.5]
+
 
 def resample(line, step):
     """Points every `step` metres along a polyline, ends included."""
@@ -266,22 +311,27 @@ def smooth(offsets, radius):
 # ---------------------------------------------------------------------------------------------------------------
 # Building the features.
 
-def taper_end(points, which, target, reach):
-    """Moves one end of a sampled line to `target`, and the points within `reach` metres of it by a share that falls
-    linearly to nothing, so a joined end doesn't kink."""
-    order = range(len(points)) if which == 0 else range(len(points) - 1, -1, -1)
-    order = list(order)
-    sx, sy = points[order[0]]
-    dx, dy = target[0] - sx, target[1] - sy
-    travelled = 0.0
-    previous = points[order[0]]
-    for i in order:
-        travelled += math.hypot(points[i][0] - previous[0], points[i][1] - previous[1])
-        previous = points[i]
-        if travelled >= reach:
-            break
-        share = 1 - travelled / reach
-        points[i] = (points[i][0] + dx * share, points[i][1] + dy * share)
+def bend_to(points, start, end, reach):
+    """Moves a sampled line's ends to `start` and `end` (None: stays) and the points near them by shares that fall
+    linearly to nothing within `reach` metres, or within the line's length when it's shorter, so each end lands
+    exactly on its target and joined ends don't kink."""
+    if start is None and end is None:
+        return
+    along = [0.0]
+    for a, b in zip(points, points[1:]):
+        along.append(along[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
+    length = along[-1]
+    span = min(reach, length) or 1.0
+    d0 = (start[0] - points[0][0], start[1] - points[0][1]) if start else (0.0, 0.0)
+    d1 = (end[0] - points[-1][0], end[1] - points[-1][1]) if end else (0.0, 0.0)
+    for i, s in enumerate(along):
+        w0 = max(0.0, 1 - s / span)
+        w1 = max(0.0, 1 - (length - s) / span)
+        points[i] = (points[i][0] + d0[0] * w0 + d1[0] * w1, points[i][1] + d0[1] * w0 + d1[1] * w1)
+    if start:
+        points[0] = start
+    if end:
+        points[-1] = end
 
 
 def county_profile(props):
@@ -327,21 +377,34 @@ def build_roads(package, features, reach, report):
         road['snapped'] = [(px + nx * o, py + ny * o) for (px, py), (nx, ny), o in zip(points, normals(points), offsets)]
         road['found'] = len(found) / max(len(raw), 1)
         moved += list(np.abs(offsets))
-    # Join ends that met before snapping: each meeting point moves to the mean of its roads' snapped ends.
+    # Join ends that met before snapping: each meeting point goes to the mean of its roads' snapped ends. All the
+    # targets are found first, then each road is bent to both of its targets at once, so a short link can't reopen
+    # one junction while closing the other.
     ends = {}
     for road in roads:
         for which in (0, -1):
             key = (round(road['line'][which][0], 1), round(road['line'][which][1], 1))
             ends.setdefault(key, []).append((road, which))
+    targets = {}
     for key, members in ends.items():
         if len(members) < 2:
             continue
         mx = sum(r['snapped'][w][0] for r, w in members) / len(members)
         my = sum(r['snapped'][w][1] for r, w in members) / len(members)
         for road, which in members:
-            taper_end(road['snapped'], which, (mx, my), 20.0)
+            targets[(id(road), which)] = (mx, my)
     for road in roads:
-        road['line'] = simplify(road['snapped'], 0.25)
+        bend_to(road['snapped'], targets.get((id(road), 0)), targets.get((id(road), -1)), 20.0)
+    # Snapping can nudge a line's end past the package's edge: clip again (a rare second part gets its own id).
+    clipped = []
+    for road in roads:
+        parts = clip_line(simplify(road['snapped'], 0.25), package.extent)
+        for n, part in enumerate(parts):
+            piece = dict(road, line=part)
+            if len(parts) > 1:
+                piece['id'] = f"{road['id']}-{n + 1}"
+            clipped.append(piece)
+    roads[:] = clipped
     if moved:
         moved = np.array(moved)
         report.append(f'{len(roads)} road lines snapped: moved a median {np.median(moved):.1f} m, 90% under '
@@ -350,32 +413,40 @@ def build_roads(package, features, reach, report):
     return roads
 
 
-def build_driveways(package, ways, roads, report):
-    """OpenStreetMap service ways that aren't county roads, as driveways with their road end on a road."""
+def nearest_road(point, road_lines):
+    """(distance, nearest point) over every road line; infinite distance when there are none."""
+    return min((nearest_on_line(point, l) for l in road_lines), key=lambda r: r[0], default=(math.inf, None))
+
+
+def build_driveways(package, ways, road_lines, report):
+    """OpenStreetMap service ways that aren't roads already, clipped to the package, as driveways with their road
+    end on a road. `road_lines` are the roads that will be written (edited ones as edited)."""
     driveways, duplicates = [], 0
-    road_lines = [r['line'] for r in roads]
-    for element, line in ways:
-        if len(line) < 2:
+    for element, way in ways:
+        if len(way) < 2:
             continue
         tags = element.get('tags', {})
         service = tags.get('service', '')
         if service in ('parking_aisle', 'slipway', 'drive-through', 'emergency_access'):
             continue
-        samples = resample(line, 5.0)
-        near = sum(1 for p in samples if min(distance_to_line(p, l) for l in road_lines) < 8)
-        if near / len(samples) > 0.7:
-            duplicates += 1
-            continue
-        # Orient from the road: the end nearer a road first, and move it onto that road if it's close.
-        d0, at0 = min((nearest_on_line(line[0], l) for l in road_lines), key=lambda r: r[0])
-        d1, at1 = min((nearest_on_line(line[-1], l) for l in road_lines), key=lambda r: r[0])
-        if d1 < d0:
-            line, d0, at0 = line[::-1], d1, at1
-        if d0 < 15:
-            line = [at0] + line[1:] if d0 < 1 else [at0] + line
-        driveways.append({'id': f"osm-way-{element['id']}", 'line': simplify(line, 0.25), 'name': tags.get('name', ''),
-                          'surface': 'paved' if tags.get('surface') in ('asphalt', 'concrete', 'paved') else 'gravel',
-                          'width': DRIVEWAY_WIDTH, 'connected': d0 < 15})
+        parts = clip_line(way, package.extent)
+        for part_index, line in enumerate(parts):
+            samples = resample(line, 5.0)
+            near = sum(1 for p in samples if nearest_road(p, road_lines)[0] < 8)
+            if near / len(samples) > 0.7:
+                duplicates += 1
+                continue
+            # Orient from the road: the end nearer a road first, and move it onto that road if it's close.
+            d0, at0 = nearest_road(line[0], road_lines)
+            d1, at1 = nearest_road(line[-1], road_lines)
+            if d1 < d0:
+                line, d0, at0 = line[::-1], d1, at1
+            if d0 < 15:
+                line = [at0] + line[1:] if d0 < 1 else [at0] + line
+            suffix = f'-{part_index + 1}' if len(parts) > 1 else ''
+            driveways.append({'id': f"osm-way-{element['id']}{suffix}", 'line': simplify(line, 0.25), 'name': tags.get('name', ''),
+                              'surface': 'paved' if tags.get('surface') in ('asphalt', 'concrete', 'paved') else 'gravel',
+                              'width': DRIVEWAY_WIDTH, 'connected': d0 < 15})
     report.append(f'{len(driveways)} driveways from OpenStreetMap ({sum(d["connected"] for d in driveways)} joined to a road); '
                   f'{duplicates} OpenStreetMap ways dropped as duplicates of county roads')
     return driveways
@@ -404,15 +475,24 @@ def main():
     centerlines = county_layer(args.cache, 'centerlines', package)
     addresses = county_layer(args.cache, 'addresses', package)
     roads = build_roads(package, centerlines, args.snap, report)
-    driveways = build_driveways(package, osm_ways(args.cache, package), roads, report)
-    report.append(f'{len(addresses)} site addresses in the package (driveways and mailboxes come from them later)')
 
+    # Features edited by hand replace their imported versions, so driveways snap to and dedupe against the roads
+    # as they will be written.
     kept, kept_ids = [], set()
     if os.path.exists(args.output):
         for f in json.load(open(args.output)).get('features', []):
             if f.get('properties', {}).get('edited'):
                 kept.append(f)
                 kept_ids.add(f['properties'].get('id'))
+    road_lines = [r['line'] for r in roads if r['id'] not in kept_ids]
+    for f in kept:
+        geometry = f.get('geometry') or {}
+        if f['properties'].get('kind') != 'road' or geometry.get('type') not in ('LineString', 'MultiLineString'):
+            continue
+        lines = geometry['coordinates'] if geometry['type'] == 'MultiLineString' else [geometry['coordinates']]
+        road_lines += [[(p[0], p[1]) for p in line] for line in lines if len(line) >= 2]
+    driveways = build_driveways(package, osm_ways(args.cache, package), road_lines, report)
+    report.append(f'{len(addresses)} site addresses in the package (driveways and mailboxes come from them later)')
     features = list(kept)
     features += [feature('road', r, 'county') for r in roads if r['id'] not in kept_ids]
     features += [feature('driveway', d, 'osm') for d in driveways if d['id'] not in kept_ids]

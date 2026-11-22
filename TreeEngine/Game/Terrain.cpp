@@ -38,7 +38,7 @@ void Terrain::LoadRoads(const std::wstring& file)
     text << input.rdbuf();
     std::string crs;
     double originX = 0, originY = 0;
-    if (!Roads::PackageFrame(m_package.Manifest().sourceJson, crs, originX, originY, m_roadsError))
+    if (!Roads::PackageFrame(m_package.Manifest().sourceJson, m_package.Manifest().worldSize, crs, originX, originY, m_roadsError))
         return;
     try
     {
@@ -62,12 +62,18 @@ void Terrain::AddRoadOverlay(RenderData& renderData)
             polyline.lineWidth = line.kind == Roads::Kind::Road ? 3.0f : 2.0f;
             polyline.color = line.kind == Roads::Kind::Driveway ? XMFLOAT4(0.2f, 0.9f, 1.0f, 1)
                 : line.surface == "gravel" ? XMFLOAT4(0.85f, 0.7f, 0.45f, 1) : XMFLOAT4(1.0f, 0.55f, 0.1f, 1);
+            // A point off the terrain ends the polyline drawn so far; the next point on it starts another.
             const auto add = [&](float x, float z)
             {
                 float y = 0;
-                if (!HeightAt(x + m_offset.x, z + m_offset.z, y))
-                    y = m_offset.y;
-                polyline.points.push_back(XMFLOAT3(x + m_offset.x, y + 0.5f, z + m_offset.z));
+                if (HeightAt(x + m_offset.x, z + m_offset.z, y))
+                    polyline.points.push_back(XMFLOAT3(x + m_offset.x, y + 0.5f, z + m_offset.z));
+                else if (!polyline.points.empty())
+                {
+                    if (polyline.points.size() >= 2)
+                        m_roadOverlay.push_back(polyline);
+                    polyline.points.clear();
+                }
             };
             for (size_t i = 0; i + 1 < line.points.size(); ++i)
             {
@@ -78,7 +84,8 @@ void Terrain::AddRoadOverlay(RenderData& renderData)
                     add(a.x + (b.x - a.x) * s / steps, a.y + (b.y - a.y) * s / steps);
             }
             add(line.points.back().x, line.points.back().y);
-            m_roadOverlay.push_back(std::move(polyline));
+            if (polyline.points.size() >= 2)
+                m_roadOverlay.push_back(std::move(polyline));
         }
     }
     static std::mutex overlayMutex;     // Terrains update in parallel.
