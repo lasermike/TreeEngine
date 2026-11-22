@@ -757,9 +757,10 @@ int RenderManager::RegisterLeafOpacity(const ShaderMaterial& material, const Glt
     SceneLoadScope timer(&m_renderData.loadProfile, "graphics.opacity.register");
     // Matches the any-hit alpha test: a base-color texture sampled at mip 0, compared with flags.z.
     const float cutoff = material.flags.z;
-    // Not for alpha blending or transmission: their any-hit ignores hits for reasons other than alpha.
+    // Not for alpha blending or transmission: their any-hit ignores hits for reasons other than alpha. Not for a base
+    // color factor with alpha below 1 either: the alpha test uses factor x texture, and the micromap holds texture.
     if (!m_renderData.opacityMicromaps.supported || cutoff <= 0 || material.flags.y <= 0 || material.flags.x > 0
-        || material.opticalParams.y > 0 || !baseColor)
+        || material.opticalParams.y > 0 || material.Diffuse.w < 1 || !baseColor)
         return -1;
     const XMFLOAT4& row0 = material.uvTransformRow0[BaseColorTextureRole];
     const XMFLOAT4& row1 = material.uvTransformRow1[BaseColorTextureRole];

@@ -1497,6 +1497,8 @@ public:
     // TEMPTEMP
     CComPtr<XSF::D3DDeviceContext>      m_immediateContext;
     ID3D11ShaderResourceView* m_specularTextureViews[8] = {};
+    // The frame's blend (RenderProlog), restored after a material that blends: SetRenderUnit binds each material's.
+    StockBlendStates m_frameBlendState = StockBlendStates::Overwrite;
 
     //
     // Base RenderPlatform methods
