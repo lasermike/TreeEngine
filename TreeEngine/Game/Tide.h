@@ -25,6 +25,7 @@ namespace Tide
     bool Supported(const std::string& name);
     // The tide's height above its mean at a UTC time, in seconds since 1970-01-01.
     double Height(const std::vector<Constituent>& constituents, double unixSeconds);
-    // Seconds since 1970-01-01 for "YYYY-MM-DDTHH:MM:SSZ" (UTC); false if it isn't that form.
+    // Seconds since 1970-01-01 for exactly "YYYY-MM-DDTHH:MM:SSZ" (UTC); false if it isn't that form or isn't a real
+    // calendar date and time (February 29 only in leap years; no leap seconds).
     bool ParseUtc(const std::string& text, double& unixSeconds);
 }

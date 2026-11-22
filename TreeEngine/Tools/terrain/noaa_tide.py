@@ -17,6 +17,7 @@ import argparse
 import datetime
 import json
 import math
+import re
 import sys
 import urllib.request
 
@@ -99,7 +100,13 @@ def height(constituents, seconds):
 
 
 def utc(text):
-    return datetime.datetime.strptime(text, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc).timestamp()
+    """Seconds since 1970 for exactly YYYY-MM-DDTHH:MM:SSZ, the form the engine accepts (Tide::ParseUtc)."""
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', text):
+        sys.exit(f'--start {text!r} is not a UTC time like 2026-06-21T19:00:00Z')
+    try:
+        return datetime.datetime.strptime(text, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc).timestamp()
+    except ValueError as error:
+        sys.exit(f'--start {text!r} is not a real date and time: {error}')
 
 
 def fit(constituents, subordinate, month):
@@ -119,7 +126,10 @@ def fit(constituents, subordinate, month):
         h = [height(constituents, t - 60 * delay) for t in times]
         n = len(h)
         mh, mv = sum(h) / n, sum(values) / n
-        scale = sum((x - mh) * (y - mv) for x, y in zip(h, values)) / sum((x - mh) ** 2 for x in h)
+        variance = sum((x - mh) ** 2 for x in h)
+        if variance == 0:
+            sys.exit(f'the tide is flat at the {n} prediction times, so it cannot be fitted to {subordinate}')
+        scale = sum((x - mh) * (y - mv) for x, y in zip(h, values)) / variance
         offset = mv - scale * mh
         rms = math.sqrt(sum((scale * x + offset - y) ** 2 for x, y in zip(h, values)) / n)
         if best is None or rms < best[0]:
@@ -156,6 +166,9 @@ def main():
             dropped.append(f"{h['name']} ({h['amplitude'] * 1000:.0f} mm)")
     if dropped:
         print('not supported, left out: ' + ', '.join(dropped), file=sys.stderr)
+    if not constituents:
+        sys.exit(f'station {args.station} has no supported constituent of at least {args.min_amplitude} m '
+                 f'(--min-amplitude); nothing to write')
 
     source = f"NOAA {args.station} {station['name']}"
     if args.fit_to:

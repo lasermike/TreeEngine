@@ -2,7 +2,6 @@
 #include "Tide.h"
 
 #include <cmath>
-#include <cstdio>
 #include <map>
 
 namespace
@@ -136,10 +135,26 @@ namespace Tide
 
     bool ParseUtc(const std::string& text, double& unixSeconds)
     {
-        int year, month, day, hour, minute, second;
-        char t, z;
-        if (sscanf_s(text.c_str(), "%4d-%2d-%2d%c%2d:%2d:%2d%c", &year, &month, &day, &t, 1, &hour, &minute, &second, &z, 1) != 8
-            || t != 'T' || z != 'Z' || month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 60)
+        // Exactly "YYYY-MM-DDTHH:MM:SSZ": every digit where a digit belongs, nothing before or after.
+        static const char pattern[] = "dddd-dd-ddTdd:dd:ddZ";
+        if (text.size() != sizeof(pattern) - 1)
+            return false;
+        for (size_t i = 0; i < text.size(); ++i)
+            if (pattern[i] == 'd' ? !(text[i] >= '0' && text[i] <= '9') : text[i] != pattern[i])
+                return false;
+        const auto field = [&](size_t at, size_t digits)
+        {
+            int value = 0;
+            for (size_t i = at; i < at + digits; ++i)
+                value = value * 10 + (text[i] - '0');
+            return value;
+        };
+        const int year = field(0, 4), month = field(5, 2), day = field(8, 2);
+        const int hour = field(11, 2), minute = field(14, 2), second = field(17, 2);
+        const bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+        static const int daysInMonth[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+        if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1] + (month == 2 && leap ? 1 : 0)
+            || hour > 23 || minute > 59 || second > 59)
             return false;
         // Days since 1970-01-01 in the proleptic Gregorian calendar (Howard Hinnant's days_from_civil).
         const int y = year - (month <= 2 ? 1 : 0);

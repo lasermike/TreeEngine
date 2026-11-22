@@ -817,8 +817,12 @@ void TestTide()
     double seconds = 0;
     Check(Tide::ParseUtc("2026-06-21T00:00:00Z", seconds) && seconds == 1782000000.0, "UTC time was not parsed");
     Check(Tide::ParseUtc("2000-02-29T12:30:15Z", seconds) && seconds == 951827415.0, "leap day was not parsed");
-    Check(!Tide::ParseUtc("2026-06-21 00:00:00", seconds) && !Tide::ParseUtc("2026-13-01T00:00:00Z", seconds),
-        "a malformed time was accepted");
+    Check(Tide::ParseUtc("2024-02-29T23:59:59Z", seconds) && seconds == 1709251199.0, "a leap year's February 29 was rejected");
+    for (const char* malformed : { "2026-06-21 00:00:00", "2026-13-01T00:00:00Z", "2026-02-29T00:00:00Z",
+             "1900-02-29T00:00:00Z", "2026-04-31T00:00:00Z", "2026-06-21T00:00:00Zjunk", " 2026-06-21T00:00:00Z",
+             "2026-06-21T-1:00:00Z", "2026-06-21T24:00:00Z", "2026-06-21T00:60:00Z", "2026-06-21T00:00:60Z",
+             "2026-6-21T00:00:00Z", "+026-06-21T00:00:00Z", "" })
+        Check(!Tide::ParseUtc(malformed, seconds), "a malformed or impossible UTC time was accepted");
     // Budd Inlet (NOAA 9446807): its published constituents and mean sea level (1.290 m above NAVD88) against NOAA's
     // own predictions above NAVD88, every 6 hours from 2026-06-21T00:00Z.
     const std::vector<Tide::Constituent> budd = {
@@ -870,6 +874,9 @@ void TestTideSettings()
     Reject(bad.dump(), ".tide.start");
     bad = Json::parse(json);
     bad["objects"][0]["tide"]["start"] = "June 21";
+    Reject(bad.dump(), ".tide.start");
+    bad = Json::parse(json);
+    bad["objects"][0]["tide"]["start"] = "2026-02-29T00:00:00Z";
     Reject(bad.dump(), ".tide.start");
     bad = Json::parse(json);
     bad["objects"][0]["tide"]["constituents"][0]["name"] = "M1";
