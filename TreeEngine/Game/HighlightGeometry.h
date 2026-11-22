@@ -41,6 +41,45 @@ namespace HighlightGeometry
         return a.w > 1e-6f && b.w > 1e-6f;
     }
 
+    // One clip-space segment as a screen-space quad of lineWidth pixels.
+    inline void AppendSegment(DirectX::XMFLOAT4 a, DirectX::XMFLOAT4 b, const DirectX::XMFLOAT4& color, float lineWidth,
+        HighlightOcclusion occlusion, float width, float height, std::vector<Vertex>& vertices)
+    {
+        using namespace DirectX;
+        if (!Clip(a, b)) return;
+        a = XMFLOAT4(a.x / a.w, a.y / a.w, a.z / a.w, 1);
+        b = XMFLOAT4(b.x / b.w, b.y / b.w, b.z / b.w, 1);
+        const float dx = (b.x - a.x) * width, dy = (b.y - a.y) * height;
+        const float length = std::sqrt(dx * dx + dy * dy);
+        if (length < 1e-6f) return;
+        const float ox = -dy / length * lineWidth / width;
+        const float oy = dx / length * lineWidth / height;
+        const float depth = occlusion == HighlightOcclusion::SceneDepth ? 1.0f : 0.0f;
+        Vertex quad[] = {
+            { XMFLOAT4(a.x + ox, a.y + oy, a.z, 1), color, depth },
+            { XMFLOAT4(a.x - ox, a.y - oy, a.z, 1), color, depth },
+            { XMFLOAT4(b.x + ox, b.y + oy, b.z, 1), color, depth },
+            { XMFLOAT4(b.x - ox, b.y - oy, b.z, 1), color, depth }
+        };
+        for (const int index : { 0, 1, 2, 2, 1, 3 }) vertices.push_back(quad[index]);
+    }
+
+    inline void Append(const DebugPolyline& line, DirectX::FXMMATRIX viewProjection, float width, float height,
+        std::vector<Vertex>& vertices)
+    {
+        using namespace DirectX;
+        if (width <= 0 || height <= 0 || line.lineWidth <= 0 || line.points.size() < 2) return;
+        XMFLOAT4 previous;
+        XMStoreFloat4(&previous, XMVector4Transform(XMVectorSet(line.points[0].x, line.points[0].y, line.points[0].z, 1), viewProjection));
+        for (size_t i = 1; i < line.points.size(); ++i)
+        {
+            XMFLOAT4 next;
+            XMStoreFloat4(&next, XMVector4Transform(XMVectorSet(line.points[i].x, line.points[i].y, line.points[i].z, 1), viewProjection));
+            AppendSegment(previous, next, line.color, line.lineWidth, line.occlusion, width, height, vertices);
+            previous = next;
+        }
+    }
+
     inline void Append(const ObjectHighlight& highlight, DirectX::FXMMATRIX viewProjection,
         float width, float height, std::vector<Vertex>& vertices)
     {
@@ -65,23 +104,8 @@ namespace HighlightGeometry
                 for (int axis = 1; axis <= 4; axis <<= 1)
                 {
                     if (i & axis) continue;
-                    XMFLOAT4 a = corners[i], b = corners[i | axis];
-                    if (!Clip(a, b)) continue;
-                    a = XMFLOAT4(a.x / a.w, a.y / a.w, a.z / a.w, 1);
-                    b = XMFLOAT4(b.x / b.w, b.y / b.w, b.z / b.w, 1);
-                    const float dx = (b.x - a.x) * width, dy = (b.y - a.y) * height;
-                    const float length = std::sqrt(dx * dx + dy * dy);
-                    if (length < 1e-6f) continue;
-                    const float ox = -dy / length * highlight.lineWidth / width;
-                    const float oy = dx / length * highlight.lineWidth / height;
-                    const float depth = highlight.occlusion == HighlightOcclusion::SceneDepth ? 1.0f : 0.0f;
-                    Vertex quad[] = {
-                        { XMFLOAT4(a.x + ox, a.y + oy, a.z, 1), highlight.color, depth },
-                        { XMFLOAT4(a.x - ox, a.y - oy, a.z, 1), highlight.color, depth },
-                        { XMFLOAT4(b.x + ox, b.y + oy, b.z, 1), highlight.color, depth },
-                        { XMFLOAT4(b.x - ox, b.y - oy, b.z, 1), highlight.color, depth }
-                    };
-                    for (const int index : { 0, 1, 2, 2, 1, 3 }) vertices.push_back(quad[index]);
+                    AppendSegment(corners[i], corners[i | axis], highlight.color, highlight.lineWidth, highlight.occlusion,
+                        width, height, vertices);
                 }
             }
         }

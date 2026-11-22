@@ -210,6 +210,8 @@ HRESULT RenderManager::BeginNewFrame()
     m_renderData.lodDistanceScale = m_settings->m_lodDistanceScale;
     m_renderData.lodFadeFrames = static_cast<UINT>(std::max(0, m_settings->m_lodFadeFrames));
     m_renderData.terrainStreaming = m_settings->m_terrainStreaming;
+    m_renderData.showRoads = m_settings->m_showRoads;
+    m_renderData.debugLines.clear();
     D3DBuffer* buffer = m_instancedBuffer.Get(m_renderData.frame);
     m_batchListUsed = 0;
 

@@ -7,6 +7,7 @@
 #include "DebugVectorMath.h"
 #include "Lod.h"
 #include "TerrainPackage.h"
+#include "RoadNetwork.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -904,6 +905,79 @@ void TestTideSettings()
     Reject(bad.dump(), ".tide.simulationTicksPerDay");
 }
 
+void TestRoadNetwork()
+{
+    std::string crs, error;
+    double originX = 0, originY = 0;
+    Check(Roads::PackageFrame(R"({"crs":"EPSG:32610","bounds":[1000,2000,1100,2300]})", crs, originX, originY, error)
+        && crs == "EPSG:32610" && originX == 1050 && originY == 2150, "the package frame was not read");
+    Check(!Roads::PackageFrame(R"({"preset":"hills"})", crs, originX, originY, error) && !error.empty(),
+        "a procedural package was given a frame");
+
+    const std::string file = R"({"type":"FeatureCollection",
+        "crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:EPSG::32610"}},
+        "features":[
+          {"type":"Feature","properties":{"kind":"road","id":"county-1","source":"county","edited":true,"name":"E TEST RD",
+            "surface":"gravel","owner":"county","width":5,"shoulder":0.3,"ditchDepth":0.5,"ditchWidth":2,"speedLimit":25},
+           "geometry":{"type":"LineString","coordinates":[[1050,2150],[1060,2160.5]]}},
+          {"type":"Feature","properties":{"kind":"driveway","id":"osm-way-7"},
+           "geometry":{"type":"MultiLineString","coordinates":[[[1040,2140],[1041,2141]],[[1042,2142],[1043,2143]]]}},
+          {"type":"Feature","properties":{"kind":"prop","id":"mailbox-1"},"geometry":{"type":"Point","coordinates":[1050,2150]}}]})";
+    const auto network = Roads::Parse(file, "EPSG:32610", 1050, 2150);
+    Check(network.crs == "EPSG:32610" && network.lines.size() == 3, "roads were not parsed (props skipped, multilines split)");
+    const auto& road = network.lines[0];
+    Check(road.kind == Roads::Kind::Road && road.edited && road.name == "E TEST RD" && road.surface == "gravel"
+        && road.width == 5 && road.ditchDepth == 0.5f && road.speedLimit == 25 && road.points.size() == 2
+        && road.points[0].x == 0 && road.points[0].y == 0 && road.points[1].x == 10 && road.points[1].y == 10.5f,
+        "a road's properties or package coordinates are wrong");
+    const auto& driveway = network.lines[1];
+    Check(driveway.kind == Roads::Kind::Driveway && driveway.width == 3 && driveway.surface == "paved"
+        && driveway.points[0].x == -10 && network.lines[2].points[0].x == -8, "a driveway's defaults or parts are wrong");
+
+    const auto rejects = [&](const std::string& text, const std::string& expected)
+    {
+        try { Roads::Parse(text, "EPSG:32610", 1050, 2150); }
+        catch (const std::runtime_error& e)
+        {
+            Check(std::string(e.what()).find(expected) != std::string::npos, "a roads error lacks its location");
+            return;
+        }
+        Check(false, "an invalid roads file was accepted");
+    };
+    auto bad = Json::parse(file);
+    bad["crs"]["properties"]["name"] = "EPSG:4326";
+    rejects(bad.dump(), "crs");
+    bad = Json::parse(file);
+    bad["features"][0]["properties"]["surface"] = "dirt";
+    rejects(bad.dump(), "features[0] (county-1).properties.surface");
+    bad = Json::parse(file);
+    bad["features"][0]["properties"]["width"] = 0;
+    rejects(bad.dump(), "properties.width");
+    bad = Json::parse(file);
+    bad["features"][1]["geometry"] = { { "type", "Point" }, { "coordinates", Json::array({ 1, 2 }) } };
+    rejects(bad.dump(), "features[1] (osm-way-7).geometry");
+    bad = Json::parse(file);
+    bad["features"][0]["geometry"]["coordinates"] = Json::array({ Json::array({ 1050, 2150 }) });
+    rejects(bad.dump(), "at least two points");
+    rejects("[]", "FeatureCollection");
+
+    // The scene field, saved and parsed again.
+    const std::string scene = R"({"version":1,"name":"Roads","objects":[
+        {"id":"ground","type":"terrain","source":"Terrain/Hills.terrain","roads":"Terrain/Hills.roads.geojson"}]})";
+    const auto parsed = SceneData::ParseScene(scene, "roads");
+    const auto& terrain = static_cast<const SceneData::TerrainDefinition&>(*parsed.objects[0]);
+    Check(terrain.roads == "Terrain/Hills.roads.geojson", "the terrain's roads file was not parsed");
+    const auto saved = Json::parse(SceneData::SerializeScene(parsed));
+    Check(saved["objects"][0]["roads"] == "Terrain/Hills.roads.geojson", "the terrain's roads file was not saved");
+    auto noRoads = Json::parse(scene);
+    noRoads["objects"][0].erase("roads");
+    Check(!Json::parse(SceneData::SerializeScene(SceneData::ParseScene(noRoads.dump(), "no-roads")))["objects"][0].contains("roads"),
+        "a terrain without roads saved a roads field");
+    auto empty = Json::parse(scene);
+    empty["objects"][0]["roads"] = "";
+    Reject(empty.dump(), ".roads");
+}
+
 void TestTreeLodSettings()
 {
     const std::string json = R"({"version":1,"name":"Lod","objects":[
@@ -1165,6 +1239,7 @@ int main(int argc, char** argv)
         TestWaterSettings();
         TestTide();
         TestTideSettings();
+        TestRoadNetwork();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

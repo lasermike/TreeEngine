@@ -212,6 +212,7 @@ namespace SceneData
     {
         TerrainDefinition() : ObjectDefinition(ObjectKind::Terrain) {}
         std::string source;         // The package directory, such as "Terrain/Hills.terrain".
+        std::string roads;          // Optional roads file (Tools/terrain/import_roads.py), such as "Terrain/Hills.roads.geojson".
         bool hasMaterial = false;   // A single material, or
         MaterialDefinition material;
         std::vector<TerrainLayerDefinition> layers;     // up to four layers.

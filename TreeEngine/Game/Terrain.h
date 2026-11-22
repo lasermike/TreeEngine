@@ -1,6 +1,7 @@
 #pragma once
 #include "WorldObject.h"
 #include "TerrainPackage.h"
+#include "RoadNetwork.h"
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -37,6 +38,8 @@ public:
     std::vector<TerrainLayerParams> layers;     // Empty: the single material in slot 0.
     std::wstring packageDirectory;  // Resolved package directory.
     std::string source;             // As authored, for saving.
+    std::wstring roadsFile;         // Resolved roads file (empty for none), and
+    std::string roads;              // as authored, for saving.
     float lodRange = 2.0f;          // A node splits within lodRange x its size of the camera.
     UINT slots = 512;               // Vertex pool size, in nodes.
 };
@@ -56,6 +59,9 @@ public:
     // False with Error() set when the package can't be opened.
     bool IsOpen() const { return m_open; }
     const std::string& Error() const { return m_package.Error(); }
+    // The roads file's problem, when it has one (the terrain still opens; the scene load reports it).
+    const std::string& RoadsError() const { return m_roadsError; }
+    const Roads::Network& RoadNetwork() const { return m_roads; }
     const TerrainPackage& Package() const { return m_package; }
 
     void AppendGeometry(GeometryBufferData& geometryData) override;
@@ -121,6 +127,11 @@ private:
 
     TerrainPackage m_package;
     bool m_open = false;
+    Roads::Network m_roads;
+    std::string m_roadsError;
+    std::vector<DebugPolyline> m_roadOverlay;   // Built on first use: the centerlines on the ground, in world space.
+    void LoadRoads(const std::wstring& file);
+    void AddRoadOverlay(RenderData& renderData);
     XMFLOAT3 m_offset = {};             // The authored position, added to every vertex.
     GeometryBufferData::BufferOffsets m_offsets = {};   // Index pattern, and the pool's first vertex and node size.
     RenderUnit* m_renderUnit = nullptr;

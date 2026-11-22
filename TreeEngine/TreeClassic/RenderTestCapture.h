@@ -17,6 +17,7 @@ struct RenderTestPoint
     bool checkSelection = false;
     std::vector<std::string> expectedSelection;
     bool highlightsThroughGeometry = true;
+    bool showRoads = false;             // Terrains draw their road centerlines (the debug overlay).
     double time;
     std::wstring filename;
     std::string mode;

@@ -92,6 +92,40 @@ Height in meters is `height-offset + height-scale * value`. The image's top row 
 (-x), so the terrain seen from above with +z up matches the image; the engine is left-handed with y up. Rasters that are not 64 * 2^n + 1 samples per side are
 padded to the next size by repeating their edge.
 
+**Roads.** `import_roads.py` writes a package's roads file from Mason County's Street Centerlines and Site Address
+layers and OpenStreetMap's service ways, downloading them once into `--cache` (kept outside the repo):
+
+```bash
+python import_roads.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Game/Resources/Terrain/Hungerford.roads.geojson \
+    --cache E:/Source/Tree/Content/roads
+```
+
+It snaps each county centerline sideways onto the road bed in the package's heights (the flattest strip of the
+road's width within `--snap` meters, default 8, smoothed along the road; ends that met still meet), drops
+OpenStreetMap ways that duplicate a county road, and turns the rest into driveways whose road end is moved onto the
+nearest road when it's within 15 m. For Hungerford: 74 roads moved a median 1.0 m (90% under 3 m), and 124
+driveways, 99 of them joined to a road. Re-running keeps every feature whose `edited` is true.
+
+The roads file is GeoJSON in the package's CRS (its `crs` member names it, such as EPSG:32610), so QGIS opens it over
+aerial imagery for editing. Each feature's `properties`:
+
+| Property | Features | Meaning |
+| --- | --- | --- |
+| `kind` | all | `road`, `driveway` or `prop` (props: planned; the engine skips them) |
+| `id` | all | stable id: `county-<road number or name>-<start x>-<start y>`, `osm-way-<id>` |
+| `source` | all | `county`, `osm` or `generated` |
+| `edited` | all | true once changed by hand: the importer leaves it alone |
+| `name` | roads | street name, for signs |
+| `surface` | lines | `paved` or `gravel` |
+| `owner` | roads | `county` or `private`; private roads stay plain gravel lanes |
+| `width`, `shoulder` | lines | meters: the traveled width, and the shoulder each side |
+| `ditchDepth`, `ditchWidth` | roads | meters, each side; 0 for none |
+| `speedLimit` | roads | mph, from the county |
+
+Widths come from the surface and owner: county paved 6 m with 0.6 m shoulders (6.6 m and 1.2 m at 40 mph and up),
+county gravel 5 m, private paved 4 m, private gravel 3.6 m, driveways 3 m; county roads get 0.5 to 0.6 m deep ditches.
+A terrain object names its roads file with `roads` (Scenes README).
+
 **Layer textures.** `TerrainTool texture --out Textures/rock --kind rock --size 512 --seed 3` writes
 `rock_color.png` (sRGB), `rock_normal.png` (tangent space, +Y up the image) and `rock_mr.png` (roughness in G,
 metallic 0 in B), all tiling seamlessly, for a terrain layer's material. `Game/Resources/Terrain/Textures` holds a set

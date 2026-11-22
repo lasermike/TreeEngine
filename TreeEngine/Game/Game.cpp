@@ -1649,6 +1649,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         for (const auto& diagnostic : m_loader.Catalog().Diagnostics())
             ImGui::TextWrapped("Discovery: %s", diagnostic.c_str());
         ImGui::Checkbox("Show highlights through geometry", &m_settings.m_highlightsThroughGeometry);
+        ImGui::Checkbox("Show road centerlines", &m_settings.m_showRoads);
         if (objectSelection.reveal) ImGui::SetNextItemOpen(true);
         if (ImGui::TreeNodeEx("Objects", ImGuiTreeNodeFlags_DefaultOpen,
             "Objects (%zu)", m_pScene->Children().size()))
