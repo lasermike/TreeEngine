@@ -206,6 +206,7 @@ private:
     DX::StepTimer                        m_timer;
     double                               m_timeStart;
     double                               m_timeCurrent;
+    double                               m_timeLargest;
     int                                  m_currentScene;
     SceneData::SceneDefinition m_sceneDefinition;
     std::string m_sceneFilename;

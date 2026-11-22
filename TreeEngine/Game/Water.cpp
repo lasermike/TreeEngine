@@ -14,6 +14,9 @@ Water::Water(WaterParams* params) : Primitive(params)
 float Water::SurfaceHeight(float time) const
 {
     const WaterParams& p = Params();
+    if (!p.tideConstituents.empty())
+        return p.level + static_cast<float>(Tide::Height(p.tideConstituents,
+            p.tideStart + static_cast<double>(time) * 86400.0 / p.tideSimulationTicksPerDay));
     if (p.tideRange <= 0 || p.tidePeriod <= 0)
         return p.level;
     return p.level + 0.5f * p.tideRange * sinf(XM_2PI * (time + p.tidePhase) / p.tidePeriod);

@@ -360,6 +360,7 @@ HRESULT Game::LoadScene(const std::string& name)
     m_renderManager.GetRenderData().normalAnimationTime = 0;
     m_timeStart = 0;
     m_timeCurrent = 0;
+    m_timeLargest = 0;
     m_settings.m_buffersInUse = 0;
     m_resetTree = true;
     m_needsResize = true;
@@ -608,6 +609,7 @@ HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& capture
     renderData.normalAnimationTime = static_cast<float>(simulationTime * m_settings.m_waterMotionSpeed);
     renderData.frame++;
     m_timeCurrent = simulationTime;
+    m_timeLargest = __max(m_timeLargest, simulationTime);
     if (!overrideSceneCamera) ApplySceneCamera(m_sceneDefinition, *m_player, simulationTime);
     XMStoreFloat4x4(&renderData.view, m_player->GetViewMatrix());
     renderData.eyePos = m_player->GetEyePosition();
@@ -698,10 +700,12 @@ void Game::Update(DX::StepTimer const& timer)
     {
         m_timeStart = timer.GetTotalSeconds();
         m_timeCurrent = 0;
+        m_timeLargest = 0;
     }
     else if (!m_settings.m_paused)
     {
         m_timeCurrent += timer.GetElapsedSeconds();
+        m_timeLargest = __max(m_timeLargest, m_timeCurrent);
         m_renderManager.GetRenderData().normalAnimationTime +=
             static_cast<float>(timer.GetElapsedSeconds()) * m_settings.m_waterMotionSpeed;
     }
@@ -1324,7 +1328,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Pause", &m_settings.m_paused);
 
         // Time
-        double rangeMin = 0.0, rangeMax = __max(m_timeCurrent, 50);
+        double rangeMin = 0.0, rangeMax = m_timeLargest;
         if (ImGui::SliderScalar("Time", ImGuiDataType_Double, &m_timeCurrent, &rangeMin, &rangeMax, "%.3f", 0 /*flags*/)
             && m_settings.m_paused)
             ApplySceneCamera(m_sceneDefinition, *m_player, m_timeCurrent);

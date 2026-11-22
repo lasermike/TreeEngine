@@ -812,6 +812,85 @@ void TestWaterSettings()
     Reject(bad.dump(), ".instanceOf");
 }
 
+void TestTide()
+{
+    double seconds = 0;
+    Check(Tide::ParseUtc("2026-06-21T00:00:00Z", seconds) && seconds == 1782000000.0, "UTC time was not parsed");
+    Check(Tide::ParseUtc("2000-02-29T12:30:15Z", seconds) && seconds == 951827415.0, "leap day was not parsed");
+    Check(Tide::ParseUtc("2024-02-29T23:59:59Z", seconds) && seconds == 1709251199.0, "a leap year's February 29 was rejected");
+    for (const char* malformed : { "2026-06-21 00:00:00", "2026-13-01T00:00:00Z", "2026-02-29T00:00:00Z",
+             "1900-02-29T00:00:00Z", "2026-04-31T00:00:00Z", "2026-06-21T00:00:00Zjunk", " 2026-06-21T00:00:00Z",
+             "2026-06-21T-1:00:00Z", "2026-06-21T24:00:00Z", "2026-06-21T00:60:00Z", "2026-06-21T00:00:60Z",
+             "2026-6-21T00:00:00Z", "+026-06-21T00:00:00Z", "" })
+        Check(!Tide::ParseUtc(malformed, seconds), "a malformed or impossible UTC time was accepted");
+    // Budd Inlet (NOAA 9446807): its published constituents and mean sea level (1.290 m above NAVD88) against NOAA's
+    // own predictions above NAVD88, every 6 hours from 2026-06-21T00:00Z.
+    const std::vector<Tide::Constituent> budd = {
+        { "M2", 1.459, 30.3 }, { "S2", 0.343, 62.0 }, { "N2", 0.276, 4.5 }, { "K1", 0.877, 289.6 }, { "M4", 0.049, 294.4 },
+        { "O1", 0.472, 266.4 }, { "M6", 0.029, 143.8 }, { "MK3", 0.029, 145.8 }, { "S4", 0.004, 334.8 },
+        { "MN4", 0.020, 265.4 }, { "NU2", 0.064, 10.6 }, { "MU2", 0.025, 193.0 }, { "2N2", 0.035, 345.2 },
+        { "OO1", 0.026, 5.6 }, { "LAM2", 0.027, 46.8 }, { "S1", 0.017, 63.5 }, { "J1", 0.051, 331.4 },
+        { "SSA", 0.033, 231.1 }, { "SA", 0.077, 292.9 }, { "MF", 0.022, 140.5 }, { "RHO", 0.025, 269.8 },
+        { "Q1", 0.070, 264.7 }, { "T2", 0.015, 69.9 }, { "R2", 0.012, 118.3 }, { "2Q1", 0.008, 238.2 },
+        { "P1", 0.269, 285.3 }, { "2SM2", 0.014, 273.4 }, { "M3", 0.006, 254.8 }, { "L2", 0.068, 64.4 },
+        { "2MK3", 0.006, 267.3 }, { "K2", 0.098, 58.8 }, { "M8", 0.003, 18.8 }, { "MS4", 0.029, 313.7 } };
+    const double noaa[] = { -0.986, 3.291, 0.295, 1.912, -0.374, 2.977, 0.525, 1.391 };
+    for (int i = 0; i < 8; ++i)
+    {
+        const double height = 1.290 + Tide::Height(budd, 1782000000.0 + i * 6 * 3600.0);
+        Check(std::abs(height - noaa[i]) < 0.1, "the tide is more than 10 cm from NOAA's prediction");
+    }
+    Check(Tide::Supported("M2") && Tide::Supported("2MK3") && !Tide::Supported("M1"), "constituent support changed");
+}
+
+void TestTideSettings()
+{
+    const std::string json = R"({"version":1,"name":"Tide","objects":[
+        {"id":"inlet","type":"water","tide":{"start":"2026-06-21T19:00:00Z","source":"test",
+         "constituents":[{"name":"M2","amplitude":1.5,"phase":57},{"name":"K1","amplitude":0.9}]}}]})";
+    const auto scene = SceneData::ParseScene(json, "tide");
+    const auto& inlet = static_cast<const SceneData::WaterDefinition&>(*scene.objects[0]);
+    Check(inlet.tideConstituents.size() == 2 && inlet.tideConstituents[0].phase == 57 && inlet.tideConstituents[1].phase == 0
+        && inlet.tideStart == "2026-06-21T19:00:00Z" && inlet.tideSource == "test" && inlet.tideRange == 0
+        && inlet.tideSimulationTicksPerDay == 300, "tide constituents were not parsed");
+    auto faster = Json::parse(json);
+    faster["objects"][0]["tide"]["simulationTicksPerDay"] = 60;
+    const auto fasterScene = SceneData::ParseScene(faster.dump(), "tide-faster");
+    Check(static_cast<const SceneData::WaterDefinition&>(*fasterScene.objects[0]).tideSimulationTicksPerDay == 60
+        && Json::parse(SceneData::SerializeScene(fasterScene))["objects"][0]["tide"]["simulationTicksPerDay"] == 60,
+        "the tide's simulation ticks per day did not round-trip");
+    const auto saved = Json::parse(SceneData::SerializeScene(scene));
+    Check(saved["objects"][0]["tide"]["constituents"].size() == 2 && !saved["objects"][0]["tide"].contains("range"),
+        "tide constituents saved the wrong fields");
+    const auto again = SceneData::ParseScene(saved.dump(), "saved-tide");
+    const auto& reparsed = static_cast<const SceneData::WaterDefinition&>(*again.objects[0]);
+    Check(reparsed.tideConstituents.size() == 2 && reparsed.tideConstituents[1].amplitude == 0.9
+        && reparsed.tideStart == inlet.tideStart && reparsed.tideSource == "test", "tide constituents did not round-trip");
+    auto bad = Json::parse(json);
+    bad["objects"][0]["tide"]["range"] = 4;
+    Reject(bad.dump(), ".tide");
+    bad = Json::parse(json);
+    bad["objects"][0]["tide"].erase("start");
+    Reject(bad.dump(), ".tide.start");
+    bad = Json::parse(json);
+    bad["objects"][0]["tide"]["start"] = "June 21";
+    Reject(bad.dump(), ".tide.start");
+    bad = Json::parse(json);
+    bad["objects"][0]["tide"]["start"] = "2026-02-29T00:00:00Z";
+    Reject(bad.dump(), ".tide.start");
+    bad = Json::parse(json);
+    bad["objects"][0]["tide"]["constituents"][0]["name"] = "M1";
+    Reject(bad.dump(), ".constituents[0].name");
+    bad = Json::parse(json);
+    bad["objects"][0]["tide"]["constituents"][1]["amplitude"] = -1;
+    Reject(bad.dump(), ".constituents[1].amplitude");
+    bad = Json::parse(json);
+    bad["objects"][0]["tide"]["simulationTicksPerDay"] = 0;
+    Reject(bad.dump(), ".tide.simulationTicksPerDay");
+    bad = Json::parse(R"({"version":1,"name":"Tide","objects":[{"id":"pond","type":"water","tide":{"range":2,"simulationTicksPerDay":300}}]})");
+    Reject(bad.dump(), ".tide.simulationTicksPerDay");
+}
+
 void TestTreeLodSettings()
 {
     const std::string json = R"({"version":1,"name":"Lod","objects":[
@@ -1071,6 +1150,8 @@ int main(int argc, char** argv)
         TestTreeLodSettings();
         TestTerrainSettings();
         TestWaterSettings();
+        TestTide();
+        TestTideSettings();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

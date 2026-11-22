@@ -50,6 +50,13 @@ namespace SceneData
             return static_cast<float>(result);
         }
 
+        // A number kept at full precision (Number's checks, without rounding to float).
+        double Double(const Json& value, const std::string& path)
+        {
+            Number(value, path);
+            return value.get<double>();
+        }
+
         int Integer(const Json& value, const std::string& path, int minimum, int maximum)
         {
             if (!value.is_number_integer()) Invalid(path, "expected an integer");
@@ -752,7 +759,49 @@ namespace SceneData
                     {
                         const auto& tide = value["tide"];
                         const auto tidePath = path + ".tide";
-                        Fields(tide, tidePath, { "range", "period", "phase" });
+                        Fields(tide, tidePath, { "range", "period", "phase", "start", "constituents", "source", "simulationTicksPerDay" });
+                        if (tide.contains("constituents"))
+                        {
+                            if (tide.contains("range") || tide.contains("period") || tide.contains("phase"))
+                                Invalid(tidePath, "takes either constituents or range, period and phase, not both");
+                            if (!tide.contains("start")) Invalid(tidePath + ".start", "is required with constituents");
+                            const auto& list = tide["constituents"];
+                            if (!list.is_array() || list.empty()) Invalid(tidePath + ".constituents", "must be a non-empty array");
+                            for (size_t i = 0; i < list.size(); ++i)
+                            {
+                                const auto itemPath = tidePath + ".constituents[" + std::to_string(i) + "]";
+                                Fields(list[i], itemPath, { "name", "amplitude", "phase" });
+                                Tide::Constituent c;
+                                if (!list[i].contains("name") || !list[i]["name"].is_string()) Invalid(itemPath + ".name", "must be a string");
+                                c.name = list[i]["name"].get<std::string>();
+                                if (!Tide::Supported(c.name)) Invalid(itemPath + ".name", "is not a supported constituent: " + c.name);
+                                if (!list[i].contains("amplitude")) Invalid(itemPath + ".amplitude", "is required");
+                                c.amplitude = Double(list[i]["amplitude"], itemPath + ".amplitude");
+                                if (!(c.amplitude >= 0)) Invalid(itemPath + ".amplitude", "must not be negative");
+                                if (list[i].contains("phase")) c.phase = Double(list[i]["phase"], itemPath + ".phase");
+                                water->tideConstituents.push_back(c);
+                            }
+                        }
+                        if (tide.contains("start"))
+                        {
+                            double seconds;
+                            if (!tide["start"].is_string() || !Tide::ParseUtc(tide["start"].get<std::string>(), seconds))
+                                Invalid(tidePath + ".start", "must be a UTC time like 2026-06-21T19:00:00Z");
+                            if (water->tideConstituents.empty()) Invalid(tidePath + ".start", "needs constituents");
+                            water->tideStart = tide["start"].get<std::string>();
+                        }
+                        if (tide.contains("source"))
+                        {
+                            if (!tide["source"].is_string()) Invalid(tidePath + ".source", "must be a string");
+                            water->tideSource = tide["source"].get<std::string>();
+                        }
+                        if (tide.contains("simulationTicksPerDay"))
+                        {
+                            const auto ticksPath = tidePath + ".simulationTicksPerDay";
+                            if (water->tideConstituents.empty()) Invalid(ticksPath, "needs constituents (period sets the simple tide's speed)");
+                            water->tideSimulationTicksPerDay = Number(tide["simulationTicksPerDay"], ticksPath);
+                            if (!(water->tideSimulationTicksPerDay > 0)) Invalid(ticksPath, "must be positive");
+                        }
                         if (tide.contains("range"))
                         {
                             water->tideRange = Number(tide["range"], tidePath + ".range");
@@ -1193,7 +1242,17 @@ namespace SceneData
                 if (water.hasRipples)
                     value["ripples"] = { { "velocity1", VectorJson(water.rippleVelocity1) },
                         { "velocity2", VectorJson(water.rippleVelocity2) }, { "strength", water.rippleStrength } };
-                if (water.tideRange > 0)
+                if (!water.tideConstituents.empty())
+                {
+                    Json tide = { { "start", water.tideStart } };
+                    if (!water.tideSource.empty()) tide["source"] = water.tideSource;
+                    tide["simulationTicksPerDay"] = water.tideSimulationTicksPerDay;
+                    tide["constituents"] = Json::array();
+                    for (const auto& c : water.tideConstituents)
+                        tide["constituents"].push_back({ { "name", c.name }, { "amplitude", c.amplitude }, { "phase", c.phase } });
+                    value["tide"] = tide;
+                }
+                else if (water.tideRange > 0)
                     value["tide"] = { { "range", water.tideRange }, { "period", water.tidePeriod }, { "phase", water.tidePhase } };
                 break;
             }

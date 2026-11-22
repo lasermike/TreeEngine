@@ -64,6 +64,19 @@ python import_heightmap.py puget_lowlands_2005.vrt olympics_south_2019.vrt mason
     --water-level 1.9 --seabed Puget_Sound_CoNED_Topobathy_DEM_2020_m9112_hungerford.tif
 ```
 
+**Tides.** `noaa_tide.py` writes a `water` object's tide from a NOAA CO-OPS station's harmonic constituents, plus
+the station's mean sea level above NAVD88 for the water's height (the WA DNR and CoNED heights are NAVD88). Many
+stations only publish predictions made from another station's; `--fit-to` scales and delays a harmonic station's
+tide to match one's highs and lows. Hungerford's is Budd Inlet's fitted to Arcadia (9446666), 1.4 km from the
+package's center:
+
+```bash
+python noaa_tide.py --station 9446807 --fit-to 9446666 --start 2026-06-21T19:00:00Z
+```
+
+It reports the fit (x1.089, +56 minutes, 9.2 cm RMS over June 2026's highs and lows) and prints JSON: `level` for
+the transform's y and `tide` for the scene.
+
 With `--center`, the target CRS defaults to that point's UTM zone, so the package is in meters. Mosaics of several
 tiles work through a GDAL VRT (`gdalbuildvrt all.vrt *.tif`). Cells with no data take the lowest valid height. The
 source file, CRS, bounds and spacing are recorded in the manifest's `source`. North is +z and east +x.

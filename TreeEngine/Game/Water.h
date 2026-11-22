@@ -1,9 +1,11 @@
 #pragma once
 #include "Primitive.h"
+#include "Tide.h"
 
 // A water surface: a flat plane (a thin box) at the authored height, with a material whose normal map can drift
-// (ripples) and an optional tide that raises and lowers it with simulation time:
-//   height = position.y + range / 2 * sin(2 pi (time + phase) / period).
+// (ripples) and an optional tide that raises and lowers it with simulation time. A real tide comes from a station's
+// harmonic constituents, height = position.y + Tide::Height(constituents, start + time * 86400 / ticksPerDay),
+// position.y being mean sea level, so the tide runs faster than the rest of the simulation; a simple one is height = position.y + range / 2 * sin(2 pi (time + phase) / period).
 // It draws like any primitive in raster and DXR (a transmissive material shows the ground beneath).
 class WaterParams : public WorldObjectParams
 {
@@ -16,6 +18,10 @@ public:
     float tideRange = 0;                    // Meters, low to high water.
     float tidePeriod = 44712;               // Seconds (a semidiurnal tide, 12.42 hours).
     float tidePhase = 0;                    // Seconds.
+    std::vector<Tide::Constituent> tideConstituents;    // A real tide when not empty (range, period, phase unused).
+    double tideStart = 0;                   // The UTC time at simulation time 0, in seconds since 1970.
+    std::string tideStartText, tideSource;  // As authored, for saving.
+    float tideSimulationTicksPerDay = 300;  // Simulation seconds per day of tide (300: a day every 5 minutes).
     float level = 0;                        // The mean height (the authored position's y).
 };
 

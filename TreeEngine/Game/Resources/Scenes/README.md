@@ -204,14 +204,25 @@ whose y is the mean water height (it can be moved, not rotated or scaled). Field
 - `ripples` `{ "velocity1": [u, v], "velocity2": [u, v], "strength": s }`: two
   drifting copies of the normal map, in repeats per second; `strength` (0 to 16)
   multiplies the normal scale.
-- `tide` `{ "range": m, "period": s, "phase": s }`: the surface rises and falls
-  `range / 2` either side of the mean with simulation time (period default
-  44712 s, a 12.42-hour semidiurnal tide).
+- `tide`, one of:
+  - `{ "range": m, "period": s, "phase": s }`: the surface rises and falls
+    `range / 2` either side of the mean with simulation time (period default
+    44712 s, a 12.42-hour semidiurnal tide).
+  - `{ "start": "2026-06-21T19:00:00Z", "constituents": [{ "name": "M2",
+    "amplitude": m, "phase": degrees }, ...], "source": "..." }`: a real tide
+    predicted from a tide station's harmonic constituents (NOAA's amplitudes and
+    Greenwich phases), with `start` the UTC time at simulation time 0 and the
+    transform's y the station's mean sea level. `simulationTicksPerDay` is how
+    many seconds of simulation time a day of tide takes (default 300, a day
+    every 5 minutes); the rest of the scene keeps its own pace. `source` is a
+    free-text note.
+    `Tools/terrain/noaa_tide.py` writes this block.
 
 Water draws like a primitive in raster and DXR, and casts no raster shadow.
 Elevation surveys record water as a flat surface rather than its bottom, so for
-tides import terrain with `--water-level` (`Tools/terrain/README.md`), which
-carves a sloping seabed under it. The `Hungerford` scene shows both.
+tides import terrain with `--water-level` and, where there is any, bathymetry
+(`Tools/terrain/README.md`). The `Hungerford` scene shows both, with the tide
+at Arcadia, at the mouth of Totten Inlet.
 
 ### Instancing
 
