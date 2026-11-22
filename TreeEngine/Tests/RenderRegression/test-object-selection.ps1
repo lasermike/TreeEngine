@@ -22,6 +22,9 @@ foreach ($mode in @('raster', 'raytracing')) {
         @{ id = 'no-post'; clicks = @(@{u=0.65;v=0.5}); expected = @('glass-instance'); post=$false },
         @{ id = 'leaf-surface'; clicks = @(@{u=0.5;v=0.2}); expected = @('leaf-cutout') },
         @{ id = 'leaf-hole'; clicks = @(@{u=0.432;v=0.2}); expected = @() },
+        # Transmissive panes with base alpha 0: OPAQUE covers fully, so it's picked; MASK is cut away, so nothing is.
+        @{ id = 'clear-pane'; clicks = @(@{u=0.2;v=0.854}); expected = @('clear-pane') },
+        @{ id = 'masked-pane'; clicks = @(@{u=0.8;v=0.854}); expected = @() },
         @{ id = 'tree'; scene = 'LoadTreeScene'; clicks = @(@{u=0.75;v=0.7}); expected = @('tree') },
         @{ id = 'tree-gap'; clicks = @(@{u=0.6;v=0.25}); expected = @() },
         @{ id = 'tree-instance'; scene = 'Instancing'; clicks = @(@{u=0.744;v=0.695}); expected = @('tree-right') },

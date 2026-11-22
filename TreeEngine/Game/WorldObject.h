@@ -104,6 +104,17 @@ public:
 // baseColor is linear; baseColorTexture is an optional sRGB map.
 HRESULT AddDefaultPbrMaterial(WorldObjectParams& params, XMFLOAT4 baseColor, float roughness, const wchar_t* baseColorTexture);
 
+// The blend for a blended PBR material (flags.x), matching what the pixel shader (Tree.hlsl PS) returns:
+// - Transmission returns premultiplied color, coverage x (surface lerped toward reflection), with alpha its coverage
+//   times what doesn't pass through: PremultipliedAlphaOver (ONE, INV_SRC_ALPHA). Premultiplied output keeps the
+//   color within the blend's input range on an 8-bit target and keeps coverage.
+// - Other blended materials return straight color: StraightAlphaOver (SRC_ALPHA, INV_SRC_ALPHA).
+// Both are defined the same for D3D11 and D3D12, unlike AlphaBlend and PremultipliedAlphaBlend.
+inline StockBlendStates PbrBlendState(const ShaderMaterial& material)
+{
+    return material.opticalParams.y > 0 ? StockBlendStates::PremultipliedAlphaOver : StockBlendStates::StraightAlphaOver;
+}
+
 // Render state for a material slot: PBR materials choose blending and base-color
 // sampling like imported glTF materials; legacy materials keep the caller's defaults.
 inline void ApplyPbrRenderState(const ShaderMaterial& material, StockRenderState& state)
@@ -114,7 +125,7 @@ inline void ApplyPbrRenderState(const ShaderMaterial& material, StockRenderState
         : StockSamplerStates::MinMagMipLinearUVWWrap;
     if (material.flags.x != 0)
     {
-        state.blendState = StockBlendStates::AlphaBlend;
+        state.blendState = PbrBlendState(material);
         state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
     }
 }

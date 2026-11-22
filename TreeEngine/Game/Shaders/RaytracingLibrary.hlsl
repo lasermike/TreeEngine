@@ -278,7 +278,12 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
         return;
     }
 
-    // Alpha clip — reject transparent pixels in textured geometry
+    // Alpha clip on the base color's alpha, the factor times the texture's (1 without a texture), as raster does.
+    if (mat.flags.z > 0 && mat.Diffuse.a < mat.flags.z)
+    {
+        IgnoreHit();
+        return;
+    }
     if (mat.flags.z > 0 && mat.flags.y > 0 && geoInfo.textureIndex >= 0)
     {
         float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
@@ -296,7 +301,7 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 
         float4 textureColor = SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat, texCoord, BaseColorTextureRole), mat.specularColor.w > 0);
 
-        if (textureColor.a < mat.flags.z)
+        if (mat.Diffuse.a * textureColor.a < mat.flags.z)
         {
             IgnoreHit();
             return;

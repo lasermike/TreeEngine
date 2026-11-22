@@ -701,14 +701,8 @@ HRESULT RenderPlatform11::RenderProlog(bool oculus, bool wireframe, bool useAlph
         stockStates.ApplyRasterizerState(m_immediateContext, StockRasterizerStates::Wireframe);
     }
 
-    if (useAlphaBlendedRenderTarget)
-    {
-        stockStates.ApplyBlendState(m_immediateContext, StockBlendStates::AlphaBlend);
-    }
-    else
-    {
-        stockStates.ApplyBlendState(m_immediateContext, StockBlendStates::Overwrite);
-    }
+    m_frameBlendState = useAlphaBlendedRenderTarget ? StockBlendStates::AlphaBlend : StockBlendStates::Overwrite;
+    stockStates.ApplyBlendState(m_immediateContext, m_frameBlendState);
 
     if (!oculus)
     {
@@ -914,6 +908,12 @@ HRESULT RenderPlatform11::SetRenderUnit(RenderUnit* ru, RenderPass pass)
 
         ID3D11PixelShader* pixelShader = ru->m_material->m_pixelShader->shader ? ru->m_material->m_pixelShader->shader : m_pixelShader->shader;
         m_immediateContext->PSSetShader(pixelShader, nullptr, 0);
+
+        // A blended material's own blend (PbrBlendState: straight or premultiplied); the frame's for the rest, so an
+        // opaque draw after a blended one doesn't keep blending.
+        const StockBlendStates materialBlend = ru->m_material->m_renderState.blendState;
+        XSF::StockRenderStates::GetStates().ApplyBlendState(m_immediateContext,
+            materialBlend != StockBlendStates::Overwrite ? materialBlend : m_frameBlendState);
     }
     else
     {

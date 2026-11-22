@@ -159,6 +159,58 @@ static const D3D12_BLEND_DESC s_StockBlendTypes[] =
         EMPTY_BLEND_STATE,                              // Blend Target 6
         EMPTY_BLEND_STATE,                              // Blend Target 7
         }
+    },
+
+    // StraightAlphaOver
+    {
+        FALSE,                                          // AlphaToCoverageEnable
+        FALSE,                                          // IndependentBlendEnable
+        {{                                              // Blend Target 0
+            TRUE,                                       // Blend Enable
+            FALSE,                                      // LogicOp Enable
+            D3D12_BLEND_SRC_ALPHA,                      // SrcBlend
+            D3D12_BLEND_INV_SRC_ALPHA,                  // DestBlend
+            D3D12_BLEND_OP_ADD,                         // BlendOp
+            D3D12_BLEND_ONE,                            // SrcBlendAlpha
+            D3D12_BLEND_INV_SRC_ALPHA,                  // DestBlendAlpha
+            D3D12_BLEND_OP_ADD,                         // BlendOpAlpha
+            D3D12_LOGIC_OP_NOOP,                        // LogicOp
+            D3D12_COLOR_WRITE_ENABLE_ALL,               // RenderTargetWriteMask
+        },
+        EMPTY_BLEND_STATE,                              // Blend Target 1
+        EMPTY_BLEND_STATE,                              // Blend Target 2
+        EMPTY_BLEND_STATE,                              // Blend Target 3
+        EMPTY_BLEND_STATE,                              // Blend Target 4
+        EMPTY_BLEND_STATE,                              // Blend Target 5
+        EMPTY_BLEND_STATE,                              // Blend Target 6
+        EMPTY_BLEND_STATE,                              // Blend Target 7
+        }
+    },
+
+    // PremultipliedAlphaOver
+    {
+        FALSE,                                          // AlphaToCoverageEnable
+        FALSE,                                          // IndependentBlendEnable
+        {{                                              // Blend Target 0
+            TRUE,                                       // Blend Enable
+            FALSE,                                      // LogicOp Enable
+            D3D12_BLEND_ONE,                            // SrcBlend
+            D3D12_BLEND_INV_SRC_ALPHA,                  // DestBlend
+            D3D12_BLEND_OP_ADD,                         // BlendOp
+            D3D12_BLEND_ONE,                            // SrcBlendAlpha
+            D3D12_BLEND_INV_SRC_ALPHA,                  // DestBlendAlpha
+            D3D12_BLEND_OP_ADD,                         // BlendOpAlpha
+            D3D12_LOGIC_OP_NOOP,                        // LogicOp
+            D3D12_COLOR_WRITE_ENABLE_ALL,               // RenderTargetWriteMask
+        },
+        EMPTY_BLEND_STATE,                              // Blend Target 1
+        EMPTY_BLEND_STATE,                              // Blend Target 2
+        EMPTY_BLEND_STATE,                              // Blend Target 3
+        EMPTY_BLEND_STATE,                              // Blend Target 4
+        EMPTY_BLEND_STATE,                              // Blend Target 5
+        EMPTY_BLEND_STATE,                              // Blend Target 6
+        EMPTY_BLEND_STATE,                              // Blend Target 7
+        }
     }
 };
 

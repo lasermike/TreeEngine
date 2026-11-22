@@ -264,8 +264,21 @@ void TestPbrSceneMaterials()
     glass.transmission = 0.5f;
     glass.ior = 1.33f;
     const auto glassMaterial = BuildPbrShaderMaterial(glass, alphaBlend);
-    Check(alphaBlend && glassMaterial.flags.x == 1 && glassMaterial.flags.z == 0 && glassMaterial.opticalParams.y == 0.5f
+    // An OPAQUE (or MASK) transmissive material is blended only for the raster fallback, at full coverage (flags.x 2,
+    // so the shader ignores its base-color alpha); a BLEND one keeps its alpha as coverage (flags.x 1).
+    Check(alphaBlend && glassMaterial.flags.x == 2 && glassMaterial.flags.z == 0 && glassMaterial.opticalParams.y == 0.5f
         && glassMaterial.opticalParams.x == 1.33f, "transmission did not force the raster blend fallback");
+    glass.baseColor.w = 0;
+    Check(BuildPbrShaderMaterial(glass, alphaBlend).flags.x == 2 && alphaBlend,
+        "an OPAQUE transmissive material with zero base alpha lost full coverage");
+    glass.alphaMode = PbrAlphaMode::Mask;
+    Check(BuildPbrShaderMaterial(glass, alphaBlend).flags.x == 2, "a MASK transmissive material lost full coverage");
+    glass.alphaMode = PbrAlphaMode::Blend;
+    const auto blendedGlass = BuildPbrShaderMaterial(glass, alphaBlend);
+    Check(blendedGlass.flags.x == 1 && blendedGlass.flags.z == 1.0f / 255.0f && alphaBlend,
+        "a BLEND transmissive material did not keep its alpha as coverage");
+    PbrMaterialFactors opaque;
+    Check(BuildPbrShaderMaterial(opaque, alphaBlend).flags.x == 0 && !alphaBlend, "an opaque material was blended");
 
     // Material maps load as memory-backed PNG/JPEG with role-specific color spaces.
     const auto checkerAsset = LoadGltfAsset(TestDataFilename("static-scene.gltf"));

@@ -770,9 +770,14 @@ ShaderMaterial BuildPbrShaderMaterial(const PbrMaterialFactors& factors, bool& a
         ? factors.alphaCutoff
         : (alphaBlend ? 1.0f / 255.0f : 0.0f);
     result.flags.w = factors.unlit ? 1.0f : 0.0f;
-    if (factors.transmission > 0.0f)
-        alphaBlend = true; // Raster fallback: display opaque geometry through the surface.
+    // flags.x puts the material in the blended pass: 1 for BLEND (its base-color alpha is coverage), 2 for an OPAQUE
+    // or MASK material there only for the raster transmission fallback (full coverage where it isn't clipped).
     result.flags.x = alphaBlend ? 1.0f : 0.0f;
+    if (factors.transmission > 0.0f && !alphaBlend)
+    {
+        alphaBlend = true; // Raster fallback: display opaque geometry through the surface.
+        result.flags.x = 2.0f;
+    }
     return result;
 }
 

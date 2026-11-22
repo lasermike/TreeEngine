@@ -464,22 +464,20 @@ float4 SampleBaseColor(PS_INPUT input, out Biplanar biplanar)
             input.NormL, input.Tex, ddx(input.Tex) * gradientScale, ddy(input.Tex) * gradientScale);
     }
 
-    float4 textureColor;
+    float4 textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    float lod = 0;
     if (mat.flags.y > 0)  //use texture
     {
         float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
         textureColor = SampleMaterialMap(txDiffuse, mat.specularColor.w > 0, mat, BaseColorTextureRole, input.Tex, biplanar);
-
-        if (mat.flags.z > 0)  // alpha test
-        {
-            // While upscaling, the footprint and level of detail are a display pixel's, matching the biased sample.
-            const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL))) * renderScale.y;
-            const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv) + renderScale.x;
-            clip(AlphaTestPasses(textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
-        }
+        lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv) + renderScale.x;
     }
-    else
-        textureColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    if (mat.flags.z > 0)  // alpha test, on the base color's alpha: factor x texture (glTF), 1 for no texture
+    {
+        // While upscaling, the footprint and level of detail are a display pixel's, matching the biased sample.
+        const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL))) * renderScale.y;
+        clip(AlphaTestPasses(mat.Diffuse.a * textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
+    }
     return textureColor;
 }
 
@@ -487,7 +485,10 @@ uint PSPick(PS_INPUT input) : SV_Target0
 {
     Biplanar biplanar;
     float4 base = SampleBaseColor(input, biplanar);
-    clip(base.a * mat.Diffuse.a > 0 ? 1 : -1);
+    // Pickable where the color pass covers anything: SampleBaseColor has applied a MASK cutoff, BLEND (flags.x 1)
+    // covers its base-color alpha, and the rest, including OPAQUE transmission (flags.x 2), cover fully.
+    if (mat.flags.x > 0 && mat.flags.x < 1.5f)
+        clip(base.a * mat.Diffuse.a > 0 ? 1 : -1);
     return pickObjectId;
 }
 
@@ -621,17 +622,27 @@ float4 ShadeSurface(PS_INPUT input)
         specularIbl = ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
             normal, toEye, 0.0f, prefiltered);
 
+    // Coverage: base-color alpha for BLEND (flags.x 1); full for OPAQUE and MASK in the blended pass only for
+    // transmission (flags.x 2; MASK has clipped what it doesn't cover).
     if (mat.flags.x > 0)
-        litColor.a = mat.Diffuse.a * textureColor.a;
+        litColor.a = mat.flags.x < 1.5f ? mat.Diffuse.a * textureColor.a : 1.0f;
     litColor.rgb = ToSceneColor(litColor.rgb);
     if (mat.opticalParams.y > 0.0f)
     {
-        // Alpha blend fallback for transmission: keep reflected light while
-        // displaying opaque scene geometry through the surface.
-        float opacity = 1.0f - 0.9f * saturate(mat.opticalParams.y);
+        // Blend fallback for transmission, as the ray-traced shading combines it: lerp(surface, reflection +
+        // transmitted, transmission), with what's behind passing through times (1 - Fresnel) and the base color.
+        // Premultiplied output for a ONE, INV_SRC_ALPHA blend (PbrBlendState in WorldObject.h): the covered part of
+        // the pixel adds its surface and reflection and passes `through` of what's behind; the rest passes it all.
+        // One blend factor scales what's behind, so the base color counts by its luminance (the hue is lost).
+        const float coverage = litColor.a;
+        const float transmission = saturate(mat.opticalParams.y);
+        const float f0 = ComputeDielectricF0(mat.opticalParams.x);
+        const float fresnel = f0 + (1.0f - f0) * pow(1.0f - saturate(dot(normal, toEye)), 5.0f);
+        const float tint = dot(mat.Diffuse.rgb * textureColor.rgb, float3(0.2126f, 0.7152f, 0.0722f));
+        const float through = saturate(transmission * (1.0f - fresnel) * tint);
         float3 reflection = ToSceneColor(spec.rgb + specularIbl);
-        litColor.rgb = lerp(litColor.rgb, reflection / opacity, mat.opticalParams.y);
-        litColor.a *= opacity;
+        litColor.rgb = coverage * lerp(litColor.rgb, reflection, transmission);
+        litColor.a = coverage * (1.0f - through);
     }
 
     return litColor;
@@ -645,7 +656,7 @@ float4 ShadeSurface(PS_INPUT input)
 PS_OUTPUT PSDepthMotion(PS_INPUT input)
 {
     clip(FadeKeeps(input.Fade, input.Pos.xy) ? 1 : -1);
-    if (mat.flags.y > 0 && mat.flags.z > 0)
+    if (mat.flags.z > 0)    // The alpha test, textured or not (factor alpha alone), as the rays see it.
     {
         Biplanar biplanar;
         SampleBaseColor(input, biplanar);
@@ -723,15 +734,22 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
     clip(FadeKeeps(input.Fade, input.PosH.xy) ? 1 : -1);
     if (mat.flags.z > 0)  // clip alpha threshold
     {
-        float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
-        float4 textureColor = (mat.specularColor.w > 0
-            ? txDiffuse.Sample(samLinearClamp, baseColorUv)
-            : txDiffuse.Sample(samLinearWrap, baseColorUv));
+        // The base color's alpha is the factor times the texture's (1 without a texture: no texture is bound then),
+        // as in SampleBaseColor.
+        float textureAlpha = 1.0f;
+        float lod = 0;
+        if (mat.flags.y > 0)
+        {
+            float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
+            textureAlpha = (mat.specularColor.w > 0
+                ? txDiffuse.Sample(samLinearClamp, baseColorUv)
+                : txDiffuse.Sample(samLinearWrap, baseColorUv)).a;
+            lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv);
+        }
 
         // Don't write transparent pixels to the shadow map. The footprint and level of detail are a shadow-map texel's.
         const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL)));
-        const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv);
-        clip(AlphaTestPasses(textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
+        clip(AlphaTestPasses(mat.Diffuse.a * textureAlpha, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
     }
 }
 
