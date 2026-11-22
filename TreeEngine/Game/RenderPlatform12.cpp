@@ -3363,6 +3363,9 @@ void RenderPlatform12::ReleaseDynamicBlases()
     m_sharedBlases.clear();
     m_pooledBlases.clear();
     m_pooledCompactionOwners.clear();
+    Retire(m_pooledCompactedSizes);
+    Retire(m_pooledCompactedSizesReadback);
+    m_pooledCompactedSizesCapacity = 0;
     ReleaseBlasHeap();
     Retire(m_blasScratch);
     for (auto& upload : m_ommRecordUpload)
@@ -4279,18 +4282,23 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Build pooled BLASes");
         if (m_pooledCompactedSizesCapacity < pooledBuilds.size())
         {
-            // Compaction above has read the old readback buffer; retiring keeps both alive until the GPU is done.
-            Retire(m_pooledCompactedSizes);
-            Retire(m_pooledCompactedSizesReadback);
+            // Both replacements are created before the pair is swapped, so a failure leaves the old pair and its
+            // capacity intact. Compaction above has read the old readback buffer; retiring keeps both alive until the
+            // GPU is done with them.
             const UINT capacity = (std::max)(256u, static_cast<UINT>(pooledBuilds.size() + pooledBuilds.size() / 2));
+            CComPtr<ID3D12Resource> sizes, readback;
             const D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
             const D3D12_RESOURCE_DESC sizesDesc = CD3DX12_RESOURCE_DESC::Buffer(capacity * sizeof(UINT64), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
             HRR(device->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &sizesDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-                nullptr, IID_PPV_ARGS(&m_pooledCompactedSizes)));
+                nullptr, IID_PPV_ARGS(&sizes)));
             const D3D12_HEAP_PROPERTIES readbackHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
             const D3D12_RESOURCE_DESC readbackDesc = CD3DX12_RESOURCE_DESC::Buffer(capacity * sizeof(UINT64));
             HRR(device->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&m_pooledCompactedSizesReadback)));
+                nullptr, IID_PPV_ARGS(&readback)));
+            Retire(m_pooledCompactedSizes);
+            Retire(m_pooledCompactedSizesReadback);
+            m_pooledCompactedSizes = sizes;
+            m_pooledCompactedSizesReadback = readback;
             m_pooledCompactedSizesCapacity = capacity;
         }
         std::vector<UINT64> pooledScratch(pooledBuilds.size());
@@ -5143,6 +5151,11 @@ HRESULT RenderPlatform12::UninitDevice()
 
     m_dynamicBlases.clear();
     m_sharedBlases.clear();
+    m_pooledBlases.clear();                             // Their allocations are in the heap released below.
+    m_pooledCompactionOwners.clear();
+    m_pooledCompactedSizes.Release();
+    m_pooledCompactedSizesReadback.Release();
+    m_pooledCompactedSizesCapacity = 0;
     m_blasHeap.clear();
     m_pendingBlasFrees.clear();
     m_blasHeapLiveBytes = 0;
