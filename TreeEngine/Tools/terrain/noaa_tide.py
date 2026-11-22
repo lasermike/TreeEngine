@@ -169,7 +169,7 @@ def main():
         source += f', x{scale:.3f} and {delay:+d} min to fit {args.fit_to} {subordinate}'
 
     level = datums['MSL'] - datums['NAVD88']
-    tide = {'source': source, 'start': args.start,
+    tide = {'source': source, 'start': args.start, 'simulationTicksPerDay': 300,
             'constituents': [{'name': c['name'], 'amplitude': round(c['amplitude'], 4), 'phase': round(c['phase'], 2)}
                              for c in sorted(constituents, key=lambda c: -c['amplitude'])]}
     lows = [height(tide['constituents'], utc(args.start) + 600 * i) for i in range(6 * 24 * 30)]

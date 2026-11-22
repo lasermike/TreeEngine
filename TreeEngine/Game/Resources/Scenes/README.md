@@ -212,7 +212,10 @@ whose y is the mean water height (it can be moved, not rotated or scaled). Field
     "amplitude": m, "phase": degrees }, ...], "source": "..." }`: a real tide
     predicted from a tide station's harmonic constituents (NOAA's amplitudes and
     Greenwich phases), with `start` the UTC time at simulation time 0 and the
-    transform's y the station's mean sea level. `source` is a free-text note.
+    transform's y the station's mean sea level. `simulationTicksPerDay` is how
+    many seconds of simulation time a day of tide takes (default 300, a day
+    every 5 minutes); the rest of the scene keeps its own pace. `source` is a
+    free-text note.
     `Tools/terrain/noaa_tide.py` writes this block.
 
 Water draws like a primitive in raster and DXR, and casts no raster shadow.

@@ -237,10 +237,12 @@ namespace SceneData
         float tidePeriod = 44712;                   // Seconds (12.42 hours).
         float tidePhase = 0;                        // Seconds.
         // A real tide instead (Tools/terrain/noaa_tide.py writes one): a tide station's harmonic constituents, the UTC
-        // time at simulation time 0 ("YYYY-MM-DDTHH:MM:SSZ"), and a note of where they came from.
+        // time at simulation time 0 ("YYYY-MM-DDTHH:MM:SSZ"), how many simulation seconds a day of tide takes, and a
+        // note of where they came from.
         std::vector<Tide::Constituent> tideConstituents;
         std::string tideStart;
         std::string tideSource;
+        float tideSimulationTicksPerDay = 300;      // Simulation seconds per day of tide (a day every 5 minutes).
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<WaterDefinition>(*this); }
     };
 

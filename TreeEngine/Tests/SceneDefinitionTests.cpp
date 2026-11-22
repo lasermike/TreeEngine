@@ -847,8 +847,14 @@ void TestTideSettings()
     const auto scene = SceneData::ParseScene(json, "tide");
     const auto& inlet = static_cast<const SceneData::WaterDefinition&>(*scene.objects[0]);
     Check(inlet.tideConstituents.size() == 2 && inlet.tideConstituents[0].phase == 57 && inlet.tideConstituents[1].phase == 0
-        && inlet.tideStart == "2026-06-21T19:00:00Z" && inlet.tideSource == "test" && inlet.tideRange == 0,
-        "tide constituents were not parsed");
+        && inlet.tideStart == "2026-06-21T19:00:00Z" && inlet.tideSource == "test" && inlet.tideRange == 0
+        && inlet.tideSimulationTicksPerDay == 300, "tide constituents were not parsed");
+    auto faster = Json::parse(json);
+    faster["objects"][0]["tide"]["simulationTicksPerDay"] = 60;
+    const auto fasterScene = SceneData::ParseScene(faster.dump(), "tide-faster");
+    Check(static_cast<const SceneData::WaterDefinition&>(*fasterScene.objects[0]).tideSimulationTicksPerDay == 60
+        && Json::parse(SceneData::SerializeScene(fasterScene))["objects"][0]["tide"]["simulationTicksPerDay"] == 60,
+        "the tide's simulation ticks per day did not round-trip");
     const auto saved = Json::parse(SceneData::SerializeScene(scene));
     Check(saved["objects"][0]["tide"]["constituents"].size() == 2 && !saved["objects"][0]["tide"].contains("range"),
         "tide constituents saved the wrong fields");
@@ -871,6 +877,11 @@ void TestTideSettings()
     bad = Json::parse(json);
     bad["objects"][0]["tide"]["constituents"][1]["amplitude"] = -1;
     Reject(bad.dump(), ".constituents[1].amplitude");
+    bad = Json::parse(json);
+    bad["objects"][0]["tide"]["simulationTicksPerDay"] = 0;
+    Reject(bad.dump(), ".tide.simulationTicksPerDay");
+    bad = Json::parse(R"({"version":1,"name":"Tide","objects":[{"id":"pond","type":"water","tide":{"range":2,"simulationTicksPerDay":300}}]})");
+    Reject(bad.dump(), ".tide.simulationTicksPerDay");
 }
 
 void TestTreeLodSettings()

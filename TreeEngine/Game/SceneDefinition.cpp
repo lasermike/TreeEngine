@@ -759,7 +759,7 @@ namespace SceneData
                     {
                         const auto& tide = value["tide"];
                         const auto tidePath = path + ".tide";
-                        Fields(tide, tidePath, { "range", "period", "phase", "start", "constituents", "source" });
+                        Fields(tide, tidePath, { "range", "period", "phase", "start", "constituents", "source", "simulationTicksPerDay" });
                         if (tide.contains("constituents"))
                         {
                             if (tide.contains("range") || tide.contains("period") || tide.contains("phase"))
@@ -794,6 +794,13 @@ namespace SceneData
                         {
                             if (!tide["source"].is_string()) Invalid(tidePath + ".source", "must be a string");
                             water->tideSource = tide["source"].get<std::string>();
+                        }
+                        if (tide.contains("simulationTicksPerDay"))
+                        {
+                            const auto ticksPath = tidePath + ".simulationTicksPerDay";
+                            if (water->tideConstituents.empty()) Invalid(ticksPath, "needs constituents (period sets the simple tide's speed)");
+                            water->tideSimulationTicksPerDay = Number(tide["simulationTicksPerDay"], ticksPath);
+                            if (!(water->tideSimulationTicksPerDay > 0)) Invalid(ticksPath, "must be positive");
                         }
                         if (tide.contains("range"))
                         {
@@ -1239,6 +1246,7 @@ namespace SceneData
                 {
                     Json tide = { { "start", water.tideStart } };
                     if (!water.tideSource.empty()) tide["source"] = water.tideSource;
+                    tide["simulationTicksPerDay"] = water.tideSimulationTicksPerDay;
                     tide["constituents"] = Json::array();
                     for (const auto& c : water.tideConstituents)
                         tide["constituents"].push_back({ { "name", c.name }, { "amplitude", c.amplitude }, { "phase", c.phase } });

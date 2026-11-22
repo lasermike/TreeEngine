@@ -363,6 +363,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                 Tide::ParseUtc(water.tideStart, parameters->tideStart);
             parameters->tideStartText = water.tideStart;
             parameters->tideSource = water.tideSource;
+            parameters->tideSimulationTicksPerDay = water.tideSimulationTicksPerDay;
             parameters->textureFilename.push_back(L"");
             if (water.hasMaterial)
             {
@@ -798,6 +799,7 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             water.tideConstituents = waterParams.tideConstituents;
             water.tideStart = waterParams.tideStartText;
             water.tideSource = waterParams.tideSource;
+            water.tideSimulationTicksPerDay = waterParams.tideSimulationTicksPerDay;
             if (water.hasMaterial && !params.materials.empty())
                 water.material = CaptureMaterial(params, 0, sourceFilename, destinationFilename);
             break;

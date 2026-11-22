@@ -213,6 +213,7 @@
       "tide": {
         "source": "NOAA 9446807 BUDD INLET, SOUTH OF GULL HARBOR, x1.089 and +56 min to fit 9446666 Arcadia, Totten Inlet",
         "start": "2026-06-21T19:00:00Z",
+        "simulationTicksPerDay": 300,
         "constituents": [
           { "name": "M2", "amplitude": 1.5886, "phase": 57.35 },
           { "name": "K1", "amplitude": 0.9549, "phase": 303.64 },
