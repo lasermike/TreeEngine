@@ -34,6 +34,12 @@ enum class StockBlendStates : unsigned int
     // intended for Src data with premultiplied alpha.
     AdditiveBlendIgnoreSrcAlphaKeepDestAlpha,
 
+    // Src over Dest, defined the same on every platform. AlphaBlend and PremultipliedAlphaBlend above don't agree
+    // across platforms (D3D12's AlphaBlend is ONE, INV_SRC_ALPHA and its PremultipliedAlphaBlend SRC_ALPHA; D3D11
+    // has SRC_ALPHA for both), so new code uses these.
+    StraightAlphaOver,          // SRC_ALPHA, INV_SRC_ALPHA: Src is straight color.
+    PremultipliedAlphaOver,     // ONE, INV_SRC_ALPHA: Src is already multiplied by its alpha.
+
     // The total number of stock blend states.
     BlendStateCount
 };

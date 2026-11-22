@@ -621,8 +621,10 @@ float4 ShadeSurface(PS_INPUT input)
         specularIbl = ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
             normal, toEye, 0.0f, prefiltered);
 
+    // Coverage: base-color alpha for BLEND (flags.x 1); full for OPAQUE and MASK in the blended pass only for
+    // transmission (flags.x 2; MASK has clipped what it doesn't cover).
     if (mat.flags.x > 0)
-        litColor.a = mat.Diffuse.a * textureColor.a;
+        litColor.a = mat.flags.x < 1.5f ? mat.Diffuse.a * textureColor.a : 1.0f;
     litColor.rgb = ToSceneColor(litColor.rgb);
     if (mat.opticalParams.y > 0.0f)
     {

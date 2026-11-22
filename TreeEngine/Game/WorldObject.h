@@ -104,18 +104,15 @@ public:
 // baseColor is linear; baseColorTexture is an optional sRGB map.
 HRESULT AddDefaultPbrMaterial(WorldObjectParams& params, XMFLOAT4 baseColor, float roughness, const wchar_t* baseColorTexture);
 
-// The blend for a blended PBR material (flags.x), matching what the pixel shader (Tree.hlsl PS) returns. The two
-// templates' names are swapped relative to what they do:
+// The blend for a blended PBR material (flags.x), matching what the pixel shader (Tree.hlsl PS) returns:
 // - Transmission returns premultiplied color, coverage x (surface lerped toward reflection), with alpha its coverage
-//   times what doesn't pass through: StockBlendStates::AlphaBlend (ONE, INV_SRC_ALPHA). Premultiplied output keeps
-//   the color within the blend's input range on an 8-bit target and keeps coverage.
-// - Other blended materials return straight color: StockBlendStates::PremultipliedAlphaBlend (SRC_ALPHA,
-//   INV_SRC_ALPHA).
-// These are the D3D12 templates (StockRenderStates12.cpp). The D3D11 platform (RenderPlatform11UWP, built only for
-// the Xbox profiles) defines both as SRC_ALPHA, so transmission is dimmed there.
+//   times what doesn't pass through: PremultipliedAlphaOver (ONE, INV_SRC_ALPHA). Premultiplied output keeps the
+//   color within the blend's input range on an 8-bit target and keeps coverage.
+// - Other blended materials return straight color: StraightAlphaOver (SRC_ALPHA, INV_SRC_ALPHA).
+// Both are defined the same for D3D11 and D3D12, unlike AlphaBlend and PremultipliedAlphaBlend.
 inline StockBlendStates PbrBlendState(const ShaderMaterial& material)
 {
-    return material.opticalParams.y > 0 ? StockBlendStates::AlphaBlend : StockBlendStates::PremultipliedAlphaBlend;
+    return material.opticalParams.y > 0 ? StockBlendStates::PremultipliedAlphaOver : StockBlendStates::StraightAlphaOver;
 }
 
 // Render state for a material slot: PBR materials choose blending and base-color

@@ -80,7 +80,7 @@ struct ShaderMaterial
 
     XMFLOAT4 Ambient;
     XMFLOAT4 Diffuse;
-    XMFLOAT4 flags; // x = preserve source alpha, y = useTexture, z = alpha clip threshold, w = unlit
+    XMFLOAT4 flags; // x = blended pass (1 BLEND, 2 transmission only; see BuildPbrShaderMaterial), y = useTexture, z = alpha clip threshold, w = unlit
     XMFLOAT4 specularParams; // x = 1 when built as PBR (C++ only), metallic, roughness, specularFactor
     XMFLOAT4 specularColor; // linear RGB factor; w = base-color clamp
     XMFLOAT4 specularTextures; // strength/color texture slots; z/w = clamp flags
