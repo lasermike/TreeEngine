@@ -1056,9 +1056,12 @@ HRESULT RenderManager::OnResize(UINT windowWidth, UINT windowHeight, bool render
     ASSERT(GetRenderData().projectionData.screenHeight != 0);
     ASSERT(GetRenderData().projectionData.fov != 0);
 
+    // Reversed depth: the near plane maps to 1 and the far plane to 0. Floating-point depth then keeps its precision
+    // where perspective needs it, out to kilometers (see RenderPlatform12's ReverseDepthTest); the near and far
+    // arguments are swapped to get it.
     XMStoreFloat4x4(&GetRenderData().projection, XMMatrixPerspectiveFovLH(GetRenderData().projectionData.fov,
         GetRenderData().projectionData.screenWidth / (float)GetRenderData().projectionData.screenHeight,
-        GetRenderData().projectionData.nearClippingPlane, GetRenderData().projectionData.farClippingPlane));
+        GetRenderData().projectionData.farClippingPlane, GetRenderData().projectionData.nearClippingPlane));
 
     ASSERT(!XMMatrixIsIdentity(XMLoadFloat4x4(&GetRenderData().projection)));
 

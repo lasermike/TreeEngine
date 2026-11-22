@@ -198,9 +198,10 @@ namespace
                 create.Feature.InTargetWidth = m_display.width;
                 create.Feature.InTargetHeight = m_display.height;
                 create.Feature.InPerfQualityValue = QualityForScale(static_cast<float>(m_render.width) / m_display.width);
-                // Motion is at the render size and without jitter; depth is 0 near and 1 far; exposure is applied
-                // by the tonemap pass after upscaling, so DLSS estimates its own.
+                // Motion is at the render size and without jitter; depth is reversed (1 near, 0 far); exposure is
+                // applied by the tonemap pass after upscaling, so DLSS estimates its own.
                 create.InFeatureCreateFlags = NVSDK_NGX_DLSS_Feature_Flags_MVLowRes | NVSDK_NGX_DLSS_Feature_Flags_AutoExposure
+                    | NVSDK_NGX_DLSS_Feature_Flags_DepthInverted
                     | (m_hdr ? NVSDK_NGX_DLSS_Feature_Flags_IsHDR : 0);
                 PIXScopedEvent(commandList, TREE_COLOR_DRAW_TEXT, L"DLSS create");
                 const NVSDK_NGX_Result result = NGX_D3D12_CREATE_DLSS_EXT(commandList, 1, 1, &m_feature, m_parameters, &create);

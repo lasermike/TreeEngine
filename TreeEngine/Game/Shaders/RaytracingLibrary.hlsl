@@ -201,8 +201,9 @@ void ComputeTextureFootprint(DxrGeometryInfo geometry, uint3 indices,
     float2 ndc = projected.xy / projected.w;
     // While upscaling, a display pixel's footprint (renderScale.y is render / display), so textures keep its detail.
     float2 pixelStep = 2.0f * renderScale.y / float2(DispatchRaysDimensions().xy);
-    float4 worldX = mul(float4(ndc + float2(pixelStep.x, 0), 0, 1), InverseViewProjection);
-    float4 worldY = mul(float4(ndc + float2(0, -pixelStep.y), 0, 1), InverseViewProjection);
+    // Neighboring rays through points at the near plane (depth 1: depth is reversed).
+    float4 worldX = mul(float4(ndc + float2(pixelStep.x, 0), 1, 1), InverseViewProjection);
+    float4 worldY = mul(float4(ndc + float2(0, -pixelStep.y), 1, 1), InverseViewProjection);
     float3 directionX = worldX.xyz / worldX.w - eyePos.xyz;
     float3 directionY = worldY.xyz / worldY.w - eyePos.xyz;
     float denominatorX = dot(planeNormal, directionX);
@@ -706,7 +707,9 @@ void RayGenerationShader()
     screenPos.y = -screenPos.y;
 
     // Unproject the pixel coordinate into a ray.
-    float4 world = mul(float4(screenPos, 0, 1), InverseViewProjection);
+    // A point on the pixel's ray at the near plane: depth 1, as depth is reversed. (Unprojecting the far plane, depth 0,
+    // loses precision when far is thousands of times near.)
+    float4 world = mul(float4(screenPos, 1, 1), InverseViewProjection);
 
     world.xyz /= world.w;
     
@@ -718,7 +721,7 @@ void RayGenerationShader()
     ray.Origin = origin;
     ray.Direction = direction;
     // The view axis: from the eye through the screen's center.
-    const float4 center = mul(float4(0, 0, 0, 1), InverseViewProjection);
+    const float4 center = mul(float4(0, 0, 1, 1), InverseViewProjection);
     const float3 axis = normalize(center.xyz / center.w - origin);
     ray.TMin = 0.001;
     ray.TMax = PrimaryRayLength(dot(direction, axis));

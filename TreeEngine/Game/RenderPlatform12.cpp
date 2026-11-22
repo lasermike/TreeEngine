@@ -285,6 +285,24 @@ enum RootSignatureParams
     TerrainLayersRootSignatureParam,        // Terrain material layers (t11); see Shaders/Terrain.hlsli.
 };
 
+// The scene's depth is reversed (RenderManager's projection maps near to 1 and far to 0, and the depth buffer clears to
+// 0), so its depth tests compare the other way: a template's "less" becomes "greater". Shadow maps keep conventional
+// depth (their own orthographic projections), so their pipelines don't use this.
+static void ReverseDepthTest(D3D12_DEPTH_STENCIL_DESC& desc)
+{
+    switch (desc.DepthFunc)
+    {
+    case D3D12_COMPARISON_FUNC_LESS: desc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER; break;
+    case D3D12_COMPARISON_FUNC_LESS_EQUAL: desc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL; break;
+    case D3D12_COMPARISON_FUNC_GREATER: desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS; break;
+    case D3D12_COMPARISON_FUNC_GREATER_EQUAL: desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL; break;
+    default: break;
+    }
+}
+
+// The scene depth buffer's clear value: the far plane, under reversed depth.
+static const FLOAT SceneDepthClear = 0.0f;
+
 // Velocity for pixels without object motion (NoObjectMotion in Shaders/SharedTypes.hlsli).
 static const FLOAT NoObjectMotionClear[4] = { 65504.0f, 65504.0f, 0.0f, 0.0f };
 
@@ -888,6 +906,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    ReverseDepthTest(psoDesc.DepthStencilState);
 
     psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     psoDesc.SampleMask = UINT_MAX;
@@ -905,6 +924,7 @@ HRESULT RenderPlatform12::InitGameLevelGraphics(UINT maxInstances, bool useShado
 
     // PSO for shadow map pass.
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
+    shadowPsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);   // Conventional depth.
     shadowPsoDesc.RasterizerState.DepthBias = 0;   // Each cascade biases in the shader (CascadedShadowFactor).
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 2.0f;
@@ -2337,6 +2357,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
     // TODO: fill out other render states in PSO
 
     StockRenderStates::GetInstance().CopyDepthStencilTemplate(psoDesc.DepthStencilState, material->m_renderState.depthStencilState);
+    ReverseDepthTest(psoDesc.DepthStencilState);
     psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -2377,6 +2398,8 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
 
     // Shadow pass PSO
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = psoDesc;
+    // The material's own depth template, conventional: shadow maps don't reverse depth.
+    StockRenderStates::GetInstance().CopyDepthStencilTemplate(shadowPsoDesc.DepthStencilState, material->m_renderState.depthStencilState);
     shadowPsoDesc.RasterizerState.DepthBias = 0;   // Each cascade biases in the shader (CascadedShadowFactor).
     shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 2.0f;
@@ -2412,6 +2435,7 @@ HRESULT RenderPlatform12::CreateRenderUnit(Material* material, Mesh* mesh, Rende
         pickDesc.RTVFormats[0] = DXGI_FORMAT_R32_UINT;
         pickDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
         pickDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+        ReverseDepthTest(pickDesc.DepthStencilState);
         pickDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
         HRR(createPipeline(&pickDesc, IID_PPV_ARGS(&(*renderUnit)->m_pickPipelineState)));
         m_gameLevelPSOs[std::to_string((*renderUnit)->id) + "Pick"] = (*renderUnit)->m_pickPipelineState;
@@ -4729,7 +4753,7 @@ HRESULT RenderPlatform12::CreateDepthAndVelocity(UINT width, UINT height)
 
     D3D12_CLEAR_VALUE depthClearValue;    // Performance tip: Tell the runtime at resource creation the desired clear value.
     depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-    depthClearValue.DepthStencil.Depth = 1.0f;
+    depthClearValue.DepthStencil.Depth = SceneDepthClear;
     depthClearValue.DepthStencil.Stencil = 0;
 
     HRR(GetDevice()->CreateCommittedResource(
@@ -5339,7 +5363,7 @@ HRESULT RenderPlatform12::RenderProlog(bool /*oculus*/, bool wireframe, bool use
     else
         GetCommandList()->ClearRenderTargetView(rtvHandle, &m_renderData->clearColor.x, 0, nullptr); // TODO refactor out with case above
     GetCommandList()->ClearRenderTargetView(targets[1], NoObjectMotionClear, 0, nullptr);
-    GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+    GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, SceneDepthClear, 0, 0, nullptr);
 
     GetCommandList()->SetPipelineState(m_renderData->hdrSceneColor ? m_pipelineStateHdr : m_pipelineState);  // Needed here?  Supports rendering without material?
 

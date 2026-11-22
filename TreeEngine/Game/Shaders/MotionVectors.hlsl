@@ -28,8 +28,9 @@ void MotionVectorsCS(uint3 id : SV_DispatchThreadID)
         return;
     const float depth = Depth.Load(int3(id.xy, 0));
     const float2 ndc = float2(uv.x * 2 - 1, 1 - uv.y * 2);
-    // Nothing drawn (clear color) is a direction at infinity, which only camera rotation moves.
-    const float4 previous = mul(float4(ndc, depth, 1), depth >= 1.0f ? CurrentToPreviousDirection : CurrentToPrevious);
+    // Nothing drawn (clear color) is a direction at infinity, which only camera rotation moves. Depth is reversed: the
+    // far plane, where nothing was drawn, is 0.
+    const float4 previous = mul(float4(ndc, depth, 1), depth <= 0.0f ? CurrentToPreviousDirection : CurrentToPrevious);
     if (previous.w <= 1e-6f)
     {
         Velocity[id.xy] = 0;    // Behind last frame's camera.
