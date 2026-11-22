@@ -2,6 +2,7 @@
 
 #include <DirectXMath.h>
 #include "Lod.h"
+#include "Tide.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -235,6 +236,11 @@ namespace SceneData
         float tideRange = 0;                        // Meters from low to high water; 0 = still.
         float tidePeriod = 44712;                   // Seconds (12.42 hours).
         float tidePhase = 0;                        // Seconds.
+        // A real tide instead (Tools/terrain/noaa_tide.py writes one): a tide station's harmonic constituents, the UTC
+        // time at simulation time 0 ("YYYY-MM-DDTHH:MM:SSZ"), and a note of where they came from.
+        std::vector<Tide::Constituent> tideConstituents;
+        std::string tideStart;
+        std::string tideSource;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<WaterDefinition>(*this); }
     };
 
