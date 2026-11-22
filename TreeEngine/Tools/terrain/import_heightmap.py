@@ -68,6 +68,35 @@ def check_coverage(raw, count, source, bounds, crs):
               f'height; get more tiles, or move --center or shrink --size to fit the data', file=sys.stderr)
 
 
+def grid(info):
+    """A warped raster's grid: its CRS (WKT), extent (xmin, ymin, xmax, ymax) and size, from gdalinfo -json."""
+    x0, dx, _, y0, _, dy = info['geoTransform']
+    width, height = info['size']
+    return info['coordinateSystem']['wkt'], [x0, y0 + dy * height, x0 + dx * width, y0], [width, height]
+
+
+def warp_seabed(args, work, warped, info):
+    """Warps the bathymetry onto exactly the elevation raster's grid (CRS, extent and size), since TerrainTool pairs
+    their samples by index; stops if the grids still differ. Returns the bathymetry as raw float32."""
+    wkt, extent, size = grid(info)
+    crs_file = os.path.join(work, 'grid.wkt')
+    with open(crs_file, 'w') as f:
+        f.write(wkt)
+    seabed_tif = os.path.join(work, 'seabed.tif')
+    run(['gdalwarp', '-overwrite', '-r', args.resampling, '-ot', 'Float32', '-dstnodata', '-3.4e38', '-of', 'GTiff',
+         '-t_srs', crs_file, '-te'] + [repr(v) for v in extent] + ['-ts', str(size[0]), str(size[1])]
+        + args.seabed + [seabed_tif])
+    seabed_info = json.loads(subprocess.run(['gdalinfo', '-json', seabed_tif], capture_output=True, text=True,
+                                            check=True).stdout)
+    seabed_wkt, seabed_extent, seabed_size = grid(seabed_info)
+    cell = abs(info['geoTransform'][1])
+    if seabed_size != size or any(abs(a - b) > 1e-6 * cell for a, b in zip(seabed_extent, extent)):
+        sys.exit(f'the bathymetry did not land on the elevation grid ({seabed_size} {seabed_extent} vs {size} {extent})')
+    seabed_raw = os.path.join(work, 'seabed.raw')
+    run(['gdal_translate', '-of', 'ENVI', '-ot', 'Float32', seabed_tif, seabed_raw])
+    return seabed_raw
+
+
 def utm_crs(latitude, longitude):
     zone = int((longitude + 180) // 6) + 1
     return f'EPSG:{32600 + zone if latitude >= 0 else 32700 + zone}'
@@ -90,10 +119,15 @@ def main():
     parser.add_argument('--water-level', type=float,
                         help='meters: ground at or below is water, carved into a seabed sloping from the shore '
                              '(surveys see the water surface, not the bottom)')
+    parser.add_argument('--seabed', nargs='+', metavar='raster',
+                        help='bathymetry or topobathy rasters in meters (later ones win): water at or below --water-level '
+                             'takes their depths; where they have none, the seabed is carved from the shore')
     parser.add_argument('--water-slope', type=float, default=0.05, help='seabed meters per meter from shore (default 0.05)')
     parser.add_argument('--water-depth', type=float, default=8, help='deepest seabed below --water-level (default 8 m)')
     parser.add_argument('--tool', help='path to TerrainTool.exe')
     args = parser.parse_args()
+    if args.seabed and args.water_level is None:
+        parser.error('--seabed needs --water-level (which samples are water)')
 
     tool = find_terrain_tool(args.tool)
     require('gdalwarp')
@@ -134,8 +168,13 @@ def main():
             'resampling': args.resampling,
             'size': [width, height],
         }
+        seabed_raw = None
+        if args.seabed:
+            seabed_raw = warp_seabed(args, work, warped, info)
         if args.water_level is not None:
             source['seabed'] = {'waterLevel': args.water_level, 'slope': args.water_slope, 'depth': args.water_depth}
+            if args.seabed:
+                source['seabed']['bathymetry'] = [os.path.basename(path) for path in args.seabed]
         # TerrainTool pack puts the raster's top row (north) at +z, with east at +x (the engine is left-handed, y up).
         source['north'] = '+z'
         run([tool, 'pack', '--out', args.output, '--raw', raw, '--width', str(width), '--height', str(height),
@@ -143,7 +182,8 @@ def main():
              '--height-scale', str(args.height_scale), '--height-offset', str(args.height_offset),
              '--source-json', json.dumps(source, separators=(',', ':'))]
             + ([] if args.water_level is None else ['--water-level', str(args.water_level), '--water-slope',
-                                                     str(args.water_slope), '--water-depth', str(args.water_depth)]))
+                                                     str(args.water_slope), '--water-depth', str(args.water_depth)])
+            + ([] if not seabed_raw else ['--seabed-raw', seabed_raw]))
     run([tool, 'info', args.output])
 
 

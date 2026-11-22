@@ -41,8 +41,28 @@ sit under a newer partial one (they may differ in CRS and resolution).
 Surveys see a water surface, not the bottom, and hydro-flattened DTMs make each water body one flat sheet at the level
 it was flown at. `--water-level M` turns ground at or below `M` meters into a seabed that deepens with distance from
 dry ground (`--water-slope`, meters per meter, default 0.05) down to `--water-depth` (default 8 m) below the level,
-so a `water` object's tide can uncover the shallows. Hungerford uses `--water-level 1.9 --water-slope 0.04
---water-depth 10`.
+so a `water` object's tide can uncover the shallows.
+
+Better, give real bathymetry with `--seabed` (one or more rasters in meters, stacked like the sources): water samples
+take its depth wherever it has one, and only the rest is carved. For Puget Sound, the USGS CoNED topobathymetric DEM
+(2020, 1 m, NAVD88 meters, the same vertical datum as WA DNR LiDAR) is on NOAA's public bucket as one VRT. GDAL can cut
+an area out of it without downloading the whole 1,364-tile set. In a bash shell (Git Bash on Windows); `-projwin`
+takes the area's corners in the DEM's CRS, UTM zone 10N meters (west, north, east, south), a little past the
+package; these are Hungerford's:
+
+```bash
+curl -o coned.vrt https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/dem/Puget_Sound_CoNED_DEM_2020_9112/Puget_Sound_CoNED_DEM_2020_m9112_EPSG-6339.vrt
+sed 's#relativeToVRT="1">tiles/#relativeToVRT="0">/vsicurl/https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/dem/Puget_Sound_CoNED_DEM_2020_9112/tiles/#' coned.vrt > coned-remote.vrt
+gdal_translate -projwin 502396 5230529 506692 5226233 coned-remote.vrt Puget_Sound_CoNED_Topobathy_DEM_2020_m9112_hungerford.tif
+```
+
+Hungerford was imported from the three WA DNR surveys plus that cut:
+
+```bash
+python import_heightmap.py puget_lowlands_2005.vrt olympics_south_2019.vrt mason_county_2025.vrt Hungerford.terrain \
+    --center 47.2089 -122.94 --size 4096 --spacing 1 --height-scale 0.3048006 \
+    --water-level 1.9 --seabed Puget_Sound_CoNED_Topobathy_DEM_2020_m9112_hungerford.tif
+```
 
 With `--center`, the target CRS defaults to that point's UTM zone, so the package is in meters. Mosaics of several
 tiles work through a GDAL VRT (`gdalbuildvrt all.vrt *.tif`). Cells with no data take the lowest valid height. The

@@ -4,7 +4,8 @@
 //   TerrainTool generate --out DIR [--preset valley|hills|flat] [--size 8192] [--spacing 1] [--seed 7] [--relief 600]
 //   TerrainTool pack --out DIR (--raw FILE --width W --height H [--type f32|u16|i16] | --png FILE)
 //                    [--spacing 1] [--height-scale 1] [--height-offset 0] [--nodata V] [--source-json JSON]
-//                    [--water-level M [--water-slope 0.05] [--water-depth 8]]   (carve a seabed under flat water)
+//                    [--water-level M [--seabed-raw FILE [--seabed-scale 1]] [--water-slope 0.05] [--water-depth 8]]
+//                    (under flat water: the seabed from a bathymetry raster, else carved from the shore)
 //   TerrainTool info DIR
 //   TerrainTool heights DIR --in POINTS --out HEIGHTS     (lines of "x z" in meters -> one height per line)
 //   TerrainTool texture --out PREFIX --kind grass|rock|snow|dirt [--size 512] [--seed 1]
@@ -282,6 +283,26 @@ namespace
             const float level = float(Number(args, "water-level", 0));
             const double slope = Number(args, "water-slope", 0.05), depth = Number(args, "water-depth", 8);
             const double spacingMeters = Number(args, "spacing", 1.0);
+            // A bathymetry raster on the same grid (float32, same nodata), in meters times --seabed-scale: water samples
+            // take its depth where it has one (never higher than the surface the survey saw).
+            std::vector<bool> fromSeabed(values.size(), false);
+            if (args.count("seabed-raw"))
+            {
+                std::ifstream file(Text(args, "seabed-raw").c_str(), std::ios::binary);
+                std::vector<float> seabed(values.size());
+                if (!file.read(reinterpret_cast<char*>(seabed.data()), std::streamsize(seabed.size() * sizeof(float))))
+                { fprintf(stderr, "cannot read %zu heights from %s\n", seabed.size(), Text(args, "seabed-raw").c_str()); return 1; }
+                const double seabedScale = Number(args, "seabed-scale", 1.0);
+                size_t used = 0;
+                for (size_t i = 0; i < values.size(); ++i)
+                    if (values[i] <= level && std::isfinite(seabed[i]) && seabed[i] > -1e30f && !(hasNodata && seabed[i] == float(nodata)))
+                    {
+                        values[i] = std::min(values[i], float(seabedScale * seabed[i]));
+                        fromSeabed[i] = true;
+                        ++used;
+                    }
+                fprintf(stderr, "Seabed from bathymetry under %zu water samples\n", used);
+            }
             // Two-pass chamfer distance transform (3-4 weights) to dry ground, in samples.
             const float unreached = 1e30f;
             std::vector<float> distance(values.size());
@@ -306,12 +327,13 @@ namespace
                 }
             size_t carved = 0;
             for (size_t i = 0; i < values.size(); ++i)
-                if (values[i] <= level && distance[i] < unreached)
+                if (values[i] <= level && !fromSeabed[i] && distance[i] < unreached)
                 {
                     values[i] = float(std::min<double>(values[i], level - std::min(depth, slope * distance[i] * spacingMeters)));
                     ++carved;
                 }
-            fprintf(stderr, "Carved %zu water samples below %.2f m (slope %.3f, at most %.1f m deep)\n", carved, level, slope, depth);
+            if (carved)
+                fprintf(stderr, "Carved %zu water samples below %.2f m (slope %.3f, at most %.1f m deep)\n", carved, level, slope, depth);
         }
 
         // Pad to a whole quadtree (64 * 2^n + 1 samples per side), repeating the edge. The image's top row is north,
