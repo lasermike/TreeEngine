@@ -113,9 +113,11 @@ struct RenderProfile
     UINT terrainLoadedNodes = 0;
     UINT terrainMissingNodes = 0;           // Splits held back by children still loading, and nodes queued or loading.
     UINT terrainPendingNodes = 0;
-    UINT pooledBlasBuilds = 0;
+    UINT pooledBlasBuilds = 0;              // DXR: BLASes built this frame for pooled geometry (terrain nodes),
+    UINT pooledBlasCompactions = 0;         // those compacted this frame (last frame's builds), and the bytes it saved.
+    std::uint64_t pooledBlasCompactedBytes = 0;
     double vertexUploadMs = 0;              // RenderManager::EndFrame's vertex uploads (terrain nodes): CPU time and bytes.
-    std::uint64_t vertexUploadBytes = 0;              // DXR: BLASes built this frame for pooled geometry (terrain nodes).
+    std::uint64_t vertexUploadBytes = 0;
     UINT batchedDraws = 0;                  // Batched instance draws, and the objects they drew (see RenderManager::Render).
     UINT batchedObjects = 0;
     double instanceUploadMs = 0;            // Copying the CPU instance array into the frame's instance buffer.

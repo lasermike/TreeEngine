@@ -1,0 +1,4 @@
+﻿"test","scene","mode","run","success","processMs","frameP50Ms","frameP90Ms","frameP99Ms","frameMaxMs","frameMeanMs","spikes","over33Ms","spikeExcessMs","rebuiltBLASFrames","maxBlasCpuMs"
+"Valley-flight","Valley","raytracing","1","True","18277.8267","12.9668","13.8359","15.0837","19.3364","11.69260825","0","0","0","114","5.3285"
+"Valley-flight","Valley","raytracing","2","True","18153.205","12.9307","13.7597","15.3545","17.835","11.6627223333333","0","0","0","114","4.5422"
+"Valley-flight","Valley","raytracing","3","True","18234.8544","12.9882","13.9116","16.7796","21.7514","11.7833530833333","0","0","0","114","4.3452"
