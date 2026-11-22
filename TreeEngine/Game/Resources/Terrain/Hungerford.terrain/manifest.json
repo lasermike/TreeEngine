@@ -7,9 +7,9 @@
   "nodeQuads": 64,
   "blockSamples": 67,
   "blockStride": 9216,
-  "heightOffset": -8.100000381469727,
-  "heightScale": 0.0012363967252895236,
-  "minHeight": -8.100000381469727,
+  "heightOffset": -28.589628219604492,
+  "heightScale": 0.0015490484656766057,
+  "minHeight": -28.589628219604492,
   "maxHeight": 72.92726135253906,
   "nodesFile": "nodes.bin",
   "boundsFile": "bounds.bin",
@@ -35,8 +35,11 @@
     ],
     "seabed": {
       "waterLevel": 1.9,
-      "slope": 0.04,
-      "depth": 10.0
+      "slope": 0.05,
+      "depth": 8,
+      "bathymetry": [
+        "Puget_Sound_CoNED_Topobathy_DEM_2020_m9112_hungerford.tif"
+      ]
     },
     "north": "+z"
   }

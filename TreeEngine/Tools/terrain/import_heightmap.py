@@ -90,10 +90,15 @@ def main():
     parser.add_argument('--water-level', type=float,
                         help='meters: ground at or below is water, carved into a seabed sloping from the shore '
                              '(surveys see the water surface, not the bottom)')
+    parser.add_argument('--seabed', nargs='+', metavar='raster',
+                        help='bathymetry or topobathy rasters in meters (later ones win): water at or below --water-level '
+                             'takes their depths; where they have none, the seabed is carved from the shore')
     parser.add_argument('--water-slope', type=float, default=0.05, help='seabed meters per meter from shore (default 0.05)')
     parser.add_argument('--water-depth', type=float, default=8, help='deepest seabed below --water-level (default 8 m)')
     parser.add_argument('--tool', help='path to TerrainTool.exe')
     args = parser.parse_args()
+    if args.seabed and args.water_level is None:
+        parser.error('--seabed needs --water-level (which samples are water)')
 
     tool = find_terrain_tool(args.tool)
     require('gdalwarp')
@@ -134,8 +139,17 @@ def main():
             'resampling': args.resampling,
             'size': [width, height],
         }
+        seabed_raw = None
+        if args.seabed:
+            # The bathymetry on the same grid, so each water sample has a depth beside it.
+            seabed_tif = os.path.join(work, 'seabed.tif')
+            run(command + args.seabed + [seabed_tif])
+            seabed_raw = os.path.join(work, 'seabed.raw')
+            run(['gdal_translate', '-of', 'ENVI', '-ot', 'Float32', seabed_tif, seabed_raw])
         if args.water_level is not None:
             source['seabed'] = {'waterLevel': args.water_level, 'slope': args.water_slope, 'depth': args.water_depth}
+            if args.seabed:
+                source['seabed']['bathymetry'] = [os.path.basename(path) for path in args.seabed]
         # TerrainTool pack puts the raster's top row (north) at +z, with east at +x (the engine is left-handed, y up).
         source['north'] = '+z'
         run([tool, 'pack', '--out', args.output, '--raw', raw, '--width', str(width), '--height', str(height),
@@ -143,7 +157,8 @@ def main():
              '--height-scale', str(args.height_scale), '--height-offset', str(args.height_offset),
              '--source-json', json.dumps(source, separators=(',', ':'))]
             + ([] if args.water_level is None else ['--water-level', str(args.water_level), '--water-slope',
-                                                     str(args.water_slope), '--water-depth', str(args.water_depth)]))
+                                                     str(args.water_slope), '--water-depth', str(args.water_depth)])
+            + ([] if not seabed_raw else ['--seabed-raw', seabed_raw]))
     run([tool, 'info', args.output])
 
 
