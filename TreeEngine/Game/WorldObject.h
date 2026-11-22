@@ -114,7 +114,10 @@ inline void ApplyPbrRenderState(const ShaderMaterial& material, StockRenderState
         : StockSamplerStates::MinMagMipLinearUVWWrap;
     if (material.flags.x != 0)
     {
-        state.blendState = StockBlendStates::AlphaBlend;
+        // Straight alpha (SRC_ALPHA, INV_SRC_ALPHA; the template's name is the misnomer, as in GltfModel): the pixel
+        // shader returns straight color. AlphaBlend's ONE left the color unscaled by its alpha, which overbrightened
+        // blended surfaces and, for transmission, kept the reflection boosted by 1 / opacity (water about 3.6x).
+        state.blendState = StockBlendStates::PremultipliedAlphaBlend;
         state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
     }
 }

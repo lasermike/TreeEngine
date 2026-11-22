@@ -626,12 +626,19 @@ float4 ShadeSurface(PS_INPUT input)
     litColor.rgb = ToSceneColor(litColor.rgb);
     if (mat.opticalParams.y > 0.0f)
     {
-        // Alpha blend fallback for transmission: keep reflected light while
-        // displaying opaque scene geometry through the surface.
-        float opacity = 1.0f - 0.9f * saturate(mat.opticalParams.y);
+        // Alpha blend fallback for transmission, as the ray-traced shading combines it: lerp(surface, reflection +
+        // transmitted, transmission), with what's behind passing through times (1 - Fresnel) and the base color. A
+        // straight-alpha blend can only scale what's behind by one number, so the base color counts by its luminance
+        // (the hue of the tint is lost), and the pixel's color is divided by the alpha that multiplies it back.
+        const float transmission = saturate(mat.opticalParams.y);
+        const float f0 = ComputeDielectricF0(mat.opticalParams.x);
+        const float fresnel = f0 + (1.0f - f0) * pow(1.0f - saturate(dot(normal, toEye)), 5.0f);
+        const float tint = dot(mat.Diffuse.rgb * textureColor.rgb, float3(0.2126f, 0.7152f, 0.0722f));
+        const float through = saturate(transmission * (1.0f - fresnel) * tint);
+        const float alpha = max(litColor.a * (1.0f - through), 1.0f / 1024.0f);
         float3 reflection = ToSceneColor(spec.rgb + specularIbl);
-        litColor.rgb = lerp(litColor.rgb, reflection / opacity, mat.opticalParams.y);
-        litColor.a *= opacity;
+        litColor.rgb = lerp(litColor.rgb, reflection, transmission) / alpha;
+        litColor.a = alpha;
     }
 
     return litColor;
