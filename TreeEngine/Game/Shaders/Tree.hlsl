@@ -656,7 +656,7 @@ float4 ShadeSurface(PS_INPUT input)
 PS_OUTPUT PSDepthMotion(PS_INPUT input)
 {
     clip(FadeKeeps(input.Fade, input.Pos.xy) ? 1 : -1);
-    if (mat.flags.y > 0 && mat.flags.z > 0)
+    if (mat.flags.z > 0)    // The alpha test, textured or not (factor alpha alone), as the rays see it.
     {
         Biplanar biplanar;
         SampleBaseColor(input, biplanar);
@@ -734,16 +734,22 @@ void BuildShadowMapPS(ShadowMapVertexOut input)
     clip(FadeKeeps(input.Fade, input.PosH.xy) ? 1 : -1);
     if (mat.flags.z > 0)  // clip alpha threshold
     {
-        float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
-        float4 textureColor = (mat.specularColor.w > 0
-            ? txDiffuse.Sample(samLinearClamp, baseColorUv)
-            : txDiffuse.Sample(samLinearWrap, baseColorUv));
+        // The base color's alpha is the factor times the texture's (1 without a texture: no texture is bound then),
+        // as in SampleBaseColor.
+        float textureAlpha = 1.0f;
+        float lod = 0;
+        if (mat.flags.y > 0)
+        {
+            float2 baseColorUv = TransformMaterialUv(mat, input.Tex, BaseColorTextureRole);
+            textureAlpha = (mat.specularColor.w > 0
+                ? txDiffuse.Sample(samLinearClamp, baseColorUv)
+                : txDiffuse.Sample(samLinearWrap, baseColorUv)).a;
+            lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv);
+        }
 
         // Don't write transparent pixels to the shadow map. The footprint and level of detail are a shadow-map texel's.
-        // The base color's alpha is the factor times the texture's, as in SampleBaseColor.
         const float footprint = max(length(ddx(input.PosL)), length(ddy(input.PosL)));
-        const float lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv);
-        clip(AlphaTestPasses(mat.Diffuse.a * textureColor.a, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
+        clip(AlphaTestPasses(mat.Diffuse.a * textureAlpha, mat.flags.z, lod, input.PosL, footprint) ? 1 : -1);
     }
 }
 
