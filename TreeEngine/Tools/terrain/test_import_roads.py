@@ -153,6 +153,16 @@ front = roads.build_generated_driveways(Dry(lambda x, y: 38 < y < 50), [address(
                                         1.0, [])
 check(len(front) == 1 and close(front[0]['line'][0], (70, 0)) and close(front[0]['line'][1], (70, 35)),
       f'water behind the house blocked its driveway: {front}')
+# Water at the very end of the driveway, within the last 2 m sampling interval, blocks it: a 20 m driveway with the
+# shore at 19 m. A ST is the only road, so there's no other way in.
+shore = roads.build_generated_driveways(Dry(lambda x, y: y > 19), [address(50, 20, 'A ST')], [],
+                                        [('A ST', [(0.0, 0.0), (200.0, 0.0)])], [], 1.0, [])
+check(shore == [], f'a driveway ended in water: {shore}')
+# A building on the road (its address set back 20 m) gets no zero-length driveway.
+on_road = ({'id': 13}, [(45.0, -5.0), (55.0, -5.0), (55.0, 5.0), (45.0, 5.0)])
+zero = generate([address(50, 20, 'A ST')], buildings=[on_road])
+check(zero == [], f'a house on the road got a driveway: {zero}')
+
 # The closing summary copes with a hand-made feature that has only kind and id.
 line = roads.summary('out', [{'type': 'Feature', 'properties': {'kind': 'driveway', 'id': 'mine'}},
                              {'type': 'Feature', 'properties': {'kind': 'driveway', 'id': 'g', 'source': 'generated'}}])

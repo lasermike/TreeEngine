@@ -537,6 +537,10 @@ def build_generated_driveways(package, addresses, buildings, named_roads, served
                    default=None)
         if best and math.hypot(best[0] - point[0], best[1] - point[1]) < 30:
             house = best
+            # A building on or by a road (the address set back from it) is reached from the road directly.
+            if nearest_road(house, lines)[0] < 12:
+                counts['on a road'] += 1
+                continue
         # Served already: an existing driveway ends within 30 m of the house (or of the address).
         if any(min(math.hypot(house[0] - h[0], house[1] - h[1]), math.hypot(point[0] - h[0], point[1] - h[1])) < 30
                for h in house_ends):
@@ -555,12 +559,13 @@ def build_generated_driveways(package, addresses, buildings, named_roads, served
             end = house
             if house is not point and distance > 10:
                 end = (house[0] + (at[0] - house[0]) * 5 / distance, house[1] + (at[1] - house[1]) * 5 / distance)
-            if not package.contains(*end):
+            if not package.contains(*end) or math.hypot(end[0] - at[0], end[1] - at[1]) < 1:
                 continue
             if crosses_any(at, end, lines, skip=line) or crosses_any(at, end, driveway_lines):
                 continue
-            # Water, or no ground at all (off the package: no height), blocks it.
-            heights = [package.height(x, y) for x, y in resample([at, end], 2.0)[1:-1]]
+            # Water, or no ground at all (off the package: no height), anywhere past the road blocks it, the house
+            # end included.
+            heights = [package.height(x, y) for x, y in resample([at, end], 2.0)[1:]]
             if any(math.isnan(h) or h <= water_level for h in heights):
                 continue
             chosen = (at, end)
