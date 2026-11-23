@@ -527,19 +527,24 @@ def build_generated_driveways(package, addresses, buildings, named_roads, served
             continue
         handled.append(point)
         keys.add(unit_key)
-        if any(math.hypot(point[0] - h[0], point[1] - h[1]) < 30 for h in house_ends):
-            counts['served'] += 1
-            continue
         near, _ = nearest_road(point, lines)
         if near < 12:
             counts['on a road'] += 1
             continue
-        # The house: the nearest building within 30 m of the address, else the address itself.
+        # The house: the nearest building in the package within 30 m of the address, else the address itself.
         house = point
-        best = min(centers, key=lambda c: math.hypot(c[0] - point[0], c[1] - point[1]), default=None)
+        best = min((c for c in centers if package.contains(*c)), key=lambda c: math.hypot(c[0] - point[0], c[1] - point[1]),
+                   default=None)
         if best and math.hypot(best[0] - point[0], best[1] - point[1]) < 30:
             house = best
-        # The road: the one the address names, if a straight path to it is clear; else the nearest clear one.
+        # Served already: an existing driveway ends within 30 m of the house (or of the address).
+        if any(min(math.hypot(house[0] - h[0], house[1] - h[1]), math.hypot(point[0] - h[0], point[1] - h[1])) < 30
+               for h in house_ends):
+            counts['served'] += 1
+            continue
+        # The road: the one the address names, if the driveway to it is clear; else the nearest clear one. Each
+        # candidate's driveway is the one that would be written: to a building, it ends 5 m short of the center,
+        # toward the road (the house's front), so the obstacles checked are the ones on that segment.
         street = (props.get('STREET') or '').strip().upper()
         candidates = sorted(named_roads, key=lambda r: (r[0].strip().upper() != street, nearest_on_line(house, r[1])[0]))
         chosen = None
@@ -547,20 +552,23 @@ def build_generated_driveways(package, addresses, buildings, named_roads, served
             distance, at = nearest_on_line(house, line)
             if distance > 500:
                 continue
-            if crosses_any(at, house, lines, skip=line) or crosses_any(at, house, driveway_lines):
+            end = house
+            if house is not point and distance > 10:
+                end = (house[0] + (at[0] - house[0]) * 5 / distance, house[1] + (at[1] - house[1]) * 5 / distance)
+            if not package.contains(*end):
                 continue
-            samples = resample([at, house], 2.0)
-            if any(package.height(x, y) <= water_level for x, y in samples[1:-1]):
+            if crosses_any(at, end, lines, skip=line) or crosses_any(at, end, driveway_lines):
                 continue
-            chosen = (at, distance)
+            # Water, or no ground at all (off the package: no height), blocks it.
+            heights = [package.height(x, y) for x, y in resample([at, end], 2.0)[1:-1]]
+            if any(math.isnan(h) or h <= water_level for h in heights):
+                continue
+            chosen = (at, end)
             break
         if not chosen:
             counts['crossing a road, a driveway or water' if lines else 'no road'] += 1
             continue
-        at, distance = chosen
-        # End short of the building's center, toward the road: its front.
-        if house is not point and distance > 10:
-            house = (house[0] + (at[0] - house[0]) * 5 / distance, house[1] + (at[1] - house[1]) * 5 / distance)
+        at, house = chosen
         driveway_id = base_id
         while driveway_id in ids or driveway_id in kept_ids:
             driveway_id += '+'
@@ -572,6 +580,13 @@ def build_generated_driveways(package, addresses, buildings, named_roads, served
     report.append(f'{len(driveways)} driveways generated from {len(addresses)} site addresses (skipped: '
                   + ', '.join(f'{v} {k}' for k, v in counts.items() if v) + ')')
     return driveways
+
+
+def summary(output, features):
+    """The closing line: what the file holds. Hand-made features may lack any property but kind and id."""
+    kinds = [(f.get('properties') or {}).get('kind') for f in features]
+    generated = sum((f.get('properties') or {}).get('source') == 'generated' for f in features)
+    return f'wrote {output}: {kinds.count("road")} roads, {kinds.count("driveway")} driveways ({generated} generated)'
 
 
 def feature(kind, item, source):
@@ -660,9 +675,7 @@ def main():
         out.write('\n]\n}\n')
     for line in report:
         log(line)
-    log(f'wrote {args.output}: {sum(f["properties"]["kind"] == "road" for f in features)} roads, '
-        f'{sum(f["properties"]["kind"] == "driveway" for f in features)} driveways '
-        f'({sum(f["properties"]["source"] == "generated" for f in features)} generated)')
+    log(summary(args.output, features))
 
 
 if __name__ == '__main__':

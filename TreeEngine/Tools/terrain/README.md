@@ -118,7 +118,7 @@ to check over imagery. Where several houses lie past a road's end, their drivewa
 often a shared private lane to draw instead.
 
 For Hungerford: 74 roads moved a median 1.0 m (90% under 3 m); 123 OpenStreetMap driveways, 98 joined to a road;
-and 352 generated from 502 addresses (128 already served, 2 on a road, 1 a second unit, 19 blocked), a median 45 m
+and 350 generated from 502 addresses (130 already served, 2 on a road, 1 a second unit, 19 blocked), a median 45 m
 long. Re-running keeps every feature whose `edited` is true.
 
 The roads file is GeoJSON in the package's CRS (its `crs` member names it, such as EPSG:32610), so QGIS opens it over
@@ -152,7 +152,7 @@ packing (Game/RoadGrading.h). Along each smoothed centerline the bed follows the
 a backslope up to the ground over the ditch's width. Without a ditch the bed blends back into the ground over 3 m.
 Where lines overlap, a traveled way wins (paved roads over gravel roads over driveways), else the nearest line. On
 side slopes the uphill ditch cuts into the hill and the downhill foreslope builds a small embankment. Hungerford:
-571,000 samples changed (roads and all 475 driveways), by 0.11 m on average and under 0.75 m for 99% of them; 3.10 m cut and 2.26 m fill at most.
+571,000 samples changed (roads and all 473 driveways), by 0.11 m on average and under 0.75 m for 99% of them; 3.10 m cut and 2.26 m fill at most.
 Grading works from the imported heights, so after editing roads, import the package again rather than re-grading a
 graded one.
 

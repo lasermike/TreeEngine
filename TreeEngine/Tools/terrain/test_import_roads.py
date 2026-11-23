@@ -126,5 +126,37 @@ building = ({'id': 9}, [(60.0, 50.0), (80.0, 50.0), (80.0, 70.0), (60.0, 70.0)])
 house = generate([address(72, 45, 'A ST')], buildings=[building])
 check(len(house) == 1 and close(house[0]['line'][1], (70, 55), 1e-6), f'the driveway did not end at the building: {house}')
 
+# Served is judged at the house: the address is 35 m from an existing driveway's end, but its building is 6 m from it.
+near_house = ({'id': 10}, [(40.0, 59.0), (60.0, 59.0), (60.0, 79.0), (40.0, 79.0)])
+check(generate([address(50, 40, 'A ST')], buildings=[near_house], served=[[(30.0, 0.0), (50.0, 75.0)]]) == [],
+      'an address whose building an existing driveway reaches got a second driveway')
+
+
+class Dry(Ground):
+    def __init__(self, wet=lambda x, y: False):
+        self.wet = wet
+
+    def height(self, x, y):
+        if not self.contains(x, y):
+            return float('nan')
+        return 0.0 if self.wet(x, y) else 10.0
+
+
+# A building centered off the package (y = 215) is ignored: the driveway ends at the in-bounds address instead.
+outside_house = ({'id': 11}, [(40.0, 205.0), (60.0, 205.0), (60.0, 225.0), (40.0, 225.0)])
+edge = roads.build_generated_driveways(Dry(), [address(50, 190, 'A ST')], [outside_house], roads_ab, [], 1.0, [])
+check(len(edge) == 1 and close(edge[0]['line'][1], (50, 190)), f'a driveway ended off the package: {edge}')
+# Water behind the driveway's end doesn't block it: the building's center is 40 m from the road, the driveway ends
+# 5 m short at 35 m, and the water starts at 38 m.
+behind = ({'id': 12}, [(65.0, 35.0), (75.0, 35.0), (75.0, 45.0), (65.0, 45.0)])
+front = roads.build_generated_driveways(Dry(lambda x, y: 38 < y < 50), [address(70, 30, 'A ST')], [behind], roads_ab, [],
+                                        1.0, [])
+check(len(front) == 1 and close(front[0]['line'][0], (70, 0)) and close(front[0]['line'][1], (70, 35)),
+      f'water behind the house blocked its driveway: {front}')
+# The closing summary copes with a hand-made feature that has only kind and id.
+line = roads.summary('out', [{'type': 'Feature', 'properties': {'kind': 'driveway', 'id': 'mine'}},
+                             {'type': 'Feature', 'properties': {'kind': 'driveway', 'id': 'g', 'source': 'generated'}}])
+check(line == 'wrote out: 0 roads, 2 driveways (1 generated)', f'summary: {line}')
+
 print(f'{failures} failures' if failures else 'import_roads checks passed')
 sys.exit(1 if failures else 0)

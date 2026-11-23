@@ -16,9 +16,9 @@
   "source": {
     "importer": "import_heightmap.py",
     "files": [
-      "hp___datasetsA_puget_lowlands_2005_dtm.vrt",
-      "hp___datasetsA_olympics_south_opsw_2019_dtm.vrt",
-      "hp___datasetsC_mason_county_refresh24_2025_dtm.vrt"
+      "puget_lowlands_2005.vrt",
+      "olympics_south_2019.vrt",
+      "mason_county_2025.vrt"
     ],
     "crs": "EPSG:32610",
     "bounds": [
