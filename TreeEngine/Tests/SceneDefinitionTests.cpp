@@ -8,6 +8,7 @@
 #include "Lod.h"
 #include "TerrainPackage.h"
 #include "RoadNetwork.h"
+#include "RoadMesh.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -998,6 +999,96 @@ void TestRoadNetwork()
     Reject(empty.dump(), ".roads");
 }
 
+void TestRoadMesh()
+{
+    // On flat ground at y = 2: a 24 m county paved road (6 m wide, 0.6 m shoulders, 45 mph) along +x, a gravel
+    // county road, and a gravel driveway, offset by the terrain's position (10, 2, 20).
+    Roads::Network network;
+    Roads::Line road;
+    road.surface = "paved";
+    road.owner = "county";
+    road.width = 6;
+    road.shoulder = 0.6f;
+    road.speedLimit = 45;
+    road.points = { XMFLOAT2(0, 0), XMFLOAT2(24, 0) };
+    network.lines.push_back(road);
+    Roads::Line gravelRoad = road;
+    gravelRoad.surface = "gravel";
+    gravelRoad.points = { XMFLOAT2(0, 50), XMFLOAT2(10, 50) };
+    network.lines.push_back(gravelRoad);
+    Roads::Line driveway;
+    driveway.kind = Roads::Kind::Driveway;
+    driveway.surface = "gravel";
+    driveway.width = 3;
+    driveway.points = { XMFLOAT2(5, 3), XMFLOAT2(5, 13) };
+    network.lines.push_back(driveway);
+    const auto flat = [](float, float, float& y) { y = 2; return true; };
+    const auto mesh = Roads::BuildMesh(network, XMFLOAT3(10, 0, 20), flat);
+
+    const auto& asphalt = mesh[Roads::Part::Asphalt];
+    // 25 cross-sections (every meter), and 3.6 m half-width in columns at most 1.5 m apart: 7 columns.
+    Check(asphalt.vertices.size() == 25 * 7 && asphalt.indices.size() == 24 * 6 * 6, "the paved road's strip has the wrong size");
+    bool lifted = true, up = true, inside = true;
+    for (const auto& v : asphalt.vertices)
+    {
+        lifted = lifted && std::abs(v.Pos.y - (2 + Roads::RoadLift)) < 1e-5f && v.Normal.y > 0.999f;
+        inside = inside && v.Pos.x >= 10 - 1e-4f && v.Pos.x <= 34 + 1e-4f && std::abs(v.Pos.z - 20) <= 3.6f + 1e-4f
+            && v.Tex.x == v.Pos.x && v.Tex.y == -v.Pos.z;
+    }
+    for (size_t i = 0; i + 2 < asphalt.indices.size(); i += 3)
+    {
+        const auto& a = asphalt.vertices[asphalt.indices[i]].Pos;
+        const auto& b = asphalt.vertices[asphalt.indices[i + 1]].Pos;
+        const auto& c = asphalt.vertices[asphalt.indices[i + 2]].Pos;
+        up = up && ((b.z - a.z) * (c.x - a.x) - (b.x - a.x) * (c.z - a.z)) > 0;
+    }
+    Check(lifted && inside, "the paved road isn't on the ground, lifted, world-planar and as wide as it should be");
+    Check(up, "a road triangle faces down");
+
+    // Dashed yellow center: dashes over [0, 3] and [12, 15] m, then the one starting at 24 m is too short to draw.
+    const auto& yellow = mesh[Roads::Part::YellowLine];
+    Check(yellow.vertices.size() == 2 * 2 * 4 && yellow.indices.size() == 2 * 3 * 6, "the center line's dashes are wrong");
+    bool centered = true;
+    for (const auto& v : yellow.vertices)
+        centered = centered && std::abs(v.Pos.z - 20) <= Roads::MarkingWidth / 2 + 1e-5f
+            && std::abs(v.Pos.y - (2 + Roads::MarkingLift)) < 1e-5f && ((v.Pos.x >= 10 && v.Pos.x <= 13) || (v.Pos.x >= 22 && v.Pos.x <= 25));
+    Check(centered, "a center-line dash is out of place");
+    // 45 mph: white edge lines 0.15 m inside each edge of the 6 m lane width.
+    const auto& white = mesh[Roads::Part::WhiteLine];
+    Check(white.vertices.size() == 2 * 25 * 2, "the edge lines are missing");
+    bool edges = true;
+    for (const auto& v : white.vertices)
+        edges = edges && std::abs(std::abs(v.Pos.z - 20) - 2.85f) <= Roads::MarkingWidth / 2 + 1e-5f;
+    Check(edges, "an edge line is out of place");
+
+    // Gravel: the gravel road (11 cross-sections, 7 columns) and the driveway (11 cross-sections, 3 m: 3 columns),
+    // no markings; the driveway sits below roads.
+    const auto& gravel = mesh[Roads::Part::Gravel];
+    Check(gravel.vertices.size() == 11 * 7 + 11 * 3, "the gravel strips have the wrong size");
+    Check(std::abs(gravel.vertices.front().Pos.y - (2 + Roads::GravelRoadLift)) < 1e-5f
+        && std::abs(gravel.vertices.back().Pos.y - (2 + Roads::DrivewayLift)) < 1e-5f
+        && Roads::DrivewayLift < Roads::GravelRoadLift && Roads::GravelRoadLift < Roads::RoadLift,
+        "gravel roads and driveways aren't layered below paved roads");
+
+    // A bend is smoothed: a right angle at (10, 0) is cut, so no sample passes within 1 m of the corner.
+    Roads::Network bend;
+    Roads::Line corner = driveway;
+    corner.points = { XMFLOAT2(0, 0), XMFLOAT2(10, 0), XMFLOAT2(10, 10) };
+    bend.lines.push_back(corner);
+    const auto& bent = Roads::BuildMesh(bend, XMFLOAT3(0, 0, 0), flat)[Roads::Part::Gravel];
+    float nearest = 1e9f;
+    for (size_t v = 1; v < bent.vertices.size(); v += 3)     // The centre column of the 3-column strip.
+        nearest = std::min(nearest, std::hypot(bent.vertices[v].Pos.x - 10, bent.vertices[v].Pos.z));
+    Check(nearest > 1 && bent.vertices.size() % 3 == 0, "a right-angle bend wasn't smoothed");
+
+    // A slower road has no edge lines; a private paved road has no markings at all.
+    network.lines.resize(1);
+    network.lines[0].speedLimit = 25;
+    Check(Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), flat)[Roads::Part::WhiteLine].vertices.empty(), "a 25 mph road got edge lines");
+    network.lines[0].owner = "private";
+    Check(Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), flat)[Roads::Part::YellowLine].vertices.empty(), "a private road got a center line");
+}
+
 void TestTreeLodSettings()
 {
     const std::string json = R"({"version":1,"name":"Lod","objects":[
@@ -1260,6 +1351,7 @@ int main(int argc, char** argv)
         TestTide();
         TestTideSettings();
         TestRoadNetwork();
+        TestRoadMesh();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

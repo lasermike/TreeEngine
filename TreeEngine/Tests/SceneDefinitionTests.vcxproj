@@ -38,6 +38,7 @@
     <ClCompile Include="..\Game\TerrainPackage.cpp" />
     <ClCompile Include="..\Game\Tide.cpp" />
     <ClCompile Include="..\Game\RoadNetwork.cpp" />
+    <ClCompile Include="..\Game\RoadMesh.cpp" />
     <ClCompile Include="..\Game\SceneCatalog.cpp" />
     <ClCompile Include="..\Game\OpacityMicromapBaker.cpp" />
     <SceneJson Include="..\Game\Resources\Scenes\*.scene.json" />

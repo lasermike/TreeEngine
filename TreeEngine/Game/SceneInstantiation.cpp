@@ -399,7 +399,37 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             parameters->packageDirectory = SceneData::WidePath(SceneData::ParentPath(manifest));
             parameters->roads = terrain.roads;
             if (!terrain.roads.empty())
+            {
                 parameters->roadsFile = SceneData::WidePath(RuntimeDataFile(terrain.roads, terrain.id, sceneFilename));
+                // Road surfaces, in Roads::Part order: asphalt and gravel tiled every 4 m (TerrainTool texture
+                // maps), then yellow and white paint.
+                const auto surface = [](const char* kind)
+                {
+                    SceneData::MaterialDefinition material;
+                    material.metallic = 0;
+                    material.roughness = 1;
+                    const std::string prefix = std::string("Terrain/Textures/") + kind;
+                    material.baseColorTexture.source = prefix + "_color.png";
+                    material.normalTexture.source = prefix + "_normal.png";
+                    material.metallicRoughnessTexture.source = prefix + "_mr.png";
+                    material.textureCoordScale = XMFLOAT2(0.25f, 0.25f);
+                    return material;
+                };
+                const auto paint = [](XMFLOAT4 color)
+                {
+                    SceneData::MaterialDefinition material;
+                    material.baseColor = color;
+                    material.metallic = 0;
+                    material.roughness = 0.6f;
+                    return material;
+                };
+                for (const auto& material : { surface("asphalt"), surface("gravel"),
+                         paint(XMFLOAT4(0.78f, 0.55f, 0.06f, 1)), paint(XMFLOAT4(0.82f, 0.82f, 0.8f, 1)) })
+                {
+                    parameters->roadMaterials.push_back(RuntimeMaterial(material));
+                    parameters->roadMaterialTextures.push_back(RuntimeMaterialTextures(material, terrain.id, sceneFilename));
+                }
+            }
             parameters->lodRange = terrain.lodRange;
             parameters->slots = static_cast<UINT>(terrain.slots);
             if (terrain.hasMaterial)

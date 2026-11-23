@@ -382,7 +382,7 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
     for (size_t reservation = 0; reservation < ru->reservations.size(); ++reservation)
     {
         WorldObject* object = ru->reservations[reservation];
-        if (pass == ShadowMapPass && (object->GetObjectType() == ObjectType_Primitive
+        if (pass == ShadowMapPass && (object->GetObjectType() == ObjectType_Primitive || !ru->castsShadows
             || ru->m_material->m_shaderMaterial.opticalParams.y > 0.0f))
             continue;
 
