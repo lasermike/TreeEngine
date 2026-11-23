@@ -1075,11 +1075,57 @@ void TestRoadMesh()
     Roads::Line corner = driveway;
     corner.points = { XMFLOAT2(0, 0), XMFLOAT2(10, 0), XMFLOAT2(10, 10) };
     bend.lines.push_back(corner);
-    const auto& bent = Roads::BuildMesh(bend, XMFLOAT3(0, 0, 0), flat)[Roads::Part::Gravel];
+    const Roads::Mesh bentMesh = Roads::BuildMesh(bend, XMFLOAT3(0, 0, 0), flat);
+    const auto& bent = bentMesh[Roads::Part::Gravel];
+    Check(!bent.vertices.empty() && bent.vertices.size() % 3 == 0, "the bend's strip is missing");
     float nearest = 1e9f;
     for (size_t v = 1; v < bent.vertices.size(); v += 3)     // The centre column of the 3-column strip.
         nearest = std::min(nearest, std::hypot(bent.vertices[v].Pos.x - 10, bent.vertices[v].Pos.z));
-    Check(nearest > 1 && bent.vertices.size() % 3 == 0, "a right-angle bend wasn't smoothed");
+    Check(nearest > 0.2f && nearest < 0.6f, "a right-angle bend wasn't smoothed, or moved too far");
+
+    // Smoothing stays near the surveyed line however long its segments: a 100 m, 5 m, 100 m zigzag's corners move
+    // under 0.6 m (before the split into 3 m pieces, the long segments moved them several meters).
+    const std::vector<XMFLOAT2> zigzag = { XMFLOAT2(0, 0), XMFLOAT2(100, 0), XMFLOAT2(100, 5), XMFLOAT2(0, 60) };
+    const auto smoothed = Roads::SmoothCenterline(zigzag);
+    float worst = 0;
+    for (const XMFLOAT2& corner : zigzag)
+    {
+        float best = 1e9f;
+        for (size_t i = 0; i + 1 < smoothed.size(); ++i)
+        {
+            const XMFLOAT2 a = smoothed[i], b = smoothed[i + 1];
+            const float dx = b.x - a.x, dz = b.y - a.y, length2 = dx * dx + dz * dz;
+            const float t = length2 > 0 ? std::max(0.0f, std::min(1.0f, ((corner.x - a.x) * dx + (corner.y - a.y) * dz) / length2)) : 0;
+            best = std::min(best, std::hypot(corner.x - a.x - t * dx, corner.y - a.y - t * dz));
+        }
+        worst = std::max(worst, best);
+    }
+    Check(worst < 0.6f && smoothed.front().x == 0 && smoothed.back().y == 60, "smoothing moved a surveyed corner too far");
+
+    // No ground for x in [10, 14): the strip ends before the gap and starts again after it, with no triangle across.
+    Roads::Network gap;
+    Roads::Line across = driveway;
+    across.points = { XMFLOAT2(0, 0), XMFLOAT2(24, 0) };
+    gap.lines.push_back(across);
+    const auto holed = [](float x, float, float& y) { y = 50; return x < 10 || x >= 14; };
+    const Roads::Mesh gapMesh = Roads::BuildMesh(gap, XMFLOAT3(0, 0, 0), holed);
+    const auto& gapped = gapMesh[Roads::Part::Gravel];
+    bool bridged = false, grounded = true;
+    for (size_t i = 0; i + 2 < gapped.indices.size(); i += 3)
+    {
+        float low = 1e9f, high = -1e9f;
+        for (int k = 0; k < 3; ++k)
+        {
+            const auto& p = gapped.vertices[gapped.indices[i + k]].Pos;
+            low = std::min(low, p.x);
+            high = std::max(high, p.x);
+            grounded = grounded && std::abs(p.y - (50 + Roads::DrivewayLift)) < 1e-4f;
+        }
+        bridged = bridged || (low < 10 && high >= 14) || (low >= 10 && low < 14) || (high >= 10 && high < 14);
+    }
+    Check(!gapped.indices.empty() && !bridged && grounded, "a strip bridged ground it didn't have");
+
+    // A slower road has no edge lines; a private paved road has no markings at all.
 
     // A slower road has no edge lines; a private paved road has no markings at all.
     network.lines.resize(1);
