@@ -2,6 +2,10 @@
 #include "Terrain.h"
 #include "RenderManager.h"
 
+#include <fstream>
+#include <mutex>
+#include <sstream>
+
 using namespace TerrainFormat;
 
 Terrain::Terrain(TerrainParams* params) : WorldObject(params)
@@ -17,7 +21,76 @@ Terrain::Terrain(TerrainParams* params) : WorldObject(params)
         const float half = static_cast<float>(m.worldSize / 2);
         _boundingBox[0] = XMFLOAT3(m_offset.x - half, m_offset.y + m.minHeight, m_offset.z - half);
         _boundingBox[1] = XMFLOAT3(m_offset.x + half, m_offset.y + m.maxHeight, m_offset.z + half);
+        if (!params->roadsFile.empty())
+            LoadRoads(params->roadsFile);
     }
+}
+
+void Terrain::LoadRoads(const std::wstring& file)
+{
+    std::ifstream input(file, std::ios::binary);
+    if (!input)
+    {
+        m_roadsError = "cannot read the roads file";
+        return;
+    }
+    std::stringstream text;
+    text << input.rdbuf();
+    std::string crs;
+    double originX = 0, originY = 0;
+    if (!Roads::PackageFrame(m_package.Manifest().sourceJson, m_package.Manifest().worldSize, crs, originX, originY, m_roadsError))
+        return;
+    try
+    {
+        m_roads = Roads::Parse(text.str(), crs, originX, originY);
+    }
+    catch (const std::runtime_error& error)
+    {
+        m_roadsError = error.what();
+    }
+}
+
+// The centerlines draped on the terrain, every 4 m and half a meter up so they clear the road bed: paved roads
+// orange, gravel roads tan, driveways cyan.
+void Terrain::AddRoadOverlay(RenderData& renderData)
+{
+    if (m_roadOverlay.empty())
+    {
+        for (const Roads::Line& line : m_roads.lines)
+        {
+            DebugPolyline polyline;
+            polyline.lineWidth = line.kind == Roads::Kind::Road ? 3.0f : 2.0f;
+            polyline.color = line.kind == Roads::Kind::Driveway ? XMFLOAT4(0.2f, 0.9f, 1.0f, 1)
+                : line.surface == "gravel" ? XMFLOAT4(0.85f, 0.7f, 0.45f, 1) : XMFLOAT4(1.0f, 0.55f, 0.1f, 1);
+            // A point off the terrain ends the polyline drawn so far; the next point on it starts another.
+            const auto add = [&](float x, float z)
+            {
+                float y = 0;
+                if (HeightAt(x + m_offset.x, z + m_offset.z, y))
+                    polyline.points.push_back(XMFLOAT3(x + m_offset.x, y + 0.5f, z + m_offset.z));
+                else if (!polyline.points.empty())
+                {
+                    if (polyline.points.size() >= 2)
+                        m_roadOverlay.push_back(polyline);
+                    polyline.points.clear();
+                }
+            };
+            for (size_t i = 0; i + 1 < line.points.size(); ++i)
+            {
+                const XMFLOAT2 a = line.points[i], b = line.points[i + 1];
+                const float length = std::hypot(b.x - a.x, b.y - a.y);
+                const int steps = std::max(1, static_cast<int>(std::ceil(length / 4)));
+                for (int s = 0; s < steps; ++s)
+                    add(a.x + (b.x - a.x) * s / steps, a.y + (b.y - a.y) * s / steps);
+            }
+            add(line.points.back().x, line.points.back().y);
+            if (polyline.points.size() >= 2)
+                m_roadOverlay.push_back(std::move(polyline));
+        }
+    }
+    static std::mutex overlayMutex;     // Terrains update in parallel.
+    std::lock_guard<std::mutex> lock(overlayMutex);
+    renderData.debugLines.insert(renderData.debugLines.end(), m_roadOverlay.begin(), m_roadOverlay.end());
 }
 
 Terrain::~Terrain()
@@ -338,6 +411,8 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
     m_loadedThisFrame = m_missing = 0;
     if (!m_open || m_slots.empty())
         return S_OK;
+    if (frame->GetRenderData().showRoads && !m_roads.lines.empty())
+        AddRoadOverlay(frame->GetRenderData());
 
     ++m_frame;
     // The first frame draws everything it needs; later ones stream unless streaming is off.

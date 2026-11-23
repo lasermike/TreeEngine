@@ -24,6 +24,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Terrain.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Water.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Tide.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\RoadNetwork.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\OpacityMicromapBaker.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneCatalog.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneInstantiation.cpp" />
@@ -58,6 +59,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Terrain.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Water.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Tide.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\RoadNetwork.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />
     <None Include="$(MSBuildThisFileDirectory)..\Game\Resources\Models\Gltf\MetalRoughSpheres.glb" />

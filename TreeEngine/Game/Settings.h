@@ -104,6 +104,7 @@ public:
     bool m_wireframe;
     bool m_showDebugUI;
     bool m_highlightsThroughGeometry = true;
+    bool m_showRoads = false;               // Draw terrains' road and driveway centerlines (debug overlay).
     bool m_showPerfGraph;
     int m_debugUIScale = 0; // 100, 125, 150, or 200 percent
     bool m_debugUISeparateWindow = false;

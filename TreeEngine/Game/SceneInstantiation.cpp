@@ -397,6 +397,9 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             parameters->source = terrain.source;
             const std::string manifest = RuntimeDataFile(terrain.source + "/manifest.json", terrain.id, sceneFilename);
             parameters->packageDirectory = SceneData::WidePath(SceneData::ParentPath(manifest));
+            parameters->roads = terrain.roads;
+            if (!terrain.roads.empty())
+                parameters->roadsFile = SceneData::WidePath(RuntimeDataFile(terrain.roads, terrain.id, sceneFilename));
             parameters->lodRange = terrain.lodRange;
             parameters->slots = static_cast<UINT>(terrain.slots);
             if (terrain.hasMaterial)
@@ -422,6 +425,8 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             parameters.release();
             if (!runtime->IsOpen())
                 throw std::runtime_error("Object '" + terrain.id + "': terrain package " + terrain.source + ": " + runtime->Error());
+            if (!runtime->RoadsError().empty())
+                throw std::runtime_error("Object '" + terrain.id + "': " + terrain.roads + ": " + runtime->RoadsError());
             objects.push_back(std::move(runtime));
         }
         else
@@ -811,6 +816,7 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             const auto& terrainParams = dynamic_cast<const TerrainParams&>(params);
             const std::string manifest = RebaseAsset(terrainParams.source + "/manifest.json", sourceFilename, destinationFilename);
             terrain.source = manifest.substr(0, manifest.find_last_of("/\\"));
+            terrain.roads = RebaseAsset(terrainParams.roads, sourceFilename, destinationFilename);
             terrain.lodRange = terrainParams.lodRange;
             terrain.slots = static_cast<int>(terrainParams.slots);
             terrain.layers.clear();

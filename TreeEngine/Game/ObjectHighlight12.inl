@@ -1,8 +1,11 @@
 HRESULT RenderPlatform12::DrawObjectHighlights()
 {
-    if (m_renderData->highlights.empty()) return S_OK;
+    if (m_renderData->highlights.empty() && m_renderData->debugLines.empty()) return S_OK;
+    PIXScopedEvent(GetCommandList(), PIX_COLOR_DEFAULT, L"Highlights and debug lines");
     std::vector<HighlightGeometry::Vertex> vertices;
     const auto viewProjection = XMLoadFloat4x4(&m_renderData->view) * XMLoadFloat4x4(&m_renderData->projection);
+    for (const auto& line : m_renderData->debugLines)
+        HighlightGeometry::Append(line, viewProjection, m_displayViewport.Width, m_displayViewport.Height, vertices);
     for (const auto& highlight : m_renderData->highlights)
         HighlightGeometry::Append(highlight, viewProjection, m_displayViewport.Width, m_displayViewport.Height, vertices);
     if (vertices.empty()) return S_OK;

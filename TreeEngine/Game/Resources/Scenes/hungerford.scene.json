@@ -147,6 +147,7 @@
       "id": "ground",
       "type": "terrain",
       "source": "Terrain/Hungerford.terrain",
+      "roads": "Terrain/Hungerford.roads.geojson",
       "lodRange": 2,
       "slots": 768,
       "layers": [

@@ -818,11 +818,16 @@ namespace SceneData
                 }
                 else if (type == "terrain")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "material", "layers", "textureCoordScale", "lodRange", "slots" });
+                    Fields(value, path, { "id", "type", "transform", "source", "roads", "material", "layers", "textureCoordScale", "lodRange", "slots" });
                     auto terrain = std::make_unique<TerrainDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     terrain->source = String(value["source"], path + ".source");
                     if (terrain->source.empty()) Invalid(path + ".source", "must not be empty");
+                    if (value.contains("roads"))
+                    {
+                        terrain->roads = String(value["roads"], path + ".roads");
+                        if (terrain->roads.empty()) Invalid(path + ".roads", "must not be empty");
+                    }
                     if (value.contains("material"))
                     {
                         terrain->hasMaterial = true;
@@ -1261,6 +1266,7 @@ namespace SceneData
                 const auto& terrain = dynamic_cast<const TerrainDefinition&>(*object);
                 value["type"] = "terrain";
                 value["source"] = terrain.source;
+                if (!terrain.roads.empty()) value["roads"] = terrain.roads;
                 if (terrain.hasMaterial) value["material"] = MaterialJson(terrain.material);
                 if (!terrain.layers.empty())
                 {

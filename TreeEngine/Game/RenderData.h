@@ -201,6 +201,8 @@ struct RenderData : SceneRenderSettings
     ObjectSelection selection;
     SceneLoadProfile loadProfile;
     std::vector<ObjectHighlight> highlights;
+    std::vector<DebugPolyline> debugLines;  // Cleared each frame (BeginNewFrame); objects add theirs as they update.
+    bool showRoads = false;                 // Settings::m_showRoads: terrains add their road centerlines to debugLines.
     bool picking = false;
     UINT pickObjectId = 0;
     std::vector<const void*> pickObjects;

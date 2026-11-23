@@ -333,6 +333,7 @@ void ParseRenderTestCommandLine()
             throw std::runtime_error("Capture tonemap must be \"clamp\", \"aces\" or \"agx\", and exposure a finite EV");
         point.renderScale = value.value("renderScale", parsed->renderScale);
         point.highlightsThroughGeometry = value.value("highlightsThroughGeometry", true);
+        point.showRoads = value.value("showRoads", false);
         if (value.contains("expectedSelection"))
         {
             point.checkSelection = true;
@@ -604,6 +605,7 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
             game.SetRenderTestRenderScale(point.renderScale);
             game.SetRenderTestHighlightsThroughGeometry(point.highlightsThroughGeometry);
+            game.SetRenderTestShowRoads(point.showRoads);
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion
                 : point.debugView == "reprojection" ? Settings::MotionView::ReprojectedHistory

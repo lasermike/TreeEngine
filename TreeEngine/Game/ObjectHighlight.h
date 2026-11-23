@@ -22,3 +22,13 @@ struct ObjectHighlight
     HighlightOcclusion occlusion = HighlightOcclusion::AlwaysVisible;
     std::vector<HighlightAdornment> adornments = { HighlightAdornment::BoundingBox };
 };
+
+// A world-space polyline drawn like a highlight's edges (screen-space width), for debug overlays such as road
+// centerlines.
+struct DebugPolyline
+{
+    std::vector<DirectX::XMFLOAT3> points;
+    DirectX::XMFLOAT4 color = DirectX::XMFLOAT4(1, 1, 0, 1);
+    float lineWidth = 2;
+    HighlightOcclusion occlusion = HighlightOcclusion::SceneDepth;
+};

@@ -157,6 +157,12 @@ or GIS elevation data). It requires `source`, the package directory, such as
   when the camera is within `lodRange` times its size. Higher is more detailed.
 - `slots` (16 to 4096, default 512): how many nodes can be resident at once,
   each about 215 KB of vertex buffer, reserved at load.
+- `roads`: a roads file for the package, such as
+  `"Terrain/Hungerford.roads.geojson"` (made by `Tools/terrain/import_roads.py`;
+  see that README). The package must record its source CRS and bounds (GIS
+  imports do). For now the roads are only drawn by the debug UI's **Show road
+  centerlines** (render tests: a capture's `"showRoads": true`): paved roads
+  orange, gravel roads tan, driveways cyan.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,
