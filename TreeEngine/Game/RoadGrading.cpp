@@ -74,10 +74,15 @@ namespace
             }
             else
             {
-                const float embankment = bottom - Roads::EmbankmentSlope * (q - half);
-                if (q - half > Roads::MaxEmbankment || embankment <= ground)
+                const float out = q - half;
+                const float embankment = bottom - Roads::EmbankmentSlope * out;
+                if (out > Roads::MaxEmbankment || embankment <= ground)
                     return false;
-                height = embankment;
+                // Ground falling faster than the embankment never meets it: over the cap's outer half the fill
+                // tapers to nothing, so it reaches the ground by MaxEmbankment.
+                const float taperStart = Roads::MaxEmbankment / 2;
+                const float taper = out <= taperStart ? 0 : (out - taperStart) / (Roads::MaxEmbankment - taperStart);
+                height = embankment + (ground - embankment) * taper;
             }
             ditch = height < ground;
             return true;
@@ -149,7 +154,9 @@ namespace Roads
             // interpolated along it, so a grid finer than the samples follows a grade smoothly. A point past a
             // segment's start, at a joint, measures from the joint itself (a round join), which covers the outsides
             // of bends; past the first sample or the last, nothing is graded, so a road stops at its ends.
-            const float reach = p.halfWidth + p.shoulder + (ditched ? p.ditchWidth / 2 + MaxEmbankment : BlendWidth);
+            // As far as either ditch shape goes: the backslope to the ditch's outer edge, or the embankment's cap.
+            const float reach = p.halfWidth + p.shoulder
+                + (ditched ? std::max(p.ditchWidth, p.ditchWidth / 2 + MaxEmbankment) : BlendWidth);
             for (size_t k = 0; k + 1 < centerline.size(); ++k)
             {
                 const XMFLOAT2 a = centerline[k].point, b = centerline[k + 1].point;

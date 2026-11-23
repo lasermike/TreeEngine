@@ -1272,6 +1272,35 @@ void TestRoadGrading()
     for (float z = -8; z < 0; z += step)
         steepest = std::max(steepest, std::abs(side[fineIndex(0, z + step)] - side[fineIndex(0, z)]));
     Check(steepest <= 0.5f * step * 2.5f, "the downhill ditch jumps to the ground");
+
+    // An 80% side slope, falling faster than a 1:1.5 embankment: the fill never meets the ground on its own, so it
+    // tapers to it by the cap. Across the cap there is no jump (before the taper, 3.9 m in one 0.25 m step).
+    std::vector<float> cliff(size_t(fine) * fine);
+    for (int j = 0; j < fine; ++j)
+        for (int i = 0; i < fine; ++i)
+            cliff[size_t(j) * fine + i] = 10 + 0.8f * (j - 64) * step;
+    const std::vector<float> cliffGround = cliff;
+    Roads::Grade(slope, cliff, fine, step);
+    float sheer = 0;
+    for (float z = -15.5f; z < 0; z += step)
+        sheer = std::max(sheer, std::abs(cliff[fineIndex(0, z + step)] - cliff[fineIndex(0, z)]));
+    Check(sheer <= 2 * step && cliff[fineIndex(0, -15)] == cliffGround[fineIndex(0, -15)],
+        "the embankment ends in a cliff at its cap");
+
+    // A 20 m wide, 5 m deep ditch on flat ground at 0.5 m: the backslope reaches the ground 23 m out, with no jump
+    // where the search used to stop (21 m).
+    std::vector<float> wide(size_t(fine) * fine, 10);
+    Roads::Network canal;
+    Roads::Line widened = hillside;
+    widened.ditchDepth = 5;
+    widened.ditchWidth = 20;
+    canal.lines.push_back(widened);
+    Roads::Grade(canal, wide, fine, coarse);
+    float widest = 0;
+    for (int j = 64; j < fine - 1; ++j)
+        widest = std::max(widest, std::abs(wide[size_t(j + 1) * fine + 64] - wide[size_t(j) * fine + 64]));
+    Check(widest <= 0.3f && wide[size_t(64 + 46) * fine + 64] == 10 && wide[size_t(64 + 40) * fine + 64] < 10,
+        "a wide ditch stops short of the ground");
 }
 
 void TestTreeLodSettings()

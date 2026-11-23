@@ -13,7 +13,8 @@ namespace Roads
     constexpr float PavedCrown = 0.02f, GravelCrown = 0.03f, DrivewayCrown = 0.01f, ShoulderSlope = 0.04f;
     constexpr float BlendWidth = 3.0f;
     // Where the ground falls away below a ditch's bottom (a fill on a side slope), an embankment falls from the bottom
-    // at this slope (1 vertical in 1.5 horizontal) until it meets the ground, at most MaxEmbankment meters out.
+    // at this slope (1 vertical in 1.5 horizontal) until it meets the ground; on ground falling faster than that it
+    // tapers to the ground over the outer half of MaxEmbankment meters.
     constexpr float EmbankmentSlope = 1 / 1.5f, MaxEmbankment = 8.0f;
     // Along the road: the bed follows the ground's running median over MedianWindow samples, then its running mean
     // over SmoothingWindow samples (samples are SampleSpacing apart), so bumps under 10 m or so are planed off.
