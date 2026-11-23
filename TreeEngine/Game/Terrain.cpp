@@ -47,7 +47,14 @@ void Terrain::LoadRoads(const std::wstring& file)
     catch (const std::runtime_error& error)
     {
         m_roadsError = error.what();
+        return;
     }
+    // The surfaces, on the ground as the package has it (HeightAt reads the finest blocks it needs).
+    m_roadMesh = Roads::BuildMesh(m_roads, m_offset, [this](float x, float z, float& y) { return HeightAt(x, z, y); });
+    m_heightBlocks.clear();
+    for (int part = 0; part < static_cast<int>(Roads::Part::Count); ++part)
+        if (!m_roadMesh.parts[part].indices.empty())
+            m_roadParts.push_back({ static_cast<Roads::Part>(part) });
 }
 
 // The centerlines draped on the terrain, every 4 m and half a meter up so they clear the road bed: paved roads
@@ -135,6 +142,18 @@ void Terrain::AppendGeometry(GeometryBufferData& geometryData)
     m_offsets.VertexOffset = static_cast<UINT>(geometryData.vertices.size());
     m_offsets.VertexCount = VerticesPerNode;
     geometryData.vertices.resize(geometryData.vertices.size() + size_t(Params().slots) * VerticesPerNode, SimpleVertex{});
+
+    // Road surfaces, each part's indices relative to its first vertex.
+    for (RoadPart& road : m_roadParts)
+    {
+        const Roads::MeshPart& part = m_roadMesh[road.part];
+        road.offsets.VertexOffset = static_cast<UINT>(geometryData.vertices.size());
+        road.offsets.VertexCount = static_cast<UINT>(part.vertices.size());
+        road.offsets.IndexOffset = static_cast<UINT>(geometryData.indices.size());
+        road.offsets.IndexCount = static_cast<UINT>(part.indices.size());
+        geometryData.vertices.insert(geometryData.vertices.end(), part.vertices.begin(), part.vertices.end());
+        geometryData.indices.insert(geometryData.indices.end(), part.indices.begin(), part.indices.end());
+    }
 }
 
 HRESULT Terrain::InitGraphics(RenderManager& renderManager)
@@ -206,6 +225,34 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
     HRR(renderManager.ReserveRenderUnit(material, mesh, this, &m_renderUnit));
     m_renderUnit->pooledRayTracingGeometry = true;
 
+    // Road surfaces: static geometry (the DXR renderer keeps it in its static BLAS).
+    for (RoadPart& road : m_roadParts)
+    {
+        const size_t index = static_cast<size_t>(road.part);
+        ShaderMaterial roadMaterial = index < Params().roadMaterials.size() ? Params().roadMaterials[index] : _params->materials[0];
+        wchar_t roadName[64];
+        swprintf(roadName, 64, L"terrain%d-road%zu", _id, index);
+        Material* surface = nullptr;
+        StockRenderState roadState;
+        roadState.samplerState = StockSamplerStates::MinMagMipLinearUVWWrap;
+        const MaterialTextureSources* roadMaps = index < Params().roadMaterialTextures.size() ? &Params().roadMaterialTextures[index] : nullptr;
+        if (roadMaps && !roadMaps->Empty())
+        {
+            HRR(renderManager.BindMaterialTextures(*roadMaps, roadMaterial));
+            HRR(renderManager.CreateMaterial(roadName, roadMaps->roles[BaseColorTextureRole].get(), nullptr, nullptr, nullptr, nullptr,
+                roadMaterial, roadState, &surface));
+        }
+        else
+            HRR(renderManager.CreateMaterial(roadName, static_cast<const wchar_t*>(nullptr), nullptr, nullptr, nullptr, nullptr,
+                roadMaterial, roadState, &surface));
+        Mesh* roadMesh = nullptr;
+        HRR(renderManager.CreateMesh(roadName, renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
+            renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), &road.offsets, BASIC_INPUT_LAYOUT, &roadMesh));
+        HRR(renderManager.ReserveRenderUnit(surface, roadMesh, this, &road.renderUnit));
+        road.renderUnit->staticRayTracingGeometry = true;
+        road.renderUnit->castsShadows = false;     // A ribbon 6 to 12 cm above the ground casts nothing worth drawing.
+    }
+
     // A fresh vertex buffer: every slot is empty.
     m_slots.assign(Params().slots, Slot());
     m_freeSlots.clear();
@@ -224,6 +271,8 @@ HRESULT Terrain::CleanUpDeviceObjects()
 {
     StopLoader();
     m_renderUnit = nullptr;
+    for (RoadPart& road : m_roadParts)
+        road.renderUnit = nullptr;
     m_resident.clear();
     m_slots.clear();
     m_freeSlots.clear();
@@ -407,6 +456,18 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
     data.PreviousSlot = instance;
     // Nodes draw through AddDraw, not the reservation's range.
     HRR(frame->SetInstances(m_renderUnit, this, instance, 0));
+    // Road surfaces: an instance each, in world space.
+    for (UINT r = 0; r < RoadParts(); ++r)
+    {
+        const UINT slot = instance + 1 + r;
+        InstancedData& roadData = frame->GetRenderData().instanceData[slot];
+        XMStoreFloat4x4(&roadData.World, XMMatrixIdentity());
+        roadData.InstanceOffset = roadData.InstanceOffsetPrev = slot;
+        roadData.AtlasRegion = 0;
+        roadData.PreviousSlot = slot;
+        if (m_roadParts[r].renderUnit)
+            HRR(frame->SetInstances(m_roadParts[r].renderUnit, this, slot, 1));
+    }
     m_selected.clear();
     m_loadedThisFrame = m_missing = 0;
     if (!m_open || m_slots.empty())

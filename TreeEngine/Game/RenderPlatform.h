@@ -532,6 +532,8 @@ struct RenderUnit
     // pool). DXR builds a BLAS per draw owner straight from the vertex buffer, skipping the deformation pass; it is
     // rebuilt only when the owner's vertex range changes.
     bool                        pooledRayTracingGeometry = false;
+    // Drawn in the raster shadow pass (flat surfaces just above the ground, such as road ribbons, aren't).
+    bool                        castsShadows = true;
 
 #if defined(TREE3D12)
 

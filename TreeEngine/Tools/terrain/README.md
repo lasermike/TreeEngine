@@ -10,7 +10,7 @@ them.
 | `TerrainTool pack` | Packs a height raster: 16-bit PNG, or RAW float32/uint16/int16. |
 | `TerrainTool info` | Prints a package's manifest and reads every block. |
 | `TerrainTool heights` | Samples heights at points (bilinear on the finest level), for placing objects. |
-| `TerrainTool texture` | Tileable procedural maps for terrain material layers: `grass`, `rock`, `snow`, `dirt`. |
+| `TerrainTool texture` | Tileable procedural maps for terrain material layers and road surfaces: `grass`, `rock`, `snow`, `dirt`, `asphalt`, `gravel`. |
 | `import_heightmap.py` | GIS import: reprojects, crops and resamples with GDAL, then runs `TerrainTool pack`. |
 
 Build TerrainTool with `msbuild Tools\terrain\TerrainTool.vcxproj -p:Configuration=Release -p:Platform=x64`. It is not
@@ -133,7 +133,7 @@ joins) on synthetic data.
 **Layer textures.** `TerrainTool texture --out Textures/rock --kind rock --size 512 --seed 3` writes
 `rock_color.png` (sRGB), `rock_normal.png` (tangent space, +Y up the image) and `rock_mr.png` (roughness in G,
 metallic 0 in B), all tiling seamlessly, for a terrain layer's material. `Game/Resources/Terrain/Textures` holds a set
-made this way (seed 3, 512 px).
+made this way (seed 3, 512 px); terrains with roads use its `asphalt` and `gravel` maps for their surfaces.
 
 ## Package format (version 1)
 

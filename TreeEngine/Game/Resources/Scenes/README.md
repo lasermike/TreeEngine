@@ -160,9 +160,14 @@ or GIS elevation data). It requires `source`, the package directory, such as
 - `roads`: a roads file for the package, such as
   `"Terrain/Hungerford.roads.geojson"` (made by `Tools/terrain/import_roads.py`;
   see that README). The package must record its source CRS and bounds (GIS
-  imports do). For now the roads are only drawn by the debug UI's **Show road
-  centerlines** (render tests: a capture's `"showRoads": true`): paved roads
-  orange, gravel roads tan, driveways cyan.
+  imports do). Roads and driveways draw as surfaces draped on the terrain,
+  in raster and DXR: asphalt or gravel (`Terrain/Textures/asphalt_*` and
+  `gravel_*`, tiled every 4 m), with a dashed yellow center line on county paved
+  roads and white edge lines on those signed 40 mph or more. Where surfaces
+  overlap, paved roads show over gravel roads, and both over driveways. They
+  cast no raster shadow. The debug UI's **Show road centerlines** (render tests:
+  a capture's `"showRoads": true`) draws the centerlines: paved roads orange,
+  gravel roads tan, driveways cyan.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,

@@ -2,6 +2,8 @@
 #include "WorldObject.h"
 #include "TerrainPackage.h"
 #include "RoadNetwork.h"
+#include "RoadMesh.h"
+#include <array>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -40,6 +42,9 @@ public:
     std::string source;             // As authored, for saving.
     std::wstring roadsFile;         // Resolved roads file (empty for none), and
     std::string roads;              // as authored, for saving.
+    // The road surfaces' materials and maps, one per Roads::Part (asphalt, gravel, yellow and white markings).
+    std::vector<ShaderMaterial> roadMaterials;
+    std::vector<MaterialTextureSources> roadMaterialTextures;
     float lodRange = 2.0f;          // A node splits within lodRange x its size of the camera.
     UINT slots = 512;               // Vertex pool size, in nodes.
 };
@@ -68,10 +73,11 @@ public:
     HRESULT InitGraphics(RenderManager& renderManager) override;
     HRESULT CleanUpDeviceObjects() override;
     HRESULT ComputeConstants(IRenderFrame* frame) override;
-    unsigned int GetNumInstances() override { return 1; }
-    unsigned int GetMaxInstances() override { return 1; }
-    // Each drawn node is a ray-tracing geometry of its own.
-    unsigned int GetMaxDrawnInstances() override { return Params().slots; }
+    // One instance for the nodes, and one per road surface part.
+    unsigned int GetNumInstances() override { return 1 + RoadParts(); }
+    unsigned int GetMaxInstances() override { return 1 + RoadParts(); }
+    // Each drawn node is a ray-tracing geometry of its own; so is each road surface part.
+    unsigned int GetMaxDrawnInstances() override { return Params().slots + RoadParts(); }
 
     // The terrain's height at world (x, z) from the package's finest level, bilinear between samples; false outside
     // the terrain or when the block can't be read. Reads the package (not thread safe with itself).
@@ -129,6 +135,16 @@ private:
     bool m_open = false;
     Roads::Network m_roads;
     std::string m_roadsError;
+    // Road surfaces, built when the roads load: a static mesh per non-empty part, drawn like a model's.
+    Roads::Mesh m_roadMesh;
+    struct RoadPart
+    {
+        Roads::Part part;
+        GeometryBufferData::BufferOffsets offsets = {};
+        RenderUnit* renderUnit = nullptr;
+    };
+    std::vector<RoadPart> m_roadParts;
+    UINT RoadParts() const { return static_cast<UINT>(m_roadParts.size()); }
     std::vector<DebugPolyline> m_roadOverlay;   // Built on first use: the centerlines on the ground, in world space.
     void LoadRoads(const std::wstring& file);
     void AddRoadOverlay(RenderData& renderData);

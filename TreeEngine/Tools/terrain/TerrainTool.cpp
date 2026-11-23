@@ -437,9 +437,10 @@ namespace
     {
         const std::string out = Text(args, "out"), kind = Text(args, "kind", "grass");
         const int size = int(Number(args, "size", 512));
-        if (out.empty() || size < 16 || (size & (size - 1)) || (kind != "grass" && kind != "rock" && kind != "snow" && kind != "dirt"))
+        if (out.empty() || size < 16 || (size & (size - 1))
+            || (kind != "grass" && kind != "rock" && kind != "snow" && kind != "dirt" && kind != "asphalt" && kind != "gravel"))
         {
-            fprintf(stderr, "texture needs --out PREFIX, --kind grass|rock|snow|dirt and a power-of-two --size\n");
+            fprintf(stderr, "texture needs --out PREFIX, --kind grass|rock|snow|dirt|asphalt|gravel and a power-of-two --size\n");
             return 2;
         }
         const uint32_t seed = uint32_t(Number(args, "seed", 1));
@@ -472,6 +473,21 @@ namespace
                     h = 0.7 * TileFbm(noise, u, v, 4, 5, 0.45) + 0.1 * TileFbm(detail, u, v, 64, 2);
                     s = TileFbm(noise, u, v, 2, 3);
                 }
+                else if (kind == "asphalt")
+                {
+                    // Fine aggregate in a dark binder, worn lighter in broad patches.
+                    const double aggregate = std::pow(std::max(0.0, TileFbm(detail, u, v, 96, 2)), 3) * 4;
+                    h = 0.3 * TileFbm(detail, u, v, 128, 2) + aggregate;
+                    s = 0.6 * TileFbm(noise, u, v, 3, 3) + 0.8 * aggregate;
+                }
+                else if (kind == "gravel")
+                {
+                    // Packed stones of a few sizes over fines.
+                    const double stones = std::pow(std::max(0.0, TileFbm(detail, u, v, 40, 2)), 1.5) * 2.5;
+                    const double grit = std::pow(std::max(0.0, TileFbm(noise, u, v, 128, 2)), 2) * 1.5;
+                    h = stones + grit + 0.3 * TileFbm(noise, u, v, 8, 3);
+                    s = TileFbm(noise, u, v, 4, 3) + 0.6 * stones;
+                }
                 else
                 {
                     // Dirt: pebbles over a lumpy base.
@@ -484,7 +500,8 @@ namespace
             }
         });
 
-        const double bump = kind == "rock" ? 6.0 : kind == "dirt" ? 4.0 : kind == "grass" ? 3.0 : 1.5;
+        const double bump = kind == "rock" ? 6.0 : kind == "dirt" || kind == "gravel" ? 4.0 : kind == "grass" ? 3.0
+            : kind == "asphalt" ? 1.0 : 1.5;
         std::vector<uint8_t> color(size_t(size) * size * 4), normal(color.size()), mr(color.size());
         const auto at = [&](const std::vector<double>& map, int row, int column)
         {
@@ -502,6 +519,8 @@ namespace
                 if (kind == "rock")      { const double t = 0.5 + 0.5 * s; r = 0.085 + 0.06 * t; g = 0.08 + 0.05 * t; b = 0.07 + 0.04 * t; roughness = 0.75 + 0.15 * h; }
                 else if (kind == "grass") { const double t = 0.5 + 0.5 * s; r = 0.05 + 0.05 * t; g = 0.10 + 0.06 * t; b = 0.025 + 0.015 * t; roughness = 0.9; }
                 else if (kind == "snow")  { const double t = 0.5 + 0.5 * s; r = 0.78 + 0.08 * t; g = 0.80 + 0.08 * t; b = 0.86 + 0.06 * t; roughness = 0.55 + 0.15 * t; }
+                else if (kind == "asphalt") { const double t = std::min(1.0, std::max(0.0, 0.5 + 0.5 * s)); r = 0.045 + 0.05 * t; g = 0.045 + 0.05 * t; b = 0.048 + 0.05 * t; roughness = 0.85 + 0.1 * (1 - t); }
+                else if (kind == "gravel")  { const double t = std::min(1.0, std::max(0.0, 0.5 + 0.5 * s)); r = 0.13 + 0.10 * t; g = 0.12 + 0.09 * t; b = 0.10 + 0.08 * t; roughness = 0.92; }
                 else                      { const double t = 0.5 + 0.5 * s; r = 0.12 + 0.07 * t; g = 0.085 + 0.05 * t; b = 0.06 + 0.035 * t; roughness = 0.85; }
                 const double cavity = 0.75 + 0.25 * std::min(1.0, std::max(0.0, 0.5 + h));
                 color[i + 0] = srgb(b * cavity);
