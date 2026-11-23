@@ -124,6 +124,9 @@ def main():
                              'takes their depths; where they have none, the seabed is carved from the shore')
     parser.add_argument('--water-slope', type=float, default=0.05, help='seabed meters per meter from shore (default 0.05)')
     parser.add_argument('--water-depth', type=float, default=8, help='deepest seabed below --water-level (default 8 m)')
+    parser.add_argument('--roads', metavar='geojson',
+                        help="a roads file in the package's CRS (import_roads.py): grades road beds, shoulders and "
+                             'ditches into the heights')
     parser.add_argument('--tool', help='path to TerrainTool.exe')
     args = parser.parse_args()
     if args.seabed and args.water_level is None:
@@ -177,13 +180,16 @@ def main():
                 source['seabed']['bathymetry'] = [os.path.basename(path) for path in args.seabed]
         # TerrainTool pack puts the raster's top row (north) at +z, with east at +x (the engine is left-handed, y up).
         source['north'] = '+z'
+        if args.roads:
+            source['roads'] = os.path.basename(args.roads)
         run([tool, 'pack', '--out', args.output, '--raw', raw, '--width', str(width), '--height', str(height),
              '--type', 'f32', '--nodata', '-3.4e38', '--spacing', str(args.spacing),
              '--height-scale', str(args.height_scale), '--height-offset', str(args.height_offset),
              '--source-json', json.dumps(source, separators=(',', ':'))]
             + ([] if args.water_level is None else ['--water-level', str(args.water_level), '--water-slope',
                                                      str(args.water_slope), '--water-depth', str(args.water_depth)])
-            + ([] if not seabed_raw else ['--seabed-raw', seabed_raw]))
+            + ([] if not seabed_raw else ['--seabed-raw', seabed_raw])
+            + ([] if not args.roads else ['--roads', args.roads]))
     run([tool, 'info', args.output])
 
 

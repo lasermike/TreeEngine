@@ -25,6 +25,8 @@
   <ItemGroup>
     <ClCompile Include="TerrainTool.cpp" />
     <ClCompile Include="..\..\Game\TerrainPackage.cpp" />
+    <ClCompile Include="..\..\Game\RoadNetwork.cpp" />
+    <ClCompile Include="..\..\Game\RoadGrading.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

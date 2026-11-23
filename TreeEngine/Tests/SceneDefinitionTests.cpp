@@ -9,6 +9,7 @@
 #include "TerrainPackage.h"
 #include "RoadNetwork.h"
 #include "RoadMesh.h"
+#include "RoadGrading.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -1135,6 +1136,173 @@ void TestRoadMesh()
     Check(Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), flat)[Roads::Part::YellowLine].vertices.empty(), "a private road got a center line");
 }
 
+void TestRoadGrading()
+{
+    // A 129 x 129 grid at 1 m (package coordinates -64..64) tilted across the road: ground = 10 + 0.1 z. A county
+    // paved road along x at z = 0: 6 m wide, 1 m shoulders, ditches 0.5 m deep and 2.4 m wide.
+    const int n = 129;
+    const auto at = [&](std::vector<float>& h, float x, float z) -> float& { return h[size_t(z + 64) * n + size_t(x + 64)]; };
+    std::vector<float> heights(size_t(n) * n);
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i)
+            heights[size_t(j) * n + i] = 10 + 0.1f * (j - 64);
+    const std::vector<float> original = heights;
+    Roads::Network network;
+    Roads::Line road;
+    road.surface = "paved";
+    road.owner = "county";
+    road.width = 6;
+    road.shoulder = 1;
+    road.ditchDepth = 0.5f;
+    road.ditchWidth = 2.4f;
+    road.points = { XMFLOAT2(-40, 0), XMFLOAT2(40, 0) };
+    network.lines.push_back(road);
+    const auto report = Roads::Grade(network, heights, n, 1);
+    const auto equal = [](float a, float b) { return std::abs(a - b) < 2e-3f; };
+    // The bed follows the ground along the road (10 here), crowned the same both ways despite the tilt.
+    Check(equal(at(heights, 0, 0), 10) && equal(at(heights, 0, 2), 9.96f) && equal(at(heights, 0, -2), 9.96f),
+        "the road bed isn't level across and crowned");
+    // The traveled way's edge (3 m out, 9.94), and the shoulder 4% below it at its outer edge (4 m out, 9.90).
+    Check(equal(at(heights, 0, 3), 9.94f) && equal(at(heights, 0, -4), 9.90f) && equal(at(heights, 0, 4), 9.90f),
+        "the edges or shoulders are wrong");
+    // Ditches: 1 m down the 1.2 m foreslope toward 0.5 m deep; on the backslope, 0.8 m of 1.2 m up from the bottom
+    // (9.40) toward the ground, which is higher on the uphill side.
+    Check(equal(at(heights, 0, 5), 9.90f - 0.5f / 1.2f) && equal(at(heights, 0, -5), 9.90f - 0.5f / 1.2f), "the foreslopes are wrong");
+    Check(equal(at(heights, 0, 6), 9.40f + (10.6f - 9.40f) * (0.8f / 1.2f)) && equal(at(heights, 0, -6), 9.40f),
+        "the backslopes are wrong");
+    // Past the ditches, and past the road's ends, the ground is as surveyed.
+    Check(at(heights, 0, 8) == at(const_cast<std::vector<float>&>(original), 0, 8) && at(heights, 0, -8) == at(const_cast<std::vector<float>&>(original), 0, -8)
+        && at(heights, 50, 0) == at(const_cast<std::vector<float>&>(original), 50, 0), "grading reached past the road");
+    Check(report.graded > 0 && report.ditched > 0 && report.deepestCut > 0.4f, "the grading report is empty");
+
+    // Along the road: a 3 m bump 1 m high (all across x in [0, 2]) is planed off the bed.
+    std::vector<float> bumpy(size_t(n) * n, 5);
+    for (int j = 0; j < n; ++j)
+        for (int i = 64; i <= 66; ++i)
+            bumpy[size_t(j) * n + i] = 6;
+    Roads::Network flat;
+    Roads::Line lane = road;
+    lane.ditchDepth = lane.ditchWidth = 0;
+    flat.lines.push_back(lane);
+    Roads::Grade(flat, bumpy, n, 1);
+    Check(std::abs(at(bumpy, 1, 0) - 5) < 0.05f, "a short bump wasn't planed off the road bed");
+
+    // A driveway crossing the road: on the road's traveled way the road wins (its crown), beyond it the driveway.
+    std::vector<float> level(size_t(n) * n, 5);
+    Roads::Network crossing = flat;
+    Roads::Line driveway;
+    driveway.kind = Roads::Kind::Driveway;
+    driveway.surface = "gravel";
+    driveway.width = 3;
+    driveway.points = { XMFLOAT2(0, -20), XMFLOAT2(0, 20) };
+    crossing.lines.push_back(driveway);
+    Roads::Grade(crossing, level, n, 1);
+    Check(equal(at(level, 0, 1), 5 - 0.02f) && equal(at(level, 0, 12), 5), "a driveway won over the road it crosses");
+
+    // A grid finer than the centerline's samples (0.25 m) on a steady 20% grade along the road: the bed keeps the
+    // grade from grid point to grid point, with no steps where one sample's stretch ends.
+    const int fine = 129;
+    const float step = 0.25f;
+    const auto fineIndex = [&](float x, float z) { return size_t(std::lround(z / step + 64)) * fine + size_t(std::lround(x / step + 64)); };
+    std::vector<float> graded(size_t(fine) * fine);
+    for (int j = 0; j < fine; ++j)
+        for (int i = 0; i < fine; ++i)
+            graded[size_t(j) * fine + i] = 10 + 0.2f * (i - 64) * step;
+    Roads::Network grade;
+    Roads::Line uphill = lane;
+    uphill.points = { XMFLOAT2(-15, 0), XMFLOAT2(15, 0) };
+    grade.lines.push_back(uphill);
+    Roads::Grade(grade, graded, fine, step);
+    bool steady = true;
+    for (float x = -5; x < 5; x += step)
+        steady = steady && std::abs(graded[fineIndex(x + step, 0)] - graded[fineIndex(x, 0)] - 0.2f * step) < 0.005f;
+    Check(steady, "the bed steps on a steady grade between centerline samples");
+
+    // A right-angle turn on flat ground at 0.5 m: every grid point on the traveled way (0.5 to 2.9 m from the smoothed
+    // centerline, where the crown lowers it) is graded, the outside of the bend included, and nothing past the ends.
+    const float coarse = 0.5f;
+    std::vector<float> turn(size_t(fine) * fine, 10);
+    Roads::Network bend;
+    Roads::Line corner = lane;
+    corner.shoulder = 0;
+    corner.points = { XMFLOAT2(-12, 0), XMFLOAT2(0, 0), XMFLOAT2(0, 12) };
+    bend.lines.push_back(corner);
+    Roads::Grade(bend, turn, fine, coarse);
+    const auto smoothed = Roads::SmoothCenterline(corner.points);
+    const auto distance = [&](float x, float z)
+    {
+        float best = 1e9f;
+        for (size_t i = 0; i + 1 < smoothed.size(); ++i)
+        {
+            const XMFLOAT2 a = smoothed[i], b = smoothed[i + 1];
+            const float dx = b.x - a.x, dz = b.y - a.y, length2 = dx * dx + dz * dz;
+            const float t = length2 > 0 ? std::max(0.0f, std::min(1.0f, ((x - a.x) * dx + (z - a.y) * dz) / length2)) : 0;
+            best = std::min(best, std::hypot(x - a.x - t * dx, z - a.y - t * dz));
+        }
+        return best;
+    };
+    bool covered = true;
+    for (int j = 0; j < fine; ++j)
+        for (int i = 0; i < fine; ++i)
+        {
+            const float x = (i - 64) * coarse, z = (j - 64) * coarse;
+            const float d = distance(x, z);   // On the traveled way, off the centerline (the crown is 0 on it).
+            if (x > -11.5f && z < 11.5f && d > 0.5f && d < 2.9f)
+                covered = covered && turn[size_t(j) * fine + i] < 10 - 1e-4f;
+        }
+    const auto turnAt = [&](float x, float z) { return turn[size_t(std::lround(z / coarse + 64)) * fine + size_t(std::lround(x / coarse + 64))]; };
+    Check(covered && turnAt(0, -1.5f) < 10 - 1e-4f, "the outside of a bend was left ungraded");
+    Check(turnAt(-12.5f, 0) == 10 && turnAt(0, 12.5f) == 10, "grading ran past a road's ends");
+
+    // A 50% side slope falling to -z, a 6 m road with 0.5 m deep, 2 m wide ditches and no shoulder: the downhill side
+    // runs continuously down to the ground, its ditch bottom above the falling ground, with no jump.
+    std::vector<float> side(size_t(fine) * fine);
+    for (int j = 0; j < fine; ++j)
+        for (int i = 0; i < fine; ++i)
+            side[size_t(j) * fine + i] = 10 + 0.5f * (j - 64) * step;
+    Roads::Network slope;
+    Roads::Line hillside = road;
+    hillside.shoulder = 0;
+    hillside.ditchDepth = 0.5f;
+    hillside.ditchWidth = 2;
+    hillside.points = { XMFLOAT2(-15, 0), XMFLOAT2(15, 0) };
+    slope.lines.push_back(hillside);
+    Roads::Grade(slope, side, fine, step);
+    float steepest = 0;
+    for (float z = -8; z < 0; z += step)
+        steepest = std::max(steepest, std::abs(side[fineIndex(0, z + step)] - side[fineIndex(0, z)]));
+    Check(steepest <= 0.5f * step * 2.5f, "the downhill ditch jumps to the ground");
+
+    // An 80% side slope, falling faster than a 1:1.5 embankment: the fill never meets the ground on its own, so it
+    // tapers to it by the cap. Across the cap there is no jump (before the taper, 3.9 m in one 0.25 m step).
+    std::vector<float> cliff(size_t(fine) * fine);
+    for (int j = 0; j < fine; ++j)
+        for (int i = 0; i < fine; ++i)
+            cliff[size_t(j) * fine + i] = 10 + 0.8f * (j - 64) * step;
+    const std::vector<float> cliffGround = cliff;
+    Roads::Grade(slope, cliff, fine, step);
+    float sheer = 0;
+    for (float z = -15.5f; z < 0; z += step)
+        sheer = std::max(sheer, std::abs(cliff[fineIndex(0, z + step)] - cliff[fineIndex(0, z)]));
+    Check(sheer <= 2 * step && cliff[fineIndex(0, -15)] == cliffGround[fineIndex(0, -15)],
+        "the embankment ends in a cliff at its cap");
+
+    // A 20 m wide, 5 m deep ditch on flat ground at 0.5 m: the backslope reaches the ground 23 m out, with no jump
+    // where the search used to stop (21 m).
+    std::vector<float> wide(size_t(fine) * fine, 10);
+    Roads::Network canal;
+    Roads::Line widened = hillside;
+    widened.ditchDepth = 5;
+    widened.ditchWidth = 20;
+    canal.lines.push_back(widened);
+    Roads::Grade(canal, wide, fine, coarse);
+    float widest = 0;
+    for (int j = 64; j < fine - 1; ++j)
+        widest = std::max(widest, std::abs(wide[size_t(j + 1) * fine + 64] - wide[size_t(j) * fine + 64]));
+    Check(widest <= 0.3f && wide[size_t(64 + 46) * fine + 64] == 10 && wide[size_t(64 + 40) * fine + 64] < 10,
+        "a wide ditch stops short of the ground");
+}
+
 void TestTreeLodSettings()
 {
     const std::string json = R"({"version":1,"name":"Lod","objects":[
@@ -1398,6 +1566,7 @@ int main(int argc, char** argv)
         TestTideSettings();
         TestRoadNetwork();
         TestRoadMesh();
+        TestRoadGrading();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

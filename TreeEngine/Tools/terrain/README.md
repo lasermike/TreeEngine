@@ -56,12 +56,14 @@ sed 's#relativeToVRT="1">tiles/#relativeToVRT="0">/vsicurl/https://noaa-nos-coas
 gdal_translate -projwin 502396 5230529 506692 5226233 coned-remote.vrt Puget_Sound_CoNED_Topobathy_DEM_2020_m9112_hungerford.tif
 ```
 
-Hungerford was imported from the three WA DNR surveys plus that cut:
+Hungerford was imported from the three WA DNR surveys plus that cut, with its roads graded in (see Roads below;
+the roads file is made from an import without `--roads` first, then the package is imported again with it):
 
 ```bash
 python import_heightmap.py puget_lowlands_2005.vrt olympics_south_2019.vrt mason_county_2025.vrt Hungerford.terrain \
     --center 47.2089 -122.94 --size 4096 --spacing 1 --height-scale 0.3048006 \
-    --water-level 1.9 --seabed Puget_Sound_CoNED_Topobathy_DEM_2020_m9112_hungerford.tif
+    --water-level 1.9 --seabed Puget_Sound_CoNED_Topobathy_DEM_2020_m9112_hungerford.tif \
+    --roads Hungerford.roads.geojson
 ```
 
 **Tides.** `noaa_tide.py` writes a `water` object's tide from a NOAA CO-OPS station's harmonic constituents, plus
@@ -129,6 +131,17 @@ heights cover. Its package coordinates are about the packed grid's center: Terra
 southwest pixel center at the package's -x/-z corner and pads north and east, so that center is not the source
 bounds' center. `python -I -B test_import_roads.py` checks the importer's geometry (junctions, clipping, driveway
 joins) on synthetic data.
+
+**Grading.** `import_heightmap.py --roads FILE` (TerrainTool `pack --roads`) grades the roads into the heights before
+packing (Game/RoadGrading.h). Along each smoothed centerline the bed follows the ground's running median and mean
+(7 and 17 samples, a meter apart), so short bumps are planed off; across it, the traveled way is crowned (2% paved,
+3% gravel, 1% driveways), shoulders fall 4% more, and roads with ditches get a foreslope down to the ditch's depth and
+a backslope up to the ground over the ditch's width. Without a ditch the bed blends back into the ground over 3 m.
+Where lines overlap, a traveled way wins (paved roads over gravel roads over driveways), else the nearest line. On
+side slopes the uphill ditch cuts into the hill and the downhill foreslope builds a small embankment. Hungerford:
+349,000 samples changed, by 0.11 m on average and under 0.8 m for 99% of them; 2.55 m cut and 1.94 m fill at most.
+Grading works from the imported heights, so after editing roads, import the package again rather than re-grading a
+graded one.
 
 **Layer textures.** `TerrainTool texture --out Textures/rock --kind rock --size 512 --seed 3` writes
 `rock_color.png` (sRGB), `rock_normal.png` (tangent space, +Y up the image) and `rock_mr.png` (roughness in G,

@@ -6,12 +6,15 @@
 //                    [--spacing 1] [--height-scale 1] [--height-offset 0] [--nodata V] [--source-json JSON]
 //                    [--water-level M [--seabed-raw FILE [--seabed-scale 1]] [--water-slope 0.05] [--water-depth 8]]
 //                    (under flat water: the seabed from a bathymetry raster, else carved from the shore)
+//                    [--roads FILE]   (grades road beds, shoulders and ditches; needs --source-json with crs, bounds, size)
 //   TerrainTool info DIR
 //   TerrainTool heights DIR --in POINTS --out HEIGHTS     (lines of "x z" in meters -> one height per line)
-//   TerrainTool texture --out PREFIX --kind grass|rock|snow|dirt [--size 512] [--seed 1]
+//   TerrainTool texture --out PREFIX --kind grass|rock|snow|dirt|asphalt|gravel [--size 512] [--seed 1]
 //                       (tileable PREFIX_color.png, PREFIX_normal.png and PREFIX_mr.png for terrain layers)
 #include "pch.h"
 #include "TerrainPackage.h"
+#include "RoadGrading.h"
+#include <sstream>
 
 #include <wincodec.h>
 
@@ -345,6 +348,25 @@ namespace
                 heights[size_t(j) * samples + i] = values[size_t(std::max(height - 1 - j, 0)) * width + std::min(i, width - 1)];
         const double spacing = Number(args, "spacing", 1.0);
         std::string source = Text(args, "source-json", "{}");
+
+        // Road beds, shoulders and ditches (Game/RoadGrading.h), from a roads file in the source's CRS.
+        if (args.count("roads"))
+        {
+            std::ifstream file(Text(args, "roads").c_str(), std::ios::binary);
+            if (!file) { fprintf(stderr, "cannot read %s\n", Text(args, "roads").c_str()); return 1; }
+            std::stringstream text;
+            text << file.rdbuf();
+            std::string crs;
+            double originX = 0, originY = 0;
+            if (!Roads::PackageFrame(source, (samples - 1) * spacing, crs, originX, originY, error))
+            { fprintf(stderr, "--roads: %s\n", error.c_str()); return 1; }
+            Roads::Network network;
+            try { network = Roads::Parse(text.str(), crs, originX, originY); }
+            catch (const std::runtime_error& e) { fprintf(stderr, "%s\n", e.what()); return 1; }
+            const Roads::GradeReport report = Roads::Grade(network, heights, samples, float(spacing));
+            fprintf(stderr, "Graded %zu samples under %zu road and driveway lines (%zu in ditches); cut %.2f m, fill %.2f m at most\n",
+                report.graded, network.lines.size(), report.ditched, report.deepestCut, report.highestFill);
+        }
         if (!TerrainPackage::Write(Wide(out), heights, samples, spacing, source, error))
         {
             fprintf(stderr, "%s\n", error.c_str());
