@@ -134,16 +134,16 @@ def county_layer(cache, name, package):
         return json.load(open(out))['features']
 
 
-def osm_ways(cache, package):
-    """OpenStreetMap service ways in the package's area, as lists of CRS points with their tags."""
-    path = os.path.join(cache, 'osm-' + '-'.join(f'{v:.0f}' for v in package.bounds) + '.json')
+def osm_ways(cache, package, selector='["highway"="service"]', name='osm'):
+    """OpenStreetMap ways matching `selector` in the package's area, as lists of CRS points with their tags."""
+    path = os.path.join(cache, name + '-' + '-'.join(f'{v:.0f}' for v in package.bounds) + '.json')
     if not os.path.exists(path):
         lonlat = subprocess.run(['gdaltransform', '-s_srs', package.crs, '-t_srs', 'EPSG:4326', '-output_xy'],
                                 input=f'{package.bounds[0]} {package.bounds[1]}\n{package.bounds[2]} {package.bounds[3]}\n',
                                 capture_output=True, text=True, check=True).stdout.split()
         west, south, east, north = float(lonlat[0]), float(lonlat[1]), float(lonlat[2]), float(lonlat[3])
         box = f'{south:.6f},{west:.6f},{north:.6f},{east:.6f}'
-        query = f'[out:json][timeout:90];way["highway"="service"]({box});out tags geom;'
+        query = f'[out:json][timeout:90];way{selector}({box});out tags geom;'
         log('querying OpenStreetMap')
         request = urllib.request.Request(OVERPASS, data=urllib.parse.urlencode({'data': query}).encode(), headers={'User-Agent': AGENT})
         with urllib.request.urlopen(request, timeout=180) as response:
@@ -452,6 +452,97 @@ def build_driveways(package, ways, road_lines, report):
     return driveways
 
 
+def segments_cross(a, b, c, d):
+    """Whether segments ab and cd cross (touching ends don't count)."""
+    def side(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+    d1, d2, d3, d4 = side(c, d, a), side(c, d, b), side(a, b, c), side(a, b, d)
+    return d1 * d2 < 0 and d3 * d4 < 0
+
+
+def crosses_any(a, b, lines, skip=None):
+    return any(segments_cross(a, b, p, q) for line in lines if line is not skip for p, q in zip(line, line[1:]))
+
+
+def build_generated_driveways(package, addresses, buildings, named_roads, served, water_level, report):
+    """Driveways for site addresses no driveway serves yet: from the road the address names (else the nearest road)
+    straight to the house (the nearest building within 30 m, else the address point). `named_roads` are
+    (name, line) pairs as they will be written, `served` the driveway lines already there. Skips an address
+    within 12 m of a road, within 8 m of one already handled, within 30 m of a served driveway's house end, or whose
+    straight path would cross another road or driveway or pass through water (heights at or below `water_level`)."""
+    lines = [line for _, line in named_roads]
+    driveway_lines = [list(line) for line in served]
+    house_ends = [line[-1] for line in served]
+    centers = []
+    for _, outline in buildings:
+        if len(outline) >= 3:
+            centers.append((sum(p[0] for p in outline) / len(outline), sum(p[1] for p in outline) / len(outline)))
+    driveways, handled, keys, ids = [], [], set(), set()
+    counts = {'served': 0, 'on a road': 0, 'duplicate': 0, 'crossing a road, a driveway or water': 0, 'no road': 0}
+    for address in addresses:
+        props = address.get('properties') or {}
+        geometry = address.get('geometry') or {}
+        if geometry.get('type') != 'Point':
+            continue
+        point = tuple(geometry['coordinates'][:2])
+        if not package.contains(*point):
+            continue
+        # Units of one address (same parcel and number) share its driveway, as do addresses within 8 m.
+        unit_key = (props.get('PIN'), props.get('STREETNUMB'))
+        if any(math.hypot(point[0] - h[0], point[1] - h[1]) < 8 for h in handled) or (unit_key[0] and unit_key in keys):
+            counts['duplicate'] += 1
+            continue
+        handled.append(point)
+        keys.add(unit_key)
+        if any(math.hypot(point[0] - h[0], point[1] - h[1]) < 30 for h in house_ends):
+            counts['served'] += 1
+            continue
+        near, _ = nearest_road(point, lines)
+        if near < 12:
+            counts['on a road'] += 1
+            continue
+        # The house: the nearest building within 30 m of the address, else the address itself.
+        house = point
+        best = min(centers, key=lambda c: math.hypot(c[0] - point[0], c[1] - point[1]), default=None)
+        if best and math.hypot(best[0] - point[0], best[1] - point[1]) < 30:
+            house = best
+        # The road: the one the address names, if a straight path to it is clear; else the nearest clear one.
+        street = (props.get('STREET') or '').strip().upper()
+        candidates = sorted(named_roads, key=lambda r: (r[0].strip().upper() != street, nearest_on_line(house, r[1])[0]))
+        chosen = None
+        for name, line in candidates:
+            distance, at = nearest_on_line(house, line)
+            if distance > 500:
+                continue
+            if crosses_any(at, house, lines, skip=line) or crosses_any(at, house, driveway_lines):
+                continue
+            samples = resample([at, house], 2.0)
+            if any(package.height(x, y) <= water_level for x, y in samples[1:-1]):
+                continue
+            chosen = (at, distance)
+            break
+        if not chosen:
+            counts['crossing a road, a driveway or water' if lines else 'no road'] += 1
+            continue
+        at, distance = chosen
+        # End short of the building's center, toward the road: its front.
+        if house is not point and distance > 10:
+            house = (house[0] + (at[0] - house[0]) * 5 / distance, house[1] + (at[1] - house[1]) * 5 / distance)
+        label = props.get('PIN') or f'{point[0]:.0f}-{point[1]:.0f}'
+        number = props.get('STREETNUMB') or ''
+        driveway_id = f'address-{label}' + (f'-{number}' if number else '')
+        while driveway_id in ids:
+            driveway_id += '+'
+        ids.add(driveway_id)
+        driveway_lines.append([at, house])
+        driveways.append({'id': driveway_id, 'line': [at, house],
+                          'name': (props.get('ADDRESS') or '').strip(), 'surface': 'gravel', 'width': DRIVEWAY_WIDTH})
+        house_ends.append(house)
+    report.append(f'{len(driveways)} driveways generated from {len(addresses)} site addresses (skipped: '
+                  + ', '.join(f'{v} {k}' for k, v in counts.items() if v) + ')')
+    return driveways
+
+
 def feature(kind, item, source):
     props = {'kind': kind, 'id': item['id'], 'source': source, 'edited': False}
     for key in ('name', 'surface', 'owner', 'width', 'shoulder', 'ditchDepth', 'ditchWidth', 'speedLimit', 'class'):
@@ -467,10 +558,20 @@ def main():
     parser.add_argument('output', help='the roads file to write (Name.roads.geojson)')
     parser.add_argument('--cache', required=True, help='directory for the downloaded sources (kept between runs)')
     parser.add_argument('--snap', type=int, default=8, help='how far sideways (m) a road may move onto its bed')
+    parser.add_argument('--snap-heights', metavar='PACKAGE',
+                        help="snap to this package's heights instead: the same area imported without --roads, since "
+                             "a graded package's beds already follow the last import's roads")
+    parser.add_argument('--water-level', type=float, default=1.9,
+                        help='heights at or below this are water: generated driveways never cross them (default 1.9 m)')
     args = parser.parse_args()
 
     os.makedirs(args.cache, exist_ok=True)
     package = Package(args.package)
+    if args.snap_heights:
+        surveyed = Package(args.snap_heights)
+        if surveyed.crs != package.crs or surveyed.extent != package.extent or surveyed.heights.shape != package.heights.shape:
+            sys.exit(f'{args.snap_heights} does not cover the same grid as {args.package}')
+        package.heights = surveyed.heights
     report = []
     centerlines = county_layer(args.cache, 'centerlines', package)
     addresses = county_layer(args.cache, 'addresses', package)
@@ -484,18 +585,27 @@ def main():
             if f.get('properties', {}).get('edited'):
                 kept.append(f)
                 kept_ids.add(f['properties'].get('id'))
-    road_lines = [r['line'] for r in roads if r['id'] not in kept_ids]
+    named_roads = [(r['name'], r['line']) for r in roads if r['id'] not in kept_ids]
+    served = []
     for f in kept:
         geometry = f.get('geometry') or {}
-        if f['properties'].get('kind') != 'road' or geometry.get('type') not in ('LineString', 'MultiLineString'):
+        if geometry.get('type') not in ('LineString', 'MultiLineString'):
             continue
         lines = geometry['coordinates'] if geometry['type'] == 'MultiLineString' else [geometry['coordinates']]
-        road_lines += [[(p[0], p[1]) for p in line] for line in lines if len(line) >= 2]
+        lines = [[(p[0], p[1]) for p in line] for line in lines if len(line) >= 2]
+        if f['properties'].get('kind') == 'road':
+            named_roads += [(f['properties'].get('name') or '', line) for line in lines]
+        elif f['properties'].get('kind') == 'driveway':
+            served += lines
+    road_lines = [line for _, line in named_roads]
     driveways = build_driveways(package, osm_ways(args.cache, package), road_lines, report)
-    report.append(f'{len(addresses)} site addresses in the package (driveways and mailboxes come from them later)')
+    served += [d['line'] for d in driveways if d['id'] not in kept_ids]
+    buildings = osm_ways(args.cache, package, '["building"]', 'osm-buildings')
+    generated = build_generated_driveways(package, addresses, buildings, named_roads, served, args.water_level, report)
     features = list(kept)
     features += [feature('road', r, 'county') for r in roads if r['id'] not in kept_ids]
     features += [feature('driveway', d, 'osm') for d in driveways if d['id'] not in kept_ids]
+    features += [feature('driveway', d, 'generated') for d in generated if d['id'] not in kept_ids]
     if kept:
         report.append(f'{len(kept)} edited features kept from the existing file')
 
@@ -519,7 +629,8 @@ def main():
     for line in report:
         log(line)
     log(f'wrote {args.output}: {sum(f["properties"]["kind"] == "road" for f in features)} roads, '
-        f'{sum(f["properties"]["kind"] == "driveway" for f in features)} driveways')
+        f'{sum(f["properties"]["kind"] == "driveway" for f in features)} driveways '
+        f'({sum(f["properties"]["source"] == "generated" for f in features)} generated)')
 
 
 if __name__ == '__main__':

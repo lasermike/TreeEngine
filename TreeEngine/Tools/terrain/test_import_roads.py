@@ -66,5 +66,55 @@ outside = ({'id': 2, 'tags': {'highway': 'service'}}, [(50.0, 90.0), (50.0, 140.
 driveways = roads.build_driveways(Extent((0.0, 0.0, 100.0, 100.0)), [outside], edited_road, [])
 check(len(driveways) == 1 and all(p[1] <= 100.0 + 1e-6 for p in driveways[0]['line']), 'a driveway ran off the package')
 
+# Generated driveways. A 200 x 200 m package, dry except a pond at y > 150, with "A ST" along y = 0 and "B ST" along
+# x = 100 (crossing y from 0 to 200).
+class Ground:
+    extent = (0.0, 0.0, 200.0, 200.0)
+
+    def contains(self, x, y, margin=0):
+        return 0 <= x <= 200 and 0 <= y <= 200
+
+    def height(self, x, y):
+        return 0.0 if y > 150 else 10.0
+
+
+def address(x, y, street, pin='1', number='1'):
+    return {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [x, y]},
+            'properties': {'STREET': street, 'PIN': pin, 'STREETNUMB': number, 'ADDRESS': f'{number} {street}'}}
+
+
+roads_ab = [('A ST', [(0.0, 0.0), (200.0, 0.0)]), ('B ST', [(100.0, 0.0), (100.0, 200.0)])]
+generate = lambda addresses, buildings=(), served=(): roads.build_generated_driveways(
+    Ground(), addresses, list(buildings), roads_ab, list(served), 1.0, [])
+
+# The road the address names, even when another is nearer: 40 m to A ST, 30 m to B ST.
+made = generate([address(70, 40, 'A ST')])
+check(len(made) == 1 and close(made[0]['line'][0], (70, 0)) and close(made[0]['line'][1], (70, 40)),
+      f'the driveway did not run to the named road: {made}')
+# Served by an existing driveway whose house end is within 30 m; within 12 m of a road; two units of one address.
+check(generate([address(70, 40, 'A ST')], served=[[(70, 0), (75, 30)]]) == [], 'a served address got a driveway')
+check(generate([address(70, 8, 'A ST')]) == [], 'an address on a road got a driveway')
+units = generate([address(40, 60, 'A ST', '7', '12'), address(45, 64, 'A ST', '7', '12')])
+check(len(units) == 1, 'two units of one address got two driveways')
+# A house east of B ST whose address names C ST, west of B ST: the path there would cross B ST, so the driveway goes
+# to the nearest road it can reach without crossing one (A ST).
+crossing = roads.build_generated_driveways(Ground(), [address(150, 40, 'C ST')], [],
+                                           [('C ST', [(0.0, 40.0), (60.0, 40.0)])] + roads_ab, [], 1.0, [])
+check(len(crossing) == 1 and not close(crossing[0]['line'][0], (60, 40)),
+      f'a driveway crossed a road to reach the one its address names: {crossing}')
+# Driveways don't cross: the second address's path to A ST would cross the first driveway, so it takes B ST.
+pair = generate([address(20, 60, 'A ST', '1'), address(60, 30, 'A ST', '2')], served=[[(70.0, 0.0), (10.0, 80.0)]])
+check(all(not roads.segments_cross(d['line'][0], d['line'][1], (70.0, 0.0), (10.0, 80.0)) for d in pair)
+      and all(not roads.segments_cross(a['line'][0], a['line'][1], b['line'][0], b['line'][1]) for a in pair for b in pair),
+      f'driveways cross: {pair}')
+# Across water: the only road beyond the pond is skipped.
+pond = roads.build_generated_driveways(Ground(), [address(30, 190, 'D ST')], [],
+                                       [('D ST', [(0.0, 120.0), (60.0, 120.0)])], [], 1.0, [])
+check(pond == [], 'a driveway crossed water')
+# A building within 30 m: the driveway ends 5 m short of its center, toward the road.
+building = ({'id': 9}, [(60.0, 50.0), (80.0, 50.0), (80.0, 70.0), (60.0, 70.0)])
+house = generate([address(72, 45, 'A ST')], buildings=[building])
+check(len(house) == 1 and close(house[0]['line'][1], (70, 55), 1e-6), f'the driveway did not end at the building: {house}')
+
 print(f'{failures} failures' if failures else 'import_roads checks passed')
 sys.exit(1 if failures else 0)
