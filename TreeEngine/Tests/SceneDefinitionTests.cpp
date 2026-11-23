@@ -1198,6 +1198,80 @@ void TestRoadGrading()
     crossing.lines.push_back(driveway);
     Roads::Grade(crossing, level, n, 1);
     Check(equal(at(level, 0, 1), 5 - 0.02f) && equal(at(level, 0, 12), 5), "a driveway won over the road it crosses");
+
+    // A grid finer than the centerline's samples (0.25 m) on a steady 20% grade along the road: the bed keeps the
+    // grade from grid point to grid point, with no steps where one sample's stretch ends.
+    const int fine = 129;
+    const float step = 0.25f;
+    const auto fineIndex = [&](float x, float z) { return size_t(std::lround(z / step + 64)) * fine + size_t(std::lround(x / step + 64)); };
+    std::vector<float> graded(size_t(fine) * fine);
+    for (int j = 0; j < fine; ++j)
+        for (int i = 0; i < fine; ++i)
+            graded[size_t(j) * fine + i] = 10 + 0.2f * (i - 64) * step;
+    Roads::Network grade;
+    Roads::Line uphill = lane;
+    uphill.points = { XMFLOAT2(-15, 0), XMFLOAT2(15, 0) };
+    grade.lines.push_back(uphill);
+    Roads::Grade(grade, graded, fine, step);
+    bool steady = true;
+    for (float x = -5; x < 5; x += step)
+        steady = steady && std::abs(graded[fineIndex(x + step, 0)] - graded[fineIndex(x, 0)] - 0.2f * step) < 0.005f;
+    Check(steady, "the bed steps on a steady grade between centerline samples");
+
+    // A right-angle turn on flat ground at 0.5 m: every grid point on the traveled way (0.5 to 2.9 m from the smoothed
+    // centerline, where the crown lowers it) is graded, the outside of the bend included, and nothing past the ends.
+    const float coarse = 0.5f;
+    std::vector<float> turn(size_t(fine) * fine, 10);
+    Roads::Network bend;
+    Roads::Line corner = lane;
+    corner.shoulder = 0;
+    corner.points = { XMFLOAT2(-12, 0), XMFLOAT2(0, 0), XMFLOAT2(0, 12) };
+    bend.lines.push_back(corner);
+    Roads::Grade(bend, turn, fine, coarse);
+    const auto smoothed = Roads::SmoothCenterline(corner.points);
+    const auto distance = [&](float x, float z)
+    {
+        float best = 1e9f;
+        for (size_t i = 0; i + 1 < smoothed.size(); ++i)
+        {
+            const XMFLOAT2 a = smoothed[i], b = smoothed[i + 1];
+            const float dx = b.x - a.x, dz = b.y - a.y, length2 = dx * dx + dz * dz;
+            const float t = length2 > 0 ? std::max(0.0f, std::min(1.0f, ((x - a.x) * dx + (z - a.y) * dz) / length2)) : 0;
+            best = std::min(best, std::hypot(x - a.x - t * dx, z - a.y - t * dz));
+        }
+        return best;
+    };
+    bool covered = true;
+    for (int j = 0; j < fine; ++j)
+        for (int i = 0; i < fine; ++i)
+        {
+            const float x = (i - 64) * coarse, z = (j - 64) * coarse;
+            const float d = distance(x, z);   // On the traveled way, off the centerline (the crown is 0 on it).
+            if (x > -11.5f && z < 11.5f && d > 0.5f && d < 2.9f)
+                covered = covered && turn[size_t(j) * fine + i] < 10 - 1e-4f;
+        }
+    const auto turnAt = [&](float x, float z) { return turn[size_t(std::lround(z / coarse + 64)) * fine + size_t(std::lround(x / coarse + 64))]; };
+    Check(covered && turnAt(0, -1.5f) < 10 - 1e-4f, "the outside of a bend was left ungraded");
+    Check(turnAt(-12.5f, 0) == 10 && turnAt(0, 12.5f) == 10, "grading ran past a road's ends");
+
+    // A 50% side slope falling to -z, a 6 m road with 0.5 m deep, 2 m wide ditches and no shoulder: the downhill side
+    // runs continuously down to the ground, its ditch bottom above the falling ground, with no jump.
+    std::vector<float> side(size_t(fine) * fine);
+    for (int j = 0; j < fine; ++j)
+        for (int i = 0; i < fine; ++i)
+            side[size_t(j) * fine + i] = 10 + 0.5f * (j - 64) * step;
+    Roads::Network slope;
+    Roads::Line hillside = road;
+    hillside.shoulder = 0;
+    hillside.ditchDepth = 0.5f;
+    hillside.ditchWidth = 2;
+    hillside.points = { XMFLOAT2(-15, 0), XMFLOAT2(15, 0) };
+    slope.lines.push_back(hillside);
+    Roads::Grade(slope, side, fine, step);
+    float steepest = 0;
+    for (float z = -8; z < 0; z += step)
+        steepest = std::max(steepest, std::abs(side[fineIndex(0, z + step)] - side[fineIndex(0, z)]));
+    Check(steepest <= 0.5f * step * 2.5f, "the downhill ditch jumps to the ground");
 }
 
 void TestTreeLodSettings()

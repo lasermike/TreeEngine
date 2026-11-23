@@ -12,6 +12,9 @@ namespace Roads
     // shoulder falls a little more steeply, and with no ditch the bed blends back into the ground over BlendWidth.
     constexpr float PavedCrown = 0.02f, GravelCrown = 0.03f, DrivewayCrown = 0.01f, ShoulderSlope = 0.04f;
     constexpr float BlendWidth = 3.0f;
+    // Where the ground falls away below a ditch's bottom (a fill on a side slope), an embankment falls from the bottom
+    // at this slope (1 vertical in 1.5 horizontal) until it meets the ground, at most MaxEmbankment meters out.
+    constexpr float EmbankmentSlope = 1 / 1.5f, MaxEmbankment = 8.0f;
     // Along the road: the bed follows the ground's running median over MedianWindow samples, then its running mean
     // over SmoothingWindow samples (samples are SampleSpacing apart), so bumps under 10 m or so are planed off.
     constexpr int MedianWindow = 7, SmoothingWindow = 17;
@@ -25,7 +28,9 @@ namespace Roads
     };
 
     // Grades `heights`: samples x samples, row-major from -x/-z, `spacing` meters apart, centered on the package
-    // origin (the network's coordinates). Where roads overlap the more important one wins: a sample on a traveled
-    // way takes it (paved roads over gravel roads over driveways), else the nearest line's shoulder, ditch or blend.
+    // origin (the network's coordinates). Each grid point takes the cross-section at its projection onto the smoothed
+    // centerline (round at joints, cut off square at the ends), the bed interpolated there. Where roads overlap the
+    // more important one wins: a sample on a traveled way takes it (paved roads over gravel roads over driveways),
+    // else the nearest line's shoulder, ditch or blend.
     GradeReport Grade(const Network& network, std::vector<float>& heights, int samples, float spacing);
 }

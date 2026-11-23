@@ -58,14 +58,27 @@ namespace
         const float q = d - p.halfWidth - p.shoulder;
         if (p.ditchDepth > 0 && p.ditchWidth > 0)
         {
-            // Foreslope down to the ditch's bottom (on a fill, an embankment), backslope up to the ground, which the
-            // backslope never raises.
+            // Foreslope down to the ditch's bottom. Then, where the ground is above the bottom (a cut), a backslope
+            // rising to it at the ditch's outer edge; where it is below (a fill on a side slope), an embankment
+            // falling at EmbankmentSlope until it meets the ground. Where the ground crosses the bottom both give
+            // the bottom, so the section is continuous, and the embankment is never steeper than its slope.
             const float half = p.ditchWidth / 2;
-            if (q > p.ditchWidth)
-                return false;
             const float bottom = outer - p.ditchDepth;
-            const float shaped = q <= half ? outer - p.ditchDepth * (q / half) : bottom + (ground - bottom) * ((q - half) / half);
-            height = q <= half ? shaped : std::min(shaped, ground);
+            if (q <= half)
+                height = outer - p.ditchDepth * (q / half);
+            else if (ground >= bottom)
+            {
+                if (q > p.ditchWidth)
+                    return false;
+                height = bottom + (ground - bottom) * ((q - half) / half);
+            }
+            else
+            {
+                const float embankment = bottom - Roads::EmbankmentSlope * (q - half);
+                if (q - half > Roads::MaxEmbankment || embankment <= ground)
+                    return false;
+                height = embankment;
+            }
             ditch = height < ground;
             return true;
         }
@@ -130,30 +143,56 @@ namespace Roads
             for (size_t k = 0; k < centerline.size(); ++k)
                 beds[k] = groundAt(centerline[k].point.x, centerline[k].point.y);
             beds = SmoothAlong(beds);
+            const bool ditched = p.ditchDepth > 0 && p.ditchWidth > 0;
 
-            const float reach = p.halfWidth + p.shoulder + (p.ditchDepth > 0 && p.ditchWidth > 0 ? p.ditchWidth : BlendWidth);
-            for (size_t k = 0; k < centerline.size(); ++k)
+            // Each segment between consecutive samples grades the grid points that project onto it, with the bed
+            // interpolated along it, so a grid finer than the samples follows a grade smoothly. A point past a
+            // segment's start, at a joint, measures from the joint itself (a round join), which covers the outsides
+            // of bends; past the first sample or the last, nothing is graded, so a road stops at its ends.
+            const float reach = p.halfWidth + p.shoulder + (ditched ? p.ditchWidth / 2 + MaxEmbankment : BlendWidth);
+            for (size_t k = 0; k + 1 < centerline.size(); ++k)
             {
-                const CenterlineSample& c = centerline[k];
-                const XMFLOAT2 forward(c.side.y, -c.side.x);
-                const int i0 = std::max(0, static_cast<int>(std::floor((c.point.x - reach + half) / spacing)));
-                const int i1 = std::min(samples - 1, static_cast<int>(std::ceil((c.point.x + reach + half) / spacing)));
-                const int j0 = std::max(0, static_cast<int>(std::floor((c.point.y - reach + half) / spacing)));
-                const int j1 = std::min(samples - 1, static_cast<int>(std::ceil((c.point.y + reach + half) / spacing)));
+                const XMFLOAT2 a = centerline[k].point, b = centerline[k + 1].point;
+                const float sx = b.x - a.x, sz = b.y - a.y, length2 = sx * sx + sz * sz;
+                if (length2 < 1e-8f)
+                    continue;
+                const float length = std::sqrt(length2);
+                const XMFLOAT2 side(-sz / length, sx / length);
+                const int i0 = std::max(0, static_cast<int>(std::floor((std::min(a.x, b.x) - reach + half) / spacing)));
+                const int i1 = std::min(samples - 1, static_cast<int>(std::ceil((std::max(a.x, b.x) + reach + half) / spacing)));
+                const int j0 = std::max(0, static_cast<int>(std::floor((std::min(a.y, b.y) - reach + half) / spacing)));
+                const int j1 = std::min(samples - 1, static_cast<int>(std::ceil((std::max(a.y, b.y) + reach + half) / spacing)));
                 for (int j = j0; j <= j1; ++j)
                     for (int i = i0; i <= i1; ++i)
                     {
-                        const float dx = -half + i * spacing - c.point.x, dz = -half + j * spacing - c.point.y;
-                        // This sample's stretch of the line: within half a sample spacing along it (a little more,
-                        // so bends leave no gaps on their outsides).
-                        const float along = dx * forward.x + dz * forward.y;
-                        if (std::abs(along) > 0.75f * SampleSpacing)
-                            continue;
-                        const float lateral = dx * c.side.x + dz * c.side.y;
+                        const float dx = -half + i * spacing - a.x, dz = -half + j * spacing - a.y;
+                        const float t = (dx * sx + dz * sz) / length2;
+                        float lateral, bed;
+                        if (t > 1)
+                            continue;                   // The next segment's (or past the end).
+                        if (t < 0)
+                        {
+                            if (k == 0)
+                                continue;               // Before the start.
+                            // Only the wedge on a bend's outside, which neither segment reaches: past the previous
+                            // segment's end too. (Behind the line, that's still before the start.)
+                            const XMFLOAT2 previous = centerline[k - 1].point;
+                            if (dx * (a.x - previous.x) + dz * (a.y - previous.y) <= 0)
+                                continue;
+                            // The joint's wedge: distance from the joint, on this segment's side of the line.
+                            const float sideways = dx * side.x + dz * side.y;
+                            lateral = std::copysign(std::sqrt(dx * dx + dz * dz), sideways);
+                            bed = beds[k];
+                        }
+                        else
+                        {
+                            lateral = dx * side.x + dz * side.y;
+                            bed = beds[k] + (beds[k + 1] - beds[k]) * t;
+                        }
                         const size_t index = size_t(j) * samples + i;
                         float height = 0;
                         bool ditch = false;
-                        if (!CrossSection(p, beds[k], lateral, ground[index], height, ditch))
+                        if (!CrossSection(p, bed, lateral, ground[index], height, ditch))
                             continue;
                         // On a traveled way: rank first, then nearness. Elsewhere: nearness, after every traveled way.
                         const bool traveled = std::abs(lateral) <= p.halfWidth;
