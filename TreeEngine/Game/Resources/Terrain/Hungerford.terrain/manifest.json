@@ -41,6 +41,7 @@
         "Puget_Sound_CoNED_Topobathy_DEM_2020_m9112_hungerford.tif"
       ]
     },
-    "north": "+z"
+    "north": "+z",
+    "roads": "Hungerford.roads.geojson"
   }
 }

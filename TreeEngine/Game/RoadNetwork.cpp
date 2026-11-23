@@ -2,6 +2,7 @@
 #include "RoadNetwork.h"
 #include "ThirdParty/nlohmann/json.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -66,6 +67,91 @@ namespace
 
 namespace Roads
 {
+    using DirectX::XMFLOAT2;
+
+    // Chaikin corner cutting: each pass replaces every inner corner with two points a quarter of the way along its
+    // segments, keeping the ends, so the polylines the importer simplified bend smoothly. The segments are first split
+    // into pieces of at most SmoothingPiece meters, so a cut never reaches more than a quarter piece from a corner:
+    // the bend moves well under a road's half-width, however long the importer's segments are.
+    std::vector<XMFLOAT2> SmoothCenterline(const std::vector<XMFLOAT2>& input)
+    {
+        std::vector<XMFLOAT2> line;
+        for (size_t i = 0; i + 1 < input.size(); ++i)
+        {
+            const XMFLOAT2 a = input[i], b = input[i + 1];
+            const int pieces = std::max(1, static_cast<int>(std::ceil(std::hypot(b.x - a.x, b.y - a.y) / SmoothingPiece)));
+            for (int p = 0; p < pieces; ++p)
+                line.push_back(XMFLOAT2(a.x + (b.x - a.x) * p / pieces, a.y + (b.y - a.y) * p / pieces));
+        }
+        if (!input.empty())
+            line.push_back(input.back());
+        for (int pass = 0; pass < SmoothingPasses && line.size() > 2; ++pass)
+        {
+            std::vector<XMFLOAT2> next = { line.front() };
+            for (size_t i = 0; i + 1 < line.size(); ++i)
+            {
+                const XMFLOAT2 a = line[i], b = line[i + 1];
+                if (i > 0)
+                    next.push_back(XMFLOAT2(0.75f * a.x + 0.25f * b.x, 0.75f * a.y + 0.25f * b.y));
+                if (i + 2 < line.size())
+                    next.push_back(XMFLOAT2(0.25f * a.x + 0.75f * b.x, 0.25f * a.y + 0.75f * b.y));
+            }
+            next.push_back(line.back());
+            line.swap(next);
+        }
+        return line;
+    }
+
+    std::vector<CenterlineSample> SampleCenterline(const std::vector<XMFLOAT2>& input)
+    {
+        // Evenly along the whole line, SampleSpacing apart or a little less, ends included: however finely smoothing
+        // split the line, the cross-sections stay about a meter apart.
+        const std::vector<XMFLOAT2> line = SmoothCenterline(input);
+        std::vector<XMFLOAT2> points;
+        std::vector<float> distance;
+        for (const XMFLOAT2& q : line)
+        {
+            if (!points.empty() && std::hypot(q.x - points.back().x, q.y - points.back().y) < 1e-4f)
+                continue;
+            distance.push_back(points.empty() ? 0 : distance.back() + std::hypot(q.x - points.back().x, q.y - points.back().y));
+            points.push_back(q);
+        }
+        std::vector<CenterlineSample> samples;
+        if (points.size() < 2)
+            return samples;
+        const float length = distance.back();
+        const int steps = std::max(1, static_cast<int>(std::ceil(length / SampleSpacing - 1e-4f)));
+        size_t segment = 0;
+        for (int s = 0; s <= steps; ++s)
+        {
+            const float along = length * s / steps;
+            while (segment + 2 < points.size() && distance[segment + 1] < along)
+                ++segment;
+            const float span = distance[segment + 1] - distance[segment];
+            const float t = span > 0 ? std::min(1.0f, std::max(0.0f, (along - distance[segment]) / span)) : 0;
+            const XMFLOAT2& a = points[segment];
+            const XMFLOAT2& b = points[segment + 1];
+            samples.push_back({ XMFLOAT2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t), XMFLOAT2(0, 0), along });
+        }
+        // Sideways from the direction across each sample (central differences), so bends get mitered widths.
+        for (size_t i = 0; i < samples.size(); ++i)
+        {
+            const XMFLOAT2& p = samples[i > 0 ? i - 1 : i].point;
+            const XMFLOAT2& q = samples[i + 1 < samples.size() ? i + 1 : i].point;
+            float dx = q.x - p.x, dz = q.y - p.y;
+            const float length = std::hypot(dx, dz);
+            if (length < 1e-6f)
+            {
+                samples[i].side = i > 0 ? samples[i - 1].side : XMFLOAT2(1, 0);
+                continue;
+            }
+            dx /= length;
+            dz /= length;
+            samples[i].side = XMFLOAT2(-dz, dx);
+        }
+        return samples;
+    }
+
     bool PackageFrame(const std::string& sourceJson, double worldSize, std::string& crs, double& originX, double& originY,
         std::string& error)
     {

@@ -41,6 +41,24 @@ namespace Roads
     bool PackageFrame(const std::string& sourceJson, double worldSize, std::string& crs, double& originX, double& originY,
         std::string& error);
 
+    // Centerlines as the mesh and the terrain grading follow them.
+    constexpr int SmoothingPasses = 2;          // Corner cutting on each centerline before sampling it,
+    constexpr float SmoothingPiece = 3.0f;      // on pieces at most this long (meters), which bounds how far a bend
+                                                // moves: under 0.6 m at a right angle, 0.69 m at worst in Hungerford.
+    constexpr float SampleSpacing = 1.0f;       // Meters between samples along a line.
+
+    struct CenterlineSample
+    {
+        DirectX::XMFLOAT2 point;    // x, z.
+        DirectX::XMFLOAT2 side;     // Unit vector to the line's left (perpendicular to its direction).
+        float along;                // Meters from the line's start.
+    };
+
+    // A centerline split into pieces of at most SmoothingPiece meters, then corner-cut SmoothingPasses times (Chaikin).
+    std::vector<DirectX::XMFLOAT2> SmoothCenterline(const std::vector<DirectX::XMFLOAT2>& line);
+    // The smoothed centerline sampled evenly, about SampleSpacing apart, ends included, with sideways directions.
+    std::vector<CenterlineSample> SampleCenterline(const std::vector<DirectX::XMFLOAT2>& line);
+
     // Parses a roads file's text. Its CRS must be `crs`; coordinates become package coordinates about the origin.
     // Throws std::runtime_error naming the feature and property at fault.
     Network Parse(const std::string& text, const std::string& crs, double originX, double originY);
