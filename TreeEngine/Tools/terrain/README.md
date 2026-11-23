@@ -99,14 +99,27 @@ layers and OpenStreetMap's service ways, downloading them once into `--cache` (k
 
 ```bash
 python import_roads.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Game/Resources/Terrain/Hungerford.roads.geojson \
-    --cache E:/Source/Tree/Content/roads
+    --cache E:/Source/Tree/Content/roads --snap-heights Hungerford-ungraded.terrain
 ```
 
 It snaps each county centerline sideways onto the road bed in the package's heights (the flattest strip of the
 road's width within `--snap` meters, default 8, smoothed along the road; ends that met still meet), drops
 OpenStreetMap ways that duplicate a county road, and turns the rest into driveways whose road end is moved onto the
-nearest road when it's within 15 m. For Hungerford: 74 roads moved a median 1.0 m (90% under 3 m), and 124
-driveways, 99 of them joined to a road. Re-running keeps every feature whose `edited` is true.
+nearest road when it's within 15 m. A graded package's beds already follow the roads it was graded with, so snap to
+the same area imported without `--roads` (`--snap-heights`); then unedited roads come out as they were.
+
+Then it generates a driveway for every site address no driveway serves yet, from the road the address names to
+the house: the nearest OpenStreetMap building within 30 m (ending 5 m short of its center, toward the road), else the
+address point. It skips an address within 12 m of a road, a second unit of an address (or one within 8 m of
+another), one whose house is within 30 m of an existing driveway's end, and one whose straight path would cross a road
+or another driveway or run through water (heights at or below `--water-level`, default 1.9 m); when the named road's
+path is blocked it takes the nearest clear road. Generated driveways are straight lines from the road: a first draft
+to check over imagery. Where several houses lie past a road's end, their driveways fan out from it, where there is
+often a shared private lane to draw instead.
+
+For Hungerford: 74 roads moved a median 1.0 m (90% under 3 m); 123 OpenStreetMap driveways, 98 joined to a road;
+and 350 generated from 502 addresses (130 already served, 2 on a road, 1 a second unit, 19 blocked), a median 45 m
+long. Re-running keeps every feature whose `edited` is true.
 
 The roads file is GeoJSON in the package's CRS (its `crs` member names it, such as EPSG:32610), so QGIS opens it over
 aerial imagery for editing. Each feature's `properties`:
@@ -114,10 +127,10 @@ aerial imagery for editing. Each feature's `properties`:
 | Property | Features | Meaning |
 | --- | --- | --- |
 | `kind` | all | `road`, `driveway` or `prop` (props: planned; the engine skips them) |
-| `id` | all | stable id: `county-<road number or name>-<start x>-<start y>`, `osm-way-<id>` |
+| `id` | all | stable id: `county-<road number or name>-<start x>-<start y>`, `osm-way-<id>`, `address-<parcel>-<number>` |
 | `source` | all | `county`, `osm` or `generated` |
 | `edited` | all | true once changed by hand: the importer leaves it alone |
-| `name` | roads | street name, for signs |
+| `name` | lines | roads: street name, for signs; generated driveways: the address |
 | `surface` | lines | `paved` or `gravel` |
 | `owner` | roads | `county` or `private`; private roads stay plain gravel lanes |
 | `width`, `shoulder` | lines | meters: the traveled width, and the shoulder each side |
@@ -139,7 +152,7 @@ packing (Game/RoadGrading.h). Along each smoothed centerline the bed follows the
 a backslope up to the ground over the ditch's width. Without a ditch the bed blends back into the ground over 3 m.
 Where lines overlap, a traveled way wins (paved roads over gravel roads over driveways), else the nearest line. On
 side slopes the uphill ditch cuts into the hill and the downhill foreslope builds a small embankment. Hungerford:
-349,000 samples changed, by 0.11 m on average and under 0.8 m for 99% of them; 2.55 m cut and 1.94 m fill at most.
+571,000 samples changed (roads and all 473 driveways), by 0.11 m on average and under 0.75 m for 99% of them; 3.10 m cut and 2.26 m fill at most.
 Grading works from the imported heights, so after editing roads, import the package again rather than re-grading a
 graded one.
 
