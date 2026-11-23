@@ -107,6 +107,16 @@ pair = generate([address(20, 60, 'A ST', '1'), address(60, 30, 'A ST', '2')], se
 check(all(not roads.segments_cross(d['line'][0], d['line'][1], (70.0, 0.0), (10.0, 80.0)) for d in pair)
       and all(not roads.segments_cross(a['line'][0], a['line'][1], b['line'][0], b['line'][1]) for a in pair for b in pair),
       f'driveways cross: {pair}')
+# A crossing exactly through another road's vertex counts: B runs through (50, 50) as a vertex, the house at
+# (50, 100) names A (y = 0), so it must take B instead of crossing it.
+vertex_roads = [('A ST', [(0.0, 0.0), (100.0, 0.0)]), ('B ST', [(0.0, 50.0), (50.0, 50.0), (100.0, 50.0)])]
+through = roads.build_generated_driveways(Ground(), [address(50, 100, 'A ST')], [], vertex_roads, [], 1.0, [])
+check(len(through) == 1 and close(through[0]['line'][0], (50, 50)), f'a driveway crossed a road through its vertex: {through}')
+# An address whose driveway was edited (kept by id) is left alone, and can't serve or block a neighbor: the kept
+# driveway ends 90 m away, so the neighbor 25 m from the address still gets its own.
+kept = roads.build_generated_driveways(Ground(), [address(50, 60, 'A ST', '1', '1'), address(75, 60, 'A ST', '2', '2')],
+                                       [], roads_ab, [[(50.0, 0.0), (50.0, 150.0)]], 1.0, [], kept_ids={'address-1-1'})
+check(len(kept) == 1 and kept[0]['id'] == 'address-2-2', f'an edited address affected generation: {kept}')
 # Across water: the only road beyond the pond is skipped.
 pond = roads.build_generated_driveways(Ground(), [address(30, 190, 'D ST')], [],
                                        [('D ST', [(0.0, 120.0), (60.0, 120.0)])], [], 1.0, [])

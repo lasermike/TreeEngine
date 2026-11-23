@@ -460,16 +460,40 @@ def segments_cross(a, b, c, d):
     return d1 * d2 < 0 and d3 * d4 < 0
 
 
+def touches_interior(a, b, point, tolerance=0.01):
+    """Whether `point` lies on segment ab away from its ends."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length2 = dx * dx + dy * dy
+    if length2 == 0:
+        return False
+    t = ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / length2
+    margin = tolerance / math.sqrt(length2)
+    if t <= margin or t >= 1 - margin:
+        return False
+    return math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dy) <= tolerance
+
+
 def crosses_any(a, b, lines, skip=None):
-    return any(segments_cross(a, b, p, q) for line in lines if line is not skip for p, q in zip(line, line[1:]))
+    """Whether segment ab crosses any of the lines (but `skip`): through a segment, or through one of a line's
+    vertices on ab's interior (which a strict crossing test misses). ab's own ends may touch them."""
+    for line in lines:
+        if line is skip:
+            continue
+        if any(segments_cross(a, b, p, q) for p, q in zip(line, line[1:])):
+            return True
+        if any(touches_interior(a, b, vertex) for vertex in line):
+            return True
+    return False
 
 
-def build_generated_driveways(package, addresses, buildings, named_roads, served, water_level, report):
+def build_generated_driveways(package, addresses, buildings, named_roads, served, water_level, report, kept_ids=()):
     """Driveways for site addresses no driveway serves yet: from the road the address names (else the nearest road)
     straight to the house (the nearest building within 30 m, else the address point). `named_roads` are
     (name, line) pairs as they will be written, `served` the driveway lines already there. Skips an address
     within 12 m of a road, within 8 m of one already handled, within 30 m of a served driveway's house end, or whose
-    straight path would cross another road or driveway or pass through water (heights at or below `water_level`)."""
+    straight path would cross another road or driveway or pass through water (heights at or below `water_level`).
+    An address whose driveway id is in `kept_ids` (edited by hand, already among `served`) is left alone before it
+    can affect any other."""
     lines = [line for _, line in named_roads]
     driveway_lines = [list(line) for line in served]
     house_ends = [line[-1] for line in served]
@@ -478,7 +502,8 @@ def build_generated_driveways(package, addresses, buildings, named_roads, served
         if len(outline) >= 3:
             centers.append((sum(p[0] for p in outline) / len(outline), sum(p[1] for p in outline) / len(outline)))
     driveways, handled, keys, ids = [], [], set(), set()
-    counts = {'served': 0, 'on a road': 0, 'duplicate': 0, 'crossing a road, a driveway or water': 0, 'no road': 0}
+    counts = {'edited': 0, 'served': 0, 'on a road': 0, 'duplicate': 0, 'crossing a road, a driveway or water': 0,
+              'no road': 0}
     for address in addresses:
         props = address.get('properties') or {}
         geometry = address.get('geometry') or {}
@@ -486,6 +511,14 @@ def build_generated_driveways(package, addresses, buildings, named_roads, served
             continue
         point = tuple(geometry['coordinates'][:2])
         if not package.contains(*point):
+            continue
+        label = props.get('PIN') or f'{point[0]:.0f}-{point[1]:.0f}'
+        number = props.get('STREETNUMB') or ''
+        base_id = f'address-{label}' + (f'-{number}' if number else '')
+        if base_id in kept_ids:
+            counts['edited'] += 1
+            handled.append(point)
+            keys.add((props.get('PIN'), props.get('STREETNUMB')))
             continue
         # Units of one address (same parcel and number) share its driveway, as do addresses within 8 m.
         unit_key = (props.get('PIN'), props.get('STREETNUMB'))
@@ -528,10 +561,8 @@ def build_generated_driveways(package, addresses, buildings, named_roads, served
         # End short of the building's center, toward the road: its front.
         if house is not point and distance > 10:
             house = (house[0] + (at[0] - house[0]) * 5 / distance, house[1] + (at[1] - house[1]) * 5 / distance)
-        label = props.get('PIN') or f'{point[0]:.0f}-{point[1]:.0f}'
-        number = props.get('STREETNUMB') or ''
-        driveway_id = f'address-{label}' + (f'-{number}' if number else '')
-        while driveway_id in ids:
+        driveway_id = base_id
+        while driveway_id in ids or driveway_id in kept_ids:
             driveway_id += '+'
         ids.add(driveway_id)
         driveway_lines.append([at, house])
@@ -601,7 +632,8 @@ def main():
     driveways = build_driveways(package, osm_ways(args.cache, package), road_lines, report)
     served += [d['line'] for d in driveways if d['id'] not in kept_ids]
     buildings = osm_ways(args.cache, package, '["building"]', 'osm-buildings')
-    generated = build_generated_driveways(package, addresses, buildings, named_roads, served, args.water_level, report)
+    generated = build_generated_driveways(package, addresses, buildings, named_roads, served, args.water_level, report,
+                                          kept_ids)
     features = list(kept)
     features += [feature('road', r, 'county') for r in roads if r['id'] not in kept_ids]
     features += [feature('driveway', d, 'osm') for d in driveways if d['id'] not in kept_ids]
