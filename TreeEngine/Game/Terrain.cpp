@@ -2,6 +2,7 @@
 #include "Terrain.h"
 #include "GltfLoader.h"
 #include "RenderManager.h"
+#include "SignText.h"
 
 #include <algorithm>
 #include <fstream>
@@ -87,6 +88,22 @@ void Terrain::PlaceProps()
         XMFLOAT4X4 world;
         XMStoreFloat4x4(&world, XMMatrixRotationY(XMConvertToRadians(prop.heading)) * XMMatrixTranslation(x, y, z));
         m_propWorlds[model].push_back(world);
+        if (prop.model == Roads::PropModel::StreetNameSign)
+        {
+            // "LOWER|UPPER": the lower blade names the road it runs along, the upper the other (one name: both).
+            const size_t bar = prop.text.find('|');
+            const std::string names[2] = { prop.text.substr(0, bar),
+                bar == std::string::npos ? prop.text : prop.text.substr(bar + 1) };
+            std::array<UINT, 2> blades = {};
+            for (int b = 0; b < 2; ++b)
+            {
+                const auto found = std::find(m_signNames.begin(), m_signNames.end(), names[b]);
+                blades[b] = static_cast<UINT>(found - m_signNames.begin());
+                if (found == m_signNames.end())
+                    m_signNames.push_back(names[b]);
+            }
+            m_signBlades.push_back(blades);
+        }
     }
     for (size_t model = 0; model < PropModels; ++model)
     {
@@ -108,8 +125,31 @@ void Terrain::PlaceProps()
             }
             batch->transforms.push_back(part.transform);
             m_propInstances += static_cast<UINT>(m_propWorlds[model].size());
+            if (model == static_cast<size_t>(Roads::PropModel::StreetNameSign))
+            {
+                const std::string& material = Params().propModels[model]->materials[part.materialIndex].name;
+                // A blade's faces and edges stretch with its name; other materials (a bracket, say) stay as made.
+                batch->blade = SignText::BladeMaterial(material, batch->face);
+            }
         }
     }
+    BuildSignText();
+}
+
+// The street names drawn into an atlas texture (a BMP in memory, for the texture loader), a cell per name.
+void Terrain::BuildSignText()
+{
+    if (m_signNames.empty())
+        return;
+    const SignText::Atlas atlas = SignText::Build(m_signNames);
+    m_signRegions = atlas.regions;
+    for (const std::string& name : m_signNames)
+        m_signStretch.push_back(SignText::BladeLength(name) / SignText::ModelBladeLength);
+    m_signTexture = std::make_shared<GltfTextureSource>();
+    m_signTexture->encodedData = atlas.Bmp();
+    m_signTexture->mimeType = "image/bmp";
+    m_signTexture->colorSpace = 2;      // sRGB.
+    m_signTexture->origin = GltfTextureSource::Origin::DataUri;
 }
 
 // The centerlines draped on the terrain, every 4 m and half a meter up so they clear the road bed: paved roads
@@ -328,6 +368,19 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
             state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
         }
         ShaderMaterial shaderMaterial = imported.shaderMaterial;
+        std::wstring materialName = assetName + L"#material" + std::to_wstring(batch.material);
+        if (batch.face && m_signTexture)
+        {
+            // A street-name blade's face: white times the names atlas, each sign's cell chosen by its instance's
+            // atlas region (ComputeConstants).
+            texture = m_signTexture.get();
+            m_signTexture->key = L"terrain" + std::to_wstring(_id) + L"#sign-names";
+            shaderMaterial.Diffuse = XMFLOAT4(1, 1, 1, 1);
+            shaderMaterial.Ambient = XMFLOAT4(0.15f, 0.15f, 0.15f, 1);
+            shaderMaterial.flags.y = 1;
+            state.samplerState = StockSamplerStates::MinMagMipLinearUVWClamp;
+            materialName = m_signTexture->key + std::to_wstring(batch.blade);
+        }
         const std::pair<int, MaterialTextureRole> maps[] = {
             { imported.specularTextureIndex, SpecularStrengthTextureRole },
             { imported.metallicRoughnessTextureIndex, MetallicRoughnessTextureRole },
@@ -337,7 +390,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
             if (map.first >= 0)
                 HRR(renderManager.BindMaterialTexture(asset.textures[map.first], map.second, shaderMaterial));
         Material* material = nullptr;
-        HRR(renderManager.CreateMaterial((assetName + L"#material" + std::to_wstring(batch.material)).c_str(), texture,
+        HRR(renderManager.CreateMaterial(materialName.c_str(), texture,
             nullptr, nullptr, nullptr, nullptr, shaderMaterial, state, &material));
         Mesh* mesh = nullptr;
         HRR(renderManager.CreateMesh((assetName + L"#primitive" + std::to_wstring(batch.primitive)).c_str(),
@@ -567,6 +620,7 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
     }
     // Props: each batch an instance per part per prop of its model, the part's transform then the prop's.
     UINT slot = instance + 1 + RoadParts();
+    const UINT regions = slot + PropInstances();
     for (const PropBatch& batch : m_propBatches)
     {
         const auto& worlds = m_propWorlds[batch.model];
@@ -577,15 +631,38 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
             for (const XMFLOAT4X4& world : worlds)
             {
                 InstancedData& propData = frame->GetRenderData().instanceData[slot];
-                XMStoreFloat4x4(&propData.World, part * XMLoadFloat4x4(&world));
+                // A blade face shows its sign's name (one plus the slot holding that name's atlas region), on a
+                // blade stretched along its length (the model's x for the lower one, z for the upper) to fit it.
+                const size_t sign = static_cast<size_t>(&world - worlds.data());
+                const bool named = batch.blade >= 0 && sign < m_signBlades.size() && SignNames();
+                XMMATRIX stretch = XMMatrixIdentity();
+                if (named)
+                {
+                    const float s = m_signStretch[m_signBlades[sign][batch.blade]];
+                    stretch = batch.blade == 0 ? XMMatrixScaling(s, 1, 1) : XMMatrixScaling(1, 1, s);
+                }
+                XMStoreFloat4x4(&propData.World, part * stretch * XMLoadFloat4x4(&world));
                 propData.InstanceOffset = propData.InstanceOffsetPrev = slot;
-                propData.AtlasRegion = 0;
+                propData.AtlasRegion = named && batch.face ? 1 + regions + m_signBlades[sign][batch.blade] : 0;
                 propData.PreviousSlot = slot;
                 ++slot;
             }
         }
         if (batch.renderUnit)
             HRR(frame->SetInstances(batch.renderUnit, this, first, slot - first));
+    }
+    // The street names' atlas regions, a slot each (World row 0: u offset, v offset, u scale, v scale).
+    for (UINT n = 0; n < SignNames(); ++n)
+    {
+        InstancedData& regionData = frame->GetRenderData().instanceData[regions + n];
+        XMStoreFloat4x4(&regionData.World, XMMatrixIdentity());
+        regionData.World._11 = m_signRegions[n].x;
+        regionData.World._12 = m_signRegions[n].y;
+        regionData.World._13 = m_signRegions[n].z;
+        regionData.World._14 = m_signRegions[n].w;
+        regionData.InstanceOffset = regionData.InstanceOffsetPrev = regions + n;
+        regionData.AtlasRegion = 0;
+        regionData.PreviousSlot = regions + n;
     }
     m_selected.clear();
     m_loadedThisFrame = m_missing = 0;

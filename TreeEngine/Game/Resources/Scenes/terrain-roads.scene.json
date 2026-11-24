@@ -5,13 +5,13 @@
   "name": "Terrain - roads and roadside props (256 m of Hungerford)",
   "camera": {
     "position": [
-      14,
-      28.4,
-      -11
+      2.5,
+      28.3,
+      6.5
     ],
     "rotationDegrees": [
-      5,
-      -39,
+      3,
+      150,
       0
     ]
   },

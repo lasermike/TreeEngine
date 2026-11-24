@@ -595,6 +595,12 @@ def summary(output, features):
     return f'wrote {output}: {kinds.count("road")} roads, {kinds.count("driveway")} driveways ({generated} generated)'
 
 
+def kept_features(features):
+    """The existing file's features a re-run keeps as they are: those edited by hand, and removed markers (which
+    keep their ids from being imported or generated again)."""
+    return [f for f in features if (f.get('properties') or {}).get('edited') or (f.get('properties') or {}).get('removed')]
+
+
 def write_collection(path, header, features):
     """Writes a roads file: the header members (type, name, crs, treeRoads) one per line, then one feature per line,
     so a diff shows each changed feature."""
@@ -644,18 +650,14 @@ def main():
 
     # Features edited by hand replace their imported versions, so driveways snap to and dedupe against the roads
     # as they will be written.
-    kept, kept_ids = [], set()
-    if os.path.exists(args.output):
-        for f in json.load(open(args.output)).get('features', []):
-            if f.get('properties', {}).get('edited'):
-                kept.append(f)
-                kept_ids.add(f['properties'].get('id'))
+    kept = kept_features(json.load(open(args.output)).get('features', [])) if os.path.exists(args.output) else []
+    kept_ids = {f['properties'].get('id') for f in kept}
     named_roads = [(r['name'], r['line']) for r in roads if r['id'] not in kept_ids]
     served = []
     for f in kept:
         geometry = f.get('geometry') or {}
-        if geometry.get('type') not in ('LineString', 'MultiLineString'):
-            continue
+        if geometry.get('type') not in ('LineString', 'MultiLineString') or f['properties'].get('removed'):
+            continue        # A removed marker only keeps its id from being imported again.
         lines = geometry['coordinates'] if geometry['type'] == 'MultiLineString' else [geometry['coordinates']]
         lines = [[(p[0], p[1]) for p in line] for line in lines if len(line) >= 2]
         if f['properties'].get('kind') == 'road':

@@ -130,6 +130,7 @@ aerial imagery for editing. Each feature's `properties`:
 | `id` | all | stable id: `county-<road number or name>-<start x>-<start y>`, `osm-way-<id>`, `address-<parcel>-<number>`, `prop-<model>-...` |
 | `source` | all | `county`, `osm`, `generated`, or `manual` (drawn by hand) |
 | `edited` | all | true once changed by hand: the importer leaves it alone |
+| `removed` | all | true: deleted by hand. The engine skips it; imports and prop placement don't make it again |
 | `name` | lines | roads: street name, for signs; generated driveways: the address |
 | `surface` | lines | `paved` or `gravel` |
 | `owner` | roads | `county` or `private`; private roads stay plain gravel lanes |
@@ -169,8 +170,13 @@ room"). Hungerford: 27 street-name signs, 15 stop signs and 465 mailboxes (8 Ope
 prop in QGIS and marking it `edited` keeps it there; a point you add becomes a prop (set its `prop` and `heading`).
 `python -I -B test_road_props.py` checks the rules. The models are `Game/Resources/Models/Roadside/<prop>.glb`, from
 `make_road_props.py` (meters, y up, the origin at the foot of the post, the front facing glTF -z): replace one with any
-glTF of the same name. A model that isn't installed draws none of its props; the scene still loads. Street names on
-the blades come later; the blades are blank.
+glTF of the same name. A model that isn't installed draws none of its props; the scene still loads.
+
+Street-name signs show their `text`: the engine draws each name (upper case, in a stroke font of its own: letters,
+digits and `. - ' / &`) white on green with a white border into a texture when the roads load, and maps it on the
+blade faces (the model's `sign-blade-lower` and `sign-blade-upper` materials, UV-mapped 0 to 1 as seen from each
+side). Letters are 0.1 m tall; a blade grows from the model's 0.9 m to fit its name, up to 1.2 m, and a longer name is
+squeezed to fit that (Game/SignText.h). Editing a sign's `text` in QGIS changes it at the next load.
 
 The render suite's `terrain-roads` scene draws `RoadsTest.terrain`: 256 m of Hungerford around the E Scott Dr and
 E Benson Loop intersection, imported like Hungerford but with `--crs EPSG:32610 --bounds 504346.2248 5228427.0807
@@ -191,9 +197,11 @@ python finish_road_edits.py ../../Game/Resources/Terrain/Hungerford.roads.geojso
 It compares the saved file with its last commit and marks every changed or new feature `edited`, fills in a new
 driveway's id (`manual-<x>-<y>`), source `manual`, gravel and 3 m width, snaps a changed line's first point onto the
 nearest line within 6 m when QGIS missed it, and restores one feature per line with unchanged features exactly as
-before (QGIS rewrites every coordinate), so the diff shows just the edits. It reports deletions and real crossings.
-Then re-import the package with `--roads` (below) and rebuild. Don't run `import_roads.py` after deleting a feature
-by hand: it would bring back a deleted import. `python -I -B test_finish_road_edits.py` checks it.
+before (QGIS rewrites every coordinate), so the diff shows just the edits. A deleted imported or generated feature
+(a county road, an OpenStreetMap or generated driveway, a generated prop) stays in the file as a removed marker
+(`removed: true`, `edited: true`), so a later `import_roads.py` or prop placement leaves it out; a deleted hand-drawn
+one just goes. It places the props again for the edited lines, and reports deletions and real crossings. Then
+re-import the package with `--roads` (below) and rebuild. `python -I -B test_finish_road_edits.py` checks it.
 
 **Grading.** `import_heightmap.py --roads FILE` (TerrainTool `pack --roads`) grades the roads into the heights before
 packing (Game/RoadGrading.h). Along each smoothed centerline the bed follows the ground's running median and mean
