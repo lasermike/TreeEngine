@@ -152,8 +152,9 @@ joins) on synthetic data.
 **Props.** `road_props.py` places mailboxes and signs from the lines (`import_roads.py` and `finish_road_edits.py`
 run it; `python road_props.py FILE` runs it alone), replacing the generated props that weren't edited:
 
-- a street-name sign at each intersection of differently named roads, private roads included, on the right corner
-  of the lowest-ranked road's approach, its lower blade along the highest-ranked road;
+- a street-name sign at each intersection of differently named roads (where one ends on another, or where they
+  cross), private roads included, on the right corner of the lowest-ranked road's approach, facing square to the
+  highest-ranked road so its lower blade runs along it;
 - a stop sign on each approach of a county road that yields: it ends or crosses at a higher-ranked road (county over
   private, then functional class, speed limit, paved over gravel), or ends (a T) at one of its rank or higher that
   carries on through. Private roads and driveways get none. The county splits roads where they meet, so a road
@@ -162,11 +163,14 @@ run it; `python road_props.py FILE` runs it alone), replacing the generated prop
   driveway's side, 2.5 m past it in the direction of travel, the door to the road. Driveways sharing a mouth line
   their mailboxes up.
 
-Hungerford: 24 street-name signs, 15 stop signs and 465 mailboxes (8 OpenStreetMap driveways reach no road). Moving a
+A sign's post stands at least 0.5 m off every road's shoulder: where roads meet at a sharp angle it moves further back
+along the approach or further out, and where no spot within 15 m is clear it's left out and counted ("sign without
+room"). Hungerford: 25 street-name signs, 15 stop signs and 465 mailboxes (8 OpenStreetMap driveways reach no road). Moving a
 prop in QGIS and marking it `edited` keeps it there; a point you add becomes a prop (set its `prop` and `heading`).
 `python -I -B test_road_props.py` checks the rules. The models are `Game/Resources/Models/Roadside/<prop>.glb`, from
 `make_road_props.py` (meters, y up, the origin at the foot of the post, the front facing glTF -z): replace one with any
-glTF of the same name. Street names on the blades come later; the blades are blank.
+glTF of the same name. A model that isn't installed draws none of its props; the scene still loads. Street names on
+the blades come later; the blades are blank.
 
 The render suite's `terrain-roads` scene draws `RoadsTest.terrain`: 256 m of Hungerford around the E Scott Dr and
 E Benson Loop intersection, imported like Hungerford but with `--crs EPSG:32610 --bounds 504346.2248 5228427.0807

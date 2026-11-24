@@ -90,6 +90,53 @@ out, counts = props.place_props(branching)
 check(any(f['properties']['id'] == 'prop-mailbox-target' for f in out),
       f'a driveway through a dead-end branch got no mailbox: {counts}')
 
+# Two roads crossing at a shared middle vertex, neither split there: a street-name sign, and stops on both arms of
+# the lower-ranked one.
+fast = dict(county, speedLimit=45)
+crossing = [line('road', 'a', [[-100.0, 0.0], [0.0, 0.0], [100.0, 0.0]], name='A ST', **fast),
+            line('road', 'h', [[0.0, -100.0], [0.0, 0.0], [0.0, 100.0]], name='H ST', **county)]
+out, counts = props.place_props(crossing)
+check(counts['street-name-sign'] == 1 and counts['stop-sign'] == 2, f'an unsplit crossing: {counts}')
+
+# Three roads at a point with a narrow wedge between two of them: every sign placed stands clear of every road
+# (none falls back into a lane); where there's no room, none is placed and it's counted.
+narrow = dict(county, shoulder=0.0)
+wedge = [line('road', 'a', [[-100.0, 0.0], [100.0, 0.0]], name='A ST', **dict(narrow, speedLimit=45)),
+         line('road', 'n', [[0.0, 0.0], [0.0, 100.0]], name='N ST', **narrow),
+         line('road', 'w', [[0.0, 0.0], [-26.0, 97.0]], name='W ST', **narrow)]
+out, counts = props.place_props(wedge)
+wedge_lines = [(f['properties'], [tuple(p) for p in f['geometry']['coordinates']]) for f in wedge]
+for sign in placed(out, 'stop-sign') + placed(out, 'street-name-sign'):
+    point = tuple(sign['geometry']['coordinates'])
+    check(all(props.nearest(point, l)[0] >= props.reach(p) + 0.45 for p, l in wedge_lines),
+          f"a sign stands in a lane at a narrow wedge: {sign['properties']['id']} at {point}")
+check(counts['stop-sign'] + counts['street-name-sign'] + counts.get('sign without room', 0) >= 2, f'wedge counts: {counts}')
+
+# A driveway that a lane ends on the middle of (a T) finds the road through the lane.
+tee = [line('road', 'a', [[-100.0, 0.0], [100.0, 0.0]], name='A ST', **county),
+       line('driveway', 'lane3', [[0.0, 0.0], [0.0, 20.0]]),
+       line('driveway', 'across', [[-20.0, 20.0], [20.0, 20.0]])]
+out, counts = props.place_props(tee)
+check(counts['mailbox'] == 2 and counts['mailbox without a road'] == 0, f'a T-joined driveway lost its mailbox: {counts}')
+
+# Many driveways meeting at one point far from any road: each search visits each driveway once, so the work stays
+# small (it grew with every path through them before).
+calls = [0]
+original = props.nearest
+
+
+def counting(point, line_):
+    calls[0] += 1
+    return original(point, line_)
+
+
+props.nearest = counting
+fan = [line('road', 'far', [[1000.0, 1000.0], [1100.0, 1000.0]], name='FAR RD', **county)]
+fan += [line('driveway', f'fan-{k}', [[0.0, 0.0], [30 * math.cos(k), 30 * math.sin(k)]]) for k in range(9)]
+out, counts = props.place_props(fan)
+props.nearest = original
+check(counts['mailbox without a road'] == 9 and calls[0] < 400, f'a disconnected fan took {calls[0]} nearest-line calls')
+
 # A road piece meeting another piece of itself (a bend split in two) is no intersection.
 bend = [line('road', 'd1', [[0.0, 0.0], [50.0, 0.0]], name='D RD', **county),
         line('road', 'd2', [[50.0, 0.0], [50.0, 50.0]], name='D RD', **county)]

@@ -5,6 +5,7 @@
 #include "RoadMesh.h"
 #include <array>
 #include <condition_variable>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -47,8 +48,10 @@ public:
     // The road surfaces' materials and maps, one per Roads::Part (asphalt, gravel, yellow and white markings).
     std::vector<ShaderMaterial> roadMaterials;
     std::vector<MaterialTextureSources> roadMaterialTextures;
-    // The roadside prop models by Roads::PropModel (Models/Roadside/<name>.glb); a null one draws nothing.
-    std::array<std::shared_ptr<GltfAsset>, static_cast<size_t>(Roads::PropModel::Count)> propModels;
+    // Loads a roadside prop model (Models/Roadside/<name>.glb), asked once for each model the roads file's props
+    // use; null (or a null result, for a model that isn't installed) draws none of that model's props.
+    std::function<std::shared_ptr<GltfAsset>(Roads::PropModel)> loadPropModel;
+    std::array<std::shared_ptr<GltfAsset>, static_cast<size_t>(Roads::PropModel::Count)> propModels;   // As loaded.
     float lodRange = 2.0f;          // A node splits within lodRange x its size of the camera.
     UINT slots = 512;               // Vertex pool size, in nodes.
 };
@@ -84,6 +87,8 @@ public:
     unsigned int GetMaxDrawnInstances() override { return Params().slots + RoadParts() + PropInstances(); }
     // The props drawn of a model (Roads::PropModel), for tests.
     UINT PropCount(Roads::PropModel model) const { return static_cast<UINT>(m_propWorlds[static_cast<size_t>(model)].size()); }
+    // Props left out because their model isn't installed.
+    UINT PropsWithoutModel() const { return m_propsWithoutModel; }
 
     // The terrain's height at world (x, z) from the package's finest level, bilinear between samples; false outside
     // the terrain or when the block can't be read. Reads the package (not thread safe with itself).
@@ -165,6 +170,7 @@ private:
     };
     std::vector<PropBatch> m_propBatches;
     UINT m_propInstances = 0;
+    UINT m_propsWithoutModel = 0;
     UINT PropInstances() const { return m_propInstances; }
     void PlaceProps();
     std::vector<DebugPolyline> m_roadOverlay;   // Built on first use: the centerlines on the ground, in world space.

@@ -61,15 +61,25 @@ void Terrain::LoadRoads(const std::wstring& file)
 }
 
 // Each prop stands on the ground at its point (the package's finest heights), turned to its heading: its model's
-// front (+z) faces that many degrees clockwise from north. Props off the terrain, or whose model is missing, are
-// left out.
+// front (+z) faces that many degrees clockwise from north. Each model in use loads once; props off the terrain, or
+// whose model isn't installed, are left out.
 void Terrain::PlaceProps()
 {
+    std::array<bool, PropModels> asked = {};
     for (const Roads::Prop& prop : m_roads.props)
     {
         const size_t model = static_cast<size_t>(prop.model);
+        if (!asked[model])
+        {
+            asked[model] = true;
+            if (!Params().propModels[model] && Params().loadPropModel)
+                Params().propModels[model] = Params().loadPropModel(prop.model);
+        }
         if (!Params().propModels[model])
+        {
+            ++m_propsWithoutModel;
             continue;
+        }
         const float x = prop.point.x + m_offset.x, z = prop.point.y + m_offset.z;
         float y = 0;
         if (!HeightAt(x, z, y))

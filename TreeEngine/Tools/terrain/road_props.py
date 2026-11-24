@@ -29,6 +29,7 @@ MEETS = 4.0         # meters: a road this close to an intersection's center is o
 APPROACH = 15.0     # meters back along a road to find which way it approaches
 SIGN_SETBACK = 1.5  # meters beyond a road's shoulder for a sign's post
 STOP_BEHIND = 2.5   # meters further back along the approach for a stop sign than for a street-name sign
+CLEARANCE = 0.5     # meters a sign post stands off the edge of any road's shoulder
 MAILBOX_ALONG = 2.5     # meters along the road from the driveway's center to the first mailbox
 MAILBOX_SPACING = 0.45  # meters between mailboxes at one mouth
 MAILBOX_SETBACK = 0.35  # meters beyond the shoulder's edge to the mailbox post
@@ -113,6 +114,12 @@ def intersections(roads):
                 d, at, _ = nearest(end, other.line)
                 if d <= JOIN:
                     points.append(at)
+    # Roads crossing where neither ends (an unsplit four-way).
+    boxes = [bounds(road.line) for road in roads]
+    for a in range(len(roads)):
+        for b in range(a + 1, len(roads)):
+            if overlaps(boxes[a], boxes[b]):
+                points += crossings(roads[a].line, roads[b].line)
     clusters = []
     for p in points:
         for c in clusters:
@@ -144,6 +151,30 @@ def intersections(roads):
     return result
 
 
+def bounds(line, margin=JOIN):
+    xs, ys = [p[0] for p in line], [p[1] for p in line]
+    return (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
+
+
+def overlaps(a, b):
+    return a[0] <= b[2] and b[0] <= a[2] and a[1] <= b[3] and b[1] <= a[3]
+
+
+def crossings(a, b):
+    """Where polylines a and b cross or touch, vertices included."""
+    found = []
+    for p, q in zip(a, a[1:]):
+        for s, t in zip(b, b[1:]):
+            d = (q[0] - p[0]) * (t[1] - s[1]) - (q[1] - p[1]) * (t[0] - s[0])
+            if abs(d) < 1e-12:
+                continue
+            u = ((s[0] - p[0]) * (t[1] - s[1]) - (s[1] - p[1]) * (t[0] - s[0])) / d
+            v = ((s[0] - p[0]) * (q[1] - p[1]) - (s[1] - p[1]) * (q[0] - p[0])) / d
+            if -1e-9 <= u <= 1 + 1e-9 and -1e-9 <= v <= 1 + 1e-9:
+                found.append((p[0] + u * (q[0] - p[0]), p[1] + u * (q[1] - p[1])))
+    return found
+
+
 def along_line(line, point):
     best, total, where = math.inf, 0.0, 0.0
     for a, b in zip(line, line[1:]):
@@ -157,19 +188,25 @@ def along_line(line, point):
     return where
 
 
+def clear(point, roads):
+    """Whether a post at the point stands off every road's traveled way and shoulder."""
+    return all(nearest(point, other.line)[0] >= reach(other.props) + CLEARANCE for other in roads)
+
+
 def corner(center, approach, road, major, roads, back_extra=0.0):
-    """A post on the right of an approach (direction of travel toward the center), back from the major road's edge,
-    and further back, a meter at a time, until it's clear of every road (where roads meet at a sharp angle)."""
+    """A post on the right of an approach (direction of travel toward the center), back from the major road's edge:
+    where roads meet at a sharp angle, the nearest spot further back (a meter at a time, up to APPROACH) or further
+    out from the road (up to 3 m) that's clear of every road; None when there's none."""
     dx, dy = approach
     right = (dy, -dx)
     side = reach(road.props) + SIGN_SETBACK
     back = reach(major.props) + SIGN_SETBACK + back_extra
-    for _ in range(int(APPROACH)):
-        point = (center[0] - dx * back + right[0] * side, center[1] - dy * back + right[1] * side)
-        if all(nearest(point, other.line)[0] >= reach(other.props) + 0.5 for other in roads):
-            break
-        back += 1.0
-    return point
+    for extra in sorted(((b, o) for b in range(int(APPROACH)) for o in range(4)), key=lambda e: e[0] + e[1]):
+        point = (center[0] - dx * (back + extra[0]) + right[0] * (side + extra[1]),
+                 center[1] - dy * (back + extra[0]) + right[1] * (side + extra[1]))
+        if clear(point, roads):
+            return point
+    return None
 
 
 def prop(kind, pid, point, facing, text=''):
@@ -202,9 +239,12 @@ def signs(roads, counts):
             # minor road's oncoming traffic.
             _, _, (mx, my) = nearest(center, major_road.line)
             facing = (my, -mx) if my * -approach[0] - mx * -approach[1] >= 0 else (-my, mx)
-            out.append(prop('street-name-sign', f'prop-street-{key}', corner(center, approach, road, major_road, roads),
-                            heading(*facing), f'{major}|{minor}'))
-            counts['street-name-sign'] += 1
+            point = corner(center, approach, road, major_road, roads)
+            if point is None:
+                counts['sign without room'] += 1
+            else:
+                out.append(prop('street-name-sign', f'prop-street-{key}', point, heading(*facing), f'{major}|{minor}'))
+                counts['street-name-sign'] += 1
         for name, arms in groups.items():
             if name == major:
                 continue
@@ -215,8 +255,11 @@ def signs(roads, counts):
             for road, approach in arms:
                 if road.props.get('owner') != 'county':
                     continue
-                out.append(prop('stop-sign', f'prop-stop-{key}-{heading(*approach):.0f}',
-                                corner(center, approach, road, major_road, roads, STOP_BEHIND),
+                point = corner(center, approach, road, major_road, roads, STOP_BEHIND)
+                if point is None:
+                    counts['sign without room'] += 1
+                    continue
+                out.append(prop('stop-sign', f'prop-stop-{key}-{heading(*approach):.0f}', point,
                                 heading(-approach[0], -approach[1])))
                 counts['stop-sign'] += 1
     return out
@@ -226,25 +269,42 @@ def mailboxes(roads, driveways, counts):
     """One per driveway, at its mouth on a road (following lanes it branches from)."""
     mouths = {}     # (road index, rounded point) -> [(driveway props, mouth, road direction, side)]
 
-    def mouth_of(line, seen):
+    # Each driveway's road end, if it has one, and which driveways meet it (an end of either on the other).
+    road_end = []
+    for props, line in driveways:
+        found = None
         for end in (line[0], line[-1]):
             best = min(((nearest(end, r.line), i) for i, r in enumerate(roads)), key=lambda x: x[0][0], default=None)
             if best and best[0][0] <= JOIN:
                 (_, at, direction), i = best
-                inward = line[1] if end is line[0] else line[-2]
-                return i, at, direction, inward
-        for end in (line[0], line[-1]):
-            for j, (_, other) in enumerate(driveways):
-                if j in seen or other is line:
-                    continue
-                if nearest(end, other)[0] <= JOIN:
-                    found = mouth_of(other, seen | {j})
-                    if found:       # Else a dead end: try the other connections.
-                        return found
+                found = (i, at, direction, line[1] if end is line[0] else line[-2])
+                break
+        road_end.append(found)
+    boxes = [bounds(line) for _, line in driveways]
+    meets = [[] for _ in driveways]
+    for a, (_, la) in enumerate(driveways):
+        for b in range(a + 1, len(driveways)):
+            lb = driveways[b][1]
+            if overlaps(boxes[a], boxes[b]) and (any(nearest(e, lb)[0] <= JOIN for e in (la[0], la[-1]))
+                                                 or any(nearest(e, la)[0] <= JOIN for e in (lb[0], lb[-1]))):
+                meets[a].append(b)
+                meets[b].append(a)
+
+    def mouth_of(start):
+        """The road end nearest in hops along the driveways joined to this one, visiting each once."""
+        queue, visited = [start], {start}
+        while queue:
+            k = queue.pop(0)
+            if road_end[k]:
+                return road_end[k]
+            for m in meets[k]:
+                if m not in visited:
+                    visited.add(m)
+                    queue.append(m)
         return None
 
     for j, (props, line) in enumerate(driveways):
-        found = mouth_of(line, {j})
+        found = mouth_of(j)
         if not found:
             counts['mailbox without a road'] += 1
             continue
@@ -282,7 +342,7 @@ def place_props(features):
                 roads.append(Road(props, line))
             elif props.get('kind') == 'driveway':
                 driveways.append((props, line))
-    counts = {'street-name-sign': 0, 'stop-sign': 0, 'mailbox': 0, 'mailbox without a road': 0}
+    counts = {'street-name-sign': 0, 'stop-sign': 0, 'sign without room': 0, 'mailbox': 0, 'mailbox without a road': 0}
     placed = signs(roads, counts) + mailboxes(roads, driveways, counts)
     seen = set()
     new = []
