@@ -335,7 +335,8 @@ def mailboxes(roads, driveways, counts):
 def place_props(features):
     """Returns (features, counts): the features with generated props that weren't edited replaced."""
     kept = [f for f in features if (f.get('properties') or {}).get('kind') != 'prop'
-            or (f.get('properties') or {}).get('edited') or (f.get('properties') or {}).get('source') != 'generated']
+            or (f.get('properties') or {}).get('edited') or (f.get('properties') or {}).get('removed')
+            or (f.get('properties') or {}).get('source') != 'generated']
     kept_ids = {(f.get('properties') or {}).get('id') for f in kept}
     roads, driveways = [], []
     for f in features:

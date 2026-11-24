@@ -170,7 +170,8 @@ private:
     {
         size_t model = 0, primitive = 0, material = 0;
         std::vector<XMFLOAT4X4> transforms;     // The transforms within the model of the parts drawing these.
-        int blade = -1;                         // A street-name blade's face: 0 lower, 1 upper (else -1).
+        int blade = -1;                         // A street-name blade's face or edge: 0 lower, 1 upper (else -1),
+        bool face = false;                      // stretched to its name; a face also shows the name.
         RenderUnit* renderUnit = nullptr;
     };
     // Street names: the distinct names on street-name signs, each sign's lower and upper blade name (indices, by

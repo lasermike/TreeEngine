@@ -74,6 +74,12 @@ check(len(out) == 2 and any('mine: deleted' in n for n in notes), f'a deleted ha
 near_marker = line({'kind': 'driveway', 'id': 'n'}, [[50.0, 3.0], [70.0, 40.0]])
 out, notes = finish.finish(base, [road, near_marker], snap_start=6)
 check(out[1]['geometry']['coordinates'][0] == [50.0, 0.0], f'a line snapped to a removed marker: {out[1]}')
+# Deleting a removed marker deletes it (so the next import may bring the feature back), not another marker.
+osm_marker = line({'kind': 'driveway', 'id': 'osm-way-9', 'source': 'osm', 'edited': True, 'removed': True},
+                  [[20.0, 0.0], [20.0, 30.0]])
+out, notes = finish.finish(base + [osm_marker], [road, drive])
+check(len(out) == 2 and not any(f['properties']['id'] == 'osm-way-9' for f in out)
+      and any('osm-way-9: removed marker deleted' in n for n in notes), f'a deleted marker came back: {out}, {notes}')
 
 # A crossing through an interior vertex of either line is still a crossing.
 vertex = line(dict(drive['properties']), [[50.0, -10.0], [50.0, 0.0], [50.0, 10.0]])

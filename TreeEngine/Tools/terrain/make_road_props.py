@@ -34,6 +34,8 @@ MATERIALS = {
     'green': ((0.0, 0.18, 0.07), 0.0, 0.35),
     'sign-blade-lower': ((0.0, 0.18, 0.07), 0.0, 0.35),
     'sign-blade-upper': ((0.0, 0.18, 0.07), 0.0, 0.35),
+    'sign-blade-lower-edge': ((0.45, 0.46, 0.47), 0.8, 0.45),
+    'sign-blade-upper-edge': ((0.45, 0.46, 0.47), 0.8, 0.45),
 }
 
 
@@ -242,10 +244,11 @@ def blade(m, y, along_x, material):
         else:
             uvs = [(1, 1), (1, 0), (0, 0), (0, 1)]
         m.quad(material, *corners, uvs=uvs)
+    # The edges: material `<material>-edge`, so the engine stretches them with the faces but doesn't texture them.
     if along_x:
-        m.box('steel', (-w, y - h, -half_t), (w, y + h, half_t), faces='xXyY')
+        m.box(material + '-edge', (-w, y - h, -half_t), (w, y + h, half_t), faces='xXyY')
     else:
-        m.box('steel', (-half_t, y - h, -w), (half_t, y + h, w), faces='zZyY')
+        m.box(material + '-edge', (-half_t, y - h, -w), (half_t, y + h, w), faces='zZyY')
 
 
 def street_name_sign():

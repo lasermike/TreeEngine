@@ -147,7 +147,10 @@ def finish(base, edited, snap_start=6.0):
     markers = []
     for i in sorted(set(before) - {(f.get('properties') or {}).get('id') for f in edited} - {None}):
         old = before[i]
-        if (old.get('properties') or {}).get('source') in ('county', 'osm', 'generated'):
+        old_props = old.get('properties') or {}
+        if old_props.get('removed'):
+            notes.append(f'{i}: removed marker deleted (an import may bring it back)')
+        elif old_props.get('source') in ('county', 'osm', 'generated'):
             marker = json.loads(json.dumps(old))
             marker['properties']['edited'] = True
             marker['properties']['removed'] = True

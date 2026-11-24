@@ -155,6 +155,11 @@ again = [f for f in first if f['properties']['id'] != stop['properties']['id']] 
 out, counts = props.place_props(again)
 same = [f for f in out if f['properties']['id'] == stop['properties']['id']]
 check(len(same) == 1 and same[0]['properties'].get('removed') is True, f'a removed stop sign came back: {same}')
+# Marked removed but not edited (by hand in QGIS): still kept, and not placed again.
+unedited = {'type': 'Feature', 'properties': dict(stop['properties'], removed=True, edited=False), 'geometry': stop['geometry']}
+out, _ = props.place_props([f for f in first if f['properties']['id'] != stop['properties']['id']] + [unedited])
+same = [f for f in out if f['properties']['id'] == stop['properties']['id']]
+check(len(same) == 1 and same[0]['properties'].get('removed') is True, f'a removed, unedited stop sign came back: {same}')
 
 # A road piece meeting another piece of itself (a bend split in two) is no intersection.
 bend = [line('road', 'd1', [[0.0, 0.0], [50.0, 0.0]], name='D RD', **county),

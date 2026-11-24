@@ -5,6 +5,7 @@
 #include "SignText.h"
 
 #include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <mutex>
 #include <sstream>
@@ -128,7 +129,10 @@ void Terrain::PlaceProps()
             if (model == static_cast<size_t>(Roads::PropModel::StreetNameSign))
             {
                 const std::string& material = Params().propModels[model]->materials[part.materialIndex].name;
-                batch->blade = material == "sign-blade-lower" ? 0 : material == "sign-blade-upper" ? 1 : -1;
+                // A blade's faces (sign-blade-lower, -upper) and edges (the same with -edge) stretch with its name.
+                const auto blade = [&](const char* name) { return material.compare(0, strlen(name), name) == 0; };
+                batch->blade = blade("sign-blade-lower") ? 0 : blade("sign-blade-upper") ? 1 : -1;
+                batch->face = batch->blade >= 0 && material.find("-edge") == std::string::npos;
             }
         }
     }
@@ -368,7 +372,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         }
         ShaderMaterial shaderMaterial = imported.shaderMaterial;
         std::wstring materialName = assetName + L"#material" + std::to_wstring(batch.material);
-        if (batch.blade >= 0 && m_signTexture)
+        if (batch.face && m_signTexture)
         {
             // A street-name blade's face: white times the names atlas, each sign's cell chosen by its instance's
             // atlas region (ComputeConstants).
@@ -642,7 +646,7 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
                 }
                 XMStoreFloat4x4(&propData.World, part * stretch * XMLoadFloat4x4(&world));
                 propData.InstanceOffset = propData.InstanceOffsetPrev = slot;
-                propData.AtlasRegion = named ? 1 + regions + m_signBlades[sign][batch.blade] : 0;
+                propData.AtlasRegion = named && batch.face ? 1 + regions + m_signBlades[sign][batch.blade] : 0;
                 propData.PreviousSlot = slot;
                 ++slot;
             }
