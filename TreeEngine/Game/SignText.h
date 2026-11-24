@@ -39,6 +39,10 @@ namespace SignText
     float BladeLength(const std::string& text);
     // How much the text is squeezed sideways to fit its blade (1 when it fits as it is).
     float Squeeze(const std::string& text);
+    // A street-name sign model's blade material: 0 for the lower blade, 1 for the upper, -1 for any other material.
+    // Exactly sign-blade-lower and sign-blade-upper are faces (textured with the name); the same with -edge appended
+    // are their edges (stretched with them, not textured).
+    int BladeMaterial(const std::string& material, bool& face);
     // A cell per name, in order.
     Atlas Build(const std::vector<std::string>& names);
 }

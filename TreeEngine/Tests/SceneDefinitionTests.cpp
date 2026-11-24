@@ -1354,6 +1354,13 @@ void TestSignText()
     Check(SignText::BladeLength("E EVERGREEN WAY EAST") == SignText::LongestBlade && SignText::Squeeze("E EVERGREEN WAY EAST") < 1
         && SignText::Squeeze("E EVERGREEN WAY EAST") > 0.6f, "a long sign name isn't squeezed onto the longest blade");
 
+    // Blade materials: exactly the two faces and two edges; a replacement model's other materials are left alone.
+    bool face = true;
+    Check(SignText::BladeMaterial("sign-blade-lower", face) == 0 && face
+        && SignText::BladeMaterial("sign-blade-upper-edge", face) == 1 && !face
+        && SignText::BladeMaterial("sign-blade-lower-bracket", face) == -1 && !face
+        && SignText::BladeMaterial("steel", face) == -1 && !face, "a sign blade material was misclassified");
+
     // Three names: two cells across, two rows, each region a padded cell inside the atlas.
     const auto atlas = SignText::Build({ "E SCOTT DR", "E BENSON LOOP", "" });
     const int strideX = SignText::CellWidth + 2 * SignText::Padding, strideY = SignText::CellHeight + 2 * SignText::Padding;

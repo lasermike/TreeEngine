@@ -199,6 +199,16 @@ namespace SignText
         return text.empty() ? 0 : width - Gap;
     }
 
+    int BladeMaterial(const std::string& material, bool& face)
+    {
+        face = material == "sign-blade-lower" || material == "sign-blade-upper";
+        if (material == "sign-blade-lower" || material == "sign-blade-lower-edge")
+            return 0;
+        if (material == "sign-blade-upper" || material == "sign-blade-upper-edge")
+            return 1;
+        return -1;
+    }
+
     float BladeLength(const std::string& text)
     {
         const float needed = Width(text) * CapMeters + 2 * MarginMeters;

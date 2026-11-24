@@ -5,7 +5,6 @@
 #include "SignText.h"
 
 #include <algorithm>
-#include <cstring>
 #include <fstream>
 #include <mutex>
 #include <sstream>
@@ -129,10 +128,8 @@ void Terrain::PlaceProps()
             if (model == static_cast<size_t>(Roads::PropModel::StreetNameSign))
             {
                 const std::string& material = Params().propModels[model]->materials[part.materialIndex].name;
-                // A blade's faces (sign-blade-lower, -upper) and edges (the same with -edge) stretch with its name.
-                const auto blade = [&](const char* name) { return material.compare(0, strlen(name), name) == 0; };
-                batch->blade = blade("sign-blade-lower") ? 0 : blade("sign-blade-upper") ? 1 : -1;
-                batch->face = batch->blade >= 0 && material.find("-edge") == std::string::npos;
+                // A blade's faces and edges stretch with its name; other materials (a bracket, say) stay as made.
+                batch->blade = SignText::BladeMaterial(material, batch->face);
             }
         }
     }
