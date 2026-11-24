@@ -165,7 +165,7 @@ run it; `python road_props.py FILE` runs it alone), replacing the generated prop
 
 A sign's post stands at least 0.5 m off every road's shoulder: where roads meet at a sharp angle it moves further back
 along the approach or further out, and where no spot within 15 m is clear it's left out and counted ("sign without
-room"). Hungerford: 25 street-name signs, 15 stop signs and 465 mailboxes (8 OpenStreetMap driveways reach no road). Moving a
+room"). Hungerford: 27 street-name signs, 15 stop signs and 465 mailboxes (8 OpenStreetMap driveways reach no road). Moving a
 prop in QGIS and marking it `edited` keeps it there; a point you add becomes a prop (set its `prop` and `heading`).
 `python -I -B test_road_props.py` checks the rules. The models are `Game/Resources/Models/Roadside/<prop>.glb`, from
 `make_road_props.py` (meters, y up, the origin at the foot of the post, the front facing glTF -z): replace one with any
