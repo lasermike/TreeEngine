@@ -594,6 +594,19 @@ def summary(output, features):
     return f'wrote {output}: {kinds.count("road")} roads, {kinds.count("driveway")} driveways ({generated} generated)'
 
 
+def write_collection(path, header, features):
+    """Writes a roads file: the header members (type, name, crs, treeRoads) one per line, then one feature per line,
+    so a diff shows each changed feature."""
+    with open(path, 'w', newline='\n') as out:
+        out.write('{\n')
+        for key in ('type', 'name', 'crs', 'treeRoads'):
+            if key in header:
+                out.write(f'"{key}": {json.dumps(header[key])},\n')
+        out.write('"features": [\n')
+        out.write(',\n'.join(json.dumps(f) for f in features))
+        out.write('\n]\n}\n')
+
+
 def feature(kind, item, source):
     props = {'kind': kind, 'id': item['id'], 'source': source, 'edited': False}
     for key in ('name', 'surface', 'owner', 'width', 'shoulder', 'ditchDepth', 'ditchWidth', 'speedLimit', 'class'):
@@ -671,13 +684,7 @@ def main():
                                   'OpenStreetMap contributors (ODbL)']},
         'features': features,
     }
-    with open(args.output, 'w', newline='\n') as out:
-        out.write('{\n')
-        for key in ('type', 'name', 'crs', 'treeRoads'):
-            out.write(f'"{key}": {json.dumps(collection[key])},\n')
-        out.write('"features": [\n')
-        out.write(',\n'.join(json.dumps(f) for f in features))
-        out.write('\n]\n}\n')
+    write_collection(args.output, collection, features)
     for line in report:
         log(line)
     log(summary(args.output, features))

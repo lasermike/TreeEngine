@@ -128,7 +128,7 @@ aerial imagery for editing. Each feature's `properties`:
 | --- | --- | --- |
 | `kind` | all | `road`, `driveway` or `prop` (props: planned; the engine skips them) |
 | `id` | all | stable id: `county-<road number or name>-<start x>-<start y>`, `osm-way-<id>`, `address-<parcel>-<number>` |
-| `source` | all | `county`, `osm` or `generated` |
+| `source` | all | `county`, `osm`, `generated`, or `manual` (drawn by hand) |
 | `edited` | all | true once changed by hand: the importer leaves it alone |
 | `name` | lines | roads: street name, for signs; generated driveways: the address |
 | `surface` | lines | `paved` or `gravel` |
@@ -145,6 +145,24 @@ southwest pixel center at the package's -x/-z corner and pads north and east, so
 bounds' center. `python -I -B test_import_roads.py` checks the importer's geometry (junctions, clipping, driveway
 joins) on synthetic data.
 
+**Editing roads in QGIS.** Open the roads file first (Layer → Add Layer → Add Vector Layer), so the project takes its
+CRS, then aerial imagery as an XYZ tile layer below it (Esri World Imagery:
+`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`). Style the layer
+Categorized by `source`, turn on snapping (Vertex and Segment), toggle editing, and use the Vertex Tool to reshape
+lines (click a point, click where it goes; double-click a line to add a point) and Add Line Feature to draw new ones
+from the road outward (type `driveway` in `kind`; leave the rest empty). Save Layer Edits, then:
+
+```bash
+python finish_road_edits.py ../../Game/Resources/Terrain/Hungerford.roads.geojson
+```
+
+It compares the saved file with its last commit and marks every changed or new feature `edited`, fills in a new
+driveway's id (`manual-<x>-<y>`), source `manual`, gravel and 3 m width, snaps a changed line's first point onto the
+nearest line within 6 m when QGIS missed it, and restores one feature per line with unchanged features exactly as
+before (QGIS rewrites every coordinate), so the diff shows just the edits. It reports deletions and real crossings.
+Then re-import the package with `--roads` (below) and rebuild. Don't run `import_roads.py` after deleting a feature
+by hand: it would bring back a deleted import. `python -I -B test_finish_road_edits.py` checks it.
+
 **Grading.** `import_heightmap.py --roads FILE` (TerrainTool `pack --roads`) grades the roads into the heights before
 packing (Game/RoadGrading.h). Along each smoothed centerline the bed follows the ground's running median and mean
 (7 and 17 samples, a meter apart), so short bumps are planed off; across it, the traveled way is crowned (2% paved,
@@ -152,7 +170,7 @@ packing (Game/RoadGrading.h). Along each smoothed centerline the bed follows the
 a backslope up to the ground over the ditch's width. Without a ditch the bed blends back into the ground over 3 m.
 Where lines overlap, a traveled way wins (paved roads over gravel roads over driveways), else the nearest line. On
 side slopes the uphill ditch cuts into the hill and the downhill foreslope builds a small embankment. Hungerford:
-571,000 samples changed (roads and all 473 driveways), by 0.11 m on average and under 0.75 m for 99% of them; 3.10 m cut and 2.26 m fill at most.
+560,000 samples changed (roads and all 473 driveways), by 0.11 m on average and under 0.76 m for 99% of them; 3.10 m cut and 2.26 m fill at most.
 Grading works from the imported heights, so after editing roads, import the package again rather than re-grading a
 graded one.
 
