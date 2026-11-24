@@ -191,10 +191,7 @@ float Terrain::GroundHit(const XMFLOAT3& origin, const XMFLOAT3& direction, floa
 int Terrain::PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* distance)
 {
     int best = -1;
-    // Only props in front of the ground the ray meets (a hillside hides what's behind it); a prop's foot stands on
-    // the ground, so the ground's hit counts with a little to spare.
-    const float ground = GroundHit(origin, direction, 4000);
-    float nearest = ground >= 0 ? ground + 0.25f : 1e30f;
+    float nearest = 1e30f;
     for (size_t p = 0; p < m_propRefs.size(); ++p)
     {
         const PropRef& ref = m_propRefs[p];
@@ -217,6 +214,15 @@ int Terrain::PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* 
             nearest = t;
             best = static_cast<int>(p);
         }
+    }
+    // The nearest prop the ray hits counts only if the ground doesn't come first (a hillside hides what's behind
+    // it); its foot stands on the ground, so the ground may come a little after the prop's bounds. Any prop further
+    // on is behind that ground too.
+    if (best >= 0)
+    {
+        const float ground = GroundHit(origin, direction, nearest);
+        if (ground >= 0 && ground + 0.25f < nearest)
+            best = -1;
     }
     if (distance)
         *distance = best >= 0 ? nearest : -1;
@@ -291,34 +297,18 @@ bool Terrain::SaveProps(std::string& message, const std::vector<std::wstring>* o
     std::vector<Roads::PropEdit> edits;
     for (const auto& entry : m_propEdits)
         edits.push_back(entry.second);
-    // The file the terrain loaded; and when that's the copy the build put beside the executable (<executable's
-    // folder>\<roads>), the source it was copied from: Game\Resources\<roads> in a folder above. A roads file loaded
-    // from anywhere else (a scene's own folder) is saved alone.
+    // The file the terrain loaded, and the source the build copied it from when that's what it is
+    // (Roads::BuildSource); a roads file loaded from anywhere else is saved alone.
     std::vector<std::wstring> files = only ? *only : std::vector<std::wstring>{ m_roadsFile };
-    const auto fullPath = [](const std::wstring& path)
-    {
-        wchar_t full[MAX_PATH] = {};
-        const DWORD length = GetFullPathNameW(path.c_str(), MAX_PATH, full, nullptr);
-        return length && length < MAX_PATH ? std::wstring(full) : path;
-    };
     wchar_t executable[MAX_PATH] = {};
     if (!only && GetModuleFileNameW(nullptr, executable, MAX_PATH))
     {
         std::wstring folder = executable;
         folder.resize(folder.find_last_of(L'\\'));
-        std::wstring relative = SceneData::WidePath(Params().roads);
-        std::replace(relative.begin(), relative.end(), L'/', L'\\');
-        if (_wcsicmp(fullPath(m_roadsFile).c_str(), fullPath(folder + L"\\" + relative).c_str()) == 0)
-            for (size_t slash = folder.find_last_of(L'\\'); slash != std::wstring::npos; slash = folder.find_last_of(L'\\'))
-            {
-                folder.resize(slash);
-                const std::wstring candidate = folder + L"\\Game\\Resources\\" + relative;
-                if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES)
-                {
-                    files.push_back(candidate);
-                    break;
-                }
-            }
+        const std::wstring source = Roads::BuildSource(m_roadsFile, Params().roads, folder,
+            [](const std::wstring& path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; });
+        if (!source.empty())
+            files.push_back(source);
     }
     // Every file's new text first (an edit a file can't take saves nothing), then each staged beside its file, and
     // only then each replaced, so a failure leaves the files as they were (or, past the first replacement, says which

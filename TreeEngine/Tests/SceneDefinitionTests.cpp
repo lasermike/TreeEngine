@@ -1393,9 +1393,20 @@ void TestPropEditing()
 
     // Saving safely: a staged file is complete beside its target until it's published over it; staging beside a
     // missing folder fails, leaving the target alone.
-    wchar_t folder[MAX_PATH] = {};
-    GetTempPathW(MAX_PATH, folder);
-    const std::string target = SceneData::Utf8Path(folder) + "tree-roads-save-test.geojson";
+    // In a folder of this run's own, so concurrent test runs don't share files.
+    wchar_t temp[MAX_PATH] = {};
+    GetTempPathW(MAX_PATH, temp);
+    std::wstring own;
+    for (int attempt = 0; attempt < 100 && own.empty(); ++attempt)
+    {
+        const std::wstring candidate = std::wstring(temp) + L"tree-roads-save-" + std::to_wstring(GetCurrentProcessId()) + L"-"
+            + std::to_wstring(GetTickCount64()) + L"-" + std::to_wstring(attempt);
+        if (CreateDirectoryW(candidate.c_str(), nullptr))
+            own = candidate + L"\\";
+    }
+    Check(!own.empty(), "the save test couldn't make its folder");
+    const std::wstring folder = own;
+    const std::string target = SceneData::Utf8Path(folder) + "roads.geojson";
     {
         std::ofstream original(SceneData::WidePath(target), std::ios::binary | std::ios::trunc);
         original << "old";
@@ -1415,6 +1426,26 @@ void TestPropEditing()
     catch (const std::runtime_error&) { threw = true; }
     Check(threw && contents(target) == "new text", "staging into a missing folder succeeded");
     DeleteFileW(SceneData::WidePath(target).c_str());
+    RemoveDirectoryW(folder.c_str());
+
+    // Mirroring a save into the build's source: only for the build's copy of a relative path inside both folders.
+    const std::wstring build = L"C:\\work\\TreeEngine\\TreeClassic\\bin\\x64\\Release";
+    const auto onlySource = [](const std::wstring& path)
+    {
+        return _wcsicmp(path.c_str(), L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\A.roads.geojson") == 0
+            || _wcsicmp(path.c_str(), L"C:\\work\\Shared\\A.roads.geojson") == 0;
+    };
+    Check(Roads::BuildSource(build + L"\\Terrain\\A.roads.geojson", "Terrain/A.roads.geojson", build, onlySource)
+        == L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\A.roads.geojson", "the build's copy has no source");
+    // A scene's own copy (loaded from beside the scene, not the build) is saved alone.
+    Check(Roads::BuildSource(L"C:\\scenes\\Terrain\\A.roads.geojson", "Terrain/A.roads.geojson", build, onlySource).empty(),
+        "a scene's own roads file was mirrored into the build's source");
+    // A path escaping the folders (../Shared, which resolves beside the build and beside Game\\Resources, where a file
+    // with the same props exists) or absolute is never mirrored.
+    Check(Roads::BuildSource(L"C:\\work\\TreeEngine\\TreeClassic\\bin\\x64\\Shared\\A.roads.geojson", "../Shared/A.roads.geojson",
+        build, onlySource).empty() && Roads::BuildSource(L"C:\\work\\Shared\\A.roads.geojson", "C:/work/Shared/A.roads.geojson",
+        build, onlySource).empty() && Roads::BuildSource(build + L"\\Terrain\\A.roads.geojson", "Terrain/./A.roads.geojson",
+        build, onlySource).empty(), "an escaping or absolute roads path was mirrored");
 
     // Picking: a ray hits a box from outside at its entry distance, misses beside it, and from inside starts at 0.
     const DirectX::XMFLOAT3 low(-1, 0, -1), high(1, 3, 1);

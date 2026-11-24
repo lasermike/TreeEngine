@@ -409,6 +409,51 @@ namespace Roads
         return out;
     }
 
+    std::wstring BuildSource(const std::wstring& loaded, const std::string& authored, const std::wstring& executableFolder,
+        const std::function<bool(const std::wstring&)>& exists)
+    {
+        // The authored path: relative, with no empty, . or .. parts.
+        std::wstring relative(authored.begin(), authored.end());
+        std::replace(relative.begin(), relative.end(), L'/', L'\\');
+        if (relative.empty() || relative[0] == L'\\' || relative.find(L':') != std::wstring::npos)
+            return {};
+        for (size_t start = 0; start <= relative.size();)
+        {
+            const size_t end = std::min(relative.find(L'\\', start), relative.size());
+            const std::wstring part = relative.substr(start, end - start);
+            if (part.empty() || part == L"." || part == L"..")
+                return {};
+            start = end + 1;
+        }
+        const auto full = [](const std::wstring& path)
+        {
+            wchar_t buffer[MAX_PATH] = {};
+            const DWORD length = GetFullPathNameW(path.c_str(), MAX_PATH, buffer, nullptr);
+            return length && length < MAX_PATH ? std::wstring(buffer) : std::wstring();
+        };
+        const auto inside = [](const std::wstring& path, const std::wstring& root)
+        {
+            return !path.empty() && !root.empty() && path.size() > root.size() + 1
+                && _wcsnicmp(path.c_str(), root.c_str(), root.size()) == 0 && path[root.size()] == L'\\';
+        };
+        // It was loaded from the build's copy: <executable's folder>\<authored>, inside that folder.
+        const std::wstring folder = full(executableFolder);
+        const std::wstring copy = full(executableFolder + L"\\" + relative);
+        if (!inside(copy, folder) || _wcsicmp(full(loaded).c_str(), copy.c_str()) != 0)
+            return {};
+        // The source: Game\Resources\<authored> in the nearest folder above, inside that Resources folder.
+        std::wstring above = folder;
+        for (size_t slash = above.find_last_of(L'\\'); slash != std::wstring::npos; slash = above.find_last_of(L'\\'))
+        {
+            above.resize(slash);
+            const std::wstring resources = full(above + L"\\Game\\Resources");
+            const std::wstring candidate = full(resources + L"\\" + relative);
+            if (inside(candidate, resources) && exists(candidate))
+                return candidate;
+        }
+        return {};
+    }
+
     float RayBox(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, const DirectX::XMFLOAT3& low,
         const DirectX::XMFLOAT3& high)
     {

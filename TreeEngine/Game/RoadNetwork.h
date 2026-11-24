@@ -5,6 +5,7 @@
 // coordinates to the package's: x east and z north in meters from the center of the package's source bounds.
 
 #include <DirectXMath.h>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -92,6 +93,13 @@ namespace Roads
     // every other line, as they were. The file is a feature per line (import_roads.py's layout), and rewritten lines
     // keep it (Python's json.dumps spacing). Throws std::runtime_error when an edited prop's line isn't there.
     std::string UpdateProps(const std::string& text, const std::vector<PropEdit>& edits, double originX, double originY);
+
+    // The source file a loaded roads file was copied from by the build, when it was: `loaded` must be the file the
+    // scene's `authored` path (relative, no ..) names in the executable's folder, and the source is
+    // Game\Resources\<authored> in the nearest folder above that `exists` finds. Empty otherwise (an absolute or
+    // escaping path, a file loaded from elsewhere, no source found), so nothing outside those folders is mirrored.
+    std::wstring BuildSource(const std::wstring& loaded, const std::string& authored, const std::wstring& executableFolder,
+        const std::function<bool(const std::wstring&)>& exists);
 
     // Where a ray (origin, unit direction) enters an axis-aligned box: the distance along it, or a negative value when
     // it misses (or the box is behind it). From inside, 0.
