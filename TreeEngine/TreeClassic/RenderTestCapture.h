@@ -18,6 +18,20 @@ struct RenderTestPoint
     std::vector<std::string> expectedSelection;
     bool highlightsThroughGeometry = true;
     bool showRoads = false;             // Terrains draw their road centerlines (the debug overlay).
+    // Roadside props: the prop a click should select (checked when set), and edits made before the first frame, as
+    // the debug UI makes them: move by (x, z) meters, turn to a heading, or remove.
+    bool checkProp = false;
+    std::string expectedProp;
+    struct PropEdit
+    {
+        std::string id;
+        float moveX = 0, moveZ = 0;
+        bool turn = false;
+        float heading = 0;
+        bool remove = false;
+    };
+    std::vector<PropEdit> propEdits;
+    std::wstring savePropsTo;           // Then save them into this file (a copy of the roads file) only.
     double time;
     std::wstring filename;
     std::string mode;

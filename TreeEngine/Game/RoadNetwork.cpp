@@ -322,3 +322,102 @@ namespace Roads
         return network;
     }
 }
+
+namespace
+{
+    // A value as Python's json.dumps writes it: ", " and ": " separators, non-ASCII escaped, numbers shortest.
+    std::string PythonJson(const nlohmann::ordered_json& value)
+    {
+        if (value.is_object())
+        {
+            std::string out = "{";
+            bool first = true;
+            for (auto item = value.begin(); item != value.end(); ++item)
+            {
+                out += (first ? "" : ", ") + nlohmann::ordered_json(item.key()).dump(-1, ' ', true) + ": " + PythonJson(item.value());
+                first = false;
+            }
+            return out + "}";
+        }
+        if (value.is_array())
+        {
+            std::string out = "[";
+            for (size_t i = 0; i < value.size(); ++i)
+                out += (i ? ", " : "") + PythonJson(value[i]);
+            return out + "]";
+        }
+        return value.dump(-1, ' ', true);
+    }
+}
+
+namespace Roads
+{
+    std::string UpdateProps(const std::string& text, const std::vector<PropEdit>& edits, double originX, double originY)
+    {
+        // The file's lines, each feature on one (the line ending, \n or \r\n, kept as it was).
+        std::vector<std::string> lines;
+        for (size_t start = 0; start < text.size();)
+        {
+            const size_t end = text.find('\n', start);
+            const size_t stop = end == std::string::npos ? text.size() : end + 1;
+            lines.push_back(text.substr(start, stop - start));
+            start = stop;
+        }
+        for (const PropEdit& edit : edits)
+        {
+            const std::string needle = "\"id\": " + nlohmann::ordered_json(edit.id).dump(-1, ' ', true) + ",";
+            size_t found = lines.size();
+            for (size_t i = 0; i < lines.size(); ++i)
+                if (lines[i].find(needle) != std::string::npos && lines[i].find("\"kind\": \"prop\"") != std::string::npos)
+                {
+                    found = i;
+                    break;
+                }
+            if (found == lines.size())
+                throw std::runtime_error("roads: prop " + edit.id + " isn't on a line of its own in the file");
+            std::string& line = lines[found];
+            size_t ending = line.size();
+            while (ending > 0 && (line[ending - 1] == '\n' || line[ending - 1] == '\r'))
+                --ending;
+            const bool comma = ending > 0 && line[ending - 1] == ',';
+            auto feature = nlohmann::ordered_json::parse(line.substr(0, ending - (comma ? 1 : 0)));
+            auto& props = feature["properties"];
+            props["edited"] = true;
+            props["heading"] = std::round(static_cast<double>(edit.heading) * 10) / 10;
+            if (edit.removed)
+                props["removed"] = true;
+            feature["geometry"]["coordinates"] = nlohmann::ordered_json::array({
+                std::round((edit.point.x + originX) * 100) / 100, std::round((edit.point.y + originY) * 100) / 100 });
+            line = PythonJson(feature) + (comma ? "," : "") + line.substr(ending);
+        }
+        std::string out;
+        for (const std::string& line : lines)
+            out += line;
+        return out;
+    }
+
+    float RayBox(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, const DirectX::XMFLOAT3& low,
+        const DirectX::XMFLOAT3& high)
+    {
+        const float o[3] = { origin.x, origin.y, origin.z }, d[3] = { direction.x, direction.y, direction.z };
+        const float lo[3] = { low.x, low.y, low.z }, hi[3] = { high.x, high.y, high.z };
+        float enter = 0, leave = 1e30f;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            if (std::abs(d[axis]) < 1e-12f)
+            {
+                if (o[axis] < lo[axis] || o[axis] > hi[axis])
+                    return -1;
+                continue;
+            }
+            float t0 = (lo[axis] - o[axis]) / d[axis], t1 = (hi[axis] - o[axis]) / d[axis];
+            if (t0 > t1)
+                std::swap(t0, t1);
+            enter = std::max(enter, t0);
+            leave = std::min(leave, t1);
+            if (enter > leave)
+                return -1;
+        }
+        return enter;
+    }
+}

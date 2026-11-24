@@ -178,6 +178,15 @@ blade faces (the model's `sign-blade-lower` and `sign-blade-upper` materials, UV
 side). Letters are 0.1 m tall; a blade grows from the model's 0.9 m to fit its name, up to 1.2 m, and a longer name is
 squeezed to fit that (Game/SignText.h). Editing a sign's `text` in QGIS changes it at the next load.
 
+**Editing props in the engine.** Ctrl-click a prop (in the debug UI's viewport) to select it: the click selects its
+terrain, and the prop the click's ray hits within its model's bounds; it's highlighted. The terrain's **Props**
+section in the Objects panel then shows it: drag its position with the position gizmo (it stays on the ground) or
+type its heading, or **Remove prop**. **Save prop edits to the roads file** writes them into the roads file the build
+copied (found above the executable as `Game\Resources\<roads>`) and into the running copy: only the edited props'
+lines change, each marked `edited` (and `removed` when removed), in the same layout as `import_roads.py`'s, so the
+diff shows just them. Unsaved edits are lost when the scene reloads. `Tests/RenderRegression/test-prop-editing.ps1`
+picks, edits and saves (into a copy) in raster and DXR.
+
 The render suite's `terrain-roads` scene draws `RoadsTest.terrain`: 256 m of Hungerford around the E Scott Dr and
 E Benson Loop intersection, imported like Hungerford but with `--crs EPSG:32610 --bounds 504346.2248 5228427.0807
 504602.2248 5228683.0807` (on Hungerford's grid) and `--roads RoadsTest.roads.geojson`, whose features were cut from

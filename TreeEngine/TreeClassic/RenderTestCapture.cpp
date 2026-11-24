@@ -2,6 +2,7 @@
 #include "RenderTestCapture.h"
 #include "Game.h"
 #include "Player.h"
+#include "Terrain.h"
 #include "SceneDefinition.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <shellapi.h>
@@ -334,6 +335,28 @@ void ParseRenderTestCommandLine()
         point.renderScale = value.value("renderScale", parsed->renderScale);
         point.highlightsThroughGeometry = value.value("highlightsThroughGeometry", true);
         point.showRoads = value.value("showRoads", false);
+        if (value.contains("expectedProp"))
+        {
+            point.checkProp = true;
+            point.expectedProp = value.at("expectedProp").get<std::string>();
+        }
+        if (value.contains("propEdits"))
+            for (const auto& item : value.at("propEdits"))
+            {
+                RenderTestPoint::PropEdit entry;
+                entry.id = item.at("id").get<std::string>();
+                if (item.contains("move"))
+                {
+                    entry.moveX = item.at("move").at(0).get<float>();
+                    entry.moveZ = item.at("move").at(1).get<float>();
+                }
+                entry.turn = item.contains("heading");
+                entry.heading = item.value("heading", 0.0f);
+                entry.remove = item.value("remove", false);
+                point.propEdits.push_back(entry);
+            }
+        if (value.contains("savePropsTo"))
+            point.savePropsTo = SceneData::WidePath(value.at("savePropsTo").get<std::string>());
         if (value.contains("expectedSelection"))
         {
             point.checkSelection = true;
@@ -606,6 +629,38 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestRenderScale(point.renderScale);
             game.SetRenderTestHighlightsThroughGeometry(point.highlightsThroughGeometry);
             game.SetRenderTestShowRoads(point.showRoads);
+            // Prop edits, on the scene's terrain, through the calls the debug UI makes.
+            Terrain* terrain = nullptr;
+            for (WorldObject* object : game.GetScene().Children())
+                if (object->GetObjectType() == ObjectType_Terrain)
+                    terrain = static_cast<Terrain*>(object);
+            const auto propIndex = [&](const std::string& id)
+            {
+                const auto& props = terrain->RoadNetwork().props;
+                for (size_t i = 0; i < props.size(); ++i)
+                    if (props[i].id == id)
+                        return static_cast<int>(i);
+                throw std::runtime_error("No prop " + id + " to edit");
+            };
+            for (const auto& edit : point.propEdits)
+            {
+                if (!terrain)
+                    throw std::runtime_error("Prop edits need a terrain");
+                const int prop = propIndex(edit.id);
+                const Roads::Prop before = terrain->RoadNetwork().props[prop];
+                if (edit.remove)
+                    terrain->RemoveProp(prop);
+                else
+                    terrain->SetProp(prop, DirectX::XMFLOAT2(before.point.x + edit.moveX, before.point.y + edit.moveZ),
+                        edit.turn ? edit.heading : before.heading);
+            }
+            if (!point.savePropsTo.empty())
+            {
+                std::string message;
+                const std::vector<std::wstring> files = { point.savePropsTo };
+                if (!terrain || !terrain->SaveProps(message, &files))
+                    throw std::runtime_error("Saving props failed: " + message);
+            }
             game.GetRenderManager().GetRenderData().cacheTreePoses = point.poseCache;
             const Settings::MotionView motionView = point.debugView == "motion" ? Settings::MotionView::Motion
                 : point.debugView == "reprojection" ? Settings::MotionView::ReprojectedHistory
@@ -701,12 +756,41 @@ int RunRenderTestCapture(Game& game)
             if (point.checkSelection && selectedNames != point.expectedSelection)
                 throw std::runtime_error("Selection mismatch: " + nlohmann::json(selectedNames).dump()
                     + "; expected " + nlohmann::json(point.expectedSelection).dump());
+            // The selected prop, and each edited one: where it stands (its bounds) and the ground there.
+            std::string selectedProp;
+            nlohmann::json editedProps = nlohmann::json::array();
+            for (WorldObject* object : game.GetScene().Children())
+            {
+                if (object->GetObjectType() != ObjectType_Terrain)
+                    continue;
+                auto* terrain = static_cast<Terrain*>(object);
+                const auto& props = terrain->RoadNetwork().props;
+                if (game.SelectedPropTerrain() == terrain && game.SelectedProp() >= 0)
+                    selectedProp = props[game.SelectedProp()].id;
+                for (const auto& edit : point.propEdits)
+                    for (size_t i = 0; i < props.size(); ++i)
+                    {
+                        if (props[i].id != edit.id)
+                            continue;
+                        DirectX::XMFLOAT3 bounds[2];
+                        const bool drawn = terrain->PropBounds(static_cast<int>(i), bounds);
+                        const auto offset = terrain->GetParams().position;
+                        float ground = 0;
+                        terrain->HeightAt(props[i].point.x + offset.x, props[i].point.y + offset.z, ground);
+                        editedProps.push_back({ { "id", props[i].id }, { "x", props[i].point.x }, { "z", props[i].point.y },
+                            { "heading", props[i].heading }, { "ground", ground }, { "edited", terrain->PropEdited(static_cast<int>(i)) },
+                            { "bottom", drawn ? bounds[0].y : 0.0f }, { "height", drawn ? bounds[1].y - bounds[0].y : 0.0f } });
+                    }
+            }
+            if (point.checkProp && selectedProp != point.expectedProp)
+                throw std::runtime_error("Prop selection mismatch: \"" + selectedProp + "\"; expected \"" + point.expectedProp + "\"");
             report["captures"].push_back({ { "scene", currentScene }, { "antialiasing", point.antialiasing },
                 { "postProcessing", point.postProcessing }, { "time", point.time }, { "mode", point.mode },
                 { "width", point.width }, { "height", point.height }, { "renderScale", point.renderScale },
                 { "renderWidth", renderData.renderWidth }, { "renderHeight", renderData.renderHeight },
                 { "upscaler", std::string(renderData.upscalerStatus) }, { "success", true },
-                { "poseCache", point.poseCache }, { "samples", samples }, { "selectedObjects", selectedNames } });
+                { "poseCache", point.poseCache }, { "samples", samples }, { "selectedObjects", selectedNames },
+                { "selectedProp", selectedProp }, { "props", editedProps } });
         }
         report["gpuPasses"] = { "frame", "shadow", "main", "deformation", "blas", "tlas", "rays", "antialiasing" };
         report["success"] = true;

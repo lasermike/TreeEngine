@@ -78,4 +78,23 @@ namespace Roads
     // Parses a roads file's text. Its CRS must be `crs`; coordinates become package coordinates about the origin.
     // Throws std::runtime_error naming the feature and property at fault.
     Network Parse(const std::string& text, const std::string& crs, double originX, double originY);
+
+    // A prop changed in the engine: moved or turned (point in package coordinates, heading in degrees), or removed.
+    struct PropEdit
+    {
+        std::string id;
+        DirectX::XMFLOAT2 point = {};
+        float heading = 0;
+        bool removed = false;
+    };
+    // The roads file's text with each edited prop's line rewritten: its point (back in the CRS, to the centimeter),
+    // heading (to a tenth of a degree), edited true, and removed true when it's removed; its other properties, and
+    // every other line, as they were. The file is a feature per line (import_roads.py's layout), and rewritten lines
+    // keep it (Python's json.dumps spacing). Throws std::runtime_error when an edited prop's line isn't there.
+    std::string UpdateProps(const std::string& text, const std::vector<PropEdit>& edits, double originX, double originY);
+
+    // Where a ray (origin, unit direction) enters an axis-aligned box: the distance along it, or a negative value when
+    // it misses (or the box is behind it). From inside, 0.
+    float RayBox(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, const DirectX::XMFLOAT3& low,
+        const DirectX::XMFLOAT3& high);
 }

@@ -23,6 +23,7 @@
 #include "imgui_impl_win32.h"
 #include "implot.h"
 #include "DebugVectorEditor.h"
+#include "Terrain.h"
 #include "DebugObjectSelection.h"
 
 using namespace DirectX;
@@ -323,6 +324,9 @@ HRESULT Game::LoadScene(const std::string& name)
 {
     DebugVectorEditor::Reset();
     m_debugUvEdits.clear();
+    m_propTerrain = nullptr;
+    m_selectedProp = -1;
+    m_propStatus.clear();
     auto nextScene = std::make_unique<SceneRoot>();
     SceneRenderSettings nextSettings = m_renderManager.GetSceneSettings();
     GameData nextData;
@@ -1087,10 +1091,99 @@ int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
 
 
 
+// The roads file's props: the one picked by Ctrl-clicking it, moved with the position gizmo (it stays on the ground)
+// and turned by its heading, or removed; and saving the edits into the roads file.
+void Game::ShowPropEditor(Terrain& terrain, const std::string& prefix)
+{
+    const auto& props = terrain.RoadNetwork().props;
+    if (props.empty())
+        return;
+    if (!ImGui::TreeNodeEx("Props", ImGuiTreeNodeFlags_DefaultOpen, "Props (%zu)", props.size()))
+        return;
+    if (m_propTerrain == &terrain && m_selectedProp >= 0 && m_selectedProp < static_cast<int>(props.size()))
+    {
+        const Roads::Prop& prop = props[m_selectedProp];
+        ImGui::Text("Selected: %s (%s)%s", prop.id.c_str(), Roads::PropModelName(prop.model),
+            terrain.PropEdited(m_selectedProp) ? ", edited" : "");
+        if (!prop.text.empty())
+            ImGui::TextWrapped("Text: %s", prop.text.c_str());
+        XMFLOAT3 bounds[2];
+        if (terrain.PropBounds(m_selectedProp, bounds))
+        {
+            using DebugVectorEditor::Edit;
+            using DebugVectorEditor::Tools;
+            const XMFLOAT3 offset = terrain.GetParams().position;
+            XMFLOAT3 position(prop.point.x + offset.x, (bounds[0].y + bounds[1].y) / 2, prop.point.y + offset.z);
+            XMFLOAT4 cameraRotation;
+            XMStoreFloat4(&cameraRotation, m_player->GetRotation());
+            if (Edit("Prop position", &position.x, 3, 0.05f, Tools::Position, nullptr, &cameraRotation, nullptr,
+                (prefix + "Prop position").c_str()))
+                terrain.SetProp(m_selectedProp, XMFLOAT2(position.x - offset.x, position.z - offset.z), prop.heading);
+            float heading = prop.heading;
+            if (ImGui::DragFloat("Heading (degrees from north)", &heading, 0.5f, -360, 720, "%.1f"))
+                terrain.SetProp(m_selectedProp, prop.point, heading);
+            if (ImGui::Button("Remove prop"))
+            {
+                terrain.RemoveProp(m_selectedProp);
+                m_selectedProp = -1;
+                m_propTerrain = nullptr;
+            }
+        }
+        else
+            ImGui::TextDisabled("Removed.");
+    }
+    else
+        ImGui::TextDisabled("Ctrl-click a prop to select it.");
+    if (terrain.PropEdits())
+    {
+        if (ImGui::Button("Save prop edits to the roads file"))
+        {
+            terrain.SaveProps(m_propStatus);
+            OutputDebugStringA((m_propStatus + "\n").c_str());
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%zu edited", terrain.PropEdits());
+    }
+    if (!m_propStatus.empty())
+        ImGui::TextWrapped("%s", m_propStatus.c_str());
+    ImGui::TreePop();
+}
+
 void Game::UpdateObjectSelection()
 {
     auto& data = m_renderManager.GetRenderData();
     auto& selection = data.selection;
+    // Props are instances of their terrain, so the GPU pick sees only the terrain: a click on one picks the prop the
+    // click's ray hits, if any (any other click leaves no prop selected, unless it adds to the selection).
+    for (const auto& result : selection.results)
+    {
+        if (result.request.epoch != selection.epoch)
+            continue;
+        Terrain* terrain = nullptr;
+        for (WorldObject* object : m_pScene->Children())
+            if (object == result.object && object->GetObjectType() == ObjectType_Terrain)
+                terrain = static_cast<Terrain*>(object);
+        if (!terrain)
+        {
+            if (!result.request.toggle)
+            {
+                m_propTerrain = nullptr;
+                m_selectedProp = -1;
+            }
+            continue;
+        }
+        // The click's ray: back through the view and projection from the near plane (reversed depth: z = 1) to a point
+        // further in.
+        const XMMATRIX inverse = XMMatrixInverse(nullptr, XMLoadFloat4x4(&data.view) * XMLoadFloat4x4(&data.projection));
+        const float x = 2 * result.request.u - 1, y = 1 - 2 * result.request.v;
+        const XMVECTOR nearPoint = XMVector3TransformCoord(XMVectorSet(x, y, 1, 1), inverse);
+        const XMVECTOR farPoint = XMVector3TransformCoord(XMVectorSet(x, y, 0.5f, 1), inverse);
+        XMFLOAT3 origin, direction;
+        XMStoreFloat3(&origin, nearPoint);
+        XMStoreFloat3(&direction, XMVector3Normalize(farPoint - nearPoint));
+        m_selectedProp = terrain->PickProp(origin, direction);
+        m_propTerrain = m_selectedProp >= 0 ? terrain : nullptr;
+    }
     selection.ConsumeResults();
     const auto* viewport = ImGui::GetMainViewport();
     const auto& io = ImGui::GetIO();
@@ -1105,6 +1198,11 @@ void Game::UpdateObjectSelection()
         selection.reveal = selection.latest;
     m_selectionUIWasVisible = m_settings.m_showDebugUI;
     data.highlights.clear();
+    if (m_propTerrain && !selection.Contains(m_propTerrain))
+    {
+        m_propTerrain = nullptr;
+        m_selectedProp = -1;
+    }
     for (auto* object : m_pScene->Children())
     {
         if (!selection.Contains(object)) continue;
@@ -1112,6 +1210,9 @@ void Game::UpdateObjectSelection()
         const auto* bounds = object->GetBoundingBox();
         highlight.bounds[0] = bounds[0];
         highlight.bounds[1] = bounds[1];
+        // A terrain with a prop selected highlights the prop, not the whole terrain.
+        if (object == m_propTerrain && !static_cast<Terrain*>(object)->PropBounds(m_selectedProp, highlight.bounds))
+            continue;
         highlight.occlusion = m_settings.m_highlightsThroughGeometry
             ? HighlightOcclusion::AlwaysVisible : HighlightOcclusion::SceneDepth;
         data.highlights.push_back(highlight);
@@ -1726,6 +1827,8 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                     const auto* bounds = obj->GetBoundingBox();
                     DebugVectorEditor::ReadOnly((prefix + "Bounds minimum").c_str(), &bounds[0].x, 3);
                     DebugVectorEditor::ReadOnly((prefix + "Bounds maximum").c_str(), &bounds[1].x, 3);
+                    if (obj->GetObjectType() == ObjectType_Terrain)
+                        ShowPropEditor(*static_cast<Terrain*>(obj), prefix);
                     if (params.generatorType == ModelGeneratorType)
                     {
                         const auto& model = static_cast<const GltfModelParams&>(params);

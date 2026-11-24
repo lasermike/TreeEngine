@@ -1334,6 +1334,56 @@ void TestRoadGrading()
         "a wide ditch stops short of the ground");
 }
 
+void TestPropEditing()
+{
+    // A roads file as import_roads.py writes it: header lines, a feature per line (CRLF here), Python's spacing.
+    const std::string file =
+        "{\r\n\"type\": \"FeatureCollection\",\r\n\"features\": [\r\n"
+        "{\"type\": \"Feature\", \"properties\": {\"kind\": \"road\", \"id\": \"county-1\", \"source\": \"county\", \"edited\": false}, \"geometry\": {\"type\": \"LineString\", \"coordinates\": [[1000.0, 2000.0], [1100.5, 2000.25]]}},\r\n"
+        "{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"id\": \"prop-mailbox-a\", \"source\": \"generated\", \"edited\": false, \"prop\": \"mailbox\", \"heading\": 90.0, \"text\": \"12 E TEST RD\"}, \"geometry\": {\"type\": \"Point\", \"coordinates\": [1010.25, 2003.5]}},\r\n"
+        "{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"id\": \"prop-stop-b\", \"source\": \"generated\", \"edited\": false, \"prop\": \"stop-sign\", \"heading\": 0.0}, \"geometry\": {\"type\": \"Point\", \"coordinates\": [1050.0, 1996.0]}}\r\n"
+        "]\r\n}\r\n";
+    Roads::PropEdit moved;
+    moved.id = "prop-mailbox-a";
+    moved.point = DirectX::XMFLOAT2(12.344f, 5.006f);       // Package coordinates about (1000, 2000).
+    moved.heading = 271.26f;
+    Roads::PropEdit removed;
+    removed.id = "prop-stop-b";
+    removed.point = DirectX::XMFLOAT2(50, -4);
+    removed.removed = true;
+    const std::string updated = Roads::UpdateProps(file, { moved, removed }, 1000, 2000);
+    // Only the two prop lines change; the moved one keeps its properties' order and text, gains edited, and its
+    // point and heading round as import_roads.py rounds them; the removed one is marked; line endings and commas stay.
+    const std::string movedLine = "{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"id\": \"prop-mailbox-a\", "
+        "\"source\": \"generated\", \"edited\": true, \"prop\": \"mailbox\", \"heading\": 271.3, \"text\": \"12 E TEST RD\"}, "
+        "\"geometry\": {\"type\": \"Point\", \"coordinates\": [1012.34, 2005.01]}},\r\n";
+    const std::string removedLine = "{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"id\": \"prop-stop-b\", "
+        "\"source\": \"generated\", \"edited\": true, \"prop\": \"stop-sign\", \"heading\": 0.0, \"removed\": true}, "
+        "\"geometry\": {\"type\": \"Point\", \"coordinates\": [1050.0, 1996.0]}}\r\n";
+    const size_t roadEnd = file.find("},\r\n", file.find("county-1")) + 4;
+    Check(updated.compare(0, roadEnd, file, 0, roadEnd) == 0 && updated.find(movedLine) == roadEnd
+        && updated.find(removedLine) == roadEnd + movedLine.size() && updated.substr(updated.size() - 6) == "]\r\n}\r\n",
+        "a prop edit rewrote the roads file wrongly");
+    // The result still parses, with the edits in it.
+    const auto network = Roads::Parse(updated.substr(0, 1) + "\"crs\": {\"type\": \"name\", \"properties\": {\"name\": \"EPSG:32610\"}}, "
+        + updated.substr(1), "EPSG:32610", 1000, 2000);
+    Check(network.props.size() == 1 && std::abs(network.props[0].point.x - 12.34f) < 1e-3f && network.props[0].heading == 271.3f
+        && network.props[0].edited, "an edited roads file doesn't parse back to its edits");
+    // A prop that isn't in the file is an error, not a silent no-op.
+    Roads::PropEdit missing;
+    missing.id = "prop-mailbox-z";
+    bool threw = false;
+    try { Roads::UpdateProps(file, { missing }, 1000, 2000); }
+    catch (const std::runtime_error&) { threw = true; }
+    Check(threw, "editing a prop the file doesn't have succeeded");
+
+    // Picking: a ray hits a box from outside at its entry distance, misses beside it, and from inside starts at 0.
+    const DirectX::XMFLOAT3 low(-1, 0, -1), high(1, 3, 1);
+    Check(std::abs(Roads::RayBox({ -5, 1, 0 }, { 1, 0, 0 }, low, high) - 4) < 1e-5f
+        && Roads::RayBox({ -5, 5, 0 }, { 1, 0, 0 }, low, high) < 0 && Roads::RayBox({ 5, 1, 0 }, { 1, 0, 0 }, low, high) < 0
+        && Roads::RayBox({ 0, 1, 0 }, { 0, 0, 1 }, low, high) == 0, "a prop pick ray tested its box wrongly");
+}
+
 void TestSignText()
 {
     // The font draws every letter and digit, upper or lower case, and the punctuation street names use.
@@ -1660,6 +1710,7 @@ int main(int argc, char** argv)
         TestRoadMesh();
         TestRoadGrading();
         TestSignText();
+        TestPropEditing();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

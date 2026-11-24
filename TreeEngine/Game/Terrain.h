@@ -5,6 +5,7 @@
 #include "RoadMesh.h"
 #include <array>
 #include <condition_variable>
+#include <map>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -91,6 +92,18 @@ public:
     UINT PropCount(Roads::PropModel model) const { return static_cast<UINT>(m_propWorlds[static_cast<size_t>(model)].size()); }
     // The distinct street names on its signs, in atlas order (for tests).
     const std::vector<std::string>& SignNamesList() const { return m_signNames; }
+    // Editing props (Game's debug UI). A prop is its index in RoadNetwork().props. PickProp: the nearest drawn prop a
+    // world-space ray (unit direction) hits within its model's bounds, or -1. SetProp moves one (package x, z; it
+    // stands on the ground there) and turns it (degrees clockwise from north); RemoveProp hides it. Both mark it
+    // edited until SaveProps writes the edits into the roads file: the runtime copy, and the source file the build
+    // copied it from when it's found above the executable (Game\Resources\<roads>); `message` says where.
+    int PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* distance = nullptr) const;
+    bool PropBounds(int prop, XMFLOAT3 bounds[2]) const;     // World axis-aligned bounds of a drawn prop.
+    void SetProp(int prop, const XMFLOAT2& point, float heading);
+    void RemoveProp(int prop);
+    bool PropEdited(int prop) const { return m_propEdits.count(prop) != 0; }
+    size_t PropEdits() const { return m_propEdits.size(); }
+    bool SaveProps(std::string& message, const std::vector<std::wstring>* files = nullptr);    // files: instead (tests).
     // Props left out because their model isn't installed.
     UINT PropsWithoutModel() const { return m_propsWithoutModel; }
 
@@ -129,6 +142,7 @@ private:
     };
 
     TerrainParams& Params() { return static_cast<TerrainParams&>(*_params); }
+    const TerrainParams& Params() const { return static_cast<const TerrainParams&>(*_params); }
     static uint32_t Index(const Node& node) { return static_cast<uint32_t>(TerrainPackage::NodeIndex(node.level, node.x, node.z)); }
     void NodeBounds(const Node& node, XMFLOAT3 bounds[2]) const;
     float Distance(const Node& node, const XMFLOAT3& eye) const;
@@ -150,6 +164,8 @@ private:
     bool m_open = false;
     Roads::Network m_roads;
     std::string m_roadsError;
+    std::wstring m_roadsFile;           // The roads file the terrain loaded, and its CRS origin (for saving props).
+    double m_roadsOriginX = 0, m_roadsOriginY = 0;
     // Road surfaces, built when the roads load: a static mesh per non-empty part, drawn like a model's.
     Roads::Mesh m_roadMesh;
     struct RoadPart
@@ -188,6 +204,11 @@ private:
     UINT m_propsWithoutModel = 0;
     UINT PropInstances() const { return m_propInstances; }
     void PlaceProps();
+    // Each prop's drawn instance (its model and index in m_propWorlds), or model -1 when it isn't drawn; and edits.
+    struct PropRef { int model = -1; size_t index = 0; };
+    std::vector<PropRef> m_propRefs;
+    std::map<int, Roads::PropEdit> m_propEdits;
+    bool PropWorld(const Roads::Prop& prop, XMFLOAT4X4& world);
     std::vector<DebugPolyline> m_roadOverlay;   // Built on first use: the centerlines on the ground, in world space.
     void LoadRoads(const std::wstring& file);
     void AddRoadOverlay(RenderData& renderData);
