@@ -114,9 +114,11 @@ def finish(base, edited, snap_start=6.0):
         others = [part for _, part in every if part is not own[0]]
         if not others:
             continue
-        distance, at = min((roads.nearest_on_line(tuple(own[0][0][:2]), part) for part in others), key=lambda r: r[0])
+        # In plan (x, y): a file may carry heights or other ordinates, kept as they are when a start moves.
+        distance, at = min((roads.nearest_on_line(tuple(own[0][0][:2]), [tuple(p[:2]) for p in part]) for part in others),
+                           key=lambda r: r[0])
         if 0.05 < distance <= snap_start:
-            own[0][0] = [round(at[0], 2), round(at[1], 2)]
+            own[0][0] = [round(at[0], 2), round(at[1], 2)] + list(own[0][0][2:])
             notes.append(f"{feature['properties']['id']}: start moved {distance:.1f} m onto the nearest line")
     for feature, new in changed:
         props = feature['properties']

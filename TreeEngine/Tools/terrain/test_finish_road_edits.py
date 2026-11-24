@@ -82,6 +82,12 @@ gap = finish.roads.nearest_on_line(tuple(final_c[0]), [tuple(p) for p in final_a
 check(final_a[0] == [0.0, 0.0] and final_b[0] == [2.0, 11.0] and gap < 0.05,
       f'snapped to where a line was drawn, not where it is: a {final_a}, b {final_b}, c {final_c}')
 
+# XYZ coordinates: snapping works in plan and keeps the start's z.
+road3 = line(dict(road['properties']), [[0.0, 0.0, 12.0], [100.0, 0.0, 13.0]])
+drive3 = line({'kind': 'driveway', 'id': 'z'}, [[30.0, 3.0, 14.0], [30.0, 40.0, 15.0]])
+out, notes = finish.finish([road3], [road3, drive3])
+check(out[1]['geometry']['coordinates'][0] == [30.0, 0.0, 14.0], f'an XYZ start did not snap: {out[1]}')
+
 # Multi-part lines: an unchanged re-save is kept, a reshape is kept (not restored), a property change keeps the parts.
 multi = {'type': 'Feature', 'properties': {'kind': 'road', 'id': 'm', 'source': 'county', 'edited': False,
                                            'surface': 'gravel', 'width': 5.0},
