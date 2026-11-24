@@ -82,6 +82,13 @@ gap = finish.roads.nearest_on_line(tuple(final_c[0]), [tuple(p) for p in final_a
 check(final_a[0] == [0.0, 0.0] and final_b[0] == [2.0, 11.0] and gap < 0.05,
       f'snapped to where a line was drawn, not where it is: a {final_a}, b {final_b}, c {final_c}')
 
+# A new point is a prop: a post facing north unless its prop is set, with a note.
+point = {'type': 'Feature', 'properties': {'kind': None, 'prop': None}, 'geometry': {'type': 'Point', 'coordinates': [12.0, 7.0]}}
+out, notes = finish.finish(base, [road, drive, point])
+p = out[2]['properties']
+check(p.get('kind') == 'prop' and p.get('prop') == 'post' and p.get('heading') == 0 and p.get('id') == 'manual-12-7'
+      and any('without a model' in n for n in notes), f'the new point: {out[2]}, {notes}')
+
 # XYZ coordinates: snapping works in plan and keeps the start's z.
 road3 = line(dict(road['properties']), [[0.0, 0.0, 12.0], [100.0, 0.0, 13.0]])
 drive3 = line({'kind': 'driveway', 'id': 'z'}, [[30.0, 3.0, 14.0], [30.0, 40.0, 15.0]])

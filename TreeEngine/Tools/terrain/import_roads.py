@@ -16,6 +16,7 @@ A feature whose `edited` property is true in an existing output is kept as it is
 """
 
 import argparse
+import importlib.util
 import json
 import math
 import os
@@ -684,6 +685,14 @@ def main():
                                   'OpenStreetMap contributors (ODbL)']},
         'features': features,
     }
+    # Roadside props from the lines as written (road_props.py).
+    spec = importlib.util.spec_from_file_location('road_props', os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                                             'road_props.py'))
+    road_props = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(road_props)
+    features, prop_counts = road_props.place_props(features)
+    collection['features'] = features
+    report.append(f'props: {road_props.describe(prop_counts)}')
     write_collection(args.output, collection, features)
     for line in report:
         log(line)

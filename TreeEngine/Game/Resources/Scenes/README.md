@@ -167,7 +167,10 @@ or GIS elevation data). It requires `source`, the package directory, such as
   overlap, paved roads show over gravel roads, and both over driveways. They
   cast no raster shadow. The debug UI's **Show road centerlines** (render tests:
   a capture's `"showRoads": true`) draws the centerlines: paved roads orange,
-  gravel roads tan, driveways cyan.
+  gravel roads tan, driveways cyan. The file's props (mailboxes, posts, stop
+  signs, street-name signs) stand on the terrain at their points, turned to
+  their headings, drawn instanced from `Models/Roadside/<prop>.glb` in raster
+  (with shadows) and DXR.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,

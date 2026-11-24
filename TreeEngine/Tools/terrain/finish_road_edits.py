@@ -4,15 +4,19 @@
 
 It compares the file with its last committed version (--base REF, default HEAD; or --base-file FILE) and:
 - marks every changed or new feature `edited: true`, so a later import_roads.py run keeps it;
-- fills in a new feature's missing properties: kind driveway, a unique id, source manual, and for a driveway
-  gravel, 3 m wide (a new road needs its surface and width set by hand);
+- fills in a new feature's missing properties: a unique id and source manual; a new line is a driveway (gravel,
+  3 m wide; a new road needs its surface and width set by hand), a new point a prop (a post facing north unless
+  its prop and heading are set);
 - moves the first point of a changed or new line onto the nearest other line when it is within --snap-start meters
   (default 6) but not on it: a road end the snapping in QGIS missed;
 - drops empty (null) properties, rounds changed coordinates to centimeters, and writes one feature per line in the
-  file's order, unchanged features exactly as before, so the diff shows only the edits.
+  file's order, unchanged features exactly as before, so the diff shows only the edits;
+- places the generated props again (road_props.py; --no-props skips it), so mailboxes and signs follow the edited
+  lines; props you moved or added stay.
 
 It lists what it changed, deleted features, and changed lines that cross another more than 3 m from both lines'
-ends (closer is a junction: a line starting on another, a little past it). Then re-grade the terrain with import_heightmap.py --roads and rebuild.
+ends (closer is a junction: a line starting on another, a little past it). Then re-grade the terrain with
+import_heightmap.py --roads and rebuild.
 """
 
 import argparse
@@ -27,6 +31,10 @@ _spec = importlib.util.spec_from_file_location('import_roads', os.path.join(os.p
                                                                             'import_roads.py'))
 roads = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(roads)
+_spec = importlib.util.spec_from_file_location('road_props', os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                                          'road_props.py'))
+road_props = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(road_props)
 
 TOLERANCE = 0.005  # coordinates closer than this (m) are unchanged: QGIS rewrites them with more digits
 JUNCTION = 3.0  # a crossing this close (m) to either line's end is a junction, not reported
@@ -83,9 +91,10 @@ def finish(base, edited, snap_start=6.0):
                     'coordinates': rounded(json.loads(json.dumps((f.get('geometry') or {}).get('coordinates'))))}
         lines = parts({'geometry': geometry})
         if old is None:
-            props.setdefault('kind', 'driveway')
+            point = geometry['type'] == 'Point'
+            props.setdefault('kind', 'prop' if point else 'driveway')
             if not props.get('id'):
-                start = lines[0][0] if lines and lines[0] else (0, 0)
+                start = (geometry['coordinates'] if point else lines[0][0] if lines and lines[0] else (0, 0))
                 props['id'] = f'manual-{start[0]:.0f}-{start[1]:.0f}'
                 while props['id'] in ids:
                     props['id'] += '+'
@@ -94,6 +103,11 @@ def finish(base, edited, snap_start=6.0):
             if props['kind'] == 'driveway':
                 props.setdefault('surface', 'gravel')
                 props.setdefault('width', roads.DRIVEWAY_WIDTH)
+            elif props['kind'] == 'prop':
+                if 'prop' not in props:
+                    notes.append(f"{props['id']}: a new prop without a model is a post: set its prop and heading")
+                props.setdefault('prop', 'post')
+                props.setdefault('heading', 0)
             elif 'surface' not in props or 'width' not in props:
                 notes.append(f"{props['id']}: a new {props['kind']} needs its surface and width set")
         props['edited'] = True
@@ -178,6 +192,8 @@ def main():
     parser.add_argument('--base-file', help='compare with this file instead of a git revision')
     parser.add_argument('--snap-start', type=float, default=6.0,
                         help="move a changed line's first point onto the nearest line within this many meters (0: off)")
+    parser.add_argument('--no-props', dest='props', action='store_false',
+                        help="leave the props as they are (by default they're placed again for the edited lines)")
     args = parser.parse_args()
 
     base = read_base(args.roads, args.base, args.base_file)
@@ -185,6 +201,9 @@ def main():
     features, notes = finish(base.get('features', []), current.get('features', []), args.snap_start)
     header = {k: base[k] for k in ('type', 'name', 'crs', 'treeRoads') if k in base}
     header.update({k: current[k] for k in ('crs',) if k in current})
+    if args.props:
+        features, prop_counts = road_props.place_props(features)
+        notes.append(f'props: {road_props.describe(prop_counts)}')
     roads.write_collection(args.roads, header, features)
     for note in notes:
         print(note)
