@@ -137,6 +137,13 @@ out, counts = props.place_props(fan)
 props.nearest = original
 check(counts['mailbox without a road'] == 9 and calls[0] < 400, f'a disconnected fan took {calls[0]} nearest-line calls')
 
+# Staggered T-junctions 12 m apart on one through road stay two intersections: a sign and a stop at each.
+staggered = [line('road', 'a', [[-100.0, 0.0], [100.0, 0.0]], name='A ST', **fast),
+             line('road', 'p', [[0.0, 0.0], [0.0, 80.0]], name='P ST', **county),
+             line('road', 'q', [[12.0, 0.0], [12.0, -80.0]], name='Q ST', **county)]
+out, counts = props.place_props(staggered)
+check(counts['street-name-sign'] == 2 and counts['stop-sign'] == 2, f'staggered T-junctions: {counts}')
+
 # A road piece meeting another piece of itself (a bend split in two) is no intersection.
 bend = [line('road', 'd1', [[0.0, 0.0], [50.0, 0.0]], name='D RD', **county),
         line('road', 'd2', [[50.0, 0.0], [50.0, 50.0]], name='D RD', **county)]

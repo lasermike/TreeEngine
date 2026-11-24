@@ -24,7 +24,9 @@ import os
 import sys
 
 JOIN = 1.5          # meters: a line end this close to another line meets it
-CLUSTER = 15.0      # meters: junction points this close are one intersection
+CLUSTER = 4.0       # meters: junction points this close are one intersection (where pieces of roads meet, their
+                    # points coincide; T-junctions staggered a few meters apart stay two)
+STUB = 7.5          # meters: a road reaching less than this past an intersection has no approach from that side
 MEETS = 4.0         # meters: a road this close to an intersection's center is one of its roads
 APPROACH = 15.0     # meters back along a road to find which way it approaches
 SIGN_SETBACK = 1.5  # meters beyond a road's shoulder for a sign's post
@@ -141,7 +143,7 @@ def intersections(roads):
             # From each side with road left beyond the intersection, the direction traffic comes in.
             for sign in (-1, 1):
                 remaining = along if sign < 0 else length - along
-                if remaining < CLUSTER / 2:
+                if remaining < STUB:
                     continue
                 back = point_along(road.line, along + sign * min(APPROACH, remaining))
                 approaches.append((road, unit(at[0] - back[0], at[1] - back[1])))
