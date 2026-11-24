@@ -32,11 +32,15 @@ TOLERANCE = 0.005  # coordinates closer than this (m) are unchanged: QGIS rewrit
 JUNCTION = 3.0  # a crossing this close (m) to either line's end is a junction, not reported
 
 
-def points(f):
+def parts(f):
+    """A line feature's parts (lists of [x, y]); none for other geometry."""
     geometry = f.get('geometry') or {}
-    if geometry.get('type') != 'LineString':
-        return []
-    return [(p[0], p[1]) for p in geometry.get('coordinates') or []]
+    coordinates = geometry.get('coordinates') or []
+    if geometry.get('type') == 'LineString':
+        return [coordinates]
+    if geometry.get('type') == 'MultiLineString':
+        return list(coordinates)
+    return []
 
 
 def properties(f):
@@ -44,9 +48,22 @@ def properties(f):
     return {k: v for k, v in (f.get('properties') or {}).items() if v is not None and k != 'edited'}
 
 
+def close(a, b):
+    """Whether two GeoJSON coordinate trees match to TOLERANCE."""
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) <= TOLERANCE
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(close(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+def rounded(c):
+    return round(c, 2) if isinstance(c, float) else [rounded(x) for x in c] if isinstance(c, list) else c
+
+
 def same(a, b):
-    pa, pb = points(a), points(b)
-    return (len(pa) == len(pb) and all(math.hypot(p[0] - q[0], p[1] - q[1]) <= TOLERANCE for p, q in zip(pa, pb))
+    ga, gb = a.get('geometry') or {}, b.get('geometry') or {}
+    return (ga.get('type') == gb.get('type') and close(ga.get('coordinates'), gb.get('coordinates'))
             and properties(a) == properties(b))
 
 
@@ -54,18 +71,21 @@ def finish(base, edited, snap_start=6.0):
     """Returns (features, notes): `edited`'s features tidied against `base`'s, and what was done."""
     before = {(f.get('properties') or {}).get('id'): f for f in base}
     ids = {(f.get('properties') or {}).get('id') for f in edited} - {None, ''}
-    notes, out, changed = [], [], []
+    notes, result, changed = [], [], []
     for f in edited:
         props = properties(f)
         old = before.get(props.get('id'))
         if old is not None and same(old, f):
-            out.append(old)
+            result.append(old)
             continue
-        line = points(f)
+        # A copy of the geometry, rounded to centimeters: snapping below moves points in it.
+        geometry = {'type': (f.get('geometry') or {}).get('type'),
+                    'coordinates': rounded(json.loads(json.dumps((f.get('geometry') or {}).get('coordinates'))))}
+        lines = parts({'geometry': geometry})
         if old is None:
             props.setdefault('kind', 'driveway')
             if not props.get('id'):
-                start = line[0] if line else (0, 0)
+                start = lines[0][0] if lines and lines[0] else (0, 0)
                 props['id'] = f'manual-{start[0]:.0f}-{start[1]:.0f}'
                 while props['id'] in ids:
                     props['id'] += '+'
@@ -80,59 +100,64 @@ def finish(base, edited, snap_start=6.0):
         # Key order as import_roads writes it.
         order = ['kind', 'id', 'source', 'edited']
         props = {k: props[k] for k in order + [k for k in props if k not in order] if k in props}
-        changed.append((props, [list(p) for p in line], old is None))
-        out.append(None)
+        feature = {'type': 'Feature', 'properties': props, 'geometry': geometry}
+        changed.append((feature, old is None))
+        result.append(feature)
 
-    # Snap missed road ends, against every line as it will be written.
-    lines = [points(f) for f in out if f is not None] + [[tuple(p) for p in c] for _, c, _ in changed]
-    for props, coords, _ in changed:
-        if len(coords) < 2 or snap_start <= 0:
+    # Snap missed road ends onto the lines as they will be written: every part is the written feature's own list,
+    # so a start moved here is where the next snap looks.
+    every = [(f['properties'].get('id'), part) for f in result for part in parts(f) if len(part) >= 2]
+    for feature, _ in changed:
+        own = parts(feature)
+        if snap_start <= 0 or not own or len(own[0]) < 2:
             continue
-        own = [tuple(p) for p in coords]
-        others = [l for l in lines if l != own and len(l) >= 2]
+        others = [part for _, part in every if part is not own[0]]
         if not others:
             continue
-        distance, at = min((roads.nearest_on_line(own[0], l) for l in others), key=lambda r: r[0])
+        distance, at = min((roads.nearest_on_line(tuple(own[0][0][:2]), part) for part in others), key=lambda r: r[0])
         if 0.05 < distance <= snap_start:
-            coords[0] = [at[0], at[1]]
-            notes.append(f"{props['id']}: start moved {distance:.1f} m onto the nearest line")
-    written = iter(changed)
-    result = []
-    for f in out:
-        if f is not None:
-            result.append(f)
-            continue
-        props, coords, new = next(written)
+            own[0][0] = [round(at[0], 2), round(at[1], 2)]
+            notes.append(f"{feature['properties']['id']}: start moved {distance:.1f} m onto the nearest line")
+    for feature, new in changed:
+        props = feature['properties']
         notes.append(f"{props['id']}: {'new' if new else 'changed'}" + (f" ({props.get('name')})" if props.get('name') else ''))
-        result.append({'type': 'Feature', 'properties': props,
-                       'geometry': {'type': 'LineString', 'coordinates': [[round(x, 2), round(y, 2)] for x, y in coords]}})
+        if not parts(feature):
+            notes.append(f"{props['id']}: not a line ({feature['geometry'].get('type')}); kept as drawn")
 
     for i in sorted(set(before) - {(f.get('properties') or {}).get('id') for f in edited} - {None}):
         notes.append(f'{i}: deleted (a later import_roads.py run would bring it back)')
-    # Crossings away from both lines' ends (a line starting on another, a little past it, is a junction).
-    final = {(f.get('properties') or {}).get('id'): points(f) for f in result}
-    for props, _, _ in changed:
-        own = final[props['id']]
-        for other_id, other in final.items():
-            if other_id == props['id']:
+    # Crossings away from both lines' ends (a line starting on another, a little past it, is a junction), including
+    # those through a vertex of either line.
+    for feature, _ in changed:
+        own_id, own = feature['properties']['id'], [part for part in parts(feature) if len(part) >= 2]
+        own_ends = [part[i] for part in own for i in (0, -1)]
+        reported = set()
+        for other_id, other in every:
+            if other_id == own_id or other_id in reported:
                 continue
-            for x in crossings(own, other):
-                if min(math.hypot(x[0] - e[0], x[1] - e[1]) for e in (own[0], own[-1], other[0], other[-1])) > JUNCTION:
-                    notes.append(f"{props['id']}: crosses {other_id} at ({x[0]:.0f}, {x[1]:.0f})")
+            ends = own_ends + [other[0], other[-1]]
+            for part in own:
+                hit = next((x for x in crossings(part, other)
+                            if min(math.hypot(x[0] - e[0], x[1] - e[1]) for e in ends) > JUNCTION), None)
+                if hit:
+                    notes.append(f'{own_id}: crosses {other_id} at ({hit[0]:.0f}, {hit[1]:.0f})')
+                    reported.add(other_id)
                     break
     return result, notes
 
 
 def crossings(a, b):
-    """Where polylines a and b cross."""
+    """Where polylines a and b meet: through segments or at a vertex of either."""
     found = []
     for p, q in zip(a, a[1:]):
         for s, t in zip(b, b[1:]):
-            if not roads.segments_cross(p, q, s, t):
-                continue
             d = (q[0] - p[0]) * (t[1] - s[1]) - (q[1] - p[1]) * (t[0] - s[0])
+            if abs(d) < 1e-12:
+                continue  # parallel
             u = ((s[0] - p[0]) * (t[1] - s[1]) - (s[1] - p[1]) * (t[0] - s[0])) / d
-            found.append((p[0] + u * (q[0] - p[0]), p[1] + u * (q[1] - p[1])))
+            v = ((s[0] - p[0]) * (q[1] - p[1]) - (s[1] - p[1]) * (q[0] - p[0])) / d
+            if -1e-9 <= u <= 1 + 1e-9 and -1e-9 <= v <= 1 + 1e-9:
+                found.append((p[0] + u * (q[0] - p[0]), p[1] + u * (q[1] - p[1])))
     return found
 
 

@@ -65,5 +65,37 @@ check(not any('crosses' in n for n in notes), f'a junction was reported as a cro
 out, notes = finish.finish(base, [road])
 check(len(out) == 1 and any('d: deleted' in n for n in notes), f'a deletion was not reported: {notes}')
 
+# A crossing through an interior vertex of either line is still a crossing.
+vertex = line(dict(drive['properties']), [[50.0, -10.0], [50.0, 0.0], [50.0, 10.0]])
+out, notes = finish.finish(base, [road, vertex], snap_start=0)
+check(any('d: crosses r' in n for n in notes), f'a crossing through a vertex was not reported: {notes}')
+
+# Snaps see earlier snaps. A's start moves from (0, 5) onto the road, so A becomes (0, 0)-(100, 5). B, starting at
+# (2, 11), was 6 m from A as drawn but is 10.9 m from A as written: it stays put rather than snapping to where A was.
+# C, starting at (70, 8.5), snaps onto A as written (y = 3.5 at x = 70, 5 m away), not onto A as drawn (y = 5).
+a = line({'kind': 'driveway', 'id': 'a'}, [[0.0, 5.0], [100.0, 5.0]])
+b = line({'kind': 'driveway', 'id': 'b'}, [[2.0, 11.0], [2.0, 100.0]])
+c = line({'kind': 'driveway', 'id': 'c'}, [[70.0, 8.5], [70.0, 100.0]])
+out, notes = finish.finish(base, [road, drive, a, b, c])
+final_a, final_b, final_c = (out[i]['geometry']['coordinates'] for i in (2, 3, 4))
+gap = finish.roads.nearest_on_line(tuple(final_c[0]), [tuple(p) for p in final_a])[0]
+check(final_a[0] == [0.0, 0.0] and final_b[0] == [2.0, 11.0] and gap < 0.05,
+      f'snapped to where a line was drawn, not where it is: a {final_a}, b {final_b}, c {final_c}')
+
+# Multi-part lines: an unchanged re-save is kept, a reshape is kept (not restored), a property change keeps the parts.
+multi = {'type': 'Feature', 'properties': {'kind': 'road', 'id': 'm', 'source': 'county', 'edited': False,
+                                           'surface': 'gravel', 'width': 5.0},
+         'geometry': {'type': 'MultiLineString', 'coordinates': [[[0.0, 50.0], [40.0, 50.0]], [[60.0, 50.0], [100.0, 50.0]]]}}
+same_multi = {**multi, 'geometry': {'type': 'MultiLineString',
+                                    'coordinates': [[[0.0000001, 50.0], [40.0, 50.0]], [[60.0, 50.0], [100.0, 50.0]]]}}
+out, notes = finish.finish(base + [multi], [road, drive, same_multi])
+check(out[2] is multi and notes == [], f'an unchanged multi-part line changed: {notes}')
+bent = {**multi, 'geometry': {'type': 'MultiLineString', 'coordinates': [[[0.0, 50.0], [40.0, 60.0]], [[60.0, 50.0], [100.0, 50.0]]]}}
+out, _ = finish.finish(base + [multi], [road, drive, bent], snap_start=0)
+check(out[2]['properties']['edited'] is True and out[2]['geometry'] == bent['geometry'], f'a multi-part reshape was lost: {out[2]}')
+renamed = {**multi, 'properties': dict(multi['properties'], name='X RD')}
+out, _ = finish.finish(base + [multi], [road, drive, renamed], snap_start=0)
+check(out[2]['geometry'] == multi['geometry'] and out[2]['properties']['name'] == 'X RD', f'a renamed multi-part line: {out[2]}')
+
 print(f'{failures} failures' if failures else 'finish_road_edits checks passed')
 sys.exit(1 if failures else 0)
