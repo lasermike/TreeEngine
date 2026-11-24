@@ -97,7 +97,10 @@ public:
     // stands on the ground there) and turns it (degrees clockwise from north); RemoveProp hides it. Both mark it
     // edited until SaveProps writes the edits into the roads file: the runtime copy, and the source file the build
     // copied it from when it's found above the executable (Game\Resources\<roads>); `message` says where.
-    int PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* distance = nullptr) const;
+    int PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* distance = nullptr);
+    // Where a world-space ray (unit direction) first meets the terrain's surface within `reach`: its distance, or a
+    // negative value when it doesn't.
+    float GroundHit(const XMFLOAT3& origin, const XMFLOAT3& direction, float reach);
     bool PropBounds(int prop, XMFLOAT3 bounds[2]) const;     // World axis-aligned bounds of a drawn prop.
     void SetProp(int prop, const XMFLOAT2& point, float heading);
     void RemoveProp(int prop);
@@ -209,6 +212,8 @@ private:
     std::vector<PropRef> m_propRefs;
     std::map<int, Roads::PropEdit> m_propEdits;
     bool PropWorld(const Roads::Prop& prop, XMFLOAT4X4& world);
+    // A drawn prop's bounds in its own frame: its model's, with a street-name sign's blades as long as they're drawn.
+    void PropLocalBounds(const PropRef& ref, XMFLOAT3& low, XMFLOAT3& high) const;
     std::vector<DebugPolyline> m_roadOverlay;   // Built on first use: the centerlines on the ground, in world space.
     void LoadRoads(const std::wstring& file);
     void AddRoadOverlay(RenderData& renderData);

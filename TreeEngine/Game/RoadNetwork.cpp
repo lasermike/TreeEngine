@@ -365,22 +365,35 @@ namespace Roads
         }
         for (const PropEdit& edit : edits)
         {
-            const std::string needle = "\"id\": " + nlohmann::ordered_json(edit.id).dump(-1, ' ', true) + ",";
+            // The line that is exactly this prop's feature (with a comma after it, or not): parsed, not matched as
+            // text, so a file in another layout (all on one line, say) is refused rather than edited wrongly.
+            const std::string quoted = nlohmann::ordered_json(edit.id).dump(-1, ' ', true);
             size_t found = lines.size();
-            for (size_t i = 0; i < lines.size(); ++i)
-                if (lines[i].find(needle) != std::string::npos && lines[i].find("\"kind\": \"prop\"") != std::string::npos)
-                {
-                    found = i;
-                    break;
-                }
+            size_t ending = 0;
+            bool comma = false;
+            nlohmann::ordered_json feature;
+            for (size_t i = 0; i < lines.size() && found == lines.size(); ++i)
+            {
+                const std::string& line = lines[i];
+                if (line.find(quoted) == std::string::npos)
+                    continue;
+                size_t end = line.size();
+                while (end > 0 && (line[end - 1] == '\n' || line[end - 1] == '\r'))
+                    --end;
+                const bool trailing = end > 0 && line[end - 1] == ',';
+                auto parsed = nlohmann::ordered_json::parse(line.substr(0, end - (trailing ? 1 : 0)), nullptr, false);
+                if (parsed.is_discarded() || !parsed.is_object() || parsed.value("type", "") != "Feature"
+                    || !parsed.contains("properties") || !parsed["properties"].is_object()
+                    || parsed["properties"].value("kind", "") != "prop" || parsed["properties"].value("id", "") != edit.id)
+                    continue;
+                found = i;
+                ending = end;
+                comma = trailing;
+                feature = std::move(parsed);
+            }
             if (found == lines.size())
-                throw std::runtime_error("roads: prop " + edit.id + " isn't on a line of its own in the file");
+                throw std::runtime_error("roads: prop " + edit.id + " isn't a feature on a line of its own in the file");
             std::string& line = lines[found];
-            size_t ending = line.size();
-            while (ending > 0 && (line[ending - 1] == '\n' || line[ending - 1] == '\r'))
-                --ending;
-            const bool comma = ending > 0 && line[ending - 1] == ',';
-            auto feature = nlohmann::ordered_json::parse(line.substr(0, ending - (comma ? 1 : 0)));
             auto& props = feature["properties"];
             props["edited"] = true;
             props["heading"] = std::round(static_cast<double>(edit.heading) * 10) / 10;

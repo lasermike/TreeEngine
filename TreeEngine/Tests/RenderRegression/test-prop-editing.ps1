@@ -15,11 +15,17 @@ $mailbox = 'prop-mailbox-osm-way-975904216'
 foreach ($mode in @('raster', 'raytracing')) {
     $steps = @(
         @{ id = 'sign'; clicks = @(@{u=0.66;v=0.38}); expected = @('ground'); prop = $sign },
+        # The blade's last 15 cm: E MOONLIGHT OASIS's blade is drawn 1.2 m long, past the model's 0.9 m.
+        @{ id = 'blade-tip'; clicks = @(@{u=0.58;v=0.382}); expected = @('ground'); prop = $sign },
         @{ id = 'ground'; clicks = @(@{u=0.2;v=0.8}); expected = @('ground'); prop = '' },
         @{ id = 'sky'; clicks = @(@{u=0.5;v=0.05}); expected = @(); prop = '' },
         @{ id = 'before'; clicks = @(); expected = @(); prop = '' },
         @{ id = 'edited'; clicks = @(); expected = @(); prop = ''
-           edits = @(@{ id = $stop; move = @(3, 0); heading = 90 }, @{ id = $mailbox; remove = $true }) }
+           edits = @(@{ id = $stop; move = @(3, 0); heading = 90 }, @{ id = $mailbox; remove = $true }) },
+        # A mailbox 70 m off behind a rise: the click hits the hillside in front of it, so no prop. (Last: its camera
+        # stays for the captures after it.)
+        @{ id = 'occluded'; clicks = @(@{u=0.5;v=0.5}); expected = @('ground'); prop = ''
+           camera = @(91.0, 46.08, -42.7); rotation = @(2.4, 10.0, 0) }
     )
     # The save goes to a copy of the roads file: only the two edited props' lines may change.
     $source = Join-Path $workspace 'Game\Resources\Terrain\RoadsTest.roads.geojson'
@@ -30,6 +36,7 @@ foreach ($mode in @('raster', 'raytracing')) {
         $capture = @{ time = 0; filename = (Join-Path $artifacts "$mode-$($step.id).png")
             selectionClicks = @($step.clicks); expectedSelection = @($step.expected); expectedProp = $step.prop }
         if ($step.ContainsKey('edits')) { $capture.propEdits = @($step.edits); $capture.savePropsTo = $saved }
+        if ($step.ContainsKey('camera')) { $capture.cameraPosition = $step.camera; $capture.cameraRotationDegrees = $step.rotation }
         $captures += $capture
     }
     $report = Join-Path $artifacts "$mode-report.json"
@@ -45,7 +52,7 @@ foreach ($mode in @('raster', 'raytracing')) {
         throw "$mode prop editing test failed: $details"
     }
     $result = Get-Content -Raw $report | ConvertFrom-Json
-    $edited = $result.captures[-1].props
+    $edited = ($result.captures | Where-Object { $_.props.Count })[-1].props
     $moved = $edited | Where-Object { $_.id -eq $stop }
     $gone = $edited | Where-Object { $_.id -eq $mailbox }
     if (!$moved -or [math]::Abs($moved.heading - 90) -gt 0.01 -or [math]::Abs($moved.bottom - $moved.ground) -gt 0.05 -or $moved.height -lt 2.5) {

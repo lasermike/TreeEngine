@@ -1376,6 +1376,45 @@ void TestPropEditing()
     try { Roads::UpdateProps(file, { missing }, 1000, 2000); }
     catch (const std::runtime_error&) { threw = true; }
     Check(threw, "editing a prop the file doesn't have succeeded");
+    // A collection written on one line is refused (its line is the collection, not the prop's feature), not edited.
+    const std::string oneLine = "{\"type\": \"FeatureCollection\", \"features\": [{\"type\": \"Feature\", \"properties\": "
+        "{\"kind\": \"prop\", \"id\": \"prop-mailbox-a\", \"prop\": \"mailbox\"}, \"geometry\": {\"type\": \"Point\", "
+        "\"coordinates\": [1010.0, 2003.0]}}]}\n";
+    threw = false;
+    try { Roads::UpdateProps(oneLine, { moved }, 1000, 2000); }
+    catch (const std::runtime_error&) { threw = true; }
+    Check(threw, "a one-line roads file was edited");
+    // A feature whose id comes last in its properties (no comma after it), as the last line of the list.
+    const std::string idLast = "{\"features\": [\n{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"prop\": "
+        "\"mailbox\", \"id\": \"prop-mailbox-a\"}, \"geometry\": {\"type\": \"Point\", \"coordinates\": [1010.0, 2003.0]}}\n]}\n";
+    const std::string idLastUpdated = Roads::UpdateProps(idLast, { moved }, 1000, 2000);
+    Check(idLastUpdated.find("\"id\": \"prop-mailbox-a\", \"edited\": true, \"heading\": 271.3}, \"geometry\": {\"type\": "
+        "\"Point\", \"coordinates\": [1012.34, 2005.01]}}\n]}") != std::string::npos, "a prop with its id last wasn't edited");
+
+    // Saving safely: a staged file is complete beside its target until it's published over it; staging beside a
+    // missing folder fails, leaving the target alone.
+    wchar_t folder[MAX_PATH] = {};
+    GetTempPathW(MAX_PATH, folder);
+    const std::string target = SceneData::Utf8Path(folder) + "tree-roads-save-test.geojson";
+    {
+        std::ofstream original(SceneData::WidePath(target), std::ios::binary | std::ios::trunc);
+        original << "old";
+    }
+    const auto contents = [&](const std::string& path)
+    {
+        std::ifstream input(SceneData::WidePath(path), std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    };
+    const std::wstring staged = SceneData::StageFile(target, "new text");
+    Check(contents(target) == "old" && contents(SceneData::Utf8Path(staged)) == "new text", "a staged file replaced its target early");
+    SceneData::PublishFile(staged, target);
+    Check(contents(target) == "new text" && GetFileAttributesW(staged.c_str()) == INVALID_FILE_ATTRIBUTES,
+        "publishing a staged file didn't replace its target");
+    threw = false;
+    try { SceneData::StageFile(SceneData::Utf8Path(folder) + "no-such-folder-for-tree-tests\\roads.geojson", "x"); }
+    catch (const std::runtime_error&) { threw = true; }
+    Check(threw && contents(target) == "new text", "staging into a missing folder succeeded");
+    DeleteFileW(SceneData::WidePath(target).c_str());
 
     // Picking: a ray hits a box from outside at its entry distance, misses beside it, and from inside starts at 0.
     const DirectX::XMFLOAT3 low(-1, 0, -1), high(1, 3, 1);

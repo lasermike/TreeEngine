@@ -1160,6 +1160,20 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
 
     if (!m_renderData.selection.requests.empty())
     {
+        // Each request's ray through its pixel, from this frame's camera (reversed depth: the near plane is z = 1).
+        const XMMATRIX inverse = XMMatrixInverse(nullptr, XMLoadFloat4x4(&m_renderData.view) * XMLoadFloat4x4(&m_renderData.projection));
+        for (auto& request : m_renderData.selection.requests)
+        {
+            const float x = 2 * request.u - 1, y = 1 - 2 * request.v;
+            const XMVECTOR nearPoint = XMVector3TransformCoord(XMVectorSet(x, y, 1, 1), inverse);
+            const XMVECTOR farPoint = XMVector3TransformCoord(XMVectorSet(x, y, 0.5f, 1), inverse);
+            XMFLOAT3 origin, direction;
+            XMStoreFloat3(&origin, nearPoint);
+            XMStoreFloat3(&direction, XMVector3Normalize(farPoint - nearPoint));
+            request.rayOrigin[0] = origin.x; request.rayOrigin[1] = origin.y; request.rayOrigin[2] = origin.z;
+            request.rayDirection[0] = direction.x; request.rayDirection[1] = direction.y; request.rayDirection[2] = direction.z;
+            request.hasRay = true;
+        }
         m_renderData.picking = true;
         m_renderData.pickObjects.clear();
         m_pickObjectIds.clear();

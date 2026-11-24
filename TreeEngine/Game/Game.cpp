@@ -1172,15 +1172,12 @@ void Game::UpdateObjectSelection()
             }
             continue;
         }
-        // The click's ray: back through the view and projection from the near plane (reversed depth: z = 1) to a point
-        // further in.
-        const XMMATRIX inverse = XMMatrixInverse(nullptr, XMLoadFloat4x4(&data.view) * XMLoadFloat4x4(&data.projection));
-        const float x = 2 * result.request.u - 1, y = 1 - 2 * result.request.v;
-        const XMVECTOR nearPoint = XMVector3TransformCoord(XMVectorSet(x, y, 1, 1), inverse);
-        const XMVECTOR farPoint = XMVector3TransformCoord(XMVectorSet(x, y, 0.5f, 1), inverse);
-        XMFLOAT3 origin, direction;
-        XMStoreFloat3(&origin, nearPoint);
-        XMStoreFloat3(&direction, XMVector3Normalize(farPoint - nearPoint));
+        // The click's ray, as the pick's frame saw it (RenderManager sets it when it draws the pick); the prop it hits
+        // must be nearer than the ground it meets, which the GPU pick saw when it found the terrain.
+        if (!result.request.hasRay)
+            continue;
+        const XMFLOAT3 origin(result.request.rayOrigin[0], result.request.rayOrigin[1], result.request.rayOrigin[2]);
+        const XMFLOAT3 direction(result.request.rayDirection[0], result.request.rayDirection[1], result.request.rayDirection[2]);
         m_selectedProp = terrain->PickProp(origin, direction);
         m_propTerrain = m_selectedProp >= 0 ? terrain : nullptr;
     }

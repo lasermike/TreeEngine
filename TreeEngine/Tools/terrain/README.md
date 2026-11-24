@@ -181,10 +181,13 @@ squeezed to fit that (Game/SignText.h). Editing a sign's `text` in QGIS changes 
 **Editing props in the engine.** Ctrl-click a prop (in the debug UI's viewport) to select it: the click selects its
 terrain, and the prop the click's ray hits within its model's bounds; it's highlighted. The terrain's **Props**
 section in the Objects panel then shows it: drag its position with the position gizmo (it stays on the ground) or
-type its heading, or **Remove prop**. **Save prop edits to the roads file** writes them into the roads file the build
-copied (found above the executable as `Game\Resources\<roads>`) and into the running copy: only the edited props'
-lines change, each marked `edited` (and `removed` when removed), in the same layout as `import_roads.py`'s, so the
-diff shows just them. Unsaved edits are lost when the scene reloads. `Tests/RenderRegression/test-prop-editing.ps1`
+type its heading, or **Remove prop**. A click picks only a prop in front of the ground it meets, so one hidden behind a
+hill isn't. **Save prop edits to the roads file** writes them into the running copy, and when that is the copy the
+build put beside the executable, into the file it was copied from (found above the executable as
+`Game\Resources\<roads>`); a roads file loaded from anywhere else is saved alone. Only the edited props' lines change,
+each marked `edited` (and `removed` when removed), in the same layout as `import_roads.py`'s, so the diff shows just
+them. Every file's new text is staged beside it before any is replaced, so a failed save changes nothing (or says
+which file it did save). Unsaved edits are lost when the scene reloads. `Tests/RenderRegression/test-prop-editing.ps1`
 picks, edits and saves (into a copy) in raster and DXR.
 
 The render suite's `terrain-roads` scene draws `RoadsTest.terrain`: 256 m of Hungerford around the E Scott Dr and

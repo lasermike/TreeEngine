@@ -308,6 +308,11 @@ namespace SceneData
     SceneDefinition ReadScene(const std::string& filename);
     std::string SerializeScene(const SceneDefinition& scene);
     void WriteScene(const SceneDefinition& scene, const std::string& filename, bool overwrite = false);
+    // Writing a file safely in two steps: StageFile writes the text to a new temporary file beside `filename`,
+    // flushed and closed, and returns its path (throwing, with nothing left behind, when it can't); PublishFile then
+    // moves it over `filename` in one step. Staging every file first lets a caller replace none if any fails.
+    std::wstring StageFile(const std::string& filename, const std::string& text);
+    void PublishFile(const std::wstring& staged, const std::string& filename, bool overwrite = true);
 
     std::wstring WidePath(const std::string& path);
     std::string Utf8Path(const std::wstring& path);

@@ -150,10 +150,51 @@ void Terrain::PlaceProps()
     BuildSignText();
 }
 
-int Terrain::PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* distance) const
+void Terrain::PropLocalBounds(const PropRef& ref, XMFLOAT3& low, XMFLOAT3& high) const
+{
+    const GltfAsset& asset = *Params().propModels[ref.model];
+    low = asset.boundsMin;
+    high = asset.boundsMax;
+    if (ref.model == static_cast<int>(Roads::PropModel::StreetNameSign) && ref.index < m_signBlades.size() && SignNames())
+    {
+        // The lower blade runs along the model's x, the upper along z, each centered on the post.
+        const float alongX = std::max(1.0f, m_signStretch[m_signBlades[ref.index][0]]);
+        const float alongZ = std::max(1.0f, m_signStretch[m_signBlades[ref.index][1]]);
+        low.x *= alongX;
+        high.x *= alongX;
+        low.z *= alongZ;
+        high.z *= alongZ;
+    }
+}
+
+float Terrain::GroundHit(const XMFLOAT3& origin, const XMFLOAT3& direction, float reach)
+{
+    // March half a meter at a time until the ray is below the ground, then halve the last step to a centimeter.
+    const auto below = [&](float t)
+    {
+        float ground = 0;
+        return HeightAt(origin.x + direction.x * t, origin.z + direction.z * t, ground) && origin.y + direction.y * t <= ground;
+    };
+    if (below(0))
+        return 0;
+    for (float t = 0.5f; t <= reach; t += 0.5f)
+        if (below(t))
+        {
+            float low = t - 0.5f, high = t;
+            while (high - low > 0.01f)
+                (below((low + high) / 2) ? high : low) = (low + high) / 2;
+            return high;
+        }
+    return -1;
+}
+
+int Terrain::PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* distance)
 {
     int best = -1;
-    float nearest = 1e30f;
+    // Only props in front of the ground the ray meets (a hillside hides what's behind it); a prop's foot stands on
+    // the ground, so the ground's hit counts with a little to spare.
+    const float ground = GroundHit(origin, direction, 4000);
+    float nearest = ground >= 0 ? ground + 0.25f : 1e30f;
     for (size_t p = 0; p < m_propRefs.size(); ++p)
     {
         const PropRef& ref = m_propRefs[p];
@@ -168,8 +209,9 @@ int Terrain::PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* 
         XMFLOAT3 localOrigin, localDirection;
         XMStoreFloat3(&localOrigin, XMVector3TransformCoord(XMLoadFloat3(&origin), inverse));
         XMStoreFloat3(&localDirection, XMVector3TransformNormal(XMLoadFloat3(&direction), inverse));
-        const GltfAsset& asset = *Params().propModels[ref.model];
-        const float t = Roads::RayBox(localOrigin, localDirection, asset.boundsMin, asset.boundsMax);
+        XMFLOAT3 low, high;
+        PropLocalBounds(ref, low, high);
+        const float t = Roads::RayBox(localOrigin, localDirection, low, high);
         if (t >= 0 && t < nearest)       // Rotations and translations keep distances.
         {
             nearest = t;
@@ -177,7 +219,7 @@ int Terrain::PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* 
         }
     }
     if (distance)
-        *distance = nearest;
+        *distance = best >= 0 ? nearest : -1;
     return best;
 }
 
@@ -186,13 +228,14 @@ bool Terrain::PropBounds(int prop, XMFLOAT3 bounds[2]) const
     if (prop < 0 || prop >= static_cast<int>(m_propRefs.size()) || m_propRefs[prop].model < 0)
         return false;
     const PropRef& ref = m_propRefs[prop];
-    const GltfAsset& asset = *Params().propModels[ref.model];
+    XMFLOAT3 lo, hi;
+    PropLocalBounds(ref, lo, hi);
     const XMMATRIX world = XMLoadFloat4x4(&m_propWorlds[ref.model][ref.index]);
     XMVECTOR low = XMVectorReplicate(1e30f), high = XMVectorReplicate(-1e30f);
     for (int corner = 0; corner < 8; ++corner)
     {
-        const XMVECTOR point = XMVector3TransformCoord(XMVectorSet(corner & 1 ? asset.boundsMax.x : asset.boundsMin.x,
-            corner & 2 ? asset.boundsMax.y : asset.boundsMin.y, corner & 4 ? asset.boundsMax.z : asset.boundsMin.z, 1), world);
+        const XMVECTOR point = XMVector3TransformCoord(XMVectorSet(corner & 1 ? hi.x : lo.x,
+            corner & 2 ? hi.y : lo.y, corner & 4 ? hi.z : lo.z, 1), world);
         low = XMVectorMin(low, point);
         high = XMVectorMax(high, point);
     }
@@ -248,53 +291,95 @@ bool Terrain::SaveProps(std::string& message, const std::vector<std::wstring>* o
     std::vector<Roads::PropEdit> edits;
     for (const auto& entry : m_propEdits)
         edits.push_back(entry.second);
-    // The runtime copy, and the source the build copied it from: Game\Resources\<roads> above the executable.
+    // The file the terrain loaded; and when that's the copy the build put beside the executable (<executable's
+    // folder>\<roads>), the source it was copied from: Game\Resources\<roads> in a folder above. A roads file loaded
+    // from anywhere else (a scene's own folder) is saved alone.
     std::vector<std::wstring> files = only ? *only : std::vector<std::wstring>{ m_roadsFile };
+    const auto fullPath = [](const std::wstring& path)
+    {
+        wchar_t full[MAX_PATH] = {};
+        const DWORD length = GetFullPathNameW(path.c_str(), MAX_PATH, full, nullptr);
+        return length && length < MAX_PATH ? std::wstring(full) : path;
+    };
     wchar_t executable[MAX_PATH] = {};
     if (!only && GetModuleFileNameW(nullptr, executable, MAX_PATH))
     {
         std::wstring folder = executable;
-        std::wstring relative(Params().roads.begin(), Params().roads.end());
+        folder.resize(folder.find_last_of(L'\\'));
+        std::wstring relative = SceneData::WidePath(Params().roads);
         std::replace(relative.begin(), relative.end(), L'/', L'\\');
-        for (size_t slash = folder.find_last_of(L'\\'); slash != std::wstring::npos; slash = folder.find_last_of(L'\\'))
-        {
-            folder.resize(slash);
-            const std::wstring candidate = folder + L"\\Game\\Resources\\" + relative;
-            if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES)
+        if (_wcsicmp(fullPath(m_roadsFile).c_str(), fullPath(folder + L"\\" + relative).c_str()) == 0)
+            for (size_t slash = folder.find_last_of(L'\\'); slash != std::wstring::npos; slash = folder.find_last_of(L'\\'))
             {
-                files.push_back(candidate);
-                break;
+                folder.resize(slash);
+                const std::wstring candidate = folder + L"\\Game\\Resources\\" + relative;
+                if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES)
+                {
+                    files.push_back(candidate);
+                    break;
+                }
             }
-        }
     }
-    message.clear();
+    // Every file's new text first (an edit a file can't take saves nothing), then each staged beside its file, and
+    // only then each replaced, so a failure leaves the files as they were (or, past the first replacement, says which
+    // were saved).
+    std::vector<std::string> texts;
     for (const std::wstring& file : files)
     {
         std::ifstream input(file, std::ios::binary);
+        if (!input)
+        {
+            message = "Couldn't read " + SceneData::Utf8Path(file) + "; nothing was saved.";
+            return false;
+        }
         std::stringstream text;
         text << input.rdbuf();
-        std::string updated;
         try
         {
-            updated = Roads::UpdateProps(text.str(), edits, m_roadsOriginX, m_roadsOriginY);
+            texts.push_back(Roads::UpdateProps(text.str(), edits, m_roadsOriginX, m_roadsOriginY));
         }
         catch (const std::runtime_error& error)
         {
-            message = error.what();
+            message = std::string(error.what()) + " (" + SceneData::Utf8Path(file) + "); nothing was saved.";
             return false;
         }
-        std::ofstream output(file, std::ios::binary | std::ios::trunc);
-        output << updated;
-        if (!output)
-        {
-            message = "Couldn't write " + SceneData::Utf8Path(file);
-            return false;
-        }
-        message += (message.empty() ? "Saved " : " and ") + std::to_string(edits.size()) + " prop edits to "
-            + SceneData::Utf8Path(file);
     }
+    std::vector<std::wstring> staged;
+    const auto discard = [&]()
+    {
+        for (const std::wstring& path : staged)
+            DeleteFileW(path.c_str());
+    };
+    try
+    {
+        for (size_t i = 0; i < files.size(); ++i)
+            staged.push_back(SceneData::StageFile(SceneData::Utf8Path(files[i]), texts[i]));
+    }
+    catch (const std::runtime_error& error)
+    {
+        discard();
+        message = std::string(error.what()) + "; nothing was saved.";
+        return false;
+    }
+    std::string saved;
+    for (size_t i = 0; i < files.size(); ++i)
+    {
+        try
+        {
+            SceneData::PublishFile(staged[i], SceneData::Utf8Path(files[i]));
+            staged[i].clear();
+            saved += (saved.empty() ? "" : " and ") + SceneData::Utf8Path(files[i]);
+        }
+        catch (const std::runtime_error& error)
+        {
+            discard();
+            message = std::string(error.what()) + (saved.empty() ? "; nothing was saved." : "; only " + saved + " was saved.");
+            return false;
+        }
+    }
+    message = "Saved " + std::to_string(edits.size()) + " prop edits to " + saved;
     if (files.size() == 1 && !only)
-        message += " (the source file wasn't found above the executable: copy it back by hand)";
+        message += " (no source copy to update: it was loaded from there, or Game\\Resources wasn't found above the executable)";
     m_propEdits.clear();
     return true;
 }
