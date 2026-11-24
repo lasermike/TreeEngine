@@ -5,12 +5,15 @@
 #include "RoadMesh.h"
 #include <array>
 #include <condition_variable>
+#include <functional>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
 
 struct RenderUnit;
+struct GltfAsset;
 
 // A heightfield terrain drawn from a terrain package (TerrainPackage.h), CDLOD style: each frame a quadtree walk from
 // the root chooses nodes by distance, finer near the camera, and each chosen node is one draw of a shared 64 x 64-quad
@@ -45,6 +48,10 @@ public:
     // The road surfaces' materials and maps, one per Roads::Part (asphalt, gravel, yellow and white markings).
     std::vector<ShaderMaterial> roadMaterials;
     std::vector<MaterialTextureSources> roadMaterialTextures;
+    // Loads a roadside prop model (Models/Roadside/<name>.glb), asked once for each model the roads file's props
+    // use; null (or a null result, for a model that isn't installed) draws none of that model's props.
+    std::function<std::shared_ptr<GltfAsset>(Roads::PropModel)> loadPropModel;
+    std::array<std::shared_ptr<GltfAsset>, static_cast<size_t>(Roads::PropModel::Count)> propModels;   // As loaded.
     float lodRange = 2.0f;          // A node splits within lodRange x its size of the camera.
     UINT slots = 512;               // Vertex pool size, in nodes.
 };
@@ -73,11 +80,15 @@ public:
     HRESULT InitGraphics(RenderManager& renderManager) override;
     HRESULT CleanUpDeviceObjects() override;
     HRESULT ComputeConstants(IRenderFrame* frame) override;
-    // One instance for the nodes, and one per road surface part.
-    unsigned int GetNumInstances() override { return 1 + RoadParts(); }
-    unsigned int GetMaxInstances() override { return 1 + RoadParts(); }
-    // Each drawn node is a ray-tracing geometry of its own; so is each road surface part.
-    unsigned int GetMaxDrawnInstances() override { return Params().slots + RoadParts(); }
+    // One instance for the nodes, one per road surface part, and one per prop part per prop.
+    unsigned int GetNumInstances() override { return 1 + RoadParts() + PropInstances(); }
+    unsigned int GetMaxInstances() override { return 1 + RoadParts() + PropInstances(); }
+    // Each drawn node is a ray-tracing geometry of its own; so is each road surface part and prop instance.
+    unsigned int GetMaxDrawnInstances() override { return Params().slots + RoadParts() + PropInstances(); }
+    // The props drawn of a model (Roads::PropModel), for tests.
+    UINT PropCount(Roads::PropModel model) const { return static_cast<UINT>(m_propWorlds[static_cast<size_t>(model)].size()); }
+    // Props left out because their model isn't installed.
+    UINT PropsWithoutModel() const { return m_propsWithoutModel; }
 
     // The terrain's height at world (x, z) from the package's finest level, bilinear between samples; false outside
     // the terrain or when the block can't be read. Reads the package (not thread safe with itself).
@@ -145,6 +156,23 @@ private:
     };
     std::vector<RoadPart> m_roadParts;
     UINT RoadParts() const { return static_cast<UINT>(m_roadParts.size()); }
+    // Roadside props: each one's transform (turned to its heading, on the ground) by model, and a batch per primitive
+    // and material of each model in use, drawn instanced once per part using them per prop of the model (one render
+    // unit each, as a glTF model groups its parts).
+    static constexpr size_t PropModels = static_cast<size_t>(Roads::PropModel::Count);
+    static constexpr float PropHeight = 3.5f;   // Meters: the tallest prop, which the terrain's bounds reach above it.
+    std::array<std::vector<XMFLOAT4X4>, PropModels> m_propWorlds;
+    struct PropBatch
+    {
+        size_t model = 0, primitive = 0, material = 0;
+        std::vector<XMFLOAT4X4> transforms;     // The transforms within the model of the parts drawing these.
+        RenderUnit* renderUnit = nullptr;
+    };
+    std::vector<PropBatch> m_propBatches;
+    UINT m_propInstances = 0;
+    UINT m_propsWithoutModel = 0;
+    UINT PropInstances() const { return m_propInstances; }
+    void PlaceProps();
     std::vector<DebugPolyline> m_roadOverlay;   // Built on first use: the centerlines on the ground, in world space.
     void LoadRoads(const std::wstring& file);
     void AddRoadOverlay(RenderData& renderData);

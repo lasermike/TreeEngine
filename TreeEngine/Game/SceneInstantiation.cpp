@@ -401,6 +401,17 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             if (!terrain.roads.empty())
             {
                 parameters->roadsFile = SceneData::WidePath(RuntimeDataFile(terrain.roads, terrain.id, sceneFilename));
+                // Roadside props' models, loaded as the roads file's props need them (Tools/terrain/make_road_props.py
+                // writes them; any glTF may replace one). One that isn't installed draws nothing; one that is but
+                // doesn't load is an error.
+                const std::string terrainId = terrain.id;
+                parameters->loadPropModel = [terrainId, sceneFilename](Roads::PropModel model) -> std::shared_ptr<GltfAsset>
+                {
+                    const std::string file = std::string("Models/Roadside/") + Roads::PropModelName(model) + ".glb";
+                    try { SceneData::ResolveSceneAsset(file, sceneFilename); }
+                    catch (const std::runtime_error&) { return nullptr; }
+                    return RuntimeModel(file, terrainId, sceneFilename);
+                };
                 // Road surfaces, in Roads::Part order: asphalt and gravel tiled every 4 m (TerrainTool texture
                 // maps), then yellow and white paint.
                 const auto surface = [](const char* kind)

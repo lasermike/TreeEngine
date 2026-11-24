@@ -932,9 +932,16 @@ void TestRoadNetwork()
            "geometry":{"type":"LineString","coordinates":[[1050,2150],[1060,2160.5]]}},
           {"type":"Feature","properties":{"kind":"driveway","id":"osm-way-7"},
            "geometry":{"type":"MultiLineString","coordinates":[[[1040,2140],[1041,2141]],[[1042,2142],[1043,2143]]]}},
-          {"type":"Feature","properties":{"kind":"prop","id":"mailbox-1"},"geometry":{"type":"Point","coordinates":[1050,2150]}}]})";
+          {"type":"Feature","properties":{"kind":"prop","id":"mailbox-1","source":"generated","prop":"mailbox","heading":270,
+            "text":"12 E TEST RD"},"geometry":{"type":"Point","coordinates":[1052,2147]}},
+          {"type":"Feature","properties":{"kind":"prop","id":"sign-1","prop":"street-name-sign"},
+           "geometry":{"type":"Point","coordinates":[1050,2150,3]}}]})";
     const auto network = Roads::Parse(file, "EPSG:32610", 1050, 2150);
-    Check(network.crs == "EPSG:32610" && network.lines.size() == 3, "roads were not parsed (props skipped, multilines split)");
+    Check(network.crs == "EPSG:32610" && network.lines.size() == 3, "roads were not parsed (multilines split)");
+    Check(network.props.size() == 2 && network.props[0].model == Roads::PropModel::Mailbox && network.props[0].heading == 270
+        && network.props[0].text == "12 E TEST RD" && network.props[0].point.x == 2 && network.props[0].point.y == -3
+        && network.props[1].model == Roads::PropModel::StreetNameSign && network.props[1].heading == 0
+        && network.props[1].point.x == 0, "props were not parsed");
     const auto& road = network.lines[0];
     Check(road.kind == Roads::Kind::Road && road.edited && road.name == "E TEST RD" && road.surface == "gravel"
         && road.width == 5 && road.ditchDepth == 0.5f && road.speedLimit == 25 && road.points.size() == 2
@@ -969,6 +976,18 @@ void TestRoadNetwork()
     bad = Json::parse(file);
     bad["features"][0]["geometry"]["coordinates"] = Json::array({ Json::array({ 1050, 2150 }) });
     rejects(bad.dump(), "at least two points");
+    bad = Json::parse(file);
+    bad["features"][2]["properties"]["prop"] = "bench";
+    rejects(bad.dump(), "features[2] (mailbox-1).properties.prop");
+    bad = Json::parse(file);
+    bad["features"][2]["properties"].erase("prop");
+    rejects(bad.dump(), "features[2] (mailbox-1).properties.prop");
+    bad = Json::parse(file);
+    bad["features"][2]["geometry"] = { { "type", "LineString" }, { "coordinates", Json::array({ Json::array({ 1, 2 }), Json::array({ 3, 4 }) }) } };
+    rejects(bad.dump(), "a prop must be a Point");
+    bad = Json::parse(file);
+    bad["features"][3]["geometry"]["coordinates"] = Json::array({ 1050 });
+    rejects(bad.dump(), "features[3] (sign-1).geometry.coordinates");
     bad = Json::parse(file);
     bad["features"][0]["geometry"].erase("coordinates");
     rejects(bad.dump(), "features[0] (county-1).geometry.coordinates");

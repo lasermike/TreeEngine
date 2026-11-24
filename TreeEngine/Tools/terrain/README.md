@@ -126,8 +126,8 @@ aerial imagery for editing. Each feature's `properties`:
 
 | Property | Features | Meaning |
 | --- | --- | --- |
-| `kind` | all | `road`, `driveway` or `prop` (props: planned; the engine skips them) |
-| `id` | all | stable id: `county-<road number or name>-<start x>-<start y>`, `osm-way-<id>`, `address-<parcel>-<number>` |
+| `kind` | all | `road` or `driveway` (lines), or `prop` (points) |
+| `id` | all | stable id: `county-<road number or name>-<start x>-<start y>`, `osm-way-<id>`, `address-<parcel>-<number>`, `prop-<model>-...` |
 | `source` | all | `county`, `osm`, `generated`, or `manual` (drawn by hand) |
 | `edited` | all | true once changed by hand: the importer leaves it alone |
 | `name` | lines | roads: street name, for signs; generated driveways: the address |
@@ -136,6 +136,10 @@ aerial imagery for editing. Each feature's `properties`:
 | `width`, `shoulder` | lines | meters: the traveled width, and the shoulder each side |
 | `ditchDepth`, `ditchWidth` | roads | meters, each side; 0 for none |
 | `speedLimit` | roads | mph, from the county |
+| `class` | roads | the county's functional class, when it has one (lower is more important) |
+| `prop` | props | the model: `mailbox`, `post`, `stop-sign` or `street-name-sign` |
+| `heading` | props | degrees clockwise from north that the prop's front faces (a mailbox's door, a sign's face) |
+| `text` | props | a mailbox's address; a street-name sign's names, the lower blade's first, separated by `\|` |
 
 Widths come from the surface and owner: county paved 6 m with 0.6 m shoulders (6.6 m and 1.2 m at 40 mph and up),
 county gravel 5 m, private paved 4 m, private gravel 3.6 m, driveways 3 m; county roads get 0.5 to 0.6 m deep ditches.
@@ -144,6 +148,34 @@ heights cover. Its package coordinates are about the packed grid's center: Terra
 southwest pixel center at the package's -x/-z corner and pads north and east, so that center is not the source
 bounds' center. `python -I -B test_import_roads.py` checks the importer's geometry (junctions, clipping, driveway
 joins) on synthetic data.
+
+**Props.** `road_props.py` places mailboxes and signs from the lines (`import_roads.py` and `finish_road_edits.py`
+run it; `python road_props.py FILE` runs it alone), replacing the generated props that weren't edited:
+
+- a street-name sign at each intersection of differently named roads (where one ends on another, or where they
+  cross), private roads included, on the right corner of the lowest-ranked road's approach, facing square to the
+  highest-ranked road so its lower blade runs along it;
+- a stop sign on each approach of a county road that yields: it ends or crosses at a higher-ranked road (county over
+  private, then functional class, speed limit, paved over gravel), or ends (a T) at one of its rank or higher that
+  carries on through. Private roads and driveways get none. The county splits roads where they meet, so a road
+  carries on through where two pieces with its name meet;
+- a mailbox for each driveway, at the mouth on the road where it (or the lane it branches from) starts: on the
+  driveway's side, 2.5 m past it in the direction of travel, the door to the road. Driveways sharing a mouth line
+  their mailboxes up.
+
+A sign's post stands at least 0.5 m off every road's shoulder: where roads meet at a sharp angle it moves further back
+along the approach or further out, and where no spot within 15 m is clear it's left out and counted ("sign without
+room"). Hungerford: 27 street-name signs, 15 stop signs and 465 mailboxes (8 OpenStreetMap driveways reach no road). Moving a
+prop in QGIS and marking it `edited` keeps it there; a point you add becomes a prop (set its `prop` and `heading`).
+`python -I -B test_road_props.py` checks the rules. The models are `Game/Resources/Models/Roadside/<prop>.glb`, from
+`make_road_props.py` (meters, y up, the origin at the foot of the post, the front facing glTF -z): replace one with any
+glTF of the same name. A model that isn't installed draws none of its props; the scene still loads. Street names on
+the blades come later; the blades are blank.
+
+The render suite's `terrain-roads` scene draws `RoadsTest.terrain`: 256 m of Hungerford around the E Scott Dr and
+E Benson Loop intersection, imported like Hungerford but with `--crs EPSG:32610 --bounds 504346.2248 5228427.0807
+504602.2248 5228683.0807` (on Hungerford's grid) and `--roads RoadsTest.roads.geojson`, whose features were cut from
+Hungerford's roads file (lines clipped to the area, its props inside it). It's a fixture: it changes only on purpose.
 
 **Editing roads in QGIS.** Open the roads file first (Layer → Add Layer → Add Vector Layer), so the project takes its
 CRS, then aerial imagery as an XYZ tile layer below it (Esri World Imagery:

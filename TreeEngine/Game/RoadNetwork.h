@@ -1,7 +1,7 @@
 #pragma once
 
 // A terrain package's roads file (Tools/terrain/import_roads.py writes it; Tools/terrain/README.md documents it):
-// GeoJSON in the package's CRS, with road and driveway centerlines and, later, props. Loading converts its
+// GeoJSON in the package's CRS, with road and driveway centerlines and roadside props. Loading converts its
 // coordinates to the package's: x east and z north in meters from the center of the package's source bounds.
 
 #include <DirectXMath.h>
@@ -28,10 +28,26 @@ namespace Roads
         std::vector<DirectX::XMFLOAT2> points;  // Package x, z.
     };
 
+    // Roadside props: a model on the ground at a point, turned to face its heading.
+    enum class PropModel { Mailbox, Post, StopSign, StreetNameSign, Count };
+    const char* PropModelName(PropModel model);        // "mailbox", "post", "stop-sign", "street-name-sign".
+
+    struct Prop
+    {
+        PropModel model = PropModel::Post;
+        std::string id;
+        std::string source;
+        bool edited = false;
+        std::string text;                   // An address, or a sign's street names (lower blade first, | between).
+        float heading = 0;                  // Degrees clockwise from north (+z) that its front faces.
+        DirectX::XMFLOAT2 point = {};       // Package x, z.
+    };
+
     struct Network
     {
         std::string crs;                    // As "EPSG:32610".
         std::vector<Line> lines;
+        std::vector<Prop> props;
     };
 
     // The origin of a package's coordinates in its CRS, and the CRS, from its manifest's source JSON and world size;

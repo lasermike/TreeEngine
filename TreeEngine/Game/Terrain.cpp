@@ -1,7 +1,9 @@
 #include "pch.h"
 #include "Terrain.h"
+#include "GltfLoader.h"
 #include "RenderManager.h"
 
+#include <algorithm>
 #include <fstream>
 #include <mutex>
 #include <sstream>
@@ -51,10 +53,63 @@ void Terrain::LoadRoads(const std::wstring& file)
     }
     // The surfaces, on the ground as the package has it (HeightAt reads the finest blocks it needs).
     m_roadMesh = Roads::BuildMesh(m_roads, m_offset, [this](float x, float z, float& y) { return HeightAt(x, z, y); });
-    m_heightBlocks.clear();
     for (int part = 0; part < static_cast<int>(Roads::Part::Count); ++part)
         if (!m_roadMesh.parts[part].indices.empty())
             m_roadParts.push_back({ static_cast<Roads::Part>(part) });
+    PlaceProps();
+    m_heightBlocks.clear();     // HeightAt's cache: not needed again.
+}
+
+// Each prop stands on the ground at its point (the package's finest heights), turned to its heading: its model's
+// front (+z) faces that many degrees clockwise from north. Each model in use loads once; props off the terrain, or
+// whose model isn't installed, are left out.
+void Terrain::PlaceProps()
+{
+    std::array<bool, PropModels> asked = {};
+    for (const Roads::Prop& prop : m_roads.props)
+    {
+        const size_t model = static_cast<size_t>(prop.model);
+        if (!asked[model])
+        {
+            asked[model] = true;
+            if (!Params().propModels[model] && Params().loadPropModel)
+                Params().propModels[model] = Params().loadPropModel(prop.model);
+        }
+        if (!Params().propModels[model])
+        {
+            ++m_propsWithoutModel;
+            continue;
+        }
+        const float x = prop.point.x + m_offset.x, z = prop.point.y + m_offset.z;
+        float y = 0;
+        if (!HeightAt(x, z, y))
+            continue;
+        XMFLOAT4X4 world;
+        XMStoreFloat4x4(&world, XMMatrixRotationY(XMConvertToRadians(prop.heading)) * XMMatrixTranslation(x, y, z));
+        m_propWorlds[model].push_back(world);
+    }
+    for (size_t model = 0; model < PropModels; ++model)
+    {
+        if (m_propWorlds[model].empty())
+            continue;
+        const size_t first = m_propBatches.size();
+        for (const GltfRenderPart& part : Params().propModels[model]->renderParts)
+        {
+            // Parts sharing a primitive and material (one mesh on several nodes) share a batch.
+            auto batch = std::find_if(m_propBatches.begin() + first, m_propBatches.end(), [&](const PropBatch& b)
+                { return b.primitive == part.primitiveIndex && b.material == part.materialIndex; });
+            if (batch == m_propBatches.end())
+            {
+                m_propBatches.emplace_back();
+                batch = m_propBatches.end() - 1;
+                batch->model = model;
+                batch->primitive = part.primitiveIndex;
+                batch->material = part.materialIndex;
+            }
+            batch->transforms.push_back(part.transform);
+            m_propInstances += static_cast<UINT>(m_propWorlds[model].size());
+        }
+    }
 }
 
 // The centerlines draped on the terrain, every 4 m and half a meter up so they clear the road bed: paved roads
@@ -154,6 +209,11 @@ void Terrain::AppendGeometry(GeometryBufferData& geometryData)
         geometryData.vertices.insert(geometryData.vertices.end(), part.vertices.begin(), part.vertices.end());
         geometryData.indices.insert(geometryData.indices.end(), part.indices.begin(), part.indices.end());
     }
+
+    // Prop models (each asset once, however many objects share it).
+    for (size_t model = 0; model < PropModels; ++model)
+        if (!m_propWorlds[model].empty())
+            Params().propModels[model]->AppendGeometry(geometryData);
 }
 
 HRESULT Terrain::InitGraphics(RenderManager& renderManager)
@@ -253,6 +313,41 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         road.renderUnit->castsShadows = false;     // A ribbon 6 to 12 cm above the ground casts nothing worth drawing.
     }
 
+    // Props: a batch per model part, its material and mesh named as a glTF model's (so they're shared with one).
+    for (PropBatch& batch : m_propBatches)
+    {
+        const GltfAsset& asset = *Params().propModels[batch.model];
+        const std::wstring assetName(asset.sourceFilename.begin(), asset.sourceFilename.end());
+        const GltfMaterialData& imported = asset.materials[batch.material];
+        const GltfTextureSource* texture = imported.textureIndex >= 0 ? &asset.textures[static_cast<size_t>(imported.textureIndex)] : nullptr;
+        StockRenderState state;
+        state.samplerState = imported.wrapTexture ? StockSamplerStates::MinMagMipLinearUVWWrap : StockSamplerStates::MinMagMipLinearUVWClamp;
+        if (imported.alphaBlend)
+        {
+            state.blendState = PbrBlendState(imported.shaderMaterial);
+            state.depthStencilState = StockDepthStencilStates::DepthLessThanNoZWriteNoStencil;
+        }
+        ShaderMaterial shaderMaterial = imported.shaderMaterial;
+        const std::pair<int, MaterialTextureRole> maps[] = {
+            { imported.specularTextureIndex, SpecularStrengthTextureRole },
+            { imported.metallicRoughnessTextureIndex, MetallicRoughnessTextureRole },
+            { imported.normalTextureIndex, NormalTextureRole },
+            { imported.specularColorTextureIndex, SpecularColorTextureRole } };
+        for (const auto& map : maps)
+            if (map.first >= 0)
+                HRR(renderManager.BindMaterialTexture(asset.textures[map.first], map.second, shaderMaterial));
+        Material* material = nullptr;
+        HRR(renderManager.CreateMaterial((assetName + L"#material" + std::to_wstring(batch.material)).c_str(), texture,
+            nullptr, nullptr, nullptr, nullptr, shaderMaterial, state, &material));
+        Mesh* mesh = nullptr;
+        HRR(renderManager.CreateMesh((assetName + L"#primitive" + std::to_wstring(batch.primitive)).c_str(),
+            renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
+            renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
+            &asset.primitives[batch.primitive].bufferOffsets, BASIC_INPUT_LAYOUT, &mesh));
+        HRR(renderManager.ReserveRenderUnit(material, mesh, this, &batch.renderUnit));
+        batch.renderUnit->staticRayTracingGeometry = true;     // They never move: the DXR renderer's static BLAS.
+    }
+
     // A fresh vertex buffer: every slot is empty.
     m_slots.assign(Params().slots, Slot());
     m_freeSlots.clear();
@@ -273,6 +368,8 @@ HRESULT Terrain::CleanUpDeviceObjects()
     m_renderUnit = nullptr;
     for (RoadPart& road : m_roadParts)
         road.renderUnit = nullptr;
+    for (PropBatch& batch : m_propBatches)
+        batch.renderUnit = nullptr;
     m_resident.clear();
     m_slots.clear();
     m_freeSlots.clear();
@@ -468,6 +565,28 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
         if (m_roadParts[r].renderUnit)
             HRR(frame->SetInstances(m_roadParts[r].renderUnit, this, slot, 1));
     }
+    // Props: each batch an instance per part per prop of its model, the part's transform then the prop's.
+    UINT slot = instance + 1 + RoadParts();
+    for (const PropBatch& batch : m_propBatches)
+    {
+        const auto& worlds = m_propWorlds[batch.model];
+        const UINT first = slot;
+        for (const XMFLOAT4X4& transform : batch.transforms)
+        {
+            const XMMATRIX part = XMLoadFloat4x4(&transform);
+            for (const XMFLOAT4X4& world : worlds)
+            {
+                InstancedData& propData = frame->GetRenderData().instanceData[slot];
+                XMStoreFloat4x4(&propData.World, part * XMLoadFloat4x4(&world));
+                propData.InstanceOffset = propData.InstanceOffsetPrev = slot;
+                propData.AtlasRegion = 0;
+                propData.PreviousSlot = slot;
+                ++slot;
+            }
+        }
+        if (batch.renderUnit)
+            HRR(frame->SetInstances(batch.renderUnit, this, first, slot - first));
+    }
     m_selected.clear();
     m_loadedThisFrame = m_missing = 0;
     if (!m_open || m_slots.empty())
@@ -506,6 +625,8 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
     }
     if (XMVector3LessOrEqual(minimum, maximum))
     {
+        if (m_propInstances)
+            maximum = XMVectorAdd(maximum, XMVectorSet(0, PropHeight, 0, 0));     // Signs stand above the ground.
         XMStoreFloat3(&_boundingBox[0], minimum);
         XMStoreFloat3(&_boundingBox[1], maximum);
     }

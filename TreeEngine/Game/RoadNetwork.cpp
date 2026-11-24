@@ -69,6 +69,18 @@ namespace Roads
 {
     using DirectX::XMFLOAT2;
 
+    const char* PropModelName(PropModel model)
+    {
+        switch (model)
+        {
+        case PropModel::Mailbox: return "mailbox";
+        case PropModel::Post: return "post";
+        case PropModel::StopSign: return "stop-sign";
+        case PropModel::StreetNameSign: return "street-name-sign";
+        default: return "";
+        }
+    }
+
     // Chaikin corner cutting: each pass replaces every inner corner with two points a quarter of the way along its
     // segments, keeping the ends, so the polylines the importer simplified bend smoothly. The segments are first split
     // into pieces of at most SmoothingPiece meters, so a cut never reaches more than a quarter piece from a corner:
@@ -218,16 +230,43 @@ namespace Roads
             if (!id.empty())
                 where += " (" + id + ")";
             const std::string kind = Text(props, "kind", where + ".properties");
-            if (kind != "road" && kind != "driveway")
-            {
-                if (kind == "prop")
-                    continue;       // Props come in a later version of the engine; older engines skip them.
+            if (kind != "road" && kind != "driveway" && kind != "prop")
                 Fail(where + ".properties.kind", "must be road, driveway or prop");
-            }
             if (!feature.contains("geometry") || !feature["geometry"].is_object())
                 Fail(where + ".geometry", "required");
             const auto& geometry = feature["geometry"];
             const std::string type = geometry.contains("type") && geometry["type"].is_string() ? geometry["type"].get<std::string>() : "";
+            if (kind == "prop")
+            {
+                Prop prop;
+                prop.id = id;
+                prop.source = Text(props, "source", where + ".properties");
+                if (props.contains("edited") && !props["edited"].is_null())
+                {
+                    if (!props["edited"].is_boolean())
+                        Fail(where + ".properties.edited", "expected true or false");
+                    prop.edited = props["edited"].get<bool>();
+                }
+                const std::string model = Text(props, "prop", where + ".properties");
+                int found = -1;
+                for (int m = 0; m < static_cast<int>(PropModel::Count); ++m)
+                    if (model == PropModelName(static_cast<PropModel>(m)))
+                        found = m;
+                if (found < 0)
+                    Fail(where + ".properties.prop", "must be mailbox, post, stop-sign or street-name-sign");
+                prop.model = static_cast<PropModel>(found);
+                prop.heading = Number(props, "heading", where + ".properties", 0, -360, 720);
+                prop.text = Text(props, "text", where + ".properties");
+                if (type != "Point")
+                    Fail(where + ".geometry", "a prop must be a Point");
+                if (!geometry.contains("coordinates"))
+                    Fail(where + ".geometry.coordinates", "required");
+                // A point is a one-point line to Points, which wants two: check it as a pair of the same point.
+                const Json pair = Json::array({ geometry["coordinates"], geometry["coordinates"] });
+                prop.point = Points(pair, where + ".geometry.coordinates", originX, originY)[0];
+                network.props.push_back(std::move(prop));
+                continue;
+            }
             if (type != "LineString" && type != "MultiLineString")
                 Fail(where + ".geometry", "a " + kind + " must be a LineString or MultiLineString");
             if (!geometry.contains("coordinates") || !geometry["coordinates"].is_array())
