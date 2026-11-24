@@ -11,6 +11,8 @@ It compares the file with its last committed version (--base REF, default HEAD; 
   (default 6) but not on it: a road end the snapping in QGIS missed;
 - drops empty (null) properties, rounds changed coordinates to centimeters, and writes one feature per line in the
   file's order, unchanged features exactly as before, so the diff shows only the edits;
+- keeps a deleted imported or generated feature as a removed marker (`removed: true`, `edited: true`): the engine
+  skips it, and imports and prop placement don't bring it back;
 - places the generated props again (road_props.py; --no-props skips it), so mailboxes and signs follow the edited
   lines; props you moved or added stay.
 
@@ -120,7 +122,8 @@ def finish(base, edited, snap_start=6.0):
 
     # Snap missed road ends onto the lines as they will be written: every part is the written feature's own list,
     # so a start moved here is where the next snap looks.
-    every = [(f['properties'].get('id'), part) for f in result for part in parts(f) if len(part) >= 2]
+    every = [(f['properties'].get('id'), part) for f in result if not f['properties'].get('removed')
+             for part in parts(f) if len(part) >= 2]
     for feature, _ in changed:
         own = parts(feature)
         if snap_start <= 0 or not own or len(own[0]) < 2:
@@ -137,11 +140,21 @@ def finish(base, edited, snap_start=6.0):
     for feature, new in changed:
         props = feature['properties']
         notes.append(f"{props['id']}: {'new' if new else 'changed'}" + (f" ({props.get('name')})" if props.get('name') else ''))
-        if not parts(feature):
+        if not parts(feature) and props.get('kind') != 'prop':
             notes.append(f"{props['id']}: not a line ({feature['geometry'].get('type')}); kept as drawn")
 
+    # Deleted features an import or prop placement would make again stay as removed markers; others just go.
+    markers = []
     for i in sorted(set(before) - {(f.get('properties') or {}).get('id') for f in edited} - {None}):
-        notes.append(f'{i}: deleted (a later import_roads.py run would bring it back)')
+        old = before[i]
+        if (old.get('properties') or {}).get('source') in ('county', 'osm', 'generated'):
+            marker = json.loads(json.dumps(old))
+            marker['properties']['edited'] = True
+            marker['properties']['removed'] = True
+            markers.append(marker)
+            notes.append(f'{i}: removed (kept as a removed marker, so imports leave it out)')
+        else:
+            notes.append(f'{i}: deleted')
     # Crossings away from both lines' ends (a line starting on another, a little past it, is a junction), including
     # those through a vertex of either line.
     for feature, _ in changed:
@@ -159,7 +172,7 @@ def finish(base, edited, snap_start=6.0):
                     notes.append(f'{own_id}: crosses {other_id} at ({hit[0]:.0f}, {hit[1]:.0f})')
                     reported.add(other_id)
                     break
-    return result, notes
+    return result + markers, notes
 
 
 def crossings(a, b):

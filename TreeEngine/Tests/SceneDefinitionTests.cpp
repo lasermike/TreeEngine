@@ -10,6 +10,7 @@
 #include "RoadNetwork.h"
 #include "RoadMesh.h"
 #include "RoadGrading.h"
+#include "SignText.h"
 #include "ThirdParty/nlohmann/json.hpp"
 #include <functional>
 #include <fstream>
@@ -976,6 +977,17 @@ void TestRoadNetwork()
     bad = Json::parse(file);
     bad["features"][0]["geometry"]["coordinates"] = Json::array({ Json::array({ 1050, 2150 }) });
     rejects(bad.dump(), "at least two points");
+    // Removed features are left out (they only keep the tools from making them again); removed must be a boolean.
+    auto removed = Json::parse(file);
+    removed["features"][0]["properties"]["removed"] = true;
+    removed["features"][2]["properties"]["removed"] = true;
+    removed["features"][3]["properties"]["removed"] = false;
+    const auto kept = Roads::Parse(removed.dump(), "EPSG:32610", 1050, 2150);
+    Check(kept.lines.size() == 2 && kept.lines[0].id == "osm-way-7" && kept.props.size() == 1 && kept.props[0].id == "sign-1",
+        "removed features were drawn");
+    bad = Json::parse(file);
+    bad["features"][1]["properties"]["removed"] = "yes";
+    rejects(bad.dump(), "features[1] (osm-way-7).properties.removed");
     bad = Json::parse(file);
     bad["features"][2]["properties"]["prop"] = "bench";
     rejects(bad.dump(), "features[2] (mailbox-1).properties.prop");
@@ -1322,6 +1334,60 @@ void TestRoadGrading()
         "a wide ditch stops short of the ground");
 }
 
+void TestSignText()
+{
+    // The font draws every letter and digit, upper or lower case, and the punctuation street names use.
+    const std::string drawn = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-'/&";
+    bool all = true;
+    for (char c : drawn)
+        all = all && SignText::Drawn(c);
+    Check(all && !SignText::Drawn('#'), "the sign font misses a character a street name uses");
+    Check(SignText::Width("") == 0 && SignText::Width("E") < SignText::Width("E SCOTT DR")
+        && SignText::Width("i") == SignText::Width("I"), "sign text widths are wrong");
+    // A short name fits the model's 0.9 m blade; a longer one gets a longer blade, up to 1.2 m; a longer one still is
+    // squeezed to fit that.
+    Check(SignText::BladeLength("E ROSE LN") == SignText::ModelBladeLength && SignText::Squeeze("E ROSE LN") == 1,
+        "a short sign name doesn't fit the model's blade");
+    const float scott = SignText::BladeLength("E SCOTT DR");
+    Check(scott > SignText::ModelBladeLength && scott < SignText::LongestBlade && SignText::Squeeze("E SCOTT DR") == 1,
+        "a medium sign name's blade is wrong");
+    Check(SignText::BladeLength("E EVERGREEN WAY EAST") == SignText::LongestBlade && SignText::Squeeze("E EVERGREEN WAY EAST") < 1
+        && SignText::Squeeze("E EVERGREEN WAY EAST") > 0.6f, "a long sign name isn't squeezed onto the longest blade");
+
+    // Three names: two cells across, two rows, each region a padded cell inside the atlas.
+    const auto atlas = SignText::Build({ "E SCOTT DR", "E BENSON LOOP", "" });
+    const int strideX = SignText::CellWidth + 2 * SignText::Padding, strideY = SignText::CellHeight + 2 * SignText::Padding;
+    Check(atlas.width == 2 * strideX && atlas.height == 2 * strideY && atlas.regions.size() == 3
+        && atlas.pixels.size() == size_t(atlas.width) * atlas.height * 3, "the sign atlas has the wrong size");
+    const auto& second = atlas.regions[1];
+    Check(std::abs(second.x - float(strideX + SignText::Padding) / atlas.width) < 1e-6f
+        && std::abs(second.y - float(SignText::Padding) / atlas.height) < 1e-6f
+        && std::abs(second.z - float(SignText::CellWidth) / atlas.width) < 1e-6f
+        && std::abs(second.w - float(SignText::CellHeight) / atlas.height) < 1e-6f, "a sign cell's region is wrong");
+    const auto pixel = [&](int x, int y) { return &atlas.pixels[(size_t(y) * atlas.width + x) * 3]; };
+    // The first cell: green padding, a white border band inside the edge, white letters across its middle row, and
+    // green face beside them. The empty third cell is a plain green face inside its border.
+    const int x0 = SignText::Padding, y0 = SignText::Padding, middle = y0 + SignText::CellHeight / 2;
+    Check(pixel(0, 0)[1] < 120 && pixel(x0 + 5, middle)[0] > 200, "a sign cell's padding or border is wrong");
+    int white = 0;
+    for (int x = x0 + 20; x < x0 + SignText::CellWidth - 20; ++x)
+        white += pixel(x, middle)[0] > 200;
+    Check(white > 20 && white < SignText::CellWidth / 2, "a sign cell's letters are missing or cover it");
+    bool blank = true;
+    for (int x = x0 + 20; x < x0 + SignText::CellWidth - 20; ++x)
+        blank = blank && pixel(x, strideY + middle)[0] < 50;
+    Check(blank, "an empty sign cell has letters");
+    // The BMP: its header, and rows bottom-up as BGR.
+    const auto bmp = atlas.Bmp();
+    const auto u32 = [&](size_t at) { return uint32_t(bmp[at]) | uint32_t(bmp[at + 1]) << 8 | uint32_t(bmp[at + 2]) << 16 | uint32_t(bmp[at + 3]) << 24; };
+    Check(bmp.size() == 54 + size_t(atlas.width) * 3 * atlas.height && bmp[0] == 'B' && bmp[1] == 'M'
+        && u32(2) == bmp.size() && u32(18) == uint32_t(atlas.width) && u32(22) == uint32_t(atlas.height) && bmp[28] == 24,
+        "the sign atlas BMP header is wrong");
+    const uint8_t* topLeft = &bmp[54 + size_t(atlas.height - 1) * atlas.width * 3];
+    Check(topLeft[0] == pixel(0, 0)[2] && topLeft[1] == pixel(0, 0)[1] && topLeft[2] == pixel(0, 0)[0],
+        "the sign atlas BMP's rows or channels are out of order");
+}
+
 void TestTreeLodSettings()
 {
     const std::string json = R"({"version":1,"name":"Lod","objects":[
@@ -1586,6 +1652,7 @@ int main(int argc, char** argv)
         TestRoadNetwork();
         TestRoadMesh();
         TestRoadGrading();
+        TestSignText();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

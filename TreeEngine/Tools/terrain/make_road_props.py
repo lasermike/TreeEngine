@@ -10,8 +10,10 @@ so any of them can be replaced by a modelled .glb of the same name.
 - post: a 4x4 wood post 1.2 m tall with a white reflector, for marking a driveway or a corner.
 - stop-sign: a 30 in (0.75 m) red octagon with a white border and block letters, its bottom at 2.1 m, on a square
   steel post.
-- street-name-sign: two blank green blades with white borders, crossed at the top of a 3 m steel post; the lower one
-  faces the front. Street names come with sign text (Tools/terrain/README.md).
+- street-name-sign: two green blades crossed on top of a 2.6 m steel post, the lower one facing the front. Each
+  face is one quad mapped 0-1 (u left to right and v top to bottom as seen from that side), with material
+  sign-blade-lower or sign-blade-upper: the engine draws each sign's street names, white with a white border, into
+  a texture there (Game/SignText.h). Alone, the blades are plain green.
 """
 
 import json
@@ -30,19 +32,23 @@ MATERIALS = {
     'red': ((0.50, 0.01, 0.01), 0.0, 0.35),
     'white': ((0.80, 0.80, 0.78), 0.0, 0.35),
     'green': ((0.0, 0.18, 0.07), 0.0, 0.35),
+    'sign-blade-lower': ((0.0, 0.18, 0.07), 0.0, 0.35),
+    'sign-blade-upper': ((0.0, 0.18, 0.07), 0.0, 0.35),
 }
 
 
 class Model:
     def __init__(self):
-        self.parts = {}     # material -> (positions, normals, indices)
+        self.parts = {}     # material -> (positions, normals, indices, texture coordinates)
 
     def _part(self, material):
-        return self.parts.setdefault(material, ([], [], []))
+        return self.parts.setdefault(material, ([], [], [], []))
 
-    def quad(self, material, a, b, c, d):
-        """A flat quad a-b-c-d, counterclockwise seen from its front (glTF: right-handed, front faces the viewer)."""
-        positions, normals, indices = self._part(material)
+    def quad(self, material, a, b, c, d, uvs=None):
+        """A flat quad a-b-c-d, counterclockwise seen from its front (glTF: right-handed, front faces the viewer),
+        with texture coordinates for its corners (default zero)."""
+        positions, normals, indices, texcoords = self._part(material)
+        texcoords += list(uvs) if uvs else [(0.0, 0.0)] * 4
         u = [b[i] - a[i] for i in range(3)]
         v = [d[i] - a[i] for i in range(3)]
         n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
@@ -55,7 +61,8 @@ class Model:
 
     def polygon(self, material, points):
         """A flat convex polygon, counterclockwise seen from its front, as a fan."""
-        positions, normals, indices = self._part(material)
+        positions, normals, indices, texcoords = self._part(material)
+        texcoords += [(0.0, 0.0)] * len(points)
         a, b, c = points[0], points[1], points[2]
         u = [b[i] - a[i] for i in range(3)]
         v = [c[i] - a[i] for i in range(3)]
@@ -83,8 +90,9 @@ class Model:
         """The top half of a cylinder along z (a mailbox's roof), with its two half-disc ends."""
         ring = [(cx + radius * math.cos(math.pi * i / segments), cy + radius * math.sin(math.pi * i / segments))
                 for i in range(segments + 1)]
-        positions, normals, indices = self._part(material)
+        positions, normals, indices, texcoords = self._part(material)
         for (xa, ya), (xb, yb), i in zip(ring, ring[1:], range(segments)):
+            texcoords += [(0.0, 0.0)] * 4
             mid = math.pi * (i + 0.5) / segments
             n = [math.cos(mid), math.sin(mid), 0]
             base = len(positions)
@@ -107,7 +115,7 @@ class Model:
             blob.extend(data)
             return len(views) - 1
 
-        for name, (positions, normals, indices) in self.parts.items():
+        for name, (positions, normals, indices, texcoords) in self.parts.items():
             p = add_view(b''.join(struct.pack('<3f', *v) for v in positions), 34962)
             lo = [min(v[i] for v in positions) for i in range(3)]
             hi = [max(v[i] for v in positions) for i in range(3)]
@@ -115,13 +123,18 @@ class Model:
                               'min': lo, 'max': hi})
             n = add_view(b''.join(struct.pack('<3f', *v) for v in normals), 34962)
             accessors.append({'bufferView': n, 'componentType': 5126, 'count': len(normals), 'type': 'VEC3'})
+            attributes = {'POSITION': len(accessors) - 2, 'NORMAL': len(accessors) - 1}
+            if any(uv != (0, 0) for uv in texcoords):   # Only parts that map a texture.
+                t = add_view(b''.join(struct.pack('<2f', *v) for v in texcoords), 34962)
+                accessors.append({'bufferView': t, 'componentType': 5126, 'count': len(texcoords), 'type': 'VEC2'})
+                attributes['TEXCOORD_0'] = len(accessors) - 1
             i = add_view(struct.pack(f'<{len(indices)}I', *indices), 34963)
             accessors.append({'bufferView': i, 'componentType': 5125, 'count': len(indices), 'type': 'SCALAR'})
             color, metallic, roughness = MATERIALS[name]
             materials.append({'name': name, 'pbrMetallicRoughness': {'baseColorFactor': list(color) + [1.0],
                                                                     'metallicFactor': metallic,
                                                                     'roughnessFactor': roughness}})
-            primitives.append({'attributes': {'POSITION': len(accessors) - 3, 'NORMAL': len(accessors) - 2},
+            primitives.append({'attributes': attributes,
                                'indices': len(accessors) - 1, 'material': len(materials) - 1})
         while len(blob) % 4:
             blob.append(0)
@@ -209,38 +222,41 @@ def stop_sign():
     return m
 
 
-def blade(m, y, along_x):
+def blade(m, y, along_x, material):
     """A street-name blade 0.9 m by 0.2 m, 12 mm thick, centered on the post: along x facing -z and +z, or along z
-    facing -x and +x. Green with a 15 mm white border on both faces."""
-    length, height, half_t, border = 0.9, 0.2, 0.006, 0.015
-
-    def face(sign, inset, offset, material):
-        h, w = height / 2 - inset, length / 2 - inset
+    facing -x and +x. Each face one quad of `material`, mapped so the texture reads left to right from that side."""
+    length, height, half_t = 0.9, 0.2, 0.006
+    h, w = height / 2, length / 2
+    for sign in (-1, 1):
         if along_x:
-            z = sign * (half_t + offset)
+            z = sign * half_t
             corners = [(-w, y - h, z), (-w, y + h, z), (w, y + h, z), (w, y - h, z)]
         else:
-            x = sign * (half_t + offset)
+            x = sign * half_t
             corners = [(x, y - h, w), (x, y + h, w), (x, y + h, -w), (x, y - h, -w)]
+        # Seen from its front, the first corner is the bottom right on the -side and (after reordering so the quad
+        # faces outward) the bottom left on the +side.
         if sign > 0:
             corners = [corners[0], corners[3], corners[2], corners[1]]
-        m.quad(material, *corners)
-
-    for sign in (-1, 1):
-        face(sign, 0, 0, 'white')
-        face(sign, border, 0.001, 'green')
-    h, w = height / 2, length / 2
+            uvs = [(0, 1), (1, 1), (1, 0), (0, 0)]
+        else:
+            uvs = [(1, 1), (1, 0), (0, 0), (0, 1)]
+        m.quad(material, *corners, uvs=uvs)
     if along_x:
-        m.box('white', (-w, y - h, -half_t), (w, y + h, half_t), faces='xXyY')
+        m.box('steel', (-w, y - h, -half_t), (w, y + h, half_t), faces='xXyY')
     else:
-        m.box('white', (-half_t, y - h, -w), (half_t, y + h, w), faces='zZyY')
+        m.box('steel', (-half_t, y - h, -w), (half_t, y + h, w), faces='zZyY')
 
 
 def street_name_sign():
     m = Model()
-    post(m, 3.0, size=0.05, material='steel')
-    blade(m, 2.72, along_x=True)
-    blade(m, 2.93, along_x=False)
+    # The post stops under the blades (so it doesn't cross their faces), with a cap holding the lower blade and a
+    # spacer between the two.
+    post(m, 2.6, size=0.05, material='steel')
+    m.box('steel', (-0.04, 2.6, -0.04), (0.04, 2.62, 0.04))
+    m.box('steel', (-0.02, 2.82, -0.02), (0.02, 2.83, 0.02), faces='xXzZ')
+    blade(m, 2.72, along_x=True, material='sign-blade-lower')
+    blade(m, 2.93, along_x=False, material='sign-blade-upper')
     return m
 
 

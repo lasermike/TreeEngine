@@ -14,6 +14,7 @@
 
 struct RenderUnit;
 struct GltfAsset;
+struct GltfTextureSource;
 
 // A heightfield terrain drawn from a terrain package (TerrainPackage.h), CDLOD style: each frame a quadtree walk from
 // the root chooses nodes by distance, finer near the camera, and each chosen node is one draw of a shared 64 x 64-quad
@@ -81,12 +82,15 @@ public:
     HRESULT CleanUpDeviceObjects() override;
     HRESULT ComputeConstants(IRenderFrame* frame) override;
     // One instance for the nodes, one per road surface part, and one per prop part per prop.
-    unsigned int GetNumInstances() override { return 1 + RoadParts() + PropInstances(); }
-    unsigned int GetMaxInstances() override { return 1 + RoadParts() + PropInstances(); }
+    // Then a slot per street name holding its sign-text atlas region (not drawn).
+    unsigned int GetNumInstances() override { return 1 + RoadParts() + PropInstances() + SignNames(); }
+    unsigned int GetMaxInstances() override { return 1 + RoadParts() + PropInstances() + SignNames(); }
     // Each drawn node is a ray-tracing geometry of its own; so is each road surface part and prop instance.
     unsigned int GetMaxDrawnInstances() override { return Params().slots + RoadParts() + PropInstances(); }
     // The props drawn of a model (Roads::PropModel), for tests.
     UINT PropCount(Roads::PropModel model) const { return static_cast<UINT>(m_propWorlds[static_cast<size_t>(model)].size()); }
+    // The distinct street names on its signs, in atlas order (for tests).
+    const std::vector<std::string>& SignNamesList() const { return m_signNames; }
     // Props left out because their model isn't installed.
     UINT PropsWithoutModel() const { return m_propsWithoutModel; }
 
@@ -166,8 +170,18 @@ private:
     {
         size_t model = 0, primitive = 0, material = 0;
         std::vector<XMFLOAT4X4> transforms;     // The transforms within the model of the parts drawing these.
+        int blade = -1;                         // A street-name blade's face: 0 lower, 1 upper (else -1).
         RenderUnit* renderUnit = nullptr;
     };
+    // Street names: the distinct names on street-name signs, each sign's lower and upper blade name (indices, by
+    // the sign's place in its model's transforms), and the atlas they're drawn in (SignText.h).
+    std::vector<std::string> m_signNames;
+    std::vector<std::array<UINT, 2>> m_signBlades;
+    std::shared_ptr<GltfTextureSource> m_signTexture;
+    std::vector<XMFLOAT4> m_signRegions;
+    std::vector<float> m_signStretch;           // Per name: its blade's length over the model's (SignText::BladeLength).
+    UINT SignNames() const { return static_cast<UINT>(m_signRegions.size()); }
+    void BuildSignText();
     std::vector<PropBatch> m_propBatches;
     UINT m_propInstances = 0;
     UINT m_propsWithoutModel = 0;

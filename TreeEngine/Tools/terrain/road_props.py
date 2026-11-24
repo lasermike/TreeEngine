@@ -6,7 +6,8 @@ it also runs alone):
 Props are Point features, `kind` "prop", with `prop` the model (mailbox, post, stop-sign, street-name-sign),
 `heading` the direction its front faces in degrees clockwise from north, and `text` (an address, or the street names
 on a sign's blades, the lower blade's first, separated by |). Every run replaces the generated props that weren't
-edited; edited and hand-placed ones stay, and suppress the generated prop with the same id.
+edited; edited and hand-placed ones stay, and suppress the generated prop with the same id. A feature marked
+`removed` (finish_road_edits.py marks deleted ones) is ignored, and a removed prop isn't placed again.
 
 - Street-name signs: one at each intersection of differently named roads (private roads included, as long as they
   have a name), on the corner to the right of the lowest-ranked road's approach. Its lower blade runs along the
@@ -339,6 +340,8 @@ def place_props(features):
     roads, driveways = [], []
     for f in features:
         props = f.get('properties') or {}
+        if props.get('removed'):
+            continue        # Kept only so nothing makes it again.
         for line in parts(f):
             if props.get('kind') == 'road':
                 roads.append(Road(props, line))

@@ -654,8 +654,8 @@ def main():
     served = []
     for f in kept:
         geometry = f.get('geometry') or {}
-        if geometry.get('type') not in ('LineString', 'MultiLineString'):
-            continue
+        if geometry.get('type') not in ('LineString', 'MultiLineString') or f['properties'].get('removed'):
+            continue        # A removed marker only keeps its id from being imported again.
         lines = geometry['coordinates'] if geometry['type'] == 'MultiLineString' else [geometry['coordinates']]
         lines = [[(p[0], p[1]) for p in line] for line in lines if len(line) >= 2]
         if f['properties'].get('kind') == 'road':

@@ -26,6 +26,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Tide.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\RoadNetwork.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\RoadMesh.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SignText.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\RoadGrading.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\OpacityMicromapBaker.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneCatalog.cpp" />
@@ -63,6 +64,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\Tide.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\RoadNetwork.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\RoadMesh.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\SignText.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\RoadGrading.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\Game\TreeSegment.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\ThirdParty\cgltf\cgltf.h" />

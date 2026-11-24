@@ -171,7 +171,9 @@ or GIS elevation data). It requires `source`, the package directory, such as
   signs, street-name signs) stand on the terrain at their points, turned to
   their headings, drawn instanced from `Models/Roadside/<prop>.glb` in raster
   (with shadows) and DXR. Each model loads when a prop uses it; a model that
-  isn't installed draws none of its props.
+  isn't installed draws none of its props. Street-name signs show their street
+  names, drawn into a texture at load (`Game/SignText.h`), on blades as long
+  as each name needs (0.9 to 1.2 m). Features marked `removed` are skipped.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,

@@ -232,6 +232,14 @@ namespace Roads
             const std::string kind = Text(props, "kind", where + ".properties");
             if (kind != "road" && kind != "driveway" && kind != "prop")
                 Fail(where + ".properties.kind", "must be road, driveway or prop");
+            // A removed feature only keeps the tools from making it again.
+            if (props.contains("removed") && !props["removed"].is_null())
+            {
+                if (!props["removed"].is_boolean())
+                    Fail(where + ".properties.removed", "expected true or false");
+                if (props["removed"].get<bool>())
+                    continue;
+            }
             if (!feature.contains("geometry") || !feature["geometry"].is_object())
                 Fail(where + ".geometry", "required");
             const auto& geometry = feature["geometry"];
