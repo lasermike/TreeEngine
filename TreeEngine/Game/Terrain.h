@@ -151,15 +151,16 @@ private:
     };
     std::vector<RoadPart> m_roadParts;
     UINT RoadParts() const { return static_cast<UINT>(m_roadParts.size()); }
-    // Roadside props: each one's transform (turned to its heading, on the ground) by model, and a batch per part
-    // (primitive and material) of each model in use, drawn instanced once per prop of the model, like a glTF model's.
+    // Roadside props: each one's transform (turned to its heading, on the ground) by model, and a batch per primitive
+    // and material of each model in use, drawn instanced once per part using them per prop of the model (one render
+    // unit each, as a glTF model groups its parts).
     static constexpr size_t PropModels = static_cast<size_t>(Roads::PropModel::Count);
     static constexpr float PropHeight = 3.5f;   // Meters: the tallest prop, which the terrain's bounds reach above it.
     std::array<std::vector<XMFLOAT4X4>, PropModels> m_propWorlds;
     struct PropBatch
     {
         size_t model = 0, primitive = 0, material = 0;
-        XMFLOAT4X4 transform;           // The part's transform within its model.
+        std::vector<XMFLOAT4X4> transforms;     // The transforms within the model of the parts drawing these.
         RenderUnit* renderUnit = nullptr;
     };
     std::vector<PropBatch> m_propBatches;

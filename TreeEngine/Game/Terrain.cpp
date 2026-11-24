@@ -3,6 +3,7 @@
 #include "GltfLoader.h"
 #include "RenderManager.h"
 
+#include <algorithm>
 #include <fstream>
 #include <mutex>
 #include <sstream>
@@ -81,14 +82,21 @@ void Terrain::PlaceProps()
     {
         if (m_propWorlds[model].empty())
             continue;
+        const size_t first = m_propBatches.size();
         for (const GltfRenderPart& part : Params().propModels[model]->renderParts)
         {
-            PropBatch batch;
-            batch.model = model;
-            batch.primitive = part.primitiveIndex;
-            batch.material = part.materialIndex;
-            batch.transform = part.transform;
-            m_propBatches.push_back(batch);
+            // Parts sharing a primitive and material (one mesh on several nodes) share a batch.
+            auto batch = std::find_if(m_propBatches.begin() + first, m_propBatches.end(), [&](const PropBatch& b)
+                { return b.primitive == part.primitiveIndex && b.material == part.materialIndex; });
+            if (batch == m_propBatches.end())
+            {
+                m_propBatches.emplace_back();
+                batch = m_propBatches.end() - 1;
+                batch->model = model;
+                batch->primitive = part.primitiveIndex;
+                batch->material = part.materialIndex;
+            }
+            batch->transforms.push_back(part.transform);
             m_propInstances += static_cast<UINT>(m_propWorlds[model].size());
         }
     }
@@ -547,23 +555,27 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
         if (m_roadParts[r].renderUnit)
             HRR(frame->SetInstances(m_roadParts[r].renderUnit, this, slot, 1));
     }
-    // Props: each batch an instance per prop of its model, the part's transform then the prop's.
+    // Props: each batch an instance per part per prop of its model, the part's transform then the prop's.
     UINT slot = instance + 1 + RoadParts();
     for (const PropBatch& batch : m_propBatches)
     {
         const auto& worlds = m_propWorlds[batch.model];
-        const XMMATRIX part = XMLoadFloat4x4(&batch.transform);
-        for (UINT k = 0; k < worlds.size(); ++k)
+        const UINT first = slot;
+        for (const XMFLOAT4X4& transform : batch.transforms)
         {
-            InstancedData& propData = frame->GetRenderData().instanceData[slot + k];
-            XMStoreFloat4x4(&propData.World, part * XMLoadFloat4x4(&worlds[k]));
-            propData.InstanceOffset = propData.InstanceOffsetPrev = slot + k;
-            propData.AtlasRegion = 0;
-            propData.PreviousSlot = slot + k;
+            const XMMATRIX part = XMLoadFloat4x4(&transform);
+            for (const XMFLOAT4X4& world : worlds)
+            {
+                InstancedData& propData = frame->GetRenderData().instanceData[slot];
+                XMStoreFloat4x4(&propData.World, part * XMLoadFloat4x4(&world));
+                propData.InstanceOffset = propData.InstanceOffsetPrev = slot;
+                propData.AtlasRegion = 0;
+                propData.PreviousSlot = slot;
+                ++slot;
+            }
         }
         if (batch.renderUnit)
-            HRR(frame->SetInstances(batch.renderUnit, this, slot, static_cast<UINT>(worlds.size())));
-        slot += static_cast<UINT>(worlds.size());
+            HRR(frame->SetInstances(batch.renderUnit, this, first, slot - first));
     }
     m_selected.clear();
     m_loadedThisFrame = m_missing = 0;

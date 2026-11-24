@@ -10,7 +10,7 @@ edited; edited and hand-placed ones stay, and suppress the generated prop with t
 
 - Street-name signs: one at each intersection of differently named roads (private roads included, as long as they
   have a name), on the corner to the right of the lowest-ranked road's approach. Its lower blade runs along the
-  highest-ranked road and names it; the upper blade names the other.
+  highest-ranked road and names it (the sign faces square to that road); the upper blade names the other.
 - Stop signs: on every approach of a county road that ends at, or crosses, a higher-ranked road (rank: county over
   private, then functional class, speed limit, paved over gravel), or that ends (a T) at a road of its rank or
   higher carrying on through; on the right, facing the traffic that stops. Private roads and driveways get none.
@@ -198,8 +198,12 @@ def signs(roads, counts):
             # On the right corner of the lowest-ranked road's approach (one that ends here, if any).
             minor = min(others, key=lambda name: (len(groups[name]) > 1, rank_of[name]))
             road, approach = groups[minor][0]
+            # The lower blade (the model's x axis) runs along the major road: the sign faces square to it, toward the
+            # minor road's oncoming traffic.
+            _, _, (mx, my) = nearest(center, major_road.line)
+            facing = (my, -mx) if my * -approach[0] - mx * -approach[1] >= 0 else (-my, mx)
             out.append(prop('street-name-sign', f'prop-street-{key}', corner(center, approach, road, major_road, roads),
-                            heading(-approach[0], -approach[1]), f'{major}|{minor}'))
+                            heading(*facing), f'{major}|{minor}'))
             counts['street-name-sign'] += 1
         for name, arms in groups.items():
             if name == major:
@@ -234,7 +238,9 @@ def mailboxes(roads, driveways, counts):
                 if j in seen or other is line:
                     continue
                 if nearest(end, other)[0] <= JOIN:
-                    return mouth_of(other, seen | {j})
+                    found = mouth_of(other, seen | {j})
+                    if found:       # Else a dead end: try the other connections.
+                        return found
         return None
 
     for j, (props, line) in enumerate(driveways):

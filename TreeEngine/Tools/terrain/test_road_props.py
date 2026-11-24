@@ -70,6 +70,26 @@ for sign in placed(out, 'stop-sign') + placed(out, 'street-name-sign'):
     check(clear, f"a sign stands on a road at a sharp junction: {sign['properties']['id']} at {point}")
 check(counts['stop-sign'] == 1, f'sharp junction counts: {counts}')
 
+# A street-name sign faces square to the road its lower blade names, whatever angle the side road comes in at:
+# G ST meets A ST (east-west) from the north-east at 45 degrees, so the sign faces north or south.
+diagonal = [line('road', 'a', [[-100.0, 0.0], [100.0, 0.0]], name='A ST', **county),
+            line('road', 'g', [[0.0, 0.0], [70.0, 70.0]], name='G ST', **county)]
+out, _ = props.place_props(diagonal)
+for sign in placed(out, 'street-name-sign'):
+    h = sign['properties']['heading'] % 180
+    check(min(h, 180 - h) < 0.5, f"a street-name sign isn't square to A ST: heading {sign['properties']['heading']}")
+check(len(placed(out, 'street-name-sign')) == 1, 'the diagonal junction has no street-name sign')
+
+# A driveway joined to a dead-end branch at one end and to a lane reaching the road at the other still finds the road.
+branching = network + [
+    line('driveway', 'target', [[0.0, 20.0], [20.0, 20.0]]),
+    line('driveway', 'dead-end', [[0.0, 20.0], [-10.0, 30.0]]),
+    line('driveway', 'lane2', [[20.0, 20.0], [20.0, 0.0]]),
+]
+out, counts = props.place_props(branching)
+check(any(f['properties']['id'] == 'prop-mailbox-target' for f in out),
+      f'a driveway through a dead-end branch got no mailbox: {counts}')
+
 # A road piece meeting another piece of itself (a bend split in two) is no intersection.
 bend = [line('road', 'd1', [[0.0, 0.0], [50.0, 0.0]], name='D RD', **county),
         line('road', 'd2', [[50.0, 0.0], [50.0, 50.0]], name='D RD', **county)]
