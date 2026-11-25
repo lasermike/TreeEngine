@@ -322,3 +322,160 @@ namespace Roads
         return network;
     }
 }
+
+namespace
+{
+    // A value as Python's json.dumps writes it: ", " and ": " separators, non-ASCII escaped, numbers shortest.
+    std::string PythonJson(const nlohmann::ordered_json& value)
+    {
+        if (value.is_object())
+        {
+            std::string out = "{";
+            bool first = true;
+            for (auto item = value.begin(); item != value.end(); ++item)
+            {
+                out += (first ? "" : ", ") + nlohmann::ordered_json(item.key()).dump(-1, ' ', true) + ": " + PythonJson(item.value());
+                first = false;
+            }
+            return out + "}";
+        }
+        if (value.is_array())
+        {
+            std::string out = "[";
+            for (size_t i = 0; i < value.size(); ++i)
+                out += (i ? ", " : "") + PythonJson(value[i]);
+            return out + "]";
+        }
+        return value.dump(-1, ' ', true);
+    }
+}
+
+namespace Roads
+{
+    std::string UpdateProps(const std::string& text, const std::vector<PropEdit>& edits, double originX, double originY)
+    {
+        // The file's lines, each feature on one (the line ending, \n or \r\n, kept as it was).
+        std::vector<std::string> lines;
+        for (size_t start = 0; start < text.size();)
+        {
+            const size_t end = text.find('\n', start);
+            const size_t stop = end == std::string::npos ? text.size() : end + 1;
+            lines.push_back(text.substr(start, stop - start));
+            start = stop;
+        }
+        for (const PropEdit& edit : edits)
+        {
+            // The line that is exactly this prop's feature (with a comma after it, or not): parsed, not matched as
+            // text, so a file in another layout (all on one line, say) is refused rather than edited wrongly.
+            const std::string quoted = nlohmann::ordered_json(edit.id).dump(-1, ' ', true);
+            size_t found = lines.size();
+            size_t ending = 0;
+            bool comma = false;
+            nlohmann::ordered_json feature;
+            for (size_t i = 0; i < lines.size() && found == lines.size(); ++i)
+            {
+                const std::string& line = lines[i];
+                if (line.find(quoted) == std::string::npos)
+                    continue;
+                size_t end = line.size();
+                while (end > 0 && (line[end - 1] == '\n' || line[end - 1] == '\r'))
+                    --end;
+                const bool trailing = end > 0 && line[end - 1] == ',';
+                auto parsed = nlohmann::ordered_json::parse(line.substr(0, end - (trailing ? 1 : 0)), nullptr, false);
+                if (parsed.is_discarded() || !parsed.is_object() || parsed.value("type", "") != "Feature"
+                    || !parsed.contains("properties") || !parsed["properties"].is_object()
+                    || parsed["properties"].value("kind", "") != "prop" || parsed["properties"].value("id", "") != edit.id)
+                    continue;
+                found = i;
+                ending = end;
+                comma = trailing;
+                feature = std::move(parsed);
+            }
+            if (found == lines.size())
+                throw std::runtime_error("roads: prop " + edit.id + " isn't a feature on a line of its own in the file");
+            std::string& line = lines[found];
+            auto& props = feature["properties"];
+            props["edited"] = true;
+            props["heading"] = std::round(static_cast<double>(edit.heading) * 10) / 10;
+            if (edit.removed)
+                props["removed"] = true;
+            feature["geometry"]["coordinates"] = nlohmann::ordered_json::array({
+                std::round((edit.point.x + originX) * 100) / 100, std::round((edit.point.y + originY) * 100) / 100 });
+            line = PythonJson(feature) + (comma ? "," : "") + line.substr(ending);
+        }
+        std::string out;
+        for (const std::string& line : lines)
+            out += line;
+        return out;
+    }
+
+    std::wstring BuildSource(const std::wstring& loaded, const std::wstring& authored, const std::wstring& executableFolder,
+        const std::function<bool(const std::wstring&)>& exists)
+    {
+        // The authored path: relative, with no empty, . or .. parts.
+        std::wstring relative = authored;      // Decoded from the scene's UTF-8 by the caller.
+        std::replace(relative.begin(), relative.end(), L'/', L'\\');
+        if (relative.empty() || relative[0] == L'\\' || relative.find(L':') != std::wstring::npos)
+            return {};
+        for (size_t start = 0; start <= relative.size();)
+        {
+            const size_t end = std::min(relative.find(L'\\', start), relative.size());
+            const std::wstring part = relative.substr(start, end - start);
+            if (part.empty() || part == L"." || part == L"..")
+                return {};
+            start = end + 1;
+        }
+        const auto full = [](const std::wstring& path)
+        {
+            wchar_t buffer[MAX_PATH] = {};
+            const DWORD length = GetFullPathNameW(path.c_str(), MAX_PATH, buffer, nullptr);
+            return length && length < MAX_PATH ? std::wstring(buffer) : std::wstring();
+        };
+        const auto inside = [](const std::wstring& path, const std::wstring& root)
+        {
+            return !path.empty() && !root.empty() && path.size() > root.size() + 1
+                && _wcsnicmp(path.c_str(), root.c_str(), root.size()) == 0 && path[root.size()] == L'\\';
+        };
+        // It was loaded from the build's copy: <executable's folder>\<authored>, inside that folder.
+        const std::wstring folder = full(executableFolder);
+        const std::wstring copy = full(executableFolder + L"\\" + relative);
+        if (!inside(copy, folder) || _wcsicmp(full(loaded).c_str(), copy.c_str()) != 0)
+            return {};
+        // The source: Game\Resources\<authored> in the nearest folder above, inside that Resources folder.
+        std::wstring above = folder;
+        for (size_t slash = above.find_last_of(L'\\'); slash != std::wstring::npos; slash = above.find_last_of(L'\\'))
+        {
+            above.resize(slash);
+            const std::wstring resources = full(above + L"\\Game\\Resources");
+            const std::wstring candidate = full(resources + L"\\" + relative);
+            if (inside(candidate, resources) && exists(candidate))
+                return candidate;
+        }
+        return {};
+    }
+
+    float RayBox(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, const DirectX::XMFLOAT3& low,
+        const DirectX::XMFLOAT3& high)
+    {
+        const float o[3] = { origin.x, origin.y, origin.z }, d[3] = { direction.x, direction.y, direction.z };
+        const float lo[3] = { low.x, low.y, low.z }, hi[3] = { high.x, high.y, high.z };
+        float enter = 0, leave = 1e30f;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            if (std::abs(d[axis]) < 1e-12f)
+            {
+                if (o[axis] < lo[axis] || o[axis] > hi[axis])
+                    return -1;
+                continue;
+            }
+            float t0 = (lo[axis] - o[axis]) / d[axis], t1 = (hi[axis] - o[axis]) / d[axis];
+            if (t0 > t1)
+                std::swap(t0, t1);
+            enter = std::max(enter, t0);
+            leave = std::min(leave, t1);
+            if (enter > leave)
+                return -1;
+        }
+        return enter;
+    }
+}

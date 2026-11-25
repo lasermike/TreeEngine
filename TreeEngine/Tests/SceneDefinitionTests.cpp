@@ -1334,6 +1334,131 @@ void TestRoadGrading()
         "a wide ditch stops short of the ground");
 }
 
+void TestPropEditing()
+{
+    // A roads file as import_roads.py writes it: header lines, a feature per line (CRLF here), Python's spacing.
+    const std::string file =
+        "{\r\n\"type\": \"FeatureCollection\",\r\n\"features\": [\r\n"
+        "{\"type\": \"Feature\", \"properties\": {\"kind\": \"road\", \"id\": \"county-1\", \"source\": \"county\", \"edited\": false}, \"geometry\": {\"type\": \"LineString\", \"coordinates\": [[1000.0, 2000.0], [1100.5, 2000.25]]}},\r\n"
+        "{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"id\": \"prop-mailbox-a\", \"source\": \"generated\", \"edited\": false, \"prop\": \"mailbox\", \"heading\": 90.0, \"text\": \"12 E TEST RD\"}, \"geometry\": {\"type\": \"Point\", \"coordinates\": [1010.25, 2003.5]}},\r\n"
+        "{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"id\": \"prop-stop-b\", \"source\": \"generated\", \"edited\": false, \"prop\": \"stop-sign\", \"heading\": 0.0}, \"geometry\": {\"type\": \"Point\", \"coordinates\": [1050.0, 1996.0]}}\r\n"
+        "]\r\n}\r\n";
+    Roads::PropEdit moved;
+    moved.id = "prop-mailbox-a";
+    moved.point = DirectX::XMFLOAT2(12.344f, 5.006f);       // Package coordinates about (1000, 2000).
+    moved.heading = 271.26f;
+    Roads::PropEdit removed;
+    removed.id = "prop-stop-b";
+    removed.point = DirectX::XMFLOAT2(50, -4);
+    removed.removed = true;
+    const std::string updated = Roads::UpdateProps(file, { moved, removed }, 1000, 2000);
+    // Only the two prop lines change; the moved one keeps its properties' order and text, gains edited, and its
+    // point and heading round as import_roads.py rounds them; the removed one is marked; line endings and commas stay.
+    const std::string movedLine = "{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"id\": \"prop-mailbox-a\", "
+        "\"source\": \"generated\", \"edited\": true, \"prop\": \"mailbox\", \"heading\": 271.3, \"text\": \"12 E TEST RD\"}, "
+        "\"geometry\": {\"type\": \"Point\", \"coordinates\": [1012.34, 2005.01]}},\r\n";
+    const std::string removedLine = "{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"id\": \"prop-stop-b\", "
+        "\"source\": \"generated\", \"edited\": true, \"prop\": \"stop-sign\", \"heading\": 0.0, \"removed\": true}, "
+        "\"geometry\": {\"type\": \"Point\", \"coordinates\": [1050.0, 1996.0]}}\r\n";
+    const size_t roadEnd = file.find("},\r\n", file.find("county-1")) + 4;
+    Check(updated.compare(0, roadEnd, file, 0, roadEnd) == 0 && updated.find(movedLine) == roadEnd
+        && updated.find(removedLine) == roadEnd + movedLine.size() && updated.substr(updated.size() - 6) == "]\r\n}\r\n",
+        "a prop edit rewrote the roads file wrongly");
+    // The result still parses, with the edits in it.
+    const auto network = Roads::Parse(updated.substr(0, 1) + "\"crs\": {\"type\": \"name\", \"properties\": {\"name\": \"EPSG:32610\"}}, "
+        + updated.substr(1), "EPSG:32610", 1000, 2000);
+    Check(network.props.size() == 1 && std::abs(network.props[0].point.x - 12.34f) < 1e-3f && network.props[0].heading == 271.3f
+        && network.props[0].edited, "an edited roads file doesn't parse back to its edits");
+    // A prop that isn't in the file is an error, not a silent no-op.
+    Roads::PropEdit missing;
+    missing.id = "prop-mailbox-z";
+    bool threw = false;
+    try { Roads::UpdateProps(file, { missing }, 1000, 2000); }
+    catch (const std::runtime_error&) { threw = true; }
+    Check(threw, "editing a prop the file doesn't have succeeded");
+    // A collection written on one line is refused (its line is the collection, not the prop's feature), not edited.
+    const std::string oneLine = "{\"type\": \"FeatureCollection\", \"features\": [{\"type\": \"Feature\", \"properties\": "
+        "{\"kind\": \"prop\", \"id\": \"prop-mailbox-a\", \"prop\": \"mailbox\"}, \"geometry\": {\"type\": \"Point\", "
+        "\"coordinates\": [1010.0, 2003.0]}}]}\n";
+    threw = false;
+    try { Roads::UpdateProps(oneLine, { moved }, 1000, 2000); }
+    catch (const std::runtime_error&) { threw = true; }
+    Check(threw, "a one-line roads file was edited");
+    // A feature whose id comes last in its properties (no comma after it), as the last line of the list.
+    const std::string idLast = "{\"features\": [\n{\"type\": \"Feature\", \"properties\": {\"kind\": \"prop\", \"prop\": "
+        "\"mailbox\", \"id\": \"prop-mailbox-a\"}, \"geometry\": {\"type\": \"Point\", \"coordinates\": [1010.0, 2003.0]}}\n]}\n";
+    const std::string idLastUpdated = Roads::UpdateProps(idLast, { moved }, 1000, 2000);
+    Check(idLastUpdated.find("\"id\": \"prop-mailbox-a\", \"edited\": true, \"heading\": 271.3}, \"geometry\": {\"type\": "
+        "\"Point\", \"coordinates\": [1012.34, 2005.01]}}\n]}") != std::string::npos, "a prop with its id last wasn't edited");
+
+    // Saving safely: a staged file is complete beside its target until it's published over it; staging beside a
+    // missing folder fails, leaving the target alone.
+    // In a folder of this run's own, so concurrent test runs don't share files.
+    wchar_t temp[MAX_PATH] = {};
+    GetTempPathW(MAX_PATH, temp);
+    std::wstring own;
+    for (int attempt = 0; attempt < 100 && own.empty(); ++attempt)
+    {
+        const std::wstring candidate = std::wstring(temp) + L"tree-roads-save-" + std::to_wstring(GetCurrentProcessId()) + L"-"
+            + std::to_wstring(GetTickCount64()) + L"-" + std::to_wstring(attempt);
+        if (CreateDirectoryW(candidate.c_str(), nullptr))
+            own = candidate + L"\\";
+    }
+    Check(!own.empty(), "the save test couldn't make its folder");
+    const std::wstring folder = own;
+    const std::string target = SceneData::Utf8Path(folder) + "roads.geojson";
+    {
+        std::ofstream original(SceneData::WidePath(target), std::ios::binary | std::ios::trunc);
+        original << "old";
+    }
+    const auto contents = [&](const std::string& path)
+    {
+        std::ifstream input(SceneData::WidePath(path), std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    };
+    const std::wstring staged = SceneData::StageFile(target, "new text");
+    Check(contents(target) == "old" && contents(SceneData::Utf8Path(staged)) == "new text", "a staged file replaced its target early");
+    SceneData::PublishFile(staged, target);
+    Check(contents(target) == "new text" && GetFileAttributesW(staged.c_str()) == INVALID_FILE_ATTRIBUTES,
+        "publishing a staged file didn't replace its target");
+    threw = false;
+    try { SceneData::StageFile(SceneData::Utf8Path(folder) + "no-such-folder-for-tree-tests\\roads.geojson", "x"); }
+    catch (const std::runtime_error&) { threw = true; }
+    Check(threw && contents(target) == "new text", "staging into a missing folder succeeded");
+    DeleteFileW(SceneData::WidePath(target).c_str());
+    RemoveDirectoryW(folder.c_str());
+
+    // Mirroring a save into the build's source: only for the build's copy of a relative path inside both folders.
+    const std::wstring build = L"C:\\work\\TreeEngine\\TreeClassic\\bin\\x64\\Release";
+    const auto onlySource = [](const std::wstring& path)
+    {
+        return _wcsicmp(path.c_str(), L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\A.roads.geojson") == 0
+            || _wcsicmp(path.c_str(), L"C:\\work\\Shared\\A.roads.geojson") == 0
+            || _wcsicmp(path.c_str(), L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\Caf\u00e9.roads.geojson") == 0;
+    };
+    Check(Roads::BuildSource(build + L"\\Terrain\\A.roads.geojson", L"Terrain/A.roads.geojson", build, onlySource)
+        == L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\A.roads.geojson", "the build's copy has no source");
+    // A scene's own copy (loaded from beside the scene, not the build) is saved alone.
+    Check(Roads::BuildSource(L"C:\\scenes\\Terrain\\A.roads.geojson", L"Terrain/A.roads.geojson", build, onlySource).empty(),
+        "a scene's own roads file was mirrored into the build's source");
+    // A path escaping the folders (../Shared, which resolves beside the build and beside Game\\Resources, where a file
+    // with the same props exists) or absolute is never mirrored.
+    Check(Roads::BuildSource(L"C:\\work\\TreeEngine\\TreeClassic\\bin\\x64\\Shared\\A.roads.geojson", L"../Shared/A.roads.geojson",
+        build, onlySource).empty() && Roads::BuildSource(L"C:\\work\\Shared\\A.roads.geojson", L"C:/work/Shared/A.roads.geojson",
+        build, onlySource).empty() && Roads::BuildSource(build + L"\\Terrain\\A.roads.geojson", L"Terrain/./A.roads.geojson",
+        build, onlySource).empty(), "an escaping or absolute roads path was mirrored");
+    // A name beyond ASCII: the scene's UTF-8 path, decoded as the asset loader decodes it (é is C3 A9).
+    Check(Roads::BuildSource(build + L"\\Terrain\\Caf\u00e9.roads.geojson", SceneData::WidePath("Terrain/Caf\xc3\xa9.roads.geojson"),
+        build, onlySource) == L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\Caf\u00e9.roads.geojson",
+        "an accented roads file's source wasn't found");
+
+    // Picking: a ray hits a box from outside at its entry distance, misses beside it, and from inside starts at 0.
+    const DirectX::XMFLOAT3 low(-1, 0, -1), high(1, 3, 1);
+    Check(std::abs(Roads::RayBox({ -5, 1, 0 }, { 1, 0, 0 }, low, high) - 4) < 1e-5f
+        && Roads::RayBox({ -5, 5, 0 }, { 1, 0, 0 }, low, high) < 0 && Roads::RayBox({ 5, 1, 0 }, { 1, 0, 0 }, low, high) < 0
+        && Roads::RayBox({ 0, 1, 0 }, { 0, 0, 1 }, low, high) == 0, "a prop pick ray tested its box wrongly");
+}
+
 void TestSignText()
 {
     // The font draws every letter and digit, upper or lower case, and the punctuation street names use.
@@ -1660,6 +1785,7 @@ int main(int argc, char** argv)
         TestRoadMesh();
         TestRoadGrading();
         TestSignText();
+        TestPropEditing();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")
         {
             auto asset = LoadGltfAsset(argv[2]);

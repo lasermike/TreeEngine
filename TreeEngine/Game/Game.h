@@ -181,6 +181,15 @@ private:
     void HandleInput(bool key[512]);
     void UpdateObjectSelection();
     bool m_selectionUIWasVisible = false;
+    // The roadside prop selected by clicking its terrain (Terrain::PickProp), or -1; and the last save's message.
+    void ShowPropEditor(class Terrain& terrain, const std::string& prefix);
+    const WorldObject* m_propTerrain = nullptr;
+    int m_selectedProp = -1;
+    std::string m_propStatus;
+public:
+    const WorldObject* SelectedPropTerrain() const { return m_propTerrain; }
+    int SelectedProp() const { return m_selectedProp; }
+private:
     void HandleGamepadInput(bool key[512]);
 
     HRESULT ReloadDevice();

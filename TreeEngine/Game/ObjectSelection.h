@@ -11,6 +11,10 @@ struct ObjectPickRequest
     uint64_t epoch = 0;
     bool toggle = false;
     uint64_t sequence = 0;
+    // The world-space ray through (u, v) of the frame the pick was drawn in (set when it's drawn): later frames may
+    // have moved the camera by the time the result is read back.
+    bool hasRay = false;
+    float rayOrigin[3] = {}, rayDirection[3] = {};
 };
 
 struct ObjectPickResult

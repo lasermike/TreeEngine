@@ -65,6 +65,11 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # off. Every frame must draw terrain; once the camera stops nothing may still be loading; synchronous loads never wait.
 .\Tests\RenderRegression\test-terrain-streaming.ps1
 
+# Roadside props in terrain-roads, raster and DXR: a click picks a prop (its terrain and the prop under the click),
+# bare ground picks no prop, the sky nothing; moving and turning a stop sign and removing a mailbox draw them so (the
+# stop sign on the ground at its new heading), and saving into a copy of the roads file changes just their two lines.
+.\Tests\RenderRegression\test-prop-editing.ps1
+
 # Edit, save, reload, restart, and compare scene appearance in both modes.
 # Uses an isolated runtime copy; never modifies the deployment's UserScenes.
 .\Tests\RenderRegression\test-scene-persistence.ps1

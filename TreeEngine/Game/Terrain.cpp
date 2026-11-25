@@ -2,6 +2,7 @@
 #include "Terrain.h"
 #include "GltfLoader.h"
 #include "RenderManager.h"
+#include "SceneDefinition.h"
 #include "SignText.h"
 
 #include <algorithm>
@@ -43,6 +44,9 @@ void Terrain::LoadRoads(const std::wstring& file)
     double originX = 0, originY = 0;
     if (!Roads::PackageFrame(m_package.Manifest().sourceJson, m_package.Manifest().worldSize, crs, originX, originY, m_roadsError))
         return;
+    m_roadsFile = file;
+    m_roadsOriginX = originX;
+    m_roadsOriginY = originY;
     try
     {
         m_roads = Roads::Parse(text.str(), crs, originX, originY);
@@ -64,11 +68,23 @@ void Terrain::LoadRoads(const std::wstring& file)
 // Each prop stands on the ground at its point (the package's finest heights), turned to its heading: its model's
 // front (+z) faces that many degrees clockwise from north. Each model in use loads once; props off the terrain, or
 // whose model isn't installed, are left out.
+bool Terrain::PropWorld(const Roads::Prop& prop, XMFLOAT4X4& world)
+{
+    const float x = prop.point.x + m_offset.x, z = prop.point.y + m_offset.z;
+    float y = 0;
+    if (!HeightAt(x, z, y))
+        return false;
+    XMStoreFloat4x4(&world, XMMatrixRotationY(XMConvertToRadians(prop.heading)) * XMMatrixTranslation(x, y, z));
+    return true;
+}
+
 void Terrain::PlaceProps()
 {
     std::array<bool, PropModels> asked = {};
-    for (const Roads::Prop& prop : m_roads.props)
+    m_propRefs.assign(m_roads.props.size(), PropRef());
+    for (size_t p = 0; p < m_roads.props.size(); ++p)
     {
+        const Roads::Prop& prop = m_roads.props[p];
         const size_t model = static_cast<size_t>(prop.model);
         if (!asked[model])
         {
@@ -81,12 +97,10 @@ void Terrain::PlaceProps()
             ++m_propsWithoutModel;
             continue;
         }
-        const float x = prop.point.x + m_offset.x, z = prop.point.y + m_offset.z;
-        float y = 0;
-        if (!HeightAt(x, z, y))
-            continue;
         XMFLOAT4X4 world;
-        XMStoreFloat4x4(&world, XMMatrixRotationY(XMConvertToRadians(prop.heading)) * XMMatrixTranslation(x, y, z));
+        if (!PropWorld(prop, world))
+            continue;
+        m_propRefs[p] = { static_cast<int>(model), m_propWorlds[model].size() };
         m_propWorlds[model].push_back(world);
         if (prop.model == Roads::PropModel::StreetNameSign)
         {
@@ -134,6 +148,230 @@ void Terrain::PlaceProps()
         }
     }
     BuildSignText();
+}
+
+void Terrain::PropLocalBounds(const PropRef& ref, XMFLOAT3& low, XMFLOAT3& high) const
+{
+    const GltfAsset& asset = *Params().propModels[ref.model];
+    low = asset.boundsMin;
+    high = asset.boundsMax;
+    if (ref.model == static_cast<int>(Roads::PropModel::StreetNameSign) && ref.index < m_signBlades.size() && SignNames())
+    {
+        // The lower blade runs along the model's x, the upper along z, each centered on the post.
+        const float alongX = std::max(1.0f, m_signStretch[m_signBlades[ref.index][0]]);
+        const float alongZ = std::max(1.0f, m_signStretch[m_signBlades[ref.index][1]]);
+        low.x *= alongX;
+        high.x *= alongX;
+        low.z *= alongZ;
+        high.z *= alongZ;
+    }
+}
+
+float Terrain::GroundHit(const XMFLOAT3& origin, const XMFLOAT3& direction, float reach)
+{
+    // March half a meter at a time until the ray is below the ground, then halve the last step to a centimeter.
+    const auto below = [&](float t)
+    {
+        float ground = 0;
+        return HeightAt(origin.x + direction.x * t, origin.z + direction.z * t, ground) && origin.y + direction.y * t <= ground;
+    };
+    if (below(0))
+        return 0;
+    for (float t = 0.5f; t <= reach; t += 0.5f)
+        if (below(t))
+        {
+            float low = t - 0.5f, high = t;
+            while (high - low > 0.01f)
+                (below((low + high) / 2) ? high : low) = (low + high) / 2;
+            return high;
+        }
+    return -1;
+}
+
+int Terrain::PickProp(const XMFLOAT3& origin, const XMFLOAT3& direction, float* distance)
+{
+    int best = -1;
+    float nearest = 1e30f;
+    for (size_t p = 0; p < m_propRefs.size(); ++p)
+    {
+        const PropRef& ref = m_propRefs[p];
+        if (ref.model < 0 || !Params().propModels[ref.model])
+            continue;
+        // The ray in the prop's own frame, against its model's bounds.
+        const XMMATRIX world = XMLoadFloat4x4(&m_propWorlds[ref.model][ref.index]);
+        XMVECTOR determinant;
+        const XMMATRIX inverse = XMMatrixInverse(&determinant, world);
+        if (XMVectorGetX(determinant) == 0)
+            continue;       // Removed: hidden at zero scale.
+        XMFLOAT3 localOrigin, localDirection;
+        XMStoreFloat3(&localOrigin, XMVector3TransformCoord(XMLoadFloat3(&origin), inverse));
+        XMStoreFloat3(&localDirection, XMVector3TransformNormal(XMLoadFloat3(&direction), inverse));
+        XMFLOAT3 low, high;
+        PropLocalBounds(ref, low, high);
+        const float t = Roads::RayBox(localOrigin, localDirection, low, high);
+        if (t >= 0 && t < nearest)       // Rotations and translations keep distances.
+        {
+            nearest = t;
+            best = static_cast<int>(p);
+        }
+    }
+    // The nearest prop the ray hits counts only if the ground doesn't come first (a hillside hides what's behind
+    // it); its foot stands on the ground, so the ground may come a little after the prop's bounds. Any prop further
+    // on is behind that ground too.
+    if (best >= 0)
+    {
+        const float ground = GroundHit(origin, direction, nearest);
+        if (ground >= 0 && ground + 0.25f < nearest)
+            best = -1;
+    }
+    if (distance)
+        *distance = best >= 0 ? nearest : -1;
+    return best;
+}
+
+bool Terrain::PropBounds(int prop, XMFLOAT3 bounds[2]) const
+{
+    if (prop < 0 || prop >= static_cast<int>(m_propRefs.size()) || m_propRefs[prop].model < 0)
+        return false;
+    const PropRef& ref = m_propRefs[prop];
+    XMFLOAT3 lo, hi;
+    PropLocalBounds(ref, lo, hi);
+    const XMMATRIX world = XMLoadFloat4x4(&m_propWorlds[ref.model][ref.index]);
+    XMVECTOR low = XMVectorReplicate(1e30f), high = XMVectorReplicate(-1e30f);
+    for (int corner = 0; corner < 8; ++corner)
+    {
+        const XMVECTOR point = XMVector3TransformCoord(XMVectorSet(corner & 1 ? hi.x : lo.x,
+            corner & 2 ? hi.y : lo.y, corner & 4 ? hi.z : lo.z, 1), world);
+        low = XMVectorMin(low, point);
+        high = XMVectorMax(high, point);
+    }
+    XMStoreFloat3(&bounds[0], low);
+    XMStoreFloat3(&bounds[1], high);
+    return true;
+}
+
+void Terrain::SetProp(int prop, const XMFLOAT2& point, float heading)
+{
+    if (prop < 0 || prop >= static_cast<int>(m_propRefs.size()) || m_propRefs[prop].model < 0)
+        return;
+    Roads::Prop& entry = m_roads.props[prop];
+    const Roads::Prop before = entry;
+    entry.point = point;
+    entry.heading = std::fmod(std::fmod(heading, 360.0f) + 360.0f, 360.0f);
+    XMFLOAT4X4 world;
+    if (!PropWorld(entry, world))
+    {
+        entry = before;     // Off the terrain: it stays where it was.
+        return;
+    }
+    const PropRef& ref = m_propRefs[prop];
+    m_propWorlds[ref.model][ref.index] = world;
+    Roads::PropEdit& change = m_propEdits[prop];
+    change.id = entry.id;
+    change.point = entry.point;
+    change.heading = entry.heading;
+}
+
+void Terrain::RemoveProp(int prop)
+{
+    if (prop < 0 || prop >= static_cast<int>(m_propRefs.size()) || m_propRefs[prop].model < 0)
+        return;
+    const PropRef& ref = m_propRefs[prop];
+    // Hidden at zero scale: the instance stays (instance counts are fixed once the terrain is drawn).
+    XMStoreFloat4x4(&m_propWorlds[ref.model][ref.index], XMMatrixScaling(0, 0, 0));
+    const Roads::Prop& entry = m_roads.props[prop];
+    Roads::PropEdit& change = m_propEdits[prop];
+    change.id = entry.id;
+    change.point = entry.point;
+    change.heading = entry.heading;
+    change.removed = true;
+}
+
+bool Terrain::SaveProps(std::string& message, const std::vector<std::wstring>* only)
+{
+    if (m_propEdits.empty())
+    {
+        message = "No prop edits to save.";
+        return true;
+    }
+    std::vector<Roads::PropEdit> edits;
+    for (const auto& entry : m_propEdits)
+        edits.push_back(entry.second);
+    // The file the terrain loaded, and the source the build copied it from when that's what it is
+    // (Roads::BuildSource); a roads file loaded from anywhere else is saved alone.
+    std::vector<std::wstring> files = only ? *only : std::vector<std::wstring>{ m_roadsFile };
+    wchar_t executable[MAX_PATH] = {};
+    if (!only && GetModuleFileNameW(nullptr, executable, MAX_PATH))
+    {
+        std::wstring folder = executable;
+        folder.resize(folder.find_last_of(L'\\'));
+        const std::wstring source = Roads::BuildSource(m_roadsFile, SceneData::WidePath(Params().roads), folder,
+            [](const std::wstring& path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; });
+        if (!source.empty())
+            files.push_back(source);
+    }
+    // Every file's new text first (an edit a file can't take saves nothing), then each staged beside its file, and
+    // only then each replaced, so a failure leaves the files as they were (or, past the first replacement, says which
+    // were saved).
+    std::vector<std::string> texts;
+    for (const std::wstring& file : files)
+    {
+        std::ifstream input(file, std::ios::binary);
+        if (!input)
+        {
+            message = "Couldn't read " + SceneData::Utf8Path(file) + "; nothing was saved.";
+            return false;
+        }
+        std::stringstream text;
+        text << input.rdbuf();
+        try
+        {
+            texts.push_back(Roads::UpdateProps(text.str(), edits, m_roadsOriginX, m_roadsOriginY));
+        }
+        catch (const std::runtime_error& error)
+        {
+            message = std::string(error.what()) + " (" + SceneData::Utf8Path(file) + "); nothing was saved.";
+            return false;
+        }
+    }
+    std::vector<std::wstring> staged;
+    const auto discard = [&]()
+    {
+        for (const std::wstring& path : staged)
+            DeleteFileW(path.c_str());
+    };
+    try
+    {
+        for (size_t i = 0; i < files.size(); ++i)
+            staged.push_back(SceneData::StageFile(SceneData::Utf8Path(files[i]), texts[i]));
+    }
+    catch (const std::runtime_error& error)
+    {
+        discard();
+        message = std::string(error.what()) + "; nothing was saved.";
+        return false;
+    }
+    std::string saved;
+    for (size_t i = 0; i < files.size(); ++i)
+    {
+        try
+        {
+            SceneData::PublishFile(staged[i], SceneData::Utf8Path(files[i]));
+            staged[i].clear();
+            saved += (saved.empty() ? "" : " and ") + SceneData::Utf8Path(files[i]);
+        }
+        catch (const std::runtime_error& error)
+        {
+            discard();
+            message = std::string(error.what()) + (saved.empty() ? "; nothing was saved." : "; only " + saved + " was saved.");
+            return false;
+        }
+    }
+    message = "Saved " + std::to_string(edits.size()) + " prop edits to " + saved;
+    if (files.size() == 1 && !only)
+        message += " (no source copy to update: it was loaded from there, or Game\\Resources wasn't found above the executable)";
+    m_propEdits.clear();
+    return true;
 }
 
 // The street names drawn into an atlas texture (a BMP in memory, for the texture loader), a cell per name.

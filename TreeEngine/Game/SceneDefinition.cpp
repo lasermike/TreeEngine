@@ -1362,8 +1362,18 @@ namespace SceneData
 
     void WriteScene(const SceneDefinition& scene, const std::string& filename, bool overwrite)
     {
-        const auto text = SerializeScene(scene);
-        if (text.size() > MAXDWORD) throw std::runtime_error(filename + ": scene file is too large");
+        const std::wstring staged = StageFile(filename, SerializeScene(scene));
+        try { PublishFile(staged, filename, overwrite); }
+        catch (...)
+        {
+            DeleteFileW(staged.c_str());
+            throw;
+        }
+    }
+
+    std::wstring StageFile(const std::string& filename, const std::string& text)
+    {
+        if (text.size() > MAXDWORD) throw std::runtime_error(filename + ": file is too large");
         static LONG sequence = 0;
         struct TemporaryFile
         {
@@ -1373,7 +1383,7 @@ namespace SceneData
             {
                 if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
                 if (!path.empty() && !DeleteFileW(path.c_str()))
-                    OutputDebugStringW((L"Cannot clean up scene save temporary file: " + path + L"\n").c_str());
+                    OutputDebugStringW((L"Cannot clean up temporary file: " + path + L"\n").c_str());
             }
         } temporary;
         for (int attempt = 0; attempt < 16; ++attempt)
@@ -1384,19 +1394,25 @@ namespace SceneData
             if (temporary.handle != INVALID_HANDLE_VALUE) break;
             DWORD error = GetLastError();
             temporary.path.clear();
-            if (error != ERROR_FILE_EXISTS && error != ERROR_ALREADY_EXISTS) FileError(filename, "cannot create temporary scene file", error);
+            if (error != ERROR_FILE_EXISTS && error != ERROR_ALREADY_EXISTS) FileError(filename, "cannot create temporary file", error);
         }
-        if (temporary.handle == INVALID_HANDLE_VALUE) FileError(filename, "cannot create unique temporary scene file", ERROR_FILE_EXISTS);
+        if (temporary.handle == INVALID_HANDLE_VALUE) FileError(filename, "cannot create unique temporary file", ERROR_FILE_EXISTS);
         DWORD written = 0;
         if (!WriteFile(temporary.handle, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) || written != text.size())
-            FileError(filename, "cannot write scene file");
-        if (!FlushFileBuffers(temporary.handle)) FileError(filename, "cannot flush scene file");
+            FileError(filename, "cannot write file");
+        if (!FlushFileBuffers(temporary.handle)) FileError(filename, "cannot flush file");
         const HANDLE handle = temporary.handle;
         temporary.handle = INVALID_HANDLE_VALUE;
-        if (!CloseHandle(handle)) FileError(filename, "cannot close scene file");
-        if (!MoveFileExW(temporary.path.c_str(), WidePath(filename).c_str(),
-            MOVEFILE_WRITE_THROUGH | (overwrite ? MOVEFILE_REPLACE_EXISTING : 0)))
-            FileError(filename, "cannot publish scene file");
+        if (!CloseHandle(handle)) FileError(filename, "cannot close file");
+        const std::wstring staged = temporary.path;
         temporary.path.clear();
+        return staged;
+    }
+
+    void PublishFile(const std::wstring& staged, const std::string& filename, bool overwrite)
+    {
+        if (!MoveFileExW(staged.c_str(), WidePath(filename).c_str(),
+            MOVEFILE_WRITE_THROUGH | (overwrite ? MOVEFILE_REPLACE_EXISTING : 0)))
+            FileError(filename, "cannot replace the file with its new version");
     }
 }
