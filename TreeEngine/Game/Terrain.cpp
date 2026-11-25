@@ -400,7 +400,8 @@ void Terrain::AddRoadOverlay(RenderData& renderData)
         {
             DebugPolyline polyline;
             polyline.lineWidth = line.kind == Roads::Kind::Road ? 3.0f : 2.0f;
-            polyline.color = line.kind == Roads::Kind::Driveway ? XMFLOAT4(0.2f, 0.9f, 1.0f, 1)
+            polyline.color = line.kind == Roads::Kind::Trail ? XMFLOAT4(0.55f, 1.0f, 0.25f, 1)
+                : line.kind == Roads::Kind::Driveway ? XMFLOAT4(0.2f, 0.9f, 1.0f, 1)
                 : line.surface == "gravel" ? XMFLOAT4(0.85f, 0.7f, 0.45f, 1) : XMFLOAT4(1.0f, 0.55f, 0.1f, 1);
             // A point off the terrain ends the polyline drawn so far; the next point on it starts another.
             const auto add = [&](float x, float z)

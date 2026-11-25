@@ -1520,6 +1520,62 @@ void TestSignText()
         "the sign atlas BMP's rows or channels are out of order");
 }
 
+void TestTrails()
+{
+    // Parsing: a trail is 1 m wide unless it says otherwise (narrower than any road allows), with no surface rule.
+    const std::string file = R"({"type":"FeatureCollection",
+        "crs":{"type":"name","properties":{"name":"EPSG:32610"}},
+        "features":[
+          {"type":"Feature","properties":{"kind":"trail","id":"trail-1"},
+           "geometry":{"type":"LineString","coordinates":[[1000,2000],[1030,2010]]}},
+          {"type":"Feature","properties":{"kind":"trail","id":"trail-2","width":0.6,"surface":"bark"},
+           "geometry":{"type":"LineString","coordinates":[[1000,2020],[1030,2020]]}}]})";
+    const auto network = Roads::Parse(file, "EPSG:32610", 1000, 2000);
+    Check(network.lines.size() == 2 && network.lines[0].kind == Roads::Kind::Trail && network.lines[0].width == Roads::TrailWidth
+        && network.lines[1].width == 0.6f, "trails were parsed wrongly");
+    bool threw = false;
+    try { Roads::Parse(std::string(file).replace(file.find("\"kind\":\"trail\""), 14, "\"kind\":\"path\""), "EPSG:32610", 1000, 2000); }
+    catch (const std::runtime_error& error) { threw = std::string(error.what()).find("road, driveway, trail or prop") != std::string::npos; }
+    Check(threw, "an unknown kind's error doesn't list trails");
+
+    // The mesh: trails go in their own part, on the ground at the trail lift, as wide as they say; nothing else.
+    Roads::Network trails;
+    Roads::Line trail;
+    trail.kind = Roads::Kind::Trail;
+    trail.width = 1;
+    trail.points = { XMFLOAT2(0, 0), XMFLOAT2(20, 0) };
+    trails.lines.push_back(trail);
+    const auto flat = [](float, float, float& y) { y = 2; return true; };
+    const auto mesh = Roads::BuildMesh(trails, XMFLOAT3(0, 0, 0), flat);
+    const auto& tread = mesh[Roads::Part::Trail];
+    float minZ = 1e9f, maxZ = -1e9f;
+    bool level = true;
+    for (const auto& v : tread.vertices)
+    {
+        minZ = std::min(minZ, v.Pos.z);
+        maxZ = std::max(maxZ, v.Pos.z);
+        level = level && std::abs(v.Pos.y - (2 + Roads::TrailLift)) < 1e-5f;
+    }
+    Check(!tread.indices.empty() && level && std::abs(maxZ - minZ - 1) < 1e-4f && mesh[Roads::Part::Asphalt].vertices.empty()
+        && mesh[Roads::Part::Gravel].vertices.empty() && mesh[Roads::Part::YellowLine].vertices.empty(),
+        "a trail's mesh is wrong");
+    Check(Roads::TrailLift < Roads::DrivewayLift, "trails would show over driveways");
+
+    // Grading leaves trails alone: they lie on the ground as it is.
+    const int n = 65;
+    std::vector<float> bumpy(size_t(n) * n);
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i)
+            bumpy[size_t(j) * n + i] = 10 + 0.5f * std::sin(i * 0.7f) * std::cos(j * 0.4f);
+    const auto before = bumpy;
+    Roads::Network graded;
+    Roads::Line crossing = trail;
+    crossing.points = { XMFLOAT2(-20, -5), XMFLOAT2(20, 5) };
+    graded.lines.push_back(crossing);
+    const auto report = Roads::Grade(graded, bumpy, n, 1);
+    Check(report.graded == 0 && bumpy == before, "grading changed the ground under a trail");
+}
+
 void TestTreeLodSettings()
 {
     const std::string json = R"({"version":1,"name":"Lod","objects":[
@@ -1784,6 +1840,7 @@ int main(int argc, char** argv)
         TestRoadNetwork();
         TestRoadMesh();
         TestRoadGrading();
+        TestTrails();
         TestSignText();
         TestPropEditing();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")

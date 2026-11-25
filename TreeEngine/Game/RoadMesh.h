@@ -10,7 +10,7 @@
 
 namespace Roads
 {
-    enum class Part { Asphalt, Gravel, YellowLine, WhiteLine, Count };
+    enum class Part { Asphalt, Gravel, YellowLine, WhiteLine, Trail, Count };
 
     struct MeshPart
     {
@@ -26,8 +26,8 @@ namespace Roads
     };
 
     // Heights above the ground (meters), so that where surfaces overlap at a junction the more important one shows:
-    // paved roads, then gravel roads, then driveways; markings above them all.
-    constexpr float RoadLift = 0.10f, GravelRoadLift = 0.08f, DrivewayLift = 0.06f, MarkingLift = 0.12f;
+    // paved roads, then gravel roads, then driveways, then trails; markings above them all.
+    constexpr float RoadLift = 0.10f, GravelRoadLift = 0.08f, DrivewayLift = 0.06f, TrailLift = 0.04f, MarkingLift = 0.12f;
     constexpr float MarkingWidth = 0.10f;
     constexpr float CenterDash = 3.0f, CenterGap = 9.0f;   // A dashed center line's dashes and gaps, meters.
     constexpr int EdgeLineSpeed = 40;           // County paved roads this fast (mph) and up get white edge lines.

@@ -413,7 +413,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     return RuntimeModel(file, terrainId, sceneFilename);
                 };
                 // Road surfaces, in Roads::Part order: asphalt and gravel tiled every 4 m (TerrainTool texture
-                // maps), then yellow and white paint.
+                // maps), yellow and white paint, then trails (the dirt maps).
                 const auto surface = [](const char* kind)
                 {
                     SceneData::MaterialDefinition material;
@@ -435,7 +435,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     return material;
                 };
                 for (const auto& material : { surface("asphalt"), surface("gravel"),
-                         paint(XMFLOAT4(0.78f, 0.55f, 0.06f, 1)), paint(XMFLOAT4(0.82f, 0.82f, 0.8f, 1)) })
+                         paint(XMFLOAT4(0.78f, 0.55f, 0.06f, 1)), paint(XMFLOAT4(0.82f, 0.82f, 0.8f, 1)), surface("dirt") })
                 {
                     parameters->roadMaterials.push_back(RuntimeMaterial(material));
                     parameters->roadMaterialTextures.push_back(RuntimeMaterialTextures(material, terrain.id, sceneFilename));

@@ -5,8 +5,8 @@
 It compares the file with its last committed version (--base REF, default HEAD; or --base-file FILE) and:
 - marks every changed or new feature `edited: true`, so a later import_roads.py run keeps it;
 - fills in a new feature's missing properties: a unique id and source manual; a new line is a driveway (gravel,
-  3 m wide; a new road needs its surface and width set by hand), a new point a prop (a post facing north unless
-  its prop and heading are set);
+  3 m wide) unless its kind says road (set its surface and width by hand) or trail (1 m wide), a new point a prop
+  (a post facing north unless its prop and heading are set);
 - moves the first point of a changed or new line onto the nearest other line when it is within --snap-start meters
   (default 6) but not on it: a road end the snapping in QGIS missed;
 - drops empty (null) properties, rounds changed coordinates to centimeters, and writes one feature per line in the
@@ -39,6 +39,7 @@ road_props = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(road_props)
 
 TOLERANCE = 0.005  # coordinates closer than this (m) are unchanged: QGIS rewrites them with more digits
+TRAIL_WIDTH = 1.0  # m, a new trail's tread (Game/RoadNetwork.h's TrailWidth)
 JUNCTION = 3.0  # a crossing this close (m) to either line's end is a junction, not reported
 
 
@@ -105,6 +106,8 @@ def finish(base, edited, snap_start=6.0):
             if props['kind'] == 'driveway':
                 props.setdefault('surface', 'gravel')
                 props.setdefault('width', roads.DRIVEWAY_WIDTH)
+            elif props['kind'] == 'trail':
+                props.setdefault('width', TRAIL_WIDTH)
             elif props['kind'] == 'prop':
                 if 'prop' not in props:
                     notes.append(f"{props['id']}: a new prop without a model is a post: set its prop and heading")
@@ -121,12 +124,13 @@ def finish(base, edited, snap_start=6.0):
         result.append(feature)
 
     # Snap missed road ends onto the lines as they will be written: every part is the written feature's own list,
-    # so a start moved here is where the next snap looks.
+    # so a start moved here is where the next snap looks. Trails go anywhere and cross roads: they neither snap nor
+    # are snapped to, and their crossings aren't reported.
     every = [(f['properties'].get('id'), part) for f in result if not f['properties'].get('removed')
-             for part in parts(f) if len(part) >= 2]
+             and f['properties'].get('kind') != 'trail' for part in parts(f) if len(part) >= 2]
     for feature, _ in changed:
         own = parts(feature)
-        if snap_start <= 0 or not own or len(own[0]) < 2:
+        if snap_start <= 0 or not own or len(own[0]) < 2 or feature['properties'].get('kind') == 'trail':
             continue
         others = [part for _, part in every if part is not own[0]]
         if not others:
@@ -161,6 +165,8 @@ def finish(base, edited, snap_start=6.0):
     # Crossings away from both lines' ends (a line starting on another, a little past it, is a junction), including
     # those through a vertex of either line.
     for feature, _ in changed:
+        if feature['properties'].get('kind') == 'trail':
+            continue
         own_id, own = feature['properties']['id'], [part for part in parts(feature) if len(part) >= 2]
         own_ends = [part[i] for part in own for i in (0, -1)]
         reported = set()

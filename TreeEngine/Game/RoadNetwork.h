@@ -11,7 +11,10 @@
 
 namespace Roads
 {
-    enum class Kind { Road, Driveway };
+    // Trails are footpaths drawn by hand: narrow, their own material, laid on the ground as it is (not graded).
+    enum class Kind { Road, Driveway, Trail };
+
+    constexpr float TrailWidth = 1.0f;          // Meters: a trail's tread unless its width says otherwise.
 
     struct Line
     {
@@ -20,7 +23,7 @@ namespace Roads
         std::string source;                 // county, osm, generated, ...
         bool edited = false;
         std::string name;
-        std::string surface = "paved";      // paved or gravel
+        std::string surface = "paved";      // paved or gravel (trails: their own surface; the property is unused)
         std::string owner;                  // county or private (roads)
         float width = 6;                    // Meters, the traveled surface.
         float shoulder = 0;                 // Meters each side.

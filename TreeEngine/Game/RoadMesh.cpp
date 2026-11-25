@@ -137,12 +137,12 @@ namespace Roads
                 sample.point = XMFLOAT2(sample.point.x + offset.x, sample.point.y + offset.z);
             if (samples.size() < 2)
                 continue;
-            const bool road = line.kind == Kind::Road;
+            const bool road = line.kind == Kind::Road, trail = line.kind == Kind::Trail;
             const bool gravel = line.surface == "gravel";
-            MeshPart& surface = mesh[gravel ? Part::Gravel : Part::Asphalt];
+            MeshPart& surface = mesh[trail ? Part::Trail : gravel ? Part::Gravel : Part::Asphalt];
             const float halfWidth = line.width / 2 + (road ? line.shoulder : 0);
             const size_t vertexStart = surface.vertices.size(), indexStart = surface.indices.size();
-            const float lift = !road ? DrivewayLift : gravel ? GravelRoadLift : RoadLift;
+            const float lift = trail ? TrailLift : !road ? DrivewayLift : gravel ? GravelRoadLift : RoadLift;
             AddStrip(surface, samples, 0, samples.size() - 1, Across(halfWidth), lift, true, 0, height);
             ComputeNormals(surface, vertexStart, indexStart);
 

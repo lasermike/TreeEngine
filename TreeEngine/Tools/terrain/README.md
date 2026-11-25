@@ -126,15 +126,15 @@ aerial imagery for editing. Each feature's `properties`:
 
 | Property | Features | Meaning |
 | --- | --- | --- |
-| `kind` | all | `road` or `driveway` (lines), or `prop` (points) |
+| `kind` | all | `road`, `driveway` or `trail` (lines), or `prop` (points) |
 | `id` | all | stable id: `county-<road number or name>-<start x>-<start y>`, `osm-way-<id>`, `address-<parcel>-<number>`, `prop-<model>-...` |
 | `source` | all | `county`, `osm`, `generated`, or `manual` (drawn by hand) |
 | `edited` | all | true once changed by hand: the importer leaves it alone |
 | `removed` | all | true: deleted by hand. The engine skips it; imports and prop placement don't make it again |
 | `name` | lines | roads: street name, for signs; generated driveways: the address |
-| `surface` | lines | `paved` or `gravel` |
+| `surface` | roads, driveways | `paved` or `gravel` (trails have their own) |
 | `owner` | roads | `county` or `private`; private roads stay plain gravel lanes |
-| `width`, `shoulder` | lines | meters: the traveled width, and the shoulder each side |
+| `width`, `shoulder` | lines | meters: the traveled width (trails 1 m unless set, 0.3 m at least), and the shoulder each side |
 | `ditchDepth`, `ditchWidth` | roads | meters, each side; 0 for none |
 | `speedLimit` | roads | mph, from the county |
 | `class` | roads | the county's functional class, when it has one (lower is more important) |
@@ -201,6 +201,13 @@ CRS, then aerial imagery as an XYZ tile layer below it (Esri World Imagery:
 Categorized by `source`, turn on snapping (Vertex and Segment), toggle editing, and use the Vertex Tool to reshape
 lines (click a point, click where it goes; double-click a line to add a point) and Add Line Feature to draw new ones
 from the road outward (type `driveway` in `kind`; leave the rest empty). Save Layer Edits, then:
+
+**Trails** are drawn by hand the same way: Add Line Feature anywhere, with `trail` in `kind` (and a `name` if you
+like; `width` defaults to 1 m). They're their own material (the dirt maps, under every road and driveway where they
+cross), lie on the ground as it is rather than being graded, and nothing imports or generates them, so a re-run of
+`import_roads.py` keeps them whether or not they're marked `edited`. Since they aren't graded, a trail edit needs
+`finish_road_edits.py` and a rebuild, but no terrain re-import. Hungerford has one example,
+`trail-example` (from E Scott Dr near the middle of the map, 250 m west): reshape or delete it.
 
 ```bash
 python finish_road_edits.py ../../Game/Resources/Terrain/Hungerford.roads.geojson
