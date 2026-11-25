@@ -1533,6 +1533,15 @@ void TestTrails()
     const auto network = Roads::Parse(file, "EPSG:32610", 1000, 2000);
     Check(network.lines.size() == 2 && network.lines[0].kind == Roads::Kind::Trail && network.lines[0].width == Roads::TrailWidth
         && network.lines[1].width == 0.6f, "trails were parsed wrongly");
+    // The documented minimum, 0.3 m, is accepted exactly; anything narrower isn't.
+    auto narrow = Json::parse(file);
+    narrow["features"][1]["properties"]["width"] = 0.3;
+    Check(Roads::Parse(narrow.dump(), "EPSG:32610", 1000, 2000).lines[1].width == 0.3f, "a 0.3 m trail was refused");
+    narrow["features"][1]["properties"]["width"] = 0.29;
+    bool narrowRefused = false;
+    try { Roads::Parse(narrow.dump(), "EPSG:32610", 1000, 2000); }
+    catch (const std::runtime_error& error) { narrowRefused = std::string(error.what()).find("width") != std::string::npos; }
+    Check(narrowRefused, "a trail narrower than 0.3 m was accepted");
     bool threw = false;
     try { Roads::Parse(std::string(file).replace(file.find("\"kind\":\"trail\""), 14, "\"kind\":\"path\""), "EPSG:32610", 1000, 2000); }
     catch (const std::runtime_error& error) { threw = std::string(error.what()).find("road, driveway, trail or prop") != std::string::npos; }
@@ -1560,6 +1569,33 @@ void TestTrails()
         && mesh[Roads::Part::Gravel].vertices.empty() && mesh[Roads::Part::YellowLine].vertices.empty(),
         "a trail's mesh is wrong");
     Check(Roads::TrailLift < Roads::DrivewayLift, "trails would show over driveways");
+    // A ridge between rows: ground 0, 0.2, 0 m at x = 0, 1, 2 (rising and falling linearly), and a trail from x = 0.5
+    // to 2.5, whose rows (a meter apart) straddle the ridge. Along its centerline it stays above the ground.
+    const auto ridge = [](float x, float, float& y) { y = 0.2f * std::max(0.0f, 1 - std::abs(x - 1)); return true; };
+    Roads::Network overRidge;
+    Roads::Line ridgeTrail = trail;
+    ridgeTrail.points = { XMFLOAT2(0.5f, 0), XMFLOAT2(2.5f, 0) };
+    overRidge.lines.push_back(ridgeTrail);
+    const auto ridgeMesh = Roads::BuildMesh(overRidge, XMFLOAT3(0, 0, 0), ridge)[Roads::Part::Trail];
+    float clearance = 1e9f;
+    for (float x = 0.5f; x <= 2.5f; x += 0.01f)
+        for (size_t i = 0; i + 2 < ridgeMesh.indices.size(); i += 3)
+        {
+            const XMFLOAT3& a = ridgeMesh.vertices[ridgeMesh.indices[i]].Pos;
+            const XMFLOAT3& b = ridgeMesh.vertices[ridgeMesh.indices[i + 1]].Pos;
+            const XMFLOAT3& c = ridgeMesh.vertices[ridgeMesh.indices[i + 2]].Pos;
+            const float d = (b.x - a.x) * (c.z - a.z) - (c.x - a.x) * (b.z - a.z);
+            if (std::abs(d) < 1e-9f)
+                continue;
+            const float u = ((x - a.x) * (c.z - a.z) - (c.x - a.x) * (0 - a.z)) / d;
+            const float v = ((b.x - a.x) * (0 - a.z) - (x - a.x) * (b.z - a.z)) / d;
+            if (u < -1e-5f || v < -1e-5f || u + v > 1 + 1e-5f)
+                continue;
+            float ground = 0;
+            ridge(x, 0, ground);
+            clearance = std::min(clearance, a.y + (b.y - a.y) * u + (c.y - a.y) * v - ground);
+        }
+    Check(clearance > 0 && clearance < 1, ("a trail dips under a ridge between its rows (clearance " + std::to_string(clearance) + ")").c_str());
 
     // Grading leaves trails alone: they lie on the ground as it is.
     const int n = 65;

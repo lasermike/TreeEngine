@@ -61,6 +61,20 @@ void Terrain::LoadRoads(const std::wstring& file)
     for (int part = 0; part < static_cast<int>(Roads::Part::Count); ++part)
         if (!m_roadMesh.parts[part].indices.empty())
             m_roadParts.push_back({ static_cast<Roads::Part>(part) });
+    const size_t trail = static_cast<size_t>(Roads::Part::Trail);
+    if (!m_roadMesh.parts[trail].indices.empty() && Params().loadTrailMaterialTextures
+        && trail < Params().roadMaterialTextures.size())
+    {
+        try
+        {
+            Params().roadMaterialTextures[trail] = Params().loadTrailMaterialTextures();
+        }
+        catch (const std::runtime_error& error)
+        {
+            m_roadsError = std::string("the trail material: ") + error.what();
+            return;
+        }
+    }
     PlaceProps();
     m_heightBlocks.clear();     // HeightAt's cache: not needed again.
 }

@@ -114,6 +114,41 @@ namespace
         }
     }
 
+    // A surface laid on ungraded ground (a trail) can dip under a ridge between its rows and columns, where its flat
+    // triangles cut a corner of the ground: each triangle is checked at points an eighth of the way apart, and where
+    // the ground there comes within `lift` of it, its corners are raised to clear it by `lift` (twice over, since a
+    // raised corner changes its neighbors' triangles only upward).
+    void ClearGround(Roads::MeshPart& part, size_t firstIndex, float lift, const std::function<bool(float, float, float&)>& height)
+    {
+        const int steps = 8;
+        for (int pass = 0; pass < 2; ++pass)
+        {
+            std::vector<float> raise(part.vertices.size(), 0.0f);
+            for (size_t i = firstIndex; i + 2 < part.indices.size(); i += 3)
+            {
+                const UINT corner[3] = { part.indices[i], part.indices[i + 1], part.indices[i + 2] };
+                const XMFLOAT3& a = part.vertices[corner[0]].Pos;
+                const XMFLOAT3& b = part.vertices[corner[1]].Pos;
+                const XMFLOAT3& c = part.vertices[corner[2]].Pos;
+                float deficit = 0;
+                for (int u = 0; u <= steps; ++u)
+                    for (int v = 0; u + v <= steps; ++v)
+                    {
+                        const float wu = float(u) / steps, wv = float(v) / steps, wa = 1 - wu - wv;
+                        const float x = a.x * wa + b.x * wu + c.x * wv, z = a.z * wa + b.z * wu + c.z * wv;
+                        const float y = a.y * wa + b.y * wu + c.y * wv;
+                        float ground = 0;
+                        if (height(x, z, ground))
+                            deficit = std::max(deficit, ground + lift - y);
+                    }
+                for (const UINT v : corner)
+                    raise[v] = std::max(raise[v], deficit);
+            }
+            for (size_t v = 0; v < raise.size(); ++v)
+                part.vertices[v].Pos.y += raise[v];
+        }
+    }
+
     // Columns across a surface: edges, center and enough between that no two are more than about 1.5 m apart.
     std::vector<float> Across(float halfWidth)
     {
@@ -144,6 +179,8 @@ namespace Roads
             const size_t vertexStart = surface.vertices.size(), indexStart = surface.indices.size();
             const float lift = trail ? TrailLift : !road ? DrivewayLift : gravel ? GravelRoadLift : RoadLift;
             AddStrip(surface, samples, 0, samples.size() - 1, Across(halfWidth), lift, true, 0, height);
+            if (trail)
+                ClearGround(surface, indexStart, lift, height);
             ComputeNormals(surface, vertexStart, indexStart);
 
             // Markings: county paved roads get a dashed yellow center line, and white edge lines when fast.

@@ -435,11 +435,17 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     return material;
                 };
                 for (const auto& material : { surface("asphalt"), surface("gravel"),
-                         paint(XMFLOAT4(0.78f, 0.55f, 0.06f, 1)), paint(XMFLOAT4(0.82f, 0.82f, 0.8f, 1)), surface("dirt") })
+                         paint(XMFLOAT4(0.78f, 0.55f, 0.06f, 1)), paint(XMFLOAT4(0.82f, 0.82f, 0.8f, 1)) })
                 {
                     parameters->roadMaterials.push_back(RuntimeMaterial(material));
                     parameters->roadMaterialTextures.push_back(RuntimeMaterialTextures(material, terrain.id, sceneFilename));
                 }
+                // Trails: their maps load only if the roads have a trail (Terrain::LoadRoads).
+                const auto dirt = surface("dirt");
+                parameters->roadMaterials.push_back(RuntimeMaterial(dirt));
+                parameters->roadMaterialTextures.push_back(MaterialTextureSources());
+                parameters->loadTrailMaterialTextures = [dirt, terrainId, sceneFilename]()
+                    { return RuntimeMaterialTextures(dirt, terrainId, sceneFilename); };
             }
             parameters->lodRange = terrain.lodRange;
             parameters->slots = static_cast<UINT>(terrain.slots);

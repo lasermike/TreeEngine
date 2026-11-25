@@ -34,7 +34,8 @@ namespace
         return props[key].get<std::string>();
     }
 
-    float Number(const Json& props, const char* key, const std::string& where, float fallback, float low, float high)
+    // Bounds are doubles, as the file's numbers are, so a bound like 0.3 accepts the file's 0.3.
+    float Number(const Json& props, const char* key, const std::string& where, float fallback, double low, double high)
     {
         if (!props.contains(key) || props[key].is_null())
             return fallback;
@@ -307,7 +308,7 @@ namespace Roads
                 Fail(where + ".properties.surface", "must be paved or gravel");
             line.owner = Text(props, "owner", where + ".properties");
             line.width = Number(props, "width", where + ".properties",
-                line.kind == Kind::Road ? 6.0f : line.kind == Kind::Trail ? TrailWidth : 3.0f, line.kind == Kind::Trail ? 0.3f : 1, 40);
+                line.kind == Kind::Road ? 6.0f : line.kind == Kind::Trail ? TrailWidth : 3.0f, line.kind == Kind::Trail ? 0.3 : 1.0, 40.0);
             line.shoulder = Number(props, "shoulder", where + ".properties", 0, 0, 10);
             line.ditchDepth = Number(props, "ditchDepth", where + ".properties", 0, 0, 5);
             line.ditchWidth = Number(props, "ditchWidth", where + ".properties", 0, 0, 20);
