@@ -255,8 +255,8 @@ How it works:
    metre) when that's within 2.5 m, since its crown overhangs the road. Otherwise, like a top inside an OpenStreetMap
    building, it's dropped.
 
-Hungerford: a 300 m square about the 190 E Scott Dr driveway (2025 Mason County survey, NAIP 2023) holds 678 trees:
-468 stand-grown Douglas firs, 111 cedars, 63 hemlocks and 36 broadleaf trees, mostly near the bluff. Heights run
+Hungerford: a 300 m square about the 190 E Scott Dr driveway (2025 Mason County survey, NAIP 2023) holds 701 trees:
+485 stand-grown Douglas firs, 114 cedars, 66 hemlocks and 36 broadleaf trees, mostly near the bluff. Heights run
 9 to 61 m (nine in ten between 23 and 50), with a median of 41 m. LiDAR sees only the top layer of the canopy, so the understory (young cedars and
 hemlocks, alders under the firs) isn't in the file; placement scatters it.
 

@@ -265,9 +265,13 @@ def road_lines(path):
     for f in json.load(open(path, encoding='utf-8')).get('features', []):
         props = f.get('properties') or {}
         if props.get('kind') in ('road', 'driveway') and not props.get('removed'):
-            coords = f.get('geometry', {}).get('coordinates') or []
+            geometry = f.get('geometry') or {}
+            coords = geometry.get('coordinates') or []
+            # A MultiLineString (the engine and finish_road_edits.py allow them) is several polylines.
+            parts = coords if geometry.get('type') == 'MultiLineString' else [coords]
             width = props.get('width') or (3.0 if props.get('kind') == 'driveway' else 5.0)
-            lines.append((width / 2 + 1.0, [tuple(p[:2]) for p in coords]))
+            for part in parts:
+                lines.append((width / 2 + 1.0, [tuple(p[:2]) for p in part]))
     return lines
 
 
@@ -281,6 +285,7 @@ def inside(point, polygon):
 
 
 MAX_SHIFT = 2.5    # How far (m) a trunk may move off a road: a crown overhanging a road has its trunk beside it.
+CLEARANCE_TOLERANCE = 1e-3
 
 
 def place(point, roads, buildings):
@@ -293,8 +298,9 @@ def place(point, roads, buildings):
             if len(line) < 2:
                 continue
             distance, nearest = import_roads.nearest_on_line((x, y), line)
-            if distance < clearance:
-                shift = clearance - distance
+            if distance < clearance - CLEARANCE_TOLERANCE:
+                # Just past the edge, so rounding can't leave it a hair inside on the next pass.
+                shift = clearance - distance + CLEARANCE_TOLERANCE
                 if shift > MAX_SHIFT:
                     return None, 'road'
                 dx, dy = x - nearest[0], y - nearest[1]
@@ -370,6 +376,22 @@ def detect(chm, dtm, image, extent, roads=(), buildings=(), water_level=3.0, bro
     return trees, report
 
 
+def merge(kept, trees):
+    """The trees file's features: the kept ones, then each detected tree a kept one doesn't stand for. A kept tree
+    stands for its own detection wherever it was moved (they share the id) and for any found within 2 m of it."""
+    near_kept = [tuple(f['geometry']['coordinates'][:2]) for f in kept]
+    kept_ids = {(f.get('properties') or {}).get('id') for f in kept}
+    features = list(kept)
+    for t in trees:
+        tid = f'lidar-{t["x"]:.0f}-{t["y"]:.0f}'
+        if tid in kept_ids or any(math.hypot(t['x'] - kx, t['y'] - ky) < 2.0 for kx, ky in near_kept):
+            continue
+        features.append(tree_feature(tid, t['x'], t['y'], {
+            'species': t['species'], 'height': round(t['height'], 1), 'crown': round(t['crown'], 1),
+            'type': t['type'], 'source': 'lidar', 'edited': False}))
+    return features
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('package', help='the terrain package directory (Name.terrain): its CRS')
@@ -418,15 +440,7 @@ def main():
     trees, report = detect(chm, dtm, image, extent, road_lines(args.roads), buildings, args.water_level,
                            args.broadleaf_yellow)
     kept = kept_trees(args.output)
-    near_kept = [tuple(f['geometry']['coordinates'][:2]) for f in kept]
-    features = list(kept)
-    for t in trees:
-        tid = f'lidar-{t["x"]:.0f}-{t["y"]:.0f}'
-        if any(math.hypot(t['x'] - kx, t['y'] - ky) < 2.0 for kx, ky in near_kept):
-            continue
-        features.append(tree_feature(tid, t['x'], t['y'], {
-            'species': t['species'], 'height': round(t['height'], 1), 'crown': round(t['crown'], 1),
-            'type': t['type'], 'source': 'lidar', 'edited': False}))
+    features = merge(kept, trees)
     header = {'type': 'FeatureCollection', 'name': os.path.basename(args.output).split('.')[0] + ' trees',
               'crs': {'type': 'name', 'properties': {'name': 'urn:ogc:def:crs:' + crs.replace(':', '::')}}}
     import_roads.write_collection(args.output, header, features)

@@ -106,7 +106,7 @@ check(species <= ids, f'species not in pnw-plants: {sorted(species - ids)}')
 road = [(5.0, (0.0, 0.0), (100.0, 0.0))]
 roads_list = [(clearance, [a_, b_]) for clearance, a_, b_ in road]
 moved, why = trees.place((50.0, 3.5), roads_list, [])
-check(why is None and abs(moved[1] - 5.0) < 1e-6 and abs(moved[0] - 50.0) < 1e-6,
+check(why is None and abs(moved[1] - 5.0) < 1e-2 and abs(moved[0] - 50.0) < 1e-6,
       f'a top 1.5 m inside the road edge went to {moved}, {why}')
 _, why = trees.place((50.0, 0.5), roads_list, [])
 check(why == 'road', 'a top over the middle of the road kept a trunk')
@@ -147,6 +147,43 @@ with tempfile.TemporaryDirectory() as tmp:
     trees.import_roads.write_collection(path, {'type': 'FeatureCollection'}, features)
     kept = [f['properties']['id'] for f in trees.kept_trees(path)]
     check(kept == ['lidar-1', 'mine', 'lidar-3'], f'kept {kept}')
+
+# A LiDAR tree moved more than 2 m and marked edited isn't found again at its old place (Codex review of #22).
+detected = [{'x': 1015.2, 'y': 2045.3, 'height': 40.0, 'crown': 5.0, 'type': 'conifer', 'species': 'douglas-fir-stand'},
+            {'x': 1030.0, 'y': 2045.0, 'height': 30.0, 'crown': 4.0, 'type': 'conifer', 'species': 'western-hemlock'}]
+moved = trees.tree_feature('lidar-1015-2045', 1020.0, 2045.0, {'species': 'western-red-cedar', 'source': 'lidar',
+                                                               'edited': True})
+merged = trees.merge([moved], detected)
+ids = [f['properties']['id'] for f in merged]
+check(ids == ['lidar-1015-2045', 'lidar-1030-2045'], f'a moved tree came back at its old place: {ids}')
+check(merged[0]['geometry']['coordinates'] == [1020.0, 2045.0], 'the moved tree lost its new place')
+# A hand-added tree suppresses a detection within 2 m of it.
+mine = trees.tree_feature('mine', 1029.0, 2045.5, {'species': 'bigleaf-maple', 'source': 'manual'})
+check([f['properties']['id'] for f in trees.merge([mine], detected)] == ['mine', 'lidar-1015-2045'],
+      'a detection beside a hand-added tree was kept')
+
+# Multipart roads are several polylines (Codex review of #22): each keeps trunks off it.
+with tempfile.TemporaryDirectory() as tmp:
+    path = os.path.join(tmp, 'Test.roads.geojson')
+    json.dump({'type': 'FeatureCollection', 'features': [
+        {'type': 'Feature', 'properties': {'kind': 'road', 'id': 'r', 'width': 5.0},
+         'geometry': {'type': 'MultiLineString', 'coordinates': [[[0, 0], [100, 0]], [[0, 50], [100, 50]]]}}]},
+        open(path, 'w'))
+    multi = trees.road_lines(path)
+    check(len(multi) == 2 and all(len(line) == 2 for _, line in multi), f'a two-part road gave {multi}')
+    moved, why = trees.place((50.0, 48.5), multi, [])
+    check(why is None and moved[1] <= 46.5 + 1e-6, f'a top on the second part went to {moved}, {why}')
+
+# A trunk moved to an oblique road's edge stays there (Codex review of #22: rounding left it a hair inside).
+where, why = trees.place((70.23419074566571, 44.10747966498315), [(3.5, [(0.0, 0.0), (100.0, 60.0)])], [])
+check(why is None, 'a top 1.8 m inside an oblique road was dropped')
+for t in np.linspace(0.05, 0.95, 50):
+    px, py = 100 * t, 60 * t
+    for side in (-1, 1):
+        ox, oy = px - side * 0.514 * 2.0, py + side * 0.857 * 2.0
+        where, why = trees.place((ox, oy), [(3.5, [(0.0, 0.0), (100.0, 60.0)])], [])
+        check(why is None and trees.import_roads.distance_to_line(where, [(0.0, 0.0), (100.0, 60.0)]) >= 3.5,
+              f'a top 2 m from an oblique road at {ox:.2f}, {oy:.2f}: {where}, {why}')
 
 print('import_trees checks passed' if not failures else f'{failures} import_trees checks failed')
 sys.exit(1 if failures else 0)
