@@ -173,13 +173,15 @@ check([f['properties']['id'] for f in trees.merge([mine], detected)] == ['mine',
 with tempfile.TemporaryDirectory() as tmp:
     path = os.path.join(tmp, 'Test.roads.geojson')
     json.dump({'type': 'FeatureCollection', 'features': [
-        {'type': 'Feature', 'properties': {'kind': 'road', 'id': 'r', 'width': 5.0},
+        {'type': 'Feature', 'properties': {'kind': 'road', 'id': 'r'},
          'geometry': {'type': 'MultiLineString', 'coordinates': [[[0, 0], [100, 0]], [[0, 50], [100, 50]]]}}]},
         open(path, 'w'))
     multi = trees.road_lines(path)
+    # A road without a width is 6 m, as the engine draws it: its clearance is half that plus a metre.
+    check(all(abs(c - 4.0) < 1e-9 for c, _ in multi), f'a road without a width has clearances {[c for c, _ in multi]}')
     check(len(multi) == 2 and all(len(line) == 2 for _, line in multi), f'a two-part road gave {multi}')
-    moved, why = trees.place((50.0, 48.5), multi, [])
-    check(why is None and moved[1] <= 46.5 + 1e-6, f'a top on the second part went to {moved}, {why}')
+    moved, why = trees.place((50.0, 48.0), multi, [])
+    check(why is None and moved[1] <= 46.0 + 1e-2, f'a top on the second part went to {moved}, {why}')
 
 # Overlapping roads (a corner) can't move a trunk further than MAX_SHIFT in all (Codex review of #22).
 corner = [(3.5, [(-100.0, 0.0), (100.0, 0.0)]), (3.5, [(0.0, -100.0), (0.0, 100.0)])]

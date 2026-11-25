@@ -274,6 +274,35 @@ A re-run keeps edited, hand-added and removed trees (and finds none within 2 m o
 `python -I -B test_import_trees.py` checks it on a synthetic canopy: tops, crowns, types, species, roads and kept
 trees.
 
+**Planting.** `place_plants.py` puts the trees file's trees and an understory into a scene, as instances of the
+species in `Game/Resources/Scenes/pnw-plants.scene.json`:
+
+```bash
+python place_plants.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Game/Resources/Terrain/Hungerford.trees.geojson     ../../Game/Resources/Scenes/hungerford.scene.json --roads ../../Game/Resources/Terrain/Hungerford.roads.geojson     --understory 3000 --focus 504546 5228299 60 5000
+```
+
+- **Sources.** Each species used becomes one source tree (`pnw-<species>`), copied from pnw-plants. It stands at its
+  first plant and grows at once (`animationSpeed` 1000), so the scene opens on mature trees. Every other plant is an
+  `instanceOf` copy (`plant-<n>`) with a random turn.
+- **Materials.** They're leaner than pnw-plants' (every bark on the furrowed bark's maps, tinted as before, and no
+  roughness maps), because a scene holds 32 textures and the terrain, water, roads and props use most of them.
+- **Trees** stand where the file has them, on the package's ground plus the half metre trees draw below their origin,
+  scaled from their species' own height (`SOURCE_HEIGHT`) to theirs.
+- **Understory** is scattered over the trees' area (plus `--margin`, 10 m), with `--focus X Y RADIUS COUNT` adding
+  more where the camera starts:
+  - under a crown: sword fern most, then salal, Oregon grape, red huckleberry, cedar and hemlock saplings and vine
+    maple;
+  - in openings: orchard and pasture grass and bracken;
+  - within 4 m of a road or driveway: blackberry and bracken;
+  - within 40 m of beach: oceanspray and salal.
+- **Clearances.** Nothing stands on a road, driveway or trail, in the water, or in a trunk.
+
+It's seeded, and a re-run replaces the objects it made before and keeps everything else, so re-run it after editing the
+trees file, the roads or the species, then rebuild. Hungerford: 701 trees and 8,000 understory plants (9,827 objects).
+The cost is per object for now: about 2 to 2.5 ms of frame time per 1,000 plants, from draw records in DXR and every
+plant in every shadow cascade in raster. `python -I -B test_place_plants.py` checks placement, clearances, mixes,
+sources and textures.
+
 **Grading.** `import_heightmap.py --roads FILE` (TerrainTool `pack --roads`) grades the roads into the heights before
 packing (Game/RoadGrading.h). Along each smoothed centerline the bed follows the ground's running median and mean
 (7 and 17 samples, a meter apart), so short bumps are planed off; across it, the traveled way is crowned (2% paved,
