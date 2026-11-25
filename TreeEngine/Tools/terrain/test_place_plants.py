@@ -1,0 +1,102 @@
+"""Checks place_plants.py on synthetic trees and ground (no package):
+
+    python -I test_place_plants.py
+"""
+
+import importlib.util
+import json
+import math
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+spec = importlib.util.spec_from_file_location('place_plants', os.path.join(HERE, 'place_plants.py'))
+plants = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(plants)
+
+failures = 0
+
+
+def check(condition, message):
+    global failures
+    if not condition:
+        failures += 1
+        print('FAIL:', message)
+
+
+# Ground: a slope rising east, under water (below 1.9 m) along the west edge.
+def ground(x, y):
+    return 0.5 + 0.1 * (x - 1000.0)
+
+
+trees = [{'x': 1050.0 + 10 * i, 'y': 2050.0 + 7 * (i % 3), 'species': s, 'height': h, 'crown': 4.0, 'id': f't{i}'}
+         for i, (s, h) in enumerate([('douglas-fir-stand', 40.0), ('douglas-fir-stand', 20.0), ('western-red-cedar', 28.0),
+                                     ('red-alder', 30.0), ('pacific-madrone-bluff', 11.0)])]
+road = [(2.5, [(1000.0, 2040.0), (1120.0, 2040.0)])]
+trail = [(0.5, [(1080.0, 2000.0), (1080.0, 2100.0)])]
+extent = (1000.0, 2000.0, 1120.0, 2100.0)
+placed = plants.plan(trees, road + trail, ground, extent, 1500, 7, water_level=1.9, focus=(1060.0, 2060.0, 15.0, 300))
+
+# Trees come first, where they were found, scaled to their height from their species' own.
+check([p[0] for p in placed[:5]] == [t['species'] for t in trees], 'trees are not first, in order')
+check(all((p[1], p[2]) == (t['x'], t['y']) for p, t in zip(placed, trees)), 'a tree moved')
+check(abs(placed[0][3] - 1.0) < 1e-6 and abs(placed[1][3] - 0.5) < 1e-6, 'trees are not scaled to their height')
+check(abs(placed[3][3] - 1.5) < 1e-6, 'a 30 m alder (20 m source) is not scaled 1.5')
+# Understory: as many as asked, none on the road or trail, in the water or in a trunk.
+under = placed[5:]
+check(len(under) == 1800, f'{len(under)} understory plants, expected 1500 + 300')
+on_lines = [p for p in under if any(plants.import_roads.distance_to_line((p[1], p[2]), line) < half + 0.3
+                                    for half, line in road + trail)]
+check(not on_lines, f'{len(on_lines)} plants on the road or trail')
+check(all(ground(p[1], p[2]) >= 2.2 for p in under), 'a plant stands in the water')
+check(all(math.hypot(p[1] - t['x'], p[2] - t['y']) >= 0.8 for p in under for t in trees), 'a plant in a trunk')
+# The focus: its 300 extra plants within 15 m of it.
+near = sum(math.hypot(p[1] - 1060.0, p[2] - 2060.0) <= 15.0 for p in under)
+check(near >= 300, f'only {near} plants within the focus')
+# Mixes by place: under crowns the canopy mix; by the road the roadside mix shows up; near the beach shore plants.
+canopy = {s for s, *_ in plants.UNDER_CANOPY}
+covered = [p for p in under if any(math.hypot(p[1] - t['x'], p[2] - t['y']) < t['crown'] for t in trees)
+           and plants.edge_distance(p[1], p[2], road + trail, plants.line_grid(road + trail)) >= 4.0
+           and p[1] > 1040.0]
+check(covered and all(p[0] in canopy for p in covered), 'a plant under a crown is not from the canopy mix')
+roadside = {p[0] for p in under if plants.edge_distance(p[1], p[2], road, plants.line_grid(road)) < 4.0}
+check('himalayan-blackberry' in roadside, 'no blackberry along the road')
+shore = {p[0] for p in under if p[1] < 1030.0}
+check('oceanspray' in shore, 'no oceanspray near the beach')
+# Seeded: the same plan twice.
+again = plants.plan(trees, road + trail, ground, extent, 1500, 7, water_level=1.9, focus=(1060.0, 2060.0, 15.0, 300))
+check(again == placed, 'the plan changed between runs')
+
+# Scene objects: a source per species from pnw-plants (grown at once), instances of it, companions with their plants.
+pnw = json.load(open(plants.PNW, encoding='utf-8'))
+objects = plants.scene_objects(placed, ground, (1060.0, 2050.0), pnw)
+sources = [o for o in objects if not o.get('instanceOf')]
+ids = [o['id'] for o in sources]
+check(len(ids) == len(set(ids)) and all(i.startswith('pnw-') for i in ids), 'sources are not one per species')
+check(all(o['animationSpeed'] == plants.GROWN for o in sources), 'a source would grow in slowly')
+check(all(o['instanceOf'] in ids for o in objects if o.get('instanceOf')), 'an instance of a missing source')
+fir = objects[0]
+check(fir['id'] == 'pnw-douglas-fir-stand' and fir['transform']['position'] == [-10.0, round(ground(1050, 2050) + 0.5, 3), 0.0],
+      f'the first fir stands at {fir["transform"]["position"]}, not on the ground at its place (+0.5)')
+oceanspray = [o for o in objects if 'oceanspray' in (o.get('instanceOf') or o['id'])]
+plumes = [o for o in objects if 'oceanspray-plumes' in (o.get('instanceOf') or o['id'])]
+check(len(oceanspray) == 2 * len(plumes) and plumes, 'oceanspray without its plumes')
+# Materials: lean (one bark's maps, no roughness maps), all the sources need, few textures.
+materials, atlases = plants.used_resources(objects, pnw)
+textures = {v['source'] for m in materials.values() for v in m.values() if isinstance(v, dict) and 'source' in v}
+check(all('metallicRoughnessTexture' not in m for m in materials.values()), 'a material kept its roughness map')
+check(all(not t.startswith('Nature/bark_') or t.startswith(f'Nature/bark_{plants.LEAN_BARK}_') for t in textures),
+      'more than one bark texture')
+check(len(textures) <= 8, f'{len(textures)} textures for the plants: {sorted(textures)}')
+check(all(o['materials'][k] in materials for o in sources for k in o['materials']), 'a source material is missing')
+
+# Hungerford's committed scene: planted, and within the 32 textures a scene holds.
+scene = json.load(open(os.path.join(HERE, '..', '..', 'Game', 'Resources', 'Scenes', 'hungerford.scene.json'),
+                       encoding='utf-8-sig'))
+all_textures = {v['source'] for m in scene['materials'].values() for v in m.values() if isinstance(v, dict) and 'source' in v}
+check(len(all_textures) <= 24, f'Hungerford names {len(all_textures)} textures; roads, props and signs need the rest of 32')
+check(any(o['id'] == 'pnw-douglas-fir-stand' for o in scene['objects']), 'Hungerford is not planted')
+
+print('place_plants checks passed' if not failures else f'{failures} place_plants checks failed')
+sys.exit(1 if failures else 0)

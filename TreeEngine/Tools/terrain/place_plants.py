@@ -296,7 +296,7 @@ def main():
     pnw = json.load(open(PNW, encoding='utf-8'))
     objects = scene_objects(placed, package.height, (package.cx, package.cy), pnw)
     materials, atlases = used_resources(objects, pnw)
-    scene = json.load(open(args.scene, encoding='utf-8'))
+    scene = json.load(open(args.scene, encoding='utf-8-sig'))
     keep = [o for o in scene['objects'] if not (o.get('id', '').startswith('pnw-') or o.get('id', '').startswith('plant-'))]
     scene['objects'] = keep + objects
     for name, material in materials.items():
