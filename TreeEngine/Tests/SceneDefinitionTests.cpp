@@ -1569,33 +1569,71 @@ void TestTrails()
         && mesh[Roads::Part::Gravel].vertices.empty() && mesh[Roads::Part::YellowLine].vertices.empty(),
         "a trail's mesh is wrong");
     Check(Roads::TrailLift < Roads::DrivewayLift, "trails would show over driveways");
-    // A ridge between rows: ground 0, 0.2, 0 m at x = 0, 1, 2 (rising and falling linearly), and a trail from x = 0.5
-    // to 2.5, whose rows (a meter apart) straddle the ridge. Along its centerline it stays above the ground.
-    const auto ridge = [](float x, float, float& y) { y = 0.2f * std::max(0.0f, 1 - std::abs(x - 1)); return true; };
-    Roads::Network overRidge;
-    Roads::Line ridgeTrail = trail;
-    ridgeTrail.points = { XMFLOAT2(0.5f, 0), XMFLOAT2(2.5f, 0) };
-    overRidge.lines.push_back(ridgeTrail);
-    const auto ridgeMesh = Roads::BuildMesh(overRidge, XMFLOAT3(0, 0, 0), ridge)[Roads::Part::Trail];
-    float clearance = 1e9f;
-    for (float x = 0.5f; x <= 2.5f; x += 0.01f)
-        for (size_t i = 0; i + 2 < ridgeMesh.indices.size(); i += 3)
+    // On the ground's grid, a trail is the ground's own triangles clipped to its outline, each the trail lift above
+    // its plane: it follows the ground exactly, crests between its cross-sections included.
+    // The surface height of a mesh part at (x, z): the highest triangle there, or a very low value off it.
+    const auto surfaceAt = [](const Roads::MeshPart& part, float x, float z)
+    {
+        float best = -1e9f;
+        for (size_t i = 0; i + 2 < part.indices.size(); i += 3)
         {
-            const XMFLOAT3& a = ridgeMesh.vertices[ridgeMesh.indices[i]].Pos;
-            const XMFLOAT3& b = ridgeMesh.vertices[ridgeMesh.indices[i + 1]].Pos;
-            const XMFLOAT3& c = ridgeMesh.vertices[ridgeMesh.indices[i + 2]].Pos;
+            const XMFLOAT3& a = part.vertices[part.indices[i]].Pos;
+            const XMFLOAT3& b = part.vertices[part.indices[i + 1]].Pos;
+            const XMFLOAT3& c = part.vertices[part.indices[i + 2]].Pos;
             const float d = (b.x - a.x) * (c.z - a.z) - (c.x - a.x) * (b.z - a.z);
             if (std::abs(d) < 1e-9f)
                 continue;
-            const float u = ((x - a.x) * (c.z - a.z) - (c.x - a.x) * (0 - a.z)) / d;
-            const float v = ((b.x - a.x) * (0 - a.z) - (x - a.x) * (b.z - a.z)) / d;
+            const float u = ((x - a.x) * (c.z - a.z) - (c.x - a.x) * (z - a.z)) / d;
+            const float v = ((b.x - a.x) * (z - a.z) - (x - a.x) * (b.z - a.z)) / d;
             if (u < -1e-5f || v < -1e-5f || u + v > 1 + 1e-5f)
                 continue;
-            float ground = 0;
-            ridge(x, 0, ground);
-            clearance = std::min(clearance, a.y + (b.y - a.y) * u + (c.y - a.y) * v - ground);
+            best = std::max(best, a.y + (b.y - a.y) * u + (c.y - a.y) * v);
         }
-    Check(clearance > 0 && clearance < 1, ("a trail dips under a ridge between its rows (clearance " + std::to_string(clearance) + ")").c_str());
+        return best;
+    };
+    Roads::GroundGrid unitGrid;
+    unitGrid.spacing = 1;
+    // Ridges along z (constant across x's grid lines), so the terrain's triangles are exactly the linear profile.
+    const auto ridgeCase = [&](float peak, float from, const char* what)
+    {
+        const auto ground = [peak](float x, float, float& y) { y = peak * std::max(0.0f, 1 - std::abs(x - 1)); return true; };
+        Roads::Network network;
+        Roads::Line line = trail;
+        line.points = { XMFLOAT2(from, 0), XMFLOAT2(from + 2, 0) };
+        network.lines.push_back(line);
+        const auto part = Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), ground, &unitGrid)[Roads::Part::Trail];
+        float worst = 1e9f, covered = 1e9f;
+        for (float x = from + 0.01f; x <= from + 1.99f; x += 0.01f)
+            for (float z = -0.45f; z <= 0.45f; z += 0.15f)
+            {
+                float g = 0;
+                ground(x, z, g);
+                const float y = surfaceAt(part, x, z);
+                covered = std::min(covered, y);       // -1e9 where nothing covers the point.
+                worst = std::max(worst == 1e9f ? 0.0f : worst, std::abs(y - (g + Roads::TrailLift)));
+            }
+        Check(covered > -1 && worst < 1e-4f, (std::string(what) + ": the trail doesn't follow the ground at its lift").c_str());
+    };
+    ridgeCase(0.2f, 0.5f, "a 0.2 m ridge between cross-sections");
+    ridgeCase(1.0f, 0.4375f, "a 1 m crest off the cross-sections");
+    // A driveway crossing the trail on that ridge stays on top: at the crossing the trail is the ground plus its lift,
+    // the driveway (along z, so flat across) the ground plus its own.
+    {
+        const auto ground = [](float x, float, float& y) { y = 0.2f * std::max(0.0f, 1 - std::abs(x - 1)); return true; };
+        Roads::Network network;
+        Roads::Line line = trail;
+        line.points = { XMFLOAT2(0.5f, 0), XMFLOAT2(2.5f, 0) };
+        network.lines.push_back(line);
+        Roads::Line crossing;
+        crossing.kind = Roads::Kind::Driveway;
+        crossing.surface = "gravel";
+        crossing.width = 3;
+        crossing.points = { XMFLOAT2(0.5f, -5), XMFLOAT2(0.5f, 5) };
+        network.lines.push_back(crossing);
+        const auto mesh = Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), ground, &unitGrid);
+        const float trailY = surfaceAt(mesh[Roads::Part::Trail], 0.5f, 0), drivewayY = surfaceAt(mesh[Roads::Part::Gravel], 0.5f, 0);
+        Check(trailY > 0 && drivewayY > trailY + 0.015f, "a trail draws over a driveway crossing it on a ridge");
+    }
 
     // Grading leaves trails alone: they lie on the ground as it is.
     const int n = 65;

@@ -204,8 +204,8 @@ from the road outward (type `driveway` in `kind`; leave the rest empty). Save La
 
 **Trails** are drawn by hand the same way: Add Line Feature anywhere, with `trail` in `kind` (and a `name` if you
 like; `width` defaults to 1 m). They're their own material (the dirt maps, under every road and driveway where they
-cross), lie on the ground as it is rather than being graded (raised just enough to clear a ridge between their mesh
-rows), and nothing imports or generates them, so a re-run of
+cross), lie on the ground as it is rather than being graded (built from the terrain's own triangles, so they follow
+it exactly), and nothing imports or generates them, so a re-run of
 `import_roads.py` keeps them whether or not they're marked `edited`. Since they aren't graded, a trail edit needs
 `finish_road_edits.py` and a rebuild, but no terrain re-import. Hungerford has one example,
 `trail-example` (from E Scott Dr near the middle of the map, 250 m west): reshape or delete it.

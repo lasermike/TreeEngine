@@ -36,5 +36,16 @@ namespace Roads
     // package coordinates into the world. Surfaces use world-planar texture coordinates (u = x, v = -z, in meters), so
     // ribbons overlapping at a junction shade alike. Every triangle faces up. A cross-section with no ground height
     // under it is left out, and no triangle spans it: the strip ends there and starts again past it.
-    Mesh BuildMesh(const Network& network, DirectX::XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height);
+    //
+    // Trails lie on the ground as it is, so a strip of flat triangles could cut under a ridge between its rows. Given
+    // the ground's grid (`grid`: its spacing, and the world x, z of its node 0, 0; each cell split along the diagonal
+    // from its +x to its +z corner, as the terrain draws it), a trail is instead the ground's own triangles clipped to
+    // its outline, each `TrailLift` above its plane: it follows the ground exactly. Without a grid a trail is a strip.
+    struct GroundGrid
+    {
+        float spacing = 0;
+        float originX = 0, originZ = 0;
+    };
+    Mesh BuildMesh(const Network& network, DirectX::XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height,
+        const GroundGrid* grid = nullptr);
 }

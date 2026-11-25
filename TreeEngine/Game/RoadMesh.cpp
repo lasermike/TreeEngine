@@ -114,38 +114,132 @@ namespace
         }
     }
 
-    // A surface laid on ungraded ground (a trail) can dip under a ridge between its rows and columns, where its flat
-    // triangles cut a corner of the ground: each triangle is checked at points an eighth of the way apart, and where
-    // the ground there comes within `lift` of it, its corners are raised to clear it by `lift` (twice over, since a
-    // raised corner changes its neighbors' triangles only upward).
-    void ClearGround(Roads::MeshPart& part, size_t firstIndex, float lift, const std::function<bool(float, float, float&)>& height)
+    // A trail as the ground's own triangles clipped to its outline: for each quad between consecutive cross-sections
+    // (left and right edges), each grid cell under it, and each of the cell's two triangles, the part of the triangle
+    // inside the quad, at the triangle's plane plus `lift`. Pieces carry their plane's normal; texture coordinates are
+    // world-planar like the other surfaces'.
+    void AddTrail(Roads::MeshPart& part, const std::vector<Sample>& samples, float halfWidth, float lift,
+        const Roads::GroundGrid& grid, const std::function<bool(float, float, float&)>& height)
     {
-        const int steps = 8;
-        for (int pass = 0; pass < 2; ++pass)
+        typedef XMFLOAT2 P;
+        const auto cross = [](const P& o, const P& a, const P& b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); };
+        // Keeps the part of a convex polygon on the inner side of edge a-b of a counterclockwise polygon.
+        const auto clip = [&](const std::vector<P>& polygon, const P& a, const P& b)
         {
-            std::vector<float> raise(part.vertices.size(), 0.0f);
-            for (size_t i = firstIndex; i + 2 < part.indices.size(); i += 3)
+            std::vector<P> out;
+            for (size_t i = 0; i < polygon.size(); ++i)
             {
-                const UINT corner[3] = { part.indices[i], part.indices[i + 1], part.indices[i + 2] };
-                const XMFLOAT3& a = part.vertices[corner[0]].Pos;
-                const XMFLOAT3& b = part.vertices[corner[1]].Pos;
-                const XMFLOAT3& c = part.vertices[corner[2]].Pos;
-                float deficit = 0;
-                for (int u = 0; u <= steps; ++u)
-                    for (int v = 0; u + v <= steps; ++v)
-                    {
-                        const float wu = float(u) / steps, wv = float(v) / steps, wa = 1 - wu - wv;
-                        const float x = a.x * wa + b.x * wu + c.x * wv, z = a.z * wa + b.z * wu + c.z * wv;
-                        const float y = a.y * wa + b.y * wu + c.y * wv;
-                        float ground = 0;
-                        if (height(x, z, ground))
-                            deficit = std::max(deficit, ground + lift - y);
-                    }
-                for (const UINT v : corner)
-                    raise[v] = std::max(raise[v], deficit);
+                const P& p = polygon[i];
+                const P& q = polygon[(i + 1) % polygon.size()];
+                const float dp = cross(a, b, p), dq = cross(a, b, q);
+                if (dp >= 0)
+                    out.push_back(p);
+                if ((dp >= 0) != (dq >= 0))
+                {
+                    const float t = dp / (dp - dq);
+                    out.push_back(P(p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t));
+                }
             }
-            for (size_t v = 0; v < raise.size(); ++v)
-                part.vertices[v].Pos.y += raise[v];
+            return out;
+        };
+        const auto emit = [&](std::vector<P> polygon, const P& o, const P& u, const P& v, float h0, float hu, float hv)
+        {
+            // The terrain triangle's plane: h0 at o, hu along u, hv along v (u and v its two edges from o).
+            const float det = u.x * v.y - u.y * v.x;
+            const auto planeHeight = [&](const P& p)
+            {
+                const float dx = p.x - o.x, dz = p.y - o.y;
+                const float a = (dx * v.y - dz * v.x) / det, b = (u.x * dz - u.y * dx) / det;
+                return h0 + (hu - h0) * a + (hv - h0) * b + lift;
+            };
+            const UINT base = static_cast<UINT>(part.vertices.size());
+            for (const P& p : polygon)
+            {
+                SimpleVertex vertex = {};
+                vertex.Pos = XMFLOAT3(p.x, planeHeight(p), p.y);
+                vertex.Normal = XMFLOAT3(0, 1, 0);
+                vertex.Tex = XMFLOAT2(p.x, -p.y);
+                vertex.TangentU = XMFLOAT4(1, 0, 0, 1);
+                part.vertices.push_back(vertex);
+            }
+            for (UINT i = 1; i + 1 < polygon.size(); ++i)
+            {
+                // Counterclockwise in (x, z) is clockwise seen from above (+y): wind each so it faces up.
+                const P& a = polygon[0];
+                const P& b = polygon[i];
+                const P& c = polygon[i + 1];
+                if (cross(a, b, c) <= 0)
+                    part.indices.insert(part.indices.end(), { base, base + i, base + i + 1 });
+                else
+                    part.indices.insert(part.indices.end(), { base, base + i + 1, base + i });
+            }
+        };
+        for (size_t k = 0; k + 1 < samples.size(); ++k)
+        {
+            const Sample& s0 = samples[k];
+            const Sample& s1 = samples[k + 1];
+            std::vector<P> quad = {
+                P(s0.point.x - s0.side.x * halfWidth, s0.point.y - s0.side.y * halfWidth),
+                P(s1.point.x - s1.side.x * halfWidth, s1.point.y - s1.side.y * halfWidth),
+                P(s1.point.x + s1.side.x * halfWidth, s1.point.y + s1.side.y * halfWidth),
+                P(s0.point.x + s0.side.x * halfWidth, s0.point.y + s0.side.y * halfWidth) };
+            // Counterclockwise in (x, z), and convex (a tight bend's quad can fold: then it's two triangles).
+            float area = 0;
+            for (size_t i = 0; i < 4; ++i)
+                area += quad[i].x * quad[(i + 1) % 4].y - quad[(i + 1) % 4].x * quad[i].y;
+            if (area < 0)
+                std::reverse(quad.begin(), quad.end());
+            bool convex = true;
+            for (size_t i = 0; i < 4; ++i)
+                convex = convex && cross(quad[i], quad[(i + 1) % 4], quad[(i + 2) % 4]) >= 0;
+            std::vector<std::vector<P>> pieces;
+            if (convex)
+                pieces.push_back(quad);
+            else
+            {
+                pieces.push_back({ quad[0], quad[1], quad[2] });
+                pieces.push_back({ quad[0], quad[2], quad[3] });
+                for (auto& piece : pieces)
+                    if (cross(piece[0], piece[1], piece[2]) < 0)
+                        std::reverse(piece.begin(), piece.end());
+            }
+            for (const auto& outline : pieces)
+            {
+                float minX = 1e30f, maxX = -1e30f, minZ = 1e30f, maxZ = -1e30f;
+                for (const P& p : outline)
+                {
+                    minX = std::min(minX, p.x); maxX = std::max(maxX, p.x);
+                    minZ = std::min(minZ, p.y); maxZ = std::max(maxZ, p.y);
+                }
+                const int i0 = static_cast<int>(std::floor((minX - grid.originX) / grid.spacing));
+                const int i1 = static_cast<int>(std::floor((maxX - grid.originX) / grid.spacing));
+                const int j0 = static_cast<int>(std::floor((minZ - grid.originZ) / grid.spacing));
+                const int j1 = static_cast<int>(std::floor((maxZ - grid.originZ) / grid.spacing));
+                for (int j = j0; j <= j1; ++j)
+                    for (int i = i0; i <= i1; ++i)
+                    {
+                        const float x0 = grid.originX + i * grid.spacing, z0 = grid.originZ + j * grid.spacing;
+                        const float x1 = x0 + grid.spacing, z1 = z0 + grid.spacing;
+                        float h00, h10, h01, h11;
+                        if (!height(x0, z0, h00) || !height(x1, z0, h10) || !height(x0, z1, h01) || !height(x1, z1, h11))
+                            continue;       // Off the ground.
+                        // The cell's two triangles (split from its +x corner to its +z corner), counterclockwise.
+                        const P c00(x0, z0), c10(x1, z0), c01(x0, z1), c11(x1, z1);
+                        const std::vector<P> lower = { c00, c10, c01 }, upper = { c10, c11, c01 };
+                        for (int t = 0; t < 2; ++t)
+                        {
+                            std::vector<P> polygon = t ? upper : lower;
+                            for (size_t e = 0; e < outline.size() && polygon.size() >= 3; ++e)
+                                polygon = clip(polygon, outline[e], outline[(e + 1) % outline.size()]);
+                            if (polygon.size() < 3)
+                                continue;
+                            if (t == 0)
+                                emit(polygon, c00, P(grid.spacing, 0), P(0, grid.spacing), h00, h10, h01);
+                            else
+                                emit(polygon, c11, P(-grid.spacing, 0), P(0, -grid.spacing), h11, h01, h10);
+                        }
+                    }
+            }
         }
     }
 
@@ -162,7 +256,8 @@ namespace
 
 namespace Roads
 {
-    Mesh BuildMesh(const Network& network, XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height)
+    Mesh BuildMesh(const Network& network, XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height,
+        const GroundGrid* grid)
     {
         Mesh mesh;
         for (const Line& line : network.lines)
@@ -178,9 +273,10 @@ namespace Roads
             const float halfWidth = line.width / 2 + (road ? line.shoulder : 0);
             const size_t vertexStart = surface.vertices.size(), indexStart = surface.indices.size();
             const float lift = trail ? TrailLift : !road ? DrivewayLift : gravel ? GravelRoadLift : RoadLift;
-            AddStrip(surface, samples, 0, samples.size() - 1, Across(halfWidth), lift, true, 0, height);
-            if (trail)
-                ClearGround(surface, indexStart, lift, height);
+            if (trail && grid && grid->spacing > 0)
+                AddTrail(surface, samples, halfWidth, lift, *grid, height);
+            else
+                AddStrip(surface, samples, 0, samples.size() - 1, Across(halfWidth), lift, true, 0, height);
             ComputeNormals(surface, vertexStart, indexStart);
 
             // Markings: county paved roads get a dashed yellow center line, and white edge lines when fast.

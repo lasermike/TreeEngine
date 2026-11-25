@@ -57,7 +57,12 @@ void Terrain::LoadRoads(const std::wstring& file)
         return;
     }
     // The surfaces, on the ground as the package has it (HeightAt reads the finest blocks it needs).
-    m_roadMesh = Roads::BuildMesh(m_roads, m_offset, [this](float x, float z, float& y) { return HeightAt(x, z, y); });
+    // Trails follow the finest level's triangles: its grid's node 0, 0 is the package's -x, -z corner.
+    Roads::GroundGrid grid;
+    grid.spacing = static_cast<float>(m_package.Manifest().sampleSpacing);
+    grid.originX = m_offset.x - static_cast<float>(m_package.Manifest().worldSize / 2);
+    grid.originZ = m_offset.z - static_cast<float>(m_package.Manifest().worldSize / 2);
+    m_roadMesh = Roads::BuildMesh(m_roads, m_offset, [this](float x, float z, float& y) { return HeightAt(x, z, y); }, &grid);
     for (int part = 0; part < static_cast<int>(Roads::Part::Count); ++part)
         if (!m_roadMesh.parts[part].indices.empty())
             m_roadParts.push_back({ static_cast<Roads::Part>(part) });
