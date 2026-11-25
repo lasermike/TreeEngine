@@ -292,7 +292,8 @@ def road_lines(path):
             coords = geometry.get('coordinates') or []
             # A MultiLineString (the engine and finish_road_edits.py allow them) is several polylines.
             parts = coords if geometry.get('type') == 'MultiLineString' else [coords]
-            width = props.get('width') or (3.0 if props.get('kind') == 'driveway' else 5.0)
+            # Without a width, the engine draws roads 6 m and driveways 3 m (Roads::Load in Game/RoadNetwork.cpp).
+            width = props.get('width') or (3.0 if props.get('kind') == 'driveway' else 6.0)
             for part in parts:
                 lines.append((width / 2 + 1.0, [tuple(p[:2]) for p in part]))
     return lines

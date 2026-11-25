@@ -44,6 +44,8 @@ SOURCE_HEIGHT = {
     'red-alder': 20.0, 'bigleaf-maple': 18.0, 'pacific-madrone': 13.0, 'pacific-madrone-bluff': 11.0,
     'western-red-cedar-sapling': 4.2, 'western-hemlock-sapling': 3.9,
 }
+# Widths of lines without one, as the engine draws them (Roads::Load in Game/RoadNetwork.cpp).
+WIDTHS = {'road': 6.0, 'driveway': 3.0, 'trail': 1.0}
 # Plants grown together: the second stands with the first (its flowers or seed heads).
 COMPANIONS = {'oceanspray': 'oceanspray-plumes', 'orchard-grass': 'orchard-grass-seed'}
 
@@ -93,7 +95,7 @@ def load_lines(path):
         g = f.get('geometry') or {}
         parts = g.get('coordinates') or []
         parts = parts if g.get('type') == 'MultiLineString' else [parts]
-        default = {'road': 5.0, 'driveway': 3.0, 'trail': 1.0}[p['kind']]
+        default = WIDTHS[p['kind']]
         half = (p.get('width') or default) / 2 + (p.get('shoulder') or 0)
         for part in parts:
             if len(part) >= 2:

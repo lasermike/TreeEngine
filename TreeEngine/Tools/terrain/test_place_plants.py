@@ -74,6 +74,19 @@ shore_plan = plants.plan([], [], beach, (40.0, 0.0, 50.0, 100.0), 400, 3, water_
 shore_share = sum(p[0] in ('oceanspray',) for p in shore_plan) / len(shore_plan)
 check(shore_share > 0.15, f'plants 25-35 m from the beach got oceanspray {shore_share:.0%} of the time')
 
+# Lines without a width are as wide as the engine draws them (Codex review of #23): a road 6 m, a driveway 3 m.
+import tempfile
+with tempfile.TemporaryDirectory() as tmp:
+    path = os.path.join(tmp, 'Test.roads.geojson')
+    json.dump({'type': 'FeatureCollection', 'features': [
+        {'type': 'Feature', 'properties': {'kind': k, 'id': k},
+         'geometry': {'type': 'LineString', 'coordinates': [[0, y], [100, y]]}}
+        for k, y in (('road', 0), ('driveway', 50), ('trail', 80))]}, open(path, 'w'))
+    halves = sorted(round(h, 3) for h, _ in plants.load_lines(path))
+    check(halves == [0.5, 1.5, 3.0], f'default half widths {halves}, expected trail 0.5, driveway 1.5, road 3')
+    lines = plants.load_lines(path)
+    check(plants.edge_distance(50.0, 2.9, lines, plants.line_grid(lines)) < 0, 'a point 2.9 m from a 6 m road is off it')
+
 # Seeded: the same plan twice.
 again = plants.plan(trees, road + trail, ground, extent, 1500, 7, water_level=1.9, focus=(1060.0, 2060.0, 15.0, 300))
 check(again == placed, 'the plan changed between runs')
