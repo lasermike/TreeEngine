@@ -1,0 +1,2101 @@
+{
+  "version": 1,
+  "id": "LoadPnwPlants",
+  "priority": 0,
+  "name": "PNW Plants - south Puget Sound trees and understory",
+  "camera": {
+    "position": [
+      2,
+      5,
+      -14
+    ],
+    "rotationDegrees": [
+      -2,
+      0,
+      0
+    ]
+  },
+  "render": {
+    "clearColor": [
+      0.48,
+      0.54,
+      0.58,
+      1
+    ],
+    "farClippingPlane": 400,
+    "environment": {
+      "diffuse": "Environment/terra-daylight-diffuse.dds",
+      "specular": "Environment/terra-daylight-specular.dds"
+    },
+    "sky": {
+      "cubeMap": "Environment/terra-daylight-sky.dds"
+    },
+    "ambientOcclusion": {
+      "radius": 1.25,
+      "strength": 0.65
+    }
+  },
+  "light": {
+    "ambient": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "diffuse": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "specular": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "direction": [
+      0.6259292648824133,
+      -0.7141802822623909,
+      0.3133034947002239
+    ],
+    "angularDiameterDegrees": 2,
+    "shadowSamples": 8
+  },
+  "materials": {
+    "meadow": {
+      "baseColor": [
+        0.11,
+        0.15,
+        0.06,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.95
+    },
+    "bark-douglas-fir": {
+      "baseColor": [
+        0.75,
+        0.62,
+        0.55,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1.0,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_pine_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_pine_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_pine_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "bark-hemlock": {
+      "baseColor": [
+        0.7,
+        0.6,
+        0.55,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1.0,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_furrowed_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_furrowed_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_furrowed_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "bark-cedar": {
+      "baseColor": [
+        1.25,
+        1.0,
+        0.9,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1.0,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        2
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_willow_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_willow_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_willow_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "bark-alder": {
+      "baseColor": [
+        1.35,
+        1.35,
+        1.3,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1.0,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        2
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_furrowed_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_furrowed_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_furrowed_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "bark-maple": {
+      "baseColor": [
+        0.95,
+        0.95,
+        0.85,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1.0,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        3
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_furrowed_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_furrowed_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_furrowed_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "bark-madrone": {
+      "baseColor": [
+        0.42,
+        0.13,
+        0.06,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.45,
+      "specular": 0.4
+    },
+    "stem-shrub": {
+      "baseColor": [
+        0.17,
+        0.12,
+        0.07,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.85
+    },
+    "stem-green": {
+      "baseColor": [
+        0.12,
+        0.17,
+        0.06,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.8
+    },
+    "stem-cane": {
+      "baseColor": [
+        0.22,
+        0.1,
+        0.09,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.6
+    },
+    "needles-fir": {
+      "baseColor": [
+        0.62,
+        0.72,
+        0.55,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/pnw_conifer_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/pnw_conifer_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/pnw_conifer_roughness.png",
+        "wrap": false
+      }
+    },
+    "needles-hemlock": {
+      "baseColor": [
+        0.5,
+        0.62,
+        0.5,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/pnw_conifer_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/pnw_conifer_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/pnw_conifer_roughness.png",
+        "wrap": false
+      }
+    },
+    "sprays-cedar": {
+      "baseColor": [
+        0.45,
+        0.58,
+        0.36,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/pnw_conifer_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/pnw_conifer_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/pnw_conifer_roughness.png",
+        "wrap": false
+      }
+    },
+    "fronds-fern": {
+      "baseColor": [
+        0.75,
+        0.85,
+        0.65,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/pnw_conifer_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/pnw_conifer_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/pnw_conifer_roughness.png",
+        "wrap": false
+      }
+    },
+    "leaves-broadleaf": {
+      "baseColor": [
+        0.95,
+        1.0,
+        0.9,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/pnw_broadleaf_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/pnw_broadleaf_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/pnw_broadleaf_roughness.png",
+        "wrap": false
+      }
+    },
+    "leaves-glossy": {
+      "baseColor": [
+        0.85,
+        0.95,
+        0.8,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.6,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/pnw_broadleaf_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/pnw_broadleaf_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/pnw_broadleaf_roughness.png",
+        "wrap": false
+      }
+    },
+    "grass": {
+      "baseColor": [
+        0.75,
+        0.95,
+        0.6,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/canyon_grasses_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/canyon_grasses_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/canyon_grasses_roughness.png",
+        "wrap": false
+      }
+    }
+  },
+  "atlases": {
+    "pnw-conifer": {
+      "regions": {
+        "fir-a": {
+          "rect": [
+            0.0059,
+            0.6348,
+            0.1499,
+            0.9941
+          ],
+          "stem": [
+            0.0806,
+            0.9941
+          ]
+        },
+        "fir-b": {
+          "rect": [
+            0.877,
+            0.0059,
+            0.9712,
+            0.3682
+          ],
+          "stem": [
+            0.9253,
+            0.3682
+          ]
+        },
+        "hemlock-a": {
+          "rect": [
+            0.1558,
+            0.6348,
+            0.3003,
+            0.9941
+          ],
+          "stem": [
+            0.231,
+            0.9941
+          ]
+        },
+        "hemlock-b": {
+          "rect": [
+            0.7773,
+            0.0059,
+            0.8711,
+            0.3687
+          ],
+          "stem": [
+            0.8257,
+            0.3687
+          ]
+        },
+        "cedar-spray": {
+          "rect": [
+            0.0059,
+            0.0059,
+            0.4502,
+            0.6289
+          ],
+          "stem": [
+            0.2329,
+            0.6289
+          ]
+        },
+        "sword-fern-a": {
+          "rect": [
+            0.6035,
+            0.0059,
+            0.7715,
+            0.3735
+          ],
+          "stem": [
+            0.6904,
+            0.3735
+          ]
+        },
+        "sword-fern-b": {
+          "rect": [
+            0.4561,
+            0.0059,
+            0.5977,
+            0.3813
+          ],
+          "stem": [
+            0.5381,
+            0.3813
+          ]
+        }
+      }
+    },
+    "pnw-broadleaf": {
+      "regions": {
+        "alder-a": {
+          "rect": [
+            0.4146,
+            0.4004,
+            0.5869,
+            0.6914
+          ],
+          "stem": [
+            0.479,
+            0.6914
+          ]
+        },
+        "alder-b": {
+          "rect": [
+            0.0059,
+            0.0059,
+            0.1753,
+            0.3945
+          ],
+          "stem": [
+            0.0757,
+            0.3945
+          ]
+        },
+        "maple-a": {
+          "rect": [
+            0.0059,
+            0.4004,
+            0.4087,
+            0.7729
+          ],
+          "stem": [
+            0.2227,
+            0.7729
+          ]
+        },
+        "maple-b": {
+          "rect": [
+            0.1812,
+            0.0059,
+            0.6255,
+            0.3882
+          ],
+          "stem": [
+            0.4648,
+            0.3882
+          ]
+        },
+        "madrone-a": {
+          "rect": [
+            0.4116,
+            0.7788,
+            0.4873,
+            0.9521
+          ],
+          "stem": [
+            0.457,
+            0.9521
+          ]
+        },
+        "madrone-b": {
+          "rect": [
+            0.3267,
+            0.7788,
+            0.4058,
+            0.9531
+          ],
+          "stem": [
+            0.3589,
+            0.9531
+          ]
+        },
+        "salal-a": {
+          "rect": [
+            0.0757,
+            0.7788,
+            0.2056,
+            0.9858
+          ],
+          "stem": [
+            0.1445,
+            0.9858
+          ]
+        },
+        "salal-b": {
+          "rect": [
+            0.2114,
+            0.7788,
+            0.3208,
+            0.9688
+          ],
+          "stem": [
+            0.2524,
+            0.9688
+          ]
+        },
+        "oregon-grape-a": {
+          "rect": [
+            0.5928,
+            0.4004,
+            0.7412,
+            0.6699
+          ],
+          "stem": [
+            0.6592,
+            0.6699
+          ]
+        },
+        "oregon-grape-b": {
+          "rect": [
+            0.7471,
+            0.4004,
+            0.897,
+            0.6328
+          ],
+          "stem": [
+            0.8281,
+            0.6328
+          ]
+        },
+        "huckleberry-a": {
+          "rect": [
+            0.9028,
+            0.4004,
+            0.98,
+            0.624
+          ],
+          "stem": [
+            0.9741,
+            0.624
+          ]
+        },
+        "huckleberry-b": {
+          "rect": [
+            0.0059,
+            0.7788,
+            0.0698,
+            0.9941
+          ],
+          "stem": [
+            0.0513,
+            0.9941
+          ]
+        },
+        "bramble": {
+          "rect": [
+            0.6313,
+            0.0059,
+            0.9292,
+            0.3794
+          ],
+          "stem": [
+            0.8062,
+            0.3794
+          ]
+        }
+      }
+    },
+    "canyon-grasses": {
+      "regions": {
+        "sedge-1": {
+          "rect": [
+            0.1626,
+            0.0059,
+            0.2095,
+            0.7026
+          ],
+          "stem": [
+            0.1787,
+            0.7026
+          ]
+        },
+        "sedge-2": {
+          "rect": [
+            0.0479,
+            0.0059,
+            0.0771,
+            0.7295
+          ],
+          "stem": [
+            0.0625,
+            0.7295
+          ]
+        },
+        "sedge-3": {
+          "rect": [
+            0.083,
+            0.0059,
+            0.1567,
+            0.7144
+          ],
+          "stem": [
+            0.1328,
+            0.7144
+          ]
+        },
+        "sedge-4": {
+          "rect": [
+            0.2153,
+            0.0059,
+            0.2476,
+            0.6943
+          ],
+          "stem": [
+            0.2319,
+            0.6943
+          ]
+        },
+        "sedge-5": {
+          "rect": [
+            0.0059,
+            0.0059,
+            0.042,
+            0.7314
+          ],
+          "stem": [
+            0.0225,
+            0.7314
+          ]
+        },
+        "sedge-6": {
+          "rect": [
+            0.4561,
+            0.0059,
+            0.481,
+            0.5356
+          ],
+          "stem": [
+            0.4683,
+            0.5356
+          ]
+        },
+        "sedge-7": {
+          "rect": [
+            0.7373,
+            0.0059,
+            0.772,
+            0.4604
+          ],
+          "stem": [
+            0.7446,
+            0.4604
+          ]
+        },
+        "sedge-8": {
+          "rect": [
+            0.8403,
+            0.0059,
+            0.8994,
+            0.3711
+          ],
+          "stem": [
+            0.8867,
+            0.3711
+          ]
+        },
+        "dry-1": {
+          "rect": [
+            0.2534,
+            0.0059,
+            0.2842,
+            0.6279
+          ],
+          "stem": [
+            0.27,
+            0.6279
+          ]
+        },
+        "dry-2": {
+          "rect": [
+            0.3853,
+            0.0059,
+            0.416,
+            0.5659
+          ],
+          "stem": [
+            0.3901,
+            0.5659
+          ]
+        },
+        "dry-3": {
+          "rect": [
+            0.7778,
+            0.0059,
+            0.8027,
+            0.4209
+          ],
+          "stem": [
+            0.792,
+            0.4209
+          ]
+        },
+        "dry-4": {
+          "rect": [
+            0.3408,
+            0.0059,
+            0.3794,
+            0.5747
+          ],
+          "stem": [
+            0.3452,
+            0.5747
+          ]
+        },
+        "dry-5": {
+          "rect": [
+            0.4219,
+            0.0059,
+            0.4502,
+            0.5381
+          ],
+          "stem": [
+            0.4341,
+            0.5381
+          ]
+        },
+        "seed-head-a": {
+          "rect": [
+            0.0059,
+            0.7373,
+            0.0381,
+            0.9399
+          ],
+          "stem": [
+            0.02,
+            0.9399
+          ]
+        },
+        "seed-head-b": {
+          "rect": [
+            0.9053,
+            0.0059,
+            0.9468,
+            0.2954
+          ],
+          "stem": [
+            0.9253,
+            0.2954
+          ]
+        },
+        "reed-1": {
+          "rect": [
+            0.5439,
+            0.0059,
+            0.5718,
+            0.5249
+          ],
+          "stem": [
+            0.5566,
+            0.5249
+          ]
+        },
+        "reed-2": {
+          "rect": [
+            0.5156,
+            0.0059,
+            0.5381,
+            0.5278
+          ],
+          "stem": [
+            0.5244,
+            0.5278
+          ]
+        },
+        "reed-3": {
+          "rect": [
+            0.29,
+            0.0059,
+            0.335,
+            0.582
+          ],
+          "stem": [
+            0.3135,
+            0.582
+          ]
+        },
+        "reed-4": {
+          "rect": [
+            0.6069,
+            0.0059,
+            0.6431,
+            0.5146
+          ],
+          "stem": [
+            0.6177,
+            0.5146
+          ]
+        },
+        "reed-5": {
+          "rect": [
+            0.4868,
+            0.0059,
+            0.5098,
+            0.5283
+          ],
+          "stem": [
+            0.4956,
+            0.5283
+          ]
+        },
+        "reed-6": {
+          "rect": [
+            0.5776,
+            0.0059,
+            0.6011,
+            0.5249
+          ],
+          "stem": [
+            0.5903,
+            0.5249
+          ]
+        },
+        "reed-plume": {
+          "rect": [
+            0.9526,
+            0.0059,
+            0.9941,
+            0.2837
+          ],
+          "stem": [
+            0.9766,
+            0.2837
+          ]
+        },
+        "horsetail-a": {
+          "rect": [
+            0.8086,
+            0.0059,
+            0.8345,
+            0.3789
+          ],
+          "stem": [
+            0.8174,
+            0.3789
+          ]
+        },
+        "horsetail-b": {
+          "rect": [
+            0.6841,
+            0.0059,
+            0.7314,
+            0.4805
+          ],
+          "stem": [
+            0.7197,
+            0.4805
+          ]
+        },
+        "horsetail-c": {
+          "rect": [
+            0.6489,
+            0.0059,
+            0.6782,
+            0.4897
+          ],
+          "stem": [
+            0.6719,
+            0.4897
+          ]
+        }
+      }
+    }
+  },
+  "objects": [
+    {
+      "id": "ground",
+      "type": "primitive",
+      "shape": "cylinderHD",
+      "transform": {
+        "scale": [
+          140,
+          0.01,
+          140
+        ]
+      },
+      "material": "meadow"
+    },
+    {
+      "id": "douglas-fir",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -36,
+          0,
+          40
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-douglas-fir",
+        "leaf": "needles-fir"
+      },
+      "leaves": {
+        "atlas": "pnw-conifer",
+        "twistDegrees": 25,
+        "sizeVariation": 0.25,
+        "regions": {
+          "fir-a": 1,
+          "fir-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "!(1) F(4) A(1)",
+        "iterations": 17,
+        "thickness": 0.45,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s) F(1.5, 0.12) [Z(82, 8) B(s)] [Y(90, 15) Z(86, 8) B(s * 0.9)] [Y(180, 15) Z(78, 8) B(s * 0.95)] [Y(270, 15) Z(84, 8) B(s * 0.9)] Y(45, 20) A(s * 0.94)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.2) F(0.45, 0.2) [Y(90, 20) Z(70, 10) C(1)] [Y(270, 20) Z(70, 10) C(1)] [Y(0, 40) Z(35, 10) C(1)] z(4, 3) B(s * 0.93)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(0.025) F(0.2, 0.3) [Y(90) Z(50, 15) L(0.5)] [Y(270) Z(50, 15) L(0.5)] F(0.2, 0.3) [Y(90) Z(50, 15) L(0.45)] [Y(270) Z(50, 15) L(0.45)] L(0.55)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "western-hemlock",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -20,
+          0,
+          44
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-hemlock",
+        "leaf": "needles-hemlock"
+      },
+      "leaves": {
+        "atlas": "pnw-conifer",
+        "twistDegrees": 25,
+        "sizeVariation": 0.25,
+        "regions": {
+          "hemlock-a": 1,
+          "hemlock-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "!(1) F(3) A(1)",
+        "iterations": 17,
+        "thickness": 0.36,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s) F(1.35, 0.12) [Z(88, 8) B(s)] [Y(90, 15) Z(92, 8) B(s * 0.9)] [Y(180, 15) Z(85, 8) B(s * 0.95)] [Y(270, 15) Z(90, 8) B(s * 0.9)] Y(45, 20) A(s * 0.94)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.17) F(0.38, 0.2) [Y(90, 20) Z(75, 10) C(1)] [Y(270, 20) Z(75, 10) C(1)] [Y(0, 40) Z(40, 10) C(1)] Z(5, 3) B(s * 0.92)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(0.02) F(0.18, 0.3) [Y(90) Z(60, 15) L(0.38)] [Y(270) Z(60, 15) L(0.38)] F(0.15, 0.3) [Y(90) Z(60, 15) L(0.35)] [Y(270) Z(60, 15) L(0.35)] Z(25) L(0.4)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "western-red-cedar",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -4,
+          0,
+          40
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-cedar",
+        "leaf": "sprays-cedar"
+      },
+      "leaves": {
+        "atlas": "pnw-conifer",
+        "twistDegrees": 40,
+        "sizeVariation": 0.25,
+        "regions": {
+          "cedar-spray": 1
+        }
+      },
+      "generator": {
+        "axiom": "!(1.6) F(0.6) !(1.05) F(2.4) A(1)",
+        "iterations": 17,
+        "thickness": 0.5,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s) F(1.45, 0.12) [Z(80, 8) B(s)] [Y(90, 15) Z(84, 8) B(s * 0.9)] [Y(180, 15) Z(78, 8) B(s * 0.95)] [Y(270, 15) Z(82, 8) B(s * 0.9)] Y(45, 20) A(s * 0.93)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.2) F(0.5, 0.2) [Y(90, 25) Z(115, 15) C(1)] [Y(270, 25) Z(115, 15) C(1)] [Y(0, 40) Z(60, 15) C(1)] Z(2, 2) B(s * 0.93)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(0.02) F(0.2, 0.3) [Y(70) Z(30, 10) L(0.6)] [Y(250) Z(30, 10) L(0.6)] F(0.15) [Y(20) Z(25, 10) L(0.55)] L(0.65)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "red-alder",
+      "type": "tree",
+      "transform": {
+        "position": [
+          12,
+          0,
+          42
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-alder",
+        "leaf": "leaves-broadleaf"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "alder-a": 1,
+          "alder-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "!(1) F(5, 0.1) Z(3) A(1)",
+        "iterations": 12,
+        "thickness": 0.24,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s) F(1.15, 0.15) [Y(0, 30) Z(50, 12) B(s)] [Y(180, 30) Z(46, 12) B(s * 0.85)] Y(97, 15) Z(2, 3) A(s * 0.9)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.45) F(0.6, 0.25) [Y(90, 40) Z(45, 15) T(1)] [Y(270, 40) Z(45, 15) T(1)] [Y(0, 40) Z(25, 10) T(1)] z(4, 4) B(s * 0.82)"
+          },
+          {
+            "input": "T(s)",
+            "output": "!(0.03) F(0.25, 0.3) [Y(60) Z(55, 15) L(0.3)] [Y(180) Z(55, 15) L(0.28)] [Y(300) Z(55, 15) L(0.3)] F(0.22, 0.3) [Y(30) Z(55, 15) L(0.28)] [Y(150) Z(55, 15) L(0.28)] [Y(270) Z(55, 15) L(0.28)] L(0.3)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "bigleaf-maple",
+      "type": "tree",
+      "transform": {
+        "position": [
+          30,
+          0,
+          42
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-maple",
+        "leaf": "leaves-broadleaf"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "maple-a": 1,
+          "maple-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "!(1) F(3.5, 0.1) [Z(26, 6) M(1)] [Y(95) Z(34, 6) M(0.9)] [Y(190) Z(30, 6) M(0.95)] [Y(285) Z(32, 6) M(0.85)]",
+        "iterations": 9,
+        "thickness": 0.34,
+        "rules": [
+          {
+            "input": "M(s)",
+            "output": "!(s * 0.8) F(1.5, 0.15) [Y(0, 40) Z(55, 12) B(s * 0.7)] [Y(180, 40) Z(50, 12) B(s * 0.6)] Y(97, 20) Z(4, 4) M(s * 0.85)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.5) F(0.75, 0.25) [Y(90, 40) Z(45, 15) T(1)] [Y(270, 40) Z(45, 15) T(1)] [Y(0, 40) Z(25, 10) T(1)] z(2, 4) B(s * 0.82)"
+          },
+          {
+            "input": "T(s)",
+            "output": "!(0.035) F(0.3, 0.3) [Y(45) Z(60, 15) L(0.5)] [Y(165) Z(60, 15) L(0.5)] [Y(285) Z(60, 15) L(0.5)] F(0.25) [Y(100) Z(50, 15) L(0.45)] [Y(280) Z(50, 15) L(0.45)] L(0.5)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "pacific-madrone",
+      "type": "tree",
+      "transform": {
+        "position": [
+          46,
+          0,
+          36
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-madrone",
+        "leaf": "leaves-glossy"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 70,
+        "sizeVariation": 0.25,
+        "regions": {
+          "madrone-a": 1,
+          "madrone-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "!(1) Z(14) F(2.5, 0.1) z(10) F(1.5) [Z(30, 8) M(1)] [Y(150) Z(38, 8) M(0.85)] [Y(260) Z(25, 8) M(0.7)]",
+        "iterations": 9,
+        "thickness": 0.26,
+        "rules": [
+          {
+            "input": "M(s)",
+            "output": "!(s * 0.75) F(1.0, 0.2) Z(9, 9) [Y(0, 50) Z(50, 15) B(s * 0.7)] [Y(180, 50) Z(45, 15) B(s * 0.6)] Y(110, 30) z(8, 8) M(s * 0.85)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.45) F(0.6, 0.3) Z(8, 8) [Y(90, 40) Z(40, 15) T(1)] [Y(270, 40) Z(40, 15) T(1)] [Y(0, 40) Z(20, 10) T(1)] B(s * 0.8)"
+          },
+          {
+            "input": "T(s)",
+            "output": "!(0.03) F(0.2, 0.3) [Y(50) Z(55, 15) L(0.24)] [Y(170) Z(55, 15) L(0.24)] [Y(290) Z(55, 15) L(0.24)] F(0.12) [Y(0) Z(45) L(0.22)] [Y(120) Z(45) L(0.22)] [Y(240) Z(45) L(0.22)] L(0.24)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "vine-maple",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -14,
+          0,
+          16
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-shrub",
+        "leaf": "leaves-broadleaf"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "maple-a": 1,
+          "maple-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Z(18, 6) S(1)] [Y(90) Z(28, 6) S(0.9)] [Y(180) Z(22, 6) S(0.95)] [Y(270) Z(32, 6) S(0.8)] [Y(45) Z(40, 6) S(0.7)]",
+        "iterations": 9,
+        "thickness": 0.05,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s) F(0.45, 0.15) [Y(0, 40) Z(55, 12) T(1)] [Y(180, 40) Z(55, 12) T(1)] Y(97, 20) Z(6, 4) S(s * 0.88)"
+          },
+          {
+            "input": "T(s)",
+            "output": "!(0.25) F(0.25, 0.3) [Y(60) Z(65, 15) L(0.2)] [Y(180) Z(65, 15) L(0.2)] [Y(300) Z(65, 15) L(0.2)] F(0.15) [Y(0) Z(60) L(0.18)] [Y(180) Z(60) L(0.18)] L(0.2)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      }
+    },
+    {
+      "id": "red-huckleberry",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -6,
+          0,
+          12
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "leaves-broadleaf"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "huckleberry-a": 1,
+          "huckleberry-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Z(10, 6) S(1)] [Y(90) Z(20, 6) S(0.85)] [Y(180) Z(16, 6) S(0.9)] [Y(270) Z(24, 6) S(0.8)]",
+        "iterations": 8,
+        "thickness": 0.015,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s) F(0.3, 0.2) [Y(0, 40) Z(55, 12) T(1)] [Y(180, 40) Z(55, 12) T(1)] Y(97, 20) Z(5, 5) S(s * 0.9)"
+          },
+          {
+            "input": "T(s)",
+            "output": "!(0.4) F(0.12, 0.3) [Y(60) Z(55) L(0.06)] [Y(180) Z(55) L(0.06)] [Y(300) Z(55) L(0.06)] Z(30) F(0.1) [Y(0) Z(55) L(0.06)] [Y(120) Z(55) L(0.06)] [Y(240) Z(55) L(0.06)] z(50) F(0.1) [Y(60) Z(55) L(0.06)] [Y(180) Z(55) L(0.06)] [Y(300) Z(55) L(0.06)] L(0.06)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      }
+    },
+    {
+      "id": "himalayan-blackberry",
+      "type": "tree",
+      "transform": {
+        "position": [
+          2,
+          0,
+          12
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-cane",
+        "leaf": "leaves-broadleaf"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25,
+        "regions": {
+          "bramble": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(14, 6) K(1)] [Y(50) Z(22, 6) K(1)] [Y(100) Z(12, 6) K(1)] [Y(150) Z(20, 6) K(1)] [Y(200) Z(16, 6) K(1)] [Y(250) Z(24, 6) K(1)] [Y(300) Z(10, 6) K(1)] [Y(340) Z(18, 6) K(1)]",
+        "iterations": 10,
+        "thickness": 0.02,
+        "rules": [
+          {
+            "input": "K(s)",
+            "output": "!(s) F(0.3, 0.15) [Y(90, 30) Z(55, 12) L(0.3)] [Y(270, 30) Z(55, 12) L(0.3)] [Y(0, 30) Z(40, 12) L(0.28)] Z(9, 3) K(s * 0.93)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      }
+    },
+    {
+      "id": "salal",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -2,
+          0,
+          6
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-shrub",
+        "leaf": "leaves-glossy"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "salal-a": 1,
+          "salal-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(15, 8) S(1)] [Y(45) Z(30, 8) S(0.9)] [Y(90) Z(22, 8) S(1)] [Y(135) Z(35, 8) S(0.85)] [Y(180) Z(18, 8) S(1)] [Y(225) Z(32, 8) S(0.9)] [Y(270) Z(25, 8) S(0.95)] [Y(315) Z(38, 8) S(0.8)] [Y(20) Z(50, 8) S(0.6)] [Y(200) Z(50, 8) S(0.6)]",
+        "iterations": 8,
+        "thickness": 0.012,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s) F(0.11, 0.2) [Y(0) Z(60, 15) L(0.11)] [Y(120) Z(60, 15) L(0.11)] [Y(240) Z(60, 15) L(0.11)] [Y(60, 30) Z(45, 10) T(1)] Y(90, 20) Z(6, 8) S(s * 0.9)"
+          },
+          {
+            "input": "T(s)",
+            "output": "F(0.08) [Y(0) Z(50) L(0.1)] [Y(120) Z(50) L(0.1)] [Y(240) Z(50) L(0.1)] L(0.1)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      }
+    },
+    {
+      "id": "oregon-grape",
+      "type": "tree",
+      "transform": {
+        "position": [
+          2,
+          0,
+          5
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-shrub",
+        "leaf": "leaves-glossy"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25,
+        "regions": {
+          "oregon-grape-a": 1,
+          "oregon-grape-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[S(1)] [Y(70) Z(15, 6) S(0.85)] [Y(140) Z(12, 6) S(0.9)] [Y(210) Z(18, 6) S(0.8)] [Y(290) Z(14, 6) S(0.9)]",
+        "iterations": 8,
+        "thickness": 0.012,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s) F(0.13, 0.15) [Y(90) Z(55, 10) P(1)] [Y(270) Z(55, 10) P(1)] Y(90, 15) S(s * 0.93)"
+          },
+          {
+            "input": "P(s)",
+            "output": "F(0.05) [Y(90) Z(60) L(0.09)] [Y(270) Z(60) L(0.09)] F(0.06) [Y(90) Z(60) L(0.09)] [Y(270) Z(60) L(0.09)] L(0.1)"
+          }
+        ],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      }
+    },
+    {
+      "id": "sword-fern",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -5,
+          0,
+          4
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "fronds-fern"
+      },
+      "leaves": {
+        "atlas": "pnw-conifer",
+        "twistDegrees": 30,
+        "sizeVariation": 0.2,
+        "regions": {
+          "sword-fern-a": 1,
+          "sword-fern-b": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(25, 8) L(1.0)] [Y(30) Z(40, 8) L(0.95)] [Y(60) Z(30, 8) L(1.05)] [Y(90) Z(45, 8) L(0.9)] [Y(120) Z(28, 8) L(1.0)] [Y(150) Z(42, 8) L(0.95)] [Y(180) Z(32, 8) L(1.0)] [Y(210) Z(48, 8) L(0.85)] [Y(240) Z(35, 8) L(1.0)] [Y(270) Z(38, 8) L(0.95)] [Y(300) Z(30, 8) L(1.0)] [Y(330) Z(44, 8) L(0.9)] [Y(15) Z(60, 8) L(0.8)] [Y(75) Z(62, 8) L(0.8)] [Y(135) Z(58, 8) L(0.85)] [Y(195) Z(63, 8) L(0.8)] [Y(255) Z(60, 8) L(0.85)] [Y(315) Z(61, 8) L(0.8)] [Y(45) Z(15, 8) L(0.9)] [Y(165) Z(18, 8) L(0.9)] [Y(285) Z(16, 8) L(0.9)]",
+        "iterations": 1,
+        "thickness": 0.01,
+        "rules": [],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      }
+    },
+    {
+      "id": "pasture-grass",
+      "type": "tree",
+      "transform": {
+        "position": [
+          5.5,
+          0,
+          4
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "grass"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 40,
+        "sizeVariation": 0.3,
+        "regions": {
+          "sedge-1": 1,
+          "sedge-2": 1,
+          "sedge-3": 1,
+          "sedge-4": 1,
+          "sedge-5": 1
+        }
+      },
+      "generator": {
+        "axiom": "[Y(0) Z(6, 6) L(0.55)] [Y(30) Z(16, 6) L(0.5)] [Y(60) Z(10, 6) L(0.6)] [Y(90) Z(20, 6) L(0.45)] [Y(120) Z(8, 6) L(0.55)] [Y(150) Z(18, 6) L(0.5)] [Y(180) Z(12, 6) L(0.6)] [Y(210) Z(22, 6) L(0.45)] [Y(240) Z(9, 6) L(0.55)] [Y(270) Z(17, 6) L(0.5)] [Y(300) Z(13, 6) L(0.6)] [Y(330) Z(24, 6) L(0.45)] [Y(15) Z(28, 6) L(0.4)] [Y(105) Z(30, 6) L(0.4)] [Y(195) Z(28, 6) L(0.4)] [Y(285) Z(30, 6) L(0.4)] [Y(45) Z(4, 6) L(0.65)] [Y(225) Z(5, 6) L(0.65)]",
+        "iterations": 1,
+        "thickness": 0.005,
+        "rules": [],
+        "angle": 0.017453292519943295,
+        "segmentLength": 1
+      }
+    },
+    {
+      "id": "pasture-grass-2",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -4.23,
+          0,
+          -1.25
+        ],
+        "rotationDegrees": [
+          0,
+          234.33641029434736,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-3",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -10.26,
+          0,
+          0.68
+        ],
+        "rotationDegrees": [
+          0,
+          131.64801008853078,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-4",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -10.61,
+          0,
+          0.54
+        ],
+        "rotationDegrees": [
+          0,
+          13.498437039114556,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-5",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -1.59,
+          0,
+          -1.65
+        ],
+        "rotationDegrees": [
+          0,
+          32.65668480379142,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-6",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -1.81,
+          0,
+          2.13
+        ],
+        "rotationDegrees": [
+          0,
+          44.568706013872415,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-7",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -6.64,
+          0,
+          1.14
+        ],
+        "rotationDegrees": [
+          0,
+          341.17521928452203,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-8",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          1.85,
+          0,
+          -0.02
+        ],
+        "rotationDegrees": [
+          0,
+          351.4518380134512,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-9",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -10.88,
+          0,
+          2.29
+        ],
+        "rotationDegrees": [
+          0,
+          104.25934307940345,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-10",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -8.54,
+          0,
+          -1.41
+        ],
+        "rotationDegrees": [
+          0,
+          111.05345667669637,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-11",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          7.59,
+          0,
+          -1.1
+        ],
+        "rotationDegrees": [
+          0,
+          209.37605891848784,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-12",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          3.33,
+          0,
+          -0.14
+        ],
+        "rotationDegrees": [
+          0,
+          197.1880076554408,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-13",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -10.49,
+          0,
+          -1.7
+        ],
+        "rotationDegrees": [
+          0,
+          74.14513661495755,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-14",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          4.33,
+          0,
+          0.14
+        ],
+        "rotationDegrees": [
+          0,
+          113.09298133564495,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-15",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          2.05,
+          0,
+          0.27
+        ],
+        "rotationDegrees": [
+          0,
+          107.91611887092564,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-16",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          7.07,
+          0,
+          1.49
+        ],
+        "rotationDegrees": [
+          0,
+          87.87474385997504,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-17",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          1.79,
+          0,
+          0.63
+        ],
+        "rotationDegrees": [
+          0,
+          315.0494984064344,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-18",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          5.51,
+          0,
+          -0.56
+        ],
+        "rotationDegrees": [
+          0,
+          352.86294509732954,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-19",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -9.17,
+          0,
+          0.09
+        ],
+        "rotationDegrees": [
+          0,
+          272.5707346434898,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-20",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          -8.35,
+          0,
+          0.44
+        ],
+        "rotationDegrees": [
+          0,
+          14.114612537077559,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-21",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          4.04,
+          0,
+          1.82
+        ],
+        "rotationDegrees": [
+          0,
+          206.28933849985822,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-22",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          9.01,
+          0,
+          -0.43
+        ],
+        "rotationDegrees": [
+          0,
+          250.30633185851735,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-23",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          2.26,
+          0,
+          0.9
+        ],
+        "rotationDegrees": [
+          0,
+          164.23391926850869,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-24",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          8.16,
+          0,
+          2.72
+        ],
+        "rotationDegrees": [
+          0,
+          170.675401471072,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pasture-grass-25",
+      "instanceOf": "pasture-grass",
+      "transform": {
+        "position": [
+          3.94,
+          0,
+          -1.7
+        ],
+        "rotationDegrees": [
+          0,
+          252.5371276695926,
+          0
+        ]
+      }
+    },
+    {
+      "id": "sword-fern-2",
+      "instanceOf": "sword-fern",
+      "transform": {
+        "position": [
+          -8.76,
+          0,
+          9.97
+        ],
+        "rotationDegrees": [
+          0,
+          295.89292317949736,
+          0
+        ]
+      }
+    },
+    {
+      "id": "sword-fern-3",
+      "instanceOf": "sword-fern",
+      "transform": {
+        "position": [
+          -10.58,
+          0,
+          6.93
+        ],
+        "rotationDegrees": [
+          0,
+          240.71497771830775,
+          0
+        ]
+      }
+    },
+    {
+      "id": "sword-fern-4",
+      "instanceOf": "sword-fern",
+      "transform": {
+        "position": [
+          -11.89,
+          0,
+          7.31
+        ],
+        "rotationDegrees": [
+          0,
+          60.49741640635604,
+          0
+        ]
+      }
+    },
+    {
+      "id": "sword-fern-5",
+      "instanceOf": "sword-fern",
+      "transform": {
+        "position": [
+          -11.41,
+          0,
+          5.29
+        ],
+        "rotationDegrees": [
+          0,
+          276.5638758501075,
+          0
+        ]
+      }
+    },
+    {
+      "id": "sword-fern-6",
+      "instanceOf": "sword-fern",
+      "transform": {
+        "position": [
+          -11.35,
+          0,
+          6.24
+        ],
+        "rotationDegrees": [
+          0,
+          140.74189312796176,
+          0
+        ]
+      }
+    }
+  ]
+}
