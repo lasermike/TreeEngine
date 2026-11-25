@@ -224,6 +224,56 @@ before (QGIS rewrites every coordinate), so the diff shows just the edits. A del
 one just goes. It places the props again for the edited lines, and reports deletions and real crossings. Then
 re-import the package with `--roads` (below) and rebuild. `python -I -B test_finish_road_edits.py` checks it.
 
+**Trees.** `import_trees.py` finds the trees in an area from LiDAR and writes them to a trees file
+(`Name.trees.geojson`): one point per tree in the package's CRS, with `kind: tree`, `species` (an id from
+`Game/Resources/Scenes/pnw-plants.scene.json`), `height` (m), `crown` (radius, m), `type` (`conifer` or `broadleaf`),
+`source` (`lidar`) and `edited`.
+
+```bash
+python import_trees.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Game/Resources/Terrain/Hungerford.trees.geojson     --dsm <survey>/dsm --dtm <survey>/dtm --center 504546 5228299 --size 300     --roads ../../Game/Resources/Terrain/Hungerford.roads.geojson     --buildings E:/Source/Tree/Content/roads/osm-buildings-502496-5226333-506592-5230429.json
+```
+
+How it works:
+1. **Canopy height.** The canopy height is the survey's highest-hit surface (the DNR download's `dsm` folder, `hh_*`
+   tiles) minus its bare earth (`dtm`, `be_*`), cut to the area on a 0.5 m grid. Heights are in US survey feet
+   (`--height-scale` otherwise).
+2. **Treetops.** Treetops are its local maxima at least 4 m tall. Each is searched over a radius that grows with
+   height (1.5 m + 6% of it), so a tall crown's second leader isn't a second tree.
+3. **Crowns.** Each crown is the canopy that drains to its top (a watershed), and its area gives the radius. A tree's
+   height is the unsmoothed canopy at its top.
+4. **Conifer or broadleaf.** The newest NAIP image over the area (`--naip fetch`, from Microsoft's Planetary Computer,
+   which is sent the area's bounds; or `--naip <raster>`, or `none`) sorts crowns. In summer imagery the conifers here
+   are blue-grey green and the alders, maples and madrones yellow-green, so a crown yellower than
+   `--broadleaf-yellow` (0.08) is broadleaf. Brightness and NDVI don't separate them: sunlit conifers are as bright.
+5. **Species.**
+   - Conifers are mostly stand-grown Douglas fir, with western red cedar and hemlock. Wide, open-grown crowns become
+     open-grown firs and cedars, and conifers under 8 m become saplings.
+   - Broadleaf trees within 40 m of beach (ground under `--water-level`, 3 m) are madrones or alders. Big ones elsewhere
+     are bigleaf maples, and the rest mostly alders.
+   - The choice is seeded by position, so a re-run picks the same species.
+6. **Roads and buildings.** A top over a road or driveway has its trunk moved to the edge (half its width plus a
+   metre) when that's within 2.5 m, since its crown overhangs the road. Otherwise, like a top inside an OpenStreetMap
+   building, it's dropped.
+
+Hungerford: a 300 m square about the 190 E Scott Dr driveway (2025 Mason County survey, NAIP 2023) holds 701 trees:
+485 stand-grown Douglas firs, 114 cedars, 66 hemlocks and 36 broadleaf trees, mostly near the bluff. Heights run
+9 to 61 m (nine in ten between 23 and 50), with a median of 41 m. LiDAR sees only the top layer of the canopy, so the understory (young cedars and
+hemlocks, alders under the firs) isn't in the file; placement scatters it.
+
+To see them, open the trees file in QGIS over aerial imagery (as for the roads, below). `Hungerford.trees.qml`
+beside it is the layer's default style, which QGIS applies when it opens the file: each tree is a circle the size of its crown,
+coloured by species, with its height labelled when zoomed in. Copy it to `<Name>.trees.qml` for another area.
+
+Edit it in QGIS like the roads file:
+- move, delete or add points, or change a `species`;
+- set `edited` to true on what you change;
+- give a tree you add `source: manual`;
+- mark a deleted LiDAR tree `removed: true` instead of deleting it, so a re-run doesn't find it again.
+
+A re-run keeps edited, hand-added and removed trees (and finds none within 2 m of them), and replaces the rest.
+`python -I -B test_import_trees.py` checks it on a synthetic canopy: tops, crowns, types, species, roads and kept
+trees.
+
 **Grading.** `import_heightmap.py --roads FILE` (TerrainTool `pack --roads`) grades the roads into the heights before
 packing (Game/RoadGrading.h). Along each smoothed centerline the bed follows the ground's running median and mean
 (7 and 17 samples, a meter apart), so short bumps are planed off; across it, the traveled way is crowned (2% paved,
