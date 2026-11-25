@@ -1524,6 +1524,7 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         ImGui::Checkbox("Enable shadows", &m_settings.m_shadowsEnabled);
         ImGui::SliderInt("Shadow cascades", &m_settings.m_shadowCascades, 1, RenderData::MaxShadowCascades);
         ImGui::SliderFloat("Shadow distance", &m_settings.m_shadowDistance, 10.0f, 1000.0f, "%.0f m", ImGuiSliderFlags_Logarithmic);
+        ImGui::SliderFloat("Smallest shadow caster (texels)", &m_settings.m_shadowMinCasterTexels, 0.0f, 128.0f, "%.0f");
         auto& sceneRenderSettings = m_renderManager.GetRenderData();
         ImGui::Checkbox("Enable Post Processing", &sceneRenderSettings.enablePostProcessing);
         int antialiasing = static_cast<int>(m_settings.m_antialiasing);

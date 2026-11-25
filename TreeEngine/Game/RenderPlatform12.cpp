@@ -4424,16 +4424,19 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
     const UINT firstDesc = m_tlasUploadHalf * MAX_INSTANCES_IN_TLAS;
     D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
     HRR(m_instancesTLAS->Map(&instanceDescs));
+    // Each descriptor is filled on the stack and copied whole: its InstanceID, mask, hit-group offset and flags are
+    // bitfields, and setting a bitfield in place reads the write-combined upload memory back, which took over a
+    // microsecond per instance (12.5 ms a frame for Hungerford's 10,000 instances).
     for (UINT i = 0; i < instanceTotal; ++i)
     {
-        D3D12_RAYTRACING_INSTANCE_DESC& desc = instanceDescs[firstDesc + i];
-        ZeroMemory(&desc, sizeof(desc));
+        D3D12_RAYTRACING_INSTANCE_DESC desc = {};
         desc.AccelerationStructure = m_tlasState[i].blas;
         desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
         desc.InstanceContributionToHitGroupIndex = 0;
         desc.InstanceID = m_tlasState[i].firstGeometry;    // The hit shaders' geometry-table index is InstanceID() + GeometryIndex().
         desc.InstanceMask = m_tlasState[i].mask;
         memcpy(desc.Transform, m_tlasState[i].transform, sizeof(desc.Transform));
+        memcpy(&instanceDescs[firstDesc + i], &desc, sizeof(desc));
     }
     m_instancesTLAS->Unmap();
     m_numInstancesInTLAS = instanceTotal;

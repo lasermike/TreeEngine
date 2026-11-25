@@ -324,6 +324,21 @@ bool RenderManager::IsVisible(const XMFLOAT3 bounds[2]) const
     return true;
 }
 
+// Whether an object's shadow in the current cascade would be under Settings::m_shadowMinCasterTexels texels across:
+// its bounds' largest side against the cascade's texel. Such casters (ferns, grass, shrubs in the far cascades) cost
+// the shadow pass a draw each for a shadow of a few texels.
+bool RenderManager::TooSmallForCascade(WorldObject* object) const
+{
+    const float minTexels = m_settings->m_shadowMinCasterTexels;
+    if (minTexels <= 0)
+        return false;
+    XMFLOAT3 bounds[2];
+    if (!object->GetCullBounds(bounds))
+        return false;
+    const float extent = std::max({ bounds[1].x - bounds[0].x, bounds[1].y - bounds[0].y, bounds[1].z - bounds[0].z });
+    return extent < minTexels * m_renderData.cascadeTexel[m_renderData.shadowCascade];
+}
+
 // Whether an object can be seen: its cull bounds intersect the view frustum, or it has none.
 bool RenderManager::IsVisible(WorldObject* object)
 {
@@ -409,9 +424,11 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
                 }
                 else m_renderData.pickObjectId = found->second;
             }
-            // The regular pass culls against the view, each shadow cascade against its light-space box.
-            m_renderData.currentDrawCulled = m_settings->m_viewCulling && (pass == RegularPass || pass == ShadowMapPass)
-                && !IsVisible(object);
+            // The regular pass culls against the view, each shadow cascade against its light-space box. Casters too
+            // small for a cascade's texels are left out of it whether or not culling is on (a shadow setting, not
+            // culling: test-view-culling compares images with culling on and off).
+            m_renderData.currentDrawCulled = (m_settings->m_viewCulling && (pass == RegularPass || pass == ShadowMapPass)
+                && !IsVisible(object)) || (pass == ShadowMapPass && TooSmallForCascade(object));
             if (batching && transformSlot != UINT_MAX)
             {
                 if (recordEach)

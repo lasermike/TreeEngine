@@ -87,6 +87,7 @@ struct RenderTestRequest
     bool batchInstances = true;        // "batchInstances": false draws each instanced object on its own.
     int shadowCascades = 3;            // "shadowCascades": raster shadow cascades, 1 to 4.
     float shadowDistance = 150.0f;     // "shadowDistance": how far raster shadows reach, in meters.
+    float shadowMinCasterTexels = -1;  // "shadowMinCasterTexels": Settings::m_shadowMinCasterTexels; -1 keeps the default.
     // Ray-cost diagnostics (see Settings::m_rayContactShading and the rest).
     bool rayContactShading = true;     // "rayContactShading"
     int raySunSamples = 0;             // "raySunSamples": 0 keeps the scene's

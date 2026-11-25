@@ -34,6 +34,9 @@ public:
     // give crisp leaf shadows close up.
     int m_shadowCascades = 3;
     float m_shadowDistance = 150.0f;
+    // A caster smaller than this many of a cascade's texels (its bounds' largest side) isn't drawn into that cascade:
+    // its shadow there would be a few texels. 0 draws every caster into every cascade it reaches.
+    float m_shadowMinCasterTexels = 32.0f;
     bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
     // Ray-tracing cost diagnostics (debug UI "Ray costs"; render-test fields ray*): turn one kind of ray work off to
     // measure what it costs. Contact shading's probe rays, a sun-shadow sample count in place of the scene's (0 keeps
