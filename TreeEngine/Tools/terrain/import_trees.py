@@ -330,6 +330,9 @@ def place(point, roads, buildings):
                 if distance < 1e-6:
                     return None, 'road'
                 x, y = x + dx / distance * shift, y + dy / distance * shift
+                # The limit holds for the trunk's whole move, not each step: overlapping roads add up.
+                if math.hypot(x - point[0], y - point[1]) > MAX_SHIFT:
+                    return None, 'road'
                 moved = True
         if not moved:
             break

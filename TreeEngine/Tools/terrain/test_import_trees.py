@@ -181,6 +181,14 @@ with tempfile.TemporaryDirectory() as tmp:
     moved, why = trees.place((50.0, 48.5), multi, [])
     check(why is None and moved[1] <= 46.5 + 1e-6, f'a top on the second part went to {moved}, {why}')
 
+# Overlapping roads (a corner) can't move a trunk further than MAX_SHIFT in all (Codex review of #22).
+corner = [(3.5, [(-100.0, 0.0), (100.0, 0.0)]), (3.5, [(0.0, -100.0), (0.0, 100.0)])]
+_, why = trees.place((1.5, 1.5), corner, [])
+check(why == 'road', 'a top in a road corner moved 2.8 m in two steps')
+where, why = trees.place((2.5, 2.5), corner, [])
+check(why is None and math.hypot(where[0] - 2.5, where[1] - 2.5) <= trees.MAX_SHIFT,
+      f'a top 1 m inside both edges of a corner went to {where}, {why}')
+
 # A trunk moved to an oblique road's edge stays there (Codex review of #22: rounding left it a hair inside).
 where, why = trees.place((70.23419074566571, 44.10747966498315), [(3.5, [(0.0, 0.0), (100.0, 60.0)])], [])
 check(why is None, 'a top 1.8 m inside an oblique road was dropped')
