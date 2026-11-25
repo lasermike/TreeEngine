@@ -156,17 +156,40 @@ def find_tops(chm, min_height=MIN_HEIGHT):
     for r in np.unique(cell_r[tall]):
         band = tall & (cell_r == r)
         tops |= band & (heights >= window_max(heights, int(r)))
-    rows, cols = np.nonzero(tops)
-    order = np.argsort(-heights[rows, cols])
-    # Plateaus (equal heights) mark several neighbouring cells: keep the first of any within one cell of another.
-    kept = []
-    taken = np.zeros(heights.shape, dtype=bool)
-    for i in order:
-        r, c = rows[i], cols[i]
-        if taken[max(0, r - 1):r + 2, max(0, c - 1):c + 2].any():
+    # Candidates that touch (a plateau: a flat or level top passes the test at every cell) are one top, at the cell
+    # nearest the plateau's middle.
+    seen = np.zeros(heights.shape, dtype=bool)
+    centers = []
+    for r0, c0 in zip(*np.nonzero(tops)):
+        if seen[r0, c0]:
             continue
-        taken[r, c] = True
-        kept.append((int(r), int(c)))
+        seen[r0, c0] = True
+        group, stack = [], [(r0, c0)]
+        while stack:
+            r, c = stack.pop()
+            group.append((r, c))
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    rr, cc = r + dr, c + dc
+                    if (0 <= rr < tops.shape[0] and 0 <= cc < tops.shape[1] and tops[rr, cc]
+                            and not seen[rr, cc]):
+                        seen[rr, cc] = True
+                        stack.append((rr, cc))
+        mr = sum(r for r, _ in group) / len(group)
+        mc = sum(c for _, c in group) / len(group)
+        centers.append(min(group, key=lambda p: (p[0] - mr) ** 2 + (p[1] - mc) ** 2))
+    rows = np.array([r for r, _ in centers], dtype=int)
+    cols = np.array([c for _, c in centers], dtype=int)
+    order = np.argsort(-heights[rows, cols], kind='stable')
+    # A flat or level top (a plateau) passes the test at every cell: keep a candidate only when no taller or equal
+    # one already kept is within its search radius, so each crown keeps one top.
+    kept = []
+    for i in order:
+        r, c = int(rows[i]), int(cols[i])
+        reach = search_radius(heights[r, c]) / CELL
+        if any((r - kr) ** 2 + (c - kc) ** 2 <= reach * reach for kr, kc in kept):
+            continue
+        kept.append((r, c))
     return kept, heights
 
 

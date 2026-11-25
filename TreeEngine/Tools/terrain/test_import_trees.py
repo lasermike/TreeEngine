@@ -71,6 +71,13 @@ twin_tops, _ = trees.find_tops(twin)
 check(sum(math.hypot(world(r, c)[0] - 1015.0, world(r, c)[1] - 2045.0) < 3 for r, c in twin_tops) == 1,
       'a second leader on a 40 m crown made a second tree')
 
+# A crown with a flat top 6 m across is one tree, not a top per plateau cell (Codex review of #22).
+flat = np.zeros((N, N), dtype=np.float32)
+d = np.hypot(xs - 1030.0, ys - 2030.0)
+flat = np.where(d < 3.0, 25.0, np.where(d < 8.0, 25.0 - (d - 3.0) * 3.0, 0)).astype(np.float32)
+flat_tops, _ = trees.find_tops(flat)
+check(len(flat_tops) == 1, f'a flat-topped crown gave {len(flat_tops)} tops')
+
 # Crowns: each cone's cells drain to its own top, so its area gives back its radius (within a cell or so).
 labels, counts = trees.crowns(heights, tops)
 for i, (r, c) in enumerate(tops):
