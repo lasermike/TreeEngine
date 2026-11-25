@@ -52,6 +52,14 @@
         { "time": 15, "position": [-40, 30, 275.7], "rotationDegrees": [6, 60.9, 0] },
         { "time": 20, "position": [460, 30, 553.7], "rotationDegrees": [6, 86.2, 0] }
       ]
+    },
+    { "id": "Hungerford", "scene": "Hungerford", "type": "steady" },
+    {
+      "id": "Hungerford-walk", "scene": "Hungerford", "type": "pacing", "startTime": 3, "duration": 10, "settleFrames": 30,
+      "camera": [
+        { "time": 0, "position": [2.15, 41.0, -82.05], "rotationDegrees": [5, -90, 0] },
+        { "time": 10, "position": [-24, 41.9, -80.2], "rotationDegrees": [5, -110, 0] }
+      ]
     }
   ]
 }
