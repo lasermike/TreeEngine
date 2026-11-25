@@ -91,7 +91,7 @@ void Terrain::BuildTrailTiles()
     builder.Bounds(minX, minZ, maxX, maxZ);
     const TerrainManifest& m = m_package.Manifest();
     const double half = m.worldSize / 2;
-    for (int level = m.levels - 1; level >= 0 && m.NodeSpacing(level) <= TrailFarSpacing; --level)
+    for (int level = m.levels - 1; level >= 0 && Roads::DrawsTrails(m.NodeSpacing(level), level == m.levels - 1); --level)
     {
         const double size = m.NodeSize(level), spacing = m.NodeSpacing(level);
         const int nodes = 1 << level;
@@ -105,12 +105,16 @@ void Terrain::BuildTrailTiles()
                 return false;
             const int nx = static_cast<int>(std::min<long long>(i / NodeQuads, nodes - 1));
             const int nz = static_cast<int>(std::min<long long>(j / NodeQuads, nodes - 1));
-            auto& block = blocks[TerrainPackage::NodeIndex(level, nx, nz)];
+            const uint64_t index = TerrainPackage::NodeIndex(level, nx, nz);
+            auto& block = blocks[index];
             if (block.empty())
             {
                 block.resize(size_t(BlockSamples) * BlockSamples);
                 if (!m_package.ReadBlock(level, nx, nz, block.data()))
+                {
+                    blocks.erase(index);       // Not a block of zeros next time: read again, or fail again.
                     return false;
+                }
             }
             const int a = static_cast<int>(i - nx * NodeQuads), b = static_cast<int>(j - nz * NodeQuads);
             y = m.Height(block[size_t(b + 1) * BlockSamples + a + 1]) + m_offset.y;

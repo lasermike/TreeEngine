@@ -6,7 +6,10 @@
 
 #include "RoadNetwork.h"
 #include "GeometryGenerator.h"
+#include <cmath>
+#include <cstdint>
 #include <functional>
+#include <unordered_map>
 
 namespace Roads
 {
@@ -40,6 +43,11 @@ namespace Roads
     Mesh BuildMesh(const Network& network, DirectX::XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height,
         bool trails = true);
 
+    // Which of a terrain's levels draw trails: the finest always (however coarse), and others whose samples are at
+    // most TrailFarSpacing apart (further off, where coarser levels draw, a trail is under a pixel).
+    constexpr double TrailFarSpacing = 8.0;
+    inline bool DrawsTrails(double spacing, bool finest) { return finest || spacing <= TrailFarSpacing; }
+
     // A square grid of ground heights as a terrain draws one level of it: `spacing` apart from the world x, z of its
     // node 0, 0, each cell split along the diagonal from its +x corner to its +z corner.
     struct GroundGrid
@@ -70,6 +78,12 @@ namespace Roads
             std::vector<DirectX::XMFLOAT2> points;      // Convex, counterclockwise in (x, z).
             float minX, minZ, maxX, maxZ;
         };
-        std::vector<Outline> m_trails, m_covers;
+        std::vector<Outline> m_trails, m_covers;        // Covers: road and driveway outlines that reach a trail,
+        std::unordered_map<int64_t, std::vector<size_t>> m_buckets;    // by the BucketSize squares they touch.
+        static constexpr float BucketSize = 32.0f;
+        static int Bucket(float v) { return static_cast<int>(std::floor(v / BucketSize)); }
+        static int64_t BucketKey(int x, int z) { return (static_cast<int64_t>(x) << 32) ^ static_cast<uint32_t>(z); }
+    public:
+        size_t Covers() const { return m_covers.size(); }     // For tests.
     };
 }

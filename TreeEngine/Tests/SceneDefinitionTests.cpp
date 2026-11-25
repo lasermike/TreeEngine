@@ -1672,6 +1672,44 @@ void TestTrails()
                     beside = beside && covered;
             }
         Check(!underDriveway && beside, "a trail shows under a driveway crossing it, or is missing beside it");
+
+        // The same 8192 m out (world coordinates of a large terrain): the trail's and the driveway's outlines keep
+        // their area, so the trail is there beside the driveway and not under it.
+        Roads::GroundGrid distant;
+        distant.spacing = 1;
+        distant.originX = distant.originZ = 8192;
+        const auto farRidge = [&](float x, float z, float& y) { return ridge(x - 8192, z - 8192, y); };
+        const auto farPart = Roads::TrailBuilder(network, XMFLOAT3(8192, 0, 8192)).Build(distant, -20, -20, 20, 20, farRidge);
+        bool farUnder = false, farBeside = true;
+        for (float x = -2.9f; x <= 3.9f; x += 0.05f)
+        {
+            const bool covered = surfaceAt(farPart, 8192 + x, 8192) > -1;
+            if (x > -0.99f && x < 1.99f)
+                farUnder = farUnder || covered;
+            else if (x < -1.01f || x > 2.01f)
+                farBeside = farBeside && covered;
+        }
+        Check(!farUnder && farBeside, "8 km out, a trail's or a driveway's outline lost its area");
+    }
+    // Which levels draw trails: the finest always, however coarse its samples; others up to 8 m between samples.
+    Check(Roads::DrawsTrails(10, true) && !Roads::DrawsTrails(10, false) && Roads::DrawsTrails(8, false)
+        && Roads::DrawsTrails(1, true), "the levels that draw trails are wrong");
+    // Only road and driveway outlines that reach a trail are kept to cut it.
+    {
+        Roads::Network network;
+        Roads::Line line = trail;
+        line.points = { XMFLOAT2(0, 0), XMFLOAT2(10, 0) };
+        network.lines.push_back(line);
+        Roads::Line farDriveway;
+        farDriveway.kind = Roads::Kind::Driveway;
+        farDriveway.width = 3;
+        farDriveway.points = { XMFLOAT2(1000, 0), XMFLOAT2(1000, 20) };
+        network.lines.push_back(farDriveway);
+        Check(Roads::TrailBuilder(network, XMFLOAT3(0, 0, 0)).Covers() == 0, "a driveway 1 km from any trail was kept to cut trails");
+        Roads::Line nearDriveway = farDriveway;
+        nearDriveway.points = { XMFLOAT2(5, -10), XMFLOAT2(5, 10) };
+        network.lines.push_back(nearDriveway);
+        Check(Roads::TrailBuilder(network, XMFLOAT3(0, 0, 0)).Covers() > 0, "a driveway crossing a trail wasn't kept to cut it");
     }
     // Grading leaves trails alone: they lie on the ground as it is.
     const int n = 65;

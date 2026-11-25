@@ -212,11 +212,12 @@ namespace
         return out;
     }
 
+    // About the first vertex, so world coordinates thousands of meters out don't cancel the products away.
     float Area(const std::vector<Point>& polygon)
     {
         float area = 0;
-        for (size_t i = 0; i < polygon.size(); ++i)
-            area += polygon[i].x * polygon[(i + 1) % polygon.size()].y - polygon[(i + 1) % polygon.size()].x * polygon[i].y;
+        for (size_t i = 1; i + 1 < polygon.size(); ++i)
+            area += Cross(polygon[0], polygon[i], polygon[i + 1]);
         return area / 2;
     }
 
@@ -284,6 +285,20 @@ namespace Roads
             else
                 Ribbon(samples, line.width / 2 + (line.kind == Kind::Road ? line.shoulder : 0), m_covers);
         }
+        // Only covers that reach a trail matter: keep those, in buckets of BucketSize meters by their bounds.
+        std::vector<Outline> reaching;
+        for (const Outline& cover : m_covers)
+            for (const Outline& trail : m_trails)
+                if (cover.maxX > trail.minX && cover.minX < trail.maxX && cover.maxZ > trail.minZ && cover.minZ < trail.maxZ)
+                {
+                    reaching.push_back(cover);
+                    break;
+                }
+        m_covers.swap(reaching);
+        for (size_t c = 0; c < m_covers.size(); ++c)
+            for (int bz = Bucket(m_covers[c].minZ); bz <= Bucket(m_covers[c].maxZ); ++bz)
+                for (int bx = Bucket(m_covers[c].minX); bx <= Bucket(m_covers[c].maxX); ++bx)
+                    m_buckets[BucketKey(bx, bz)].push_back(c);
     }
 
     void TrailBuilder::Bounds(float& minX, float& minZ, float& maxX, float& maxZ) const
@@ -322,12 +337,31 @@ namespace Roads
             for (UINT i = 1; i + 1 < polygon.size(); ++i)
                 part.indices.insert(part.indices.end(), { base, base + i + 1, base + i });
         };
-        // A piece minus every road or driveway outline it overlaps: the piece's parts outside each in turn.
+        // A piece minus every road or driveway outline it overlaps: the piece's parts outside each in turn. Only the
+        // covers in the buckets its bounds touch are candidates.
+        std::vector<size_t> candidates;
         const auto uncovered = [&](const std::vector<Point>& piece)
         {
-            std::vector<std::vector<Point>> pieces = { piece };
-            for (const Outline& cover : m_covers)
+            float pminX = 1e30f, pmaxX = -1e30f, pminZ = 1e30f, pmaxZ = -1e30f;
+            for (const Point& q : piece)
             {
+                pminX = std::min(pminX, q.x); pmaxX = std::max(pmaxX, q.x);
+                pminZ = std::min(pminZ, q.y); pmaxZ = std::max(pmaxZ, q.y);
+            }
+            candidates.clear();
+            for (int bz = Bucket(pminZ); bz <= Bucket(pmaxZ); ++bz)
+                for (int bx = Bucket(pminX); bx <= Bucket(pmaxX); ++bx)
+                {
+                    const auto bucket = m_buckets.find(BucketKey(bx, bz));
+                    if (bucket != m_buckets.end())
+                        candidates.insert(candidates.end(), bucket->second.begin(), bucket->second.end());
+                }
+            std::sort(candidates.begin(), candidates.end());
+            candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+            std::vector<std::vector<Point>> pieces = { piece };
+            for (const size_t c : candidates)
+            {
+                const Outline& cover = m_covers[c];
                 std::vector<std::vector<Point>> next;
                 for (const auto& p : pieces)
                 {

@@ -215,9 +215,9 @@ private:
     UINT m_propsWithoutModel = 0;
     UINT PropInstances() const { return m_propInstances; }
     void PlaceProps();
-    // Trails: for each node a trail crosses at the levels that draw them (no coarser than TrailFarSpacing), its
+    // Trails: for each node a trail crosses at the levels that draw them, its
     // trails on that node's own triangles (Roads::TrailBuilder); drawn with the node whenever the terrain selects it.
-    static constexpr double TrailFarSpacing = 8.0;     // Meters between a level's samples: coarser ones draw no trails.
+    // Levels: Roads::DrawsTrails.
     struct TrailTile
     {
         Roads::MeshPart mesh;
