@@ -5,13 +5,13 @@
   "name": "Hungerford - WA DNR LiDAR (2005, 2019 and 2025 surveys), 4 km",
   "camera": {
     "position": [
-      0,
-      110,
-      -700
+      2.15,
+      41.0,
+      -82.05
     ],
     "rotationDegrees": [
-      8,
-      0,
+      5,
+      -90,
       0
     ]
   },
