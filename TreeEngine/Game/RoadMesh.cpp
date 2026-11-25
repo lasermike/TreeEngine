@@ -285,15 +285,36 @@ namespace Roads
             else
                 Ribbon(samples, line.width / 2 + (line.kind == Kind::Road ? line.shoulder : 0), m_covers);
         }
-        // Only covers that reach a trail matter: keep those, in buckets of BucketSize meters by their bounds.
+        // Only covers that reach a trail matter: the trails' outlines in buckets of BucketSize meters, then each cover
+        // tested against the trails in the buckets it touches; the covers kept, bucketed the same way.
+        std::unordered_map<int64_t, std::vector<size_t>> trailBuckets;
+        for (size_t t = 0; t < m_trails.size(); ++t)
+            for (int bz = Bucket(m_trails[t].minZ); bz <= Bucket(m_trails[t].maxZ); ++bz)
+                for (int bx = Bucket(m_trails[t].minX); bx <= Bucket(m_trails[t].maxX); ++bx)
+                    trailBuckets[BucketKey(bx, bz)].push_back(t);
         std::vector<Outline> reaching;
         for (const Outline& cover : m_covers)
-            for (const Outline& trail : m_trails)
-                if (cover.maxX > trail.minX && cover.minX < trail.maxX && cover.maxZ > trail.minZ && cover.minZ < trail.maxZ)
+        {
+            bool reaches = false;
+            for (int bz = Bucket(cover.minZ); bz <= Bucket(cover.maxZ) && !reaches; ++bz)
+                for (int bx = Bucket(cover.minX); bx <= Bucket(cover.maxX) && !reaches; ++bx)
                 {
-                    reaching.push_back(cover);
-                    break;
+                    const auto bucket = trailBuckets.find(BucketKey(bx, bz));
+                    if (bucket == trailBuckets.end())
+                        continue;
+                    for (const size_t t : bucket->second)
+                    {
+                        const Outline& trail = m_trails[t];
+                        if (cover.maxX > trail.minX && cover.minX < trail.maxX && cover.maxZ > trail.minZ && cover.minZ < trail.maxZ)
+                        {
+                            reaches = true;
+                            break;
+                        }
+                    }
                 }
+            if (reaches)
+                reaching.push_back(cover);
+        }
         m_covers.swap(reaching);
         for (size_t c = 0; c < m_covers.size(); ++c)
             for (int bz = Bucket(m_covers[c].minZ); bz <= Bucket(m_covers[c].maxZ); ++bz)

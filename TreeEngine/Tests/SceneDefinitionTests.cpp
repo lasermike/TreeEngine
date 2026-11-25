@@ -12,6 +12,7 @@
 #include "RoadGrading.h"
 #include "SignText.h"
 #include "ThirdParty/nlohmann/json.hpp"
+#include <chrono>
 #include <functional>
 #include <fstream>
 #include <iostream>
@@ -1710,6 +1711,25 @@ void TestTrails()
         nearDriveway.points = { XMFLOAT2(5, -10), XMFLOAT2(5, 10) };
         network.lines.push_back(nearDriveway);
         Check(Roads::TrailBuilder(network, XMFLOAT3(0, 0, 0)).Covers() > 0, "a driveway crossing a trail wasn't kept to cut it");
+    }
+    // Many roads far from many trails: choosing the covers is local (buckets), not every road piece against every
+    // trail piece (20 km of each, 400 million pairs, took many seconds).
+    {
+        Roads::Network network;
+        for (int k = 0; k < 20; ++k)
+        {
+            Roads::Line road;
+            road.kind = Roads::Kind::Road;
+            road.points = { XMFLOAT2(0, k * 20.0f), XMFLOAT2(1000, k * 20.0f) };
+            network.lines.push_back(road);
+            Roads::Line path = trail;
+            path.points = { XMFLOAT2(5000, k * 20.0f), XMFLOAT2(6000, k * 20.0f) };
+            network.lines.push_back(path);
+        }
+        const auto start = std::chrono::steady_clock::now();
+        const Roads::TrailBuilder builder(network, XMFLOAT3(0, 0, 0));
+        const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        Check(builder.Covers() == 0 && seconds < 5, ("choosing trail covers took " + std::to_string(seconds) + " s").c_str());
     }
     // Grading leaves trails alone: they lie on the ground as it is.
     const int n = 65;
