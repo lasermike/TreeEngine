@@ -11,6 +11,7 @@ import json
 import math
 import os
 import random
+import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESOURCES = os.path.normpath(os.path.join(HERE, '..', '..', 'Game', 'Resources'))
@@ -89,8 +90,13 @@ def tree(tid, position, trunk, leaf, atlas, leaf_regions, generator, *, twist=60
 
 
 def rules(**r):
-    """rules(A_s_="...") is the rule for A(s)."""
-    return [{"input": f"{k.split('_')[0]}({k.split('_')[1]})", "output": v} for k, v in r.items()]
+    """rules(A_s_="...") is the rule for A(s).
+
+    The engine's rule parser evaluates `s * k` and `s + k` but reads a bare `s` as 0, so a variable passed on unchanged
+    is written `s * 1` (a trunk segment `!(s)` would otherwise have no thickness)."""
+    bare = re.compile(r'\(([a-z])\s*([,)])')
+    return [{"input": f"{k.split('_')[0]}({k.split('_')[1]})", "output": bare.sub(r"(\1 * 1\2", v)}
+            for k, v in r.items()]
 
 
 # --- Trees ------------------------------------------------------------------------------------------------------
