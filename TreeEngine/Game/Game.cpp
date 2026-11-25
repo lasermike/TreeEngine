@@ -1091,7 +1091,7 @@ int Game::RuleTextEditCallback(ImGuiInputTextCallbackData* data)
 
 
 
-// The roads file's props: the one picked by Ctrl-clicking it, moved with the position gizmo (it stays on the ground)
+// The roads file's props: the one picked by clicking it, moved with the position gizmo (it stays on the ground)
 // and turned by its heading, or removed; and saving the edits into the roads file.
 void Game::ShowPropEditor(Terrain& terrain, const std::string& prefix)
 {
@@ -1133,7 +1133,7 @@ void Game::ShowPropEditor(Terrain& terrain, const std::string& prefix)
             ImGui::TextDisabled("Removed.");
     }
     else
-        ImGui::TextDisabled("Ctrl-click a prop to select it.");
+        ImGui::TextDisabled("Click a prop to select it.");
     if (terrain.PropEdits())
     {
         if (ImGui::Button("Save prop edits to the roads file"))

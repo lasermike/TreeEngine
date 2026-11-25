@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
-# Roadside props in the terrain-roads scene, in raster and DXR: Ctrl-click picking (a click on a prop selects its
+# Roadside props in the terrain-roads scene, in raster and DXR: click picking (a click on a prop selects its
 # terrain and the prop the click's ray hits; on bare ground, the terrain and no prop; on the sky, nothing), then edits
 # as the debug UI makes them (move a stop sign 3 m east and turn it, remove a mailbox): the moved prop stands on the
 # ground at its new place facing its new heading, the removed one is gone, and the picture changes. Nothing is saved.

@@ -178,7 +178,7 @@ blade faces (the model's `sign-blade-lower` and `sign-blade-upper` materials, UV
 side). Letters are 0.1 m tall; a blade grows from the model's 0.9 m to fit its name, up to 1.2 m, and a longer name is
 squeezed to fit that (Game/SignText.h). Editing a sign's `text` in QGIS changes it at the next load.
 
-**Editing props in the engine.** Ctrl-click a prop (in the debug UI's viewport) to select it: the click selects its
+**Editing props in the engine.** Click a prop (with the debug UI open) to select it: the click selects its
 terrain, and the prop the click's ray hits within its model's bounds; it's highlighted. The terrain's **Props**
 section in the Objects panel then shows it: drag its position with the position gizmo (it stays on the ground) or
 type its heading, or **Remove prop**. A click picks only a prop in front of the ground it meets, so one hidden behind a

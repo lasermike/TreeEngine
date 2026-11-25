@@ -174,7 +174,7 @@ or GIS elevation data). It requires `source`, the package directory, such as
   isn't installed draws none of its props. Street-name signs show their street
   names, drawn into a texture at load (`Game/SignText.h`), on blades as long
   as each name needs (0.9 to 1.2 m). Features marked `removed` are skipped.
-  Ctrl-clicking a prop selects it for editing in the terrain's Props section
+  Clicking a prop selects it for editing in the terrain's Props section
   of the Objects panel: move it, turn it, remove it, and save the edits back
   into the roads file (Tools/terrain/README.md).
 - `transform`: a position only; terrain cannot be rotated or scaled.
