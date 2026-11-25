@@ -203,9 +203,10 @@ lines (click a point, click where it goes; double-click a line to add a point) a
 from the road outward (type `driveway` in `kind`; leave the rest empty). Save Layer Edits, then:
 
 **Trails** are drawn by hand the same way: Add Line Feature anywhere, with `trail` in `kind` (and a `name` if you
-like; `width` defaults to 1 m). They're their own material (the dirt maps, under every road and driveway where they
-cross), lie on the ground as it is rather than being graded (built from the terrain's own triangles, so they follow
-it exactly), and nothing imports or generates them, so a re-run of
+like; `width` defaults to 1 m). They're their own material (the dirt maps; where a road or driveway crosses one, the
+trail stops at its edges), and lie on the ground as it is rather than being graded: the terrain builds them from its
+own triangles, for each tile and level of detail it may draw (out to levels 8 m between samples; beyond that a 1 m
+trail is under a pixel), so they follow the ground it draws exactly, and nothing imports or generates them, so a re-run of
 `import_roads.py` keeps them whether or not they're marked `edited`. Since they aren't graded, a trail edit needs
 `finish_road_edits.py` and a rebuild, but no terrain re-import. Hungerford has one example,
 `trail-example` (from E Scott Dr near the middle of the map, 250 m west): reshape or delete it.

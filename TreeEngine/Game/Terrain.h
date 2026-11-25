@@ -90,7 +90,12 @@ public:
     unsigned int GetNumInstances() override { return 1 + RoadParts() + PropInstances() + SignNames(); }
     unsigned int GetMaxInstances() override { return 1 + RoadParts() + PropInstances() + SignNames(); }
     // Each drawn node is a ray-tracing geometry of its own; so is each road surface part and prop instance.
-    unsigned int GetMaxDrawnInstances() override { return Params().slots + RoadParts() + PropInstances(); }
+    unsigned int GetMaxDrawnInstances() override
+    {
+        return Params().slots + RoadParts() + PropInstances() + static_cast<unsigned int>(m_trailTiles.size());
+    }
+    // Trail tiles built (for tests): a tile per terrain node a trail crosses, at each level trails are drawn at.
+    size_t TrailTiles() const { return m_trailTiles.size(); }
     // The props drawn of a model (Roads::PropModel), for tests.
     UINT PropCount(Roads::PropModel model) const { return static_cast<UINT>(m_propWorlds[static_cast<size_t>(model)].size()); }
     // The distinct street names on its signs, in atlas order (for tests).
@@ -210,6 +215,20 @@ private:
     UINT m_propsWithoutModel = 0;
     UINT PropInstances() const { return m_propInstances; }
     void PlaceProps();
+    // Trails: for each node a trail crosses at the levels that draw them (no coarser than TrailFarSpacing), its
+    // trails on that node's own triangles (Roads::TrailBuilder); drawn with the node whenever the terrain selects it.
+    static constexpr double TrailFarSpacing = 8.0;     // Meters between a level's samples: coarser ones draw no trails.
+    struct TrailTile
+    {
+        Roads::MeshPart mesh;
+        XMFLOAT3 bounds[2];
+        GeometryBufferData::BufferOffsets offsets = {};
+        RenderUnit* renderUnit = nullptr;
+        char owner = 0;         // Its identity as a ray-tracing geometry.
+    };
+    std::vector<TrailTile> m_trailTiles;
+    std::unordered_map<uint32_t, size_t> m_trailTileOf;     // Node index -> tile.
+    void BuildTrailTiles();
     // Each prop's drawn instance (its model and index in m_propWorlds), or model -1 when it isn't drawn; and edits.
     struct PropRef { int model = -1; size_t index = 0; };
     std::vector<PropRef> m_propRefs;

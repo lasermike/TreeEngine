@@ -56,19 +56,15 @@ void Terrain::LoadRoads(const std::wstring& file)
         m_roadsError = error.what();
         return;
     }
-    // The surfaces, on the ground as the package has it (HeightAt reads the finest blocks it needs).
-    // Trails follow the finest level's triangles: its grid's node 0, 0 is the package's -x, -z corner.
-    Roads::GroundGrid grid;
-    grid.spacing = static_cast<float>(m_package.Manifest().sampleSpacing);
-    grid.originX = m_offset.x - static_cast<float>(m_package.Manifest().worldSize / 2);
-    grid.originZ = m_offset.z - static_cast<float>(m_package.Manifest().worldSize / 2);
-    m_roadMesh = Roads::BuildMesh(m_roads, m_offset, [this](float x, float z, float& y) { return HeightAt(x, z, y); }, &grid);
+    // The surfaces, on the ground as the package has it (HeightAt reads the finest blocks it needs); trails in tiles of
+    // their own, on each level's triangles.
+    m_roadMesh = Roads::BuildMesh(m_roads, m_offset, [this](float x, float z, float& y) { return HeightAt(x, z, y); }, false);
     for (int part = 0; part < static_cast<int>(Roads::Part::Count); ++part)
         if (!m_roadMesh.parts[part].indices.empty())
             m_roadParts.push_back({ static_cast<Roads::Part>(part) });
+    BuildTrailTiles();
     const size_t trail = static_cast<size_t>(Roads::Part::Trail);
-    if (!m_roadMesh.parts[trail].indices.empty() && Params().loadTrailMaterialTextures
-        && trail < Params().roadMaterialTextures.size())
+    if (!m_trailTiles.empty() && Params().loadTrailMaterialTextures && trail < Params().roadMaterialTextures.size())
     {
         try
         {
@@ -82,6 +78,72 @@ void Terrain::LoadRoads(const std::wstring& file)
     }
     PlaceProps();
     m_heightBlocks.clear();     // HeightAt's cache: not needed again.
+}
+
+// Trails on each level's own triangles, a tile per node they cross, for the levels fine enough to show a trail. A
+// level's heights are its blocks' samples, exactly what the terrain draws there.
+void Terrain::BuildTrailTiles()
+{
+    const Roads::TrailBuilder builder(m_roads, m_offset);
+    if (builder.Empty())
+        return;
+    float minX, minZ, maxX, maxZ;
+    builder.Bounds(minX, minZ, maxX, maxZ);
+    const TerrainManifest& m = m_package.Manifest();
+    const double half = m.worldSize / 2;
+    for (int level = m.levels - 1; level >= 0 && m.NodeSpacing(level) <= TrailFarSpacing; --level)
+    {
+        const double size = m.NodeSize(level), spacing = m.NodeSpacing(level);
+        const int nodes = 1 << level;
+        std::unordered_map<uint64_t, std::vector<uint16_t>> blocks;
+        // A node's height at grid node (i, j) of this level (exact: queries land on grid nodes).
+        const auto height = [&](float x, float z, float& y)
+        {
+            const long long i = std::llround((x - m_offset.x + half) / spacing), j = std::llround((z - m_offset.z + half) / spacing);
+            const long long last = static_cast<long long>(NodeQuads) * nodes;
+            if (i < 0 || j < 0 || i > last || j > last)
+                return false;
+            const int nx = static_cast<int>(std::min<long long>(i / NodeQuads, nodes - 1));
+            const int nz = static_cast<int>(std::min<long long>(j / NodeQuads, nodes - 1));
+            auto& block = blocks[TerrainPackage::NodeIndex(level, nx, nz)];
+            if (block.empty())
+            {
+                block.resize(size_t(BlockSamples) * BlockSamples);
+                if (!m_package.ReadBlock(level, nx, nz, block.data()))
+                    return false;
+            }
+            const int a = static_cast<int>(i - nx * NodeQuads), b = static_cast<int>(j - nz * NodeQuads);
+            y = m.Height(block[size_t(b + 1) * BlockSamples + a + 1]) + m_offset.y;
+            return true;
+        };
+        Roads::GroundGrid grid;
+        grid.spacing = static_cast<float>(spacing);
+        grid.originX = static_cast<float>(m_offset.x - half);
+        grid.originZ = static_cast<float>(m_offset.z - half);
+        const int x0 = std::max(0, static_cast<int>(std::floor((minX - grid.originX) / size)));
+        const int x1 = std::min(nodes - 1, static_cast<int>(std::floor((maxX - grid.originX) / size)));
+        const int z0 = std::max(0, static_cast<int>(std::floor((minZ - grid.originZ) / size)));
+        const int z1 = std::min(nodes - 1, static_cast<int>(std::floor((maxZ - grid.originZ) / size)));
+        for (int nz = z0; nz <= z1; ++nz)
+            for (int nx = x0; nx <= x1; ++nx)
+            {
+                TrailTile tile;
+                tile.mesh = builder.Build(grid, nx * NodeQuads, nz * NodeQuads, nx * NodeQuads + NodeQuads - 1,
+                    nz * NodeQuads + NodeQuads - 1, height);
+                if (tile.mesh.indices.empty())
+                    continue;
+                XMVECTOR low = XMVectorReplicate(FLT_MAX), high = XMVectorReplicate(-FLT_MAX);
+                for (const SimpleVertex& v : tile.mesh.vertices)
+                {
+                    low = XMVectorMin(low, XMLoadFloat3(&v.Pos));
+                    high = XMVectorMax(high, XMLoadFloat3(&v.Pos));
+                }
+                XMStoreFloat3(&tile.bounds[0], low);
+                XMStoreFloat3(&tile.bounds[1], high);
+                m_trailTileOf[static_cast<uint32_t>(TerrainPackage::NodeIndex(level, nx, nz))] = m_trailTiles.size();
+                m_trailTiles.push_back(std::move(tile));
+            }
+    }
 }
 
 // Each prop stands on the ground at its point (the package's finest heights), turned to its heading: its model's
@@ -508,6 +570,17 @@ void Terrain::AppendGeometry(GeometryBufferData& geometryData)
         geometryData.indices.insert(geometryData.indices.end(), part.indices.begin(), part.indices.end());
     }
 
+    // Trail tiles, each part's indices relative to its first vertex.
+    for (TrailTile& tile : m_trailTiles)
+    {
+        tile.offsets.VertexOffset = static_cast<UINT>(geometryData.vertices.size());
+        tile.offsets.VertexCount = static_cast<UINT>(tile.mesh.vertices.size());
+        tile.offsets.IndexOffset = static_cast<UINT>(geometryData.indices.size());
+        tile.offsets.IndexCount = static_cast<UINT>(tile.mesh.indices.size());
+        geometryData.vertices.insert(geometryData.vertices.end(), tile.mesh.vertices.begin(), tile.mesh.vertices.end());
+        geometryData.indices.insert(geometryData.indices.end(), tile.mesh.indices.begin(), tile.mesh.indices.end());
+    }
+
     // Prop models (each asset once, however many objects share it).
     for (size_t model = 0; model < PropModels; ++model)
         if (!m_propWorlds[model].empty())
@@ -583,9 +656,21 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
     HRR(renderManager.ReserveRenderUnit(material, mesh, this, &m_renderUnit));
     m_renderUnit->pooledRayTracingGeometry = true;
 
-    // Road surfaces: static geometry (the DXR renderer keeps it in its static BLAS).
+    // Road surfaces: static geometry (the DXR renderer keeps it in its static BLAS); then trail tiles, in their
+    // material (the trail part's), drawn with the nodes the terrain selects, so a ray-tracing geometry of their own
+    // each, like a node.
+    std::vector<RoadPart> trailMaterial;
+    if (!m_trailTiles.empty())
+        trailMaterial.push_back({ Roads::Part::Trail });
+    Material* trailSurface = nullptr;
+    std::vector<RoadPart*> surfaces;
     for (RoadPart& road : m_roadParts)
+        surfaces.push_back(&road);
+    for (RoadPart& road : trailMaterial)
+        surfaces.push_back(&road);
+    for (RoadPart* part : surfaces)
     {
+        RoadPart& road = *part;
         const size_t index = static_cast<size_t>(road.part);
         ShaderMaterial roadMaterial = index < Params().roadMaterials.size() ? Params().roadMaterials[index] : _params->materials[0];
         wchar_t roadName[64];
@@ -603,12 +688,29 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         else
             HRR(renderManager.CreateMaterial(roadName, static_cast<const wchar_t*>(nullptr), nullptr, nullptr, nullptr, nullptr,
                 roadMaterial, roadState, &surface));
+        if (road.part == Roads::Part::Trail && part == surfaces.back() && !trailMaterial.empty())
+        {
+            trailSurface = surface;
+            continue;
+        }
         Mesh* roadMesh = nullptr;
         HRR(renderManager.CreateMesh(roadName, renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
             renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), &road.offsets, BASIC_INPUT_LAYOUT, &roadMesh));
         HRR(renderManager.ReserveRenderUnit(surface, roadMesh, this, &road.renderUnit));
         road.renderUnit->staticRayTracingGeometry = true;
         road.renderUnit->castsShadows = false;     // A ribbon 6 to 12 cm above the ground casts nothing worth drawing.
+    }
+    for (size_t t = 0; t < m_trailTiles.size(); ++t)
+    {
+        TrailTile& tile = m_trailTiles[t];
+        wchar_t tileName[64];
+        swprintf(tileName, 64, L"terrain%d-trail%zu", _id, t);
+        Mesh* tileMesh = nullptr;
+        HRR(renderManager.CreateMesh(tileName, renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
+            renderManager.GetPlatform()->GetIndexBuffer(PRIMITIVE_GEOMETRY_BUFFER), &tile.offsets, BASIC_INPUT_LAYOUT, &tileMesh));
+        HRR(renderManager.ReserveRenderUnit(trailSurface, tileMesh, this, &tile.renderUnit));
+        tile.renderUnit->pooledRayTracingGeometry = true;     // World-space vertices, drawn when their node is.
+        tile.renderUnit->castsShadows = false;
     }
 
     // Props: a batch per model part, its material and mesh named as a glTF model's (so they're shared with one).
@@ -681,6 +783,8 @@ HRESULT Terrain::CleanUpDeviceObjects()
         road.renderUnit = nullptr;
     for (PropBatch& batch : m_propBatches)
         batch.renderUnit = nullptr;
+    for (TrailTile& tile : m_trailTiles)
+        tile.renderUnit = nullptr;
     m_resident.clear();
     m_slots.clear();
     m_freeSlots.clear();
@@ -951,6 +1055,13 @@ HRESULT Terrain::ComputeConstants(IRenderFrame* frame)
         const uint32_t node = m_slots[selected.second].node;
         HRR(frame->AddDraw(m_renderUnit, this, instance, 1, static_cast<INT>(m_offsets.VertexOffset + selected.second * VerticesPerNode),
             &m_nodeOwners[node], bounds));
+        // The node's trails, on its own triangles.
+        const auto tile = m_trailTileOf.find(Index(selected.first));
+        if (tile != m_trailTileOf.end() && m_trailTiles[tile->second].renderUnit)
+        {
+            TrailTile& trail = m_trailTiles[tile->second];
+            HRR(frame->AddDraw(trail.renderUnit, this, instance, 1, static_cast<INT>(trail.offsets.VertexOffset), &trail.owner, trail.bounds));
+        }
         // The scene box (which reaches shadow casters toward the sun) takes the terrain near the camera only.
         if (bounds[1].x > eye.x - 512 && bounds[0].x < eye.x + 512 && bounds[1].z > eye.z - 512 && bounds[0].z < eye.z + 512)
         {

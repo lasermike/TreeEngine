@@ -36,16 +36,40 @@ namespace Roads
     // package coordinates into the world. Surfaces use world-planar texture coordinates (u = x, v = -z, in meters), so
     // ribbons overlapping at a junction shade alike. Every triangle faces up. A cross-section with no ground height
     // under it is left out, and no triangle spans it: the strip ends there and starts again past it.
-    //
-    // Trails lie on the ground as it is, so a strip of flat triangles could cut under a ridge between its rows. Given
-    // the ground's grid (`grid`: its spacing, and the world x, z of its node 0, 0; each cell split along the diagonal
-    // from its +x to its +z corner, as the terrain draws it), a trail is instead the ground's own triangles clipped to
-    // its outline, each `TrailLift` above its plane: it follows the ground exactly. Without a grid a trail is a strip.
+    // Trails (Kind::Trail) are left out when `trails` is false: a terrain builds them with TrailBuilder instead.
+    Mesh BuildMesh(const Network& network, DirectX::XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height,
+        bool trails = true);
+
+    // A square grid of ground heights as a terrain draws one level of it: `spacing` apart from the world x, z of its
+    // node 0, 0, each cell split along the diagonal from its +x corner to its +z corner.
     struct GroundGrid
     {
         float spacing = 0;
         float originX = 0, originZ = 0;
     };
-    Mesh BuildMesh(const Network& network, DirectX::XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height,
-        const GroundGrid* grid = nullptr);
+
+    // Trails laid on a terrain's own triangles. A strip of flat triangles would cut under a ridge between its rows,
+    // and a terrain draws coarser levels further off, so a terrain builds its trails for each of its tiles and levels:
+    // the cells of a grid inside a window, each of their triangles clipped to the trails' outlines, `TrailLift` above
+    // its plane, leaving out what any road or driveway covers (they show over trails everywhere).
+    class TrailBuilder
+    {
+    public:
+        TrailBuilder(const Network& network, DirectX::XMFLOAT3 offset);
+        bool Empty() const { return m_trails.empty(); }
+        // The trails' outlines' world bounds in x and z.
+        void Bounds(float& minX, float& minZ, float& maxX, float& maxZ) const;
+        // The trails on cells [i0, i1] x [j0, j1] of the grid (cell i, j spans origin + i, j times spacing);
+        // `height` gives the grid's height at its nodes (false off the ground: the cell is left out).
+        MeshPart Build(const GroundGrid& grid, int i0, int j0, int i1, int j1,
+            const std::function<bool(float, float, float&)>& height) const;
+
+    private:
+        struct Outline
+        {
+            std::vector<DirectX::XMFLOAT2> points;      // Convex, counterclockwise in (x, z).
+            float minX, minZ, maxX, maxZ;
+        };
+        std::vector<Outline> m_trails, m_covers;
+    };
 }
