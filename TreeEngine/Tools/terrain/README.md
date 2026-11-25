@@ -260,6 +260,10 @@ Hungerford: a 300 m square about the 190 E Scott Dr driveway (2025 Mason County 
 9 to 61 m (nine in ten between 23 and 50), with a median of 41 m. LiDAR sees only the top layer of the canopy, so the understory (young cedars and
 hemlocks, alders under the firs) isn't in the file; placement scatters it.
 
+To see them, open the trees file in QGIS over aerial imagery (as for the roads, below). `Hungerford.trees.qml`
+beside it is the layer's default style, which QGIS applies when it opens the file: each tree is a circle the size of its crown,
+coloured by species, with its height labelled when zoomed in. Copy it to `<Name>.trees.qml` for another area.
+
 Edit it in QGIS like the roads file:
 - move, delete or add points, or change a `species`;
 - set `edited` to true on what you change;
