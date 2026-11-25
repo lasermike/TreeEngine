@@ -34,7 +34,8 @@ namespace
         return props[key].get<std::string>();
     }
 
-    float Number(const Json& props, const char* key, const std::string& where, float fallback, float low, float high)
+    // Bounds are doubles, as the file's numbers are, so a bound like 0.3 accepts the file's 0.3.
+    float Number(const Json& props, const char* key, const std::string& where, float fallback, double low, double high)
     {
         if (!props.contains(key) || props[key].is_null())
             return fallback;
@@ -230,8 +231,8 @@ namespace Roads
             if (!id.empty())
                 where += " (" + id + ")";
             const std::string kind = Text(props, "kind", where + ".properties");
-            if (kind != "road" && kind != "driveway" && kind != "prop")
-                Fail(where + ".properties.kind", "must be road, driveway or prop");
+            if (kind != "road" && kind != "driveway" && kind != "trail" && kind != "prop")
+                Fail(where + ".properties.kind", "must be road, driveway, trail or prop");
             // A removed feature only keeps the tools from making it again.
             if (props.contains("removed") && !props["removed"].is_null())
             {
@@ -292,7 +293,7 @@ namespace Roads
             }
 
             Line line;
-            line.kind = kind == "road" ? Kind::Road : Kind::Driveway;
+            line.kind = kind == "road" ? Kind::Road : kind == "trail" ? Kind::Trail : Kind::Driveway;
             line.id = id;
             line.source = Text(props, "source", where + ".properties");
             if (props.contains("edited") && !props["edited"].is_null())
@@ -302,11 +303,12 @@ namespace Roads
                 line.edited = props["edited"].get<bool>();
             }
             line.name = Text(props, "name", where + ".properties");
-            line.surface = Text(props, "surface", where + ".properties", "paved");
-            if (line.surface != "paved" && line.surface != "gravel")
+            line.surface = Text(props, "surface", where + ".properties", line.kind == Kind::Trail ? "trail" : "paved");
+            if (line.kind != Kind::Trail && line.surface != "paved" && line.surface != "gravel")
                 Fail(where + ".properties.surface", "must be paved or gravel");
             line.owner = Text(props, "owner", where + ".properties");
-            line.width = Number(props, "width", where + ".properties", line.kind == Kind::Road ? 6.0f : 3.0f, 1, 40);
+            line.width = Number(props, "width", where + ".properties",
+                line.kind == Kind::Road ? 6.0f : line.kind == Kind::Trail ? TrailWidth : 3.0f, line.kind == Kind::Trail ? 0.3 : 1.0, 40.0);
             line.shoulder = Number(props, "shoulder", where + ".properties", 0, 0, 10);
             line.ditchDepth = Number(props, "ditchDepth", where + ".properties", 0, 0, 5);
             line.ditchWidth = Number(props, "ditchWidth", where + ".properties", 0, 0, 20);

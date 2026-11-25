@@ -140,6 +140,8 @@ namespace Roads
         std::vector<Claim> claims(heights.size());
         for (const Line& line : network.lines)
         {
+            if (line.kind == Roads::Kind::Trail)
+                continue;       // Trails lie on the ground as it is.
             const std::vector<CenterlineSample> centerline = SampleCenterline(line.points);
             if (centerline.size() < 2)
                 continue;

@@ -413,7 +413,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     return RuntimeModel(file, terrainId, sceneFilename);
                 };
                 // Road surfaces, in Roads::Part order: asphalt and gravel tiled every 4 m (TerrainTool texture
-                // maps), then yellow and white paint.
+                // maps), yellow and white paint, then trails (the dirt maps).
                 const auto surface = [](const char* kind)
                 {
                     SceneData::MaterialDefinition material;
@@ -440,6 +440,12 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     parameters->roadMaterials.push_back(RuntimeMaterial(material));
                     parameters->roadMaterialTextures.push_back(RuntimeMaterialTextures(material, terrain.id, sceneFilename));
                 }
+                // Trails: their maps load only if the roads have a trail (Terrain::LoadRoads).
+                const auto dirt = surface("dirt");
+                parameters->roadMaterials.push_back(RuntimeMaterial(dirt));
+                parameters->roadMaterialTextures.push_back(MaterialTextureSources());
+                parameters->loadTrailMaterialTextures = [dirt, terrainId, sceneFilename]()
+                    { return RuntimeMaterialTextures(dirt, terrainId, sceneFilename); };
             }
             parameters->lodRange = terrain.lodRange;
             parameters->slots = static_cast<UINT>(terrain.slots);

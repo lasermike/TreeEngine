@@ -127,7 +127,8 @@ namespace
 
 namespace Roads
 {
-    Mesh BuildMesh(const Network& network, XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height)
+    Mesh BuildMesh(const Network& network, XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height,
+        bool trails)
     {
         Mesh mesh;
         for (const Line& line : network.lines)
@@ -137,12 +138,14 @@ namespace Roads
                 sample.point = XMFLOAT2(sample.point.x + offset.x, sample.point.y + offset.z);
             if (samples.size() < 2)
                 continue;
-            const bool road = line.kind == Kind::Road;
+            const bool road = line.kind == Kind::Road, trail = line.kind == Kind::Trail;
             const bool gravel = line.surface == "gravel";
-            MeshPart& surface = mesh[gravel ? Part::Gravel : Part::Asphalt];
+            MeshPart& surface = mesh[trail ? Part::Trail : gravel ? Part::Gravel : Part::Asphalt];
             const float halfWidth = line.width / 2 + (road ? line.shoulder : 0);
             const size_t vertexStart = surface.vertices.size(), indexStart = surface.indices.size();
-            const float lift = !road ? DrivewayLift : gravel ? GravelRoadLift : RoadLift;
+            const float lift = trail ? TrailLift : !road ? DrivewayLift : gravel ? GravelRoadLift : RoadLift;
+            if (trail && !trails)
+                continue;
             AddStrip(surface, samples, 0, samples.size() - 1, Across(halfWidth), lift, true, 0, height);
             ComputeNormals(surface, vertexStart, indexStart);
 
@@ -177,5 +180,274 @@ namespace Roads
             }
         }
         return mesh;
+    }
+}
+
+namespace
+{
+    typedef XMFLOAT2 Point;
+
+    float Cross(const Point& o, const Point& a, const Point& b)
+    {
+        return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    }
+
+    // The part of a convex polygon on the left of a -> b (inside, for a counterclockwise outline's edge).
+    std::vector<Point> ClipLeft(const std::vector<Point>& polygon, const Point& a, const Point& b)
+    {
+        std::vector<Point> out;
+        for (size_t i = 0; i < polygon.size(); ++i)
+        {
+            const Point& p = polygon[i];
+            const Point& q = polygon[(i + 1) % polygon.size()];
+            const float dp = Cross(a, b, p), dq = Cross(a, b, q);
+            if (dp >= 0)
+                out.push_back(p);
+            if ((dp >= 0) != (dq >= 0))
+            {
+                const float t = dp / (dp - dq);
+                out.push_back(Point(p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t));
+            }
+        }
+        return out;
+    }
+
+    // About the first vertex, so world coordinates thousands of meters out don't cancel the products away.
+    float Area(const std::vector<Point>& polygon)
+    {
+        float area = 0;
+        for (size_t i = 1; i + 1 < polygon.size(); ++i)
+            area += Cross(polygon[0], polygon[i], polygon[i + 1]);
+        return area / 2;
+    }
+
+    // The convex outlines of a ribbon `halfWidth` either side of its samples: a quad per pair of cross-sections, two
+    // triangles where a tight bend folds it.
+    template <typename Outline>
+    void Ribbon(const std::vector<Sample>& samples, float halfWidth, std::vector<Outline>& out)
+    {
+        for (size_t k = 0; k + 1 < samples.size(); ++k)
+        {
+            const Sample& s0 = samples[k];
+            const Sample& s1 = samples[k + 1];
+            std::vector<Point> quad = {
+                Point(s0.point.x - s0.side.x * halfWidth, s0.point.y - s0.side.y * halfWidth),
+                Point(s1.point.x - s1.side.x * halfWidth, s1.point.y - s1.side.y * halfWidth),
+                Point(s1.point.x + s1.side.x * halfWidth, s1.point.y + s1.side.y * halfWidth),
+                Point(s0.point.x + s0.side.x * halfWidth, s0.point.y + s0.side.y * halfWidth) };
+            if (Area(quad) < 0)
+                std::reverse(quad.begin(), quad.end());
+            bool convex = true;
+            for (size_t i = 0; i < 4; ++i)
+                convex = convex && Cross(quad[i], quad[(i + 1) % 4], quad[(i + 2) % 4]) >= 0;
+            std::vector<std::vector<Point>> pieces;
+            if (convex)
+                pieces.push_back(quad);
+            else
+            {
+                pieces.push_back({ quad[0], quad[1], quad[2] });
+                pieces.push_back({ quad[0], quad[2], quad[3] });
+            }
+            for (auto& piece : pieces)
+            {
+                if (Area(piece) < 0)
+                    std::reverse(piece.begin(), piece.end());
+                if (Area(piece) < 1e-6f)
+                    continue;
+                Outline outline;
+                outline.points = piece;
+                outline.minX = outline.minZ = 1e30f;
+                outline.maxX = outline.maxZ = -1e30f;
+                for (const Point& p : piece)
+                {
+                    outline.minX = std::min(outline.minX, p.x); outline.maxX = std::max(outline.maxX, p.x);
+                    outline.minZ = std::min(outline.minZ, p.y); outline.maxZ = std::max(outline.maxZ, p.y);
+                }
+                out.push_back(outline);
+            }
+        }
+    }
+}
+
+namespace Roads
+{
+    TrailBuilder::TrailBuilder(const Network& network, XMFLOAT3 offset)
+    {
+        for (const Line& line : network.lines)
+        {
+            std::vector<Sample> samples = SampleCenterline(line.points);
+            for (Sample& sample : samples)
+                sample.point = XMFLOAT2(sample.point.x + offset.x, sample.point.y + offset.z);
+            if (samples.size() < 2)
+                continue;
+            if (line.kind == Kind::Trail)
+                Ribbon(samples, line.width / 2, m_trails);
+            else
+                Ribbon(samples, line.width / 2 + (line.kind == Kind::Road ? line.shoulder : 0), m_covers);
+        }
+        // Only covers that reach a trail matter: the trails' outlines in buckets of BucketSize meters, then each cover
+        // tested against the trails in the buckets it touches; the covers kept, bucketed the same way.
+        std::unordered_map<int64_t, std::vector<size_t>> trailBuckets;
+        for (size_t t = 0; t < m_trails.size(); ++t)
+            for (int bz = Bucket(m_trails[t].minZ); bz <= Bucket(m_trails[t].maxZ); ++bz)
+                for (int bx = Bucket(m_trails[t].minX); bx <= Bucket(m_trails[t].maxX); ++bx)
+                    trailBuckets[BucketKey(bx, bz)].push_back(t);
+        std::vector<Outline> reaching;
+        for (const Outline& cover : m_covers)
+        {
+            bool reaches = false;
+            for (int bz = Bucket(cover.minZ); bz <= Bucket(cover.maxZ) && !reaches; ++bz)
+                for (int bx = Bucket(cover.minX); bx <= Bucket(cover.maxX) && !reaches; ++bx)
+                {
+                    const auto bucket = trailBuckets.find(BucketKey(bx, bz));
+                    if (bucket == trailBuckets.end())
+                        continue;
+                    for (const size_t t : bucket->second)
+                    {
+                        const Outline& trail = m_trails[t];
+                        if (cover.maxX > trail.minX && cover.minX < trail.maxX && cover.maxZ > trail.minZ && cover.minZ < trail.maxZ)
+                        {
+                            reaches = true;
+                            break;
+                        }
+                    }
+                }
+            if (reaches)
+                reaching.push_back(cover);
+        }
+        m_covers.swap(reaching);
+        for (size_t c = 0; c < m_covers.size(); ++c)
+            for (int bz = Bucket(m_covers[c].minZ); bz <= Bucket(m_covers[c].maxZ); ++bz)
+                for (int bx = Bucket(m_covers[c].minX); bx <= Bucket(m_covers[c].maxX); ++bx)
+                    m_buckets[BucketKey(bx, bz)].push_back(c);
+    }
+
+    void TrailBuilder::Bounds(float& minX, float& minZ, float& maxX, float& maxZ) const
+    {
+        minX = minZ = 1e30f;
+        maxX = maxZ = -1e30f;
+        for (const Outline& o : m_trails)
+        {
+            minX = std::min(minX, o.minX); maxX = std::max(maxX, o.maxX);
+            minZ = std::min(minZ, o.minZ); maxZ = std::max(maxZ, o.maxZ);
+        }
+    }
+
+    MeshPart TrailBuilder::Build(const GroundGrid& grid, int i0, int j0, int i1, int j1,
+        const std::function<bool(float, float, float&)>& height) const
+    {
+        MeshPart part;
+        const auto emit = [&](const std::vector<Point>& polygon, const Point& o, const Point& u, const Point& v,
+            float h0, float hu, float hv)
+        {
+            // The terrain triangle's plane: h0 at o, hu at o + u, hv at o + v.
+            const float det = u.x * v.y - u.y * v.x;
+            const UINT base = static_cast<UINT>(part.vertices.size());
+            for (const Point& p : polygon)
+            {
+                const float dx = p.x - o.x, dz = p.y - o.y;
+                const float a = (dx * v.y - dz * v.x) / det, b = (u.x * dz - u.y * dx) / det;
+                SimpleVertex vertex = {};
+                vertex.Pos = XMFLOAT3(p.x, h0 + (hu - h0) * a + (hv - h0) * b + TrailLift, p.y);
+                vertex.Normal = XMFLOAT3(0, 1, 0);
+                vertex.Tex = XMFLOAT2(p.x, -p.y);
+                vertex.TangentU = XMFLOAT4(1, 0, 0, 1);
+                part.vertices.push_back(vertex);
+            }
+            // Counterclockwise in (x, z) is clockwise seen from above: these indices make each triangle face up.
+            for (UINT i = 1; i + 1 < polygon.size(); ++i)
+                part.indices.insert(part.indices.end(), { base, base + i + 1, base + i });
+        };
+        // A piece minus every road or driveway outline it overlaps: the piece's parts outside each in turn. Only the
+        // covers in the buckets its bounds touch are candidates.
+        std::vector<size_t> candidates;
+        const auto uncovered = [&](const std::vector<Point>& piece)
+        {
+            float pminX = 1e30f, pmaxX = -1e30f, pminZ = 1e30f, pmaxZ = -1e30f;
+            for (const Point& q : piece)
+            {
+                pminX = std::min(pminX, q.x); pmaxX = std::max(pmaxX, q.x);
+                pminZ = std::min(pminZ, q.y); pmaxZ = std::max(pmaxZ, q.y);
+            }
+            candidates.clear();
+            for (int bz = Bucket(pminZ); bz <= Bucket(pmaxZ); ++bz)
+                for (int bx = Bucket(pminX); bx <= Bucket(pmaxX); ++bx)
+                {
+                    const auto bucket = m_buckets.find(BucketKey(bx, bz));
+                    if (bucket != m_buckets.end())
+                        candidates.insert(candidates.end(), bucket->second.begin(), bucket->second.end());
+                }
+            std::sort(candidates.begin(), candidates.end());
+            candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+            std::vector<std::vector<Point>> pieces = { piece };
+            for (const size_t c : candidates)
+            {
+                const Outline& cover = m_covers[c];
+                std::vector<std::vector<Point>> next;
+                for (const auto& p : pieces)
+                {
+                    float minX = 1e30f, maxX = -1e30f, minZ = 1e30f, maxZ = -1e30f;
+                    for (const Point& q : p)
+                    {
+                        minX = std::min(minX, q.x); maxX = std::max(maxX, q.x);
+                        minZ = std::min(minZ, q.y); maxZ = std::max(maxZ, q.y);
+                    }
+                    if (maxX <= cover.minX || minX >= cover.maxX || maxZ <= cover.minZ || minZ >= cover.maxZ)
+                    {
+                        next.push_back(p);
+                        continue;
+                    }
+                    // P minus a convex C: for each edge k of C, P inside edges before k and outside edge k.
+                    std::vector<Point> inside = p;
+                    const auto& c = cover.points;
+                    for (size_t k = 0; k < c.size() && inside.size() >= 3; ++k)
+                    {
+                        const Point& a = c[k];
+                        const Point& b = c[(k + 1) % c.size()];
+                        const std::vector<Point> outside = ClipLeft(inside, b, a);
+                        if (outside.size() >= 3 && std::abs(Area(outside)) > 1e-6f)
+                            next.push_back(outside);
+                        inside = ClipLeft(inside, a, b);
+                    }
+                }
+                pieces.swap(next);
+            }
+            return pieces;
+        };
+        for (const Outline& outline : m_trails)
+        {
+            const int ci0 = std::max(i0, static_cast<int>(std::floor((outline.minX - grid.originX) / grid.spacing)));
+            const int ci1 = std::min(i1, static_cast<int>(std::floor((outline.maxX - grid.originX) / grid.spacing)));
+            const int cj0 = std::max(j0, static_cast<int>(std::floor((outline.minZ - grid.originZ) / grid.spacing)));
+            const int cj1 = std::min(j1, static_cast<int>(std::floor((outline.maxZ - grid.originZ) / grid.spacing)));
+            for (int j = cj0; j <= cj1; ++j)
+                for (int i = ci0; i <= ci1; ++i)
+                {
+                    const float x0 = grid.originX + i * grid.spacing, z0 = grid.originZ + j * grid.spacing;
+                    const float x1 = x0 + grid.spacing, z1 = z0 + grid.spacing;
+                    float h00, h10, h01, h11;
+                    if (!height(x0, z0, h00) || !height(x1, z0, h10) || !height(x0, z1, h01) || !height(x1, z1, h11))
+                        continue;
+                    const Point c00(x0, z0), c10(x1, z0), c01(x0, z1), c11(x1, z1);
+                    for (int t = 0; t < 2; ++t)
+                    {
+                        // The cell's two triangles, counterclockwise: split from its +x corner to its +z corner.
+                        std::vector<Point> polygon = t ? std::vector<Point>{ c10, c11, c01 } : std::vector<Point>{ c00, c10, c01 };
+                        for (size_t e = 0; e < outline.points.size() && polygon.size() >= 3; ++e)
+                            polygon = ClipLeft(polygon, outline.points[e], outline.points[(e + 1) % outline.points.size()]);
+                        if (polygon.size() < 3 || std::abs(Area(polygon)) < 1e-6f)
+                            continue;
+                        for (const auto& piece : uncovered(polygon))
+                        {
+                            if (t == 0)
+                                emit(piece, c00, Point(grid.spacing, 0), Point(0, grid.spacing), h00, h10, h01);
+                            else
+                                emit(piece, c11, Point(-grid.spacing, 0), Point(0, -grid.spacing), h11, h01, h10);
+                        }
+                    }
+                }
+        }
+        ComputeNormals(part, 0, 0);
+        return part;
     }
 }

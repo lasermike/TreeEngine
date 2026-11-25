@@ -167,7 +167,10 @@ or GIS elevation data). It requires `source`, the package directory, such as
   overlap, paved roads show over gravel roads, and both over driveways. They
   cast no raster shadow. The debug UI's **Show road centerlines** (render tests:
   a capture's `"showRoads": true`) draws the centerlines: paved roads orange,
-  gravel roads tan, driveways cyan. The file's props (mailboxes, posts, stop
+  gravel roads tan, driveways cyan, trails green. Trails draw 1 m wide (or
+  their `width`) in their own dirt material (`Terrain/Textures/dirt_*`), on
+  the ungraded ground as each terrain tile draws it at its level of detail,
+  and stop at the edges of roads and driveways crossing them. The file's props (mailboxes, posts, stop
   signs, street-name signs) stand on the terrain at their points, turned to
   their headings, drawn instanced from `Models/Roadside/<prop>.glb` in raster
   (with shadows) and DXR. Each model loads when a prop uses it; a model that

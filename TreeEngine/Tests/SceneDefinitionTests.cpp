@@ -12,6 +12,7 @@
 #include "RoadGrading.h"
 #include "SignText.h"
 #include "ThirdParty/nlohmann/json.hpp"
+#include <chrono>
 #include <functional>
 #include <fstream>
 #include <iostream>
@@ -1520,6 +1521,231 @@ void TestSignText()
         "the sign atlas BMP's rows or channels are out of order");
 }
 
+void TestTrails()
+{
+    // Parsing: a trail is 1 m wide unless it says otherwise (narrower than any road allows), with no surface rule.
+    const std::string file = R"({"type":"FeatureCollection",
+        "crs":{"type":"name","properties":{"name":"EPSG:32610"}},
+        "features":[
+          {"type":"Feature","properties":{"kind":"trail","id":"trail-1"},
+           "geometry":{"type":"LineString","coordinates":[[1000,2000],[1030,2010]]}},
+          {"type":"Feature","properties":{"kind":"trail","id":"trail-2","width":0.6,"surface":"bark"},
+           "geometry":{"type":"LineString","coordinates":[[1000,2020],[1030,2020]]}}]})";
+    const auto network = Roads::Parse(file, "EPSG:32610", 1000, 2000);
+    Check(network.lines.size() == 2 && network.lines[0].kind == Roads::Kind::Trail && network.lines[0].width == Roads::TrailWidth
+        && network.lines[1].width == 0.6f, "trails were parsed wrongly");
+    // The documented minimum, 0.3 m, is accepted exactly; anything narrower isn't.
+    auto narrow = Json::parse(file);
+    narrow["features"][1]["properties"]["width"] = 0.3;
+    Check(Roads::Parse(narrow.dump(), "EPSG:32610", 1000, 2000).lines[1].width == 0.3f, "a 0.3 m trail was refused");
+    narrow["features"][1]["properties"]["width"] = 0.29;
+    bool narrowRefused = false;
+    try { Roads::Parse(narrow.dump(), "EPSG:32610", 1000, 2000); }
+    catch (const std::runtime_error& error) { narrowRefused = std::string(error.what()).find("width") != std::string::npos; }
+    Check(narrowRefused, "a trail narrower than 0.3 m was accepted");
+    bool threw = false;
+    try { Roads::Parse(std::string(file).replace(file.find("\"kind\":\"trail\""), 14, "\"kind\":\"path\""), "EPSG:32610", 1000, 2000); }
+    catch (const std::runtime_error& error) { threw = std::string(error.what()).find("road, driveway, trail or prop") != std::string::npos; }
+    Check(threw, "an unknown kind's error doesn't list trails");
+
+    // The mesh: trails go in their own part, on the ground at the trail lift, as wide as they say; nothing else.
+    Roads::Network trails;
+    Roads::Line trail;
+    trail.kind = Roads::Kind::Trail;
+    trail.width = 1;
+    trail.points = { XMFLOAT2(0, 0), XMFLOAT2(20, 0) };
+    trails.lines.push_back(trail);
+    const auto flat = [](float, float, float& y) { y = 2; return true; };
+    const auto mesh = Roads::BuildMesh(trails, XMFLOAT3(0, 0, 0), flat);
+    const auto& tread = mesh[Roads::Part::Trail];
+    float minZ = 1e9f, maxZ = -1e9f;
+    bool level = true;
+    for (const auto& v : tread.vertices)
+    {
+        minZ = std::min(minZ, v.Pos.z);
+        maxZ = std::max(maxZ, v.Pos.z);
+        level = level && std::abs(v.Pos.y - (2 + Roads::TrailLift)) < 1e-5f;
+    }
+    Check(!tread.indices.empty() && level && std::abs(maxZ - minZ - 1) < 1e-4f && mesh[Roads::Part::Asphalt].vertices.empty()
+        && mesh[Roads::Part::Gravel].vertices.empty() && mesh[Roads::Part::YellowLine].vertices.empty(),
+        "a trail's mesh is wrong");
+    Check(Roads::TrailLift < Roads::DrivewayLift, "trails would show over driveways");
+    // On a terrain, trails are built by TrailBuilder: the ground's own triangles clipped to each trail's outline, each
+    // the trail lift above its plane, for any level's grid. They follow that level's ground exactly.
+    // The surface height of a mesh part at (x, z): the highest triangle there, or a very low value where none is.
+    const auto surfaceAt = [](const Roads::MeshPart& part, float x, float z)
+    {
+        float best = -1e9f;
+        for (size_t i = 0; i + 2 < part.indices.size(); i += 3)
+        {
+            const XMFLOAT3& a = part.vertices[part.indices[i]].Pos;
+            const XMFLOAT3& b = part.vertices[part.indices[i + 1]].Pos;
+            const XMFLOAT3& c = part.vertices[part.indices[i + 2]].Pos;
+            const float d = (b.x - a.x) * (c.z - a.z) - (c.x - a.x) * (b.z - a.z);
+            if (std::abs(d) < 1e-9f)
+                continue;
+            const float u = ((x - a.x) * (c.z - a.z) - (c.x - a.x) * (z - a.z)) / d;
+            const float v = ((b.x - a.x) * (z - a.z) - (x - a.x) * (b.z - a.z)) / d;
+            if (u < -1e-5f || v < -1e-5f || u + v > 1 + 1e-5f)
+                continue;
+            best = std::max(best, a.y + (b.y - a.y) * u + (c.y - a.y) * v);
+        }
+        return best;
+    };
+    // A ridge along z (so the terrain's triangles are exactly its profile), `peak` high at x = 1, sampled on a grid of
+    // `spacing`; the trail runs along x from `from`. Everywhere across it, it is the grid's ground plus the trail lift.
+    const auto ridgeCase = [&](float peak, float from, float spacing, const char* what)
+    {
+        Roads::GroundGrid grid;
+        grid.spacing = spacing;
+        // The ground the grid draws: the ridge at its nodes, linear between them.
+        const auto nodes = [peak](float x, float, float& y) { y = peak * std::max(0.0f, 1 - std::abs(x - 1)); return true; };
+        const auto drawn = [&](float x)
+        {
+            const float i = std::floor(x / spacing);
+            float a = 0, b = 0;
+            nodes(i * spacing, 0, a);
+            nodes((i + 1) * spacing, 0, b);
+            return a + (b - a) * (x / spacing - i);
+        };
+        Roads::Network network;
+        Roads::Line line = trail;
+        line.points = { XMFLOAT2(from, 0), XMFLOAT2(from + 2, 0) };
+        network.lines.push_back(line);
+        const auto part = Roads::TrailBuilder(network, XMFLOAT3(0, 0, 0)).Build(grid, -20, -20, 20, 20, nodes);
+        float worst = 0, covered = 1e9f;
+        for (float x = from + 0.01f; x <= from + 1.99f; x += 0.01f)
+            for (float z = -0.45f; z <= 0.45f; z += 0.15f)
+            {
+                const float y = surfaceAt(part, x, z);
+                covered = std::min(covered, y);
+                worst = std::max(worst, std::abs(y - (drawn(x) + Roads::TrailLift)));
+            }
+        Check(covered > -1 && worst < 1e-4f, (std::string(what) + ": the trail doesn't follow the ground at its lift").c_str());
+    };
+    ridgeCase(0.2f, 0.5f, 1, "a 0.2 m ridge between cross-sections");
+    ridgeCase(1.0f, 0.4375f, 1, "a 1 m crest off the cross-sections");
+    // A coarser level (2 m between samples, as the terrain draws further off): the trail follows that level's
+    // triangles, not the finest ground's.
+    ridgeCase(0.2f, 0.5f, 2, "a coarser level's ground");
+    // A window: only the cells inside it (a terrain tile).
+    {
+        Roads::Network network;
+        Roads::Line line = trail;
+        line.points = { XMFLOAT2(-10, 0.5f), XMFLOAT2(10, 0.5f) };
+        network.lines.push_back(line);
+        Roads::GroundGrid grid;
+        grid.spacing = 1;
+        const auto part = Roads::TrailBuilder(network, XMFLOAT3(0, 0, 0)).Build(grid, 0, -4, 3, 3, flat);
+        float lowX = 1e9f, highX = -1e9f;
+        for (const auto& v : part.vertices)
+        {
+            lowX = std::min(lowX, v.Pos.x);
+            highX = std::max(highX, v.Pos.x);
+        }
+        Check(!part.indices.empty() && lowX >= -1e-4f && highX <= 4 + 1e-4f, "a trail tile reaches past its window");
+    }
+    // Roads and driveways show over trails everywhere: the trail leaves out what a driveway covers, here a driveway
+    // crossing the trail on the ridge, along z at x = 0.5 (3 m wide: x from -1 to 2).
+    {
+        const auto ridge = [](float x, float, float& y) { y = 0.2f * std::max(0.0f, 1 - std::abs(x - 1)); return true; };
+        Roads::Network network;
+        Roads::Line line = trail;
+        line.points = { XMFLOAT2(-3, 0), XMFLOAT2(4, 0) };
+        network.lines.push_back(line);
+        Roads::Line crossing;
+        crossing.kind = Roads::Kind::Driveway;
+        crossing.surface = "gravel";
+        crossing.width = 3;
+        crossing.points = { XMFLOAT2(0.5f, -5), XMFLOAT2(0.5f, 5) };
+        network.lines.push_back(crossing);
+        Roads::GroundGrid grid;
+        grid.spacing = 1;
+        const auto part = Roads::TrailBuilder(network, XMFLOAT3(0, 0, 0)).Build(grid, -20, -20, 20, 20, ridge);
+        bool underDriveway = false, beside = true;
+        for (float x = -2.9f; x <= 3.9f; x += 0.05f)
+            for (float z = -0.45f; z <= 0.45f; z += 0.15f)
+            {
+                const bool covered = surfaceAt(part, x, z) > -1;
+                if (x > -0.99f && x < 1.99f)
+                    underDriveway = underDriveway || covered;
+                else if (x < -1.01f || x > 2.01f)
+                    beside = beside && covered;
+            }
+        Check(!underDriveway && beside, "a trail shows under a driveway crossing it, or is missing beside it");
+
+        // The same 8192 m out (world coordinates of a large terrain): the trail's and the driveway's outlines keep
+        // their area, so the trail is there beside the driveway and not under it.
+        Roads::GroundGrid distant;
+        distant.spacing = 1;
+        distant.originX = distant.originZ = 8192;
+        const auto farRidge = [&](float x, float z, float& y) { return ridge(x - 8192, z - 8192, y); };
+        const auto farPart = Roads::TrailBuilder(network, XMFLOAT3(8192, 0, 8192)).Build(distant, -20, -20, 20, 20, farRidge);
+        bool farUnder = false, farBeside = true;
+        for (float x = -2.9f; x <= 3.9f; x += 0.05f)
+        {
+            const bool covered = surfaceAt(farPart, 8192 + x, 8192) > -1;
+            if (x > -0.99f && x < 1.99f)
+                farUnder = farUnder || covered;
+            else if (x < -1.01f || x > 2.01f)
+                farBeside = farBeside && covered;
+        }
+        Check(!farUnder && farBeside, "8 km out, a trail's or a driveway's outline lost its area");
+    }
+    // Which levels draw trails: the finest always, however coarse its samples; others up to 8 m between samples.
+    Check(Roads::DrawsTrails(10, true) && !Roads::DrawsTrails(10, false) && Roads::DrawsTrails(8, false)
+        && Roads::DrawsTrails(1, true), "the levels that draw trails are wrong");
+    // Only road and driveway outlines that reach a trail are kept to cut it.
+    {
+        Roads::Network network;
+        Roads::Line line = trail;
+        line.points = { XMFLOAT2(0, 0), XMFLOAT2(10, 0) };
+        network.lines.push_back(line);
+        Roads::Line farDriveway;
+        farDriveway.kind = Roads::Kind::Driveway;
+        farDriveway.width = 3;
+        farDriveway.points = { XMFLOAT2(1000, 0), XMFLOAT2(1000, 20) };
+        network.lines.push_back(farDriveway);
+        Check(Roads::TrailBuilder(network, XMFLOAT3(0, 0, 0)).Covers() == 0, "a driveway 1 km from any trail was kept to cut trails");
+        Roads::Line nearDriveway = farDriveway;
+        nearDriveway.points = { XMFLOAT2(5, -10), XMFLOAT2(5, 10) };
+        network.lines.push_back(nearDriveway);
+        Check(Roads::TrailBuilder(network, XMFLOAT3(0, 0, 0)).Covers() > 0, "a driveway crossing a trail wasn't kept to cut it");
+    }
+    // Many roads far from many trails: choosing the covers is local (buckets), not every road piece against every
+    // trail piece (20 km of each, 400 million pairs, took many seconds).
+    {
+        Roads::Network network;
+        for (int k = 0; k < 20; ++k)
+        {
+            Roads::Line road;
+            road.kind = Roads::Kind::Road;
+            road.points = { XMFLOAT2(0, k * 20.0f), XMFLOAT2(1000, k * 20.0f) };
+            network.lines.push_back(road);
+            Roads::Line path = trail;
+            path.points = { XMFLOAT2(5000, k * 20.0f), XMFLOAT2(6000, k * 20.0f) };
+            network.lines.push_back(path);
+        }
+        const auto start = std::chrono::steady_clock::now();
+        const Roads::TrailBuilder builder(network, XMFLOAT3(0, 0, 0));
+        const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        Check(builder.Covers() == 0 && seconds < 5, ("choosing trail covers took " + std::to_string(seconds) + " s").c_str());
+    }
+    // Grading leaves trails alone: they lie on the ground as it is.
+    const int n = 65;
+    std::vector<float> bumpy(size_t(n) * n);
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i)
+            bumpy[size_t(j) * n + i] = 10 + 0.5f * std::sin(i * 0.7f) * std::cos(j * 0.4f);
+    const auto before = bumpy;
+    Roads::Network graded;
+    Roads::Line crossing = trail;
+    crossing.points = { XMFLOAT2(-20, -5), XMFLOAT2(20, 5) };
+    graded.lines.push_back(crossing);
+    const auto report = Roads::Grade(graded, bumpy, n, 1);
+    Check(report.graded == 0 && bumpy == before, "grading changed the ground under a trail");
+}
+
 void TestTreeLodSettings()
 {
     const std::string json = R"({"version":1,"name":"Lod","objects":[
@@ -1784,6 +2010,7 @@ int main(int argc, char** argv)
         TestRoadNetwork();
         TestRoadMesh();
         TestRoadGrading();
+        TestTrails();
         TestSignText();
         TestPropEditing();
         if (argc == 3 && std::string(argv[1]) == "--gltf-only")

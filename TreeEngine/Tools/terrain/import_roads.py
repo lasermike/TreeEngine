@@ -592,13 +592,18 @@ def summary(output, features):
     """The closing line: what the file holds. Hand-made features may lack any property but kind and id."""
     kinds = [(f.get('properties') or {}).get('kind') for f in features]
     generated = sum((f.get('properties') or {}).get('source') == 'generated' for f in features)
-    return f'wrote {output}: {kinds.count("road")} roads, {kinds.count("driveway")} driveways ({generated} generated)'
+    trails = f', {kinds.count("trail")} trails' if 'trail' in kinds else ''
+    return f'wrote {output}: {kinds.count("road")} roads, {kinds.count("driveway")} driveways ({generated} generated){trails}'
 
 
 def kept_features(features):
-    """The existing file's features a re-run keeps as they are: those edited by hand, and removed markers (which
-    keep their ids from being imported or generated again)."""
-    return [f for f in features if (f.get('properties') or {}).get('edited') or (f.get('properties') or {}).get('removed')]
+    """The existing file's features a re-run keeps as they are: those edited by hand, removed markers (which keep
+    their ids from being imported or generated again), and what's only ever drawn by hand (trails, manual features),
+    edited or not."""
+    def keep(props):
+        return (props.get('edited') or props.get('removed') or props.get('kind') == 'trail'
+                or props.get('source') == 'manual')
+    return [f for f in features if keep(f.get('properties') or {})]
 
 
 def write_collection(path, header, features):

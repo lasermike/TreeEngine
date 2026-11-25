@@ -105,6 +105,15 @@ p = out[2]['properties']
 check(p.get('kind') == 'prop' and p.get('prop') == 'post' and p.get('heading') == 0 and p.get('id') == 'manual-12-7'
       and any('without a model' in n for n in notes), f'the new point: {out[2]}, {notes}')
 
+# A new trail: 1 m wide, no surface filled in; its start isn't snapped onto the road 3 m away, and its crossing of
+# the road isn't reported (trails go anywhere).
+trail = line({'kind': 'trail'}, [[30.0, 3.0], [30.0, -40.0]])
+out, notes = finish.finish(base, [road, drive, trail])
+p = out[2]['properties']
+check(p['kind'] == 'trail' and p['width'] == 1.0 and 'surface' not in p and p['edited'] is True
+      and out[2]['geometry']['coordinates'][0] == [30.0, 3.0] and not any('crosses' in n or 'start moved' in n for n in notes),
+      f'the new trail: {out[2]}, {notes}')
+
 # XYZ coordinates: snapping works in plan and keeps the start's z.
 road3 = line(dict(road['properties']), [[0.0, 0.0, 12.0], [100.0, 0.0, 13.0]])
 drive3 = line({'kind': 'driveway', 'id': 'z'}, [[30.0, 3.0, 14.0], [30.0, 40.0, 15.0]])

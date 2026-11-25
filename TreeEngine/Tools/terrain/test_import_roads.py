@@ -170,8 +170,9 @@ check(line == 'wrote out: 0 roads, 2 driveways (1 generated)', f'summary: {line}
 
 # A re-run keeps features edited by hand and removed markers (edited or not), and nothing else.
 existing = [{'properties': {'id': 'a', 'edited': True}}, {'properties': {'id': 'b', 'removed': True}},
-            {'properties': {'id': 'c', 'edited': False}}, {'properties': {'id': 'd'}}]
-check([f['properties']['id'] for f in roads.kept_features(existing)] == ['a', 'b'], 'a re-run kept the wrong features')
+            {'properties': {'id': 'c', 'edited': False}}, {'properties': {'id': 'd'}},
+            {'properties': {'id': 'e', 'kind': 'trail', 'edited': False}}, {'properties': {'id': 'f', 'source': 'manual'}}]
+check([f['properties']['id'] for f in roads.kept_features(existing)] == ['a', 'b', 'e', 'f'], 'a re-run kept the wrong features')
 
 print(f'{failures} failures' if failures else 'import_roads checks passed')
 sys.exit(1 if failures else 0)
