@@ -386,6 +386,20 @@ meadow:
 - Understory (front): vine maple, red huckleberry, Himalayan blackberry, salal,
   Oregon grape, sword fern and pasture grass, with a patch of grass and fern
   instances as they will be scattered. These have no `lod`.
+- From photos around 190 E Scott Dr:
+  - a stand-grown Douglas fir (the bulk of the canopy there: a long clear
+    trunk with dead stubs and a short crown at the top)
+  - a bluff madrone of several red stems leaning out over the water
+  - a lichen-hung standing dead alder
+  - western red cedar and hemlock saplings coming up in the understory
+  - bracken
+  - oceanspray, with its cream plumes, on the bluff
+  - tall orchard grass gone to seed in the clearings
+  Flowers and seed heads are separate objects at the same place, as in Leaf
+  Atlases.
+
+Trees are drawn half a metre below their position, so every plant stands at
+`y = 0.5` on the meadow at 0.
 
 Every species is an L-system (`tree`), with its own rules for its growth habit:
 - Conifers grow one whorl of four limbs per rewrite step, so lower limbs have

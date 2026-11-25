@@ -2305,7 +2305,9 @@ int main(int argc, char** argv)
             const auto pnw = SceneData::ReadScene(TestDataFilename("pnw-plants.scene.json"));
             const char* species[] = { "douglas-fir", "western-hemlock", "western-red-cedar", "red-alder", "bigleaf-maple",
                 "pacific-madrone", "vine-maple", "red-huckleberry", "himalayan-blackberry", "salal", "oregon-grape",
-                "sword-fern", "pasture-grass" };
+                "sword-fern", "pasture-grass", "douglas-fir-stand", "pacific-madrone-bluff", "lichen-snag",
+                "western-red-cedar-sapling", "western-hemlock-sapling", "bracken-fern", "oceanspray", "oceanspray-plumes",
+                "orchard-grass", "orchard-grass-seed" };
             for (const char* id : species)
             {
                 const SceneData::TreeDefinition* found = nullptr;
@@ -2323,6 +2325,8 @@ int main(int argc, char** argv)
                 for (const auto& region : found->leaves.regions)
                     regionsFound = regionsFound && atlas->second.regions.count(region.region);
                 Check(regionsFound, (what + "'s leaf regions aren't in its atlas").c_str());
+                // Trees draw half a metre below their position: plants stand at 0.5 on the meadow.
+                Check(std::abs(found->transform.position.y - 0.5f) < 1e-6f, (what + " isn't standing on the ground").c_str());
             }
         }
 

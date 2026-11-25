@@ -64,6 +64,13 @@ MATERIALS = {
     "leaves-broadleaf": foliage("pnw_broadleaf", [0.95, 1.0, 0.9]),
     "leaves-glossy": foliage("pnw_broadleaf", [0.85, 0.95, 0.8], specular=0.6),
     "grass": foliage("canyon_grasses", [0.75, 0.95, 0.6]),
+    "grass-seed": foliage("canyon_grasses", [0.95, 0.9, 0.7]),
+    # Old man's beard: the dry grass sprites, pale grey-green.
+    "lichen": foliage("canyon_grasses", [0.85, 0.95, 0.8]),
+    "fronds-bracken": foliage("pnw_conifer", [0.95, 1.0, 0.6]),
+    "plumes-oceanspray": foliage("canyon_grasses", [1.3, 1.25, 1.05]),
+    "bark-snag": bark("furrowed", [1.2, 1.2, 1.15], scale=(1, 2)),
+    "stem-bracken": {"baseColor": [0.25, 0.22, 0.1, 1], "metallic": 0, "roughness": 0.8},
 }
 
 
@@ -80,13 +87,22 @@ def tree(tid, position, trunk, leaf, atlas, leaf_regions, generator, *, twist=60
         obj_lod = {"distances": [100000]}
     else:
         obj_lod = LOD if lod else None
-    obj = {"id": tid, "type": "tree", "transform": {"position": position}, "animationSpeed": 10,
+    obj = {"id": tid, "type": "tree", "transform": {"position": raised(position)}, "animationSpeed": 10,
            "trunkShape": shape, "materials": {"trunk": trunk, "leaf": leaf},
            "leaves": {"atlas": atlas, "twistDegrees": twist, "sizeVariation": size, "regions": leaf_regions},
-           "generator": dict(generator, angle=DEG, segmentLength=1)}
+           "generator": dict({"segmentLength": 1}, **generator, angle=DEG)}
     if obj_lod:
         obj["lod"] = obj_lod
     return obj
+
+
+# A tree's geometry is drawn half a metre below its position (Tree::ComputeTransformationsManual), so plants stand
+# at y = 0.5 on the meadow at y = 0, as in the leaf-atlases and Forest scenes.
+TREE_ORIGIN = 0.5
+
+
+def raised(position):
+    return [position[0], position[1] + TREE_ORIGIN, position[2]]
 
 
 def rules(**r):
@@ -284,6 +300,116 @@ PASTURE_GRASS = {
 }
 
 
+DOUGLAS_FIR_STAND = {
+    # ~38 m, grown in a stand (as around 190 E Scott Dr): a long clear trunk with a few dead branch stubs, a short
+    # narrow crown at the top. Branches are shorter than an open-grown tree's: neighbours crowd them.
+    "axiom": "!(1.15) F(5, 0.05) [Y(30) Z(80) !(0.06) F(0.9)] !(1.05) F(5, 0.05) [Y(170) Z(75) !(0.05) F(1.2)] "
+             "[Y(280) Z(85) !(0.05) F(0.7)] !(0.95) F(5, 0.05) [Y(100) Z(80) !(0.05) F(1.4)] !(0.85) F(4, 0.05) A(0.8)",
+    "iterations": 14,
+    "thickness": 0.5,
+    "rules": rules(
+        A_s_="!(s) F(1.45, 0.12) [Z(80, 10) B(s)] [Y(90, 15) Z(84, 10) B(s * 0.9)] [Y(180, 15) Z(76, 10) B(s * 0.95)] "
+             "[Y(270, 15) Z(82, 10) B(s * 0.9)] Y(45, 20) A(s * 0.93)",
+        B_s_="!(s * 0.2) F(0.38, 0.25) [Y(90, 20) Z(70, 10) C(1)] [Y(270, 20) Z(70, 10) C(1)] [Y(0, 40) Z(35, 10) C(1)] "
+             "[Y(180, 40) Z(50, 10) C(1)] Z(3, 3) B(s * 0.9)",
+        C_s_="!(0.025) F(0.2, 0.3) [Y(90) Z(50, 15) L(0.5)] [Y(270) Z(50, 15) L(0.5)] F(0.2, 0.3) "
+             "[Y(90) Z(50, 15) L(0.45)] [Y(270) Z(50, 15) L(0.45)] L(0.55)",
+    ),
+}
+
+PACIFIC_MADRONE_BLUFF = {
+    # ~14 m on the bluff: several red stems leaning out over the water, curving up, dense crowns at their ends.
+    "axiom": "[Z(28, 6) !(1) F(2, 0.1) z(12) M(1)] [Y(70) Z(38, 6) !(0.85) F(2.4, 0.1) z(16) M(0.9)] "
+             "[Y(330) Z(20, 6) !(0.75) F(1.6, 0.1) z(8) M(0.8)]",
+    "iterations": 9,
+    "thickness": 0.2,
+    "rules": rules(
+        M_s_="!(s * 0.75) F(1.0, 0.2) z(7, 7) [Y(0, 50) Z(50, 15) B(s * 0.7)] [Y(180, 50) Z(45, 15) B(s * 0.6)] "
+             "Y(110, 30) M(s * 0.85)",
+        B_s_="!(s * 0.45) F(0.55, 0.3) Z(8, 8) [Y(90, 40) Z(40, 15) T(1)] [Y(270, 40) Z(40, 15) T(1)] "
+             "[Y(0, 40) Z(20, 10) T(1)] B(s * 0.8)",
+        T_s_="!(0.03) F(0.2, 0.3) [Y(50) Z(55, 15) L(0.24)] [Y(170) Z(55, 15) L(0.24)] [Y(290) Z(55, 15) L(0.24)] "
+             "F(0.12) [Y(0) Z(45) L(0.22)] [Y(120) Z(45) L(0.22)] [Y(240) Z(45) L(0.22)] L(0.24)",
+    ),
+}
+
+LICHEN_SNAG = {
+    # ~14 m: a standing dead alder, its broken top and bare, short limbs hung with pale old man's beard lichen.
+    "axiom": "!(1) F(6, 0.05) z(3) A(1)",
+    "iterations": 7,
+    "thickness": 0.18,
+    "rules": rules(
+        A_s_="!(s * 0.9) F(1.1, 0.15) [Y(0, 40) Z(55, 12) B(s)] [Y(170, 40) Z(50, 12) B(s * 0.8)] Y(97, 20) A(s * 0.85)",
+        B_s_="!(s * 0.4) F(0.6, 0.3) [Y(90) Z(150, 15) L(0.6)] [Y(270) Z(150, 15) L(0.55)] [Y(0) Z(165, 10) L(0.5)] "
+             "[Y(0, 40) Z(30, 10) U(1)] [Y(180, 40) Z(35, 10) U(1)] z(5, 5) B(s * 0.7)",
+        U_s_="!(0.03) F(0.4, 0.3) [Z(160, 10) L(0.5)] [Y(120) Z(150, 10) L(0.45)] [Y(240) Z(155, 10) L(0.45)]",
+    ),
+}
+
+CEDAR_SAPLING = dict(WESTERN_RED_CEDAR, iterations=8, segmentLength=0.32,
+                     axiom="!(1.1) F(1.5) A(1)", thickness=0.12)
+HEMLOCK_SAPLING = dict(WESTERN_HEMLOCK, iterations=8, segmentLength=0.32, axiom="!(1) F(1.2) A(1)", thickness=0.1)
+
+BRACKEN = {
+    # ~1.2 m: separate fronds on upright stalks, each blade turned out flat and wide.
+    "axiom": " ".join(f"[Y({a}) Z({z}, 8) !(1) F({h}, 0.2) Z(65, 12) L({l})]" for a, z, h, l in [
+        (0, 6, 0.6, 0.85), (60, 10, 0.5, 0.75), (120, 8, 0.65, 0.9), (180, 12, 0.45, 0.7), (240, 7, 0.55, 0.8),
+        (300, 11, 0.5, 0.75), (30, 18, 0.35, 0.6), (150, 16, 0.4, 0.65), (270, 20, 0.35, 0.6)]),
+    "iterations": 1,
+    "thickness": 0.006,
+    "rules": [],
+}
+
+OCEANSPRAY = {
+    # ~3 m: many slender stems from the base, arching outward, small toothed leaves; on the bluffs.
+    "axiom": " ".join(f"[Y({a}) Z({z}, 6) S({s})]" for a, z, s in [
+        (0, 12, 1), (50, 20, 0.95), (100, 16, 1), (150, 24, 0.9), (200, 14, 1), (250, 22, 0.9), (300, 18, 0.95),
+        (340, 28, 0.8)]),
+    "iterations": 9,
+    "thickness": 0.022,
+    "rules": rules(
+        S_s_="!(s * 1) F(0.32, 0.15) [Y(90, 30) Z(50, 12) T(1)] [Y(270, 30) Z(50, 12) T(1)] [Y(0, 30) Z(35, 12) T(1)] "
+             "Y(97, 20) Z(7, 3) S(s * 0.9)",
+        T_s_="!(0.35) F(0.1, 0.3) [Y(60) Z(55) L(0.09)] [Y(180) Z(55) L(0.09)] [Y(300) Z(55) L(0.09)] "
+             "F(0.1) [Y(0) Z(55) L(0.09)] [Y(120) Z(55) L(0.09)] [Y(240) Z(55) L(0.09)] "
+             "F(0.08) [Y(60) Z(55) L(0.08)] [Y(180) Z(55) L(0.08)] [Y(300) Z(55) L(0.08)] L(0.09)",
+    ),
+}
+
+OCEANSPRAY_PLUMES = {
+    # Its cream flower plumes (July), nodding from the arching stem ends.
+    "axiom": " ".join(f"[Y({a}) Z({z}, 6) S({s})]" for a, z, s in [
+        (0, 12, 1), (50, 20, 0.95), (100, 16, 1), (150, 24, 0.9), (200, 14, 1), (250, 22, 0.9), (300, 18, 0.95),
+        (340, 28, 0.8)]),
+    "iterations": 9,
+    "thickness": 0.022,
+    "rules": rules(
+        S_s_="!(s * 1) F(0.32, 0.15) [Y(90, 30) Z(70, 12) P(1)] Y(97, 20) Z(7, 3) S(s * 0.9)",
+        P_s_="!(0.2) F(0.05) Z(60, 20) L(0.35)",
+    ),
+}
+
+ORCHARD_GRASS = {
+    # ~0.9 m clumps of tall grass gone to seed, as in the clearings in June.
+    "axiom": " ".join(f"[Y({a}) Z({z}, 6) L({l})]" for a, z, l in [
+        (0, 6, 0.7), (25, 14, 0.65), (50, 9, 0.75), (75, 18, 0.6), (100, 7, 0.7), (125, 15, 0.65), (150, 11, 0.75),
+        (175, 20, 0.6), (200, 8, 0.7), (225, 16, 0.65), (250, 10, 0.75), (275, 19, 0.6), (300, 7, 0.7),
+        (325, 13, 0.65), (350, 22, 0.55), (40, 28, 0.5), (160, 28, 0.5), (280, 28, 0.5)]),
+    "iterations": 1,
+    "thickness": 0.005,
+    "rules": [],
+}
+
+ORCHARD_GRASS_SEED = {
+    # Its seed stalks, standing above the leaves.
+    "axiom": " ".join(f"[Y({a}) Z({z}, 5) !(1) F({h}, 0.15) L(0.18)]" for a, z, h in [
+        (10, 4, 0.75), (80, 8, 0.85), (150, 5, 0.8), (220, 9, 0.7), (290, 6, 0.9), (340, 10, 0.75), (40, 12, 0.65)]),
+    "iterations": 1,
+    "thickness": 0.003,
+    "rules": [],
+}
+
+
 def build(seed=7, lod=True):
     random.seed(seed)
     conifer = regions('pnw_conifer')
@@ -320,17 +446,40 @@ def build(seed=7, lod=True):
              {"sword-fern-a": 1, "sword-fern-b": 1}, SWORD_FERN, twist=30, size=0.2, lod=False),
         tree("pasture-grass", [5.5, 0, 4], "stem-green", "grass", "canyon-grasses",
              {"sedge-1": 1, "sedge-2": 1, "sedge-3": 1, "sedge-4": 1, "sedge-5": 1}, PASTURE_GRASS, twist=40, size=0.3, lod=False),
+        # From the photos around 190 E Scott Dr: the stand-grown fir that makes most of the canopy, madrones leaning
+        # over the bluff, a lichen-hung snag, cedar and hemlock coming up in the understory, bracken, oceanspray on the
+        # bluff and tall grass in the clearings.
+        tree("douglas-fir-stand", [-52, 0, 46], "bark-douglas-fir", "needles-fir", "pnw-conifer", {"fir-a": 1, "fir-b": 1},
+             DOUGLAS_FIR_STAND, twist=25),
+        tree("pacific-madrone-bluff", [62, 0, 34], "bark-madrone", "leaves-glossy", "pnw-broadleaf",
+             {"madrone-a": 1, "madrone-b": 1}, PACIFIC_MADRONE_BLUFF, twist=70, size=0.25),
+        tree("lichen-snag", [22, 0, 26], "bark-snag", "lichen", "canyon-grasses", {"dry-1": 1, "dry-2": 1, "dry-4": 1},
+             LICHEN_SNAG, twist=60, size=0.3),
+        tree("western-red-cedar-sapling", [-26, 0, 18], "bark-cedar", "sprays-cedar", "pnw-conifer", {"cedar-spray": 1},
+             CEDAR_SAPLING, twist=40, lod=False),
+        tree("western-hemlock-sapling", [-20, 0, 20], "bark-hemlock", "needles-hemlock", "pnw-conifer",
+             {"hemlock-a": 1, "hemlock-b": 1}, HEMLOCK_SAPLING, twist=25, lod=False),
+        tree("bracken-fern", [9, 0, 7], "stem-bracken", "fronds-bracken", "pnw-conifer", {"cedar-spray": 1},
+             BRACKEN, twist=20, size=0.2, lod=False),
+        tree("oceanspray", [14, 0, 14], "stem-shrub", "leaves-broadleaf", "pnw-broadleaf",
+             {"alder-a": 1, "alder-b": 1}, OCEANSPRAY, twist=80, size=0.3, lod=False),
+        tree("oceanspray-plumes", [14, 0, 14], "stem-shrub", "plumes-oceanspray", "canyon-grasses", {"reed-plume": 1},
+             OCEANSPRAY_PLUMES, twist=60, size=0.25, lod=False),
+        tree("orchard-grass", [13, 0, 4], "stem-green", "grass", "canyon-grasses",
+             {"sedge-1": 1, "sedge-3": 1, "sedge-5": 1, "dry-1": 1}, ORCHARD_GRASS, twist=40, size=0.3, lod=False),
+        tree("orchard-grass-seed", [13, 0, 4], "stem-green", "grass-seed", "canyon-grasses",
+             {"seed-head-a": 1, "seed-head-b": 1}, ORCHARD_GRASS_SEED, twist=60, size=0.25, lod=False),
     ]
     # A patch of instanced grass and ferns, as they will be scattered on the terrain.
     for i in range(24):
         x, z = random.uniform(-12, 12), random.uniform(-2, 3)
         objects.append({"id": f"pasture-grass-{i + 2}", "instanceOf": "pasture-grass",
-                         "transform": {"position": [round(x, 2), 0, round(z, 2)],
+                         "transform": {"position": raised([round(x, 2), 0, round(z, 2)]),
                                        "rotationDegrees": [0, random.uniform(0, 360), 0]}})
     for i in range(5):
         x, z = random.uniform(-12, -7), random.uniform(5, 10)
         objects.append({"id": f"sword-fern-{i + 2}", "instanceOf": "sword-fern",
-                        "transform": {"position": [round(x, 2), 0, round(z, 2)],
+                        "transform": {"position": raised([round(x, 2), 0, round(z, 2)]),
                                       "rotationDegrees": [0, random.uniform(0, 360), 0]}})
     return {
         "version": 1, "id": "LoadPnwPlants", "priority": 0,

@@ -423,6 +423,143 @@
         "source": "Nature/canyon_grasses_roughness.png",
         "wrap": false
       }
+    },
+    "grass-seed": {
+      "baseColor": [
+        0.95,
+        0.9,
+        0.7,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/canyon_grasses_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/canyon_grasses_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/canyon_grasses_roughness.png",
+        "wrap": false
+      }
+    },
+    "lichen": {
+      "baseColor": [
+        0.85,
+        0.95,
+        0.8,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/canyon_grasses_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/canyon_grasses_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/canyon_grasses_roughness.png",
+        "wrap": false
+      }
+    },
+    "fronds-bracken": {
+      "baseColor": [
+        0.95,
+        1.0,
+        0.6,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/pnw_conifer_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/pnw_conifer_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/pnw_conifer_roughness.png",
+        "wrap": false
+      }
+    },
+    "plumes-oceanspray": {
+      "baseColor": [
+        1.3,
+        1.25,
+        1.05,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "specular": 0.35,
+      "alphaMode": "mask",
+      "alphaCutoff": 0.5,
+      "baseColorTexture": {
+        "source": "Nature/canyon_grasses_color.png",
+        "wrap": false
+      },
+      "normalTexture": {
+        "source": "Nature/canyon_grasses_normal.png",
+        "wrap": false
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/canyon_grasses_roughness.png",
+        "wrap": false
+      }
+    },
+    "bark-snag": {
+      "baseColor": [
+        1.2,
+        1.2,
+        1.15,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1.0,
+      "specular": 0.3,
+      "textureCoordScale": [
+        1,
+        2
+      ],
+      "baseColorTexture": {
+        "source": "Nature/bark_furrowed_color.jpg",
+        "wrap": true
+      },
+      "normalTexture": {
+        "source": "Nature/bark_furrowed_normal.jpg",
+        "wrap": true
+      },
+      "metallicRoughnessTexture": {
+        "source": "Nature/bark_furrowed_roughness.jpg",
+        "wrap": true
+      }
+    },
+    "stem-bracken": {
+      "baseColor": [
+        0.25,
+        0.22,
+        0.1,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 0.8
     }
   },
   "atlases": {
@@ -999,7 +1136,7 @@
       "transform": {
         "position": [
           -36,
-          0,
+          0.5,
           40
         ]
       },
@@ -1019,6 +1156,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "!(1) F(4) A(1)",
         "iterations": 17,
         "thickness": 0.45,
@@ -1036,8 +1174,7 @@
             "output": "!(0.025) F(0.2, 0.3) [Y(90) Z(50, 15) L(0.5)] [Y(270) Z(50, 15) L(0.5)] F(0.2, 0.3) [Y(90) Z(50, 15) L(0.45)] [Y(270) Z(50, 15) L(0.45)] L(0.55)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       },
       "lod": {
         "distances": [
@@ -1059,7 +1196,7 @@
       "transform": {
         "position": [
           -20,
-          0,
+          0.5,
           44
         ]
       },
@@ -1079,6 +1216,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "!(1) F(3) A(1)",
         "iterations": 17,
         "thickness": 0.36,
@@ -1096,8 +1234,7 @@
             "output": "!(0.02) F(0.18, 0.3) [Y(90) Z(60, 15) L(0.38)] [Y(270) Z(60, 15) L(0.38)] F(0.15, 0.3) [Y(90) Z(60, 15) L(0.35)] [Y(270) Z(60, 15) L(0.35)] Z(25) L(0.4)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       },
       "lod": {
         "distances": [
@@ -1119,7 +1256,7 @@
       "transform": {
         "position": [
           -4,
-          0,
+          0.5,
           40
         ]
       },
@@ -1138,6 +1275,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "!(1.6) F(0.6) !(1.05) F(2.4) A(1)",
         "iterations": 17,
         "thickness": 0.5,
@@ -1155,8 +1293,7 @@
             "output": "!(0.02) F(0.2, 0.3) [Y(70) Z(30, 10) L(0.6)] [Y(250) Z(30, 10) L(0.6)] F(0.15) [Y(20) Z(25, 10) L(0.55)] L(0.65)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       },
       "lod": {
         "distances": [
@@ -1178,7 +1315,7 @@
       "transform": {
         "position": [
           12,
-          0,
+          0.5,
           42
         ]
       },
@@ -1198,6 +1335,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "!(1) F(5, 0.1) Z(3) A(1)",
         "iterations": 12,
         "thickness": 0.24,
@@ -1215,8 +1353,7 @@
             "output": "!(0.03) F(0.25, 0.3) [Y(60) Z(55, 15) L(0.3)] [Y(180) Z(55, 15) L(0.28)] [Y(300) Z(55, 15) L(0.3)] F(0.22, 0.3) [Y(30) Z(55, 15) L(0.28)] [Y(150) Z(55, 15) L(0.28)] [Y(270) Z(55, 15) L(0.28)] L(0.3)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       },
       "lod": {
         "distances": [
@@ -1238,7 +1375,7 @@
       "transform": {
         "position": [
           30,
-          0,
+          0.5,
           42
         ]
       },
@@ -1258,6 +1395,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "!(1) F(3.5, 0.1) [Z(26, 6) M(1)] [Y(95) Z(34, 6) M(0.9)] [Y(190) Z(30, 6) M(0.95)] [Y(285) Z(32, 6) M(0.85)]",
         "iterations": 9,
         "thickness": 0.34,
@@ -1275,8 +1413,7 @@
             "output": "!(0.035) F(0.3, 0.3) [Y(45) Z(60, 15) L(0.5)] [Y(165) Z(60, 15) L(0.5)] [Y(285) Z(60, 15) L(0.5)] F(0.25) [Y(100) Z(50, 15) L(0.45)] [Y(280) Z(50, 15) L(0.45)] L(0.5)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       },
       "lod": {
         "distances": [
@@ -1298,7 +1435,7 @@
       "transform": {
         "position": [
           46,
-          0,
+          0.5,
           36
         ]
       },
@@ -1318,6 +1455,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "!(1) Z(14) F(2.5, 0.1) z(10) F(1.5) [Z(30, 8) M(1)] [Y(150) Z(38, 8) M(0.85)] [Y(260) Z(25, 8) M(0.7)]",
         "iterations": 9,
         "thickness": 0.26,
@@ -1335,8 +1473,7 @@
             "output": "!(0.03) F(0.2, 0.3) [Y(50) Z(55, 15) L(0.24)] [Y(170) Z(55, 15) L(0.24)] [Y(290) Z(55, 15) L(0.24)] F(0.12) [Y(0) Z(45) L(0.22)] [Y(120) Z(45) L(0.22)] [Y(240) Z(45) L(0.22)] L(0.24)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       },
       "lod": {
         "distances": [
@@ -1358,7 +1495,7 @@
       "transform": {
         "position": [
           -14,
-          0,
+          0.5,
           16
         ]
       },
@@ -1378,6 +1515,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "[Z(18, 6) S(1)] [Y(90) Z(28, 6) S(0.9)] [Y(180) Z(22, 6) S(0.95)] [Y(270) Z(32, 6) S(0.8)] [Y(45) Z(40, 6) S(0.7)]",
         "iterations": 9,
         "thickness": 0.05,
@@ -1391,8 +1529,7 @@
             "output": "!(0.25) F(0.25, 0.3) [Y(60) Z(65, 15) L(0.2)] [Y(180) Z(65, 15) L(0.2)] [Y(300) Z(65, 15) L(0.2)] F(0.15) [Y(0) Z(60) L(0.18)] [Y(180) Z(60) L(0.18)] L(0.2)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       }
     },
     {
@@ -1401,7 +1538,7 @@
       "transform": {
         "position": [
           -6,
-          0,
+          0.5,
           12
         ]
       },
@@ -1421,6 +1558,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "[Z(10, 6) S(1)] [Y(90) Z(20, 6) S(0.85)] [Y(180) Z(16, 6) S(0.9)] [Y(270) Z(24, 6) S(0.8)]",
         "iterations": 8,
         "thickness": 0.015,
@@ -1434,8 +1572,7 @@
             "output": "!(0.4) F(0.12, 0.3) [Y(60) Z(55) L(0.06)] [Y(180) Z(55) L(0.06)] [Y(300) Z(55) L(0.06)] Z(30) F(0.1) [Y(0) Z(55) L(0.06)] [Y(120) Z(55) L(0.06)] [Y(240) Z(55) L(0.06)] z(50) F(0.1) [Y(60) Z(55) L(0.06)] [Y(180) Z(55) L(0.06)] [Y(300) Z(55) L(0.06)] L(0.06)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       }
     },
     {
@@ -1444,7 +1581,7 @@
       "transform": {
         "position": [
           2,
-          0,
+          0.5,
           12
         ]
       },
@@ -1463,6 +1600,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "[Y(0) Z(14, 6) K(1)] [Y(50) Z(22, 6) K(1)] [Y(100) Z(12, 6) K(1)] [Y(150) Z(20, 6) K(1)] [Y(200) Z(16, 6) K(1)] [Y(250) Z(24, 6) K(1)] [Y(300) Z(10, 6) K(1)] [Y(340) Z(18, 6) K(1)]",
         "iterations": 10,
         "thickness": 0.02,
@@ -1472,8 +1610,7 @@
             "output": "!(s * 1) F(0.3, 0.15) [Y(90, 30) Z(55, 12) L(0.3)] [Y(270, 30) Z(55, 12) L(0.3)] [Y(0, 30) Z(40, 12) L(0.28)] Z(9, 3) K(s * 0.93)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       }
     },
     {
@@ -1482,7 +1619,7 @@
       "transform": {
         "position": [
           -2,
-          0,
+          0.5,
           6
         ]
       },
@@ -1502,6 +1639,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "[Y(0) Z(15, 8) S(1)] [Y(45) Z(30, 8) S(0.9)] [Y(90) Z(22, 8) S(1)] [Y(135) Z(35, 8) S(0.85)] [Y(180) Z(18, 8) S(1)] [Y(225) Z(32, 8) S(0.9)] [Y(270) Z(25, 8) S(0.95)] [Y(315) Z(38, 8) S(0.8)] [Y(20) Z(50, 8) S(0.6)] [Y(200) Z(50, 8) S(0.6)]",
         "iterations": 8,
         "thickness": 0.012,
@@ -1515,8 +1653,7 @@
             "output": "F(0.08) [Y(0) Z(50) L(0.1)] [Y(120) Z(50) L(0.1)] [Y(240) Z(50) L(0.1)] L(0.1)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       }
     },
     {
@@ -1525,7 +1662,7 @@
       "transform": {
         "position": [
           2,
-          0,
+          0.5,
           5
         ]
       },
@@ -1545,6 +1682,7 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "[S(1)] [Y(70) Z(15, 6) S(0.85)] [Y(140) Z(12, 6) S(0.9)] [Y(210) Z(18, 6) S(0.8)] [Y(290) Z(14, 6) S(0.9)]",
         "iterations": 8,
         "thickness": 0.012,
@@ -1558,8 +1696,7 @@
             "output": "F(0.05) [Y(90) Z(60) L(0.09)] [Y(270) Z(60) L(0.09)] F(0.06) [Y(90) Z(60) L(0.09)] [Y(270) Z(60) L(0.09)] L(0.1)"
           }
         ],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       }
     },
     {
@@ -1568,7 +1705,7 @@
       "transform": {
         "position": [
           -5,
-          0,
+          0.5,
           4
         ]
       },
@@ -1588,12 +1725,12 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "[Y(0) Z(25, 8) L(1.0)] [Y(30) Z(40, 8) L(0.95)] [Y(60) Z(30, 8) L(1.05)] [Y(90) Z(45, 8) L(0.9)] [Y(120) Z(28, 8) L(1.0)] [Y(150) Z(42, 8) L(0.95)] [Y(180) Z(32, 8) L(1.0)] [Y(210) Z(48, 8) L(0.85)] [Y(240) Z(35, 8) L(1.0)] [Y(270) Z(38, 8) L(0.95)] [Y(300) Z(30, 8) L(1.0)] [Y(330) Z(44, 8) L(0.9)] [Y(15) Z(60, 8) L(0.8)] [Y(75) Z(62, 8) L(0.8)] [Y(135) Z(58, 8) L(0.85)] [Y(195) Z(63, 8) L(0.8)] [Y(255) Z(60, 8) L(0.85)] [Y(315) Z(61, 8) L(0.8)] [Y(45) Z(15, 8) L(0.9)] [Y(165) Z(18, 8) L(0.9)] [Y(285) Z(16, 8) L(0.9)]",
         "iterations": 1,
         "thickness": 0.01,
         "rules": [],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
       }
     },
     {
@@ -1602,7 +1739,7 @@
       "transform": {
         "position": [
           5.5,
-          0,
+          0.5,
           4
         ]
       },
@@ -1625,12 +1762,474 @@
         }
       },
       "generator": {
+        "segmentLength": 1,
         "axiom": "[Y(0) Z(6, 6) L(0.55)] [Y(30) Z(16, 6) L(0.5)] [Y(60) Z(10, 6) L(0.6)] [Y(90) Z(20, 6) L(0.45)] [Y(120) Z(8, 6) L(0.55)] [Y(150) Z(18, 6) L(0.5)] [Y(180) Z(12, 6) L(0.6)] [Y(210) Z(22, 6) L(0.45)] [Y(240) Z(9, 6) L(0.55)] [Y(270) Z(17, 6) L(0.5)] [Y(300) Z(13, 6) L(0.6)] [Y(330) Z(24, 6) L(0.45)] [Y(15) Z(28, 6) L(0.4)] [Y(105) Z(30, 6) L(0.4)] [Y(195) Z(28, 6) L(0.4)] [Y(285) Z(30, 6) L(0.4)] [Y(45) Z(4, 6) L(0.65)] [Y(225) Z(5, 6) L(0.65)]",
         "iterations": 1,
         "thickness": 0.005,
         "rules": [],
-        "angle": 0.017453292519943295,
-        "segmentLength": 1
+        "angle": 0.017453292519943295
+      }
+    },
+    {
+      "id": "douglas-fir-stand",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -52,
+          0.5,
+          46
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-douglas-fir",
+        "leaf": "needles-fir"
+      },
+      "leaves": {
+        "atlas": "pnw-conifer",
+        "twistDegrees": 25,
+        "sizeVariation": 0.25,
+        "regions": {
+          "fir-a": 1,
+          "fir-b": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 1,
+        "axiom": "!(1.15) F(5, 0.05) [Y(30) Z(80) !(0.06) F(0.9)] !(1.05) F(5, 0.05) [Y(170) Z(75) !(0.05) F(1.2)] [Y(280) Z(85) !(0.05) F(0.7)] !(0.95) F(5, 0.05) [Y(100) Z(80) !(0.05) F(1.4)] !(0.85) F(4, 0.05) A(0.8)",
+        "iterations": 14,
+        "thickness": 0.5,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s * 1) F(1.45, 0.12) [Z(80, 10) B(s * 1)] [Y(90, 15) Z(84, 10) B(s * 0.9)] [Y(180, 15) Z(76, 10) B(s * 0.95)] [Y(270, 15) Z(82, 10) B(s * 0.9)] Y(45, 20) A(s * 0.93)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.2) F(0.38, 0.25) [Y(90, 20) Z(70, 10) C(1)] [Y(270, 20) Z(70, 10) C(1)] [Y(0, 40) Z(35, 10) C(1)] [Y(180, 40) Z(50, 10) C(1)] Z(3, 3) B(s * 0.9)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(0.025) F(0.2, 0.3) [Y(90) Z(50, 15) L(0.5)] [Y(270) Z(50, 15) L(0.5)] F(0.2, 0.3) [Y(90) Z(50, 15) L(0.45)] [Y(270) Z(50, 15) L(0.45)] L(0.55)"
+          }
+        ],
+        "angle": 0.017453292519943295
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "pacific-madrone-bluff",
+      "type": "tree",
+      "transform": {
+        "position": [
+          62,
+          0.5,
+          34
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-madrone",
+        "leaf": "leaves-glossy"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 70,
+        "sizeVariation": 0.25,
+        "regions": {
+          "madrone-a": 1,
+          "madrone-b": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 1,
+        "axiom": "[Z(28, 6) !(1) F(2, 0.1) z(12) M(1)] [Y(70) Z(38, 6) !(0.85) F(2.4, 0.1) z(16) M(0.9)] [Y(330) Z(20, 6) !(0.75) F(1.6, 0.1) z(8) M(0.8)]",
+        "iterations": 9,
+        "thickness": 0.2,
+        "rules": [
+          {
+            "input": "M(s)",
+            "output": "!(s * 0.75) F(1.0, 0.2) z(7, 7) [Y(0, 50) Z(50, 15) B(s * 0.7)] [Y(180, 50) Z(45, 15) B(s * 0.6)] Y(110, 30) M(s * 0.85)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.45) F(0.55, 0.3) Z(8, 8) [Y(90, 40) Z(40, 15) T(1)] [Y(270, 40) Z(40, 15) T(1)] [Y(0, 40) Z(20, 10) T(1)] B(s * 0.8)"
+          },
+          {
+            "input": "T(s)",
+            "output": "!(0.03) F(0.2, 0.3) [Y(50) Z(55, 15) L(0.24)] [Y(170) Z(55, 15) L(0.24)] [Y(290) Z(55, 15) L(0.24)] F(0.12) [Y(0) Z(45) L(0.22)] [Y(120) Z(45) L(0.22)] [Y(240) Z(45) L(0.22)] L(0.24)"
+          }
+        ],
+        "angle": 0.017453292519943295
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "lichen-snag",
+      "type": "tree",
+      "transform": {
+        "position": [
+          22,
+          0.5,
+          26
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-snag",
+        "leaf": "lichen"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 60,
+        "sizeVariation": 0.3,
+        "regions": {
+          "dry-1": 1,
+          "dry-2": 1,
+          "dry-4": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 1,
+        "axiom": "!(1) F(6, 0.05) z(3) A(1)",
+        "iterations": 7,
+        "thickness": 0.18,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s * 0.9) F(1.1, 0.15) [Y(0, 40) Z(55, 12) B(s * 1)] [Y(170, 40) Z(50, 12) B(s * 0.8)] Y(97, 20) A(s * 0.85)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.4) F(0.6, 0.3) [Y(90) Z(150, 15) L(0.6)] [Y(270) Z(150, 15) L(0.55)] [Y(0) Z(165, 10) L(0.5)] [Y(0, 40) Z(30, 10) U(1)] [Y(180, 40) Z(35, 10) U(1)] z(5, 5) B(s * 0.7)"
+          },
+          {
+            "input": "U(s)",
+            "output": "!(0.03) F(0.4, 0.3) [Z(160, 10) L(0.5)] [Y(120) Z(150, 10) L(0.45)] [Y(240) Z(155, 10) L(0.45)]"
+          }
+        ],
+        "angle": 0.017453292519943295
+      },
+      "lod": {
+        "distances": [
+          10,
+          30,
+          42,
+          60,
+          85,
+          120,
+          170,
+          240
+        ],
+        "hysteresis": 0.1
+      }
+    },
+    {
+      "id": "western-red-cedar-sapling",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -26,
+          0.5,
+          18
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-cedar",
+        "leaf": "sprays-cedar"
+      },
+      "leaves": {
+        "atlas": "pnw-conifer",
+        "twistDegrees": 40,
+        "sizeVariation": 0.25,
+        "regions": {
+          "cedar-spray": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 0.32,
+        "axiom": "!(1.1) F(1.5) A(1)",
+        "iterations": 8,
+        "thickness": 0.12,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s * 1) F(1.45, 0.12) [Z(80, 8) B(s * 1)] [Y(90, 15) Z(84, 8) B(s * 0.9)] [Y(180, 15) Z(78, 8) B(s * 0.95)] [Y(270, 15) Z(82, 8) B(s * 0.9)] Y(45, 20) A(s * 0.93)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.2) F(0.5, 0.2) [Y(90, 25) Z(115, 15) C(1)] [Y(270, 25) Z(115, 15) C(1)] [Y(0, 40) Z(60, 15) C(1)] Z(2, 2) B(s * 0.93)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(0.02) F(0.2, 0.3) [Y(70) Z(30, 10) L(0.6)] [Y(250) Z(30, 10) L(0.6)] F(0.15) [Y(20) Z(25, 10) L(0.55)] L(0.65)"
+          }
+        ],
+        "angle": 0.017453292519943295
+      }
+    },
+    {
+      "id": "western-hemlock-sapling",
+      "type": "tree",
+      "transform": {
+        "position": [
+          -20,
+          0.5,
+          20
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "bark-hemlock",
+        "leaf": "needles-hemlock"
+      },
+      "leaves": {
+        "atlas": "pnw-conifer",
+        "twistDegrees": 25,
+        "sizeVariation": 0.25,
+        "regions": {
+          "hemlock-a": 1,
+          "hemlock-b": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 0.32,
+        "axiom": "!(1) F(1.2) A(1)",
+        "iterations": 8,
+        "thickness": 0.1,
+        "rules": [
+          {
+            "input": "A(s)",
+            "output": "!(s * 1) F(1.35, 0.12) [Z(88, 8) B(s * 1)] [Y(90, 15) Z(92, 8) B(s * 0.9)] [Y(180, 15) Z(85, 8) B(s * 0.95)] [Y(270, 15) Z(90, 8) B(s * 0.9)] Y(45, 20) A(s * 0.94)"
+          },
+          {
+            "input": "B(s)",
+            "output": "!(s * 0.17) F(0.38, 0.2) [Y(90, 20) Z(75, 10) C(1)] [Y(270, 20) Z(75, 10) C(1)] [Y(0, 40) Z(40, 10) C(1)] Z(5, 3) B(s * 0.92)"
+          },
+          {
+            "input": "C(s)",
+            "output": "!(0.02) F(0.18, 0.3) [Y(90) Z(60, 15) L(0.38)] [Y(270) Z(60, 15) L(0.38)] F(0.15, 0.3) [Y(90) Z(60, 15) L(0.35)] [Y(270) Z(60, 15) L(0.35)] Z(25) L(0.4)"
+          }
+        ],
+        "angle": 0.017453292519943295
+      }
+    },
+    {
+      "id": "bracken-fern",
+      "type": "tree",
+      "transform": {
+        "position": [
+          9,
+          0.5,
+          7
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-bracken",
+        "leaf": "fronds-bracken"
+      },
+      "leaves": {
+        "atlas": "pnw-conifer",
+        "twistDegrees": 20,
+        "sizeVariation": 0.2,
+        "regions": {
+          "cedar-spray": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 1,
+        "axiom": "[Y(0) Z(6, 8) !(1) F(0.6, 0.2) Z(65, 12) L(0.85)] [Y(60) Z(10, 8) !(1) F(0.5, 0.2) Z(65, 12) L(0.75)] [Y(120) Z(8, 8) !(1) F(0.65, 0.2) Z(65, 12) L(0.9)] [Y(180) Z(12, 8) !(1) F(0.45, 0.2) Z(65, 12) L(0.7)] [Y(240) Z(7, 8) !(1) F(0.55, 0.2) Z(65, 12) L(0.8)] [Y(300) Z(11, 8) !(1) F(0.5, 0.2) Z(65, 12) L(0.75)] [Y(30) Z(18, 8) !(1) F(0.35, 0.2) Z(65, 12) L(0.6)] [Y(150) Z(16, 8) !(1) F(0.4, 0.2) Z(65, 12) L(0.65)] [Y(270) Z(20, 8) !(1) F(0.35, 0.2) Z(65, 12) L(0.6)]",
+        "iterations": 1,
+        "thickness": 0.006,
+        "rules": [],
+        "angle": 0.017453292519943295
+      }
+    },
+    {
+      "id": "oceanspray",
+      "type": "tree",
+      "transform": {
+        "position": [
+          14,
+          0.5,
+          14
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-shrub",
+        "leaf": "leaves-broadleaf"
+      },
+      "leaves": {
+        "atlas": "pnw-broadleaf",
+        "twistDegrees": 80,
+        "sizeVariation": 0.3,
+        "regions": {
+          "alder-a": 1,
+          "alder-b": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 1,
+        "axiom": "[Y(0) Z(12, 6) S(1)] [Y(50) Z(20, 6) S(0.95)] [Y(100) Z(16, 6) S(1)] [Y(150) Z(24, 6) S(0.9)] [Y(200) Z(14, 6) S(1)] [Y(250) Z(22, 6) S(0.9)] [Y(300) Z(18, 6) S(0.95)] [Y(340) Z(28, 6) S(0.8)]",
+        "iterations": 9,
+        "thickness": 0.022,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s * 1) F(0.32, 0.15) [Y(90, 30) Z(50, 12) T(1)] [Y(270, 30) Z(50, 12) T(1)] [Y(0, 30) Z(35, 12) T(1)] Y(97, 20) Z(7, 3) S(s * 0.9)"
+          },
+          {
+            "input": "T(s)",
+            "output": "!(0.35) F(0.1, 0.3) [Y(60) Z(55) L(0.09)] [Y(180) Z(55) L(0.09)] [Y(300) Z(55) L(0.09)] F(0.1) [Y(0) Z(55) L(0.09)] [Y(120) Z(55) L(0.09)] [Y(240) Z(55) L(0.09)] F(0.08) [Y(60) Z(55) L(0.08)] [Y(180) Z(55) L(0.08)] [Y(300) Z(55) L(0.08)] L(0.09)"
+          }
+        ],
+        "angle": 0.017453292519943295
+      }
+    },
+    {
+      "id": "oceanspray-plumes",
+      "type": "tree",
+      "transform": {
+        "position": [
+          14,
+          0.5,
+          14
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-shrub",
+        "leaf": "plumes-oceanspray"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25,
+        "regions": {
+          "reed-plume": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 1,
+        "axiom": "[Y(0) Z(12, 6) S(1)] [Y(50) Z(20, 6) S(0.95)] [Y(100) Z(16, 6) S(1)] [Y(150) Z(24, 6) S(0.9)] [Y(200) Z(14, 6) S(1)] [Y(250) Z(22, 6) S(0.9)] [Y(300) Z(18, 6) S(0.95)] [Y(340) Z(28, 6) S(0.8)]",
+        "iterations": 9,
+        "thickness": 0.022,
+        "rules": [
+          {
+            "input": "S(s)",
+            "output": "!(s * 1) F(0.32, 0.15) [Y(90, 30) Z(70, 12) P(1)] Y(97, 20) Z(7, 3) S(s * 0.9)"
+          },
+          {
+            "input": "P(s)",
+            "output": "!(0.2) F(0.05) Z(60, 20) L(0.35)"
+          }
+        ],
+        "angle": 0.017453292519943295
+      }
+    },
+    {
+      "id": "orchard-grass",
+      "type": "tree",
+      "transform": {
+        "position": [
+          13,
+          0.5,
+          4
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "grass"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 40,
+        "sizeVariation": 0.3,
+        "regions": {
+          "sedge-1": 1,
+          "sedge-3": 1,
+          "sedge-5": 1,
+          "dry-1": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 1,
+        "axiom": "[Y(0) Z(6, 6) L(0.7)] [Y(25) Z(14, 6) L(0.65)] [Y(50) Z(9, 6) L(0.75)] [Y(75) Z(18, 6) L(0.6)] [Y(100) Z(7, 6) L(0.7)] [Y(125) Z(15, 6) L(0.65)] [Y(150) Z(11, 6) L(0.75)] [Y(175) Z(20, 6) L(0.6)] [Y(200) Z(8, 6) L(0.7)] [Y(225) Z(16, 6) L(0.65)] [Y(250) Z(10, 6) L(0.75)] [Y(275) Z(19, 6) L(0.6)] [Y(300) Z(7, 6) L(0.7)] [Y(325) Z(13, 6) L(0.65)] [Y(350) Z(22, 6) L(0.55)] [Y(40) Z(28, 6) L(0.5)] [Y(160) Z(28, 6) L(0.5)] [Y(280) Z(28, 6) L(0.5)]",
+        "iterations": 1,
+        "thickness": 0.005,
+        "rules": [],
+        "angle": 0.017453292519943295
+      }
+    },
+    {
+      "id": "orchard-grass-seed",
+      "type": "tree",
+      "transform": {
+        "position": [
+          13,
+          0.5,
+          4
+        ]
+      },
+      "animationSpeed": 10,
+      "trunkShape": "skinnedCylinder",
+      "materials": {
+        "trunk": "stem-green",
+        "leaf": "grass-seed"
+      },
+      "leaves": {
+        "atlas": "canyon-grasses",
+        "twistDegrees": 60,
+        "sizeVariation": 0.25,
+        "regions": {
+          "seed-head-a": 1,
+          "seed-head-b": 1
+        }
+      },
+      "generator": {
+        "segmentLength": 1,
+        "axiom": "[Y(10) Z(4, 5) !(1) F(0.75, 0.15) L(0.18)] [Y(80) Z(8, 5) !(1) F(0.85, 0.15) L(0.18)] [Y(150) Z(5, 5) !(1) F(0.8, 0.15) L(0.18)] [Y(220) Z(9, 5) !(1) F(0.7, 0.15) L(0.18)] [Y(290) Z(6, 5) !(1) F(0.9, 0.15) L(0.18)] [Y(340) Z(10, 5) !(1) F(0.75, 0.15) L(0.18)] [Y(40) Z(12, 5) !(1) F(0.65, 0.15) L(0.18)]",
+        "iterations": 1,
+        "thickness": 0.003,
+        "rules": [],
+        "angle": 0.017453292519943295
       }
     },
     {
@@ -1639,7 +2238,7 @@
       "transform": {
         "position": [
           -4.23,
-          0,
+          0.5,
           -1.25
         ],
         "rotationDegrees": [
@@ -1655,7 +2254,7 @@
       "transform": {
         "position": [
           -10.26,
-          0,
+          0.5,
           0.68
         ],
         "rotationDegrees": [
@@ -1671,7 +2270,7 @@
       "transform": {
         "position": [
           -10.61,
-          0,
+          0.5,
           0.54
         ],
         "rotationDegrees": [
@@ -1687,7 +2286,7 @@
       "transform": {
         "position": [
           -1.59,
-          0,
+          0.5,
           -1.65
         ],
         "rotationDegrees": [
@@ -1703,7 +2302,7 @@
       "transform": {
         "position": [
           -1.81,
-          0,
+          0.5,
           2.13
         ],
         "rotationDegrees": [
@@ -1719,7 +2318,7 @@
       "transform": {
         "position": [
           -6.64,
-          0,
+          0.5,
           1.14
         ],
         "rotationDegrees": [
@@ -1735,7 +2334,7 @@
       "transform": {
         "position": [
           1.85,
-          0,
+          0.5,
           -0.02
         ],
         "rotationDegrees": [
@@ -1751,7 +2350,7 @@
       "transform": {
         "position": [
           -10.88,
-          0,
+          0.5,
           2.29
         ],
         "rotationDegrees": [
@@ -1767,7 +2366,7 @@
       "transform": {
         "position": [
           -8.54,
-          0,
+          0.5,
           -1.41
         ],
         "rotationDegrees": [
@@ -1783,7 +2382,7 @@
       "transform": {
         "position": [
           7.59,
-          0,
+          0.5,
           -1.1
         ],
         "rotationDegrees": [
@@ -1799,7 +2398,7 @@
       "transform": {
         "position": [
           3.33,
-          0,
+          0.5,
           -0.14
         ],
         "rotationDegrees": [
@@ -1815,7 +2414,7 @@
       "transform": {
         "position": [
           -10.49,
-          0,
+          0.5,
           -1.7
         ],
         "rotationDegrees": [
@@ -1831,7 +2430,7 @@
       "transform": {
         "position": [
           4.33,
-          0,
+          0.5,
           0.14
         ],
         "rotationDegrees": [
@@ -1847,7 +2446,7 @@
       "transform": {
         "position": [
           2.05,
-          0,
+          0.5,
           0.27
         ],
         "rotationDegrees": [
@@ -1863,7 +2462,7 @@
       "transform": {
         "position": [
           7.07,
-          0,
+          0.5,
           1.49
         ],
         "rotationDegrees": [
@@ -1879,7 +2478,7 @@
       "transform": {
         "position": [
           1.79,
-          0,
+          0.5,
           0.63
         ],
         "rotationDegrees": [
@@ -1895,7 +2494,7 @@
       "transform": {
         "position": [
           5.51,
-          0,
+          0.5,
           -0.56
         ],
         "rotationDegrees": [
@@ -1911,7 +2510,7 @@
       "transform": {
         "position": [
           -9.17,
-          0,
+          0.5,
           0.09
         ],
         "rotationDegrees": [
@@ -1927,7 +2526,7 @@
       "transform": {
         "position": [
           -8.35,
-          0,
+          0.5,
           0.44
         ],
         "rotationDegrees": [
@@ -1943,7 +2542,7 @@
       "transform": {
         "position": [
           4.04,
-          0,
+          0.5,
           1.82
         ],
         "rotationDegrees": [
@@ -1959,7 +2558,7 @@
       "transform": {
         "position": [
           9.01,
-          0,
+          0.5,
           -0.43
         ],
         "rotationDegrees": [
@@ -1975,7 +2574,7 @@
       "transform": {
         "position": [
           2.26,
-          0,
+          0.5,
           0.9
         ],
         "rotationDegrees": [
@@ -1991,7 +2590,7 @@
       "transform": {
         "position": [
           8.16,
-          0,
+          0.5,
           2.72
         ],
         "rotationDegrees": [
@@ -2007,7 +2606,7 @@
       "transform": {
         "position": [
           3.94,
-          0,
+          0.5,
           -1.7
         ],
         "rotationDegrees": [
@@ -2023,7 +2622,7 @@
       "transform": {
         "position": [
           -8.76,
-          0,
+          0.5,
           9.97
         ],
         "rotationDegrees": [
@@ -2039,7 +2638,7 @@
       "transform": {
         "position": [
           -10.58,
-          0,
+          0.5,
           6.93
         ],
         "rotationDegrees": [
@@ -2055,7 +2654,7 @@
       "transform": {
         "position": [
           -11.89,
-          0,
+          0.5,
           7.31
         ],
         "rotationDegrees": [
@@ -2071,7 +2670,7 @@
       "transform": {
         "position": [
           -11.41,
-          0,
+          0.5,
           5.29
         ],
         "rotationDegrees": [
@@ -2087,7 +2686,7 @@
       "transform": {
         "position": [
           -11.35,
-          0,
+          0.5,
           6.24
         ],
         "rotationDegrees": [
