@@ -58,12 +58,22 @@ check(near >= 300, f'only {near} plants within the focus')
 canopy = {s for s, *_ in plants.UNDER_CANOPY}
 covered = [p for p in under if any(math.hypot(p[1] - t['x'], p[2] - t['y']) < t['crown'] for t in trees)
            and plants.edge_distance(p[1], p[2], road + trail, plants.line_grid(road + trail)) >= 4.0
-           and p[1] > 1040.0]
+           and p[1] > 1060.0]                      # past the beach's 40 m reach (water below x = 1014)
 check(covered and all(p[0] in canopy for p in covered), 'a plant under a crown is not from the canopy mix')
 roadside = {p[0] for p in under if plants.edge_distance(p[1], p[2], road, plants.line_grid(road)) < 4.0}
 check('himalayan-blackberry' in roadside, 'no blackberry along the road')
 shore = {p[0] for p in under if p[1] < 1030.0}
 check('oceanspray' in shore, 'no oceanspray near the beach')
+# The beach reaches 40 m whatever the grid (Codex review of #23): beach only along x < 15, a plant at x = 45 is
+# 30 m from it and gets the shore mix about half the time.
+def beach(x, y):
+    return 0.5 if x < 15.0 else 10.0
+
+
+shore_plan = plants.plan([], [], beach, (40.0, 0.0, 50.0, 100.0), 400, 3, water_level=1.9)
+shore_share = sum(p[0] in ('oceanspray',) for p in shore_plan) / len(shore_plan)
+check(shore_share > 0.15, f'plants 25-35 m from the beach got oceanspray {shore_share:.0%} of the time')
+
 # Seeded: the same plan twice.
 again = plants.plan(trees, road + trail, ground, extent, 1500, 7, water_level=1.9, focus=(1060.0, 2060.0, 15.0, 300))
 check(again == placed, 'the plan changed between runs')
@@ -79,6 +89,10 @@ check(all(o['instanceOf'] in ids for o in objects if o.get('instanceOf')), 'an i
 fir = objects[0]
 check(fir['id'] == 'pnw-douglas-fir-stand' and fir['transform']['position'] == [-10.0, round(ground(1050, 2050) + 0.5, 3), 0.0],
       f'the first fir stands at {fir["transform"]["position"]}, not on the ground at its place (+0.5)')
+# The half metre below the origin scales with the plant (Codex review of #23): the 20 m fir at scale 0.5.
+small = next(o for o in objects if o.get('instanceOf') == 'pnw-douglas-fir-stand')
+check(small['transform']['position'][1] == round(ground(1060, 2057) + 0.5 * 0.5, 3),
+      f'a half-size fir stands at {small["transform"]["position"][1]}, not 0.25 above the ground')
 oceanspray = [o for o in objects if 'oceanspray' in (o.get('instanceOf') or o['id'])]
 plumes = [o for o in objects if 'oceanspray-plumes' in (o.get('instanceOf') or o['id'])]
 check(len(oceanspray) == 2 * len(plumes) and plumes, 'oceanspray without its plumes')

@@ -298,7 +298,7 @@ python place_plants.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Gam
 - **Clearances.** Nothing stands on a road, driveway or trail, in the water, or in a trunk.
 
 It's seeded, and a re-run replaces the objects it made before and keeps everything else, so re-run it after editing the
-trees file, the roads or the species, then rebuild. Hungerford: 701 trees and 8,000 understory plants (9,819 objects).
+trees file, the roads or the species, then rebuild. Hungerford: 701 trees and 8,000 understory plants (9,827 objects).
 The cost is per object for now: about 2 to 2.5 ms of frame time per 1,000 plants, from draw records in DXR and every
 plant in every shadow cascade in raster. `python -I -B test_place_plants.py` checks placement, clearances, mixes,
 sources and textures.

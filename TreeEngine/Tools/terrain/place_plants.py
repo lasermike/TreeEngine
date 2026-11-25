@@ -33,7 +33,8 @@ import import_roads  # noqa: E402  (Package, distance_to_line)
 
 ENGINE = os.path.normpath(os.path.join(HERE, '..', '..'))
 PNW = os.path.join(ENGINE, 'Game', 'Resources', 'Scenes', 'pnw-plants.scene.json')
-TREE_ORIGIN = 0.5            # Trees draw half a metre below their position (Tree::ComputeTransformationsManual).
+TREE_ORIGIN = 0.5            # Trees draw half a metre below their position, times their scale
+                             # (Tree::ComputeTransformationsManual).
 GROWN = 1000                 # animationSpeed: every branch is grown within the first frame.
 
 # Each species' height as its rules grow it (m): the trunk's segments up its leader, rounded. Trees are scaled from
@@ -157,12 +158,14 @@ def plan(trees, lines, ground, extent, understory, seed, water_level=1.9, focus=
         scale = min(1.7, max(0.35, (t['height'] or source) / source)) if source else 1.0
         placed.append((t['species'], t['x'], t['y'], scale, rng.uniform(0, 360)))
     # Beach: cells under the water level, coarse, to find "near the beach".
-    shore = Grid(20.0)
-    step = 5.0
-    y = extent[1]
-    while y <= extent[3]:
-        x = extent[0]
-        while x <= extent[2]:
+    # Cells as wide as the 40 m reach, so a point's own and neighbouring cells hold every beach sample within it.
+    shore = Grid(40.0)
+    # Sampled 40 m past the area too: a beach just outside it is still near the plants inside.
+    step, reach = 5.0, 40.0
+    y = extent[1] - reach
+    while y <= extent[3] + reach:
+        x = extent[0] - reach
+        while x <= extent[2] + reach:
             h = ground(x, y)
             if h == h and h < water_level:
                 shore.add(x, y, x, y, (x, y))
@@ -225,7 +228,8 @@ def scene_objects(placed, ground, center, pnw):
         for sp in [species] + ([COMPANIONS[species]] if species in COMPANIONS else []):
             if sp not in sources:
                 raise SystemExit(f'{sp} is not a tree in {PNW}')
-            position = [round(x - center[0], 3), round(ground(x, y) + TREE_ORIGIN, 3), round(y - center[1], 3)]
+            # The half metre below the origin scales with the plant.
+            position = [round(x - center[0], 3), round(ground(x, y) + TREE_ORIGIN * scale, 3), round(y - center[1], 3)]
             transform = {'position': position, 'rotationDegrees': [0, round(yaw, 1), 0],
                          'scale': [round(scale, 3)] * 3}
             if sp not in made:
