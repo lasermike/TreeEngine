@@ -73,13 +73,18 @@ def regions(name):
 
 def tree(tid, position, trunk, leaf, atlas, leaf_regions, generator, *, twist=60, size=0.25, shape='skinnedCylinder',
          lod=True):
-    lod = lod and LOD_ON
+    if not LOD_ON:
+        # Full detail at any distance: one LOD distance past the scene. (Leaving lod out isn't that: the parser's
+        # default is a 10 m distance, beyond which deep twigs draw simplified.)
+        obj_lod = {"distances": [100000]}
+    else:
+        obj_lod = LOD if lod else None
     obj = {"id": tid, "type": "tree", "transform": {"position": position}, "animationSpeed": 10,
            "trunkShape": shape, "materials": {"trunk": trunk, "leaf": leaf},
            "leaves": {"atlas": atlas, "twistDegrees": twist, "sizeVariation": size, "regions": leaf_regions},
            "generator": dict(generator, angle=DEG, segmentLength=1)}
-    if lod:
-        obj["lod"] = LOD
+    if obj_lod:
+        obj["lod"] = obj_lod
     return obj
 
 
