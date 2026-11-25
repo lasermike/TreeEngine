@@ -98,7 +98,7 @@ namespace Roads
     // scene's `authored` path (relative, no ..) names in the executable's folder, and the source is
     // Game\Resources\<authored> in the nearest folder above that `exists` finds. Empty otherwise (an absolute or
     // escaping path, a file loaded from elsewhere, no source found), so nothing outside those folders is mirrored.
-    std::wstring BuildSource(const std::wstring& loaded, const std::string& authored, const std::wstring& executableFolder,
+    std::wstring BuildSource(const std::wstring& loaded, const std::wstring& authored, const std::wstring& executableFolder,
         const std::function<bool(const std::wstring&)>& exists);
 
     // Where a ray (origin, unit direction) enters an axis-aligned box: the distance along it, or a negative value when

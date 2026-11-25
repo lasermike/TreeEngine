@@ -409,11 +409,11 @@ namespace Roads
         return out;
     }
 
-    std::wstring BuildSource(const std::wstring& loaded, const std::string& authored, const std::wstring& executableFolder,
+    std::wstring BuildSource(const std::wstring& loaded, const std::wstring& authored, const std::wstring& executableFolder,
         const std::function<bool(const std::wstring&)>& exists)
     {
         // The authored path: relative, with no empty, . or .. parts.
-        std::wstring relative(authored.begin(), authored.end());
+        std::wstring relative = authored;      // Decoded from the scene's UTF-8 by the caller.
         std::replace(relative.begin(), relative.end(), L'/', L'\\');
         if (relative.empty() || relative[0] == L'\\' || relative.find(L':') != std::wstring::npos)
             return {};

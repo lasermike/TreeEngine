@@ -305,7 +305,7 @@ bool Terrain::SaveProps(std::string& message, const std::vector<std::wstring>* o
     {
         std::wstring folder = executable;
         folder.resize(folder.find_last_of(L'\\'));
-        const std::wstring source = Roads::BuildSource(m_roadsFile, Params().roads, folder,
+        const std::wstring source = Roads::BuildSource(m_roadsFile, SceneData::WidePath(Params().roads), folder,
             [](const std::wstring& path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; });
         if (!source.empty())
             files.push_back(source);

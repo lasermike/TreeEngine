@@ -1433,19 +1433,24 @@ void TestPropEditing()
     const auto onlySource = [](const std::wstring& path)
     {
         return _wcsicmp(path.c_str(), L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\A.roads.geojson") == 0
-            || _wcsicmp(path.c_str(), L"C:\\work\\Shared\\A.roads.geojson") == 0;
+            || _wcsicmp(path.c_str(), L"C:\\work\\Shared\\A.roads.geojson") == 0
+            || _wcsicmp(path.c_str(), L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\Caf\u00e9.roads.geojson") == 0;
     };
-    Check(Roads::BuildSource(build + L"\\Terrain\\A.roads.geojson", "Terrain/A.roads.geojson", build, onlySource)
+    Check(Roads::BuildSource(build + L"\\Terrain\\A.roads.geojson", L"Terrain/A.roads.geojson", build, onlySource)
         == L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\A.roads.geojson", "the build's copy has no source");
     // A scene's own copy (loaded from beside the scene, not the build) is saved alone.
-    Check(Roads::BuildSource(L"C:\\scenes\\Terrain\\A.roads.geojson", "Terrain/A.roads.geojson", build, onlySource).empty(),
+    Check(Roads::BuildSource(L"C:\\scenes\\Terrain\\A.roads.geojson", L"Terrain/A.roads.geojson", build, onlySource).empty(),
         "a scene's own roads file was mirrored into the build's source");
     // A path escaping the folders (../Shared, which resolves beside the build and beside Game\\Resources, where a file
     // with the same props exists) or absolute is never mirrored.
-    Check(Roads::BuildSource(L"C:\\work\\TreeEngine\\TreeClassic\\bin\\x64\\Shared\\A.roads.geojson", "../Shared/A.roads.geojson",
-        build, onlySource).empty() && Roads::BuildSource(L"C:\\work\\Shared\\A.roads.geojson", "C:/work/Shared/A.roads.geojson",
-        build, onlySource).empty() && Roads::BuildSource(build + L"\\Terrain\\A.roads.geojson", "Terrain/./A.roads.geojson",
+    Check(Roads::BuildSource(L"C:\\work\\TreeEngine\\TreeClassic\\bin\\x64\\Shared\\A.roads.geojson", L"../Shared/A.roads.geojson",
+        build, onlySource).empty() && Roads::BuildSource(L"C:\\work\\Shared\\A.roads.geojson", L"C:/work/Shared/A.roads.geojson",
+        build, onlySource).empty() && Roads::BuildSource(build + L"\\Terrain\\A.roads.geojson", L"Terrain/./A.roads.geojson",
         build, onlySource).empty(), "an escaping or absolute roads path was mirrored");
+    // A name beyond ASCII: the scene's UTF-8 path, decoded as the asset loader decodes it (é is C3 A9).
+    Check(Roads::BuildSource(build + L"\\Terrain\\Caf\u00e9.roads.geojson", SceneData::WidePath("Terrain/Caf\xc3\xa9.roads.geojson"),
+        build, onlySource) == L"C:\\work\\TreeEngine\\Game\\Resources\\Terrain\\Caf\u00e9.roads.geojson",
+        "an accented roads file's source wasn't found");
 
     // Picking: a ray hits a box from outside at its entry distance, misses beside it, and from inside starts at 0.
     const DirectX::XMFLOAT3 low(-1, 0, -1), high(1, 3, 1);
