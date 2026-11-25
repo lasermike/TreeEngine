@@ -2299,6 +2299,37 @@ int main(int argc, char** argv)
             Check(scene.name == catalogScene.second, "catalog scene name changed");
         }
 
+        // The south Puget Sound species (Tools/forest/make_pnw_plants.py writes the scene): each an L-system tree with
+        // a bark and a leaf material, its leaves drawn from regions of its atlas.
+        {
+            const auto pnw = SceneData::ReadScene(TestDataFilename("pnw-plants.scene.json"));
+            const char* species[] = { "douglas-fir", "western-hemlock", "western-red-cedar", "red-alder", "bigleaf-maple",
+                "pacific-madrone", "vine-maple", "red-huckleberry", "himalayan-blackberry", "salal", "oregon-grape",
+                "sword-fern", "pasture-grass", "douglas-fir-stand", "pacific-madrone-bluff", "lichen-snag",
+                "western-red-cedar-sapling", "western-hemlock-sapling", "bracken-fern", "oceanspray", "oceanspray-plumes",
+                "orchard-grass", "orchard-grass-seed" };
+            for (const char* id : species)
+            {
+                const SceneData::TreeDefinition* found = nullptr;
+                for (const auto& object : pnw.objects)
+                    if (object->id == id && object->instanceOf.empty())
+                        found = dynamic_cast<const SceneData::TreeDefinition*>(object.get());
+                const std::string what = std::string("PNW plants: ") + id;
+                Check(found != nullptr, (what + " is missing or not a tree").c_str());
+                if (!found)
+                    continue;
+                Check(!found->generator.axiom.empty() && found->hasMaterials && !found->leaf.baseColorTexture.source.empty(),
+                    (what + " lacks a generator or materials").c_str());
+                const auto atlas = pnw.atlases.find(found->leaves.atlas);
+                bool regionsFound = atlas != pnw.atlases.end() && !found->leaves.regions.empty();
+                for (const auto& region : found->leaves.regions)
+                    regionsFound = regionsFound && atlas->second.regions.count(region.region);
+                Check(regionsFound, (what + "'s leaf regions aren't in its atlas").c_str());
+                // Trees draw half a metre below their position: plants stand at 0.5 on the meadow.
+                Check(std::abs(found->transform.position.y - 0.5f) < 1e-6f, (what + " isn't standing on the ground").c_str());
+            }
+        }
+
         bool missingFileRejected = false;
         try { SceneData::ReadScene("does-not-exist.scene.json"); }
         catch (const std::runtime_error& e) { missingFileRejected = std::string(e.what()).find("cannot open") != std::string::npos; }
