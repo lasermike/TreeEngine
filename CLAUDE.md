@@ -17,6 +17,16 @@ Orientation: `ARCHITECTURE.md` (overview), `.github/copilot-instructions.md` (bu
 - The owner reviews and squash-merges on GitHub. Afterwards: `git checkout master`, `git pull --ff-only`, and delete
   the local branch.
 
+## Specs and the queue
+
+- Feature specs live in `specs/` (see `specs/README.md`); each has a GitHub issue labelled `spec` on the
+  "TreeEngine roadmap" project board. `TreeEngine/Tools/specs/specs.py` syncs, lists and moves them.
+- After each merge (or when asked for the next spec), sync, take the top **Ready** item, move it to **In progress**,
+  and say which spec was started. If Ready is empty, say so and wait.
+- Branch `feature/<issue>-<short-name>`. A large spec becomes several PRs ("Part of #N"), the last "Closes #N"; move
+  the item to **In review** when its PR opens. Ask about open questions that block the work (and record the answer on
+  the issue); decide the rest and note them in the PR.
+
 ## Before opening a PR
 
 - Build `TreeEngine/TreeEngine.sln` in `Debug|x64` and `Release|x64`.
