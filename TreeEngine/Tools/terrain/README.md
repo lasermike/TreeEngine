@@ -299,8 +299,9 @@ python place_plants.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Gam
 
 It's seeded, and a re-run replaces the objects it made before and keeps everything else, so re-run it after editing the
 trees file, the roads or the species, then rebuild. Hungerford: 701 trees and 8,000 understory plants (9,827 objects).
-The cost is mostly per object: Hungerford's start view draws in about 33 ms (raster, most of it the trees in the
-shadow cascades; ferns and grass are left out of cascades too coarse for them, `Settings::m_shadowMinCasterTexels`)
+The cost is mostly per object: Hungerford's start view draws in about 28 ms (raster, most of it the trees in the
+shadow cascades; ferns and grass are left out of cascades too coarse for them, `Settings::m_shadowMinCasterTexels`,
+and trees draw their coarsest layout into all but the first, `Settings::m_shadowLayoutLevel`)
 and 21 ms (DXR, CPU-bound). `python -I -B test_place_plants.py` checks placement, clearances, mixes,
 sources and textures.
 

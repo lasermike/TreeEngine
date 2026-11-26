@@ -255,7 +255,7 @@ where it starts:
 
 The plants are instances of `PNW Plants` species, written into the scene by
 `Tools/terrain/place_plants.py` (objects `pnw-*` and `plant-*`), with leaner
-materials so the scene stays within its 32 textures. It costs about 33 ms a
+materials so the scene stays within its 32 textures. It costs about 28 ms a
 frame in raster (most of it the shadow cascades drawing the trees) and 21 ms in
 DXR, from under 2 ms unplanted; see `Tests/Performance` (`Hungerford`,
 `Hungerford-walk`).

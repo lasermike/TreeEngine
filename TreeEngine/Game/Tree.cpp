@@ -1284,7 +1284,6 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
         pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, layout.start[segmentIndex],
             static_cast<UINT>(layout.segments[segmentIndex].size()), transformSlot);
     }
-
     // LOD crossfade: on a level change the old layout keeps drawing for lodFadeFrames, dithered out as the new one is
     // dithered in (Shaders/Tree.hlsl FadeKeeps; DXR through instance masks, LodFadeMask). A camera cut, the first
     // frame, or a fade length of 0 switches at once. A change during a fade restarts it from the layout shown.
@@ -1320,6 +1319,22 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
                 static_cast<UINT>(from.segments[segmentIndex].size()), fadeSlot, &m_fadeOwner);
     }
     m_fading = m_fadeFromLayout != SIZE_MAX;
+
+    // The coarse shadow cascades draw a coarser layout when this one is finer than RenderData::shadowLayoutLevel,
+    // clamped to the tree's last level (levels past it draw its coarsest). Not while fading: the fade fraction is in
+    // this instance's transform slot, so the coarse draw would be dithered out without the layout it fades from; the
+    // cascades draw both fading ranges as before for those few frames.
+    const UINT lastLevel = source.m_instanceLayouts.size() > 2 ? static_cast<UINT>(source.m_instanceLayouts.size() - 1) : 1;
+    const UINT shadowLevel = std::min(renderData.shadowLayoutLevel, lastLevel);
+    if (!m_fading && shadowLevel > m_instanceLodLevel)
+    {
+        // Level 0 is the near layout, 1 the far one, and each level beyond its reduced layout (as for layoutIndex).
+        const size_t shadowIndex = shadowLevel == 1 ? FarLayout : shadowLevel;
+        InstanceLayout& coarse = source.m_instanceLayouts[shadowIndex];
+        for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+            pFrameConfig->SetShadowInstances(m_segmentRenderUnits[segmentIndex], this, coarse.start[segmentIndex],
+                static_cast<UINT>(coarse.segments[segmentIndex].size()));
+    }
     renderData.frameStats[NUM_LEAVES_STAT].stat += layout.leafCount;
     renderData.frameStats[NUM_STICKS_STAT].stat += layout.stickCount;
     m_profileLevel = m_instanceLodLevel;

@@ -46,6 +46,9 @@ interface IRenderFrame
     // fades out of. It is its own DXR owner (owner, any unique address), so it gets its own TLAS instance.
     virtual HRESULT SetFadingInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
         UINT objectTransformSlot, const void* owner) = 0;
+    // The range the object draws into the shadow cascades after the first, after SetInstances (which clears it): an
+    // instanced tree's coarser layout (RenderData::shadowLayoutLevel), with the same object transform.
+    virtual HRESULT SetShadowInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances) = 0;
     virtual HRESULT GetInstanceIndex(WorldObject* object, UINT&) = 0;
     virtual RenderData& GetRenderData() = 0;
     // A draw of its own this frame, beside the object's reservation: instances [startInstance, startInstance + count)
@@ -103,6 +106,8 @@ class RenderManager : public IRenderFrame
         UINT start = 0;
         UINT count = 0;
         UINT objectTransformSlot = UINT_MAX;
+        UINT shadowStart = 0;               // See IRenderFrame::SetShadowInstances; shadowCount UINT_MAX for none.
+        UINT shadowCount = UINT_MAX;
         UINT fadeStart = 0;                 // See IRenderFrame::SetFadingInstances; fadeCount 0 for none.
         UINT fadeCount = 0;
         UINT fadeTransformSlot = UINT_MAX;
@@ -246,6 +251,7 @@ public:
     HRESULT SetFadingInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
 
         UINT objectTransformSlot, const void* owner);
+    HRESULT SetShadowInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances);
     HRESULT GetInstanceIndex(WorldObject* object, UINT&);
     HRESULT AddDraw(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT instanceCount, INT baseVertex,
         const void* owner, const XMFLOAT3 bounds[2]) override;

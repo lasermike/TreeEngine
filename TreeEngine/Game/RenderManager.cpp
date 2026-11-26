@@ -209,6 +209,7 @@ HRESULT RenderManager::BeginNewFrame()
 {
     m_renderData.lodDistanceScale = m_settings->m_lodDistanceScale;
     m_renderData.lodFadeFrames = static_cast<UINT>(std::max(0, m_settings->m_lodFadeFrames));
+    m_renderData.shadowLayoutLevel = static_cast<UINT>(std::max(0, m_settings->m_shadowLayoutLevel));
     m_renderData.terrainStreaming = m_settings->m_terrainStreaming;
     m_renderData.showRoads = m_settings->m_showRoads;
     m_renderData.debugLines.clear();
@@ -402,11 +403,14 @@ HRESULT RenderManager::Render(RenderUnit* ru, RenderPass pass)
             continue;
 
         const InstanceRange& range = ranges[reservation];
+        // Shadow cascades after the first draw an instanced tree's coarser layout, when it has one, and not the one
+        // it fades out of: their texels are too coarse to show the difference.
+        const bool coarseShadow = pass == ShadowMapPass && m_renderData.shadowCascade > 0 && range.shadowCount != UINT_MAX;
         // The object's own range, then the one it fades out of (a separate DXR owner), if any.
-        for (int part = 0; part < (range.fadeCount ? 2 : 1); ++part)
+        for (int part = 0; part < (range.fadeCount && !coarseShadow ? 2 : 1); ++part)
         {
-        const UINT startInstance = part ? range.fadeStart : range.start;
-        const UINT numInstances = part ? range.fadeCount : range.count;
+        const UINT startInstance = coarseShadow ? range.shadowStart : part ? range.fadeStart : range.start;
+        const UINT numInstances = coarseShadow ? range.shadowCount : part ? range.fadeCount : range.count;
         const UINT transformSlot = part ? range.fadeTransformSlot : range.objectTransformSlot;
 
         if (numInstances > 0)
@@ -978,6 +982,21 @@ HRESULT RenderManager::SetInstances(RenderUnit* renderUnit, WorldObject* object,
     range.count = numInstances;
     range.objectTransformSlot = objectTransformSlot;
     range.fadeCount = 0;
+    range.shadowCount = UINT_MAX;
+    return S_OK;
+}
+
+HRESULT RenderManager::SetShadowInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances)
+{
+    const auto unit = m_perFrameInstanceData.find(renderUnit);
+    if (unit == m_perFrameInstanceData.end())
+        return E_INVALIDARG;
+    const auto entry = unit->second.index.find(object);
+    if (entry == unit->second.index.end())
+        return E_INVALIDARG;
+    InstanceRange& range = unit->second.ranges[entry->second];
+    range.shadowStart = startInstance;
+    range.shadowCount = numInstances;
     return S_OK;
 }
 
