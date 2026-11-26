@@ -606,13 +606,19 @@ namespace SceneData
                 if (render.contains("environment"))
                 {
                     const auto& environment = render["environment"];
-                    Fields(environment, path + ".environment", { "diffuse", "specular", "rotationDegrees" });
+                    Fields(environment, path + ".environment", { "diffuse", "specular", "rotationDegrees", "intensity" });
                     if (!environment.contains("diffuse") || !environment.contains("specular"))
                         Invalid(path + ".environment", "diffuse and specular cube maps are both required");
                     scene.environmentDiffuse = String(environment["diffuse"], path + ".environment.diffuse");
                     scene.environmentSpecular = String(environment["specular"], path + ".environment.specular");
                     if (environment.contains("rotationDegrees"))
                         scene.environmentRotationDegrees = Number(environment["rotationDegrees"], path + ".environment.rotationDegrees");
+                    if (environment.contains("intensity"))
+                    {
+                        scene.environmentIntensity = Number(environment["intensity"], path + ".environment.intensity");
+                        if (!(scene.environmentIntensity >= 0 && scene.environmentIntensity <= 16))
+                            Invalid(path + ".environment.intensity", "must be between 0 and 16");
+                    }
                     if (scene.environmentDiffuse.empty() || scene.environmentSpecular.empty())
                         Invalid(path + ".environment", "cube map paths must be nonempty");
                 }
@@ -834,7 +840,7 @@ namespace SceneData
                 }
                 else if (type == "terrain")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "roads", "material", "layers", "textureCoordScale", "lodRange", "slots" });
+                    Fields(value, path, { "id", "type", "transform", "source", "roads", "roadSurfaces", "material", "layers", "textureCoordScale", "lodRange", "slots" });
                     auto terrain = std::make_unique<TerrainDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     terrain->source = String(value["source"], path + ".source");
@@ -843,6 +849,17 @@ namespace SceneData
                     {
                         terrain->roads = String(value["roads"], path + ".roads");
                         if (terrain->roads.empty()) Invalid(path + ".roads", "must not be empty");
+                    }
+                    if (value.contains("roadSurfaces"))
+                    {
+                        const auto& surfaces = value["roadSurfaces"];
+                        if (!surfaces.is_object()) Invalid(path + ".roadSurfaces", "expected an object of materials by surface");
+                        for (auto surface = surfaces.begin(); surface != surfaces.end(); ++surface)
+                        {
+                            if (surface.key() != "asphalt" && surface.key() != "gravel" && surface.key() != "trail")
+                                Invalid(path + ".roadSurfaces." + surface.key(), "must be asphalt, gravel or trail");
+                            terrain->roadSurfaces[surface.key()] = MaterialReference(surface.value(), path + ".roadSurfaces." + surface.key(), scene);
+                        }
                     }
                     if (value.contains("material"))
                     {
@@ -1116,6 +1133,8 @@ namespace SceneData
                 { "specular", scene.environmentSpecular } };
             if (scene.environmentRotationDegrees != 0)
                 root["render"]["environment"]["rotationDegrees"] = scene.environmentRotationDegrees;
+            if (scene.environmentIntensity != 1)
+                root["render"]["environment"]["intensity"] = scene.environmentIntensity;
         }
         if (scene.growthStartTime != 0)
             root["growth"]["startTime"] = scene.growthStartTime;
@@ -1287,6 +1306,8 @@ namespace SceneData
                 value["type"] = "terrain";
                 value["source"] = terrain.source;
                 if (!terrain.roads.empty()) value["roads"] = terrain.roads;
+                for (const auto& surface : terrain.roadSurfaces)
+                    value["roadSurfaces"][surface.first] = MaterialJson(surface.second);
                 if (terrain.hasMaterial) value["material"] = MaterialJson(terrain.material);
                 if (!terrain.layers.empty())
                 {

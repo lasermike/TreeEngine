@@ -65,7 +65,8 @@ cbuffer cbChangesEveryFrame : register(b2)
     float ambientOcclusionRadius;
     float ambientOcclusionStrength;
     uint reflectionRayCount;
-    float4 sceneTime; // x is simulation time in seconds, y the frame number mod 1024, z contact probes' full-count distance
+    float4 sceneTime; // x is simulation time in seconds, y the frame number mod 1024, z contact probes' full-count distance,
+                      // w the scene's environment light intensity (render.environment.intensity)
     float4 sunShadowParams; // x: tan(angular radius), y: sample count; z: contact probes, w: their flags (1 rotate, 2 opaque)
     float4 renderScale;     // x: texture LOD bias while upscaling (0 at native), y: 2^x; see Game/Upscaler.h;
                             // z: the camera's far plane, which bounds ray lengths (PrimaryRayLength, SecondaryRayLength)

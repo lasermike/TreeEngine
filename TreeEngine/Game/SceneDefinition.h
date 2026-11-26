@@ -218,6 +218,8 @@ namespace SceneData
         std::vector<TerrainLayerDefinition> layers;     // up to four layers.
         float lodRange = 2;         // A node splits within lodRange x its size of the camera.
         int slots = 512;            // Nodes resident at once (each about 215 KB of vertex buffer).
+        // Materials in place of the built-in road surfaces, by name: "asphalt", "gravel", "trail".
+        std::map<std::string, MaterialDefinition> roadSurfaces;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TerrainDefinition>(*this); }
     };
 
@@ -279,6 +281,7 @@ namespace SceneData
         std::string environmentDiffuse;
         std::string environmentSpecular;
         float environmentRotationDegrees = 0;
+        float environmentIntensity = 1;     // Scales the environment (sky) lighting: diffuse and specular IBL.
         // The growth clock: plants start grown this far (seconds of growth) and grow this many times faster than scene
         // time. Key 0 restarts growth from 0; Shift+0 restarts the scene, growth from startTime.
         double growthStartTime = 0;
