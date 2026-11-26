@@ -135,7 +135,9 @@ public:
         if (rays > 0) m_settings.m_waterReflectionRays = rays;
     }
     void ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile = false, bool showShadowBuffer = false);
-    HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {}, bool overrideSceneCamera = false);
+    // growthTime below 0 follows the scene's growth clock: growth.startTime + simulationTime x growth.speed.
+    HRESULT RenderTestFrame(double simulationTime, const std::wstring& captureFilename = {}, bool overrideSceneCamera = false,
+        double growthTime = -1);
     // Render tests update objects on one thread for repeatable images; performance runs use every core.
     // Call before Initialize.
     void SetRenderTestUsesAllCores(bool allCores) { m_renderTestAllCores = allCores; }
@@ -223,6 +225,13 @@ private:
     double                               m_timeStart;
     double                               m_timeCurrent;
     double                               m_timeLargest;
+    // The growth clock (RenderData::growthTime): advances with scene time times m_growthSpeed unless paused. Key 0
+    // restarts it from 0; Shift+0 restarts the scene and it (from the scene's growth.startTime); G pauses it.
+    double                               m_growthTime = 0;
+    double                               m_growthLargest = 0;
+    double                               m_growthSpeed = 1;
+    bool                                 m_growthPaused = false;
+    bool                                 m_restartGrowth = false;
     int                                  m_currentScene;
     SceneData::SceneDefinition m_sceneDefinition;
     std::string m_sceneFilename;

@@ -486,7 +486,7 @@ namespace SceneData
         try
         {
             const auto root = Json::parse(jsonText);
-            Fields(root, sourceName, { "version", "id", "name", "priority", "camera", "render", "light", "pointLightCount", "pointLight", "materials", "atlases", "objects" });
+            Fields(root, sourceName, { "version", "id", "name", "priority", "camera", "render", "light", "pointLightCount", "pointLight", "growth", "materials", "atlases", "objects" });
             if (!root.contains("version") || Integer(root["version"], sourceName + ".version", 1, 1) != 1)
                 Invalid(sourceName + ".version", "expected schema version 1");
             SceneDefinition scene;
@@ -540,6 +540,22 @@ namespace SceneData
                 scene.camera = ReadTransform(camera, sourceName + ".camera");
             }
             if (root.contains("pointLightCount")) scene.pointLightCount = Integer(root["pointLightCount"], sourceName + ".pointLightCount", 0, 1);
+            if (root.contains("growth"))
+            {
+                const auto& growth = root["growth"];
+                const std::string path = sourceName + ".growth";
+                Fields(growth, path, { "startTime", "speed" });
+                if (growth.contains("startTime"))
+                {
+                    scene.growthStartTime = Number(growth["startTime"], path + ".startTime");
+                    if (!(scene.growthStartTime >= 0 && scene.growthStartTime <= 100000)) Invalid(path + ".startTime", "must be between 0 and 100000 seconds");
+                }
+                if (growth.contains("speed"))
+                {
+                    scene.growthSpeed = Number(growth["speed"], path + ".speed");
+                    if (!(scene.growthSpeed > 0 && scene.growthSpeed <= 100)) Invalid(path + ".speed", "must be above 0 and at most 100");
+                }
+            }
             if (root.contains("pointLight"))
             {
                 const auto& light = root["pointLight"];
@@ -1101,6 +1117,10 @@ namespace SceneData
             if (scene.environmentRotationDegrees != 0)
                 root["render"]["environment"]["rotationDegrees"] = scene.environmentRotationDegrees;
         }
+        if (scene.growthStartTime != 0)
+            root["growth"]["startTime"] = scene.growthStartTime;
+        if (scene.growthSpeed != 1)
+            root["growth"]["speed"] = scene.growthSpeed;
         if (!scene.skyCubeMap.empty())
         {
             root["render"]["sky"] = { { "cubeMap", scene.skyCubeMap } };

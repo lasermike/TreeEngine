@@ -151,7 +151,8 @@ struct RenderData : SceneRenderSettings
     }
 
     // General
-    float               time;
+    float               time;                   // Scene time (s): camera paths, tides, everything but growth.
+    float               growthTime = 0;         // Growth time (s): how far plants have grown (Tree::CalcTime).
     float               normalAnimationTime = 0;
     XMFLOAT2            jitterPixels = XMFLOAT2(0, 0);   // This frame's sub-pixel camera jitter; see Settings::m_jitter.
     bool                hdrSceneColor = false;          // This frame renders linear light into the HDR target.
