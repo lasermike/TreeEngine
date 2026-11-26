@@ -780,7 +780,7 @@
           1.515
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-douglas-fir",
@@ -850,7 +850,7 @@
           1.7
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-hemlock",
@@ -1340,7 +1340,7 @@
           1.7
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-cedar",
@@ -2186,7 +2186,7 @@
           1.7
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-alder",
@@ -4167,7 +4167,7 @@
           1.7
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-maple",
@@ -12322,7 +12322,7 @@
           1.7
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-madrone",
@@ -13064,7 +13064,7 @@
           1.7
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-madrone",
@@ -15843,7 +15843,7 @@
           1.199
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-green",
@@ -15887,7 +15887,7 @@
           0.915
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-bracken",
@@ -15930,7 +15930,7 @@
           0.946
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-hemlock",
@@ -15987,7 +15987,7 @@
           1.269
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-shrub",
@@ -16103,7 +16103,7 @@
           0.933
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-green",
@@ -16149,7 +16149,7 @@
           0.933
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-green",
@@ -16214,7 +16214,7 @@
           1.111
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-green",
@@ -16351,7 +16351,7 @@
           1.252
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-cane",
@@ -16420,7 +16420,7 @@
           0.858
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-shrub",
@@ -16515,7 +16515,7 @@
           1.264
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-green",
@@ -16646,7 +16646,7 @@
           1.084
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-shrub",
@@ -16699,7 +16699,7 @@
           1.084
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-shrub",
@@ -16835,7 +16835,7 @@
           0.536
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "bark-cedar",
@@ -17794,7 +17794,7 @@
           1.015
         ]
       },
-      "animationSpeed": 1000,
+      "animationSpeed": 10,
       "trunkShape": "skinnedCylinder",
       "materials": {
         "trunk": "stem-shrub",
@@ -208431,5 +208431,8 @@
         }
       }
     }
+  },
+  "growth": {
+    "startTime": 10
   }
 }
