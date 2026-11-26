@@ -28,12 +28,12 @@
     "enablePostProcessing": false,
     "blurAmount": 0,
     "environment": {
-      "diffuse": "Environment/terra-daylight-diffuse.dds",
-      "specular": "Environment/terra-daylight-specular.dds",
+      "diffuse": "Environment/puget-sound-diffuse.dds",
+      "specular": "Environment/puget-sound-specular.dds",
       "intensity": 3.0
     },
     "sky": {
-      "cubeMap": "Environment/terra-daylight-sky.dds"
+      "cubeMap": "Environment/puget-sound-sky.dds"
     },
     "ambientOcclusion": {
       "radius": 1.25,
@@ -125,9 +125,9 @@
     },
     "bark-douglas-fir": {
       "baseColor": [
-        1.1,
-        1.3,
-        1.9,
+        0.95,
+        0.95,
+        1.0,
         1
       ],
       "metallic": 0,
@@ -138,11 +138,11 @@
         3
       ],
       "baseColorTexture": {
-        "source": "Nature/bark_furrowed_color.jpg",
+        "source": "Nature/bark_lichen_color.jpg",
         "wrap": true
       },
       "normalTexture": {
-        "source": "Nature/bark_furrowed_normal.jpg",
+        "source": "Nature/bark_lichen_normal.jpg",
         "wrap": true
       }
     },
@@ -169,9 +169,9 @@
     },
     "bark-hemlock": {
       "baseColor": [
-        1.0,
-        1.15,
-        1.6,
+        0.8,
+        0.8,
+        0.85,
         1
       ],
       "metallic": 0,
@@ -182,11 +182,11 @@
         3
       ],
       "baseColorTexture": {
-        "source": "Nature/bark_furrowed_color.jpg",
+        "source": "Nature/bark_lichen_color.jpg",
         "wrap": true
       },
       "normalTexture": {
-        "source": "Nature/bark_furrowed_normal.jpg",
+        "source": "Nature/bark_lichen_normal.jpg",
         "wrap": true
       }
     },
@@ -257,9 +257,9 @@
     },
     "bark-alder": {
       "baseColor": [
-        1.35,
-        1.35,
-        1.3,
+        1.2,
+        1.2,
+        1.2,
         1
       ],
       "metallic": 0,
@@ -270,11 +270,11 @@
         2
       ],
       "baseColorTexture": {
-        "source": "Nature/bark_furrowed_color.jpg",
+        "source": "Nature/bark_lichen_color.jpg",
         "wrap": true
       },
       "normalTexture": {
-        "source": "Nature/bark_furrowed_normal.jpg",
+        "source": "Nature/bark_lichen_normal.jpg",
         "wrap": true
       }
     },

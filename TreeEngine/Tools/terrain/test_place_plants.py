@@ -115,9 +115,14 @@ check(len(oceanspray) == 2 * len(plumes) and plumes, 'oceanspray without its plu
 materials, atlases = plants.used_resources(objects, pnw)
 textures = {v['source'] for m in materials.values() for v in m.values() if isinstance(v, dict) and 'source' in v}
 check(all('metallicRoughnessTexture' not in m for m in materials.values()), 'a material kept its roughness map')
-check(all(not t.startswith('Nature/bark_') or t.startswith(f'Nature/bark_{plants.LEAN_BARK}_') for t in textures),
-      'more than one bark texture')
-check(len(textures) <= 8, f'{len(textures)} textures for the plants: {sorted(textures)}')
+barks = {plants.LEAN_BARK} | {bark for bark, _ in plants.PHOTO_BARK.values()}
+check(all(not t.startswith('Nature/bark_') or any(t.startswith(f'Nature/bark_{b}_') for b in barks) for t in textures),
+      'a bark texture other than the lean one and the photo-matched one')
+check(len(textures) <= 10, f'{len(textures)} textures for the plants: {sorted(textures)}')
+# Photo-matched barks: the firs, hemlocks and alders take the lichen bark.
+check(materials['bark-douglas-fir']['baseColorTexture']['source'] == 'Nature/bark_lichen_color.jpg'
+      and materials['bark-cedar']['baseColorTexture']['source'] == f'Nature/bark_{plants.LEAN_BARK}_color.jpg',
+      'the fir or cedar bark is not the photo-matched one')
 check(all(o['materials'][k] in materials for o in sources for k in o['materials']), 'a source material is missing')
 
 # Hungerford's committed scene: planted, and within the 32 textures a scene holds.

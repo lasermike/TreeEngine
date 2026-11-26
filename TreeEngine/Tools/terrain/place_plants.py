@@ -254,22 +254,27 @@ LEAN_BARK = 'furrowed'
 
 # Bark colours matched to photos of the site (Content/photos/scott-dr), as tints of the lean bark: the Douglas firs and
 # hemlocks there are grey, lichen-flecked; the cedars keep their red-brown.
-PHOTO_BARK = {'bark-douglas-fir': [1.1, 1.3, 1.9, 1], 'bark-hemlock': [1.0, 1.15, 1.6, 1]}
+# The bark maps and tints matched to the photos: the Douglas firs, hemlocks and alders there are grey, flecked with
+# pale grey-green lichen (Nature/bark_lichen_*, made by Tools/make-lichen-bark.ps1 from the furrowed bark, already
+# grey, so near-neutral tints), as is the dead alder; the cedars and maples keep the furrowed bark's red-brown.
+PHOTO_BARK = {'bark-douglas-fir': ('lichen', [0.95, 0.95, 1.0, 1]), 'bark-hemlock': ('lichen', [0.8, 0.8, 0.85, 1]),
+              'bark-alder': ('lichen', [1.2, 1.2, 1.2, 1]), 'bark-snag': ('lichen', [1.1, 1.1, 1.1, 1])}
 
 
 def lean(material, name=None):
-    """A pnw-plants material on fewer textures, for a scene that has its own (a scene holds 32): barks all use one
-    bark's maps (tinted as before, or as PHOTO_BARK says), and no material has a roughness map (its roughness value
-    stands)."""
+    """A pnw-plants material on fewer textures, for a scene that has its own (a scene holds 32): barks use the lean
+    bark's maps (tinted as before), or the bark and tint PHOTO_BARK gives, and no material has a roughness map (its
+    roughness value stands)."""
     m = json.loads(json.dumps(material))
+    bark = LEAN_BARK
     if name in PHOTO_BARK:
-        m['baseColor'] = PHOTO_BARK[name]
+        bark, m['baseColor'] = PHOTO_BARK[name]
     m.pop('metallicRoughnessTexture', None)
     for key in ('baseColorTexture', 'normalTexture'):
         source = (m.get(key) or {}).get('source', '')
         if source.startswith('Nature/bark_'):
             kind = 'color' if key == 'baseColorTexture' else 'normal'
-            m[key]['source'] = f'Nature/bark_{LEAN_BARK}_{kind}.jpg'
+            m[key]['source'] = f'Nature/bark_{bark}_{kind}.jpg'
     return m
 
 
