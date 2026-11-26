@@ -1,7 +1,12 @@
 import numpy as np,pathlib,struct,math,json,argparse
 parser=argparse.ArgumentParser(description="Bake sky and lighting DDS cubemaps from rendered Terra daylight faces")
 parser.add_argument("output", help="Scratch/output directory used by render_terra_daylight.py")
-out=pathlib.Path(parser.parse_args().output).resolve()
+parser.add_argument("--name", default="terra-daylight", help="Output name: <name>-sky/-diffuse/-specular.dds")
+parser.add_argument("--clouds", type=float, default=0.0, help="Cumulus cover, 0 (clear) to 1 (overcast)")
+parser.add_argument("--cloud-seed", type=int, default=1, help="Seed for the cloud pattern")
+parser.add_argument("--cloud-scale", type=float, default=1.0, help="Cloud size; larger means bigger clouds")
+args=parser.parse_args()
+out=pathlib.Path(args.output).resolve()
 metadata=json.loads((out/"sky-metadata.json").read_text())
 faces=np.load(out/'nishita-faces.npy')[:,:,::-1,:3].astype(np.float32)
 size=faces.shape[1]; scale=float(metadata["radiance_scale"])
@@ -24,9 +29,41 @@ def sample(d):
  x0=px.astype(np.int32);y0=py.astype(np.int32);x1=np.minimum(x0+1,size-1);y1=np.minimum(y0+1,size-1)
  fx=(px-x0)[:,None];fy=(py-y0)[:,None]
  rgb=((1-fy)*((1-fx)*faces[face,y0,x0]+fx*faces[face,y0,x1])+fy*((1-fx)*faces[face,y1,x0]+fx*faces[face,y1,x1]))*scale
+ if args.clouds>0:rgb=add_clouds(d,rgb)
  ground=np.array([.055,.046,.036],dtype=np.float32)
  t=np.clip((-y-.02)/.2,0,1)[:,None];t=t*t*(3-2*t)
  return (rgb*(1-t)+ground*t).reshape(*shape,3).astype(np.float32)
+# Cumulus: a layer of fractal noise on a plane above the viewer, thresholded by the cover. Lit tops are the sky's
+# brightest blue shifted to white; bases are greyer; clouds thin toward the horizon, where the layer is seen edge on.
+def lattice(ix,iy,seed):
+ h=(ix*374761393+iy*668265263+seed*1442695040)&0xffffffff
+ h=((h^(h>>13))*1274126177)&0xffffffff
+ return ((h^(h>>16))&0xffff)/65535.0
+def value_noise(px,py,seed):
+ ix=np.floor(px).astype(np.int64);iy=np.floor(py).astype(np.int64);fx=px-ix;fy=py-iy
+ fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy)
+ a=lattice(ix,iy,seed);b=lattice(ix+1,iy,seed);c=lattice(ix,iy+1,seed);e=lattice(ix+1,iy+1,seed)
+ return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+e*fx)*fy
+def fbm(px,py,seed):
+ total=np.zeros_like(px);amp=.5;freq=1.0
+ for o in range(6):total+=amp*value_noise(px*freq,py*freq,seed+o*17);amp*=.5;freq*=2.03
+ return total
+def add_clouds(d,rgb):
+ x,y,z=d[:,0],d[:,1],d[:,2]
+ up=np.maximum(y,.035)
+ px=x/up/args.cloud_scale*1.4;py=z/up/args.cloud_scale*1.4
+ n=fbm(px,py,args.cloud_seed)
+ cover=np.clip(args.clouds,0,1)
+ density=np.clip((n-(1-cover)*.62-.18)/.22,0,1)
+ density*=np.clip((y-.02)/.18,0,1)
+ # Light: tops facing the sun brighter, and each cloud darker where it's densest (its base).
+ sun=np.array(metadata["sun_direction"],dtype=np.float32);sun/=np.linalg.norm(sun)
+ facing=np.clip(.55+.45*(d@sun),0,1)
+ white=np.max(rgb,axis=1,keepdims=True)
+ zenith=np.array([.30,.33,.36],dtype=np.float32)*scale/.045
+ lit=(zenith*2.2+white*.8)*(0.75+.5*facing[:,None])
+ base=lit*(1-.45*np.clip(n-(1-cover)*.62-.18,0,.4)[:,None]/.4)
+ return rgb*(1-density[:,None])+base*density[:,None]
 def basis(n):
  ref=np.zeros_like(n);ref[...,1]=1
  alt=np.abs(n[...,1])>.99;ref[alt]=np.array([1,0,0],np.float32)
@@ -59,7 +96,7 @@ for f in range(6):
  coverage=coverage*coverage*(3-2*coverage)
  color[:,:,:3]=color[:,:,:3]*(1-coverage[...,None])+255*coverage[...,None]
  sky.append([np.rint(color).clip(0,255).astype(np.uint8)])
-pack_cube(out/'terra-daylight-sky.dds',sky,28)
+pack_cube(out/(args.name+'-sky.dds'),sky,28)
 # Cosine-weighted mean radiance for Lambertian diffuse IBL.
 diffuse=[]
 for f in range(6):
@@ -69,7 +106,7 @@ for f in range(6):
   d=t*(math.sqrt(u)*math.cos(phi))+b*(math.sqrt(u)*math.sin(phi))+n*math.sqrt(1-u)
   acc+=sample(d)
  diffuse.append([rgba(acc/128,10)])
-pack_cube(out/'terra-daylight-diffuse.dds',diffuse,10)
+pack_cube(out/(args.name+'-diffuse.dds'),diffuse,10)
 # GGX importance-sampled environment for the existing roughness mip selection.
 spec=[[] for _ in range(6)]
 for f in range(6):
@@ -85,5 +122,5 @@ for f in range(6):
     nl=np.maximum(np.sum(n*l,axis=-1),0);acc+=sample(l)*nl[...,None];weights+=nl
    rgb=acc/np.maximum(weights[...,None],1e-6)
   spec[f].append(rgba(rgb,10))
-pack_cube(out/'terra-daylight-specular.dds',spec,10)
-print('Generated terra-daylight-sky.dds, terra-daylight-diffuse.dds, terra-daylight-specular.dds')
+pack_cube(out/(args.name+'-specular.dds'),spec,10)
+print('Generated',args.name+'-sky.dds,',args.name+'-diffuse.dds,',args.name+'-specular.dds')

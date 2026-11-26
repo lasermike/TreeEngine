@@ -279,9 +279,13 @@ at Arcadia, at the mouth of Totten Inlet.
 
 Hungerford's colours are matched to photos of the site: a red-brown needle-duff
 forest floor (`forest-duff`, the dirt maps tinted), reddish drive gravel
-(`drive-gravel` through `roadSurfaces`), grey Douglas fir and hemlock bark
-(`Tools/terrain/place_plants.py`, `PHOTO_BARK`), and a brighter sky and sun
-(`environment.intensity` 3, sun 4.2) for the light under the canopy.
+(`drive-gravel` through `roadSurfaces`), grey Douglas fir, hemlock and alder
+bark flecked with pale lichen (`Nature/bark_lichen_*`, from
+`Tools/make-lichen-bark.ps1`; `Tools/terrain/place_plants.py`, `PHOTO_BARK`),
+a hazy Puget Sound sky with scattered cumulus and its lighting
+(`Environment/puget-sound-*`; see `Environment/terra-daylight.md`), and a
+brighter sky and sun (`environment.intensity` 3, sun 4.2) for the light under
+the canopy.
 
 Hungerford is also planted in a 300 m square about the 190 E Scott Dr driveway,
 where it starts:

@@ -17,3 +17,21 @@ The generator's `--sun` is the direction **toward** the sun, opposite the scene'
 The 2-degree angular diameter is the apparent width of the sun in the sky. It controls the visible disc and the range of light directions sampled for soft shadows: a larger diameter gives broader, softer shadow edges. Terra's 2-degree sun is an artistic choice; the real sun appears about half a degree wide.
 
 The scene specifies the direction light travels as `light.direction: [0.625929, -0.714180, 0.313303]`. The components are X, Y and Z in TreeEngine coordinates, with Y pointing up; the negative Y component points the light down toward the terrain. The direction from the scene toward the sun is the opposite vector, `[-0.625929, 0.714180, -0.313303]`. This is the direction accepted by the generator's `--sun` option.
+
+# Puget Sound environment
+
+`puget-sound-sky.dds`, `-diffuse.dds` and `-specular.dds` light Hungerford: the same Blender sky for Hungerford's sun
+(its light direction `[0.626, -0.514, 0.313]`, about 36 degrees up), with marine haze (aerosol density 3, sea level),
+and a layer of cumulus over about a third of the sky. The clouds are fractal noise on a plane above the viewer, lit
+brighter on their sun side and greyer at their bases, thinning to the horizon; they are in the lighting maps too, so
+the sky light is whiter and less blue than Terra's. Regenerate with:
+
+```powershell
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b --disable-autoexec --python Misc\render_terra_daylight.py -- <scratch> --sun -0.6259292648824133 0.5141802822623909 -0.3133034947002239 --aerosol 3 --altitude 10
+& 'C:\Program Files\Blender Foundation\Blender 5.2\5.2\python\bin\python.exe' Misc\bake_terra_daylight.py <scratch> --name puget-sound --clouds 0.35
+Copy-Item <scratch>\puget-sound-*.dds TreeEngine\Game\Resources\Environment\
+```
+
+`render_terra_daylight.py` takes `--air`, `--aerosol`, `--ozone` and `--altitude` (Blender's sky densities); the
+baker takes `--name`, `--clouds` (cover, 0 to 1), `--cloud-seed` and `--cloud-scale`. Their defaults reproduce Terra's
+maps.
