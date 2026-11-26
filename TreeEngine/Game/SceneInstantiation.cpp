@@ -869,6 +869,12 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             const std::string manifest = RebaseAsset(terrainParams.source + "/manifest.json", sourceFilename, destinationFilename);
             terrain.source = manifest.substr(0, manifest.find_last_of("/\\"));
             terrain.roads = RebaseAsset(terrainParams.roads, sourceFilename, destinationFilename);
+            // Road surfaces keep their authored materials; their maps are rebased like everything else.
+            for (auto& surface : terrain.roadSurfaces)
+                for (SceneData::TextureMapDefinition* map : { &surface.second.baseColorTexture,
+                         &surface.second.metallicRoughnessTexture, &surface.second.normalTexture,
+                         &surface.second.specularTexture, &surface.second.specularColorTexture })
+                    map->source = RebaseAsset(map->source, sourceFilename, destinationFilename);
             terrain.lodRange = terrainParams.lodRange;
             terrain.slots = static_cast<int>(terrainParams.slots);
             terrain.layers.clear();
