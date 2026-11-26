@@ -166,6 +166,8 @@ struct RenderData : SceneRenderSettings
     XMVECTOR            eyePos;
     float               lodDistanceScale = 1;   // Multiplies every LOD distance (Settings::m_lodDistanceScale).
     UINT                lodFadeFrames = 0;      // Settings::m_lodFadeFrames: frames of LOD crossfade, 0 for none.
+    UINT                shadowLayoutLevel = 0;  // Settings::m_shadowLayoutLevel: instances' coarsest-or-this LOD level
+                                                // in the shadow cascades after the first; 0 for their own.
     bool                terrainStreaming = true; // Settings::m_terrainStreaming.
     // The instance slots to copy to the GPU this frame ([begin, end) ranges; see WorldObject::AppendInstanceUploadRanges),
     // or null to copy every slot.

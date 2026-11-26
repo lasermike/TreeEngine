@@ -1,0 +1,4 @@
+﻿"test","scene","mode","run","success","processMs","frameP50Ms","frameP90Ms","frameP99Ms","frameMaxMs","frameMeanMs","spikes","over33Ms","spikeExcessMs","rebuiltBLASFrames","maxBlasCpuMs"
+"Hungerford-walk","Hungerford","raster","1","True","20002.9412","26.5248","30.9036","32.132","32.9875","27.2460166666667","0","0","0","0","0"
+"Hungerford-walk","Hungerford","raster","2","True","20050.8183","26.7561","30.8181","32.0363","32.8081","27.4174233333333","0","0","0","0","0"
+"Hungerford-walk","Hungerford","raster","3","True","20179.2537","26.9698","31.2593","32.2521","33.265","27.609407","0","0","0","0","0"

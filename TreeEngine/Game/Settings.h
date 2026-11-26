@@ -37,6 +37,10 @@ public:
     // A caster smaller than this many of a cascade's texels (its bounds' largest side) isn't drawn into that cascade:
     // its shadow there would be a few texels. 0 draws every caster into every cascade it reaches.
     float m_shadowMinCasterTexels = 32.0f;
+    // Instanced trees draw at least this LOD level into the shadow cascades after the first (whose texels are a few
+    // centimetres or more), their own when it's coarser; levels past a tree's last draw its coarsest layout. 0 draws
+    // their own layout into every cascade. Hungerford: shadow pass 17.9 -> 13.9 ms GPU, no visible change.
+    int m_shadowLayoutLevel = 8;
     bool m_opacityMicromaps = true; // Use leaf opacity micromaps in DXR when the device supports them.
     // Ray-tracing cost diagnostics (debug UI "Ray costs"; render-test fields ray*): turn one kind of ray work off to
     // measure what it costs. Contact shading's probe rays, a sun-shadow sample count in place of the scene's (0 keeps

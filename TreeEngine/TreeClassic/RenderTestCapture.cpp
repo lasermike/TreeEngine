@@ -194,6 +194,7 @@ void ParseRenderTestCommandLine()
     parsed->shadowCascades = json.value("shadowCascades", 3);
     parsed->shadowDistance = json.value("shadowDistance", 150.0f);
     parsed->shadowMinCasterTexels = json.value("shadowMinCasterTexels", -1.0f);
+    parsed->shadowLayoutLevel = json.value("shadowLayoutLevel", -1);
     if (parsed->shadowCascades < 1 || parsed->shadowCascades > 4 || !std::isfinite(parsed->shadowDistance) || parsed->shadowDistance <= 0)
         throw std::runtime_error("shadowCascades must be 1 to 4 and shadowDistance positive");
     if (parsed->lodFadeFrames < 0 || parsed->lodFadeFrames > 1000)
@@ -474,7 +475,8 @@ namespace
             game.SetRenderTestContactProbes(request->contactProbes, request->contactRotate, request->contactOpaqueProbes,
                 request->contactFullDistance);
             game.SetRenderTestReflectionSampling(request->reflectionRotate, request->reflectionAdaptive);
-            game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance, request->shadowMinCasterTexels);
+            game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance, request->shadowMinCasterTexels,
+                request->shadowLayoutLevel);
             game.SetRenderTestHdr(request->hdr, TonemapSetting(request->tonemap), request->exposure);
             game.SetRenderTestRenderScale(request->renderScale);
             const int settleFrames = request->performanceSettleFrames;
@@ -625,7 +627,8 @@ int RunRenderTestCapture(Game& game)
             game.SetRenderTestContactProbes(request->contactProbes, request->contactRotate, request->contactOpaqueProbes,
                 request->contactFullDistance);
             game.SetRenderTestReflectionSampling(request->reflectionRotate, request->reflectionAdaptive);
-            game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance, request->shadowMinCasterTexels);
+            game.SetRenderTestShadows(request->shadowCascades, request->shadowDistance, request->shadowMinCasterTexels,
+                request->shadowLayoutLevel);
             game.SetRenderTestHdr(point.hdr, TonemapSetting(point.tonemap), point.exposure);
             game.SetRenderTestRenderScale(point.renderScale);
             game.SetRenderTestHighlightsThroughGeometry(point.highlightsThroughGeometry);

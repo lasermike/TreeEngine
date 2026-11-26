@@ -1284,6 +1284,19 @@ HRESULT Tree::ComputeInstanceConstants(IRenderFrame* pFrameConfig)
         pFrameConfig->SetInstances(m_segmentRenderUnits[segmentIndex], this, layout.start[segmentIndex],
             static_cast<UINT>(layout.segments[segmentIndex].size()), transformSlot);
     }
+    // The coarse shadow cascades draw a coarser layout when this one is finer than RenderData::shadowLayoutLevel.
+    const UINT shadowLevel = renderData.shadowLayoutLevel;
+    if (shadowLevel > m_instanceLodLevel)
+    {
+        const size_t shadowIndex = shadowLevel == 1 ? FarLayout : std::min<size_t>(shadowLevel, source.m_instanceLayouts.size() - 1);
+        if (shadowIndex != layoutIndex)
+        {
+            InstanceLayout& coarse = source.m_instanceLayouts[shadowIndex];
+            for (size_t segmentIndex = 0; segmentIndex < TreeSegmentCount; ++segmentIndex)
+                pFrameConfig->SetShadowInstances(m_segmentRenderUnits[segmentIndex], this, coarse.start[segmentIndex],
+                    static_cast<UINT>(coarse.segments[segmentIndex].size()));
+        }
+    }
 
     // LOD crossfade: on a level change the old layout keeps drawing for lodFadeFrames, dithered out as the new one is
     // dithered in (Shaders/Tree.hlsl FadeKeeps; DXR through instance masks, LodFadeMask). A camera cut, the first
