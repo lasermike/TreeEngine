@@ -44,6 +44,8 @@ check(specs.next_ready(board[:2]) is None, 'next with nothing Ready')
 closed = [{'state': 'CLOSED', 'status': 'In review', 'number': 8}, {'state': 'CLOSED', 'status': 'Done', 'number': 9},
           {'state': 'OPEN', 'status': 'Ready', 'number': 10}]
 check([i['number'] for i in specs.closed_not_done(closed)] == [8], 'closed items to move to Done')
+# A spec whose issue exists but isn't on the board (registration stopped short) is added, not re-created.
+check(specs.missing_from_board({8: 'a.md', 11: 'b.md'}, closed) == [11], 'specs missing from the board')
 
 with tempfile.TemporaryDirectory() as tmp:
     for name in ('README.md', 'TEMPLATE.md', 'b-spec.md', 'a-spec.md', 'notes.txt'):

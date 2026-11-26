@@ -63,6 +63,12 @@ def spec_files(folder=SPECS):
     return sorted(f for f in os.listdir(folder) if f.endswith('.md') and f not in SKIP)
 
 
+def missing_from_board(numbers, items):
+    """The spec issue numbers that have no board item."""
+    on_board = {i['number'] for i in items}
+    return sorted(n for n in numbers if n not in on_board)
+
+
 def closed_not_done(items):
     """Items whose issue is closed but which aren't in Done (the board's own "Item closed" workflow may be off)."""
     return [i for i in items if i.get('state') == 'CLOSED' and i.get('status') != 'Done']
@@ -80,7 +86,7 @@ def next_ready(items):
 # GitHub.
 
 def gh(*args, input=None):
-    result = subprocess.run([GH, *args], capture_output=True, text=True, input=input)
+    result = subprocess.run([GH, *args], capture_output=True, text=True, encoding='utf-8', input=input)
     if result.returncode:
         sys.exit(f'gh {" ".join(args[:3])} failed: {result.stderr.strip()}')
     return result.stdout
@@ -133,8 +139,8 @@ def set_status(project_id, field_id, options, item_id, column):
             p=project_id, i=item_id, f=field_id, o=options[column])
 
 
-def add_item(project_id, issue_url):
-    node = json.loads(gh('api', f'repos/{OWNER}/{REPO}/issues/{issue_url.rsplit("/", 1)[1]}'))['node_id']
+def add_item(project_id, number):
+    node = json.loads(gh('api', f'repos/{OWNER}/{REPO}/issues/{number}'))['node_id']
     data = graphql('''mutation($p: ID!, $c: ID!) { addProjectV2ItemById(input: {projectId: $p, contentId: $c})
         { item { id } } }''', p=project_id, c=node)
     return data['addProjectV2ItemById']['item']['id']
@@ -145,12 +151,13 @@ def add_item(project_id, issue_url):
 
 def sync():
     project_id, field_id, options = board()
-    made = 0
+    made, numbers = 0, {}
     for name in spec_files():
         path = os.path.join(SPECS, name)
         text = open(path, encoding='utf-8').read()
         fields, body = read_header(text)
         if fields.get('issue'):
+            numbers[int(fields['issue'].lstrip('#'))] = name
             continue
         title = title_of(body, name[:-3])
         goal = section(body, 'Goal') or '(no Goal yet)'
@@ -158,13 +165,19 @@ def sync():
         url = gh('issue', 'create', '--repo', f'{OWNER}/{REPO}', '--title', title, '--label', 'spec',
                  '--body', issue_body).strip().splitlines()[-1]
         number = int(url.rsplit('/', 1)[1])
-        set_status(project_id, field_id, options, add_item(project_id, url), 'Backlog')
+        # Recorded before the board is touched, so a failure there can't make the next sync open a second issue.
         with open(path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(write_issue(text, number))
-        print(f'#{number} {title} ({name}) -> Backlog')
+        print(f'#{number} {title} ({name})')
+        numbers[number] = name
         made += 1
     print(f'{made} new spec(s) registered' if made else 'every spec has an issue')
-    for item in closed_not_done(items(project_id)):
+    listing = items(project_id)
+    # Every spec's issue on the board: new ones, and any whose earlier registration stopped short.
+    for number in missing_from_board(numbers, listing):
+        set_status(project_id, field_id, options, add_item(project_id, number), 'Backlog')
+        print(f'#{number} ({numbers[number]}) -> Backlog')
+    for item in closed_not_done(listing):
         set_status(project_id, field_id, options, item['id'], 'Done')
         print(f'#{item["number"]} {item["title"]} closed -> Done')
 
