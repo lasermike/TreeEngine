@@ -32,6 +32,9 @@ From the TreeEngine directory, use Windows PowerShell 5.1:
 # Exact cached/recomputed image parity through growth, mature time, LOD, and rewind.
 .\Tests\RenderRegression\test-tree-skinning.ps1
 
+# Growth runs on its own clock: growth follows growthTime, not scene time; scene time still moves camera paths.
+.\Tests\RenderRegression\test-growth-clock.ps1
+
 # Also test exactly 3,000,000 DXR vertices and explicit overflow failure.
 # Requires a Release build for the expected overflow case.
 # Copies the deployed runtime into the ignored test artifacts directory.
@@ -232,6 +235,10 @@ The native `--render-test <request.json>` request also accepts:
 - `viewCulling`: default true, like the app. False rasterizes objects outside the view frustum too (DXR traces
   every object either way); profile samples report `drawnObjects` and `culledObjects`.
 - Per-capture `showShadowBuffer`: default false. Shows the shadow-map preview for that capture.
+- Per-capture `growthTime`: zero or more, the plants' growth clock at the capture
+  (it moves with the warmup frames around it). Without it the growth clock is the
+  scene's `growth.startTime + time x growth.speed`, which is `time` for scenes
+  without a `growth` block, so existing captures are unchanged.
 - Per-capture `poseCache`: default true. False forces the CPU reference pose to
   be recomputed, allowing same-process A/B comparisons.
 - Per-capture `cameraPosition`: three finite coordinates. If omitted, the

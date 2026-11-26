@@ -33,6 +33,7 @@ struct RenderTestPoint
     std::vector<PropEdit> propEdits;
     std::wstring savePropsTo;           // Then save them into this file (a copy of the roads file) only.
     double time;
+    double growthTime = -1;             // "growthTime": the growth clock at the capture; -1 follows the scene's.
     std::wstring filename;
     std::string mode;
     unsigned width = 0;

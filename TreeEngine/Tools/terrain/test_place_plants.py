@@ -97,7 +97,9 @@ objects = plants.scene_objects(placed, ground, (1060.0, 2050.0), pnw)
 sources = [o for o in objects if not o.get('instanceOf')]
 ids = [o['id'] for o in sources]
 check(len(ids) == len(set(ids)) and all(i.startswith('pnw-') for i in ids), 'sources are not one per species')
-check(all(o['animationSpeed'] == plants.GROWN for o in sources), 'a source would grow in slowly')
+pnw_speed = {o['id']: o.get('animationSpeed', 1) for o in pnw['objects']}
+check(all(o['animationSpeed'] == pnw_speed[o['id'][len('pnw-'):]] for o in sources),
+      "a source doesn't grow at its species' speed (key 0 would regrow it too fast)")
 check(all(o['instanceOf'] in ids for o in objects if o.get('instanceOf')), 'an instance of a missing source')
 fir = objects[0]
 check(fir['id'] == 'pnw-douglas-fir-stand' and fir['transform']['position'] == [-10.0, round(ground(1050, 2050) + 0.5, 3), 0.0],
@@ -124,6 +126,9 @@ scene = json.load(open(os.path.join(HERE, '..', '..', 'Game', 'Resources', 'Scen
 all_textures = {v['source'] for m in scene['materials'].values() for v in m.values() if isinstance(v, dict) and 'source' in v}
 check(len(all_textures) <= 24, f'Hungerford names {len(all_textures)} textures; roads, props and signs need the rest of 32')
 check(any(o['id'] == 'pnw-douglas-fir-stand' for o in scene['objects']), 'Hungerford is not planted')
+check(scene.get('growth', {}).get('startTime') == plants.GROWN_AT and
+      {o.get('animationSpeed') for o in scene['objects'] if o.get('type') == 'tree' and o['id'].startswith('pnw-')} == {10},
+      "Hungerford doesn't open grown with its plants at their species' speed")
 
 print('place_plants checks passed' if not failures else f'{failures} place_plants checks failed')
 sys.exit(1 if failures else 0)

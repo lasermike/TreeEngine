@@ -4,7 +4,8 @@ scattered around them.
 Each species used is copied once from Game/Resources/Scenes/pnw-plants.scene.json (with its materials and leaf
 atlases) as a source tree, standing at the first tree of that species; every other plant is an `instanceOf` copy,
 turned at random and scaled to its tree's height (trees) or a little either way (understory), on the package's own
-ground heights. Sources grow at once (a high `animationSpeed`), so the scene opens with mature trees. Their
+ground heights. Plants keep their species' growth speed, and the scene's growth clock starts at GROWN_AT (its
+`growth.startTime`), so the scene opens on mature plants and key 0 regrows them in a few seconds. Their
 materials are leaner than pnw-plants' (one bark's maps, no roughness maps: see lean()), since a scene holds 32
 textures and the terrain, water, roads and props use most of them.
 
@@ -35,7 +36,9 @@ ENGINE = os.path.normpath(os.path.join(HERE, '..', '..'))
 PNW = os.path.join(ENGINE, 'Game', 'Resources', 'Scenes', 'pnw-plants.scene.json')
 TREE_ORIGIN = 0.5            # Trees draw half a metre below their position, times their scale
                              # (Tree::ComputeTransformationsManual).
-GROWN = 1000                 # animationSpeed: every branch is grown within the first frame.
+# Seconds of growth by which every PNW species is grown at its own speed (they all are by 3 s at animationSpeed 10):
+# the scene's growth clock starts here.
+GROWN_AT = 10
 
 # Each species' height as its rules grow it (m): the trunk's segments up its leader, rounded. Trees are scaled from
 # these to their LiDAR heights.
@@ -238,7 +241,6 @@ def scene_objects(placed, ground, center, pnw):
                 source = json.loads(json.dumps(sources[sp]))
                 source['id'] = f'pnw-{sp}'
                 source['transform'] = transform
-                source['animationSpeed'] = GROWN
                 objects.append(source)
                 made.add(sp)
             else:
@@ -313,6 +315,7 @@ def main():
     scene = json.load(open(args.scene, encoding='utf-8-sig'))
     keep = [o for o in scene['objects'] if not (o.get('id', '').startswith('pnw-') or o.get('id', '').startswith('plant-'))]
     scene['objects'] = keep + objects
+    scene['growth'] = dict(scene.get('growth', {}), startTime=GROWN_AT)
     for name, material in materials.items():
         scene.setdefault('materials', {})[name] = material
     scene['atlases'] = dict(scene.get('atlases', {}), **atlases)

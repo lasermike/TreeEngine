@@ -29,6 +29,32 @@ The debug **Scene** panel has a discovered-scene picker, **Load**, **Reload**,
 reload reads the active file again. Failed loads preserve the active scene,
 camera, and settings. Successful loads reset scene time.
 
+### Scene time and growth time
+
+Two clocks run while a scene plays:
+- **Scene time** moves camera paths, tides, water ripples and the rotating sun.
+- **Growth time** is how far plants have grown. It advances with scene time,
+  times the growth speed, unless growth is paused.
+
+Keys (and the debug UI's **Controls**, with **Scene time** and **Growth time**
+sliders, **Pause growth**, **Restart growth** and **Growth speed**):
+- **0** restarts growth from nothing; the camera path, tides and the rest go on.
+- **Shift+0** restarts everything: scene time from 0, growth from the scene's
+  start.
+- **G** pauses and resumes growth; **P** pauses both clocks.
+- **<** and **>** step both clocks by a frame.
+
+Shortcuts are ignored only while a debug UI field takes the keyboard.
+
+A scene's optional `"growth": { "startTime": 60, "speed": 1 }` sets where growth
+starts on load and Shift+0 (seconds of growth, 0 to 100000, default 0: plants
+start as seeds) and how fast it runs against scene time (above 0 to 100, default
+1). A scene that should open on grown plants starts its growth clock late rather
+than raising every tree's `animationSpeed`, so 0 still replays growth at the
+species' own speed. Render tests take a capture's `growthTime` (see
+`Tests/RenderRegression/README.md`); without one the growth clock is
+`startTime + time x speed`.
+
 Save As asks for a display name and filename stem and creates `UserScenes` on the
 first save. It generates a user ID from the stem. Filenames cannot contain path
 separators, Windows-invalid characters, reserved device names, or trailing dots

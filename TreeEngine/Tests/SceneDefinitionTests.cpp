@@ -1987,6 +1987,28 @@ void TestModelBiplanar()
 }
 
 
+void TestGrowthClock()
+{
+    // A scene's growth clock: plants start grown startTime seconds and grow speed times faster than scene time.
+    const std::string scene = R"({"version":1,"name":"Growth","growth":{"startTime":60,"speed":2},"objects":[{"id":"ball","type":"primitive","shape":"sphere"}]})";
+    const auto parsed = SceneData::ParseScene(scene, "growth");
+    Check(parsed.growthStartTime == 60 && parsed.growthSpeed == 2, "the growth clock was not parsed");
+    const auto saved = Json::parse(SceneData::SerializeScene(parsed));
+    Check(saved["growth"]["startTime"] == 60 && saved["growth"]["speed"] == 2, "the growth clock was not saved");
+    const auto plain = SceneData::ParseScene(R"({"version":1,"name":"Plain","objects":[{"id":"ball","type":"primitive","shape":"sphere"}]})", "plain");
+    Check(plain.growthStartTime == 0 && plain.growthSpeed == 1, "the default growth clock isn't 0 and 1x");
+    Check(!Json::parse(SceneData::SerializeScene(plain)).contains("growth"), "a scene with the default growth clock saved it");
+    auto bad = Json::parse(scene);
+    bad["growth"]["speed"] = 0;
+    Reject(bad.dump(), ".growth.speed");
+    bad = Json::parse(scene);
+    bad["growth"]["startTime"] = -1;
+    Reject(bad.dump(), ".growth.startTime");
+    bad = Json::parse(scene);
+    bad["growth"]["rate"] = 1;
+    Reject(bad.dump(), ".growth");
+}
+
 void TestSunShadowSettings()
 {
     const std::string json = R"({"version":1,"name":"Sun","light":{"angularDiameterDegrees":2,"shadowSamples":8},"objects":[{"id":"box","type":"primitive","shape":"box"}]})";
@@ -2029,6 +2051,7 @@ int main(int argc, char** argv)
         const float copied[] = { 1.25f, -2.5f, 3 };
         Check(Format("Tree / Position", copied, 3) == "Tree / Position: [1.25, -2.5, 3]", "clipboard includes field and components");
         TestSunShadowSettings();
+        TestGrowthClock();
         TestModelNormalAnimation();
         TestModelMaterialTint();
         TestModelBiplanar();

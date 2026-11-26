@@ -293,6 +293,10 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_sceneIsUser = m_currentScene >= 0 && m_loader.Catalog().Entries()[m_currentScene].user;
     m_sceneSelection = m_sceneFilename;
     m_renderManager.ApplySceneSettings(sceneSettings);
+    // The startup scene's growth clock, as LoadScene sets it for later loads.
+    m_growthSpeed = m_sceneDefinition.growthSpeed;
+    m_growthTime = m_growthLargest = m_sceneDefinition.growthStartTime;
+    m_renderManager.GetRenderData().growthTime = static_cast<float>(m_growthTime);
 
 #if defined(TREENGINE_WIN32)
     SetWindowText(m_hwnd, Wide(m_sceneDefinition.name).c_str());
@@ -365,6 +369,10 @@ HRESULT Game::LoadScene(const std::string& name)
     m_timeStart = 0;
     m_timeCurrent = 0;
     m_timeLargest = 0;
+    m_growthSpeed = m_sceneDefinition.growthSpeed;
+    m_growthTime = m_growthLargest = m_sceneDefinition.growthStartTime;
+    m_renderManager.GetRenderData().growthTime = static_cast<float>(m_growthTime);
+    m_growthPaused = false;
     m_settings.m_buffersInUse = 0;
     m_resetTree = true;
     m_needsResize = true;
@@ -593,7 +601,8 @@ void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bo
     m_showHelp = false;
 }
 
-HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& captureFilename, bool overrideSceneCamera)
+HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& captureFilename, bool overrideSceneCamera,
+    double growthTime)
 {
     if (!m_renderTestMode || !std::isfinite(simulationTime) || simulationTime < 0) return E_INVALIDARG;
     if (m_needsResize)
@@ -610,6 +619,9 @@ HRESULT Game::RenderTestFrame(double simulationTime, const std::wstring& capture
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"Render regression frame");
     auto& renderData = m_renderManager.GetRenderData();
     renderData.time = static_cast<float>(simulationTime);
+    m_growthTime = growthTime >= 0 ? growthTime : m_sceneDefinition.growthStartTime + simulationTime * m_sceneDefinition.growthSpeed;
+    m_growthLargest = __max(m_growthLargest, m_growthTime);
+    renderData.growthTime = static_cast<float>(m_growthTime);
     renderData.normalAnimationTime = static_cast<float>(simulationTime * m_settings.m_waterMotionSpeed);
     renderData.frame++;
     m_timeCurrent = simulationTime;
@@ -702,9 +714,11 @@ void Game::Update(DX::StepTimer const& timer)
     // Update our time
     if (m_timeStart == 0)
     {
+        // A full restart (scene load, Shift+0): scene time from 0, growth from the scene's start.
         m_timeStart = timer.GetTotalSeconds();
         m_timeCurrent = 0;
         m_timeLargest = 0;
+        m_growthTime = m_growthLargest = m_sceneDefinition.growthStartTime;
     }
     else if (!m_settings.m_paused)
     {
@@ -712,8 +726,18 @@ void Game::Update(DX::StepTimer const& timer)
         m_timeLargest = __max(m_timeLargest, m_timeCurrent);
         m_renderManager.GetRenderData().normalAnimationTime +=
             static_cast<float>(timer.GetElapsedSeconds()) * m_settings.m_waterMotionSpeed;
+        if (!m_growthPaused)
+            m_growthTime += timer.GetElapsedSeconds() * m_growthSpeed;
     }
+    if (m_restartGrowth)
+    {
+        // Key 0: plants grow again from nothing; the camera path, tides and the rest keep their time.
+        m_growthTime = m_growthLargest = 0;
+        m_restartGrowth = false;
+    }
+    m_growthLargest = __max(m_growthLargest, m_growthTime);
     m_renderManager.GetRenderData().time = (float)m_timeCurrent;
+    m_renderManager.GetRenderData().growthTime = (float)m_growthTime;
 
 
     if (!m_settings.m_paused && m_rotateLights)
@@ -1425,11 +1449,21 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
         //Pause
         ImGui::Checkbox("Pause", &m_settings.m_paused);
 
-        // Time
+        // Scene time: camera paths, tides and the rest. Growth time: how far plants have grown (key 0 restarts it,
+        // Shift+0 restarts both, G pauses growth).
         double rangeMin = 0.0, rangeMax = m_timeLargest;
-        if (ImGui::SliderScalar("Time", ImGuiDataType_Double, &m_timeCurrent, &rangeMin, &rangeMax, "%.3f", 0 /*flags*/)
+        if (ImGui::SliderScalar("Scene time", ImGuiDataType_Double, &m_timeCurrent, &rangeMin, &rangeMax, "%.3f", 0 /*flags*/)
             && m_settings.m_paused)
             ApplySceneCamera(m_sceneDefinition, *m_player, m_timeCurrent);
+        double growthMax = __max(m_growthLargest, 1.0);
+        ImGui::SliderScalar("Growth time", ImGuiDataType_Double, &m_growthTime, &rangeMin, &growthMax, "%.3f", 0);
+        ImGui::Checkbox("Pause growth (G)", &m_growthPaused);
+        ImGui::SameLine();
+        if (ImGui::Button("Restart growth (0)"))
+            m_restartGrowth = true;
+        float growthSpeed = static_cast<float>(m_growthSpeed);
+        if (ImGui::SliderFloat("Growth speed", &growthSpeed, 0.1f, 10.0f, "%.2fx", ImGuiSliderFlags_Logarithmic))
+            m_growthSpeed = growthSpeed;
 
         // Camera
         using DebugVectorEditor::Edit;
@@ -2039,7 +2073,8 @@ void Game::ComputeCPU()
 
     FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
 
-    if (!ImGui::GetCurrentContext() || (!ImGui::GetIO().WantCaptureKeyboard && !ImGui::GetIO().WantCaptureMouse))
+    // Shortcuts are skipped only while a debug UI field takes the keyboard; a mouse over the UI doesn't block them.
+    if (!ImGui::GetCurrentContext() || !ImGui::GetIO().WantCaptureKeyboard)
     {
         m_player->HandleInput(inputData.key);
         HandleInput(inputData.key);
@@ -2086,7 +2121,7 @@ void Game::Render(bool oculus)
 
 void Game::HandleInput(bool key[512])  // WM_KEYDOWN
 {
-    const char availableKeys[] = { '0', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3', 'Y', '<', '>', VK_TAB };
+    const char availableKeys[] = { '0', 'G', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3', 'Y', '<', '>', VK_TAB };
     for (char k : availableKeys)
     {
         if (key[k])
@@ -2107,14 +2142,24 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
                 }
                 break;
             case '0':
-                m_timeStart = 0;
-                key[k] = false; 
+                // 0 restarts plant growth; Shift+0 restarts everything (scene time too).
+                if (key[VK_SHIFT])
+                    m_timeStart = 0;
+                else
+                    m_restartGrowth = true;
+                key[k] = false;
+                break;
+            case 'G':
+                m_growthPaused = !m_growthPaused;
+                key[k] = false;
                 break;
             case '>':
                 m_timeCurrent += 1.0 / 60.0;
+                if (!m_growthPaused) m_growthTime += m_growthSpeed / 60.0;
                 break;
             case '<':
                 m_timeCurrent -= 1.0 / 60.0;
+                if (!m_growthPaused) m_growthTime = __max(0.0, m_growthTime - m_growthSpeed / 60.0);
                 break;
             case 'Z':
                 m_settings.m_showShadowBuffer = !m_settings.m_showShadowBuffer;

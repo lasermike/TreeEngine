@@ -282,6 +282,10 @@ namespace SceneData
         std::string environmentSpecular;
         float environmentRotationDegrees = 0;
         float environmentIntensity = 1;     // Scales the environment (sky) lighting: diffuse and specular IBL.
+        // The growth clock: plants start grown this far (seconds of growth) and grow this many times faster than scene
+        // time. Key 0 restarts growth from 0; Shift+0 restarts the scene, growth from startTime.
+        double growthStartTime = 0;
+        double growthSpeed = 1;
         float ambientOcclusionRadius = 0; // World units; zero disables DXR contact shading.
         float ambientOcclusionStrength = 1;
         std::string skyCubeMap; // DDS cube map drawn behind the scene and used as the ray-miss background.

@@ -249,7 +249,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
 
     InstancedData* dataView = pFrameConfig->GetRenderData().instanceData;
     RenderData& renderData = pFrameConfig->GetRenderData();
-    const float poseTime = std::min(CalcTime(renderData.time), m_matureTime);
+    const float poseTime = std::min(CalcTime(renderData.growthTime), m_matureTime);
     m_reusePose = renderData.cacheTreePoses && m_poseValid && poseTime == m_lastPoseTime
         && XMVector3Equal(XMLoadFloat3(&_position), XMLoadFloat3(&m_lastPosePosition))
         && XMVector4Equal(XMLoadFloat4(&_rotation), XMLoadFloat4(&m_lastPoseRotation))
@@ -318,7 +318,7 @@ HRESULT Tree::ComputeConstants(IRenderFrame* pFrameConfig)
             {
                 HRR(ComputeBranchVectorAtTime(frame, &renderData));
             }
-            else if (CalcTime(renderData.time) >= frame.branch->depth
+            else if (CalcTime(renderData.growthTime) >= frame.branch->depth
                 && (frame.branch->geometryType == Leaf || frame.branch->geometryType == Stick))
             {
                 m_numInstancesPerSegment[TreeSegmentIndex(SelectSegmentType(frame, &renderData))]++;
@@ -477,7 +477,7 @@ HRESULT Tree::ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRend
 {
     PIXBeginEvent(TREE_COLOR_DRAW_TEXT, L"ComputeConstants ComputeBranchVectorAtTime");
 
-    if (CalcTime(pRenderData->time) < frame.branch->depth)
+    if (CalcTime(pRenderData->growthTime) < frame.branch->depth)
     {
         return S_FALSE;
     }
@@ -493,7 +493,7 @@ HRESULT Tree::ComputeBranchVectorAtTime(BranchInstance& frame, RenderData* pRend
         break;
     }
 
-    ComputeBranchVectorEndPoint(&vChildStart, CalcTime(pRenderData->time), frame);
+    ComputeBranchVectorEndPoint(&vChildStart, CalcTime(pRenderData->growthTime), frame);
 
 
     // Compute child branches

@@ -272,6 +272,9 @@ void ParseRenderTestCommandLine()
     {
         RenderTestPoint point;
         point.time = value.at("time").get<double>();
+        point.growthTime = value.value("growthTime", -1.0);
+        if (value.contains("growthTime") && !(std::isfinite(point.growthTime) && point.growthTime >= 0))
+            throw std::runtime_error("Capture growthTime must be zero or more");
         point.filename = Wide(value.at("filename").get<std::string>());
         point.mode = value.value("mode", parsed->mode);
         if (value.contains("width") != value.contains("height"))
@@ -711,8 +714,10 @@ int RunRenderTestCapture(Game& game)
                 const double simulationTime = frame == captureFrame ? point.time
                     : point.hasPreviousTime ? point.previousTime
                     : point.time + std::max(0, frame - request->warmupFrames) * request->benchmarkTimeStep;
+                // A capture's growthTime moves with the frames around it, so warmup frames grow toward it.
+                const double growthTime = point.growthTime < 0 ? -1 : (std::max)(0.0, point.growthTime + simulationTime - point.time);
                 HRESULT result = game.RenderTestFrame(simulationTime,
-                    frame == captureFrame ? point.filename : std::wstring(), point.overrideCamera);
+                    frame == captureFrame ? point.filename : std::wstring(), point.overrideCamera, growthTime);
                 if (FAILED(result)) throw std::runtime_error("Rendering/capture failed, HRESULT=" + std::to_string(static_cast<unsigned>(result)));
                 if (request->benchmarkFrames && frame >= request->warmupFrames && frame < captureFrame)
                 {
