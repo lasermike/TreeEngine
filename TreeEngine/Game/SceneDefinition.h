@@ -218,6 +218,8 @@ namespace SceneData
         std::vector<TerrainLayerDefinition> layers;     // up to four layers.
         float lodRange = 2;         // A node splits within lodRange x its size of the camera.
         int slots = 512;            // Nodes resident at once (each about 215 KB of vertex buffer).
+        // Materials in place of the built-in road surfaces, by name: "asphalt", "gravel", "trail".
+        std::map<std::string, MaterialDefinition> roadSurfaces;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TerrainDefinition>(*this); }
     };
 
@@ -279,6 +281,7 @@ namespace SceneData
         std::string environmentDiffuse;
         std::string environmentSpecular;
         float environmentRotationDegrees = 0;
+        float environmentIntensity = 1;     // Scales the environment (sky) lighting: diffuse and specular IBL.
         float ambientOcclusionRadius = 0; // World units; zero disables DXR contact shading.
         float ambientOcclusionStrength = 1;
         std::string skyCubeMap; // DDS cube map drawn behind the scene and used as the ray-miss background.

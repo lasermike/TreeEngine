@@ -414,8 +414,12 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                 };
                 // Road surfaces, in Roads::Part order: asphalt and gravel tiled every 4 m (TerrainTool texture
                 // maps), yellow and white paint, then trails (the dirt maps).
-                const auto surface = [](const char* kind)
+                // The scene's roadSurfaces replace them by name (asphalt, gravel, trail).
+                const auto surface = [&terrain](const char* kind)
                 {
+                    const auto replaced = terrain.roadSurfaces.find(std::string(kind) == "dirt" ? "trail" : kind);
+                    if (replaced != terrain.roadSurfaces.end())
+                        return replaced->second;
                     SceneData::MaterialDefinition material;
                     material.metallic = 0;
                     material.roughness = 1;
@@ -545,6 +549,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
     renderSettings.environmentSpecular = definition.environmentSpecular.empty() ? std::string() :
         SceneData::ResolveSceneAsset(definition.environmentSpecular, sceneFilename);
     renderSettings.environmentRotationDegrees = definition.environmentRotationDegrees;
+    renderSettings.environmentIntensity = definition.environmentIntensity;
     renderSettings.sunAngularDiameterDegrees = definition.light.angularDiameterDegrees;
     renderSettings.sunShadowSamples = definition.light.shadowSamples;
     auto& light = renderSettings.dirLights[0];
@@ -910,6 +915,7 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
     result.environmentDiffuse = RebaseAsset(settings.environmentDiffuse, sourceFilename, destinationFilename);
     result.environmentSpecular = RebaseAsset(settings.environmentSpecular, sourceFilename, destinationFilename);
     result.environmentRotationDegrees = settings.environmentRotationDegrees;
+    result.environmentIntensity = settings.environmentIntensity;
     result.skyCubeMap = RebaseAsset(authored.skyCubeMap, sourceFilename, destinationFilename);
     result.useShadowMaps = gameData.useShadowMaps;
     result.useAlphaBlendedRenderTarget = gameData.useAlphaBlendedRenderTarget;

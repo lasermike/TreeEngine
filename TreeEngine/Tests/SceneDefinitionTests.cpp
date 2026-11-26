@@ -1030,6 +1030,40 @@ void TestRoadNetwork()
     auto empty = Json::parse(scene);
     empty["objects"][0]["roads"] = "";
     Reject(empty.dump(), ".roads");
+
+    // Road surfaces replaced by scene materials (Hungerford's reddish drive gravel), saved and parsed again.
+    auto surfaced = Json::parse(scene);
+    surfaced["materials"] = { { "drive-gravel", { { "baseColor", { 2.4, 1.25, 1.1, 1 } }, { "metallic", 0 }, { "roughness", 1 },
+        { "textureCoordScale", { 0.25, 0.25 } }, { "baseColorTexture", { { "source", "Terrain/Textures/gravel_color.png" } } } } } };
+    surfaced["objects"][0]["roadSurfaces"] = { { "gravel", "drive-gravel" } };
+    const auto withSurfaces = SceneData::ParseScene(surfaced.dump(), "road-surfaces");
+    const auto& surfacedTerrain = static_cast<const SceneData::TerrainDefinition&>(*withSurfaces.objects[0]);
+    const auto gravel = surfacedTerrain.roadSurfaces.find("gravel");
+    Check(surfacedTerrain.roadSurfaces.size() == 1 && gravel != surfacedTerrain.roadSurfaces.end()
+        && gravel->second.baseColor.x == 2.4f && gravel->second.textureCoordScale.x == 0.25f
+        && gravel->second.baseColorTexture.source == "Terrain/Textures/gravel_color.png", "a road surface was not parsed");
+    const auto resaved = SceneData::ParseScene(SceneData::SerializeScene(withSurfaces), "road-surfaces-roundtrip");
+    const auto& resavedTerrain = static_cast<const SceneData::TerrainDefinition&>(*resaved.objects[0]);
+    Check(resavedTerrain.roadSurfaces.count("gravel") && resavedTerrain.roadSurfaces.at("gravel").baseColor.y == 1.25f,
+        "a road surface was not saved");
+    Check(!Json::parse(SceneData::SerializeScene(parsed))["objects"][0].contains("roadSurfaces"),
+        "a terrain without road surfaces saved them");
+    auto badSurface = surfaced;
+    badSurface["objects"][0]["roadSurfaces"] = { { "cobbles", "drive-gravel" } };
+    Reject(badSurface.dump(), ".roadSurfaces.cobbles");
+    badSurface["objects"][0]["roadSurfaces"] = { { "gravel", "no-such-material" } };
+    Reject(badSurface.dump(), ".roadSurfaces.gravel");
+
+    // The environment light's intensity (Hungerford brightens its sky light under the canopy).
+    auto lit = Json::parse(scene);
+    lit["render"] = { { "environment", { { "diffuse", "Environment/d.dds" }, { "specular", "Environment/s.dds" }, { "intensity", 3 } } } };
+    const auto litScene = SceneData::ParseScene(lit.dump(), "environment-intensity");
+    Check(litScene.environmentIntensity == 3, "the environment intensity was not parsed");
+    Check(SceneData::ParseScene(SceneData::SerializeScene(litScene), "intensity-roundtrip").environmentIntensity == 3,
+        "the environment intensity was not saved");
+    Check(SceneData::ParseScene(scene, "default-intensity").environmentIntensity == 1, "the default environment intensity isn't 1");
+    lit["render"]["environment"]["intensity"] = 20;
+    Reject(lit.dump(), ".environment.intensity");
 }
 
 void TestRoadMesh()

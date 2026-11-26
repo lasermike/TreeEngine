@@ -12,6 +12,7 @@ struct SceneRenderSettings
     std::string environmentDiffuse;
     std::string environmentSpecular;
     float environmentRotationDegrees = 0;
+    float environmentIntensity = 1;   // Scales the environment cube maps' diffuse and specular light.
     float ambientOcclusionRadius = 0; // World units; zero disables DXR contact shading.
     float ambientOcclusionStrength = 1;
     float sunAngularDiameterDegrees = 0;

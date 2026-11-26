@@ -250,10 +250,18 @@ def scene_objects(placed, ground, center, pnw):
 LEAN_BARK = 'furrowed'
 
 
-def lean(material):
+# Bark colours matched to photos of the site (Content/photos/scott-dr), as tints of the lean bark: the Douglas firs and
+# hemlocks there are grey, lichen-flecked; the cedars keep their red-brown.
+PHOTO_BARK = {'bark-douglas-fir': [1.1, 1.3, 1.9, 1], 'bark-hemlock': [1.0, 1.15, 1.6, 1]}
+
+
+def lean(material, name=None):
     """A pnw-plants material on fewer textures, for a scene that has its own (a scene holds 32): barks all use one
-    bark's maps (tinted as before), and no material has a roughness map (its roughness value stands)."""
+    bark's maps (tinted as before, or as PHOTO_BARK says), and no material has a roughness map (its roughness value
+    stands)."""
     m = json.loads(json.dumps(material))
+    if name in PHOTO_BARK:
+        m['baseColor'] = PHOTO_BARK[name]
     m.pop('metallicRoughnessTexture', None)
     for key in ('baseColorTexture', 'normalTexture'):
         source = (m.get(key) or {}).get('source', '')
@@ -270,7 +278,7 @@ def used_resources(objects, pnw):
         if o.get('instanceOf'):
             continue
         for m in (o.get('materials') or {}).values():
-            materials[m] = lean(pnw['materials'][m])
+            materials[m] = lean(pnw['materials'][m], m)
         atlas = (o.get('leaves') or {}).get('atlas')
         if atlas:
             atlases[atlas] = pnw['atlases'][atlas]

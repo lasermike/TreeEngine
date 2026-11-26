@@ -612,9 +612,9 @@ float4 ShadeSurface(PS_INPUT input)
     txEnvironmentSpecular.GetDimensions(0, cubeWidth, cubeHeight, mipCount);
     float roughness = saturate(sampledMaterial.specularParams.z);
     float3 reflected = reflect(-toEye, normal);
-    float3 irradiance = txEnvironmentDiffuse.Sample(samLinearClamp, RotateEnvironmentDirection(normal)).rgb;
+    float3 irradiance = txEnvironmentDiffuse.Sample(samLinearClamp, RotateEnvironmentDirection(normal)).rgb * sceneTime.w;
     float3 prefiltered = txEnvironmentSpecular.SampleLevel(samLinearClamp, RotateEnvironmentDirection(reflected),
-        roughness * (mipCount - 1)).rgb;
+        roughness * (mipCount - 1)).rgb * sceneTime.w;
     litColor.rgb += ComputeGltfEnvironmentLight(sampledMaterial, textureColor,
         normal, toEye, irradiance, prefiltered);
     float3 specularIbl = 0.0f;
