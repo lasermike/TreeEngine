@@ -60,6 +60,9 @@ OPENING = [('orchard-grass', 6, (0.8, 1.2)), ('pasture-grass', 6, (0.8, 1.3)), (
            ('sword-fern', 1, (0.8, 1.2))]
 ROADSIDE = [('himalayan-blackberry', 4, (0.7, 1.3)), ('bracken-fern', 3, (0.8, 1.3)), ('orchard-grass', 3, (0.8, 1.2)),
             ('sword-fern', 2, (0.8, 1.2))]
+# Cleared ground (a building lot along a driveway): most of the understory is gone; what's left is low.
+CLEARING = [('sword-fern', 4, (0.6, 1.0)), ('bracken-fern', 3, (0.6, 1.0)), ('orchard-grass', 2, (0.7, 1.0)),
+            ('pasture-grass', 2, (0.7, 1.0)), ('salal', 1, (0.5, 0.8))]
 SHORE = [('oceanspray', 4, (0.8, 1.2)), ('salal', 3, (0.8, 1.3)), ('sword-fern', 1, (0.8, 1.2))]
 
 
@@ -106,6 +109,19 @@ def load_lines(path):
     return lines
 
 
+def clearing_line(path, line_id):
+    """The polyline of the roads file's line with this id (a driveway whose lot is cleared)."""
+    if not path:
+        raise SystemExit('--clearing needs --roads')
+    for f in json.load(open(path, encoding='utf-8')).get('features', []):
+        if (f.get('properties') or {}).get('id') == line_id:
+            g = f.get('geometry') or {}
+            parts = g.get('coordinates') or []
+            parts = parts if g.get('type') == 'MultiLineString' else [parts]
+            return [tuple(q[:2]) for part in parts for q in part]
+    raise SystemExit(f'{path}: no line {line_id}')
+
+
 class Grid:
     """A coarse lookup of points or lines by 10 m cell, so each test looks only nearby."""
     def __init__(self, cell=10.0):
@@ -148,10 +164,11 @@ def edge_distance(x, y, lines, grid):
     return best
 
 
-def plan(trees, lines, ground, extent, understory, seed, water_level=1.9, focus=None):
+def plan(trees, lines, ground, extent, understory, seed, water_level=1.9, focus=None, clearings=()):
     """Where everything goes: a list of (species, x, y, scale, yaw) in the package's CRS, trees first. `ground(x, y)`
     gives the ground height (NaN outside the package). `focus` (x, y, radius, count) adds `count` more understory
-    plants within `radius` of (x, y), where the camera looks closest."""
+    plants within `radius` of (x, y), where the camera looks closest. `clearings` are (distance, polyline, keep):
+    within `distance` of the polyline only `keep` of the understory stays, and it's low ground cover (CLEARING)."""
     rng = random.Random(seed)
     placed = []
     road_grid = line_grid(lines)
@@ -188,13 +205,16 @@ def plan(trees, lines, ground, extent, understory, seed, water_level=1.9, focus=
 
     batches = [(understory, anywhere)] + ([(focus[3], near_focus)] if focus else [])
     for want, where in batches:
-        scatter(want, where, rng, trees, lines, road_grid, crowns, trunks, shore, ground, water_level, placed)
+        scatter(want, where, rng, trees, lines, road_grid, crowns, trunks, shore, ground, water_level, placed,
+                clearings)
     return placed
 
 
-def scatter(want, where, rng, trees, lines, road_grid, crowns, trunks, shore, ground, water_level, placed):
+def scatter(want, where, rng, trees, lines, road_grid, crowns, trunks, shore, ground, water_level, placed,
+            clearings=()):
     """Adds `want` understory plants at points from `where()` that pass: on the ground above the water, off roads,
-    driveways, trails and trunks; the mix by canopy, road edge and beach."""
+    driveways, trails and trunks; the mix by canopy, road edge and beach. In a clearing a plant is left out (its place
+    in `want` used up, so the clearing is thinner, not the rest denser) unless a draw under its `keep` keeps it."""
     made, tries = 0, 0
     while made < want and tries < want * 20:
         tries += 1
@@ -218,6 +238,13 @@ def scatter(want, where, rng, trees, lines, road_grid, crowns, trunks, shore, gr
             mix = UNDER_CANOPY
         else:
             mix = OPENING
+        cleared = [keep for distance, line, keep in clearings
+                   if import_roads.distance_to_line((x, y), line) < distance]
+        if cleared:
+            made += 1
+            if rng.random() >= min(cleared):
+                continue
+            mix = CLEARING
         species, scales = weighted(rng, mix)
         placed.append((species, x, y, rng.uniform(*scales), rng.uniform(0, 360)))
         made += 1
@@ -303,6 +330,9 @@ def main():
     parser.add_argument('--focus', type=float, nargs=4, metavar=('X', 'Y', 'RADIUS', 'COUNT'),
                         help='COUNT more understory plants within RADIUS (m) of X Y (CRS): denser where the camera '
                              'starts')
+    parser.add_argument('--clearing', nargs=3, action='append', default=[], metavar=('ID', 'DISTANCE', 'KEEP'),
+                        help='cleared ground within DISTANCE (m) of the roads file line ID: only KEEP (0 to 1) of the '
+                             'understory there, low ground cover; repeatable')
     parser.add_argument('--seed', type=int, default=7)
     args = parser.parse_args()
     package = import_roads.Package(args.package)
@@ -312,8 +342,10 @@ def main():
     lines = load_lines(args.roads)
     extent = (min(t['x'] for t in trees) - args.margin, min(t['y'] for t in trees) - args.margin,
               max(t['x'] for t in trees) + args.margin, max(t['y'] for t in trees) + args.margin)
+    clearings = [(float(distance), clearing_line(args.roads, line_id), float(keep))
+                 for line_id, distance, keep in args.clearing]
     placed = plan(trees, lines, package.height, extent, args.understory, args.seed,
-                  focus=tuple(args.focus) if args.focus else None)
+                  focus=tuple(args.focus) if args.focus else None, clearings=clearings)
     pnw = json.load(open(PNW, encoding='utf-8'))
     objects = scene_objects(placed, package.height, (package.cx, package.cy), pnw)
     materials, atlases = used_resources(objects, pnw)

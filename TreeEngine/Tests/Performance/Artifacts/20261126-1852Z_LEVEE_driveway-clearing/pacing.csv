@@ -1,0 +1,7 @@
+﻿"test","scene","mode","run","success","processMs","frameP50Ms","frameP90Ms","frameP99Ms","frameMaxMs","frameMeanMs","spikes","over33Ms","spikeExcessMs","rebuiltBLASFrames","maxBlasCpuMs"
+"Hungerford-walk","Hungerford","raster","1","True","13345.0281","15.6177","17.9625","20.5138","21.5571","16.0492515","0","0","0","0","0"
+"Hungerford-walk","Hungerford","raytracing","1","True","14594.4499","17.824","19.3626","22.48","23.5841","18.0348023333333","0","0","0","2","4.521"
+"Hungerford-walk","Hungerford","raster","2","True","13495.1973","15.8517","18.6902","20.7894","22.6737","16.309938","0","0","0","0","0"
+"Hungerford-walk","Hungerford","raytracing","2","True","14500.6186","17.6118","19.2719","22.0183","24.0968","17.8122868333333","0","0","0","2","5.203"
+"Hungerford-walk","Hungerford","raster","3","True","12993.4559","15.4784","16.4113","17.5523","19.5547","15.5666488333333","0","0","0","0","0"
+"Hungerford-walk","Hungerford","raytracing","3","True","14332.8553","17.3609","18.9066","20.688","22.8813","17.5679028333333","0","0","0","2","4.6355"

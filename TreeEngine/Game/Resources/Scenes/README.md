@@ -291,7 +291,9 @@ Hungerford is also planted in a 300 m square about the 190 E Scott Dr driveway,
 where it starts:
 - the 701 trees LiDAR found there (`Terrain/Hungerford.trees.geojson`), each
   scaled to its measured height;
-- 8,000 understory plants, 5,000 of them within 60 m of the start.
+- about 6,400 understory plants, most within 60 m of the start, but thin and
+  low (scattered ferns, bracken and grass) within 20 m of the 190 E Scott Dr
+  driveway, whose lot is cleared in the site photos.
 
 The plants are instances of `PNW Plants` species, written into the scene by
 `Tools/terrain/place_plants.py` (objects `pnw-*` and `plant-*`), with leaner
