@@ -86,7 +86,12 @@ public:
     void SetRenderTestLodFadeFrames(int frames) { m_settings.m_lodFadeFrames = frames; }
     void SetRenderTestTerrainStreaming(bool streaming) { m_settings.m_terrainStreaming = streaming; }
     void SetRenderTestShowRoads(bool show) { m_settings.m_showRoads = show; }
-    void SetRenderTestShadows(int cascades, float distance) { m_settings.m_shadowCascades = cascades; m_settings.m_shadowDistance = distance; }
+    void SetRenderTestShadows(int cascades, float distance, float minCasterTexels)
+    {
+        m_settings.m_shadowCascades = cascades;
+        m_settings.m_shadowDistance = distance;
+        if (minCasterTexels >= 0) m_settings.m_shadowMinCasterTexels = minCasterTexels;     // Negative keeps the default.
+    }
     void SetRenderTestHighlightsThroughGeometry(bool enabled)
     {
         m_settings.m_highlightsThroughGeometry = enabled;

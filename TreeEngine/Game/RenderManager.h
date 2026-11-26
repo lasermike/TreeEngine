@@ -237,6 +237,7 @@ public:
     void UpdateCullingFrustum();
     void UpdateCullingPlanes(const XMFLOAT4X4& viewProjection, bool orthographic);
     bool IsVisible(WorldObject* object);
+    bool TooSmallForCascade(WorldObject* object) const;
     bool IsVisible(const XMFLOAT3 bounds[2]) const;
 
     HRESULT SetInstances(RenderUnit* renderUnit, WorldObject* object, UINT startInstance, UINT numInstances,
