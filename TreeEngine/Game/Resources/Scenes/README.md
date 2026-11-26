@@ -282,7 +282,8 @@ forest floor (`forest-duff`, the dirt maps tinted), reddish drive gravel
 (`drive-gravel` through `roadSurfaces`), grey Douglas fir, hemlock and alder
 bark flecked with pale lichen (`Nature/bark_lichen_*`, from
 `Tools/make-lichen-bark.ps1`; `Tools/terrain/place_plants.py`, `PHOTO_BARK`),
-a hazy Puget Sound sky with scattered cumulus and its lighting
+olive yellow-green foliage rather than the leaf atlases' saturated green
+(`PHOTO_FOLIAGE`), a hazy Puget Sound sky with scattered cumulus and its lighting
 (`Environment/puget-sound-*`; see `Environment/terra-daylight.md`), and a
 brighter sky and sun (`environment.intensity` 3, sun 4.2) for the light under
 the canopy.

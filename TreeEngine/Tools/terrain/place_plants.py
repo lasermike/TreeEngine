@@ -289,6 +289,19 @@ PHOTO_BARK = {'bark-douglas-fir': ('lichen', [0.95, 0.95, 1.0, 1]), 'bark-hemloc
               'bark-alder': ('lichen', [1.2, 1.2, 1.2, 1]), 'bark-snag': ('lichen', [1.1, 1.1, 1.1, 1])}
 
 
+# Foliage colours matched to the photos: the leaf atlases are a saturated pure green (green about twice red), the
+# site's foliage an olive yellow-green (green about 1.1 times red, blue 0.6 times green). These multiply each foliage
+# material's tint: conifers fully; broadleaf leaves less (their sprites already have more red, and at the conifers'
+# warmth they turn autumn gold); ferns and grass less again (they're a brighter green in the photos).
+CANOPY_WARMTH = [2.8, 1.2, 1.5]
+BROADLEAF_WARMTH = [1.5, 1.1, 1.25]
+GROUND_WARMTH = [2.0, 1.1, 1.3]
+PHOTO_FOLIAGE = {'needles-fir': CANOPY_WARMTH, 'needles-hemlock': CANOPY_WARMTH, 'sprays-cedar': CANOPY_WARMTH,
+                 'leaves-broadleaf': BROADLEAF_WARMTH, 'leaves-glossy': BROADLEAF_WARMTH,
+                 'fronds-fern': GROUND_WARMTH, 'fronds-bracken': GROUND_WARMTH, 'grass': GROUND_WARMTH,
+                 'grass-seed': GROUND_WARMTH}
+
+
 def lean(material, name=None):
     """A pnw-plants material on fewer textures, for a scene that has its own (a scene holds 32): barks use the lean
     bark's maps (tinted as before), or the bark and tint PHOTO_BARK gives, and no material has a roughness map (its
@@ -297,6 +310,9 @@ def lean(material, name=None):
     bark = LEAN_BARK
     if name in PHOTO_BARK:
         bark, m['baseColor'] = PHOTO_BARK[name]
+    if name in PHOTO_FOLIAGE:
+        tint = m.get('baseColor', [1, 1, 1, 1])
+        m['baseColor'] = [round(tint[i] * PHOTO_FOLIAGE[name][i], 3) for i in range(3)] + [tint[3]]
     m.pop('metallicRoughnessTexture', None)
     for key in ('baseColorTexture', 'normalTexture'):
         source = (m.get(key) or {}).get('source', '')

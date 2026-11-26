@@ -152,6 +152,12 @@ check(len(textures) <= 10, f'{len(textures)} textures for the plants: {sorted(te
 check(materials['bark-douglas-fir']['baseColorTexture']['source'] == 'Nature/bark_lichen_color.jpg'
       and materials['bark-cedar']['baseColorTexture']['source'] == f'Nature/bark_{plants.LEAN_BARK}_color.jpg',
       'the fir or cedar bark is not the photo-matched one')
+# Photo-matched foliage: warmer than pnw-plants' (more red against green), the lichen untouched.
+fir_needles = pnw['materials']['needles-fir']['baseColor']
+check(materials['needles-fir']['baseColor'][0] / materials['needles-fir']['baseColor'][1] > 2 * fir_needles[0] / fir_needles[1],
+      'the fir needles are not warmed')
+check('lichen' not in plants.PHOTO_FOLIAGE and 'plumes-oceanspray' not in plants.PHOTO_FOLIAGE,
+      'the lichen or the oceanspray flowers are warmed')
 check(all(o['materials'][k] in materials for o in sources for k in o['materials']), 'a source material is missing')
 
 # Hungerford's committed scene: planted, and within the 32 textures a scene holds.
