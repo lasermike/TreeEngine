@@ -103,6 +103,18 @@ outside_open = [p for p in open_plan[5:] if not inside(p)]
 check(abs(len(outside_cleared) - len(outside_open)) < 0.15 * len(outside_open),
       'the clearing made the understory around it denser')
 check(cleared_plan[:5] == open_plan[:5], 'the clearing moved trees')
+# A clearing that keeps everything changes nothing but the mix: as many plants as without it (Codex review of #29).
+kept_all = plants.plan(trees, road + trail, ground, extent, 400, 7, water_level=1.9, clearings=[(1000.0, lot, 1.0)])
+check(len(kept_all) - 5 == 400, f'a clearing keeping everything gave {len(kept_all) - 5} of 400 plants')
+# A two-part line clears along each part, not across the gap between them.
+with tempfile.TemporaryDirectory() as tmp:
+    roads_path = os.path.join(tmp, 'Test.roads.geojson')
+    json.dump({'type': 'FeatureCollection', 'features': [
+        {'type': 'Feature', 'properties': {'kind': 'driveway', 'id': 'lot'},
+         'geometry': {'type': 'MultiLineString', 'coordinates': [[[0, 10], [0, 20]], [[100, 10], [100, 20]]]}}]},
+        open(roads_path, 'w'))
+    parts = plants.clearing_lines(roads_path, 'lot')
+    check(len(parts) == 2 and all(len(p) == 2 for p in parts), f'a two-part clearing line gave {parts}')
 
 # Seeded: the same plan twice.
 again = plants.plan(trees, road + trail, ground, extent, 1500, 7, water_level=1.9, focus=(1060.0, 2060.0, 15.0, 300))

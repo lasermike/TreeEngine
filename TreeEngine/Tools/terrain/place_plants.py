@@ -109,8 +109,9 @@ def load_lines(path):
     return lines
 
 
-def clearing_line(path, line_id):
-    """The polyline of the roads file's line with this id (a driveway whose lot is cleared)."""
+def clearing_lines(path, line_id):
+    """The polylines of the roads file's line with this id (a driveway whose lot is cleared): one per part, so a
+    MultiLineString's gaps aren't cleared."""
     if not path:
         raise SystemExit('--clearing needs --roads')
     for f in json.load(open(path, encoding='utf-8')).get('features', []):
@@ -118,7 +119,7 @@ def clearing_line(path, line_id):
             g = f.get('geometry') or {}
             parts = g.get('coordinates') or []
             parts = parts if g.get('type') == 'MultiLineString' else [parts]
-            return [tuple(q[:2]) for part in parts for q in part]
+            return [[tuple(q[:2]) for q in part] for part in parts if len(part) >= 2]
     raise SystemExit(f'{path}: no line {line_id}')
 
 
@@ -241,8 +242,8 @@ def scatter(want, where, rng, trees, lines, road_grid, crowns, trunks, shore, gr
         cleared = [keep for distance, line, keep in clearings
                    if import_roads.distance_to_line((x, y), line) < distance]
         if cleared:
-            made += 1
             if rng.random() >= min(cleared):
+                made += 1           # Cleared: its place is used up, so the clearing is thinner, not the rest denser.
                 continue
             mix = CLEARING
         species, scales = weighted(rng, mix)
@@ -342,8 +343,8 @@ def main():
     lines = load_lines(args.roads)
     extent = (min(t['x'] for t in trees) - args.margin, min(t['y'] for t in trees) - args.margin,
               max(t['x'] for t in trees) + args.margin, max(t['y'] for t in trees) + args.margin)
-    clearings = [(float(distance), clearing_line(args.roads, line_id), float(keep))
-                 for line_id, distance, keep in args.clearing]
+    clearings = [(float(distance), part, float(keep))
+                 for line_id, distance, keep in args.clearing for part in clearing_lines(args.roads, line_id)]
     placed = plan(trees, lines, package.height, extent, args.understory, args.seed,
                   focus=tuple(args.focus) if args.focus else None, clearings=clearings)
     pnw = json.load(open(PNW, encoding='utf-8'))

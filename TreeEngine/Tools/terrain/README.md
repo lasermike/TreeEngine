@@ -301,7 +301,7 @@ It's seeded, and a re-run replaces the objects it made before and keeps everythi
 trees file, the roads or the species, then rebuild. `--clearing ID DISTANCE KEEP` (repeatable) clears the ground within DISTANCE metres of the roads file's line ID,
 such as a driveway whose lot is cleared: only KEEP (0 to 1) of the understory that would grow there stays, and only low
 ground cover (sword fern, bracken, grass, a little salal); the rest isn't moved elsewhere, and trees stay.
-Hungerford: 701 trees and about 6,400 understory plants (8,105 objects), the 190 E Scott Dr driveway's lot cleared
+Hungerford: 701 trees and about 6,600 understory plants (8,272 objects), the 190 E Scott Dr driveway's lot cleared
 (20 m, 12%) as in the site photos.
 The cost is mostly per object: Hungerford's start view draws in about 28 ms (raster, most of it the trees in the
 shadow cascades; ferns and grass are left out of cascades too coarse for them, `Settings::m_shadowMinCasterTexels`,
