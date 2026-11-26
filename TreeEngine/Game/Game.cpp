@@ -293,6 +293,10 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_sceneIsUser = m_currentScene >= 0 && m_loader.Catalog().Entries()[m_currentScene].user;
     m_sceneSelection = m_sceneFilename;
     m_renderManager.ApplySceneSettings(sceneSettings);
+    // The startup scene's growth clock, as LoadScene sets it for later loads.
+    m_growthSpeed = m_sceneDefinition.growthSpeed;
+    m_growthTime = m_growthLargest = m_sceneDefinition.growthStartTime;
+    m_renderManager.GetRenderData().growthTime = static_cast<float>(m_growthTime);
 
 #if defined(TREENGINE_WIN32)
     SetWindowText(m_hwnd, Wide(m_sceneDefinition.name).c_str());
