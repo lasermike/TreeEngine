@@ -78,7 +78,7 @@ prompts, autosave, directory watcher, or asset packaging are provided.
 - `id`: optional stable scene identity, described above.
 - `name`: required nonempty display name.
 - `camera`: transform with optional `position`, `rotation`, and `scale`.
-- `render`: optional `clearColor`, `farClippingPlane`, `useShadowMaps`, `useAlphaBlendedRenderTarget`, `environment`, and `sky`. The far plane defaults to 30 and must exceed the 0.2-unit near plane. `environment` requires `diffuse` and `specular` paths to linear HDR DDS cube maps. The specular cube's mip levels run from smooth to rough; the environment lights glTF materials in both raster and DXR without changing the background. `sky` draws a background: `cubeMap` (required) is a DDS cube map, and `rotationDegrees` (default `0`) is a yaw about +Y. The sky follows the camera, is drawn behind all objects, and supplies the DXR ray-miss color; without it the background is `clearColor`. Skies are not objects and have no material.
+- `render`: optional `clearColor`, `farClippingPlane`, `useShadowMaps`, `useAlphaBlendedRenderTarget`, `environment`, and `sky`. The far plane defaults to 30 and must exceed the 0.2-unit near plane. `environment` requires `diffuse` and `specular` paths to linear HDR DDS cube maps, and takes an optional `intensity` (0 to 16, default 1) that scales the light they give (in raster and DXR), for scenes lit mostly by the sky, such as under a forest canopy. The specular cube's mip levels run from smooth to rough; the environment lights glTF materials in both raster and DXR without changing the background. `sky` draws a background: `cubeMap` (required) is a DDS cube map, and `rotationDegrees` (default `0`) is a yaw about +Y. The sky follows the camera, is drawn behind all objects, and supplies the DXR ray-miss color; without it the background is `clearColor`. Skies are not objects and have no material.
 - `light`: optional directional-light `ambient`, `diffuse`, `specular`, `direction`, and `shadowPosition`. Omitting `shadowPosition` retains automatic shadow placement; supplying it preserves the authored light-position override.
 - `pointLightCount`: point-light activation, `0` or `1`.
 - `pointLight`: optional `ambient`, `diffuse`, `specular`, `position`, `range`, and `attenuation`. Range and attenuation components must be nonnegative.
@@ -180,6 +180,10 @@ or GIS elevation data). It requires `source`, the package directory, such as
   Clicking a prop selects it for editing in the terrain's Props section
   of the Objects panel: move it, turn it, remove it, and save the edits back
   into the roads file (Tools/terrain/README.md).
+- `roadSurfaces`: scene materials in place of the built-in road surfaces, by
+  name: `asphalt`, `gravel`, `trail`, such as
+  `"roadSurfaces": { "gravel": "drive-gravel" }`. The built-in ones tile their
+  maps every 4 m (`textureCoordScale` 0.25); a replacement uses its own.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,
@@ -246,6 +250,12 @@ Elevation surveys record water as a flat surface rather than its bottom, so for
 tides import terrain with `--water-level` and, where there is any, bathymetry
 (`Tools/terrain/README.md`). The `Hungerford` scene shows both, with the tide
 at Arcadia, at the mouth of Totten Inlet.
+
+Hungerford's colours are matched to photos of the site: a red-brown needle-duff
+forest floor (`forest-duff`, the dirt maps tinted), reddish drive gravel
+(`drive-gravel` through `roadSurfaces`), grey Douglas fir and hemlock bark
+(`Tools/terrain/place_plants.py`, `PHOTO_BARK`), and a brighter sky and sun
+(`environment.intensity` 3, sun 4.2) for the light under the canopy.
 
 Hungerford is also planted in a 300 m square about the 190 E Scott Dr driveway,
 where it starts:

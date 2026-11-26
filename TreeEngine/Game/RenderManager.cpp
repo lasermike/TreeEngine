@@ -1154,7 +1154,7 @@ void RenderManager::Render(bool oculus, bool useAlphaBlendedRenderTarget, bool u
     // y: the frame number (mod 1024), which varies the LOD crossfade dither each frame (see FadeDither).
     // z: the distance beyond which contact shading casts fewer probes (see sunShadowParams.zw).
     cb.sceneTime = XMFLOAT4(m_renderData.normalAnimationTime, static_cast<float>(m_renderData.frame & 1023),
-        m_settings->m_contactFullDistance, 0);
+        m_settings->m_contactFullDistance, m_renderData.environmentIntensity);
     cb.sunShadowParams = XMFLOAT4(tanf(XMConvertToRadians(m_renderData.sunAngularDiameterDegrees) * 0.5f),
         static_cast<float>(m_settings->m_sunShadowSamplesOverride > 0 ? m_settings->m_sunShadowSamplesOverride
             : m_renderData.sunShadowSamples),
