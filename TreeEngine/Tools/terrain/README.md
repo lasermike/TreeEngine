@@ -278,7 +278,7 @@ trees.
 species in `Game/Resources/Scenes/pnw-plants.scene.json`:
 
 ```bash
-python place_plants.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Game/Resources/Terrain/Hungerford.trees.geojson     ../../Game/Resources/Scenes/hungerford.scene.json --roads ../../Game/Resources/Terrain/Hungerford.roads.geojson     --understory 3000 --focus 504546 5228299 60 5000
+python place_plants.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Game/Resources/Terrain/Hungerford.trees.geojson     ../../Game/Resources/Scenes/hungerford.scene.json --roads ../../Game/Resources/Terrain/Hungerford.roads.geojson     --understory 3000 --focus 504546 5228299 60 5000 --clearing address-220215000014-190 20 0.12
 ```
 
 - **Sources.** Each species used becomes one source tree (`pnw-<species>`), copied from pnw-plants. It stands at its
@@ -298,7 +298,11 @@ python place_plants.py ../../Game/Resources/Terrain/Hungerford.terrain ../../Gam
 - **Clearances.** Nothing stands on a road, driveway or trail, in the water, or in a trunk.
 
 It's seeded, and a re-run replaces the objects it made before and keeps everything else, so re-run it after editing the
-trees file, the roads or the species, then rebuild. Hungerford: 701 trees and 8,000 understory plants (9,827 objects).
+trees file, the roads or the species, then rebuild. `--clearing ID DISTANCE KEEP` (repeatable) clears the ground within DISTANCE metres of the roads file's line ID,
+such as a driveway whose lot is cleared: only KEEP (0 to 1) of the understory that would grow there stays, and only low
+ground cover (sword fern, bracken, grass, a little salal); the rest isn't moved elsewhere, and trees stay.
+Hungerford: 701 trees and about 6,600 understory plants (8,272 objects), the 190 E Scott Dr driveway's lot cleared
+(20 m, 12%) as in the site photos.
 The cost is mostly per object: Hungerford's start view draws in about 28 ms (raster, most of it the trees in the
 shadow cascades; ferns and grass are left out of cascades too coarse for them, `Settings::m_shadowMinCasterTexels`,
 and trees draw their coarsest layout into all but the first, `Settings::m_shadowLayoutLevel`)

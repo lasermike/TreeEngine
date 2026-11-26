@@ -87,6 +87,35 @@ with tempfile.TemporaryDirectory() as tmp:
     lines = plants.load_lines(path)
     check(plants.edge_distance(50.0, 2.9, lines, plants.line_grid(lines)) < 0, 'a point 2.9 m from a 6 m road is off it')
 
+# A clearing along a line: within 10 m of it only a tenth of the understory stays, and only low ground cover.
+lot = [(1050.0, 2000.0), (1050.0, 2100.0)]
+cleared_plan = plants.plan(trees, road + trail, ground, extent, 1500, 7, water_level=1.9, clearings=[(10.0, lot, 0.1)])
+open_plan = plants.plan(trees, road + trail, ground, extent, 1500, 7, water_level=1.9)
+inside = lambda p: plants.import_roads.distance_to_line((p[1], p[2]), lot) < 10.0
+in_cleared = [p for p in cleared_plan[5:] if inside(p)]
+in_open = [p for p in open_plan[5:] if inside(p)]
+check(len(in_open) > 100 and len(in_cleared) < 0.2 * len(in_open),
+      f'the clearing kept {len(in_cleared)} of about {len(in_open)} plants')
+low = {s for s, *_ in plants.CLEARING}
+check(all(p[0] in low for p in in_cleared), f'a tall plant in the clearing: {sorted({p[0] for p in in_cleared} - low)}')
+outside_cleared = [p for p in cleared_plan[5:] if not inside(p)]
+outside_open = [p for p in open_plan[5:] if not inside(p)]
+check(abs(len(outside_cleared) - len(outside_open)) < 0.15 * len(outside_open),
+      'the clearing made the understory around it denser')
+check(cleared_plan[:5] == open_plan[:5], 'the clearing moved trees')
+# A clearing that keeps everything changes nothing but the mix: as many plants as without it (Codex review of #29).
+kept_all = plants.plan(trees, road + trail, ground, extent, 400, 7, water_level=1.9, clearings=[(1000.0, lot, 1.0)])
+check(len(kept_all) - 5 == 400, f'a clearing keeping everything gave {len(kept_all) - 5} of 400 plants')
+# A two-part line clears along each part, not across the gap between them.
+with tempfile.TemporaryDirectory() as tmp:
+    roads_path = os.path.join(tmp, 'Test.roads.geojson')
+    json.dump({'type': 'FeatureCollection', 'features': [
+        {'type': 'Feature', 'properties': {'kind': 'driveway', 'id': 'lot'},
+         'geometry': {'type': 'MultiLineString', 'coordinates': [[[0, 10], [0, 20]], [[100, 10], [100, 20]]]}}]},
+        open(roads_path, 'w'))
+    parts = plants.clearing_lines(roads_path, 'lot')
+    check(len(parts) == 2 and all(len(p) == 2 for p in parts), f'a two-part clearing line gave {parts}')
+
 # Seeded: the same plan twice.
 again = plants.plan(trees, road + trail, ground, extent, 1500, 7, water_level=1.9, focus=(1060.0, 2060.0, 15.0, 300))
 check(again == placed, 'the plan changed between runs')
