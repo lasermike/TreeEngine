@@ -32,7 +32,7 @@ camera, and settings. Successful loads reset scene time.
 ### Moving the camera
 
 Scenes start on foot (walk), except scenes with a camera path, which start flying. **Double-tap Space** to switch.
-- **Walk:** W/A/S/D move level at 4.3 m/s, **Space** jumps (1.25 m), **Shift** crouches, **Ctrl** sprints. The eye
+- **Walk:** W/A/S/D move level at 4.3 m/s, **Space** jumps (1.25 m), **Shift** crouches, **Ctrl** sprints (3x). The eye
   stays 1.6 m above the terrain (above height 0 in scenes without terrain).
 - **Fly:** W/A/S/D move level at 11 m/s, **Space** and **Ctrl** (or Page Up/Down) rise and descend, **Shift**
   boosts threefold. The fly camera passes through the ground.

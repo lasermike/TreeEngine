@@ -897,6 +897,19 @@ void TestCameraMotion()
             "walking forward is not 4.3 m/s, eased, the same at 30 and 120 fps");
     }
 
+    // Ctrl sprints at three times the walk speed.
+    {
+        CameraMotion m;
+        XMFLOAT3 p(0, CameraMotion::EyeHeight, 0);
+        m.Reset(Mode::Walk, p);
+        bool sprint[512] = {};
+        sprint['W'] = true;
+        sprint[0x11] = true;
+        run(m, sprint, 3, p, facingZ);
+        Check(std::abs(m.Velocity().z - CameraMotion::WalkSpeed * CameraMotion::SprintFactor) < 0.05f
+            && CameraMotion::SprintFactor >= 3, "Ctrl did not sprint at three times the walk speed");
+    }
+
     // Looking down doesn't dive: W moves level.
     {
         CameraMotion m;

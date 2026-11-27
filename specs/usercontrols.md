@@ -23,7 +23,7 @@ Upgrade the user controls to be more accessible and comfortable to someone who p
 |---|---|
 | Eye height | 1.6 m (crouched 1.3 m) |
 | Jump height | 1.25 m |
-| Walk speed | 4.3 m/s; Ctrl sprint ×1.3; crouch ×0.3 |
+| Walk speed | 4.3 m/s; Ctrl sprint ×3; crouch ×0.3 |
 | Fly speed | about 11 m/s; Shift boost ×3 by default, scroll wheel sets it from ×1 to ×10 |
 | Double-tap window | 0.3 s between Space presses |
 

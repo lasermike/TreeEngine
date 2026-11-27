@@ -19,7 +19,7 @@ public:
     static constexpr float JumpHeight = 1.25f;
     static constexpr float Gravity = 32.0f;
     static constexpr float WalkSpeed = 4.3f;
-    static constexpr float SprintFactor = 1.3f;
+    static constexpr float SprintFactor = 3.0f;      // Much faster than Minecraft's 1.3: scenes are large.
     static constexpr float CrouchFactor = 0.3f;
     static constexpr float FlySpeed = 11.0f;
     static constexpr float FlyBoost = 3.0f;
