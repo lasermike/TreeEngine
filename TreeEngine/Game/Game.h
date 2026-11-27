@@ -198,6 +198,7 @@ public:
     static constexpr float MouseRadiansPerCount = 0.0022f;
 private:
     bool m_mouseLook = true;
+    bool m_mouseLookWasActive = false;     // Last UI frame's MouseLookActive(), to free the UI's focus as it turns on.
     void ResetPlayerMovement();
     void UpdateObjectSelection();
     bool m_selectionUIWasVisible = false;

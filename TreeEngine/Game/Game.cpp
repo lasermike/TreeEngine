@@ -1300,6 +1300,11 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
     // The window procedure drops key presses while this is set, so it must clear whenever the window isn't drawn:
     // closing the window while it had keyboard focus would otherwise leave every key, Tab included, ignored.
     m_bDebugUIKeyCaptured = false;
+    // Mouse look turning on (at start, Esc, or the UI's checkbox) takes the keyboard from the UI too: a focused debug
+    // window would otherwise keep capturing it (keyboard navigation), and movement and Esc would never reach the game.
+    if (MouseLookActive() && !m_mouseLookWasActive)
+        ImGui::SetWindowFocus(nullptr);
+    m_mouseLookWasActive = MouseLookActive();
     if (!m_settings.m_showDebugUI)
     {
         return S_OK;
