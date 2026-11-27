@@ -10,7 +10,8 @@ class CameraMotion
 {
 public:
     enum class Mode { Walk, Fly };
-    // The ground height at (x, z), false where there is no ground there.
+    // The ground height at (x, z); false where there is none (off a terrain's edge), where the walker keeps the last
+    // height it stood on. A scene without terrain reports 0 everywhere.
     using GroundHeight = std::function<bool(float x, float z, float& height)>;
 
     static constexpr float EyeHeight = 1.6f;

@@ -851,6 +851,30 @@ void TestCameraMotion()
     Check(std::abs(position.y - CameraMotion::EyeHeight) < 0.001f && walk.OnGround(),
         "the walk camera did not land at eye height on ground 0");
 
+    // A scene without terrain reports ground 0 everywhere (Codex review of #34): from above, the walker falls to eye
+    // height; from below eye height, it rises to it.
+    for (float start : { 30.0f, 0.5f })
+    {
+        CameraMotion m;
+        m.SetGround([](float, float, float& height) { height = 0; return true; });
+        XMFLOAT3 p(0, start, 0);
+        m.Reset(Mode::Walk, p);
+        run(m, keys, 3, p, facingZ);
+        Check(std::abs(p.y - CameraMotion::EyeHeight) < 0.001f, "a walker without terrain didn't stand at eye height on 0");
+    }
+    // Off a terrain's edge (no ground there), the walker keeps the last ground it stood on.
+    {
+        CameraMotion m;
+        m.SetGround([](float x, float, float& height) { height = 7; return x < 1; });
+        XMFLOAT3 p(0, 20, 0);
+        m.Reset(Mode::Walk, p);
+        run(m, keys, 2, p, facingZ);
+        bool d[512] = {};
+        d['D'] = true;
+        run(m, d, 2, p, facingZ);
+        Check(p.x > 3 && std::abs(p.y - 7 - CameraMotion::EyeHeight) < 0.001f, "off the terrain's edge the walker fell");
+    }
+
     // Terrain: stands on the ground the callback reports, climbing a slope.
     walk.SetGround([](float x, float, float& height) { height = 5 + 0.2f * x; return true; });
     keys['D'] = true;      // Facing +z, D strafes toward +x, uphill.

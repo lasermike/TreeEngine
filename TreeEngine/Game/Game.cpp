@@ -269,22 +269,27 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     //playerParams->position = XMFLOAT3(-4.0f, 1.5f, -4.0f);
     XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
     m_player = new Player(playerParams);
-    // The walk camera stands on the highest terrain under it (none: the ground is at 0).
+    // The walk camera stands on the highest terrain under it. A scene without terrain has its ground at 0; off the
+    // edge of a scene's terrain there is no ground (false), and the walker keeps the last height it stood on.
     m_player->SetGround([this](float x, float z, float& height)
     {
-        bool found = false;
+        bool terrain = false, found = false;
         if (m_pScene)
             for (WorldObject* object : m_pScene->Children())
             {
+                if (object->GetObjectType() != ObjectType_Terrain)
+                    continue;
+                terrain = true;
                 float y = 0;
-                if (object->GetObjectType() == ObjectType_Terrain && static_cast<Terrain*>(object)->HeightAt(x, z, y)
-                    && (!found || y > height))
+                if (static_cast<Terrain*>(object)->HeightAt(x, z, y) && (!found || y > height))
                 {
                     height = y;
                     found = true;
                 }
             }
-        return found;
+        if (!terrain)
+            height = 0;
+        return found || !terrain;
     });
 
     HRR(ReloadDevice());
