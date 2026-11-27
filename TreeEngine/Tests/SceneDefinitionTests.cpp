@@ -910,23 +910,24 @@ void TestCameraMotion()
         Check(std::abs(p.y - 50) < 0.001f && p.z > 5, "flying forward while looking down changed height");
     }
 
-    // Jump: about 1.25 m.
+    // Jump: about 1.25 m, at 10, 60 and 120 fps alike (Codex review of #34: it was 0.83 m at 10 fps).
+    for (float step : { 1.0f / 10, 1.0f / 60, 1.0f / 120 })
     {
         CameraMotion m;
         XMFLOAT3 p(0, CameraMotion::EyeHeight, 0);
         m.Reset(Mode::Walk, p);
-        run(m, keys, 0.1f, p, facingZ);
+        m.Step(keys, step, p, facingZ);
         bool jump[512] = {};
         jump[0x20] = true;
-        m.Step(jump, dt, p, facingZ);
+        m.Step(jump, step, p, facingZ);
         float top = p.y;
-        for (int i = 0; i < 60; ++i)
+        for (float t = 0; t < 1.5f; t += step)
         {
-            m.Step(keys, dt, p, facingZ);
+            m.Step(keys, step, p, facingZ);
             top = (std::max)(top, p.y);
         }
-        Check(std::abs(top - CameraMotion::EyeHeight - CameraMotion::JumpHeight) < 0.1f && m.OnGround(),
-            "a jump didn't rise about 1.25 m and land");
+        Check(std::abs(top - CameraMotion::EyeHeight - CameraMotion::JumpHeight) < 0.05f && m.OnGround(),
+            "a jump didn't rise about 1.25 m and land, whatever the frame rate");
     }
 
     // Double-tapping Space switches walk to fly; in fly, Space rises, Ctrl descends, and there's no gravity.

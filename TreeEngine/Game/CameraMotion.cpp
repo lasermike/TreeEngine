@@ -92,6 +92,7 @@ void CameraMotion::Step(const bool keys[512], float seconds, XMFLOAT3& position,
     m_velocity.x = Approach(m_velocity.x, XMVectorGetX(target), response, seconds);
     m_velocity.z = Approach(m_velocity.z, XMVectorGetZ(target), response, seconds);
 
+    float rise;
     if (walking)
     {
         if (space && m_onGround)
@@ -99,6 +100,8 @@ void CameraMotion::Step(const bool keys[512], float seconds, XMFLOAT3& position,
             m_velocity.y = sqrtf(2 * Gravity * JumpHeight);
             m_onGround = false;
         }
+        // Falling exactly over the step (not a step of the new speed), so a jump is as high at 10 fps as at 120.
+        rise = m_velocity.y * seconds - 0.5f * Gravity * seconds * seconds;
         m_velocity.y -= Gravity * seconds;
     }
     else
@@ -106,9 +109,10 @@ void CameraMotion::Step(const bool keys[512], float seconds, XMFLOAT3& position,
         const float vertical = (std::max)(-1.0f, (std::min)(1.0f,
             held(KeySpace) + held(KeyPageUp) - held(KeyControl) - held(KeyPageDown)));
         m_velocity.y = Approach(m_velocity.y, vertical * speed, response, seconds);
+        rise = m_velocity.y * seconds;
     }
     position.x += m_velocity.x * seconds;
-    position.y += m_velocity.y * seconds;
+    position.y += rise;
     position.z += m_velocity.z * seconds;
 
     if (walking)
