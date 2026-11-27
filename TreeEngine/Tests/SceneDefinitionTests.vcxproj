@@ -37,6 +37,7 @@
     <ClCompile Include="..\Game\SceneDefinition.cpp" />
     <ClCompile Include="..\Game\TerrainPackage.cpp" />
     <ClCompile Include="..\Game\Tide.cpp" />
+    <ClCompile Include="..\Game\CameraMotion.cpp" />
     <ClCompile Include="..\Game\RoadNetwork.cpp" />
     <ClCompile Include="..\Game\RoadMesh.cpp" />
     <ClCompile Include="..\Game\SignText.cpp" />

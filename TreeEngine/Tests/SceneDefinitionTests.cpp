@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "CameraMotion.h"
 #include "GltfLoader.h"
 #include "SceneDefinition.h"
 #include "RenderData.h"
@@ -828,6 +829,210 @@ void TestWaterSettings()
     bad = Json::parse(json);
     bad["objects"][1] = { { "id", "copy" }, { "instanceOf", "inlet" } };
     Reject(bad.dump(), ".instanceOf");
+}
+
+void TestCameraMotion()
+{
+    using Mode = CameraMotion::Mode;
+    const float dt = 1.0f / 60;
+    auto run = [&](CameraMotion& motion, bool* keys, float seconds, XMFLOAT3& position, XMFLOAT4& rotation)
+    {
+        for (float t = 0; t < seconds; t += dt)
+            motion.Step(keys, dt, position, rotation);
+    };
+    XMFLOAT4 facingZ(0, 0, 0, 1);
+    bool keys[512] = {};
+
+    // Walk: falls to eye height above flat ground at 0 (no terrain), and stays there.
+    CameraMotion walk;
+    XMFLOAT3 position(0, 10, 0);
+    walk.Reset(Mode::Walk, position);
+    run(walk, keys, 2, position, facingZ);
+    Check(std::abs(position.y - CameraMotion::EyeHeight) < 0.001f && walk.OnGround(),
+        "the walk camera did not land at eye height on ground 0");
+
+    // A scene without terrain reports ground 0 everywhere (Codex review of #34): from above, the walker falls to eye
+    // height; from below eye height, it rises to it.
+    for (float start : { 30.0f, 0.5f })
+    {
+        CameraMotion m;
+        m.SetGround([](float, float, float& height) { height = 0; return true; });
+        XMFLOAT3 p(0, start, 0);
+        m.Reset(Mode::Walk, p);
+        run(m, keys, 3, p, facingZ);
+        Check(std::abs(p.y - CameraMotion::EyeHeight) < 0.001f, "a walker without terrain didn't stand at eye height on 0");
+    }
+    // Off a terrain's edge (no ground there), the walker keeps the last ground it stood on.
+    {
+        CameraMotion m;
+        m.SetGround([](float x, float, float& height) { height = 7; return x < 1; });
+        XMFLOAT3 p(0, 20, 0);
+        m.Reset(Mode::Walk, p);
+        run(m, keys, 2, p, facingZ);
+        bool d[512] = {};
+        d['D'] = true;
+        run(m, d, 2, p, facingZ);
+        Check(p.x > 3 && std::abs(p.y - 7 - CameraMotion::EyeHeight) < 0.001f, "off the terrain's edge the walker fell");
+    }
+
+    // Terrain: stands on the ground the callback reports, climbing a slope.
+    walk.SetGround([](float x, float, float& height) { height = 5 + 0.2f * x; return true; });
+    keys['D'] = true;      // Facing +z, D strafes toward +x, uphill.
+    run(walk, keys, 2, position, facingZ);
+    keys['D'] = false;
+    Check(position.x > 6 && std::abs(position.y - (5 + 0.2f * position.x + CameraMotion::EyeHeight)) < 0.05f,
+        "the walk camera did not follow the terrain uphill");
+
+    // Speed: time based, eased to the walk speed (not per frame): 30 fps and 120 fps cover the same ground.
+    for (float step : { 1.0f / 30, 1.0f / 120 })
+    {
+        CameraMotion m;
+        XMFLOAT3 p(0, CameraMotion::EyeHeight, 0);
+        m.Reset(Mode::Walk, p);
+        bool w[512] = {};
+        w['W'] = true;
+        for (float t = 0; t < 3; t += step)
+            m.Step(w, step, p, facingZ);
+        Check(std::abs(m.Velocity().z - CameraMotion::WalkSpeed) < 0.01f && std::abs(p.z - 12.5f) < 0.6f,
+            "walking forward is not 4.3 m/s, eased, the same at 30 and 120 fps");
+    }
+
+    // Ctrl sprints at three times the walk speed.
+    {
+        CameraMotion m;
+        XMFLOAT3 p(0, CameraMotion::EyeHeight, 0);
+        m.Reset(Mode::Walk, p);
+        bool sprint[512] = {};
+        sprint['W'] = true;
+        sprint[0x11] = true;
+        run(m, sprint, 3, p, facingZ);
+        Check(std::abs(m.Velocity().z - CameraMotion::WalkSpeed * CameraMotion::SprintFactor) < 0.05f
+            && CameraMotion::SprintFactor >= 3, "Ctrl did not sprint at three times the walk speed");
+    }
+
+    // A rolled camera walks where it looks (Codex review of #34): rolled 180 degrees, still facing +z, W goes +z and D
+    // goes toward the screen's right (-x); looking straight down, W goes toward the screen's top.
+    {
+        auto walkFor = [&](XMFLOAT4 rotation, int key)
+        {
+            CameraMotion m;
+            XMFLOAT3 p(0, 50, 0);
+            m.Reset(Mode::Fly, p);
+            bool k[512] = {};
+            k[key] = true;
+            run(m, k, 1, p, rotation);
+            return p;
+        };
+        XMFLOAT4 rolled, down;
+        XMStoreFloat4(&rolled, XMQuaternionRotationAxis(XMVectorSet(0, 0, 1, 0), XM_PI));
+        XMStoreFloat4(&down, XMQuaternionRotationAxis(XMVectorSet(1, 0, 0, 0), XM_PIDIV2));
+        Check(walkFor(rolled, 'W').z > 3 && walkFor(rolled, 'D').x < -3, "a rolled camera walked away from its view");
+        const XMFLOAT3 straightDown = walkFor(down, 'W');
+        Check(straightDown.z > 3 && std::abs(straightDown.y - 50) < 0.001f, "looking straight down, W didn't go forward");
+    }
+
+    // Looking down doesn't dive: W moves level.
+    {
+        CameraMotion m;
+        XMFLOAT3 p(0, 50, 0);
+        m.Reset(Mode::Fly, p);
+        XMFLOAT4 down;
+        XMStoreFloat4(&down, XMQuaternionRotationAxis(XMVectorSet(1, 0, 0, 0), XM_PIDIV4));
+        bool w[512] = {};
+        w['W'] = true;
+        run(m, w, 1, p, down);
+        Check(std::abs(p.y - 50) < 0.001f && p.z > 5, "flying forward while looking down changed height");
+    }
+
+    // Jump: about 1.25 m, at 10, 60 and 120 fps alike (Codex review of #34: it was 0.83 m at 10 fps).
+    for (float step : { 1.0f / 10, 1.0f / 60, 1.0f / 120 })
+    {
+        CameraMotion m;
+        XMFLOAT3 p(0, CameraMotion::EyeHeight, 0);
+        m.Reset(Mode::Walk, p);
+        m.Step(keys, step, p, facingZ);
+        bool jump[512] = {};
+        jump[0x20] = true;
+        m.Step(jump, step, p, facingZ);
+        float top = p.y;
+        for (float t = 0; t < 1.5f; t += step)
+        {
+            m.Step(keys, step, p, facingZ);
+            top = (std::max)(top, p.y);
+        }
+        Check(std::abs(top - CameraMotion::EyeHeight - CameraMotion::JumpHeight) < 0.05f && m.OnGround(),
+            "a jump didn't rise about 1.25 m and land, whatever the frame rate");
+    }
+
+    // Double-tapping Space switches walk to fly; in fly, Space rises, Ctrl descends, and there's no gravity.
+    {
+        CameraMotion m;
+        XMFLOAT3 p(0, CameraMotion::EyeHeight, 0);
+        m.Reset(Mode::Walk, p);
+        bool space[512] = {};
+        space[0x20] = true;
+        m.Step(space, dt, p, facingZ);
+        m.Step(keys, dt, p, facingZ);
+        m.Step(space, dt, p, facingZ);
+        Check(m.GetMode() == Mode::Fly, "double-tapping Space did not switch to fly");
+        run(m, space, 1, p, facingZ);
+        const float risen = p.y;
+        run(m, keys, 2, p, facingZ);
+        Check(risen > 5 && std::abs(p.y - risen) < 3, "the fly camera did not rise on Space and hover after");
+        bool ctrl[512] = {};
+        ctrl[0x11] = true;
+        const float before = p.y;
+        run(m, ctrl, 0.5f, p, facingZ);
+        Check(p.y < before - 1, "Ctrl did not descend in fly");
+        // A slow second press is two single presses: no switch.
+        CameraMotion slow;
+        slow.Reset(Mode::Walk, p);
+        slow.Step(space, dt, p, facingZ);
+        run(slow, keys, 0.5f, p, facingZ);
+        slow.Step(space, dt, p, facingZ);
+        Check(slow.GetMode() == Mode::Walk, "two slow Space presses switched modes");
+        // At 5 fps, presses 0.4 s apart are not a double tap, though each step is cut to 0.1 s (Codex review of #34).
+        CameraMotion choppy;
+        choppy.Reset(Mode::Walk, p);
+        choppy.Step(space, 0.2f, p, facingZ);
+        choppy.Step(keys, 0.2f, p, facingZ);
+        choppy.Step(space, 0.2f, p, facingZ);
+        Check(choppy.GetMode() == Mode::Walk, "two presses 0.4 s apart at 5 fps switched modes");
+        // As the game runs it: its timer caps each step at 0.1 s, and the wall clock times the tap.
+        CameraMotion capped;
+        capped.Reset(Mode::Walk, p);
+        capped.Step(space, 0.1f, p, facingZ, 100.0);
+        capped.Step(keys, 0.1f, p, facingZ, 100.2);
+        capped.Step(space, 0.1f, p, facingZ, 100.4);
+        Check(capped.GetMode() == Mode::Walk, "capped 0.1 s steps made presses 0.4 s apart a double tap");
+        capped.Step(keys, 0.1f, p, facingZ, 100.5);
+        capped.Step(space, 0.1f, p, facingZ, 100.6);
+        Check(capped.GetMode() == Mode::Fly, "presses 0.2 s apart on the wall clock didn't switch to fly");
+    }
+
+    // Fly: Shift boosts to three times the fly speed.
+    {
+        CameraMotion m;
+        XMFLOAT3 p(0, 50, 0);
+        m.Reset(Mode::Fly, p);
+        bool boost[512] = {};
+        boost['W'] = true;
+        boost[0x10] = true;
+        run(m, boost, 3, p, facingZ);
+        Check(std::abs(m.Velocity().z - CameraMotion::FlySpeed * CameraMotion::FlyBoost) < 0.1f,
+            "Shift did not boost the fly speed");
+    }
+
+    // A long stall (a load) is cut to a short step rather than launching the camera.
+    {
+        CameraMotion m;
+        XMFLOAT3 p(0, CameraMotion::EyeHeight, 0);
+        m.Reset(Mode::Walk, p);
+        bool w[512] = {};
+        w['W'] = true;
+        m.Step(w, 5.0f, p, facingZ);
+        Check(p.z < 1, "a 5 s step moved the camera too far");
+    }
 }
 
 void TestTide()
@@ -2063,6 +2268,7 @@ int main(int argc, char** argv)
         TestTerrainSettings();
         TestWaterSettings();
         TestTide();
+        TestCameraMotion();
         TestTideSettings();
         TestRoadNetwork();
         TestRoadMesh();

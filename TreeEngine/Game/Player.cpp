@@ -53,65 +53,14 @@ XMVECTOR Player::GetEyePosition()
 
 void Player::HandleInput(bool key[512])  // WM_KEYDOWN
 {
-    XMMATRIX rot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
-
-    const char availableKeys[] = { 'W', 'S', 'D', 'A', VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, VK_NEXT, VK_PRIOR, 'Y'};
-    for (char k : availableKeys)
+    // Movement reads the held keys each update; Y (back to the default view) is a one-shot.
+    memcpy(m_keys, key, sizeof(m_keys));
+    if (key['Y'])
     {
-        if (key[k])
-        {
-            XMMATRIX startRot, addRot;
-
-            switch (k)
-            {
-            case 'Y':
-                SetPosition(XMVectorSet(-6.0f, 1.5f, -6.0f, 1.0));
-                SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
-                key[k] = false;
-                break;
-            case 'A':
-                XMStoreFloat3(&_position, XMLoadFloat3(&_position) + XMVector4Transform(XMVectorSet(-0.05f, 0, 0, 1), rot));
-                break;
-            case 'D':
-                XMStoreFloat3(&_position, XMLoadFloat3(&_position) + XMVector4Transform(XMVectorSet(+0.05f, 0, 0, 1), rot));
-                break;
-            case 'W':
-                XMStoreFloat3(&_position, XMLoadFloat3(&_position) + XMVector4Transform(XMVectorSet(0,0, +0.05f, 1), rot));
-                break;
-            case 'S':
-                XMStoreFloat3(&_position, XMLoadFloat3(&_position) + XMVector4Transform(XMVectorSet(0,0, -0.05f, 1), rot));
-                break;
-            case VK_NEXT:
-                XMStoreFloat3(&_position, XMLoadFloat3(&_position) + XMVector4Transform(XMVectorSet(0, -0.05f, 0, 1), rot));
-                break;
-            case VK_PRIOR:
-                XMStoreFloat3(&_position, XMLoadFloat3(&_position) + XMVector4Transform(XMVectorSet(0, 0.05f, 0, 1), rot));
-                break;
-            case VK_LEFT:
-                startRot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
-                addRot = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), -0.02f);
-                XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(startRot * addRot));
-                break;
-            case VK_RIGHT:
-                startRot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
-                addRot = XMMatrixRotationAxis(XMVectorSet(0,1,0,1), 0.02f);
-                XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(startRot * addRot));
-                break;
-            case VK_UP:
-                startRot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
-                addRot = XMMatrixRotationAxis(XMVectorSet(1, 0, 0, 0), -0.02f);
-                XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(addRot * startRot));
-                break;
-            case VK_DOWN:
-                startRot = XMMatrixRotationQuaternion(XMLoadFloat4(&_rotation));
-                addRot = XMMatrixRotationAxis(XMVectorSet(1, 0, 0, 0), 0.02f);
-                XMStoreFloat4(&_rotation, XMQuaternionRotationMatrix(addRot * startRot));
-                break;
-            default:
-                assert(false);
-                break;
-            }
-        }
+        SetPosition(XMVectorSet(-6.0f, 1.5f, -6.0f, 1.0));
+        SetRotation(XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
+        ResetMovement(GetMode());
+        key['Y'] = false;
+        m_keys['Y'] = false;
     }
 }
-

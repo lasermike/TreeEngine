@@ -29,6 +29,18 @@ The debug **Scene** panel has a discovered-scene picker, **Load**, **Reload**,
 reload reads the active file again. Failed loads preserve the active scene,
 camera, and settings. Successful loads reset scene time.
 
+### Moving the camera
+
+Scenes start on foot (walk), except scenes with a camera path, which start flying. **Double-tap Space** to switch.
+- **Walk:** W/A/S/D move level at 4.3 m/s, **Space** jumps (1.25 m), **Shift** crouches, **Ctrl** sprints (3x). The eye
+  stays 1.6 m above the terrain (above height 0 in scenes without terrain).
+- **Fly:** W/A/S/D move level at 11 m/s, **Space** and **Ctrl** (or Page Up/Down) rise and descend, **Shift**
+  boosts threefold. The fly camera passes through the ground.
+- **Arrow keys** look; **Y** returns to the default view.
+
+Speeds are per second with easing, whatever the frame rate. Render tests and performance runs place their cameras
+directly and aren't affected. Movement code: `Game/CameraMotion.cpp`.
+
 ### Scene time and growth time
 
 Two clocks run while a scene plays:
