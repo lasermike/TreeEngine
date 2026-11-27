@@ -74,6 +74,7 @@ HINSTANCE hInst;                                // current instance
 TCHAR szTitle[MAX_LOADSTRING];                    // The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 HWND m_hWnd = nullptr;
+static void UpdateMouseCapture(HWND hWnd);
 bool oculusMode = false;
 
 // Tree engine
@@ -250,6 +251,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
         }
         else
         {
+            UpdateMouseCapture(m_hWnd);
             Render();
         }
     }
@@ -468,6 +470,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         g_game->SetRenderTestDiagnostics(GetRenderTestRequest()->dred, GetRenderTestRequest()->dredReport);
     }
     g_game->SetWindow(m_hWnd);
+    if (!GetRenderTestRequest())
+    {
+        // Raw mouse input, for mouse look.
+        RAWINPUTDEVICE mouse = { 0x01 /* generic desktop */, 0x02 /* mouse */, 0, m_hWnd };
+        RegisterRawInputDevices(&mouse, 1, sizeof(mouse));
+    }
     OnWindowSizeChanged();
     g_game->GetRenderManager().GetRenderData().inputManager = &g_inputManager;
 
@@ -617,6 +625,27 @@ void OnWindowSizeChanged()
 }
 
 
+// Mouse look holds the cursor: hidden and kept inside the window while the game wants it and the window is in front,
+// released otherwise (Esc, another window, minimized).
+static void UpdateMouseCapture(HWND hWnd)
+{
+    static bool captured = false;
+    const bool want = g_game && g_game->MouseLookActive() && GetForegroundWindow() == hWnd && !IsIconic(hWnd);
+    if (want)
+    {
+        RECT client = {};
+        GetClientRect(hWnd, &client);
+        MapWindowPoints(hWnd, nullptr, reinterpret_cast<POINT*>(&client), 2);
+        ClipCursor(&client);        // Every frame: the window may have moved, and Windows drops the clip on its own.
+    }
+    if (want == captured)
+        return;
+    captured = want;
+    if (!want)
+        ClipCursor(nullptr);
+    ShowCursor(want ? FALSE : TRUE);
+}
+
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -658,8 +687,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
+    case WM_INPUT:
+    {
+        // Raw mouse motion for mouse look: unaffected by pointer acceleration or the window's edges.
+        RAWINPUT raw = {};
+        UINT size = sizeof(raw);
+        if (g_game && GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, &raw, &size, sizeof(RAWINPUTHEADER)) != UINT(-1)
+            && raw.header.dwType == RIM_TYPEMOUSE && !(raw.data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE)
+            && GetForegroundWindow() == hWnd)
+        {
+            g_game->OnMouseMove(raw.data.mouse.lLastX, raw.data.mouse.lLastY);
+        }
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    case WM_MOUSEWHEEL:
+        if (g_game)
+            g_game->OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+        return DefWindowProc(hWnd, message, wParam, lParam);
     case WM_CONTEXTMENU:
     {
+        if (g_game && g_game->MouseLookActive())
+            return 0;               // No menu while the mouse is looking around.
         if (!g_game) return DefWindowProc(hWnd, message, wParam, lParam);
         POINT point = { static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam)) };
         if (point.x == -1 && point.y == -1)

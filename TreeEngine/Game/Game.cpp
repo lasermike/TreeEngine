@@ -609,6 +609,19 @@ HRESULT Game::Regenerate()
     return S_OK;
 }
 
+void Game::OnMouseMove(int dx, int dy)
+{
+    if (MouseLookActive() && m_player)
+        m_player->AddLook(dx * MouseRadiansPerCount, dy * MouseRadiansPerCount);
+}
+
+void Game::OnMouseWheel(int delta)
+{
+    // Each notch sets Shift's fly boost one step, within 1x to 10x.
+    if (MouseLookActive() && m_player)
+        m_player->SetFlyBoost(m_player->GetFlyBoost() + delta / 120.0f);
+}
+
 bool Game::HasCameraAnimation() const
 {
     return m_sceneDefinition.cameraAnimation.size() >= 2;
@@ -805,7 +818,10 @@ void Game::Update(DX::StepTimer const& timer)
 
     // An animated camera follows its path; otherwise (or paused) the user moves it.
     if (!m_settings.m_paused && HasCameraAnimation())
+    {
         ApplySceneCamera(m_sceneDefinition, *m_player, m_timeCurrent);
+        m_player->ClearLook();      // The path has the view; looking resumes from where it is when paused.
+    }
     else
         m_player->Update(timer, &m_renderManager.GetRenderData());
 
@@ -1246,7 +1262,7 @@ void Game::UpdateObjectSelection()
     selection.ConsumeResults();
     const auto* viewport = ImGui::GetMainViewport();
     const auto& io = ImGui::GetIO();
-    if (!io.WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    if (!MouseLookActive() && !io.WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         const float u = (io.MousePos.x - viewport->Pos.x) / viewport->Size.x;
         const float v = (io.MousePos.y - viewport->Pos.y) / viewport->Size.y;
@@ -1486,6 +1502,11 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
     {
         //Pause
         ImGui::Checkbox("Pause", &m_settings.m_paused);
+        // Esc turns mouse look back on from the keyboard; the UI can't, as the mouse is the UI's while it's off.
+        ImGui::Checkbox("Mouse look (Esc)", &m_mouseLook);
+        float boost = m_player->GetFlyBoost();
+        if (ImGui::SliderFloat("Fly boost (Shift, wheel)", &boost, CameraMotion::MinBoost, CameraMotion::MaxBoost, "%.0fx"))
+            m_player->SetFlyBoost(boost);
 
         // Scene time: camera paths, tides and the rest. Growth time: how far plants have grown (key 0 restarts it,
         // Shift+0 restarts both, G pauses growth).
@@ -2111,6 +2132,13 @@ void Game::ComputeCPU()
 
     FrameInputData& inputData = m_inputMgr->GetFrameInput(0);
 
+    // While the mouse looks around, the debug UI doesn't see it (Esc frees it).
+    if (ImGui::GetCurrentContext())
+    {
+        auto& flags = ImGui::GetIO().ConfigFlags;
+        flags = MouseLookActive() ? flags | ImGuiConfigFlags_NoMouse : flags & ~ImGuiConfigFlags_NoMouse;
+    }
+
     // Shortcuts are skipped only while a debug UI field takes the keyboard; a mouse over the UI doesn't block them.
     if (!ImGui::GetCurrentContext() || !ImGui::GetIO().WantCaptureKeyboard)
     {
@@ -2161,7 +2189,8 @@ void Game::Render(bool oculus)
 
 void Game::HandleInput(bool key[512])  // WM_KEYDOWN
 {
-    const char availableKeys[] = { '0', 'G', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3', 'Y', '<', '>', VK_TAB };
+    const char availableKeys[] = { '0', 'G', 'Z', 'P', 'M' , 'H', 'N', 'B', 'R', '1', '2', '3', 'Y', '<', '>', VK_TAB,
+        VK_ESCAPE };
     for (char k : availableKeys)
     {
         if (key[k])
@@ -2187,6 +2216,11 @@ void Game::HandleInput(bool key[512])  // WM_KEYDOWN
                     m_timeStart = 0;
                 else
                     m_restartGrowth = true;
+                key[k] = false;
+                break;
+            case VK_ESCAPE:
+                // Mouse look on and off: off frees the cursor for the debug UI.
+                m_mouseLook = !m_mouseLook;
                 key[k] = false;
                 break;
             case 'G':
