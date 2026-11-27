@@ -42,8 +42,8 @@ void CameraMotion::Step(const bool keys[512], float seconds, XMFLOAT3& position,
 {
     if (!(seconds > 0))
         return;
+    m_clock += seconds;                         // Real time, for the double tap; only the movement step is cut.
     seconds = (std::min)(seconds, MaxStep);
-    m_clock += seconds;
     auto held = [keys](int key) { return keys[key] ? 1.0f : 0.0f; };
 
     // Looking: the arrow keys, at a rate in time rather than per frame.
@@ -73,12 +73,20 @@ void CameraMotion::Step(const bool keys[512], float seconds, XMFLOAT3& position,
     }
     m_spaceWasDown = space;
 
-    // W/A/S/D move level, as in Minecraft: right is the camera's right in the ground plane (the camera never rolls),
-    // forward is perpendicular to it, so looking down doesn't dive.
+    // W/A/S/D move level, as in Minecraft: forward is the view direction in the ground plane, so looking down doesn't
+    // dive, and a rolled camera still walks where it looks. Looking straight down or up, the heading is the screen's
+    // top (down) or bottom (up), as a Minecraft player turned that way would walk.
     const XMMATRIX orientation = XMMatrixRotationQuaternion(XMLoadFloat4(&rotation));
-    XMVECTOR right = XMVector3Transform(XMVectorSet(1, 0, 0, 0), orientation);
-    right = XMVector3Normalize(XMVectorSetY(right, 0));
-    const XMVECTOR forward = XMVector3Cross(right, XMVectorSet(0, 1, 0, 0));
+    const XMVECTOR view = XMVector3Transform(XMVectorSet(0, 0, 1, 0), orientation);
+    XMVECTOR heading = XMVectorSetY(view, 0);
+    if (XMVectorGetX(XMVector3LengthSq(heading)) < 1e-6f)
+        heading = XMVectorSetY(XMVector3Transform(XMVectorSet(0, 1, 0, 0), orientation), 0)
+            * (XMVectorGetY(view) < 0 ? 1.0f : -1.0f);
+    const XMVECTOR forward = XMVector3Normalize(heading);
+    // Right is level and square to forward, on the side of the screen's right (flipped for a camera rolled over).
+    XMVECTOR right = XMVector3Cross(XMVectorSet(0, 1, 0, 0), forward);
+    if (XMVectorGetX(XMVector3Dot(right, XMVector3Transform(XMVectorSet(1, 0, 0, 0), orientation))) < 0)
+        right = -right;
     XMVECTOR wish = forward * (held('W') - held('S')) + right * (held('D') - held('A'));
     if (XMVectorGetX(XMVector3LengthSq(wish)) > 0)
         wish = XMVector3Normalize(wish);

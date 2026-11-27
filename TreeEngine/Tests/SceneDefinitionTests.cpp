@@ -910,6 +910,27 @@ void TestCameraMotion()
             && CameraMotion::SprintFactor >= 3, "Ctrl did not sprint at three times the walk speed");
     }
 
+    // A rolled camera walks where it looks (Codex review of #34): rolled 180 degrees, still facing +z, W goes +z and D
+    // goes toward the screen's right (-x); looking straight down, W goes toward the screen's top.
+    {
+        auto walkFor = [&](XMFLOAT4 rotation, int key)
+        {
+            CameraMotion m;
+            XMFLOAT3 p(0, 50, 0);
+            m.Reset(Mode::Fly, p);
+            bool k[512] = {};
+            k[key] = true;
+            run(m, k, 1, p, rotation);
+            return p;
+        };
+        XMFLOAT4 rolled, down;
+        XMStoreFloat4(&rolled, XMQuaternionRotationAxis(XMVectorSet(0, 0, 1, 0), XM_PI));
+        XMStoreFloat4(&down, XMQuaternionRotationAxis(XMVectorSet(1, 0, 0, 0), XM_PIDIV2));
+        Check(walkFor(rolled, 'W').z > 3 && walkFor(rolled, 'D').x < -3, "a rolled camera walked away from its view");
+        const XMFLOAT3 straightDown = walkFor(down, 'W');
+        Check(straightDown.z > 3 && std::abs(straightDown.y - 50) < 0.001f, "looking straight down, W didn't go forward");
+    }
+
     // Looking down doesn't dive: W moves level.
     {
         CameraMotion m;
@@ -970,6 +991,13 @@ void TestCameraMotion()
         run(slow, keys, 0.5f, p, facingZ);
         slow.Step(space, dt, p, facingZ);
         Check(slow.GetMode() == Mode::Walk, "two slow Space presses switched modes");
+        // At 5 fps, presses 0.4 s apart are not a double tap, though each step is cut to 0.1 s (Codex review of #34).
+        CameraMotion choppy;
+        choppy.Reset(Mode::Walk, p);
+        choppy.Step(space, 0.2f, p, facingZ);
+        choppy.Step(keys, 0.2f, p, facingZ);
+        choppy.Step(space, 0.2f, p, facingZ);
+        Check(choppy.GetMode() == Mode::Walk, "two presses 0.4 s apart at 5 fps switched modes");
     }
 
     // Fly: Shift boosts to three times the fly speed.
