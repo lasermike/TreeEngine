@@ -20,6 +20,7 @@
     <ClCompile Include="..\Game\Materials.cpp" />
     <ClCompile Include="..\Game\MathHelper.cpp" />
     <ClCompile Include="..\Game\Player.cpp" />
+    <ClCompile Include="..\Game\CameraMotion.cpp" />
     <ClCompile Include="..\Game\Primitive.cpp" />
     <ClCompile Include="..\Game\RenderManager.cpp" />
     <ClCompile Include="..\Game\RenderPlatform.cpp" />

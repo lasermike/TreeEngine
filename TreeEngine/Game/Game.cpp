@@ -269,6 +269,23 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     //playerParams->position = XMFLOAT3(-4.0f, 1.5f, -4.0f);
     XMStoreFloat4(&playerParams->rotation, XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 1), XM_PIDIV4));
     m_player = new Player(playerParams);
+    // The walk camera stands on the highest terrain under it (none: the ground is at 0).
+    m_player->SetGround([this](float x, float z, float& height)
+    {
+        bool found = false;
+        if (m_pScene)
+            for (WorldObject* object : m_pScene->Children())
+            {
+                float y = 0;
+                if (object->GetObjectType() == ObjectType_Terrain && static_cast<Terrain*>(object)->HeightAt(x, z, y)
+                    && (!found || y > height))
+                {
+                    height = y;
+                    found = true;
+                }
+            }
+        return found;
+    });
 
     HRR(ReloadDevice());
 
@@ -294,6 +311,7 @@ HRESULT Game::Initialize(bool renderToSharedTexture)
     m_sceneSelection = m_sceneFilename;
     m_renderManager.ApplySceneSettings(sceneSettings);
     // The startup scene's growth clock, as LoadScene sets it for later loads.
+    ResetPlayerMovement();
     m_growthSpeed = m_sceneDefinition.growthSpeed;
     m_growthTime = m_growthLargest = m_sceneDefinition.growthStartTime;
     m_renderManager.GetRenderData().growthTime = static_cast<float>(m_growthTime);
@@ -369,6 +387,7 @@ HRESULT Game::LoadScene(const std::string& name)
     m_timeStart = 0;
     m_timeCurrent = 0;
     m_timeLargest = 0;
+    ResetPlayerMovement();
     m_growthSpeed = m_sceneDefinition.growthSpeed;
     m_growthTime = m_growthLargest = m_sceneDefinition.growthStartTime;
     m_renderManager.GetRenderData().growthTime = static_cast<float>(m_growthTime);
@@ -585,6 +604,18 @@ HRESULT Game::Regenerate()
     return S_OK;
 }
 
+bool Game::HasCameraAnimation() const
+{
+    return m_sceneDefinition.cameraAnimation.size() >= 2;
+}
+
+// A new scene starts the user on foot, or flying where the scene animates the camera (the walk camera would pull an
+// animated or captured camera to the ground; captures never move the player, so their cameras are untouched).
+void Game::ResetPlayerMovement()
+{
+    m_player->ResetMovement(HasCameraAnimation() ? Player::Mode::Fly : Player::Mode::Walk);
+}
+
 void Game::ConfigureRenderTest(const std::string& sceneName, bool rayTracing, bool postProcessing, bool profile, bool showShadowBuffer)
 {
     m_renderTestMode = true;
@@ -767,9 +798,11 @@ void Game::Update(DX::StepTimer const& timer)
     // Compute per-frame values
     HR(m_pScene->Update(m_renderManager, *m_threadPool));
 
-    if (!m_settings.m_paused)
+    // An animated camera follows its path; otherwise (or paused) the user moves it.
+    if (!m_settings.m_paused && HasCameraAnimation())
         ApplySceneCamera(m_sceneDefinition, *m_player, m_timeCurrent);
-    m_player->Update(timer, &m_renderManager.GetRenderData());
+    else
+        m_player->Update(timer, &m_renderManager.GetRenderData());
 
     HR(m_renderManager.EndFrame());
 
@@ -2079,6 +2112,8 @@ void Game::ComputeCPU()
         m_player->HandleInput(inputData.key);
         HandleInput(inputData.key);
     }
+    else
+        m_player->ClearInput();
 
     m_timer.Tick([&]()
     {

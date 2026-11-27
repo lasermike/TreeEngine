@@ -117,6 +117,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Materials.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\MathHelper.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Player.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\CameraMotion.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\Primitive.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\RenderManager.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\Game\SceneRoot.cpp" />

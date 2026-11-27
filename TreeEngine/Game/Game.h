@@ -187,6 +187,8 @@ private:
     void Update(DX::StepTimer const& timer);
     HRESULT Regenerate();
     void HandleInput(bool key[512]);
+    bool HasCameraAnimation() const;
+    void ResetPlayerMovement();
     void UpdateObjectSelection();
     bool m_selectionUIWasVisible = false;
     // The roadside prop selected by clicking its terrain (Terrain::PickProp), or -1; and the last save's message.
