@@ -998,6 +998,16 @@ void TestCameraMotion()
         choppy.Step(keys, 0.2f, p, facingZ);
         choppy.Step(space, 0.2f, p, facingZ);
         Check(choppy.GetMode() == Mode::Walk, "two presses 0.4 s apart at 5 fps switched modes");
+        // As the game runs it: its timer caps each step at 0.1 s, and the wall clock times the tap.
+        CameraMotion capped;
+        capped.Reset(Mode::Walk, p);
+        capped.Step(space, 0.1f, p, facingZ, 100.0);
+        capped.Step(keys, 0.1f, p, facingZ, 100.2);
+        capped.Step(space, 0.1f, p, facingZ, 100.4);
+        Check(capped.GetMode() == Mode::Walk, "capped 0.1 s steps made presses 0.4 s apart a double tap");
+        capped.Step(keys, 0.1f, p, facingZ, 100.5);
+        capped.Step(space, 0.1f, p, facingZ, 100.6);
+        Check(capped.GetMode() == Mode::Fly, "presses 0.2 s apart on the wall clock didn't switch to fly");
     }
 
     // Fly: Shift boosts to three times the fly speed.

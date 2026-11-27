@@ -2,6 +2,7 @@
 #include "worldobject.h"
 #include "StepTimer.h"
 #include "CameraMotion.h"
+#include <chrono>
 
 //-----------------------------------------------------------
 class Camera
@@ -59,6 +60,8 @@ public:
 
     inline void Update(DX::StepTimer const& timer, RenderData* pRenderData)
     {
-        m_motion.Step(m_keys, static_cast<float>(timer.GetElapsedSeconds()), _position, _rotation);
+        // The wall clock times the double tap: the timer's steps are capped at 0.1 s, so they understate slow frames.
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        m_motion.Step(m_keys, static_cast<float>(timer.GetElapsedSeconds()), _position, _rotation, now);
     }
 };

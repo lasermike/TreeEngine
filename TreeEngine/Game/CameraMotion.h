@@ -36,8 +36,11 @@ public:
     bool OnGround() const { return m_onGround; }
     const DirectX::XMFLOAT3& Velocity() const { return m_velocity; }
 
-    // Advances the eye position and rotation by seconds of the keys held (indexed by virtual-key code).
-    void Step(const bool keys[512], float seconds, DirectX::XMFLOAT3& position, DirectX::XMFLOAT4& rotation);
+    // Advances the eye position and rotation by seconds of the keys held (indexed by virtual-key code). now is the
+    // wall-clock time in seconds, for timing the double tap: the game's frame timer caps its steps at 0.1 s, so a slow
+    // frame's steps understate real time. Without it (negative), the steps are the clock.
+    void Step(const bool keys[512], float seconds, DirectX::XMFLOAT3& position, DirectX::XMFLOAT4& rotation,
+        double now = -1);
 
 private:
     Mode m_mode = Mode::Walk;

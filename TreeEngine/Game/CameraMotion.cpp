@@ -38,11 +38,12 @@ void CameraMotion::SetMode(Mode mode)
     m_onGround = false;
 }
 
-void CameraMotion::Step(const bool keys[512], float seconds, XMFLOAT3& position, XMFLOAT4& rotation)
+void CameraMotion::Step(const bool keys[512], float seconds, XMFLOAT3& position, XMFLOAT4& rotation, double now)
 {
     if (!(seconds > 0))
         return;
-    m_clock += seconds;                         // Real time, for the double tap; only the movement step is cut.
+    // Real time, for the double tap; only the movement step is cut.
+    m_clock = now >= 0 ? now : m_clock + seconds;
     seconds = (std::min)(seconds, MaxStep);
     auto held = [keys](int key) { return keys[key] ? 1.0f : 0.0f; };
 
