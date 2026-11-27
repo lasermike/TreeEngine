@@ -1023,6 +1023,42 @@ void TestCameraMotion()
             "Shift did not boost the fly speed");
     }
 
+    // Mouse look: turning right and down from facing +z; the pitch stops at 89 degrees; the view stays level.
+    {
+        XMFLOAT4 r(0, 0, 0, 1);
+        CameraMotion::Look(XM_PIDIV2, 0, r);
+        XMFLOAT3 view;
+        XMStoreFloat3(&view, XMVector3Rotate(XMVectorSet(0, 0, 1, 0), XMLoadFloat4(&r)));
+        Check(std::abs(view.x - 1) < 0.001f && std::abs(view.z) < 0.001f, "mouse look right didn't turn toward +x");
+        CameraMotion::Look(0, 0.5f, r);
+        XMStoreFloat3(&view, XMVector3Rotate(XMVectorSet(0, 0, 1, 0), XMLoadFloat4(&r)));
+        Check(std::abs(view.y + sinf(0.5f)) < 0.001f && view.x > 0, "mouse look down didn't pitch down");
+        CameraMotion::Look(0, 10, r);
+        XMStoreFloat3(&view, XMVector3Rotate(XMVectorSet(0, 0, 1, 0), XMLoadFloat4(&r)));
+        Check(std::abs(view.y + sinf(CameraMotion::MaxPitch)) < 0.001f && view.x > 0.01f,
+            "mouse look went past 89 degrees down or lost its heading");
+        XMFLOAT3 right;
+        XMStoreFloat3(&right, XMVector3Rotate(XMVectorSet(1, 0, 0, 0), XMLoadFloat4(&r)));
+        Check(std::abs(right.y) < 0.001f, "mouse look rolled the view");
+    }
+
+    // The fly boost: set by the wheel within 1x to 10x, used by Shift.
+    {
+        CameraMotion m;
+        m.SetFlyBoost(25);
+        Check(m.GetFlyBoost() == CameraMotion::MaxBoost, "the fly boost went past 10x");
+        m.SetFlyBoost(-3);
+        Check(m.GetFlyBoost() == CameraMotion::MinBoost, "the fly boost went under 1x");
+        m.SetFlyBoost(6);
+        XMFLOAT3 p(0, 50, 0);
+        m.Reset(Mode::Fly, p);
+        bool boost[512] = {};
+        boost['W'] = true;
+        boost[0x10] = true;
+        run(m, boost, 3, p, facingZ);
+        Check(std::abs(m.Velocity().z - CameraMotion::FlySpeed * 6) < 0.2f, "Shift didn't fly at the set boost");
+    }
+
     // A long stall (a load) is cut to a short step rather than launching the camera.
     {
         CameraMotion m;

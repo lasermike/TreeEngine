@@ -34,6 +34,7 @@ class Player :
     Camera*      m_camera;
     CameraMotion m_motion;
     bool         m_keys[512] = {};
+    float        m_lookYaw = 0, m_lookPitch = 0;     // Mouse look since the last update, radians.
 
 public:
     using Mode = CameraMotion::Mode;
@@ -42,7 +43,12 @@ public:
     ~Player(void);
 
     void HandleInput(bool key[512]);
-    void ClearInput() { memset(m_keys, 0, sizeof(m_keys)); }
+    void ClearInput() { memset(m_keys, 0, sizeof(m_keys)); ClearLook(); }
+    // Mouse look: radians right and down, applied at the next update.
+    void AddLook(float yaw, float pitch) { m_lookYaw += yaw; m_lookPitch += pitch; }
+    void ClearLook() { m_lookYaw = m_lookPitch = 0; }
+    float GetFlyBoost() const { return m_motion.GetFlyBoost(); }
+    void SetFlyBoost(float boost) { m_motion.SetFlyBoost(boost); }
 
     // Where the walk camera stands; without it, the ground is at height 0.
     void SetGround(CameraMotion::GroundHeight ground) { m_motion.SetGround(std::move(ground)); }
@@ -62,6 +68,8 @@ public:
     {
         // The wall clock times the double tap: the timer's steps are capped at 0.1 s, so they understate slow frames.
         const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        CameraMotion::Look(m_lookYaw, m_lookPitch, _rotation);
+        ClearLook();
         m_motion.Step(m_keys, static_cast<float>(timer.GetElapsedSeconds()), _position, _rotation, now);
     }
 };

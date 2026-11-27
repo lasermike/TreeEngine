@@ -22,7 +22,10 @@ public:
     static constexpr float SprintFactor = 3.0f;      // Much faster than Minecraft's 1.3: scenes are large.
     static constexpr float CrouchFactor = 0.3f;
     static constexpr float FlySpeed = 11.0f;
-    static constexpr float FlyBoost = 3.0f;
+    static constexpr float FlyBoost = 3.0f;          // Shift's default; the scroll wheel sets it, MinBoost to MaxBoost.
+    static constexpr float MinBoost = 1.0f;
+    static constexpr float MaxBoost = 10.0f;
+    static constexpr float MaxPitch = 1.5533f;       // 89 degrees: mouse look stops short of straight up or down.
     static constexpr float LookSpeed = 1.2f;         // Arrow keys, radians per second.
     static constexpr float DoubleTapSeconds = 0.3f;
     static constexpr float MaxStep = 0.1f;           // Longer steps (a load, a breakpoint) are cut to this.
@@ -34,6 +37,12 @@ public:
     Mode GetMode() const { return m_mode; }
     void SetMode(Mode mode);
     bool OnGround() const { return m_onGround; }
+    float GetFlyBoost() const { return m_flyBoost; }
+    void SetFlyBoost(float boost);
+
+    // Mouse look: turns the view by yaw (right) and pitch (down) radians, level (no roll), the pitch held within
+    // MaxPitch, as in Minecraft.
+    static void Look(float yaw, float pitch, DirectX::XMFLOAT4& rotation);
     const DirectX::XMFLOAT3& Velocity() const { return m_velocity; }
 
     // Advances the eye position and rotation by seconds of the keys held (indexed by virtual-key code). now is the
@@ -48,6 +57,7 @@ private:
     float m_eyeHeight = EyeHeight;
     float m_lastGround = 0;
     bool m_onGround = false;
+    float m_flyBoost = FlyBoost;
     bool m_spaceWasDown = false;
     double m_clock = 0;
     double m_lastSpacePress = -1;

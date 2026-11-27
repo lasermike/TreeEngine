@@ -188,6 +188,17 @@ private:
     HRESULT Regenerate();
     void HandleInput(bool key[512]);
     bool HasCameraAnimation() const;
+public:
+    // Mouse look: on by default, Esc toggles it (off, the cursor is free for the debug UI and picking). Never in
+    // render tests. The window captures and hides the cursor while it's active.
+    bool MouseLookActive() const { return m_mouseLook && !m_renderTestMode; }
+    void SetMouseLook(bool on) { m_mouseLook = on; }
+    void OnMouseMove(int dx, int dy);       // Raw mouse counts.
+    void OnMouseWheel(int delta);           // WHEEL_DELTA (120) per notch.
+    static constexpr float MouseRadiansPerCount = 0.0022f;
+private:
+    bool m_mouseLook = true;
+    bool m_mouseLookWasActive = false;     // Last UI frame's MouseLookActive(), to free the UI's focus as it turns on.
     void ResetPlayerMovement();
     void UpdateObjectSelection();
     bool m_selectionUIWasVisible = false;

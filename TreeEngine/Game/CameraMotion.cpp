@@ -29,6 +29,23 @@ void CameraMotion::Reset(Mode mode, const XMFLOAT3& position)
     m_lastGround = position.y - EyeHeight;
 }
 
+void CameraMotion::SetFlyBoost(float boost)
+{
+    m_flyBoost = (std::max)(MinBoost, (std::min)(MaxBoost, boost));
+}
+
+void CameraMotion::Look(float yaw, float pitch, XMFLOAT4& rotation)
+{
+    if (yaw == 0 && pitch == 0)
+        return;
+    // The view's heading and pitch (positive pitch looks down: forward.y = -sin(pitch)), turned and held in range.
+    XMFLOAT3 view;
+    XMStoreFloat3(&view, XMVector3Rotate(XMVectorSet(0, 0, 1, 0), XMLoadFloat4(&rotation)));
+    const float heading = atan2f(view.x, view.z) + yaw;
+    const float tilt = (std::max)(-MaxPitch, (std::min)(MaxPitch, asinf((std::max)(-1.0f, (std::min)(1.0f, -view.y))) + pitch));
+    XMStoreFloat4(&rotation, XMQuaternionRotationRollPitchYaw(tilt, heading, 0));
+}
+
 void CameraMotion::SetMode(Mode mode)
 {
     if (mode == m_mode)
@@ -95,7 +112,7 @@ void CameraMotion::Step(const bool keys[512], float seconds, XMFLOAT3& position,
     const bool walking = m_mode == Mode::Walk;
     const bool crouching = walking && keys[KeyShift];
     const float speed = walking ? WalkSpeed * (crouching ? CrouchFactor : keys[KeyControl] ? SprintFactor : 1.0f)
-                                : FlySpeed * (keys[KeyShift] ? FlyBoost : 1.0f);
+                                : FlySpeed * (keys[KeyShift] ? m_flyBoost : 1.0f);
     const float response = walking ? (m_onGround ? 10.0f : 2.0f) : 5.0f;     // Little steering in the air.
     const XMVECTOR target = wish * speed;
     m_velocity.x = Approach(m_velocity.x, XMVectorGetX(target), response, seconds);
