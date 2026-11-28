@@ -580,6 +580,13 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         textureColor.rgb *= drift.rgb;
         mat.specularParams.z *= drift.a;
     }
+    if (mat.metallicRoughnessTextures.z > 0)
+    {
+        // A road surface's wear across its width: the tangent's w is 1 + the place across (its sign is handedness).
+        const float4 wear = RoadWear(mat, abs(tangentData.w) - 1, WorldRayOrigin() + WorldRayDirection() * RayTCurrent());
+        textureColor.rgb *= wear.rgb;
+        mat.specularParams.z *= wear.a;
+    }
     float4 A, D, S;
     ComputeDirectionalLight(mat, textureColor, light, normal, toEye, A, D, S);
     uint cubeWidth, cubeHeight, mipCount;

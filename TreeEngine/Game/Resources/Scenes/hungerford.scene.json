@@ -586,6 +586,7 @@
       "roadSurfaces": {
         "gravel": "drive-gravel"
       },
+      "roadWear": 0.8,
       "antiTiling": {
         "variation": 0.2,
         "variationSize": 40

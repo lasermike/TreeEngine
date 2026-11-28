@@ -759,6 +759,15 @@ void TestTerrainSettings()
     bad["objects"][1] = { { "id", "copy" }, { "instanceOf", "ground" } };
     Reject(bad.dump(), ".instanceOf");
 
+    // Road wear: off by default (not saved); 0 to 1, round-tripped; out of range rejected.
+    Check(plain.roadWear == 0 && !saved["objects"][1].contains("roadWear"), "road wear was on by default or saved when off");
+    auto worn = Json::parse(json);
+    worn["objects"][0]["roadWear"] = 0.6;
+    const auto wornScene = SceneData::ParseScene(SceneData::SerializeScene(SceneData::ParseScene(worn.dump(), "wear")), "wear-saved");
+    Check(static_cast<const SceneData::TerrainDefinition&>(*wornScene.objects[0]).roadWear == 0.6f, "road wear did not round-trip");
+    worn["objects"][0]["roadWear"] = 1.5;
+    Reject(worn.dump(), ".roadWear");
+
     // Anti-tiling: off by default (not saved); on with its color drift, round-tripped; bad values rejected.
     Check(!plain.antiTiling && !saved["objects"][1].contains("antiTiling"), "anti-tiling was on by default or saved when off");
     auto tiled = Json::parse(json);
@@ -1478,6 +1487,18 @@ void TestRoadMesh()
     Check(Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), flat)[Roads::Part::WhiteLine].vertices.empty(), "a 25 mph road got edge lines");
     network.lines[0].owner = "private";
     Check(Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), flat)[Roads::Part::YellowLine].vertices.empty(), "a private road got a center line");
+
+    // Each vertex carries its place across the road in its tangent's w, 1 at one edge to 2 at the other, after
+    // ComputeNormals (Shaders/RoadWear.hlsli).
+    {
+        float low = 10, high = -10;
+        for (const auto& v : mesh[Roads::Part::Asphalt].vertices)
+        {
+            low = (std::min)(low, v.TangentU.w);
+            high = (std::max)(high, v.TangentU.w);
+        }
+        Check(low == 1 && high == 2, "a road's vertices don't carry their place across it");
+    }
 
     // Each surface draws in its own part; of county roads, only paved and chip seal get markings.
     struct Expected { const char* surface; Roads::Part part; bool marked; };
