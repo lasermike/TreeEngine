@@ -305,6 +305,9 @@ struct PS_INPUT
     float3 NormL : TEXCOORD9;   // The mesh's own normal and the object's +Y in world space, for biplanar mapping.
     float3 UpW : TEXCOORD10;
     nointerpolation float Fade : TEXCOORD11;  // LOD crossfade (see FadeKeeps); 0 when not fading.
+    // The tangent's w, interpolated on its own: a road's place across its width (Shaders/RoadWear.hlsli); the
+    // bitangent's length would shrink where the normals turn within a triangle.
+    float TangentW : TEXCOORD12;
 };
 
 struct PS_OUTPUT
@@ -426,6 +429,7 @@ PS_INPUT VS(VS_INPUT input)
     output.T = normalize(worldTangent);
 
     output.B = normalize(cross(output.N, output.T)) * input.TangentL.w;
+    output.TangentW = input.TangentL.w;
 
     // Generate projective tex-coords to project shadow map onto scene.
     output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
@@ -462,6 +466,7 @@ PS_INPUT VSSkinned(VS_SKINNED_INPUT input)
     output.T = normalize(worldTangent);
 
     output.B = normalize(cross(output.N, output.T)) * input.TangentL.w;
+    output.TangentW = input.TangentL.w;
 
     // Generate projective tex-coords to project shadow map onto scene.
     output.ShadowPosH = mul(float4(output.PosW, 1.0), shadowMatrix);
@@ -621,8 +626,8 @@ float4 ShadeSurface(PS_INPUT input)
     }
     if (mat.metallicRoughnessTextures.z > 0)
     {
-        // A road surface's wear across its width: the bitangent's length is the tangent's w, 1 + the place across.
-        const float4 wear = RoadWear(mat, length(input.B) - 1, input.PosW);
+        // A road surface's wear across its width: the tangent's w is 1 + the place across (its sign is handedness).
+        const float4 wear = RoadWear(mat, abs(input.TangentW) - 1, input.PosW);
         textureColor.rgb *= wear.rgb;
         sampledMaterial.specularParams.z *= wear.a;
     }
