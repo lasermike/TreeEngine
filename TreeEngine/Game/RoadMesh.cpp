@@ -117,14 +117,39 @@ namespace
                 XMStoreFloat3(&sum, XMLoadFloat3(&sum) + n);
             }
         }
-        for (size_t v = firstVertex; v < part.vertices.size(); ++v)
+        // Smoothed over the vertices' neighbors, twice: the surface follows the ground's kinks (a driveway's ramp up
+        // from the road, a graded crease), and unsmoothed normals light each kink as a sharp line across the road.
+        // The shape is unchanged; only its shading bends gently.
+        std::vector<XMFLOAT3> unit(sums.size());
+        for (size_t v = 0; v < sums.size(); ++v)
         {
-            XMVECTOR n = XMLoadFloat3(&sums[v - firstVertex]);
+            XMVECTOR n = XMLoadFloat3(&sums[v]);
             if (XMVectorGetX(XMVector3LengthSq(n)) < 1e-12f)
                 n = XMVectorSet(0, 1, 0, 0);
             n = XMVector3Normalize(n);
             if (XMVectorGetY(n) < 0)
                 n = -n;
+            XMStoreFloat3(&unit[v], n);
+        }
+        for (int pass = 0; pass < 2; ++pass)
+        {
+            std::vector<XMFLOAT3> next = unit;
+            for (size_t i = firstIndex; i + 2 < part.indices.size(); i += 3)
+                for (int k = 0; k < 3; ++k)
+                {
+                    const size_t v = part.indices[i + k] - firstVertex;
+                    for (int j = 1; j < 3; ++j)
+                    {
+                        const size_t w = part.indices[i + (k + j) % 3] - firstVertex;
+                        XMStoreFloat3(&next[v], XMLoadFloat3(&next[v]) + XMLoadFloat3(&unit[w]));
+                    }
+                }
+            for (size_t v = 0; v < unit.size(); ++v)
+                XMStoreFloat3(&unit[v], XMVector3Normalize(XMLoadFloat3(&next[v])));
+        }
+        for (size_t v = firstVertex; v < part.vertices.size(); ++v)
+        {
+            const XMVECTOR n = XMLoadFloat3(&unit[v - firstVertex]);
             XMStoreFloat3(&part.vertices[v].Normal, n);
             XMVECTOR t = XMVectorSet(1, 0, 0, 0);
             t = XMVector3Normalize(t - n * XMVector3Dot(t, n));

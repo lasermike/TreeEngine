@@ -280,6 +280,13 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
         IgnoreHit();
         return;
     }
+    // Ground cover (road surfaces, a few centimeters over the ground) casts no shadow and occludes nothing: its edges,
+    // lifted over a ditch or riding a crease, would otherwise lay dark bands on the ground beside it.
+    if ((payload.isShadow == 1 || payload.isShadow == 2) && mat.normalTextures.w > 0)
+    {
+        IgnoreHit();
+        return;
+    }
 
     // Alpha-blended glTF geometry already has mirrored back-facing triangles.
     // Cull their back faces to avoid coplanar hits with opposite normals.
@@ -410,8 +417,10 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 {
     if (payload.isShadow == 2)
     {
-        // Ambient-occlusion probe: only the distance to the nearest occluder matters.
-        payload.color.x = RayTCurrent() / ambientOcclusionRadius;
+        // Ambient-occlusion probe: only the distance to the nearest occluder matters. Ground cover (road surfaces)
+        // occludes nothing, as in the any-hit shader; probes may be forced opaque and skip any-hit, so it's checked
+        // here too (an occluder behind a road surface, close to the ground, is missed).
+        payload.color.x = materialBuffer[GeometryRecord()].normalTextures.w > 0 ? 1.0f : RayTCurrent() / ambientOcclusionRadius;
         return;
     }
 

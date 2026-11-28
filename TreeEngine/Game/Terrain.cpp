@@ -739,6 +739,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         RoadPart& road = *part;
         const size_t index = static_cast<size_t>(road.part);
         ShaderMaterial roadMaterial = index < Params().roadMaterials.size() ? Params().roadMaterials[index] : _params->materials[0];
+        roadMaterial.normalTextures.w = 1;      // Ground cover: no shadows or occlusion from it in DXR.
         if (road.part != Roads::Part::YellowLine && road.part != Roads::Part::WhiteLine)
             ApplyAntiTiling(roadMaterial);      // The surfaces, not the paint.
         // Wear profiles (Shaders/RoadWear.hlsli): 1 loose, 2 hard, 3 dirt; none for paint and trails (trail tiles don't
