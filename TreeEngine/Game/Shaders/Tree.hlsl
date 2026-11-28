@@ -704,7 +704,8 @@ float4 ShadeSurface(PS_INPUT input)
 PS_OUTPUT PSDepthMotion(PS_INPUT input)
 {
     clip(FadeKeeps(input.Fade, input.Pos.xy) ? 1 : -1);
-    if (mat.flags.z > 0)    // The alpha test, textured or not (factor alpha alone), as the rays see it.
+    // The alpha test, textured or not (factor alpha alone), and a road's ragged edge, as the rays see them.
+    if (mat.flags.z > 0 || mat.opticalParams.w > 0)
     {
         Biplanar biplanar;
         SampleBaseColor(input, biplanar);

@@ -298,10 +298,23 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
             sv[corner] = LoadOriginalVertex(geoInfo.baseVertexLocation
                 + LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + corner, geoInfo.isSkinned), geoInfo.isSkinned);
         const float across = abs(sv[0].tangent.w * bary.x + sv[1].tangent.w * bary.y + sv[2].tangent.w * bary.z) - 1;
+        // The base color as shaded: at the anti-tiling offsets when the surface has them (Shaders/AntiTiling.hlsli).
+        // Any-hit has no ray footprint, so it reads the finest level; the stones it keeps are the shaded ones.
         float3 color = mat.Diffuse.rgb;
         if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
-            color *= SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat,
-                sv[0].tex * bary.x + sv[1].tex * bary.y + sv[2].tex * bary.z, BaseColorTextureRole), mat.specularColor.w > 0).rgb;
+        {
+            const float2 uv = TransformMaterialUv(mat, sv[0].tex * bary.x + sv[1].tex * bary.y + sv[2].tex * bary.z,
+                BaseColorTextureRole);
+            const bool clampTexture = mat.specularColor.w > 0;
+            if (UsesAntiTiling(mat) && mat.biplanarParams.x <= 0)
+            {
+                const AntiTile tile = AntiTileAt(uv);
+                color *= lerp(SampleSpecularTexture(geoInfo.textureIndex, uv + tile.offsetA, clampTexture),
+                    SampleSpecularTexture(geoInfo.textureIndex, uv + tile.offsetB, clampTexture), tile.blend).rgb;
+            }
+            else
+                color *= SampleSpecularTexture(geoInfo.textureIndex, uv, clampTexture).rgb;
+        }
         if (!RoadEdgeKeeps(mat, across, WorldRayOrigin() + WorldRayDirection() * RayTCurrent(), color))
         {
             IgnoreHit();
