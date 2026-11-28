@@ -58,6 +58,10 @@ public:
     std::function<std::shared_ptr<GltfAsset>(Roads::PropModel)> loadPropModel;
     std::array<std::shared_ptr<GltfAsset>, static_cast<size_t>(Roads::PropModel::Count)> propModels;   // As loaded.
     float lodRange = 2.0f;          // A node splits within lodRange x its size of the camera.
+    // Anti-tiling of the layers and road surfaces, and its color drift (TerrainDefinition::antiTiling).
+    bool antiTiling = false;
+    float variation = 0;
+    float variationSize = 40;
     UINT slots = 512;               // Vertex pool size, in nodes.
 };
 
@@ -156,6 +160,8 @@ private:
     const TerrainParams& Params() const { return static_cast<const TerrainParams&>(*_params); }
     static uint32_t Index(const Node& node) { return static_cast<uint32_t>(TerrainPackage::NodeIndex(node.level, node.x, node.z)); }
     void NodeBounds(const Node& node, XMFLOAT3 bounds[2]) const;
+    // Marks a ground or road material for anti-tiling and its color drift, as the scene asks (Shaders/AntiTiling.hlsli).
+    void ApplyAntiTiling(ShaderMaterial& material) const;
     float Distance(const Node& node, const XMFLOAT3& eye) const;
     // Whether a node is resident (marking it needed or prefetched), loading it now when synchronous (needed nodes
     // only), else asking the loader for it.

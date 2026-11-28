@@ -29,6 +29,7 @@
     { "id": "tree-smaa", "name": "LoadTreeScene", "antialiasing": "smaa" },
     { "id": "terrain-hills", "name": "LoadTerrainHills" },
     { "id": "terrain-roads", "name": "LoadTerrainRoads" },
+    { "id": "terrain-anti-tiling", "name": "LoadTerrainAntiTiling" },
     { "id": "pnw-plants", "name": "LoadPnwPlants" }
   ]
 }

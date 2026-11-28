@@ -48,9 +48,30 @@ float4 SampleMaterialMapGrad(Texture2D map, bool clampMap, ShaderMaterial materi
     return clampMap ? map.SampleGrad(samLinearClamp, roleUv, dx, dy) : map.SampleGrad(samLinearWrap, roleUv, dx, dy);
 }
 
+// A material map at the two anti-tiling offsets (Shaders/AntiTiling.hlsli), with the gradients of the un-offset
+// coordinates scaled for the upscaling bias, as SampleBias would.
+float4 SampleMaterialMapAntiTiled(Texture2D map, bool clampMap, ShaderMaterial material, uint role, float2 uv)
+{
+    const float2 roleUv = TransformMaterialUv(material, uv, role);
+    const float gradientScale = exp2(renderScale.x);
+    const float2 dx = ddx(roleUv) * gradientScale, dy = ddy(roleUv) * gradientScale;
+    const AntiTile tile = AntiTileAt(TransformMaterialUv(material, uv, BaseColorTextureRole));
+    // One sample away from the seams (explicit gradients, so the branch is safe).
+    const float2 single = tile.blend < 0.5f ? tile.offsetA : tile.offsetB;
+    if (tile.blend <= 0.001f || tile.blend >= 0.999f)
+        return clampMap ? map.SampleGrad(samLinearClamp, roleUv + single, dx, dy) : map.SampleGrad(samLinearWrap, roleUv + single, dx, dy);
+    if (clampMap)
+        return lerp(map.SampleGrad(samLinearClamp, roleUv + tile.offsetA, dx, dy),
+            map.SampleGrad(samLinearClamp, roleUv + tile.offsetB, dx, dy), tile.blend);
+    return lerp(map.SampleGrad(samLinearWrap, roleUv + tile.offsetA, dx, dy),
+        map.SampleGrad(samLinearWrap, roleUv + tile.offsetB, dx, dy), tile.blend);
+}
+
 // A material map through the model's UVs, or blended over the biplanar projections when the material has them.
 float4 SampleMaterialMap(Texture2D map, bool clampMap, ShaderMaterial material, uint role, float2 uv, Biplanar biplanar)
 {
+    if (material.biplanarParams.x <= 0 && UsesAntiTiling(material))
+        return SampleMaterialMapAntiTiled(map, clampMap, material, role, uv);
     if (material.biplanarParams.x <= 0)
     {
         const float2 roleUv = TransformMaterialUv(material, uv, role);
@@ -554,9 +575,14 @@ float4 ShadeSurface(PS_INPUT input)
     {
         float2 normalUv = TransformMaterialUv(mat, input.Tex, NormalTextureRole);
         float2 normalUv1 = normalUv + mat.normalMotion.xy * sceneTime.x;
-        float3 tangentNormal = (mat.normalTextures.z > 0
-            ? txNormal.SampleBias(samLinearClamp, normalUv1, renderScale.x)
-            : txNormal.SampleBias(samLinearWrap, normalUv1, renderScale.x)).xyz * 2.0f - 1.0f;
+        float4 normalSample;
+        if (UsesAntiTiling(mat))
+            normalSample = SampleMaterialMapAntiTiled(txNormal, mat.normalTextures.z > 0, mat, NormalTextureRole, input.Tex);
+        else
+            normalSample = mat.normalTextures.z > 0
+                ? txNormal.SampleBias(samLinearClamp, normalUv1, renderScale.x)
+                : txNormal.SampleBias(samLinearWrap, normalUv1, renderScale.x);
+        float3 tangentNormal = normalSample.xyz * 2.0f - 1.0f;
         if (any(mat.normalMotion != 0))
         {
             float2 normalUv2 = normalUv + mat.normalMotion.zw * sceneTime.x;
@@ -585,6 +611,13 @@ float4 ShadeSurface(PS_INPUT input)
             normalize(input.N), normalize(input.T), normalize(input.B), input.Tex, ddx(input.Tex) * gradientScale,
             ddy(input.Tex) * gradientScale, normal);
         textureColor = float4(1, 1, 1, 1);
+    }
+    else if (UsesAntiTiling(mat))
+    {
+        // An anti-tiled surface's color drift (the terrain applies its own in TerrainSurface).
+        const float4 drift = AntiTileDrift(mat, input.PosW);
+        textureColor.rgb *= drift.rgb;
+        sampledMaterial.specularParams.z *= drift.a;
     }
 
     // Only the first light casts a shadow.

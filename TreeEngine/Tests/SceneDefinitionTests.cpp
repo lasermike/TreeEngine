@@ -759,6 +759,28 @@ void TestTerrainSettings()
     bad["objects"][1] = { { "id", "copy" }, { "instanceOf", "ground" } };
     Reject(bad.dump(), ".instanceOf");
 
+    // Anti-tiling: off by default (not saved); on with its color drift, round-tripped; bad values rejected.
+    Check(!plain.antiTiling && !saved["objects"][1].contains("antiTiling"), "anti-tiling was on by default or saved when off");
+    auto tiled = Json::parse(json);
+    tiled["objects"][0]["antiTiling"] = { { "variation", 0.25 }, { "variationSize", 30 } };
+    tiled["objects"][1]["antiTiling"] = Json::object();
+    const auto tiledScene = SceneData::ParseScene(tiled.dump(), "anti-tiling");
+    const auto& tiledGround = static_cast<const SceneData::TerrainDefinition&>(*tiledScene.objects[0]);
+    const auto& tiledPlain = static_cast<const SceneData::TerrainDefinition&>(*tiledScene.objects[1]);
+    Check(tiledGround.antiTiling && tiledGround.variation == 0.25f && tiledGround.variationSize == 30
+        && tiledPlain.antiTiling && tiledPlain.variation == 0 && tiledPlain.variationSize == 40, "anti-tiling was not parsed");
+    const auto tiledAgain = SceneData::ParseScene(SceneData::SerializeScene(tiledScene), "anti-tiling-saved");
+    const auto& tiledGroundAgain = static_cast<const SceneData::TerrainDefinition&>(*tiledAgain.objects[0]);
+    Check(tiledGroundAgain.antiTiling && tiledGroundAgain.variation == 0.25f && tiledGroundAgain.variationSize == 30,
+        "anti-tiling did not round-trip");
+    for (const auto& badTiling : { Json(true), Json({ { "variation", 1.5 } }), Json({ { "variationSize", 0 } }),
+             Json({ { "amount", 0.2 } }) })
+    {
+        bad = Json::parse(json);
+        bad["objects"][0]["antiTiling"] = badTiling;
+        Reject(bad.dump(), ".antiTiling");
+    }
+
     // Material layers.
     const std::string layered = R"({"version":1,"name":"Layers","materials":{"grass":{"roughness":0.9},"rock":{"roughness":0.8}},
         "objects":[{"id":"ground","type":"terrain","source":"Terrain/Hills.terrain","layers":[

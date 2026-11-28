@@ -13,6 +13,8 @@
 #ifndef TERRAIN_HLSLI
 #define TERRAIN_HLSLI
 
+#include "AntiTiling.hlsli"
+
 static const uint MaxTerrainLayers = 4;
 
 bool IsTerrainMaterial(ShaderMaterial material)
@@ -76,6 +78,20 @@ float4 SampleTerrainLayerMap(int slot, bool clampMap, ShaderMaterial material, u
     return result;
 }
 
+// A top-down layer map at the two anti-tiling offsets, blended (one sample where the blend is all one side).
+float4 SampleTerrainAntiTiled(int slot, bool clampMap, ShaderMaterial material, uint role, float2 uv, float2 uvDx,
+    float2 uvDy, AntiTile tile)
+{
+    const float2 roleUv = TransformMaterialUv(material, uv, role);
+    const float2 dx = TransformMaterialUvGradient(material, uvDx, role), dy = TransformMaterialUvGradient(material, uvDy, role);
+    if (tile.blend <= 0.001f)
+        return SampleTerrainTexture(slot, clampMap, roleUv + tile.offsetA, dx, dy);
+    if (tile.blend >= 0.999f)
+        return SampleTerrainTexture(slot, clampMap, roleUv + tile.offsetB, dx, dy);
+    return lerp(SampleTerrainTexture(slot, clampMap, roleUv + tile.offsetA, dx, dy),
+        SampleTerrainTexture(slot, clampMap, roleUv + tile.offsetB, dx, dy), tile.blend);
+}
+
 // The height layers see: the surface's, or on a skirt (which hangs below its node's edge to fill cracks) its edge's.
 // Skirt vertices carry their drop in the tangent's w: |w| = 1 + drop.
 float TerrainMaterialHeight(float3 positionW, float tangentW)
@@ -117,15 +133,29 @@ ShaderMaterial TerrainSurface(ShaderMaterial base, float3 positionW, float heigh
         Biplanar biplanar = (Biplanar)0;
         if (m.biplanarParams.x > 0)
             biplanar = BiplanarSetup(m, positionW, positionDx, positionDy, normalW, uv, uvDx, uvDy);
+        // Anti-tiling for the top-down layers (biplanar rock keeps its projections).
+        const bool antiTiled = UsesAntiTiling(m) && m.biplanarParams.x <= 0;
+        const AntiTile tile = AntiTileAt(TransformMaterialUv(m, uv, BaseColorTextureRole));
 
+        // (if/else rather than ?:, so only the chosen side samples.)
         float4 color = 1;
         if (layer.textures.x >= 0)
-            color = SampleTerrainLayerMap((int)layer.textures.x, layer.textures.y > 0, m, BaseColorTextureRole, uv, uvDx, uvDy, biplanar);
+        {
+            if (antiTiled)
+                color = SampleTerrainAntiTiled((int)layer.textures.x, layer.textures.y > 0, m, BaseColorTextureRole, uv, uvDx, uvDy, tile);
+            else
+                color = SampleTerrainLayerMap((int)layer.textures.x, layer.textures.y > 0, m, BaseColorTextureRole, uv, uvDx, uvDy, biplanar);
+        }
         float metallic = m.specularParams.y, roughness = m.specularParams.z;
         if (m.metallicRoughnessTextures.x >= 0)
         {
-            const float4 mr = SampleTerrainLayerMap((int)m.metallicRoughnessTextures.x, m.metallicRoughnessTextures.y > 0, m,
-                MetallicRoughnessTextureRole, uv, uvDx, uvDy, biplanar);
+            float4 mr;
+            if (antiTiled)
+                mr = SampleTerrainAntiTiled((int)m.metallicRoughnessTextures.x, m.metallicRoughnessTextures.y > 0, m,
+                    MetallicRoughnessTextureRole, uv, uvDx, uvDy, tile);
+            else
+                mr = SampleTerrainLayerMap((int)m.metallicRoughnessTextures.x, m.metallicRoughnessTextures.y > 0, m,
+                    MetallicRoughnessTextureRole, uv, uvDx, uvDy, biplanar);
             metallic *= mr.b;
             roughness *= mr.g;
         }
@@ -144,9 +174,15 @@ ShaderMaterial TerrainSurface(ShaderMaterial base, float3 positionW, float heigh
                 const float2 projectionUv = m.biplanarParams.x > 0 ? biplanar.uv[p] : uv;
                 const float2 projectionDx = m.biplanarParams.x > 0 ? biplanar.uvDx[p] : uvDx;
                 const float2 projectionDy = m.biplanarParams.x > 0 ? biplanar.uvDy[p] : uvDy;
-                float3 tangentNormal = SampleTerrainTexture((int)m.normalTextures.x, m.normalTextures.z > 0,
-                    TransformMaterialUv(m, projectionUv, NormalTextureRole), TransformMaterialUvGradient(m, projectionDx, NormalTextureRole),
-                    TransformMaterialUvGradient(m, projectionDy, NormalTextureRole)).xyz * 2 - 1;
+                float4 normalSample;
+                if (antiTiled)
+                    normalSample = SampleTerrainAntiTiled((int)m.normalTextures.x, m.normalTextures.z > 0, m, NormalTextureRole,
+                        projectionUv, projectionDx, projectionDy, tile);
+                else
+                    normalSample = SampleTerrainTexture((int)m.normalTextures.x, m.normalTextures.z > 0,
+                        TransformMaterialUv(m, projectionUv, NormalTextureRole), TransformMaterialUvGradient(m, projectionDx, NormalTextureRole),
+                        TransformMaterialUvGradient(m, projectionDy, NormalTextureRole));
+                float3 tangentNormal = normalSample.xyz * 2 - 1;
                 tangentNormal.xy *= m.normalTextures.y;
                 float3 tangent, bitangent;
                 if (axis == 1)
@@ -169,6 +205,13 @@ ShaderMaterial TerrainSurface(ShaderMaterial base, float3 positionW, float heigh
         normalSum += weight * normal;
     }
     shadingNormal = normalize(normalSum);
+    // The drift, once over the blended layers; the result is marked done, so the shader's own drift for other
+    // surfaces doesn't apply it again.
+    const float4 drift = AntiTileDrift(base, positionW);
+    surface.Diffuse.rgb *= drift.rgb;
+    surface.Ambient.rgb *= drift.rgb;
+    surface.specularParams.z *= drift.a;
+    surface.tintTextures.zw = 0;
     return surface;
 }
 

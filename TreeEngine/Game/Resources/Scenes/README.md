@@ -225,6 +225,13 @@ or GIS elevation data). It requires `source`, the package directory, such as
   name: `asphalt`, `gravel`, `trail`, such as
   `"roadSurfaces": { "gravel": "drive-gravel" }`. The built-in ones tile their
   maps every 4 m (`textureCoordScale` 0.25); a replacement uses its own.
+- `antiTiling` (optional), such as `"antiTiling": { "variation": 0.2, "variationSize": 40 }`: hides the repeat of
+  the ground layers and road surfaces (not the lane markings or biplanar rock). Each map is sampled at offsets that
+  change region by region, under a noise about three repeats across, blending over a narrow seam, so the tile grid
+  doesn't show. `variation` (0 to 1, default 0) drifts the color (brighter or darker, warmer or cooler) and the
+  roughness over `variationSize` meters (default 40), so distant ground doesn't repeat either. Raster and DXR alike;
+  `Shaders/AntiTiling.hlsli`. It costs about 0.1 ms of GPU time in Hungerford. The `terrain-anti-tiling` render test
+  covers it.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,
@@ -293,7 +300,7 @@ tides import terrain with `--water-level` and, where there is any, bathymetry
 at Arcadia, at the mouth of Totten Inlet.
 
 Hungerford's colours are matched to photos of the site: a red-brown needle-duff
-forest floor (`forest-duff`, the dirt maps tinted), reddish drive gravel
+forest floor (`forest-duff`, the dirt maps tinted, with `antiTiling` so it doesn't repeat), reddish drive gravel
 (`drive-gravel` through `roadSurfaces`), grey Douglas fir, hemlock and alder
 bark flecked with pale lichen (`Nature/bark_lichen_*`, from
 `Tools/make-lichen-bark.ps1`; `Tools/terrain/place_plants.py`, `PHOTO_BARK`),

@@ -591,6 +591,15 @@ void Terrain::AppendGeometry(GeometryBufferData& geometryData)
             Params().propModels[model]->AppendGeometry(geometryData);
 }
 
+void Terrain::ApplyAntiTiling(ShaderMaterial& material) const
+{
+    if (!Params().antiTiling)
+        return;
+    material.tintTextures.z = 1;
+    material.tintTextures.w = Params().variation;
+    material.opticalParams.z = Params().variationSize;
+}
+
 HRESULT Terrain::InitGraphics(RenderManager& renderManager)
 {
     HRR(CleanUpDeviceObjects());
@@ -602,6 +611,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
     wchar_t name[64];
     swprintf(name, 64, L"terrain%d", _id);
     ShaderMaterial shaderMaterial = _params->materials[0];
+    ApplyAntiTiling(shaderMaterial);
     shaderMaterial.ApplyTextureCoordScale(_params->textureCoordScale.x, _params->textureCoordScale.y);
     StockRenderState renderState;
     renderState.samplerState = StockSamplerStates::MinMagMipLinearUVWWrap;
@@ -630,6 +640,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
                     data[i].textures = XMFLOAT4(static_cast<float>(slot), layerMaterial.specularColor.w, 0, 0);
                 }
             }
+            ApplyAntiTiling(layerMaterial);
             data[i].material = layerMaterial;
             data[i].height = XMFLOAT4(layers[i].height.x, layers[i].height.y, layers[i].height.z, 0);
             data[i].slope = XMFLOAT4(layers[i].slope.x, layers[i].slope.y, layers[i].slope.z, 0);
@@ -677,6 +688,8 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         RoadPart& road = *part;
         const size_t index = static_cast<size_t>(road.part);
         ShaderMaterial roadMaterial = index < Params().roadMaterials.size() ? Params().roadMaterials[index] : _params->materials[0];
+        if (road.part != Roads::Part::YellowLine && road.part != Roads::Part::WhiteLine)
+            ApplyAntiTiling(roadMaterial);      // The surfaces, not the paint.
         wchar_t roadName[64];
         swprintf(roadName, 64, L"terrain%d-road%zu", _id, index);
         Material* surface = nullptr;

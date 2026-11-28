@@ -452,6 +452,9 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     { return RuntimeMaterialTextures(dirt, terrainId, sceneFilename); };
             }
             parameters->lodRange = terrain.lodRange;
+            parameters->antiTiling = terrain.antiTiling;
+            parameters->variation = terrain.variation;
+            parameters->variationSize = terrain.variationSize;
             parameters->slots = static_cast<UINT>(terrain.slots);
             if (terrain.hasMaterial)
             {
