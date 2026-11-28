@@ -608,6 +608,19 @@ void Terrain::ApplyAntiTiling(ShaderMaterial& material) const
     material.opticalParams.z = on ? Params().variationSize : 0.0f;
 }
 
+void Terrain::ApplyRoadWear(ShaderMaterial& material, float profile) const
+{
+    material.metallicRoughnessTextures.z = Params().roadWear > 0 ? profile : 0.0f;
+    material.metallicRoughnessTextures.w = Params().roadWear;
+}
+
+void Terrain::SetRoadWear(float wear)
+{
+    Params().roadWear = (std::max)(0.0f, (std::min)(1.0f, wear));
+    for (const auto& worn : m_wornMaterials)
+        ApplyRoadWear(worn.first->m_shaderMaterial, worn.second);
+}
+
 HRESULT Terrain::SetAntiTiling(RenderManager& renderManager, bool on, float variation, float variationSize)
 {
     Params().antiTiling = on;
@@ -626,6 +639,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
 {
     HRR(CleanUpDeviceObjects());
     m_antiTiledMaterials.clear();
+    m_wornMaterials.clear();
     m_firstLayer = m_layerCount = 0;
     if (_params->materials.empty())
         HRR(AddDefaultPbrMaterial(*_params, XMFLOAT4(0.25f, 0.35f, 0.15f, 1), 0.9f, nullptr));
@@ -718,6 +732,12 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         ShaderMaterial roadMaterial = index < Params().roadMaterials.size() ? Params().roadMaterials[index] : _params->materials[0];
         if (road.part != Roads::Part::YellowLine && road.part != Roads::Part::WhiteLine)
             ApplyAntiTiling(roadMaterial);      // The surfaces, not the paint.
+        // Wear profiles (Shaders/RoadWear.hlsli): 1 loose, 2 hard, 3 dirt; none for paint and trails (trail tiles don't
+        // carry the place across).
+        const Roads::Part p = road.part;
+        const float wearProfile = p == Roads::Part::Gravel || p == Roads::Part::PatchyGravel || p == Roads::Part::PadGravel
+            ? 1.0f : p == Roads::Part::Asphalt || p == Roads::Part::ChipSeal ? 2.0f : p == Roads::Part::Dirt ? 3.0f : 0.0f;
+        ApplyRoadWear(roadMaterial, wearProfile);
         wchar_t roadName[64];
         swprintf(roadName, 64, L"terrain%d-road%zu", _id, index);
         Material* surface = nullptr;
@@ -735,6 +755,8 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
                 roadMaterial, roadState, &surface));
         if (road.part != Roads::Part::YellowLine && road.part != Roads::Part::WhiteLine)
             m_antiTiledMaterials.push_back(surface);
+        if (wearProfile > 0)
+            m_wornMaterials.push_back({ surface, wearProfile });
         if (road.part == Roads::Part::Trail && part == surfaces.back() && !trailMaterial.empty())
         {
             trailSurface = surface;

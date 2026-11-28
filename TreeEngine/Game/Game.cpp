@@ -1938,6 +1938,10 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                         ImGui::EndDisabled();
                         if (changed && FAILED(terrain.SetAntiTiling(m_renderManager, antiTiling, variation, variationSize)))
                             m_sceneError = "The terrain's anti-tiling could not be updated";
+                        // Wear across the road surfaces (Shaders/RoadWear.hlsli), live.
+                        float roadWear = terrain.RoadWear();
+                        if (ImGui::SliderFloat("Road wear", &roadWear, 0, 1, "%.2f"))
+                            terrain.SetRoadWear(roadWear);
                         ShowPropEditor(terrain, prefix);
                     }
                     if (params.generatorType == ModelGeneratorType)

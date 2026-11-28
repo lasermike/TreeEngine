@@ -133,6 +133,7 @@
       "source": "Terrain/RoadsTest.terrain",
       "roads": "Terrain/RoadSurfacesTest.roads.geojson",
       "lodRange": 2,
+      "roadWear": 1,
       "slots": 64,
       "layers": [
         {

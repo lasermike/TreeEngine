@@ -38,7 +38,8 @@ namespace
                 v.Pos = XMFLOAT3(x, y + lift, z);
                 v.Normal = XMFLOAT3(0, 1, 0);
                 v.Tex = planarUv ? XMFLOAT2(x, -z) : XMFLOAT2(static_cast<float>(c) / (columns - 1), s.along - dashStart);
-                v.TangentU = XMFLOAT4(1, 0, 0, 1);
+                // w: 1 at one edge to 2 at the other, the place across the road for its wear (Shaders/RoadWear.hlsli).
+                v.TangentU = XMFLOAT4(1, 0, 0, 1 + static_cast<float>(c) / (columns - 1));
                 rows.push_back(v);
             }
         }
@@ -110,7 +111,7 @@ namespace
             t = XMVector3Normalize(t - n * XMVector3Dot(t, n));
             XMFLOAT3 tangent;
             XMStoreFloat3(&tangent, t);
-            part.vertices[v].TangentU = XMFLOAT4(tangent.x, tangent.y, tangent.z, 1);
+            part.vertices[v].TangentU = XMFLOAT4(tangent.x, tangent.y, tangent.z, part.vertices[v].TangentU.w);
         }
     }
 

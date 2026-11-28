@@ -63,6 +63,7 @@ public:
     bool antiTiling = false;
     float variation = 0;
     float variationSize = 40;
+    float roadWear = 0;             // TerrainDefinition::roadWear.
     UINT slots = 512;               // Vertex pool size, in nodes.
 };
 
@@ -133,6 +134,9 @@ public:
     float Variation() const { return Params().variation; }
     float VariationSize() const { return Params().variationSize; }
     HRESULT SetAntiTiling(RenderManager& renderManager, bool on, float variation, float variationSize);
+    // Road wear (TerrainDefinition::roadWear), changed live.
+    float RoadWear() const { return Params().roadWear; }
+    void SetRoadWear(float wear);
 
     // This frame's selection, for profiling and tests.
     UINT SelectedNodes() const { return static_cast<UINT>(m_selected.size()); }
@@ -173,6 +177,9 @@ private:
     void ApplyAntiTiling(ShaderMaterial& material) const;
     // What anti-tiling reaches, for live edits: the ground's and road surfaces' materials and the layer table's rows.
     std::vector<Material*> m_antiTiledMaterials;
+    // The road surfaces that wear, with their profile (Shaders/RoadWear.hlsli).
+    std::vector<std::pair<Material*, float>> m_wornMaterials;
+    void ApplyRoadWear(ShaderMaterial& material, float profile) const;
     UINT m_firstLayer = 0, m_layerCount = 0;
     float Distance(const Node& node, const XMFLOAT3& eye) const;
     // Whether a node is resident (marking it needed or prefetched), loading it now when synchronous (needed nodes

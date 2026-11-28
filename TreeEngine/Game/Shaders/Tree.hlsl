@@ -619,6 +619,13 @@ float4 ShadeSurface(PS_INPUT input)
         textureColor.rgb *= drift.rgb;
         sampledMaterial.specularParams.z *= drift.a;
     }
+    if (mat.metallicRoughnessTextures.z > 0)
+    {
+        // A road surface's wear across its width: the bitangent's length is the tangent's w, 1 + the place across.
+        const float4 wear = RoadWear(mat, length(input.B) - 1, input.PosW);
+        textureColor.rgb *= wear.rgb;
+        sampledMaterial.specularParams.z *= wear.a;
+    }
 
     // Only the first light casts a shadow.
     float3 shadow = float3(1.0f, 1.0f, 1.0f);

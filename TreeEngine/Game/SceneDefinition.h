@@ -228,6 +228,9 @@ namespace SceneData
         bool antiTiling = false;
         float variation = 0;
         float variationSize = 40;
+        // Wear across the road surfaces' width ("roadWear", 0 to 1, 0 off): wheel ruts, a centre strip and dirtier
+        // edges by surface (Shaders/RoadWear.hlsli).
+        float roadWear = 0;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TerrainDefinition>(*this); }
     };
 

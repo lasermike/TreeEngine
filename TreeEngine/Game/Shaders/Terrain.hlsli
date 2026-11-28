@@ -14,6 +14,7 @@
 #define TERRAIN_HLSLI
 
 #include "AntiTiling.hlsli"
+#include "RoadWear.hlsli"
 
 static const uint MaxTerrainLayers = 4;
 

@@ -234,6 +234,12 @@ or GIS elevation data). It requires `source`, the package directory, such as
   `Shaders/AntiTiling.hlsli`. It costs about 0.1 ms of GPU time in Hungerford. The `terrain-anti-tiling` render test
   covers it. The debug UI's Objects panel has it on each terrain (**Anti-tiling**, **Color drift**, **Drift size**),
   live; Save writes it to the scene.
+- `roadWear` (0 to 1, default 0): wear across the road surfaces' width, by surface: wheel ruts (darker, smoother),
+  a mossy centre strip and dirtier edges on gravel, patchy gravel and pad gravel; four polished wheel paths and
+  lighter fines at the edges on paved roads and chip seal; bare ruts and weeds down the middle on dirt. Every band
+  wanders and breaks up with noise. Not on trails or lane markings. The road mesh carries each vertex's place across
+  the road in its tangent's w (`Shaders/RoadWear.hlsli`). The debug UI's **Road wear** slider changes it live;
+  `terrain-road-surfaces` tests it.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,
