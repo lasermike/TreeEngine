@@ -840,7 +840,7 @@ namespace SceneData
                 }
                 else if (type == "terrain")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "roads", "roadSurfaces", "material", "layers", "textureCoordScale", "lodRange", "slots", "antiTiling", "roadWear" });
+                    Fields(value, path, { "id", "type", "transform", "source", "roads", "roadSurfaces", "material", "layers", "textureCoordScale", "lodRange", "slots", "antiTiling", "roadWear", "roadEdges" });
                     auto terrain = std::make_unique<TerrainDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     terrain->source = String(value["source"], path + ".source");
@@ -957,6 +957,12 @@ namespace SceneData
                     }
                     if (value.contains("roadWear"))
                         terrain->roadWear = UnitNumber(value["roadWear"], path + ".roadWear");
+                    if (value.contains("roadEdges"))
+                    {
+                        terrain->roadEdges = Number(value["roadEdges"], path + ".roadEdges");
+                        if (!(terrain->roadEdges >= 0 && terrain->roadEdges <= 0.4f))
+                            Invalid(path + ".roadEdges", "must be between 0 and 0.4");
+                    }
                     object = std::move(terrain);
                 }
                 else if (type == "model")
@@ -1353,6 +1359,8 @@ namespace SceneData
                     value["antiTiling"] = { { "variation", terrain.variation }, { "variationSize", terrain.variationSize } };
                 if (terrain.roadWear > 0)
                     value["roadWear"] = terrain.roadWear;
+                if (terrain.roadEdges > 0)
+                    value["roadEdges"] = terrain.roadEdges;
                 break;
             }
             default: throw std::runtime_error("Cannot serialize unsupported scene object");

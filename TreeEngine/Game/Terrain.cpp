@@ -612,6 +612,15 @@ void Terrain::ApplyRoadWear(ShaderMaterial& material, float profile) const
 {
     material.metallicRoughnessTextures.z = Params().roadWear > 0 ? profile : 0.0f;
     material.metallicRoughnessTextures.w = Params().roadWear;
+    // The worn surfaces are the ones with ragged edges (not paint or trails: trail tiles don't carry the place across).
+    material.opticalParams.w = profile > 0 ? Params().roadEdges : 0.0f;
+}
+
+void Terrain::SetRoadEdges(float edges)
+{
+    Params().roadEdges = (std::max)(0.0f, (std::min)(0.4f, edges));
+    for (const auto& worn : m_wornMaterials)
+        ApplyRoadWear(worn.first->m_shaderMaterial, worn.second);
 }
 
 void Terrain::SetRoadWear(float wear)

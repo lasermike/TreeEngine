@@ -289,6 +289,26 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
         return;
     }
 
+    // A road surface's ragged edge, as raster cuts it (Shaders/RoadWear.hlsli): the place across from the tangents' w.
+    if (mat.opticalParams.w > 0)
+    {
+        float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+        SimpleVertexData sv[3];
+        [unroll] for (uint corner = 0; corner < 3; ++corner)
+            sv[corner] = LoadOriginalVertex(geoInfo.baseVertexLocation
+                + LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + corner, geoInfo.isSkinned), geoInfo.isSkinned);
+        const float across = abs(sv[0].tangent.w * bary.x + sv[1].tangent.w * bary.y + sv[2].tangent.w * bary.z) - 1;
+        float3 color = mat.Diffuse.rgb;
+        if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
+            color *= SampleSpecularTexture(geoInfo.textureIndex, TransformMaterialUv(mat,
+                sv[0].tex * bary.x + sv[1].tex * bary.y + sv[2].tex * bary.z, BaseColorTextureRole), mat.specularColor.w > 0).rgb;
+        if (!RoadEdgeKeeps(mat, across, WorldRayOrigin() + WorldRayDirection() * RayTCurrent(), color))
+        {
+            IgnoreHit();
+            return;
+        }
+    }
+
     // Alpha clip on the base color's alpha, the factor times the texture's (1 without a texture), as raster does.
     if (mat.flags.z > 0 && mat.Diffuse.a < mat.flags.z)
     {

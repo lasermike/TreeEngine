@@ -767,6 +767,14 @@ void TestTerrainSettings()
     Check(static_cast<const SceneData::TerrainDefinition&>(*wornScene.objects[0]).roadWear == 0.6f, "road wear did not round-trip");
     worn["objects"][0]["roadWear"] = 1.5;
     Reject(worn.dump(), ".roadWear");
+    // Ragged road edges: off by default, 0 to 0.4, round-tripped.
+    Check(plain.roadEdges == 0 && !saved["objects"][1].contains("roadEdges"), "road edges were on by default or saved when off");
+    auto edged = Json::parse(json);
+    edged["objects"][0]["roadEdges"] = 0.15;
+    const auto edgedScene = SceneData::ParseScene(SceneData::SerializeScene(SceneData::ParseScene(edged.dump(), "edges")), "edges-saved");
+    Check(static_cast<const SceneData::TerrainDefinition&>(*edgedScene.objects[0]).roadEdges == 0.15f, "road edges did not round-trip");
+    edged["objects"][0]["roadEdges"] = 0.5;
+    Reject(edged.dump(), ".roadEdges");
 
     // Anti-tiling: off by default (not saved); on with its color drift, round-tripped; bad values rejected.
     Check(!plain.antiTiling && !saved["objects"][1].contains("antiTiling"), "anti-tiling was on by default or saved when off");

@@ -231,6 +231,10 @@ namespace SceneData
         // Wear across the road surfaces' width ("roadWear", 0 to 1, 0 off): wheel ruts, a centre strip and dirtier
         // edges by surface (Shaders/RoadWear.hlsli).
         float roadWear = 0;
+        // Ragged road edges ("roadEdges", 0 to 0.4, 0 off): within this fraction of the width from each edge the road
+        // surfaces are cut away in clumps, more nearer the edge, so the ground (or a driveway under a road) shows
+        // through (Shaders/RoadWear.hlsli). Costs any-hit shading on those surfaces in DXR.
+        float roadEdges = 0;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TerrainDefinition>(*this); }
     };
 

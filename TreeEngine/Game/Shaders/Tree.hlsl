@@ -498,6 +498,9 @@ float4 SampleBaseColor(PS_INPUT input, out Biplanar biplanar)
         textureColor = SampleMaterialMap(txDiffuse, mat.specularColor.w > 0, mat, BaseColorTextureRole, input.Tex, biplanar);
         lod = txDiffuse.CalculateLevelOfDetailUnclamped(samLinearWrap, baseColorUv) + renderScale.x;
     }
+    // A road surface's ragged edge (Shaders/RoadWear.hlsli): the ground shows through where it's cut away.
+    if (mat.opticalParams.w > 0)
+        clip(RoadEdgeKeeps(mat, abs(input.TangentW) - 1, input.PosW, mat.Diffuse.rgb * textureColor.rgb) ? 1 : -1);
     if (mat.flags.z > 0)  // alpha test, on the base color's alpha: factor x texture (glTF), 1 for no texture
     {
         // While upscaling, the footprint and level of detail are a display pixel's, matching the biased sample.

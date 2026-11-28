@@ -1942,6 +1942,10 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                         float roadWear = terrain.RoadWear();
                         if (ImGui::SliderFloat("Road wear", &roadWear, 0, 1, "%.2f"))
                             terrain.SetRoadWear(roadWear);
+                        // Ragged road edges, live in raster (DXR takes a change from or to 0 at the next scene load).
+                        float roadEdges = terrain.RoadEdges();
+                        if (ImGui::SliderFloat("Road edges", &roadEdges, 0, 0.4f, "%.2f"))
+                            terrain.SetRoadEdges(roadEdges);
                         ShowPropEditor(terrain, prefix);
                     }
                     if (params.generatorType == ModelGeneratorType)

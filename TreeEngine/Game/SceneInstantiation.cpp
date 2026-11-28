@@ -457,6 +457,7 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
             parameters->variation = terrain.variation;
             parameters->variationSize = terrain.variationSize;
             parameters->roadWear = terrain.roadWear;
+            parameters->roadEdges = terrain.roadEdges;
             parameters->slots = static_cast<UINT>(terrain.slots);
             if (terrain.hasMaterial)
             {
@@ -886,6 +887,7 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
             terrain.variation = terrainParams.variation;
             terrain.variationSize = terrainParams.variationSize;
             terrain.roadWear = terrainParams.roadWear;
+            terrain.roadEdges = terrainParams.roadEdges;
             terrain.layers.clear();
             terrain.hasMaterial = false;
             if (!terrainParams.layers.empty())
