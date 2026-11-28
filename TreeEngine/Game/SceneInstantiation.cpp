@@ -452,6 +452,9 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     { return RuntimeMaterialTextures(dirt, terrainId, sceneFilename); };
             }
             parameters->lodRange = terrain.lodRange;
+            parameters->antiTiling = terrain.antiTiling;
+            parameters->variation = terrain.variation;
+            parameters->variationSize = terrain.variationSize;
             parameters->slots = static_cast<UINT>(terrain.slots);
             if (terrain.hasMaterial)
             {
@@ -877,6 +880,9 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
                     map->source = RebaseAsset(map->source, sourceFilename, destinationFilename);
             terrain.lodRange = terrainParams.lodRange;
             terrain.slots = static_cast<int>(terrainParams.slots);
+            terrain.antiTiling = terrainParams.antiTiling;
+            terrain.variation = terrainParams.variation;
+            terrain.variationSize = terrainParams.variationSize;
             terrain.layers.clear();
             terrain.hasMaterial = false;
             if (!terrainParams.layers.empty())

@@ -225,6 +225,8 @@ public:
     // Adds a terrain's material layers to the scene's table and returns the first's index; FinalizeTerrainLayers hands
     // the table to the platform after the scene's objects initialize their graphics.
     UINT RegisterTerrainLayers(const TerrainLayerData* layers, UINT count);
+    // Changes registered layers in place (first..first+count) and uploads the table again; for live edits.
+    HRESULT UpdateTerrainLayers(UINT first, UINT count, const std::function<void(TerrainLayerData&)>& update);
     HRESULT FinalizeTerrainLayers();
     HRESULT CreateMaterial(const wchar_t* name, const GltfTextureSource* textureSource,
                            const wchar_t* vertexShaderFilename, const wchar_t* pixelShaderFilename,

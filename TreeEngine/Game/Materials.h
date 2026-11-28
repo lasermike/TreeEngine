@@ -86,9 +86,10 @@ struct ShaderMaterial
     XMFLOAT4 specularTextures; // strength/color texture slots; z/w = clamp flags
     XMFLOAT4 normalTextures; // normal texture slot, scale, clamp flag
     XMFLOAT4 metallicRoughnessTextures; // texture slot, clamp flag
-    XMFLOAT4 opticalParams; // x = IOR; y = transmission factor
+    XMFLOAT4 opticalParams; // x = IOR; y = transmission factor; z = anti-tiling color drift size, meters
     XMFLOAT4 normalMotion; // two UV velocities per second
-    XMFLOAT4 tintTextures; // tint texture slot, clamp flag
+    XMFLOAT4 tintTextures; // tint texture slot, clamp flag; z = anti-tiling (1 on), w = color drift (0 to 1)
+                           // (see Shaders/AntiTiling.hlsli; the drift's cell size is opticalParams.z)
     // Biplanar mapping (scene "biplanar"): x = UV units per object-space unit for the side projections (0 = off),
     // y = blend sharpness. The model's own UVs stay the top-down projection; see Shaders/Materials.fx.
     XMFLOAT4 biplanarParams;

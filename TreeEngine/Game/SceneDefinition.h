@@ -220,6 +220,13 @@ namespace SceneData
         int slots = 512;            // Nodes resident at once (each about 215 KB of vertex buffer).
         // Materials in place of the built-in road surfaces, by name: "asphalt", "gravel", "trail".
         std::map<std::string, MaterialDefinition> roadSurfaces;
+        // Anti-tiling ("antiTiling": {"variation": 0.2, "variationSize": 40}) for the ground layers and road surfaces
+        // (not the lane markings): their maps are sampled at two offsets blended by noise, so the repeat doesn't show;
+        // and over variationSize meters the color and roughness drift by up to variation (0 to 1), so distant ground
+        // doesn't repeat either.
+        bool antiTiling = false;
+        float variation = 0;
+        float variationSize = 40;
         std::unique_ptr<ObjectDefinition> Clone() const override { return std::make_unique<TerrainDefinition>(*this); }
     };
 

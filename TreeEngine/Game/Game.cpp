@@ -1925,7 +1925,21 @@ HRESULT Game::UpdateDebugUI(ImGuiContext* imGuiContext)
                     DebugVectorEditor::ReadOnly((prefix + "Bounds minimum").c_str(), &bounds[0].x, 3);
                     DebugVectorEditor::ReadOnly((prefix + "Bounds maximum").c_str(), &bounds[1].x, 3);
                     if (obj->GetObjectType() == ObjectType_Terrain)
-                        ShowPropEditor(*static_cast<Terrain*>(obj), prefix);
+                    {
+                        // Anti-tiling of the ground and road surfaces (Shaders/AntiTiling.hlsli), live; Save keeps it.
+                        auto& terrain = *static_cast<Terrain*>(obj);
+                        bool antiTiling = terrain.AntiTiling();
+                        float variation = terrain.Variation(), variationSize = terrain.VariationSize();
+                        bool changed = ImGui::Checkbox("Anti-tiling", &antiTiling);
+                        ImGui::BeginDisabled(!antiTiling);
+                        changed |= ImGui::SliderFloat("Color drift", &variation, 0, 1, "%.2f");
+                        changed |= ImGui::SliderFloat("Drift size (m)", &variationSize, 1, 500, "%.0f",
+                            ImGuiSliderFlags_Logarithmic);
+                        ImGui::EndDisabled();
+                        if (changed && FAILED(terrain.SetAntiTiling(m_renderManager, antiTiling, variation, variationSize)))
+                            m_sceneError = "The terrain's anti-tiling could not be updated";
+                        ShowPropEditor(terrain, prefix);
+                    }
                     if (params.generatorType == ModelGeneratorType)
                     {
                         const auto& model = static_cast<const GltfModelParams&>(params);

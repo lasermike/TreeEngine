@@ -844,6 +844,15 @@ UINT RenderManager::RegisterTerrainLayers(const TerrainLayerData* layers, UINT c
     return first;
 }
 
+HRESULT RenderManager::UpdateTerrainLayers(UINT first, UINT count, const std::function<void(TerrainLayerData&)>& update)
+{
+    if (first + count > m_terrainLayers.size())
+        return E_INVALIDARG;
+    for (UINT i = first; i < first + count; ++i)
+        update(m_terrainLayers[i]);
+    return FinalizeTerrainLayers();
+}
+
 HRESULT RenderManager::FinalizeTerrainLayers()
 {
     // Always set, so a scene without terrain layers drops the last scene's.

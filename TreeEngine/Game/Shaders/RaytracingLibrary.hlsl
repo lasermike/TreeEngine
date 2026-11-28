@@ -245,6 +245,17 @@ float4 SampleTerrainTexture(int slot, bool clampMap, float2 uv, float2 uvDx, flo
 float4 SampleMaterialMap(int slot, bool clampTexture, ShaderMaterial material, uint role, float2 uv,
     float2 uvDx, float2 uvDy, Biplanar biplanar)
 {
+    if (material.biplanarParams.x <= 0 && UsesAntiTiling(material))
+    {
+        // The two anti-tiling offsets (Shaders/AntiTiling.hlsli); the ray footprint's gradients are the un-offset ones.
+        const float2 roleUv = TransformMaterialUv(material, uv, role);
+        const AntiTile tile = AntiTileAt(TransformMaterialUv(material, uv, BaseColorTextureRole));
+        if (tile.blend <= 0.001f || tile.blend >= 0.999f)
+            return SampleFilteredMaterialTexture(slot, roleUv + (tile.blend < 0.5f ? tile.offsetA : tile.offsetB), clampTexture,
+                material, role, uvDx, uvDy);
+        return lerp(SampleFilteredMaterialTexture(slot, roleUv + tile.offsetA, clampTexture, material, role, uvDx, uvDy),
+            SampleFilteredMaterialTexture(slot, roleUv + tile.offsetB, clampTexture, material, role, uvDx, uvDy), tile.blend);
+    }
     if (material.biplanarParams.x <= 0)
         return SampleFilteredMaterialTexture(slot, TransformMaterialUv(material, uv, role), clampTexture, material, role, uvDx, uvDy);
     float4 result = 0;
@@ -460,7 +471,12 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     {
         float2 normalUv = TransformMaterialUv(mat, texCoord, NormalTextureRole);
         float2 normalUv1 = normalUv + mat.normalMotion.xy * sceneTime.x;
-        float3 tangentNormal = SampleFilteredMaterialTexture((int)mat.normalTextures.x, normalUv1, mat.normalTextures.z > 0, mat, NormalTextureRole, uvDx, uvDy).xyz * 2.0f - 1.0f;
+        float4 normalSample;
+        if (UsesAntiTiling(mat))
+            normalSample = SampleMaterialMap((int)mat.normalTextures.x, mat.normalTextures.z > 0, mat, NormalTextureRole, texCoord, uvDx, uvDy, biplanar);
+        else
+            normalSample = SampleFilteredMaterialTexture((int)mat.normalTextures.x, normalUv1, mat.normalTextures.z > 0, mat, NormalTextureRole, uvDx, uvDy);
+        float3 tangentNormal = normalSample.xyz * 2.0f - 1.0f;
         if (any(mat.normalMotion != 0))
         {
             float2 normalUv2 = normalUv + mat.normalMotion.zw * sceneTime.x;
@@ -556,6 +572,13 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         float4 mr = SampleMaterialMap((int)mat.metallicRoughnessTextures.x, mat.metallicRoughnessTextures.y > 0, mat, MetallicRoughnessTextureRole, texCoord, uvDx, uvDy, biplanar);
         mat.specularParams.y *= mr.b;
         mat.specularParams.z *= mr.g;
+    }
+    if (UsesAntiTiling(mat))
+    {
+        // An anti-tiled surface's color drift (the terrain applied its own in TerrainSurface, and cleared the mark).
+        const float4 drift = AntiTileDrift(mat, WorldRayOrigin() + WorldRayDirection() * RayTCurrent());
+        textureColor.rgb *= drift.rgb;
+        mat.specularParams.z *= drift.a;
     }
     float4 A, D, S;
     ComputeDirectionalLight(mat, textureColor, light, normal, toEye, A, D, S);

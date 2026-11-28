@@ -840,7 +840,7 @@ namespace SceneData
                 }
                 else if (type == "terrain")
                 {
-                    Fields(value, path, { "id", "type", "transform", "source", "roads", "roadSurfaces", "material", "layers", "textureCoordScale", "lodRange", "slots" });
+                    Fields(value, path, { "id", "type", "transform", "source", "roads", "roadSurfaces", "material", "layers", "textureCoordScale", "lodRange", "slots", "antiTiling" });
                     auto terrain = std::make_unique<TerrainDefinition>();
                     if (!value.contains("source")) Invalid(path + ".source", "required property");
                     terrain->source = String(value["source"], path + ".source");
@@ -935,6 +935,22 @@ namespace SceneData
                     if (value.contains("slots"))
                     {
                         terrain->slots = Integer(value["slots"], path + ".slots", 16, 4096);
+                    }
+                    if (value.contains("antiTiling"))
+                    {
+                        const auto& antiTiling = value["antiTiling"];
+                        const std::string antiPath = path + ".antiTiling";
+                        if (!antiTiling.is_object()) Invalid(antiPath, "expected an object (variation, variationSize)");
+                        Fields(antiTiling, antiPath, { "variation", "variationSize" });
+                        terrain->antiTiling = true;
+                        if (antiTiling.contains("variation"))
+                            terrain->variation = UnitNumber(antiTiling["variation"], antiPath + ".variation");
+                        if (antiTiling.contains("variationSize"))
+                        {
+                            terrain->variationSize = Number(antiTiling["variationSize"], antiPath + ".variationSize");
+                            if (!(terrain->variationSize >= 1 && terrain->variationSize <= 10000))
+                                Invalid(antiPath + ".variationSize", "must be between 1 and 10000 meters");
+                        }
                     }
                     object = std::move(terrain);
                 }
@@ -1328,6 +1344,8 @@ namespace SceneData
                 }
                 value["lodRange"] = terrain.lodRange;
                 value["slots"] = terrain.slots;
+                if (terrain.antiTiling)
+                    value["antiTiling"] = { { "variation", terrain.variation }, { "variationSize", terrain.variationSize } };
                 break;
             }
             default: throw std::runtime_error("Cannot serialize unsupported scene object");

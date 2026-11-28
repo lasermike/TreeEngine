@@ -591,9 +591,33 @@ void Terrain::AppendGeometry(GeometryBufferData& geometryData)
             Params().propModels[model]->AppendGeometry(geometryData);
 }
 
+void Terrain::ApplyAntiTiling(ShaderMaterial& material) const
+{
+    const bool on = Params().antiTiling;
+    material.tintTextures.z = on ? 1.0f : 0.0f;
+    material.tintTextures.w = on ? Params().variation : 0.0f;
+    material.opticalParams.z = on ? Params().variationSize : 0.0f;
+}
+
+HRESULT Terrain::SetAntiTiling(RenderManager& renderManager, bool on, float variation, float variationSize)
+{
+    Params().antiTiling = on;
+    Params().variation = (std::max)(0.0f, (std::min)(1.0f, variation));
+    Params().variationSize = (std::max)(1.0f, variationSize);
+    // Raster and DXR read each material every frame; the layer table is uploaded again.
+    for (Material* material : m_antiTiledMaterials)
+        ApplyAntiTiling(material->m_shaderMaterial);
+    if (m_layerCount)
+        HRR(renderManager.UpdateTerrainLayers(m_firstLayer, m_layerCount,
+            [this](TerrainLayerData& layer) { ApplyAntiTiling(layer.material); }));
+    return S_OK;
+}
+
 HRESULT Terrain::InitGraphics(RenderManager& renderManager)
 {
     HRR(CleanUpDeviceObjects());
+    m_antiTiledMaterials.clear();
+    m_firstLayer = m_layerCount = 0;
     if (_params->materials.empty())
         HRR(AddDefaultPbrMaterial(*_params, XMFLOAT4(0.25f, 0.35f, 0.15f, 1), 0.9f, nullptr));
     if (_params->textureFilename.empty())
@@ -602,6 +626,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
     wchar_t name[64];
     swprintf(name, 64, L"terrain%d", _id);
     ShaderMaterial shaderMaterial = _params->materials[0];
+    ApplyAntiTiling(shaderMaterial);
     shaderMaterial.ApplyTextureCoordScale(_params->textureCoordScale.x, _params->textureCoordScale.y);
     StockRenderState renderState;
     renderState.samplerState = StockSamplerStates::MinMagMipLinearUVWWrap;
@@ -630,12 +655,15 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
                     data[i].textures = XMFLOAT4(static_cast<float>(slot), layerMaterial.specularColor.w, 0, 0);
                 }
             }
+            ApplyAntiTiling(layerMaterial);
             data[i].material = layerMaterial;
             data[i].height = XMFLOAT4(layers[i].height.x, layers[i].height.y, layers[i].height.z, 0);
             data[i].slope = XMFLOAT4(layers[i].slope.x, layers[i].slope.y, layers[i].slope.z, 0);
             data[i].noise = XMFLOAT4(layers[i].noise.x, layers[i].noise.y, layers[i].noise.z, 0);
         }
         const UINT first = renderManager.RegisterTerrainLayers(data.data(), static_cast<UINT>(data.size()));
+        m_firstLayer = first;
+        m_layerCount = static_cast<UINT>(data.size());
         shaderMaterial = data[0].material;
         shaderMaterial.flags.y = 0;
         shaderMaterial.normalTextures.x = shaderMaterial.metallicRoughnessTextures.x = -1;
@@ -653,6 +681,8 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
     else
         HRR(renderManager.CreateMaterial(name, _params->textureFilename[0].empty() ? nullptr : _params->textureFilename[0].c_str(),
             nullptr, nullptr, nullptr, nullptr, shaderMaterial, renderState, &material));
+
+    m_antiTiledMaterials.push_back(material);
 
     Mesh* mesh = nullptr;
     HRR(renderManager.CreateMesh(name, renderManager.GetPlatform()->GetVertexBuffer(PRIMITIVE_GEOMETRY_BUFFER),
@@ -677,6 +707,8 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         RoadPart& road = *part;
         const size_t index = static_cast<size_t>(road.part);
         ShaderMaterial roadMaterial = index < Params().roadMaterials.size() ? Params().roadMaterials[index] : _params->materials[0];
+        if (road.part != Roads::Part::YellowLine && road.part != Roads::Part::WhiteLine)
+            ApplyAntiTiling(roadMaterial);      // The surfaces, not the paint.
         wchar_t roadName[64];
         swprintf(roadName, 64, L"terrain%d-road%zu", _id, index);
         Material* surface = nullptr;
@@ -692,6 +724,8 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         else
             HRR(renderManager.CreateMaterial(roadName, static_cast<const wchar_t*>(nullptr), nullptr, nullptr, nullptr, nullptr,
                 roadMaterial, roadState, &surface));
+        if (road.part != Roads::Part::YellowLine && road.part != Roads::Part::WhiteLine)
+            m_antiTiledMaterials.push_back(surface);
         if (road.part == Roads::Part::Trail && part == surfaces.back() && !trailMaterial.empty())
         {
             trailSurface = surface;
