@@ -856,8 +856,11 @@ namespace SceneData
                         if (!surfaces.is_object()) Invalid(path + ".roadSurfaces", "expected an object of materials by surface");
                         for (auto surface = surfaces.begin(); surface != surfaces.end(); ++surface)
                         {
-                            if (surface.key() != "asphalt" && surface.key() != "gravel" && surface.key() != "trail")
-                                Invalid(path + ".roadSurfaces." + surface.key(), "must be asphalt, gravel or trail");
+                            static const std::set<std::string> names = { "asphalt", "gravel", "trail", "chip-seal",
+                                "gravel-patchy", "pad-gravel", "dirt" };
+                            if (!names.count(surface.key()))
+                                Invalid(path + ".roadSurfaces." + surface.key(),
+                                    "must be asphalt, gravel, trail, chip-seal, gravel-patchy, pad-gravel or dirt");
                             terrain->roadSurfaces[surface.key()] = MaterialReference(surface.value(), path + ".roadSurfaces." + surface.key(), scene);
                         }
                     }

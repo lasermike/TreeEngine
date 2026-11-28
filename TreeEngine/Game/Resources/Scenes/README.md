@@ -222,7 +222,8 @@ or GIS elevation data). It requires `source`, the package directory, such as
   of the Objects panel: move it, turn it, remove it, and save the edits back
   into the roads file (Tools/terrain/README.md).
 - `roadSurfaces`: scene materials in place of the built-in road surfaces, by
-  name: `asphalt`, `gravel`, `trail`, such as
+  name: `asphalt` (the roads file's `paved` and `paved-unmarked`), `gravel`, `trail`, `chip-seal`,
+  `gravel-patchy`, `pad-gravel`, `dirt`, such as
   `"roadSurfaces": { "gravel": "drive-gravel" }`. The built-in ones tile their
   maps every 4 m (`textureCoordScale` 0.25); a replacement uses its own.
 - `antiTiling` (optional), such as `"antiTiling": { "variation": 0.2, "variationSize": 40 }`: hides the repeat of

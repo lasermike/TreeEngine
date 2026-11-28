@@ -68,6 +68,12 @@ namespace
 
 namespace Roads
 {
+    bool IsSurface(const std::string& surface)
+    {
+        return surface == "paved" || surface == "paved-unmarked" || surface == "chip-seal" || surface == "gravel"
+            || surface == "gravel-patchy" || surface == "pad-gravel" || surface == "dirt";
+    }
+
     using DirectX::XMFLOAT2;
 
     const char* PropModelName(PropModel model)
@@ -304,8 +310,9 @@ namespace Roads
             }
             line.name = Text(props, "name", where + ".properties");
             line.surface = Text(props, "surface", where + ".properties", line.kind == Kind::Trail ? "trail" : "paved");
-            if (line.kind != Kind::Trail && line.surface != "paved" && line.surface != "gravel")
-                Fail(where + ".properties.surface", "must be paved or gravel");
+            if (line.kind != Kind::Trail && !IsSurface(line.surface))
+                Fail(where + ".properties.surface",
+                    "must be paved, paved-unmarked, chip-seal, gravel, gravel-patchy, pad-gravel or dirt");
             line.owner = Text(props, "owner", where + ".properties");
             line.width = Number(props, "width", where + ".properties",
                 line.kind == Kind::Road ? 6.0f : line.kind == Kind::Trail ? TrailWidth : 3.0f, line.kind == Kind::Trail ? 0.3 : 1.0, 40.0);

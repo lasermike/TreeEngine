@@ -9,7 +9,7 @@
 //                    [--roads FILE]   (grades road beds, shoulders and ditches; needs --source-json with crs, bounds, size)
 //   TerrainTool info DIR
 //   TerrainTool heights DIR --in POINTS --out HEIGHTS     (lines of "x z" in meters -> one height per line)
-//   TerrainTool texture --out PREFIX --kind grass|rock|snow|dirt|asphalt|gravel [--size 512] [--seed 1]
+//   TerrainTool texture --out PREFIX --kind grass|rock|snow|dirt|asphalt|gravel|chipseal|patchygravel|padgravel|dirtweeds [--size 512] [--seed 1]
 //                       (tileable PREFIX_color.png, PREFIX_normal.png and PREFIX_mr.png for terrain layers)
 #include "pch.h"
 #include "TerrainPackage.h"
@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <thread>
 
@@ -452,6 +453,34 @@ namespace
         return ok;
     }
 
+    // Tileable cells (Voronoi): `cells` jittered points per side. edge is the distance from the nearest cell's border
+    // (half the gap between the two nearest points), in cells; shade a value in [-1, 1] fixed per cell.
+    void TileCells(double u, double v, int cells, uint32_t seed, double& edge, double& shade)
+    {
+        const auto hash = [seed](int x, int y, uint32_t salt)
+        {
+            uint32_t h = uint32_t(x) * 374761393u + uint32_t(y) * 668265263u + seed * 2246822519u + salt * 3266489917u;
+            h = (h ^ (h >> 13)) * 1274126177u;
+            return double((h ^ (h >> 16)) & 0xffffff) / double(0xffffff);
+        };
+        const double x = u * cells, y = v * cells;
+        const int cx = int(std::floor(x)), cy = int(std::floor(y));
+        double best = 1e9, second = 1e9;
+        int bestX = 0, bestY = 0;
+        for (int dy = -1; dy <= 1; ++dy)
+            for (int dx = -1; dx <= 1; ++dx)
+            {
+                const int gx = cx + dx, gy = cy + dy;
+                const int wx = ((gx % cells) + cells) % cells, wy = ((gy % cells) + cells) % cells;     // Tiles.
+                const double px = gx + 0.15 + 0.7 * hash(wx, wy, 1), py = gy + 0.15 + 0.7 * hash(wx, wy, 2);
+                const double d = std::sqrt((px - x) * (px - x) + (py - y) * (py - y));
+                if (d < best) { second = best; best = d; bestX = wx; bestY = wy; }
+                else if (d < second) second = d;
+            }
+        edge = (second - best) / 2;
+        shade = hash(bestX, bestY, 3) * 2 - 1;
+    }
+
     // Tileable surface maps for terrain layers: a height field drives the normal map, and color and roughness vary
     // with it and with broader noise. Base color is sRGB; the normal map is tangent space with +Y up the image (glTF);
     // the metallic-roughness map holds roughness in G and metallic (0) in B.
@@ -459,15 +488,17 @@ namespace
     {
         const std::string out = Text(args, "out"), kind = Text(args, "kind", "grass");
         const int size = int(Number(args, "size", 512));
-        if (out.empty() || size < 16 || (size & (size - 1))
-            || (kind != "grass" && kind != "rock" && kind != "snow" && kind != "dirt" && kind != "asphalt" && kind != "gravel"))
+        static const std::set<std::string> kinds = { "grass", "rock", "snow", "dirt", "asphalt", "gravel", "chipseal",
+            "patchygravel", "padgravel", "dirtweeds" };
+        if (out.empty() || size < 16 || (size & (size - 1)) || !kinds.count(kind))
         {
-            fprintf(stderr, "texture needs --out PREFIX, --kind grass|rock|snow|dirt|asphalt|gravel and a power-of-two --size\n");
+            fprintf(stderr, "texture needs --out PREFIX, --kind grass|rock|snow|dirt|asphalt|gravel|chipseal|patchygravel|padgravel|dirtweeds and a power-of-two --size\n");
             return 2;
         }
         const uint32_t seed = uint32_t(Number(args, "seed", 1));
         const Noise noise(seed), detail(seed * 31u + 7u);
-        std::vector<double> height(size_t(size) * size), shade(size_t(size) * size);
+        // mix: where a two-material surface shows its second material (patchy gravel's dirt, dirt's weeds), 0 to 1.
+        std::vector<double> height(size_t(size) * size), shade(size_t(size) * size), mix(size_t(size) * size);
         ParallelRows(size, [&](int row)
         {
             const double v = (row + 0.5) / size;
@@ -510,6 +541,49 @@ namespace
                     h = stones + grit + 0.3 * TileFbm(noise, u, v, 8, 3);
                     s = TileFbm(noise, u, v, 4, 3) + 0.6 * stones;
                 }
+                else if (kind == "chipseal")
+                {
+                    // Chip seal: a single layer of small, even stone chips pressed into dark binder, close packed,
+                    // some chips lighter where traffic has worn the binder off them.
+                    const double chips = std::pow(std::max(0.0, TileFbm(detail, u, v, 72, 2) + 0.15), 1.2) * 2.2;
+                    h = chips + 0.15 * TileFbm(noise, u, v, 160, 2);
+                    s = 0.5 * TileFbm(noise, u, v, 3, 3) + 0.9 * chips;
+                }
+                else if (kind == "patchygravel")
+                {
+                    // Worn gravel: stones thinned to bare packed dirt in broad patches and along wandering ruts.
+                    const double stones = std::pow(std::max(0.0, TileFbm(detail, u, v, 40, 2)), 1.5) * 2.5;
+                    const double patches = TileFbm(noise, u, v, 3, 4) + 0.35 * TileFbm(detail, u, v, 12, 2);
+                    const double dirt = std::min(1.0, std::max(0.0, (patches + 0.05) * 3.5));
+                    const double pebbles = std::pow(std::max(0.0, TileFbm(detail, u, v, 32, 2)), 2) * 1.5;
+                    h = (1 - dirt) * (stones + 0.3 * TileFbm(noise, u, v, 8, 3)) + dirt * (0.4 * TileFbm(noise, u, v, 8, 4) + pebbles);
+                    s = TileFbm(noise, u, v, 4, 3) + 0.6 * (1 - dirt) * stones;
+                    mix[size_t(row) * size + column] = dirt;
+                }
+                else if (kind == "padgravel")
+                {
+                    // Trailer-pad gravel: large crushed stones (about four times gravel's), their tops rolled level,
+                    // with dark fines in the gaps between them; each stone a slightly different grey.
+                    // Stones are cells, 24 a side (about 17 cm at the 4 m tile), their borders wobbled so they're
+                    // angular rather than round; packed tight, so the gaps are thin and not deep.
+                    double edge = 0, cellShade = 0;
+                    const double wobble = 0.015 * TileFbm(detail, u, v, 48, 2);
+                    TileCells(u + wobble, v - wobble, 24, seed, edge, cellShade);
+                    const double stone = std::min(1.0, std::max(0.0, (edge - 0.015) * 14));
+                    h = 0.5 * std::sqrt(stone) + 0.15 * TileFbm(noise, u, v, 128, 2) * stone;
+                    s = 0.35 * cellShade + 0.4 * TileFbm(noise, u, v, 3, 2) + 0.2 * TileFbm(detail, u, v, 96, 1);
+                    mix[size_t(row) * size + column] = 1 - stone;
+                }
+                else if (kind == "dirtweeds")
+                {
+                    // Packed dirt, smoother than the forest dirt, with a few small clumps of weeds.
+                    const double pebbles = std::pow(std::max(0.0, TileFbm(detail, u, v, 32, 2)), 2) * 1.5;
+                    const double clumps = TileFbm(noise, u, v, 6, 3) + 0.5 * TileFbm(detail, u, v, 48, 2);
+                    const double weeds = std::min(1.0, std::max(0.0, (clumps - 0.22) * 8));
+                    h = 0.35 * TileFbm(noise, u, v, 8, 4) + pebbles + 0.8 * weeds * TileFbm(detail, u, v, 96, 2);
+                    s = TileFbm(noise, u, v, 4, 3) + 0.4 * pebbles;
+                    mix[size_t(row) * size + column] = weeds;
+                }
                 else
                 {
                     // Dirt: pebbles over a lumpy base.
@@ -522,7 +596,8 @@ namespace
             }
         });
 
-        const double bump = kind == "rock" ? 6.0 : kind == "dirt" || kind == "gravel" ? 4.0 : kind == "grass" ? 3.0
+        const double bump = kind == "rock" ? 6.0 : kind == "dirt" || kind == "gravel" || kind == "patchygravel" ? 4.0
+            : kind == "padgravel" ? 3.0 : kind == "grass" || kind == "dirtweeds" ? 3.0 : kind == "chipseal" ? 2.5
             : kind == "asphalt" ? 1.0 : 1.5;
         std::vector<uint8_t> color(size_t(size) * size * 4), normal(color.size()), mr(color.size());
         const auto at = [&](const std::vector<double>& map, int row, int column)
@@ -535,7 +610,7 @@ namespace
             for (int column = 0; column < size; ++column)
             {
                 const size_t i = (size_t(row) * size + column) * 4;
-                const double h = at(height, row, column), s = at(shade, row, column);
+                const double h = at(height, row, column), s = at(shade, row, column), m = at(mix, row, column);
                 // Linear base color.
                 double r, g, b, roughness;
                 if (kind == "rock")      { const double t = 0.5 + 0.5 * s; r = 0.085 + 0.06 * t; g = 0.08 + 0.05 * t; b = 0.07 + 0.04 * t; roughness = 0.75 + 0.15 * h; }
@@ -543,6 +618,30 @@ namespace
                 else if (kind == "snow")  { const double t = 0.5 + 0.5 * s; r = 0.78 + 0.08 * t; g = 0.80 + 0.08 * t; b = 0.86 + 0.06 * t; roughness = 0.55 + 0.15 * t; }
                 else if (kind == "asphalt") { const double t = std::min(1.0, std::max(0.0, 0.5 + 0.5 * s)); r = 0.045 + 0.05 * t; g = 0.045 + 0.05 * t; b = 0.048 + 0.05 * t; roughness = 0.85 + 0.1 * (1 - t); }
                 else if (kind == "gravel")  { const double t = std::min(1.0, std::max(0.0, 0.5 + 0.5 * s)); r = 0.13 + 0.10 * t; g = 0.12 + 0.09 * t; b = 0.10 + 0.08 * t; roughness = 0.92; }
+                else if (kind == "chipseal") { const double t = std::min(1.0, std::max(0.0, 0.5 + 0.5 * s)); r = 0.05 + 0.10 * t; g = 0.048 + 0.095 * t; b = 0.045 + 0.085 * t; roughness = 0.88 + 0.08 * (1 - t); }
+                else if (kind == "padgravel")
+                {
+                    const double t = std::min(1.0, std::max(0.0, 0.5 + 0.5 * s)), gap = 1 - 0.3 * m;
+                    r = (0.15 + 0.11 * t) * gap; g = (0.145 + 0.10 * t) * gap; b = (0.13 + 0.09 * t) * gap; roughness = 0.9;
+                }
+                else if (kind == "patchygravel")
+                {
+                    // Gravel's grey stones over the dirt's brown, by the patch mix.
+                    const double t = std::min(1.0, std::max(0.0, 0.5 + 0.5 * s));
+                    r = (1 - m) * (0.13 + 0.10 * t) + m * (0.12 + 0.07 * t);
+                    g = (1 - m) * (0.12 + 0.09 * t) + m * (0.085 + 0.05 * t);
+                    b = (1 - m) * (0.10 + 0.08 * t) + m * (0.06 + 0.035 * t);
+                    roughness = 0.9;
+                }
+                else if (kind == "dirtweeds")
+                {
+                    // Packed dirt, a little lighter and drier than the forest's, and the weeds' muted green.
+                    const double t = 0.5 + 0.5 * s;
+                    r = (1 - m) * (0.14 + 0.07 * t) + m * (0.07 + 0.04 * t);
+                    g = (1 - m) * (0.10 + 0.05 * t) + m * (0.10 + 0.06 * t);
+                    b = (1 - m) * (0.07 + 0.035 * t) + m * (0.035 + 0.02 * t);
+                    roughness = 0.85;
+                }
                 else                      { const double t = 0.5 + 0.5 * s; r = 0.12 + 0.07 * t; g = 0.085 + 0.05 * t; b = 0.06 + 0.035 * t; roughness = 0.85; }
                 const double cavity = 0.75 + 0.25 * std::min(1.0, std::max(0.0, 0.5 + h));
                 color[i + 0] = srgb(b * cavity);

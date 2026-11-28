@@ -16,6 +16,9 @@ namespace Roads
 
     constexpr float TrailWidth = 1.0f;          // Meters: a trail's tread unless its width says otherwise.
 
+    // A road or driveway surface a roads file may name (Line::surface).
+    bool IsSurface(const std::string& surface);
+
     struct Line
     {
         Kind kind = Kind::Road;
@@ -23,7 +26,10 @@ namespace Roads
         std::string source;                 // county, osm, generated, ...
         bool edited = false;
         std::string name;
-        std::string surface = "paved";      // paved or gravel (trails: their own surface; the property is unused)
+        // paved (lane markings on county roads), paved-unmarked, chip-seal (markings as paved), gravel, gravel-patchy
+        // (worn, dirt showing through), pad-gravel (large compacted stone, trailer pads) or dirt (packed, a few weeds);
+        // trails: their own surface, the property unused.
+        std::string surface = "paved";
         std::string owner;                  // county or private (roads)
         float width = 6;                    // Meters, the traveled surface.
         float shoulder = 0;                 // Meters each side.

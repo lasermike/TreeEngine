@@ -1230,8 +1230,15 @@ void TestRoadNetwork()
     bad["crs"]["properties"]["name"] = "EPSG:4326";
     rejects(bad.dump(), "crs");
     bad = Json::parse(file);
-    bad["features"][0]["properties"]["surface"] = "dirt";
+    bad["features"][0]["properties"]["surface"] = "mud";
     rejects(bad.dump(), "features[0] (county-1).properties.surface");
+    // The surfaces of specs/road-materials.md parse.
+    for (const char* surface : { "paved", "paved-unmarked", "chip-seal", "gravel", "gravel-patchy", "pad-gravel", "dirt" })
+    {
+        auto good = Json::parse(file);
+        good["features"][0]["properties"]["surface"] = surface;
+        Check(Roads::Parse(good.dump(), "EPSG:32610", 1050, 2150).lines[0].surface == surface, "a road surface was rejected");
+    }
     bad = Json::parse(file);
     bad["features"][0]["properties"]["width"] = 0;
     rejects(bad.dump(), "properties.width");
@@ -1314,6 +1321,14 @@ void TestRoadNetwork()
     auto badSurface = surfaced;
     badSurface["objects"][0]["roadSurfaces"] = { { "cobbles", "drive-gravel" } };
     Reject(badSurface.dump(), ".roadSurfaces.cobbles");
+    for (const char* name : { "chip-seal", "gravel-patchy", "pad-gravel", "dirt" })
+    {
+        auto named = surfaced;
+        named["objects"][0]["roadSurfaces"] = { { name, "drive-gravel" } };
+        const auto namedScene = SceneData::ParseScene(named.dump(), "surfaces");
+        Check(static_cast<const SceneData::TerrainDefinition&>(*namedScene.objects[0]).roadSurfaces.count(name) == 1,
+            "a road surface name was rejected");
+    }
     badSurface["objects"][0]["roadSurfaces"] = { { "gravel", "no-such-material" } };
     Reject(badSurface.dump(), ".roadSurfaces.gravel");
 
@@ -1463,6 +1478,28 @@ void TestRoadMesh()
     Check(Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), flat)[Roads::Part::WhiteLine].vertices.empty(), "a 25 mph road got edge lines");
     network.lines[0].owner = "private";
     Check(Roads::BuildMesh(network, XMFLOAT3(0, 0, 0), flat)[Roads::Part::YellowLine].vertices.empty(), "a private road got a center line");
+
+    // Each surface draws in its own part; of county roads, only paved and chip seal get markings.
+    struct Expected { const char* surface; Roads::Part part; bool marked; };
+    for (const Expected& expected : { Expected{ "paved", Roads::Part::Asphalt, true },
+             Expected{ "paved-unmarked", Roads::Part::Asphalt, false }, Expected{ "chip-seal", Roads::Part::ChipSeal, true },
+             Expected{ "gravel", Roads::Part::Gravel, false }, Expected{ "gravel-patchy", Roads::Part::PatchyGravel, false },
+             Expected{ "pad-gravel", Roads::Part::PadGravel, false }, Expected{ "dirt", Roads::Part::Dirt, false } })
+    {
+        Roads::Network one;
+        Roads::Line line = road;
+        line.owner = "county";
+        line.surface = expected.surface;
+        one.lines.push_back(line);
+        const auto built = Roads::BuildMesh(one, XMFLOAT3(0, 0, 0), flat);
+        size_t parts = 0;
+        for (int part = 0; part < static_cast<int>(Roads::Part::Count); ++part)
+            if (part != static_cast<int>(Roads::Part::YellowLine) && part != static_cast<int>(Roads::Part::WhiteLine)
+                && !built.parts[part].vertices.empty())
+                ++parts;
+        Check(!built[expected.part].vertices.empty() && parts == 1, "a road surface drew in the wrong part");
+        Check(built[Roads::Part::YellowLine].vertices.empty() != expected.marked, "a road surface's markings are wrong");
+    }
 }
 
 void TestRoadGrading()

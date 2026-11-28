@@ -13,7 +13,13 @@
 
 namespace Roads
 {
-    enum class Part { Asphalt, Gravel, YellowLine, WhiteLine, Trail, Count };
+    // Mesh parts, one material each, in the order of the terrain's road materials. Surfaces after Trail were added
+    // later (specs/road-materials.md); paved and paved-unmarked share Asphalt.
+    enum class Part { Asphalt, Gravel, YellowLine, WhiteLine, Trail, ChipSeal, PatchyGravel, PadGravel, Dirt, Count };
+
+    // The part a road or driveway surface draws in, and whether a county road of it gets lane markings.
+    Part SurfacePart(const std::string& surface);
+    bool SurfaceMarked(const std::string& surface);
 
     struct MeshPart
     {

@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "id": "LoadTerrainRoadSurfaces",
+  "priority": 1,
+  "name": "Terrain - road surface types (256 m of Hungerford)",
+  "camera": {
+    "position": [
+      2.5,
+      28.3,
+      6.5
+    ],
+    "rotationDegrees": [
+      3,
+      150,
+      0
+    ]
+  },
+  "render": {
+    "clearColor": [
+      0.48,
+      0.54,
+      0.58,
+      1
+    ],
+    "useShadowMaps": true,
+    "useAlphaBlendedRenderTarget": true,
+    "farClippingPlane": 1000,
+    "enablePostProcessing": false,
+    "blurAmount": 0,
+    "environment": {
+      "diffuse": "Environment/terra-daylight-diffuse.dds",
+      "specular": "Environment/terra-daylight-specular.dds"
+    },
+    "sky": {
+      "cubeMap": "Environment/terra-daylight-sky.dds"
+    },
+    "ambientOcclusion": {
+      "radius": 1.25,
+      "strength": 0.65
+    }
+  },
+  "light": {
+    "ambient": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "diffuse": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "specular": [
+      2.3,
+      2.3,
+      2.3,
+      1
+    ],
+    "direction": [
+      0.6259292648824133,
+      -0.5141802822623909,
+      0.3133034947002239
+    ],
+    "angularDiameterDegrees": 2,
+    "shadowSamples": 8
+  },
+  "pointLightCount": 0,
+  "materials": {
+    "meadow": {
+      "baseColor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "baseColorTexture": {
+        "source": "Terrain/Textures/grass_color.png"
+      },
+      "metallicRoughnessTexture": {
+        "source": "Terrain/Textures/grass_mr.png"
+      },
+      "normalTexture": {
+        "source": "Terrain/Textures/grass_normal.png"
+      }
+    },
+    "dirt": {
+      "baseColor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "baseColorTexture": {
+        "source": "Terrain/Textures/dirt_color.png"
+      },
+      "metallicRoughnessTexture": {
+        "source": "Terrain/Textures/dirt_mr.png"
+      },
+      "normalTexture": {
+        "source": "Terrain/Textures/dirt_normal.png"
+      }
+    },
+    "rock": {
+      "baseColor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "metallic": 0,
+      "roughness": 1,
+      "baseColorTexture": {
+        "source": "Terrain/Textures/rock_color.png"
+      },
+      "metallicRoughnessTexture": {
+        "source": "Terrain/Textures/rock_mr.png"
+      },
+      "normalTexture": {
+        "source": "Terrain/Textures/rock_normal.png"
+      }
+    }
+  },
+  "objects": [
+    {
+      "id": "ground",
+      "type": "terrain",
+      "source": "Terrain/RoadsTest.terrain",
+      "roads": "Terrain/RoadSurfacesTest.roads.geojson",
+      "lodRange": 2,
+      "slots": 64,
+      "layers": [
+        {
+          "material": "meadow",
+          "tile": 3
+        },
+        {
+          "material": "dirt",
+          "tile": 4,
+          "height": [
+            -1000,
+            3
+          ],
+          "heightBlend": 1,
+          "noise": {
+            "height": 1,
+            "scale": 15
+          }
+        },
+        {
+          "material": "rock",
+          "tile": 6,
+          "biplanar": 4,
+          "slope": [
+            35,
+            90
+          ],
+          "slopeBlend": 5,
+          "noise": {
+            "slope": 6,
+            "scale": 12
+          }
+        }
+      ]
+    }
+  ]
+}
