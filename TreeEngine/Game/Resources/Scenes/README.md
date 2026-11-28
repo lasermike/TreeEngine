@@ -231,7 +231,8 @@ or GIS elevation data). It requires `source`, the package directory, such as
   doesn't show. `variation` (0 to 1, default 0) drifts the color (brighter or darker, warmer or cooler) and the
   roughness over `variationSize` meters (default 40), so distant ground doesn't repeat either. Raster and DXR alike;
   `Shaders/AntiTiling.hlsli`. It costs about 0.1 ms of GPU time in Hungerford. The `terrain-anti-tiling` render test
-  covers it.
+  covers it. The debug UI's Objects panel has it on each terrain (**Anti-tiling**, **Color drift**, **Drift size**),
+  live; Save writes it to the scene.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,

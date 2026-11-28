@@ -880,6 +880,9 @@ SceneData::SceneDefinition CaptureScene(const SceneData::SceneDefinition& author
                     map->source = RebaseAsset(map->source, sourceFilename, destinationFilename);
             terrain.lodRange = terrainParams.lodRange;
             terrain.slots = static_cast<int>(terrainParams.slots);
+            terrain.antiTiling = terrainParams.antiTiling;
+            terrain.variation = terrainParams.variation;
+            terrain.variationSize = terrainParams.variationSize;
             terrain.layers.clear();
             terrain.hasMaterial = false;
             if (!terrainParams.layers.empty())
