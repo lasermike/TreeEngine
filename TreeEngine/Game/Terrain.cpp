@@ -63,16 +63,25 @@ void Terrain::LoadRoads(const std::wstring& file)
         if (!m_roadMesh.parts[part].indices.empty())
             m_roadParts.push_back({ static_cast<Roads::Part>(part) });
     BuildTrailTiles();
-    const size_t trail = static_cast<size_t>(Roads::Part::Trail);
-    if (!m_trailTiles.empty() && Params().loadTrailMaterialTextures && trail < Params().roadMaterialTextures.size())
+    // The maps of the surfaces drawn: each part with geometry, and the trail's if there are trail tiles.
+    std::vector<Roads::Part> drawn;
+    for (const RoadPart& road : m_roadParts)
+        drawn.push_back(road.part);
+    if (!m_trailTiles.empty())
+        drawn.push_back(Roads::Part::Trail);
+    for (Roads::Part part : drawn)
     {
+        const size_t index = static_cast<size_t>(part);
+        if (!Params().loadRoadMaterialTextures || index >= Params().roadMaterialTextures.size()
+            || !Params().roadMaterialTextures[index].Empty())
+            continue;
         try
         {
-            Params().roadMaterialTextures[trail] = Params().loadTrailMaterialTextures();
+            Params().roadMaterialTextures[index] = Params().loadRoadMaterialTextures(part);
         }
         catch (const std::runtime_error& error)
         {
-            m_roadsError = std::string("the trail material: ") + error.what();
+            m_roadsError = std::string("a road surface's material: ") + error.what();
             return;
         }
     }

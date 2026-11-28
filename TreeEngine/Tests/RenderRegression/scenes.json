@@ -30,6 +30,7 @@
     { "id": "terrain-hills", "name": "LoadTerrainHills" },
     { "id": "terrain-roads", "name": "LoadTerrainRoads" },
     { "id": "terrain-anti-tiling", "name": "LoadTerrainAntiTiling" },
+    { "id": "terrain-road-surfaces", "name": "LoadTerrainRoadSurfaces" },
     { "id": "pnw-plants", "name": "LoadPnwPlants" }
   ]
 }

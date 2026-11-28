@@ -127,6 +127,21 @@ namespace
 
 namespace Roads
 {
+    Part SurfacePart(const std::string& surface)
+    {
+        if (surface == "gravel") return Part::Gravel;
+        if (surface == "chip-seal") return Part::ChipSeal;
+        if (surface == "gravel-patchy") return Part::PatchyGravel;
+        if (surface == "pad-gravel") return Part::PadGravel;
+        if (surface == "dirt") return Part::Dirt;
+        return Part::Asphalt;       // paved, paved-unmarked
+    }
+
+    bool SurfaceMarked(const std::string& surface)
+    {
+        return surface == "paved" || surface == "chip-seal";
+    }
+
     Mesh BuildMesh(const Network& network, XMFLOAT3 offset, const std::function<bool(float, float, float&)>& height,
         bool trails)
     {
@@ -139,18 +154,20 @@ namespace Roads
             if (samples.size() < 2)
                 continue;
             const bool road = line.kind == Kind::Road, trail = line.kind == Kind::Trail;
-            const bool gravel = line.surface == "gravel";
-            MeshPart& surface = mesh[trail ? Part::Trail : gravel ? Part::Gravel : Part::Asphalt];
+            const Part part = trail ? Part::Trail : SurfacePart(line.surface);
+            // Hard surfaces (paved, chip seal) lie above loose ones where roads cross.
+            const bool hard = part == Part::Asphalt || part == Part::ChipSeal;
+            MeshPart& surface = mesh[part];
             const float halfWidth = line.width / 2 + (road ? line.shoulder : 0);
             const size_t vertexStart = surface.vertices.size(), indexStart = surface.indices.size();
-            const float lift = trail ? TrailLift : !road ? DrivewayLift : gravel ? GravelRoadLift : RoadLift;
+            const float lift = trail ? TrailLift : !road ? DrivewayLift : hard ? RoadLift : GravelRoadLift;
             if (trail && !trails)
                 continue;
             AddStrip(surface, samples, 0, samples.size() - 1, Across(halfWidth), lift, true, 0, height);
             ComputeNormals(surface, vertexStart, indexStart);
 
-            // Markings: county paved roads get a dashed yellow center line, and white edge lines when fast.
-            if (!road || gravel || line.owner != "county")
+            // Markings: county paved and chip-seal roads get a dashed yellow center line, and white edge lines when fast.
+            if (!road || !SurfaceMarked(line.surface) || line.owner != "county")
                 continue;
             const float halfMark = MarkingWidth / 2;
             MeshPart& yellow = mesh[Part::YellowLine];

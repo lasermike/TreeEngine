@@ -218,7 +218,8 @@ namespace SceneData
         std::vector<TerrainLayerDefinition> layers;     // up to four layers.
         float lodRange = 2;         // A node splits within lodRange x its size of the camera.
         int slots = 512;            // Nodes resident at once (each about 215 KB of vertex buffer).
-        // Materials in place of the built-in road surfaces, by name: "asphalt", "gravel", "trail".
+        // Materials in place of the built-in road surfaces, by name: "asphalt" (paved and paved-unmarked), "gravel",
+        // "trail", "chip-seal", "gravel-patchy", "pad-gravel", "dirt".
         std::map<std::string, MaterialDefinition> roadSurfaces;
         // Anti-tiling ("antiTiling": {"variation": 0.2, "variationSize": 40}) for the ground layers and road surfaces
         // (not the lane markings): their maps are sampled at two offsets blended by noise, so the repeat doesn't show;

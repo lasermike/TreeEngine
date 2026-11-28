@@ -51,9 +51,9 @@ public:
     // The road surfaces' materials and maps, one per Roads::Part (asphalt, gravel, yellow and white markings).
     std::vector<ShaderMaterial> roadMaterials;
     std::vector<MaterialTextureSources> roadMaterialTextures;
-    // The trail material's maps, loaded only when the roads have a trail to draw (a roads file without trails needs
-    // none installed). An error loading them is the roads' error.
-    std::function<MaterialTextureSources()> loadTrailMaterialTextures;
+    // A road surface's maps (by Roads::Part), loaded only for the surfaces the roads draw (a roads file without a
+    // surface needs none of its maps installed). An error loading them is the roads' error.
+    std::function<MaterialTextureSources(Roads::Part)> loadRoadMaterialTextures;
     // Loads a roadside prop model (Models/Roadside/<name>.glb), asked once for each model the roads file's props
     // use; null (or a null result, for a model that isn't installed) draws none of that model's props.
     std::function<std::shared_ptr<GltfAsset>(Roads::PropModel)> loadPropModel;

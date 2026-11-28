@@ -413,17 +413,18 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     return RuntimeModel(file, terrainId, sceneFilename);
                 };
                 // Road surfaces, in Roads::Part order: asphalt and gravel tiled every 4 m (TerrainTool texture
-                // maps), yellow and white paint, then trails (the dirt maps).
-                // The scene's roadSurfaces replace them by name (asphalt, gravel, trail).
-                const auto surface = [&terrain](const char* kind)
+                // maps), yellow and white paint, trails (the dirt maps), then chip seal, patchy gravel, pad gravel
+                // and dirt with weeds (their TerrainTool maps). The scene's roadSurfaces replace them by name.
+                // A surface's maps load only if the roads draw it (Terrain::LoadRoads).
+                const auto surface = [&terrain](const char* name, const char* maps)
                 {
-                    const auto replaced = terrain.roadSurfaces.find(std::string(kind) == "dirt" ? "trail" : kind);
+                    const auto replaced = terrain.roadSurfaces.find(name);
                     if (replaced != terrain.roadSurfaces.end())
                         return replaced->second;
                     SceneData::MaterialDefinition material;
                     material.metallic = 0;
                     material.roughness = 1;
-                    const std::string prefix = std::string("Terrain/Textures/") + kind;
+                    const std::string prefix = std::string("Terrain/Textures/") + maps;
                     material.baseColorTexture.source = prefix + "_color.png";
                     material.normalTexture.source = prefix + "_normal.png";
                     material.metallicRoughnessTexture.source = prefix + "_mr.png";
@@ -438,18 +439,18 @@ void InstantiateScene(const SceneData::SceneDefinition& definition, SceneRoot& s
                     material.roughness = 0.6f;
                     return material;
                 };
-                for (const auto& material : { surface("asphalt"), surface("gravel"),
-                         paint(XMFLOAT4(0.78f, 0.55f, 0.06f, 1)), paint(XMFLOAT4(0.82f, 0.82f, 0.8f, 1)) })
+                const std::vector<SceneData::MaterialDefinition> materials = { surface("asphalt", "asphalt"),
+                    surface("gravel", "gravel"), paint(XMFLOAT4(0.78f, 0.55f, 0.06f, 1)), paint(XMFLOAT4(0.82f, 0.82f, 0.8f, 1)),
+                    surface("trail", "dirt"), surface("chip-seal", "chipseal"), surface("gravel-patchy", "patchygravel"),
+                    surface("pad-gravel", "padgravel"), surface("dirt", "dirtweeds") };
+                static_assert(static_cast<int>(Roads::Part::Count) == 9, "a road material per Roads::Part");
+                for (const auto& material : materials)
                 {
                     parameters->roadMaterials.push_back(RuntimeMaterial(material));
-                    parameters->roadMaterialTextures.push_back(RuntimeMaterialTextures(material, terrain.id, sceneFilename));
+                    parameters->roadMaterialTextures.push_back(MaterialTextureSources());
                 }
-                // Trails: their maps load only if the roads have a trail (Terrain::LoadRoads).
-                const auto dirt = surface("dirt");
-                parameters->roadMaterials.push_back(RuntimeMaterial(dirt));
-                parameters->roadMaterialTextures.push_back(MaterialTextureSources());
-                parameters->loadTrailMaterialTextures = [dirt, terrainId, sceneFilename]()
-                    { return RuntimeMaterialTextures(dirt, terrainId, sceneFilename); };
+                parameters->loadRoadMaterialTextures = [materials, terrainId, sceneFilename](Roads::Part part)
+                    { return RuntimeMaterialTextures(materials[static_cast<size_t>(part)], terrainId, sceneFilename); };
             }
             parameters->lodRange = terrain.lodRange;
             parameters->antiTiling = terrain.antiTiling;
