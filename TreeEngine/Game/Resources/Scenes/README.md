@@ -240,6 +240,13 @@ or GIS elevation data). It requires `source`, the package directory, such as
   wanders and breaks up with noise. Not on trails or lane markings. The road mesh carries each vertex's place across
   the road in its tangent's w (`Shaders/RoadWear.hlsli`). The debug UI's **Road wear** slider changes it live;
   `terrain-road-surfaces` tests it.
+- `roadEdges` (0 to 0.4, default 0): ragged road edges. Within this fraction of the width from each edge, the road
+  surfaces (the worn ones: not lane markings or trails) are cut away in clumps, more nearer the edge, so the ground
+  shows through between them; lighter, higher-looking parts of the texture reach furthest. Where a driveway meets a
+  road it shows through the road's edge the same way, blending the two. Raster clips in every pass that draws the
+  surface; DXR cuts it in the any-hit shader, so those surfaces are no longer flagged opaque (about 0.03 ms in
+  Hungerford). Live in the debug UI (**Road edges**); in DXR a change from or to 0 applies at the next scene load.
+  Tuning constants are at the top of `Shaders/RoadWear.hlsli`.
 - `transform`: a position only; terrain cannot be rotated or scaled.
 
 Ray-traced camera rays reach `render.farClippingPlane` (at least 200 m) and shadow,

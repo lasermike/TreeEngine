@@ -3005,8 +3005,9 @@ inline std::size_t hash_combine(std::size_t seed, std::size_t value) noexcept;
 
 // Settings::m_rayOpaqueGeometry: a record whose material has no alpha test, blending or transmission is flagged opaque, so
 // rays skip the any-hit shader on it (which for such geometry only culls back faces).
+// A road surface with ragged edges (opticalParams.w) has its edge cut in the any-hit shader too.
 #define OpaqueRayGeometry(dr) (m_settings->m_rayOpaqueGeometry && (dr).material.flags.z == 0 && (dr).material.flags.x == 0 \
-    && (dr).material.opticalParams.y == 0)
+    && (dr).material.opticalParams.y == 0 && (dr).material.opticalParams.w == 0 && (dr).material.normalTextures.w == 0)
 
 // The TLAS instance mask of an object whose transform slot carries an LOD crossfade (InstancedData::AtlasRegion:
 // 0 for none, else the float bits of +t fading in or -t fading out, t in (0, 1)). Each ray picks one of seven buckets
@@ -4018,7 +4019,7 @@ HRESULT RenderPlatform12::BuildBLASandTLAS(bool forceRebuild)
         pooled.lastUsedFrame = m_blasFrame;
         pooled.firstGeometry = geometryDescIndex;
         const bool opaque = m_settings->m_rayOpaqueGeometry && draw.material.flags.z == 0 && draw.material.flags.x == 0
-            && draw.material.opticalParams.y == 0;
+            && draw.material.opticalParams.y == 0 && draw.material.opticalParams.w == 0 && draw.material.normalTextures.w == 0;
         D3D12_RAYTRACING_GEOMETRY_DESC& desc = pooledDescs[drawIndex];
         desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
         desc.Flags = opaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;

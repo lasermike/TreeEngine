@@ -280,6 +280,13 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
         IgnoreHit();
         return;
     }
+    // Ground cover (road surfaces, a few centimeters over the ground) casts no shadow and occludes nothing: its edges,
+    // lifted over a ditch or riding a crease, would otherwise lay dark bands on the ground beside it.
+    if ((payload.isShadow == 1 || payload.isShadow == 2) && mat.normalTextures.w > 0)
+    {
+        IgnoreHit();
+        return;
+    }
 
     // Alpha-blended glTF geometry already has mirrored back-facing triangles.
     // Cull their back faces to avoid coplanar hits with opposite normals.
@@ -287,6 +294,39 @@ void AnyHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
     {
         IgnoreHit();
         return;
+    }
+
+    // A road surface's ragged edge, as raster cuts it (Shaders/RoadWear.hlsli): the place across from the tangents' w.
+    if (mat.opticalParams.w > 0)
+    {
+        float3 bary = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+        SimpleVertexData sv[3];
+        [unroll] for (uint corner = 0; corner < 3; ++corner)
+            sv[corner] = LoadOriginalVertex(geoInfo.baseVertexLocation
+                + LoadIndex(geoInfo.indexBufferOffset + primitiveId * 3 + corner, geoInfo.isSkinned), geoInfo.isSkinned);
+        const float across = abs(sv[0].tangent.w * bary.x + sv[1].tangent.w * bary.y + sv[2].tangent.w * bary.z) - 1;
+        // The base color as shaded: at the anti-tiling offsets when the surface has them (Shaders/AntiTiling.hlsli).
+        // Any-hit has no ray footprint, so it reads the finest level; the stones it keeps are the shaded ones.
+        float3 color = mat.Diffuse.rgb;
+        if (mat.flags.y > 0 && geoInfo.textureIndex >= 0)
+        {
+            const float2 uv = TransformMaterialUv(mat, sv[0].tex * bary.x + sv[1].tex * bary.y + sv[2].tex * bary.z,
+                BaseColorTextureRole);
+            const bool clampTexture = mat.specularColor.w > 0;
+            if (UsesAntiTiling(mat) && mat.biplanarParams.x <= 0)
+            {
+                const AntiTile tile = AntiTileAt(uv);
+                color *= lerp(SampleSpecularTexture(geoInfo.textureIndex, uv + tile.offsetA, clampTexture),
+                    SampleSpecularTexture(geoInfo.textureIndex, uv + tile.offsetB, clampTexture), tile.blend).rgb;
+            }
+            else
+                color *= SampleSpecularTexture(geoInfo.textureIndex, uv, clampTexture).rgb;
+        }
+        if (!RoadEdgeKeeps(mat, across, WorldRayOrigin() + WorldRayDirection() * RayTCurrent(), color))
+        {
+            IgnoreHit();
+            return;
+        }
     }
 
     // Alpha clip on the base color's alpha, the factor times the texture's (1 without a texture), as raster does.
@@ -377,8 +417,10 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 {
     if (payload.isShadow == 2)
     {
-        // Ambient-occlusion probe: only the distance to the nearest occluder matters.
-        payload.color.x = RayTCurrent() / ambientOcclusionRadius;
+        // Ambient-occlusion probe: only the distance to the nearest occluder matters. Ground cover (road surfaces)
+        // occludes nothing, as in the any-hit shader; probes may be forced opaque and skip any-hit, so it's checked
+        // here too (an occluder behind a road surface, close to the ground, is missed).
+        payload.color.x = materialBuffer[GeometryRecord()].normalTextures.w > 0 ? 1.0f : RayTCurrent() / ambientOcclusionRadius;
         return;
     }
 

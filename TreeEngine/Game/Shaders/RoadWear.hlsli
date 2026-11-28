@@ -60,10 +60,36 @@ static const float3 DirtWeedColor = float3(0.6f, 0.95f, 0.45f);    // and their 
 static const float DirtEdgeAmount = 0.5f;           // The edges' strength (times the grain),
 static const float3 DirtEdgeColor = float3(0.75f, 0.95f, 0.6f);    // and tint (grassy).
 
+// Ragged edges (a terrain's "roadEdges"): within the edge band (the material's opticalParams.w, a fraction of the
+// width from each edge) the surface is cut away, more of it nearer the edge, so the ground shows through between
+// clumps of surface. What stays is chosen by clumpy noise and the texture's brightness (standing in for height: the
+// lighter stones stand proud of darker fines), so stones reach out over the ground rather than fading.
+static const float RoadEdgeClumpScale = 2.3f;       // The clumps' noise per meter: higher is smaller clumps.
+static const float RoadEdgeFineScale = 9.0f;        // A finer noise per meter that frays the clumps.
+static const float RoadEdgeFineWeight = 0.3f;       // How much it frays them.
+static const float RoadEdgeTextureWeight = 0.6f;    // How much the texture's brightness decides what stays.
+static const float RoadEdgeTextureGain = 3.0f;      // Brightness to height: higher makes more of a dark surface stay.
+
 // 1 within half of width of center, fading to 0 at width.
 float RoadBand(float across, float center, float width)
 {
     return 1 - smoothstep(width * 0.5f, width, abs(across - center));
+}
+
+// Whether a road surface's pixel stays, at a point `across` it (0 to 1), with its base color (the texture's).
+bool RoadEdgeKeeps(ShaderMaterial material, float across, float3 positionW, float3 baseColor)
+{
+    const float width = material.opticalParams.w;
+    if (width <= 0)
+        return true;
+    const float a = saturate(across);
+    const float inward = min(a, 1 - a) / width;     // 0 at the edge, 1 where the band ends.
+    if (inward >= 1)
+        return true;
+    const float clumps = lerp(AntiTileNoise(positionW.xz * RoadEdgeClumpScale),
+        AntiTileNoise(positionW.xz * RoadEdgeFineScale + 7.3f), RoadEdgeFineWeight);
+    const float height = saturate(dot(baseColor, float3(0.3f, 0.59f, 0.11f)) * RoadEdgeTextureGain);
+    return lerp(clumps, height, RoadEdgeTextureWeight) > 1 - inward;
 }
 
 // The wear at a point `across` the road (0 to 1): rgb multiplies the base color, a the roughness.

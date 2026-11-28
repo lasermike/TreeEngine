@@ -64,6 +64,7 @@ public:
     float variation = 0;
     float variationSize = 40;
     float roadWear = 0;             // TerrainDefinition::roadWear.
+    float roadEdges = 0;            // TerrainDefinition::roadEdges.
     UINT slots = 512;               // Vertex pool size, in nodes.
 };
 
@@ -137,6 +138,10 @@ public:
     // Road wear (TerrainDefinition::roadWear), changed live.
     float RoadWear() const { return Params().roadWear; }
     void SetRoadWear(float wear);
+    // Ragged road edges (TerrainDefinition::roadEdges), changed live; DXR sees a change from 0 or to 0 when the static
+    // geometry is next rebuilt (a new scene), as its opaque flag is set then.
+    float RoadEdges() const { return Params().roadEdges; }
+    void SetRoadEdges(float edges);
 
     // This frame's selection, for profiling and tests.
     UINT SelectedNodes() const { return static_cast<UINT>(m_selected.size()); }

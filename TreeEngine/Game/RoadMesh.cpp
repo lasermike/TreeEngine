@@ -34,12 +34,31 @@ namespace
                 float y = center;
                 if (ground && !height(x, z, y))
                     y = center;
+                // The highest ground within half a meter along the line and inward: the terrain's triangles, sampled
+                // each meter, crease where it grades ditches and banks, and between this strip's vertices they can
+                // rise above a surface laid on single samples (straight-edged slabs of ground over the road). Riding
+                // on the local highest keeps the surface over them; not outward, or an edge beside a bank would climb
+                // it.
+                if (ground)
+                {
+                    const XMFLOAT2 along(s.side.y, -s.side.x);
+                    const float in = across[c] > 0 ? -1.0f : across[c] < 0 ? 1.0f : 0.0f;
+                    for (const XMFLOAT2 d : { XMFLOAT2(along.x * 0.5f, along.y * 0.5f), XMFLOAT2(-along.x * 0.5f, -along.y * 0.5f),
+                             XMFLOAT2(s.side.x * 0.5f * in, s.side.y * 0.5f * in) })
+                    {
+                        float around = 0;
+                        if ((d.x != 0 || d.y != 0) && height(x + d.x, z + d.y, around))
+                            y = std::max(y, around);
+                    }
+                }
                 SimpleVertex v = {};
                 v.Pos = XMFLOAT3(x, y + lift, z);
                 v.Normal = XMFLOAT3(0, 1, 0);
-                v.Tex = planarUv ? XMFLOAT2(x, -z) : XMFLOAT2(static_cast<float>(c) / (columns - 1), s.along - dashStart);
+                // The place across, 0 at one edge to 1 at the other (columns needn't be evenly spaced).
+                const float place = (across.front() - across[c]) / (across.front() - across.back());
+                v.Tex = planarUv ? XMFLOAT2(x, -z) : XMFLOAT2(place, s.along - dashStart);
                 // w: 1 at one edge to 2 at the other, the place across the road for its wear (Shaders/RoadWear.hlsli).
-                v.TangentU = XMFLOAT4(1, 0, 0, 1 + static_cast<float>(c) / (columns - 1));
+                v.TangentU = XMFLOAT4(1, 0, 0, 1 + place);
                 rows.push_back(v);
             }
         }
@@ -98,14 +117,39 @@ namespace
                 XMStoreFloat3(&sum, XMLoadFloat3(&sum) + n);
             }
         }
-        for (size_t v = firstVertex; v < part.vertices.size(); ++v)
+        // Smoothed over the vertices' neighbors, twice: the surface follows the ground's kinks (a driveway's ramp up
+        // from the road, a graded crease), and unsmoothed normals light each kink as a sharp line across the road.
+        // The shape is unchanged; only its shading bends gently.
+        std::vector<XMFLOAT3> unit(sums.size());
+        for (size_t v = 0; v < sums.size(); ++v)
         {
-            XMVECTOR n = XMLoadFloat3(&sums[v - firstVertex]);
+            XMVECTOR n = XMLoadFloat3(&sums[v]);
             if (XMVectorGetX(XMVector3LengthSq(n)) < 1e-12f)
                 n = XMVectorSet(0, 1, 0, 0);
             n = XMVector3Normalize(n);
             if (XMVectorGetY(n) < 0)
                 n = -n;
+            XMStoreFloat3(&unit[v], n);
+        }
+        for (int pass = 0; pass < 2; ++pass)
+        {
+            std::vector<XMFLOAT3> next = unit;
+            for (size_t i = firstIndex; i + 2 < part.indices.size(); i += 3)
+                for (int k = 0; k < 3; ++k)
+                {
+                    const size_t v = part.indices[i + k] - firstVertex;
+                    for (int j = 1; j < 3; ++j)
+                    {
+                        const size_t w = part.indices[i + (k + j) % 3] - firstVertex;
+                        XMStoreFloat3(&next[v], XMLoadFloat3(&next[v]) + XMLoadFloat3(&unit[w]));
+                    }
+                }
+            for (size_t v = 0; v < unit.size(); ++v)
+                XMStoreFloat3(&unit[v], XMVector3Normalize(XMLoadFloat3(&next[v])));
+        }
+        for (size_t v = firstVertex; v < part.vertices.size(); ++v)
+        {
+            const XMVECTOR n = XMLoadFloat3(&unit[v - firstVertex]);
             XMStoreFloat3(&part.vertices[v].Normal, n);
             XMVECTOR t = XMVectorSet(1, 0, 0, 0);
             t = XMVector3Normalize(t - n * XMVector3Dot(t, n));
@@ -115,13 +159,27 @@ namespace
         }
     }
 
-    // Columns across a surface: edges, center and enough between that no two are more than about 1.5 m apart.
+    // Columns across a surface: edges, center and enough between that no two are more than about 1.5 m apart, and
+    // closer near each edge (0.3 m and 0.7 m in), where the ground beside a road bends into its banks and ditches: the
+    // surface follows the ground there, so a ragged edge (Shaders/RoadWear.hlsli) shows ground at its own level rather
+    // than a step, and the ground doesn't bulge through the surface in straight-edged slabs.
     std::vector<float> Across(float halfWidth)
     {
         const int segments = std::max(2, 2 * static_cast<int>(std::ceil(halfWidth / 1.5f)));
         std::vector<float> across;
         for (int c = 0; c <= segments; ++c)
             across.push_back(halfWidth - 2 * halfWidth * c / segments);
+        for (float inset : { 0.3f, 0.7f })
+            for (float side : { 1.0f, -1.0f })
+            {
+                const float column = side * (halfWidth - inset);
+                bool crowded = inset >= halfWidth;
+                for (float existing : across)
+                    crowded = crowded || std::fabs(existing - column) < 0.15f;
+                if (!crowded)
+                    across.push_back(column);
+            }
+        std::sort(across.begin(), across.end(), std::greater<float>());
         return across;
     }
 }

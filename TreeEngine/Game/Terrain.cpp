@@ -612,6 +612,15 @@ void Terrain::ApplyRoadWear(ShaderMaterial& material, float profile) const
 {
     material.metallicRoughnessTextures.z = Params().roadWear > 0 ? profile : 0.0f;
     material.metallicRoughnessTextures.w = Params().roadWear;
+    // The worn surfaces are the ones with ragged edges (not paint or trails: trail tiles don't carry the place across).
+    material.opticalParams.w = profile > 0 ? Params().roadEdges : 0.0f;
+}
+
+void Terrain::SetRoadEdges(float edges)
+{
+    Params().roadEdges = (std::max)(0.0f, (std::min)(0.4f, edges));
+    for (const auto& worn : m_wornMaterials)
+        ApplyRoadWear(worn.first->m_shaderMaterial, worn.second);
 }
 
 void Terrain::SetRoadWear(float wear)
@@ -730,6 +739,7 @@ HRESULT Terrain::InitGraphics(RenderManager& renderManager)
         RoadPart& road = *part;
         const size_t index = static_cast<size_t>(road.part);
         ShaderMaterial roadMaterial = index < Params().roadMaterials.size() ? Params().roadMaterials[index] : _params->materials[0];
+        roadMaterial.normalTextures.w = 1;      // Ground cover: no shadows or occlusion from it in DXR.
         if (road.part != Roads::Part::YellowLine && road.part != Roads::Part::WhiteLine)
             ApplyAntiTiling(roadMaterial);      // The surfaces, not the paint.
         // Wear profiles (Shaders/RoadWear.hlsli): 1 loose, 2 hard, 3 dirt; none for paint and trails (trail tiles don't

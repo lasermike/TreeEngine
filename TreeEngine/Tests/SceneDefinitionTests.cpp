@@ -767,6 +767,14 @@ void TestTerrainSettings()
     Check(static_cast<const SceneData::TerrainDefinition&>(*wornScene.objects[0]).roadWear == 0.6f, "road wear did not round-trip");
     worn["objects"][0]["roadWear"] = 1.5;
     Reject(worn.dump(), ".roadWear");
+    // Ragged road edges: off by default, 0 to 0.4, round-tripped.
+    Check(plain.roadEdges == 0 && !saved["objects"][1].contains("roadEdges"), "road edges were on by default or saved when off");
+    auto edged = Json::parse(json);
+    edged["objects"][0]["roadEdges"] = 0.15;
+    const auto edgedScene = SceneData::ParseScene(SceneData::SerializeScene(SceneData::ParseScene(edged.dump(), "edges")), "edges-saved");
+    Check(static_cast<const SceneData::TerrainDefinition&>(*edgedScene.objects[0]).roadEdges == 0.15f, "road edges did not round-trip");
+    edged["objects"][0]["roadEdges"] = 0.5;
+    Reject(edged.dump(), ".roadEdges");
 
     // Anti-tiling: off by default (not saved); on with its color drift, round-tripped; bad values rejected.
     Check(!plain.antiTiling && !saved["objects"][1].contains("antiTiling"), "anti-tiling was on by default or saved when off");
@@ -1380,8 +1388,9 @@ void TestRoadMesh()
     const auto mesh = Roads::BuildMesh(network, XMFLOAT3(10, 0, 20), flat);
 
     const auto& asphalt = mesh[Roads::Part::Asphalt];
-    // 25 cross-sections (every meter), and 3.6 m half-width in columns at most 1.5 m apart: 7 columns.
-    Check(asphalt.vertices.size() == 25 * 7 && asphalt.indices.size() == 24 * 6 * 6, "the paved road's strip has the wrong size");
+    // 25 cross-sections (every meter), and 3.6 m half-width in columns at most 1.5 m apart (7), plus two more 0.3 m and
+    // 0.7 m in from each edge: 11 columns.
+    Check(asphalt.vertices.size() == 25 * 11 && asphalt.indices.size() == 24 * 10 * 6, "the paved road's strip has the wrong size");
     bool lifted = true, up = true, inside = true;
     for (const auto& v : asphalt.vertices)
     {
@@ -1415,14 +1424,38 @@ void TestRoadMesh()
         edges = edges && std::abs(std::abs(v.Pos.z - 20) - 2.85f) <= Roads::MarkingWidth / 2 + 1e-5f;
     Check(edges, "an edge line is out of place");
 
-    // Gravel: the gravel road (11 cross-sections, 7 columns) and the driveway (11 cross-sections, 3 m: 3 columns),
-    // no markings; the driveway sits below roads.
+    // Gravel: the gravel road (11 cross-sections, 11 columns) and the driveway (11 cross-sections, 3 m: 3 columns and
+    // two more near each edge, 7), no markings; the driveway sits below roads.
     const auto& gravel = mesh[Roads::Part::Gravel];
-    Check(gravel.vertices.size() == 11 * 7 + 11 * 3, "the gravel strips have the wrong size");
+    Check(gravel.vertices.size() == 11 * 11 + 11 * 7, "the gravel strips have the wrong size");
     Check(std::abs(gravel.vertices.front().Pos.y - (2 + Roads::GravelRoadLift)) < 1e-5f
         && std::abs(gravel.vertices.back().Pos.y - (2 + Roads::DrivewayLift)) < 1e-5f
         && Roads::DrivewayLift < Roads::GravelRoadLift && Roads::GravelRoadLift < Roads::RoadLift,
         "gravel roads and driveways aren't layered below paved roads");
+
+    // The surface rides over ground that rises between its columns (a crease just inside the edge) but doesn't climb
+    // ground rising just outside it (a bank): a 3 m driveway along +x, columns at 0.8 m and 1.5 m from its center.
+    {
+        Roads::Network one;
+        Roads::Line line = driveway;
+        line.points = { XMFLOAT2(0, 0), XMFLOAT2(10, 0) };
+        one.lines.push_back(line);
+        const auto ground = [](float, float z, float& y)
+        {
+            y = 2 + (std::abs(z - 0.4f) < 0.15f ? 0.3f : 0.0f) + (std::abs(z) > 1.6f ? 1.0f : 0.0f);
+            return true;
+        };
+        const auto built = Roads::BuildMesh(one, XMFLOAT3(0, 0, 0), ground)[Roads::Part::Gravel];
+        bool ridden = true, climbed = false;
+        for (const auto& v : built.vertices)
+        {
+            if (std::abs(std::abs(v.Pos.z) - 0.8f) < 0.01f && v.Pos.z > 0)
+                ridden = ridden && v.Pos.y >= 2.3f;
+            if (std::abs(std::abs(v.Pos.z) - 1.5f) < 0.01f)
+                climbed = climbed || v.Pos.y > 2.5f;
+        }
+        Check(ridden && !climbed, "the road surface didn't ride over a crease inside it, or climbed a bank outside it");
+    }
 
     // A bend is smoothed: a right angle at (10, 0) is cut, so no sample passes within 1 m of the corner.
     Roads::Network bend;
@@ -1431,9 +1464,9 @@ void TestRoadMesh()
     bend.lines.push_back(corner);
     const Roads::Mesh bentMesh = Roads::BuildMesh(bend, XMFLOAT3(0, 0, 0), flat);
     const auto& bent = bentMesh[Roads::Part::Gravel];
-    Check(!bent.vertices.empty() && bent.vertices.size() % 3 == 0, "the bend's strip is missing");
+    Check(!bent.vertices.empty() && bent.vertices.size() % 7 == 0, "the bend's strip is missing");
     float nearest = 1e9f;
-    for (size_t v = 1; v < bent.vertices.size(); v += 3)     // The centre column of the 3-column strip.
+    for (size_t v = 3; v < bent.vertices.size(); v += 7)     // The centre column of the 7-column strip.
         nearest = std::min(nearest, std::hypot(bent.vertices[v].Pos.x - 10, bent.vertices[v].Pos.z));
     Check(nearest > 0.2f && nearest < 0.6f, "a right-angle bend wasn't smoothed, or moved too far");
 

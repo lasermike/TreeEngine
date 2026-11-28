@@ -84,10 +84,12 @@ struct ShaderMaterial
     XMFLOAT4 specularParams; // x = 1 when built as PBR (C++ only), metallic, roughness, specularFactor
     XMFLOAT4 specularColor; // linear RGB factor; w = base-color clamp
     XMFLOAT4 specularTextures; // strength/color texture slots; z/w = clamp flags
-    XMFLOAT4 normalTextures; // normal texture slot, scale, clamp flag
+    XMFLOAT4 normalTextures; // normal texture slot, scale, clamp flag; w = 1: ground cover (road surfaces), which DXR's
+                             // shadow and ambient-occlusion rays pass through
     XMFLOAT4 metallicRoughnessTextures; // texture slot, clamp flag; z = road wear profile (0 none), w = its strength
                                         // (Shaders/RoadWear.hlsli)
-    XMFLOAT4 opticalParams; // x = IOR; y = transmission factor; z = anti-tiling color drift size, meters
+    XMFLOAT4 opticalParams; // x = IOR; y = transmission factor; z = anti-tiling color drift size, meters;
+                            // w = a road surface's ragged edge band, a fraction of its width (Shaders/RoadWear.hlsli)
     XMFLOAT4 normalMotion; // two UV velocities per second
     XMFLOAT4 tintTextures; // tint texture slot, clamp flag; z = anti-tiling (1 on), w = color drift (0 to 1)
                            // (see Shaders/AntiTiling.hlsli; the drift's cell size is opticalParams.z)
