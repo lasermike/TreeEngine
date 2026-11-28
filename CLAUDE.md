@@ -1,5 +1,7 @@
 # Working in this repository
 
+Claude and Codex share this workflow. For Codex, `AGENTS.md` defines how it applies to working-tree edits and authorized GitHub actions.
+
 Orientation: `ARCHITECTURE.md` (overview), `.github/copilot-instructions.md` (build details), and the READMEs under
 `TreeEngine/Tests/RenderRegression`, `TreeEngine/Tests/Performance`, `TreeEngine/Game/Resources/Scenes` and
 `TreeEngine/Tools/terrain`.
@@ -33,6 +35,8 @@ Orientation: `ARCHITECTURE.md` (overview), `.github/copilot-instructions.md` (bu
 - Run `TreeEngine/Tests/bin/x64/Debug/SceneDefinitionTests.exe` (the Debug solution build builds it).
 - Run the render suite, `TreeEngine/Tests/RenderRegression/run-render-tests.ps1`, which uses the Debug build, plus the
   targeted `test-*.ps1` scripts for the area changed (listed in that folder's README).
+- For intentional visual changes, inspect the captures, update golds only for the affected scenes and modes, and
+  rerun the comparison. Identify the updated golds and the reason for each change in the PR.
 - Measure with `TreeEngine/Tests/Performance/run-performance-tests.ps1` when the change is about performance, and
   commit the run it records. GPU timings drift between sessions, so compare builds run back to back.
 - `test-scene-persistence.ps1` fails on `LoadSimpleBox` raster (RMS about 0.002) and has since well before these rules;
